@@ -56,7 +56,7 @@ yours to write.
 | Model routing (cheap cases to a cheap model)? | Sun Oct 25 | the November queue |
 | Fallback model per step? | Sun Oct 25 | the November queue |
 | Hosting (default Cloud Run) | Sun Oct 18 | The hosting memo comes first |
-| Code license | Before Nov 4 (repo public) | None on file. Your choice |
+| Code license | Thu Oct 8 (skeleton review gate) | None on file. Your choice. Deferring it to Wed Nov 4 (repo public) is also your call; if you defer, note it here |
 
 ## New facts from building the skeleton (2026-10-06, verified against live OpenStax APIs)
 
@@ -66,12 +66,15 @@ yours to write.
 | CC BY books still live: `physics` (high-school Physics), `statistics`, `introduction-intellectual-property`, `física-universitaria-volumen-1` (Spanish) | same |
 | Retired first editions are CC BY and still served by the archive (e.g. `college-physics`, `precalculus`, `college-algebra`, `algebra-and-trigonometry`, `intermediate-algebra`, `chemistry`, `introductory-statistics`) | same; `in_archive_release` column |
 | The sample in `data/gold/` (3 sections of `physics` ch. 2) is a pipeline smoke test, **not** the gold-set choice | Gold-set page choice is yours (due Thu Oct 8) |
+| OpenStax marks every bold vector with an `mstyle` wrapper (16 of the 30 sample equations). The scorer now pushes that style down to the tokens, so `\mathbf{d}` matches | `tests/test_equations.py`, `tests/test_gold_sample.py` |
+| With correct LaTeX for all 30 sample equations: exact_lenient 0.83 (25/30), exact_strict 0.43, mean TEDS 0.87. The 5 lenient misses are OpenStax operators inside text (`<mtext>time =</mtext>`) | `make eval-latex-check`; table in `docs/development.md` |
+| latex2mathml 3.81.1 does not render `\begin{aligned}` as a table; `\begin{array}{rcl}` matches OpenStax's 3-column layout | checked locally 2026-10-06 |
 
 Questions this raises for you (not legal advice; unverified until you check):
 
 1. Keep the public gold set CC BY only (current code rule), or also use CC BY-NC-SA books? ShareAlike may affect how a derived dataset can be licensed.
-2. Is a retired edition acceptable as ground truth, given its alt text and MathML may be older than the current edition?
-3. Equation scoring defaults: report strict exact match, lenient exact match (mi/mn/mtext treated alike, trailing period ignored) and TEDS (1 - TED / max nodes), or a subset?
+2. Is a retired edition acceptable as ground truth, given its alt text and MathML may be older than the current edition? Until you decide, `gold fetch` refuses non-live books unless `--allow-retired` is passed, and every record carries `book_state`.
+3. Equation scoring defaults: report strict exact match, lenient exact match (mi/mn/mtext treated alike, trailing period ignored) and TEDS (1 - TED / max nodes), or a subset? Also: should lenient mode split operators out of OpenStax text (`<mtext>time =</mtext>` vs `\text{time} =`)? That affects 5 of the 30 sample equations.
 
 ## Consequences
 

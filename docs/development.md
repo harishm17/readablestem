@@ -16,17 +16,23 @@ CI also runs 3.14).
 | `make fmt` | Format and auto-fix |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
-| `make eval-selfcheck` | Score the gold equations against themselves (must be 1.0 everywhere) |
+| `make eval-plumbing` | Plumbing check only: scores each gold equation against itself, so it always prints 1.0. Does **not** test normalisation |
+| `make eval-latex-check` | Scorer check: known-correct LaTeX for every sample equation (`tests/fixtures/sample_latex_predictions.jsonl`) must match leniently; also runs in CI via `pytest` |
 
 CLI:
 
 ```
-a11y-stem gold fetch --book SLUG --pages N [--chapter C] [--page SLUG ...] [--out DIR] [--date YYYY-MM-DD]
+a11y-stem gold fetch --book SLUG --pages N [--chapter C] [--page SLUG ...] [--out DIR] [--date YYYY-MM-DD] [--no-cache] [--allow-retired]
 a11y-stem gold licenses [--cc-by-only] [--csv PATH]
 a11y-stem gold manifest [--out DIR]
 a11y-stem eval equations --gold PATH (--pred PRED.jsonl | --self-check) [--display all|block|inline] [--report OUT.json]
 a11y-stem parse FILE.pdf [--pages 1,2] [--json]
 ```
+
+Default paths (`data/gold`, `.cache/openstax`) resolve against the project root (the
+nearest parent directory whose `pyproject.toml` names `a11y-stem`), so commands work from
+any subdirectory. Outside a checkout they fall back to the working directory. Bad input
+(missing file, page out of range, malformed JSONL) prints `error: ...` and exits 2.
 
 ## Layout
 
@@ -51,7 +57,8 @@ counts; it is rebuilt after each fetch.
 Fields on every record: `id`, `kind` (`equation` | `figure` | `table`), `book_slug`,
 `book_title`, `book_uuid`, `book_version`, `archive_version`, `page_slug`, `page_title`,
 `page_uuid`, `source_url` (public page, with `#element-id` when there is one),
-`content_url` (archive JSON), `license_name`, `license_url`, `retrieved_at`,
+`content_url` (archive JSON), `license_name`, `license_url`, `book_state` (OpenStax CMS
+state, normally `live`), `retrieved_at`,
 `index_on_page`, `element_id`, `context` (enclosing note/example class, e.g.
 `worked-example`, or null).
 
@@ -72,10 +79,37 @@ JSON lines with the gold `id` and either `latex` or `mathml`:
 ```
 
 Missing predictions count as failures. Output: `exact_strict`, `exact_lenient`,
-`mean_teds`, `errors` (see the `equations.py` docstring for what each normalisation does).
+`mean_teds`, `errors`, plus `unknown_ids` / `unknown_ids_first` (prediction ids that match
+no gold record, e.g. typos). See the `equations.py` docstring for what each normalisation
+does.
+
+### Scorer check on the sample (2026-10-06)
+
+`tests/fixtures/sample_latex_predictions.jsonl` holds correct LaTeX for each of the 30
+sample equations (a scorer test input written from the gold MathML, not a gold
+label). With it:
+
+| | exact_strict | exact_lenient | mean TEDS |
+|---|---|---|---|
+| Before the mstyle fix (commit 03a537c) | 0.27 | 0.33 | 0.72 |
+| Now | 0.43 | 0.83 | 0.87 |
+
+The 5 remaining lenient misses are known gaps, kept as strict xfails in
+`tests/test_gold_sample.py`: OpenStax packs operators into text (`<mtext>time =</mtext>`,
+`<mtext>m/s)(46 s)</mtext>`, an `=` column written as `<mtext>=</mtext>`). Whether lenient
+mode should split operators out of text is an open scoring decision (ADR 0001, question 3).
+Strict misses are mostly `<mtext>Δ</mtext>` (OpenStax) vs `<mi>Δ</mi>` (LaTeX `\Delta`).
+
+Found while writing it: latex2mathml 3.81.1 does not render `\begin{aligned}` as a table
+(it emits a flat row with a literal `&`). OpenStax multi-line equations are 3-column
+`mtable`s, which `\begin{array}{rcl}` reproduces. The vision-step prompt (or a converter
+step) needs to account for this.
 
 ## Rules that the code and repo enforce
 
 - `private-inputs/`, `.env` and `.cache/` are git-ignored. Course PDFs never leave the machine.
-- `gold fetch` refuses any book whose archive or CMS license is not plain CC BY.
+- `gold fetch` refuses any book unless both the archive and the CMS license are plain CC BY
+  (a missing license in either place is refused).
+- `gold fetch` refuses books whose OpenStax state is not `live` (retired, deprecated,
+  unlisted) unless you pass `--allow-retired`. Open decision: ADR 0001, question 2.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.
