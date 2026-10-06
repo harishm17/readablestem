@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import datetime as dt
 import json
 import sys
 from pathlib import Path
@@ -66,6 +67,8 @@ def _cmd_gold_licenses(args: argparse.Namespace) -> int:
         return 2
     if args.cc_by_only:
         rows = [r for r in rows if r["cc_by"]]
+    retrieved_at = dt.date.today().isoformat()
+    rows = [r | {"retrieved_at": retrieved_at} for r in rows]
     if args.csv:
         args.csv.parent.mkdir(parents=True, exist_ok=True)
         with args.csv.open("w", newline="", encoding="utf-8") as fh:
