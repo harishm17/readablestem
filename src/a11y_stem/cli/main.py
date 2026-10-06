@@ -1,4 +1,9 @@
-"""Command line: `a11y-stem gold ...`, `a11y-stem eval ...`, `a11y-stem parse ...`."""
+"""Command line: `a11y-stem gold ...`, `a11y-stem eval ...`, `a11y-stem parse ...`.
+
+Default paths (data/gold, .cache/openstax) are resolved against the project root: the
+nearest parent of the working directory whose pyproject.toml names this project. Outside
+a checkout they fall back to the working directory.
+"""
 
 from __future__ import annotations
 
@@ -11,32 +16,74 @@ from pathlib import Path
 
 from a11y_stem import __version__
 
-DEFAULT_GOLD_DIR = Path("data/gold")
-DEFAULT_CACHE_DIR = Path(".cache/openstax")
+GOLD_DIR = Path("data/gold")
+CACHE_DIR = Path(".cache/openstax")
+_PROJECT_NAME_LINE = 'name = "a11y-stem"'
+
+
+def project_root(start: Path | None = None) -> Path:
+    """Nearest directory at or above `start` (default: cwd) holding this project's pyproject."""
+    here = (start or Path.cwd()).resolve()
+    for directory in (here, *here.parents):
+        pyproject = directory / "pyproject.toml"
+        if pyproject.is_file() and _PROJECT_NAME_LINE in pyproject.read_text(encoding="utf-8"):
+            return directory
+    return here
+
+
+def _default(path: Path) -> Path:
+    return project_root() / path
+
+
+def _shown(path: Path) -> str:
+    """Path relative to the working directory when possible (shorter output)."""
+    try:
+        return str(path.resolve().relative_to(Path.cwd().resolve()))
+    except ValueError:
+        return str(path)
+
+
+def _positive_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a whole number, got {value!r}") from None
+    if number < 1:
+        raise argparse.ArgumentTypeError(f"must be 1 or more, got {number}")
+    return number
+
+
+def _error(message: str) -> int:
+    print(f"error: {message}", file=sys.stderr)
+    return 2
 
 
 def _cmd_gold_fetch(args: argparse.Namespace) -> int:
     from a11y_stem.gold.openstax import GoldError, HttpFetcher, fetch_gold
 
-    fetcher = HttpFetcher(cache_dir=None if args.no_cache else DEFAULT_CACHE_DIR)
+    out = args.out or _default(GOLD_DIR)
+    cache_dir = None if args.no_cache else _default(CACHE_DIR)
+    fetcher = HttpFetcher(cache_dir=cache_dir)
     try:
         book, results = fetch_gold(
             args.book,
             args.pages,
-            args.out,
+            out,
             fetcher,
             chapter=args.chapter,
             page_slugs=args.page or None,
             retrieved_at=args.date,
+            allow_retired=args.allow_retired,
         )
     except GoldError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+        return _error(str(exc))
 
+    cache_note = f"archive responses cached in {_shown(cache_dir)}" if cache_dir else "no cache"
     print(f"Book:     {book.title} ({book.slug}) {book.uuid}@{book.version}")
+    print(f"State:    {book.state}")
     print(f"Archive:  {book.archive_version}")
     print(f"License:  {book.license_name} <{book.license_url}>")
-    print(f"Requests: {fetcher.requests_made} (archive responses cached in {DEFAULT_CACHE_DIR})")
+    print(f"Requests: {fetcher.requests_made} ({cache_note})")
     print()
     width = max([len("TOTAL")] + [len(r.page.slug) for r in results]) + 2
     print(f"{'page':<{width}} {'equations':>9} {'figures':>8} {'tables':>7}")
@@ -51,9 +98,9 @@ def _cmd_gold_fetch(args: argparse.Namespace) -> int:
     print(f"{'TOTAL':<{width}} {totals['equation']:>9} {totals['figure']:>8} {totals['table']:>7}")
     print()
     for result in results:
-        print(f"wrote {result.path}")
-    print(f"wrote {args.out / 'manifest.json'}")
-    print(f"wrote {args.out / 'ATTRIBUTION.md'}")
+        print(f"wrote {_shown(result.path)}")
+    print(f"wrote {_shown(out / 'manifest.json')}")
+    print(f"wrote {_shown(out / 'ATTRIBUTION.md')}")
     return 0
 
 
@@ -63,8 +110,7 @@ def _cmd_gold_licenses(args: argparse.Namespace) -> int:
     try:
         rows = license_table(HttpFetcher())
     except GoldError as exc:
-        print(f"error: {exc}", file=sys.stderr)
-        return 2
+        return _error(str(exc))
     if args.cc_by_only:
         rows = [r for r in rows if r["cc_by"]]
     retrieved_at = dt.date.today().isoformat()
@@ -88,7 +134,10 @@ def _cmd_gold_licenses(args: argparse.Namespace) -> int:
 def _cmd_gold_manifest(args: argparse.Namespace) -> int:
     from a11y_stem.gold.openstax import write_manifest
 
-    manifest = write_manifest(args.out)
+    gold_dir = args.out or _default(GOLD_DIR)
+    if not gold_dir.is_dir():
+        return _error(f"{gold_dir} is not a directory")
+    manifest = write_manifest(gold_dir)
     print(json.dumps(manifest["totals"]))
     return 0
 
@@ -100,11 +149,24 @@ def _cmd_eval_equations(args: argparse.Namespace) -> int:
         score_equations,
     )
 
-    gold = list(iter_gold_records(args.gold, kind="equation"))
+    gold_path = args.gold or _default(GOLD_DIR)
+    if not gold_path.exists():
+        return _error(f"gold path not found: {gold_path}")
+    try:
+        gold = list(iter_gold_records(gold_path, kind="equation"))
+    except ValueError as exc:  # malformed JSON, reported as file:line
+        return _error(str(exc))
     if not gold:
-        print(f"error: no equation records under {args.gold}", file=sys.stderr)
-        return 2
-    preds = None if args.self_check else load_predictions(args.pred)
+        return _error(f"no equation records under {gold_path}")
+    if args.self_check:
+        preds = None
+    else:
+        try:
+            preds = load_predictions(args.pred)
+        except FileNotFoundError:
+            return _error(f"predictions file not found: {args.pred}")
+        except ValueError as exc:  # malformed JSON or missing fields, reported as file:line
+            return _error(str(exc))
     result = score_equations(gold, preds, display=args.display)
     if args.report:
         args.report.parent.mkdir(parents=True, exist_ok=True)
@@ -115,9 +177,28 @@ def _cmd_eval_equations(args: argparse.Namespace) -> int:
 
 
 def _cmd_parse(args: argparse.Namespace) -> int:
+    import pymupdf
+
     from a11y_stem.pipeline.parse import parse_pdf
 
-    pages = [int(p) - 1 for p in args.pages.split(",")] if args.pages else None
+    if not args.pdf.is_file():
+        return _error(f"PDF not found: {args.pdf}")
+    try:
+        with pymupdf.open(args.pdf) as doc:
+            page_count = doc.page_count
+    except Exception as exc:  # pymupdf raises several types for unreadable files
+        return _error(f"cannot open {args.pdf} as a PDF: {exc}")
+    pages = None
+    if args.pages:
+        try:
+            numbers = [int(p) for p in args.pages.split(",") if p.strip()]
+        except ValueError:
+            return _error(f"--pages must be comma-separated page numbers, got {args.pages!r}")
+        bad = [n for n in numbers if not 1 <= n <= page_count]
+        if bad or not numbers:
+            shown = ", ".join(map(str, bad)) or repr(args.pages)
+            return _error(f"page(s) {shown} out of range; {args.pdf} has pages 1-{page_count}")
+        pages = [n - 1 for n in numbers]
     elements = parse_pdf(args.pdf, pages=pages)
     if args.json:
         print(json.dumps([e.to_dict() for e in elements], ensure_ascii=False, indent=2))
@@ -140,14 +221,22 @@ def build_parser() -> argparse.ArgumentParser:
     )
     fetch = gold.add_parser("fetch", help="fetch pages of a CC BY OpenStax book into JSONL")
     fetch.add_argument("--book", required=True, help="OpenStax slug, e.g. physics")
-    fetch.add_argument("--pages", type=int, default=3, help="first N numbered sections")
+    fetch.add_argument(
+        "--pages", type=_positive_int, default=3, help="first N numbered sections (N >= 1)"
+    )
     fetch.add_argument("--chapter", type=int, help="only sections of this chapter")
     fetch.add_argument(
         "--page", action="append", help="exact page slug (repeatable); overrides --pages"
     )
-    fetch.add_argument("--out", type=Path, default=DEFAULT_GOLD_DIR)
+    fetch.add_argument("--out", type=Path, help="output dir (default: <project>/data/gold)")
     fetch.add_argument("--date", help="retrieval date to record (default: today)")
     fetch.add_argument("--no-cache", action="store_true", help="ignore the local HTTP cache")
+    fetch.add_argument(
+        "--allow-retired",
+        action="store_true",
+        help="also accept books whose OpenStax state is not 'live' (retired, deprecated, "
+        "unlisted); open decision, see docs/decisions/0001-scope.md question 2",
+    )
     fetch.set_defaults(func=_cmd_gold_fetch)
 
     licenses = gold.add_parser("licenses", help="list OpenStax books and their licenses")
@@ -156,17 +245,22 @@ def build_parser() -> argparse.ArgumentParser:
     licenses.set_defaults(func=_cmd_gold_licenses)
 
     manifest = gold.add_parser("manifest", help="rebuild manifest.json and ATTRIBUTION.md")
-    manifest.add_argument("--out", type=Path, default=DEFAULT_GOLD_DIR)
+    manifest.add_argument("--out", type=Path, help="gold dir (default: <project>/data/gold)")
     manifest.set_defaults(func=_cmd_gold_manifest)
 
     evaluate = sub.add_parser("eval", help="score predictions").add_subparsers(
         dest="eval_command", required=True
     )
     eq = evaluate.add_parser("equations", help="score equations against the gold set")
-    eq.add_argument("--gold", type=Path, default=DEFAULT_GOLD_DIR)
+    eq.add_argument("--gold", type=Path, help="gold JSONL file or dir (default: data/gold)")
     group = eq.add_mutually_exclusive_group(required=True)
     group.add_argument("--pred", type=Path, help="JSONL with id + latex or mathml")
-    group.add_argument("--self-check", action="store_true", help="score gold against itself")
+    group.add_argument(
+        "--self-check",
+        action="store_true",
+        help="plumbing check only: scores gold against itself (always 1.0); "
+        "does not test normalisation",
+    )
     eq.add_argument("--display", choices=["all", "block", "inline"], default="all")
     eq.add_argument("--report", type=Path, help="write per-item scores as JSON")
     eq.set_defaults(func=_cmd_eval_equations)

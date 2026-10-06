@@ -61,6 +61,34 @@ def test_parse_finds_text_image_and_equation_candidate(tiny_pdf):
     assert x0 == pytest.approx(72, abs=1) and x1 == pytest.approx(272, abs=1)
 
 
+def test_text_bbox_excludes_equation_lines_from_the_same_block(tmp_path):
+    doc = pymupdf.open()
+    page = doc.new_page()
+    # One insert_text call -> one PyMuPDF block with three lines: prose, maths, prose.
+    page.insert_text(
+        (72, 72),
+        "Average speed is the distance traveled divided by the elapsed time.\n"
+        "v = d / t\n"
+        "This holds for any trip that we take along the road today.",
+        fontsize=11,
+    )
+    path = tmp_path / "mixed.pdf"
+    doc.save(path)
+    doc.close()
+
+    elements = parse_pdf(path)
+    assert [e.kind for e in elements] == ["text", "equation_candidate", "text"]
+    first, eq, last = elements
+    assert first.text.startswith("Average speed") and last.text.startswith("This holds")
+
+    def overlaps(a, b):
+        return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
+
+    assert not overlaps(first.bbox, eq.bbox)
+    assert not overlaps(last.bbox, eq.bbox)
+    assert first.bbox[3] <= eq.bbox[1] + 0.01 and eq.bbox[3] <= last.bbox[1] + 0.01
+
+
 def test_page_filter(tiny_pdf):
     assert parse_pdf(tiny_pdf, pages=[0])
     with pytest.raises(IndexError):

@@ -100,7 +100,43 @@ def parse_pdf(path: str | Path, pages: list[int] | None = None) -> list[Element]
     return elements
 
 
+def _union(boxes: list[tuple[float, float, float, float]]) -> tuple[float, float, float, float]:
+    return (
+        round(min(b[0] for b in boxes), 2),
+        round(min(b[1] for b in boxes), 2),
+        round(max(b[2] for b in boxes), 2),
+        round(max(b[3] for b in boxes), 2),
+    )
+
+
+@dataclass
+class _ProseRun:
+    """Consecutive prose lines of one block (no equation line between them)."""
+
+    lines: list[str] = field(default_factory=list)
+    boxes: list[tuple[float, float, float, float]] = field(default_factory=list)
+    sizes: list[float] = field(default_factory=list)
+    fonts: set[str] = field(default_factory=set)
+
+    def to_element(self, number: int) -> Element:
+        return Element(
+            kind="text",
+            page=number,
+            bbox=_union(self.boxes),
+            text="\n".join(self.lines),
+            font_size=round(max(self.sizes), 2),
+            fonts=sorted(self.fonts),
+        )
+
+
 def parse_page(page: pymupdf.Page, number: int) -> list[Element]:
+    """Elements of one page, in PyMuPDF block order.
+
+    When a block mixes prose and equation lines, the prose is split into one text element
+    per run of consecutive prose lines, each with the bbox of its own lines only. Text
+    elements therefore never overlap the equation candidates taken out of the same block,
+    and the order prose -> equation -> prose is kept.
+    """
     out: list[Element] = []
     data = page.get_text("dict")
     for block in data.get("blocks", []):
@@ -116,9 +152,7 @@ def parse_page(page: pymupdf.Page, number: int) -> list[Element]:
                 )
             )
             continue
-        prose_lines: list[str] = []
-        sizes: list[float] = []
-        block_fonts: set[str] = set()
+        run = _ProseRun()
         for line in block.get("lines", []):
             spans = line.get("spans", [])
             text = "".join(s.get("text", "") for s in spans).strip()
@@ -129,6 +163,9 @@ def parse_page(page: pymupdf.Page, number: int) -> list[Element]:
             score, reasons = equation_score(text, fonts, superscript)
             line_size = max((s.get("size", 0.0) for s in spans), default=0.0)
             if score >= EQUATION_THRESHOLD:
+                if run.lines:
+                    out.append(run.to_element(number))
+                    run = _ProseRun()
                 out.append(
                     Element(
                         kind="equation_candidate",
@@ -142,20 +179,12 @@ def parse_page(page: pymupdf.Page, number: int) -> list[Element]:
                     )
                 )
             else:
-                prose_lines.append(text)
-                sizes.append(line_size)
-                block_fonts.update(fonts)
-        if prose_lines:
-            out.append(
-                Element(
-                    kind="text",
-                    page=number,
-                    bbox=bbox,
-                    text="\n".join(prose_lines),
-                    font_size=round(max(sizes), 2),
-                    fonts=sorted(block_fonts),
-                )
-            )
+                run.lines.append(text)
+                run.boxes.append(tuple(line["bbox"]))
+                run.sizes.append(line_size)
+                run.fonts.update(fonts)
+        if run.lines:
+            out.append(run.to_element(number))
     return out
 
 

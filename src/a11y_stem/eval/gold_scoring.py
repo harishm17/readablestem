@@ -1,7 +1,8 @@
 """Score equation predictions against the OpenStax gold set.
 
 Prediction file: JSON lines, one per equation, with the gold record's "id" and either
-"latex" or "mathml". Gold equations with no prediction count as failures.
+"latex" or "mathml". Gold equations with no prediction count as failures. Prediction ids
+that match no gold record (e.g. typos) are reported in the summary as `unknown_ids`.
 """
 
 from __future__ import annotations
@@ -12,15 +13,27 @@ from pathlib import Path
 
 from a11y_stem.eval.equations import EquationScore, score_latex, score_mathml, summarize
 
+UNKNOWN_IDS_SHOWN = 5
+
+
+def _load_json_line(path: Path, number: int, line: str) -> dict:
+    try:
+        record = json.loads(line)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"{path}:{number}: not valid JSON ({exc.msg})") from exc
+    if not isinstance(record, dict):
+        raise ValueError(f"{path}:{number}: expected a JSON object")
+    return record
+
 
 def iter_gold_records(path: Path, kind: str | None = None) -> Iterator[dict]:
     """Yield records from one JSONL file or every *.jsonl under a directory."""
     files = sorted(path.rglob("*.jsonl")) if path.is_dir() else [path]
     for file in files:
         with file.open(encoding="utf-8") as fh:
-            for line in fh:
+            for number, line in enumerate(fh, 1):
                 if line.strip():
-                    record = json.loads(line)
+                    record = _load_json_line(file, number, line)
                     if kind is None or record.get("kind") == kind:
                         yield record
 
@@ -31,7 +44,7 @@ def load_predictions(path: Path) -> dict[str, dict]:
         for number, line in enumerate(fh, 1):
             if not line.strip():
                 continue
-            record = json.loads(line)
+            record = _load_json_line(path, number, line)
             if "id" not in record or not ({"latex", "mathml"} & record.keys()):
                 raise ValueError(f"{path}:{number}: need 'id' plus 'latex' or 'mathml'")
             preds[record["id"]] = record
@@ -56,4 +69,10 @@ def score_equations(gold: list[dict], preds: dict[str, dict] | None, display: st
             score = score_latex(preds[record["id"]]["latex"], record["mathml"])
         scores.append(score)
         rows.append({"id": record["id"], "display": record.get("display"), **score.to_dict()})
-    return {"summary": summarize(scores), "items": rows}
+    summary = summarize(scores)
+    if preds is not None:
+        gold_ids = {record["id"] for record in gold}
+        unknown = sorted(pid for pid in preds if pid not in gold_ids)
+        summary["unknown_ids"] = len(unknown)
+        summary["unknown_ids_first"] = unknown[:UNKNOWN_IDS_SHOWN]
+    return {"summary": summary, "items": rows}
