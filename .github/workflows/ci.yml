@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Actions are pinned to full commit SHAs (tag in the comment). Tags and SHAs checked with
+# `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` on 2026-10-06. setup-uv publishes no
+# floating major tag (no `v10`), so it must be pinned to an exact release.
+# Not verified yet: this workflow has never run on GitHub (no remote until the orchestrator
+# pushes). Update this note after the first green run.
+
 jobs:
   lint-test:
     name: ruff + pytest (Python ${{ matrix.python-version }})
@@ -18,8 +24,8 @@ jobs:
       matrix:
         python-version: ["3.12", "3.14"]
     steps:
-      - uses: actions/checkout@v7
-      - uses: astral-sh/setup-uv@v10
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
@@ -29,18 +35,25 @@ jobs:
         run: uv run ruff check .
       - name: Ruff format check
         run: uv run ruff format --check .
+      # Includes tests/test_gold_sample.py: known-correct LaTeX must match the gold sample.
       - name: Pytest (offline; live OpenStax test is opt-in with -m network)
         run: uv run pytest
 
   secret-scan:
     name: gitleaks
     runs-on: ubuntu-latest
+    # On pull_request events gitleaks-action calls GET /repos/{o}/{r}/pulls/{n}/commits,
+    # which needs pull-requests: read on a private repo.
+    permissions:
+      contents: read
+      pull-requests: read
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - uses: gitleaks/gitleaks-action@v3
+      - uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e # v3.0.0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Personal-account repos need no GITLEAKS_LICENSE (per the action's README).
+          # Comments stay off, so the job needs no write scope.
           GITLEAKS_ENABLE_COMMENTS: "false"
