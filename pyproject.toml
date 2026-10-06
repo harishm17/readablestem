@@ -40,6 +40,8 @@ select = [
     "SIM", # simplify
     "RUF", # ruff-specific
 ]
+# Maths text legitimately uses these (U+2212 minus sign, U+2032 prime, U+0394 Delta).
+allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
