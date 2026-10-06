@@ -11,6 +11,7 @@ from a11y_stem.eval.equations import canonical
 from a11y_stem.gold import openstax
 from a11y_stem.gold.openstax import (
     BookNotFoundError,
+    BookStateError,
     GoldError,
     LicenseError,
     extract_elements,
@@ -59,12 +60,17 @@ TREE = {
 
 
 class FakeFetcher:
-    def __init__(self, book_license: str = CC_BY, cms_license: str = CC_BY) -> None:
+    def __init__(
+        self,
+        book_license: str | None = CC_BY,
+        cms_license: str | None = CC_BY,
+        state: str = "live",
+    ) -> None:
         cms_book = {
             "meta": {"slug": "physics"},
             "title": "Physics",
             "cnx_id": "book-uuid",
-            "book_state": "live",
+            "book_state": state,
             "license_name": "CMS name",
             "license_url": cms_license,
             "authors": [
@@ -240,6 +246,7 @@ def test_fetch_gold_writes_jsonl_manifest_and_attribution(tmp_path):
     first = json.loads(lines[0])
     assert first["id"] == "openstax/physics/1-1-first-section/eq-000"
     assert first["license_url"] == CC_BY
+    assert first["book_state"] == "live"
     assert first["retrieved_at"] == "2026-10-06"
     assert first["archive_version"] == "20990101.000000"
     assert first["source_url"] == "https://openstax.org/books/physics/pages/1-1-first-section"
@@ -268,6 +275,45 @@ def test_license_mismatch_between_cms_and_archive_is_refused(tmp_path):
     fetcher = FakeFetcher(book_license=CC_BY, cms_license=CC_BY_NC_SA)
     with pytest.raises(LicenseError):
         fetch_gold("physics", 1, tmp_path, fetcher)
+
+
+def test_missing_cms_license_is_refused(tmp_path):
+    # Both sources must say CC BY; "the CMS has no license" is not agreement.
+    fetcher = FakeFetcher(book_license=CC_BY, cms_license=None)
+    with pytest.raises(LicenseError, match="not CC BY"):
+        fetch_gold("physics", 1, tmp_path, fetcher)
+
+
+def test_missing_archive_license_is_refused(tmp_path):
+    fetcher = FakeFetcher(book_license=None, cms_license=CC_BY)
+    with pytest.raises(LicenseError):
+        fetch_gold("physics", 1, tmp_path, fetcher)
+
+
+@pytest.mark.parametrize("state", ["retired", "deprecated", "unlisted"])
+def test_non_live_book_is_refused_before_any_page_fetch(tmp_path, state):
+    fetcher = FakeFetcher(state=state)
+    with pytest.raises(BookStateError, match=r"0001-scope\.md"):
+        fetch_gold("physics", 1, tmp_path, fetcher)
+    assert not any(":" in url.rsplit("/", 1)[-1] for url in fetcher.calls)
+    assert not (tmp_path / "openstax").exists()
+
+
+def test_retired_book_needs_explicit_opt_in_and_is_labelled(tmp_path):
+    fetcher = FakeFetcher(state="retired")
+    _, results = fetch_gold("physics", 1, tmp_path, fetcher, allow_retired=True)
+    record = json.loads(results[0].path.read_text(encoding="utf-8").splitlines()[0])
+    assert record["book_state"] == "retired"
+    manifest = json.loads((tmp_path / "manifest.json").read_text(encoding="utf-8"))
+    assert manifest["books"]["physics"]["state"] == "retired"
+
+
+@pytest.mark.parametrize("n", [0, -1])
+def test_non_positive_page_count_is_refused(tmp_path, n):
+    fetcher = FakeFetcher()
+    with pytest.raises(GoldError, match="at least 1"):
+        fetch_gold("physics", n, tmp_path, fetcher)
+    assert fetcher.calls == []
 
 
 def test_unknown_book_suggests_close_slugs(tmp_path):

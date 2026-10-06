@@ -26,7 +26,7 @@
   "files": [
     {
       "path": "openstax/physics/2-1-relative-motion-distance-and-displacement.jsonl",
-      "sha256": "edebfbc63bffbd3008b32257320aca5101e709e9f1ab332dab9b4eb60ae668ca",
+      "sha256": "3602a2313ffef100162d5a780a24abfdc173b38e4cecaac941ac662c451bd360",
       "records": 15,
       "counts": {
         "equation": 8,
@@ -39,7 +39,7 @@
     },
     {
       "path": "openstax/physics/2-2-speed-and-velocity.jsonl",
-      "sha256": "9a0578833f891d819fd9b13d5b913060dd534167a55def002963f1b77154b479",
+      "sha256": "ba5f6cad769f1ef989221afc8f6ae31d86f59ecad084c7d67ffbe45515069953",
       "records": 15,
       "counts": {
         "equation": 12,
@@ -52,7 +52,7 @@
     },
     {
       "path": "openstax/physics/2-3-position-vs-time-graphs.jsonl",
-      "sha256": "4195ee0f9783f7d3c6d2792d4dc4653c50c754be833c7cadb08bcfba138d3d41",
+      "sha256": "5604575447e59a95aa92fd07b38884ba500ed9d2f024fe8f2e654e77852ffd80",
       "records": 16,
       "counts": {
         "equation": 10,

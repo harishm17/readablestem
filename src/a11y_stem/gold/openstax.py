@@ -16,9 +16,14 @@ Endpoints (checked 2026-10-06; none needs a key):
 where {site} is https://openstax.org and {archive} is {site} + release.json["archiveUrl"]
 (e.g. /apps/archive/20260604.144757).
 
-License rule: the public gold set only takes books whose license is CC BY (checked in
-both the archive book JSON and the CMS). Most current OpenStax editions are CC BY-NC-SA;
-`a11y-stem gold licenses` prints the full table.
+License rule: the public gold set only takes books whose license is CC BY in BOTH the
+archive book JSON and the CMS (a missing license in either place is refused). Most current
+OpenStax editions are CC BY-NC-SA; `a11y-stem gold licenses` prints the full table.
+
+State rule: only books whose CMS state is "live" are fetched by default. Retired (and
+deprecated or unlisted) editions need `allow_retired=True` (`--allow-retired`), because
+whether a retired edition is acceptable ground truth is an open decision
+(docs/decisions/0001-scope.md, question 2). Every record carries `book_state`.
 """
 
 from __future__ import annotations
@@ -64,6 +69,10 @@ class BookNotFoundError(GoldError):
 
 class LicenseError(GoldError):
     pass
+
+
+class BookStateError(GoldError):
+    """The book is not live on OpenStax (retired, deprecated or unlisted)."""
 
 
 # ----------------------------------------------------------------------------- HTTP
@@ -226,15 +235,25 @@ def resolve_book(slug: str, fetcher: Fetcher) -> Book:
 
 
 def check_public_license(book: Book) -> None:
-    """Raise LicenseError unless both the archive and the CMS say CC BY."""
-    sources = {"archive": book.license_url, "cms": book.cms_license_url}
-    bad = {name: url for name, url in sources.items() if url is not None and not is_cc_by(url)}
-    if bad or book.license_url is None:
+    """Raise LicenseError unless both the archive and the CMS say CC BY (None is refused)."""
+    if not (is_cc_by(book.license_url) and is_cc_by(book.cms_license_url)):
         raise LicenseError(
             f"{book.slug!r} is not CC BY (archive: {book.license_name} {book.license_url}; "
             f"cms: {book.cms_license_name} {book.cms_license_url}). The public gold set "
             "only takes CC BY books. Run `a11y-stem gold licenses --cc-by-only` for options."
         )
+
+
+def check_book_state(book: Book, allow_retired: bool = False) -> None:
+    """Raise BookStateError for non-live books unless the caller opted in."""
+    if book.state == "live" or allow_retired:
+        return
+    raise BookStateError(
+        f"{book.slug!r} has OpenStax state {book.state!r}, not 'live'. Whether a retired "
+        "edition is acceptable as ground truth is still open (docs/decisions/0001-scope.md, "
+        "'Questions this raises for you', question 2). Pass --allow-retired to fetch it anyway; "
+        "each record then carries book_state so it stays identifiable."
+    )
 
 
 def license_table(fetcher: Fetcher) -> list[dict]:
@@ -558,6 +577,7 @@ def build_page_records(book: Book, page: PageRef, xhtml: str, retrieved_at: str)
                 "content_url": content_url,
                 "license_name": book.license_name,
                 "license_url": book.license_url,
+                "book_state": book.state,
                 "retrieved_at": retrieved_at,
                 **record,
             }
@@ -587,11 +607,15 @@ def fetch_gold(
     chapter: int | None = None,
     page_slugs: list[str] | None = None,
     retrieved_at: str | None = None,
+    allow_retired: bool = False,
 ) -> tuple[Book, list[PageResult]]:
-    """Fetch pages of one CC BY book and write one JSONL file per page plus metadata."""
+    """Fetch pages of one live CC BY book and write one JSONL file per page plus metadata."""
+    if n_pages < 1:
+        raise GoldError(f"n_pages must be at least 1 (got {n_pages}).")
     retrieved_at = retrieved_at or dt.date.today().isoformat()
     book = resolve_book(book_slug, fetcher)
     check_public_license(book)
+    check_book_state(book, allow_retired=allow_retired)
     pages = select_pages(iter_pages(book.tree), n_pages, chapter=chapter, slugs=page_slugs)
     if not pages:
         raise GoldError("No pages matched. Check --chapter, --pages or --page.")
