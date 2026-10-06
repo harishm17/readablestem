@@ -1,0 +1,29 @@
+# Python / tooling
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+
+# Secrets: never commit real keys. Only .env.example is tracked.
+.env
+.env.*
+!.env.example
+
+# Harish's own course PDFs and anything derived from them.
+# Professors' copyright: never committed, uploaded, screenshotted or used in write-ups.
+private-inputs/
+
+# Local HTTP cache for the OpenStax fetcher
+.cache/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store

@@ -1,0 +1,49 @@
+[project]
+name = "a11y-stem"
+version = "0.1.0"
+description = "Assists with making STEM course materials accessible (MathML equations, figure alt text, table headers). Skeleton."
+authors = [
+    { name = "Harish Manoharan", email = "harishmanoharan17@gmail.com" }
+]
+requires-python = ">=3.12"
+dependencies = [
+    "latex2mathml>=3.81.1",
+    "pymupdf>=1.28.2",
+]
+
+[project.scripts]
+a11y-stem = "a11y_stem.cli.main:main"
+
+[build-system]
+requires = ["uv_build>=0.12.23,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+    "ruff>=0.16.10",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "B",   # bugbear
+    "UP",  # pyupgrade
+    "SIM", # simplify
+    "RUF", # ruff-specific
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra -m 'not network'"
+markers = [
+    "network: hits the live OpenStax API (run with: uv run pytest -m network)",
+]
