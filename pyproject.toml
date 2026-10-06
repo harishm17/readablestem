@@ -2,6 +2,8 @@
 name = "a11y-stem"
 version = "0.1.0"
 description = "Assists with making STEM course materials accessible (MathML equations, figure alt text, table headers). Skeleton."
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Harish Manoharan", email = "harishmanoharan17@gmail.com" }
 ]

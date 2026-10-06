@@ -56,7 +56,7 @@ yours to write.
 | Model routing (cheap cases to a cheap model)? | Sun Oct 25 | the November queue |
 | Fallback model per step? | Sun Oct 25 | the November queue |
 | Hosting (default Cloud Run) | Sun Oct 18 | The hosting memo comes first |
-| Code license | Thu Oct 8 (skeleton review gate) | None on file. Your choice. Deferring it to Wed Nov 4 (repo public) is also your call; if you defer, note it here |
+| Code license | Thu Oct 8 (skeleton review gate) | **Decided 2026-10-06: MIT** (Harish left the choice open). Shortest, most widely recognised permissive license; no need for Apache-2.0's patent grant on a solo project. Data under `data/gold/` stays CC BY 4.0 |
 
 ## New facts from building the skeleton (2026-10-06, verified against live OpenStax APIs)
 

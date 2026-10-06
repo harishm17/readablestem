@@ -86,6 +86,5 @@ TODO (Harish writes this)
 TODO (Harish writes this)
 
 - Short roadmap.
-- **License: your choice.** There is no LICENSE file yet. Note that the code license and
-  the gold-set data license are separate: `data/gold/` is OpenStax content under CC BY 4.0
-  (see `data/gold/ATTRIBUTION.md`).
+- License: code is MIT (`LICENSE`, decided 2026-10-06). The gold-set data keeps its own
+  license: `data/gold/` is OpenStax content under CC BY 4.0 (see `data/gold/ATTRIBUTION.md`).
