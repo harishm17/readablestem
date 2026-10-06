@@ -13,8 +13,9 @@ from a11y_stem.eval.equations import (
     summarize,
 )
 
-# Shape copied from OpenStax archive output: semantics wrapper, nested mrows, a
-# MathML-Content annotation, whitespace between tags, mtext subscripts, trailing period.
+# Shape copied from OpenStax archive output (Physics 2.2, a scalar equation): semantics
+# wrapper, nested mrows, a MathML-Content annotation, whitespace between tags, mtext
+# subscripts, trailing period. It has no bold vector; see OPENSTAX_BOLD_D1 for that shape.
 OPENSTAX_DELTA_T = """
 <math display="block"><semantics><mrow>
  <mrow>
@@ -36,6 +37,25 @@ DELTA_T_CANONICAL = (
     "<math><mi>Δ</mi><mi>t</mi><mo>=</mo><msub><mi>t</mi><mtext>f</mtext></msub>"
     "<mo>−</mo><msub><mi>t</mi><mtext>0</mtext></msub><mo>.</mo></math>"
 )
+
+
+# Copied verbatim from data/gold (openstax/physics/2-1-.../eq-005). OpenStax writes every
+# bold vector as an mstyle wrapper; 16 of the 30 sample equations contain one.
+OPENSTAX_BOLD_D1 = """<math display="inline" xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow>
+                  <mrow>
+                    <mtext>Δ</mtext><msub>
+                      <mstyle mathvariant="bold" mathsize="normal"><mi>d</mi></mstyle>
+                      <mn>1</mn>
+                    </msub>
+
+                  </mrow>
+                </mrow><annotation-xml encoding="MathML-Content"><mrow>
+                    <mtext>Δ</mtext><msub>
+                      <mstyle mathvariant="bold" mathsize="normal"><mi>d</mi></mstyle>
+                      <mn>1</mn>
+                    </msub>
+
+                  </mrow></annotation-xml></semantics></math>"""
 
 
 def test_openstax_noise_is_stripped():
@@ -116,6 +136,113 @@ def test_equivalent_markup_normalises_identically(a, b):
 )
 def test_different_maths_stays_different(a, b):
     assert canonical(a) != canonical(b)
+
+
+# ------------------------------------------------- mathvariant inheritance (mstyle)
+
+
+def test_mstyle_bold_is_pushed_down_to_its_token():
+    assert canonical(OPENSTAX_BOLD_D1) == (
+        '<math><mtext>Δ</mtext><msub><mi mathvariant="bold">d</mi><mn>1</mn></msub></math>'
+    )
+
+
+def test_openstax_bold_vector_matches_mathbf_exactly():
+    gold = (
+        '<math><msub><mstyle mathvariant="bold" mathsize="normal"><mi>d</mi></mstyle>'
+        "<mn>1</mn></msub></math>"
+    )
+    score = score_latex(r"\mathbf{d}_1", gold)
+    assert score.exact_strict and score.exact_lenient and score.teds == 1.0
+
+
+def test_real_gold_bold_vector_differs_only_in_delta_token_type():
+    # Gold has <mtext>Δ</mtext>; LaTeX \Delta gives <mi>Δ</mi>. Lenient forgives that.
+    score = score_latex(r"\Delta \mathbf{d}_1", OPENSTAX_BOLD_D1)
+    assert score.exact_lenient
+    assert not score.exact_strict
+    assert score.ted == 1  # one relabel: mtext Δ -> mi Δ
+
+
+def test_unbolded_vector_still_differs():
+    score = score_latex(r"\Delta d_1", OPENSTAX_BOLD_D1)
+    assert not score.exact_strict and not score.exact_lenient
+
+
+@pytest.mark.parametrize(
+    ("a", "b"),
+    [
+        # mstyle on a whole subscript reaches every token inside it.
+        (
+            '<math><mstyle mathvariant="bold"><msub><mi>v</mi><mtext>avg</mtext></msub>'
+            "</mstyle></math>",
+            '<math><msub><mi mathvariant="bold">v</mi><mtext mathvariant="bold">avg</mtext>'
+            "</msub></math>",
+        ),
+        # A token's own mathvariant wins over the inherited one.
+        (
+            '<math><mstyle mathvariant="bold"><mi mathvariant="normal">x</mi></mstyle></math>',
+            '<math><mi mathvariant="normal">x</mi></math>',
+        ),
+        # Nested mstyle: the nearest one wins.
+        (
+            '<math><mstyle mathvariant="bold"><mstyle mathvariant="italic"><mi>x</mi>'
+            "</mstyle></mstyle></math>",
+            "<math><mi>x</mi></math>",
+        ),
+        # Inherited defaults are dropped after inheritance (mn is normal by default).
+        (
+            '<math><mstyle mathvariant="normal"><mn>2</mn></mstyle></math>',
+            "<math><mn>2</mn></math>",
+        ),
+        # A wrapper with only presentation attributes disappears entirely.
+        (
+            '<math><mstyle mathsize="normal" displaystyle="true"><mi>x</mi></mstyle></math>',
+            "<math><mi>x</mi></math>",
+        ),
+    ],
+)
+def test_mathvariant_inheritance(a, b):
+    assert canonical(a) == canonical(b)
+
+
+def test_latex_bold_subscript_matches_bold_mstyle_around_msub():
+    gold = (
+        '<math><mstyle mathvariant="bold"><msub><mi>v</mi><mtext>avg</mtext></msub></mstyle></math>'
+    )
+    assert score_latex(r"\mathbf{v}_\textbf{avg}", gold).exact_strict
+    # A plain-text subscript is a different rendering (avg not bold).
+    assert not score_latex(r"\mathbf{v}_\text{avg}", gold).exact_strict
+
+
+# ----------------------------------------------------------- lenient punctuation
+
+
+@pytest.mark.parametrize(
+    "gold",
+    [
+        "<math><mi>x</mi><mtext>.</mtext></math>",  # OpenStax often uses mtext for "."
+        "<math><mi>x</mi><mo>.</mo></math>",
+        "<math><mi>x</mi><mo>,</mo></math>",
+    ],
+)
+def test_lenient_drops_trailing_punctuation_of_any_token_type(gold):
+    assert canonical(gold, lenient=True) == canonical("<math><mi>x</mi></math>", lenient=True)
+
+
+def test_lenient_drops_period_inside_last_text_and_last_table_cell():
+    gold = (
+        "<math><mtable><mtr><mtd><mi>v</mi></mtd><mtd><mo>=</mo></mtd>"
+        "<mtd><mn>47</mn><mtext>km/h.</mtext></mtd></mtr></mtable></math>"
+    )
+    pred = r"\begin{array}{rcl} v & = & 47\ \text{km/h} \end{array}"
+    assert score_latex(pred, gold).exact_lenient
+
+
+def test_lenient_keeps_punctuation_that_is_not_at_the_end():
+    a = "<math><mi>x</mi><mo>,</mo><mi>y</mi></math>"
+    b = "<math><mi>x</mi><mi>y</mi></math>"
+    assert canonical(a, lenient=True) != canonical(b, lenient=True)
 
 
 def test_latex_round_trip_exact_match():

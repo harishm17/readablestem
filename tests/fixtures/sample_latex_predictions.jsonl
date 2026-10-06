@@ -1,0 +1,30 @@
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-000", "latex": "\\Delta \\mathbf{d}."}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-001", "latex": "\\Delta"}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-002", "latex": "\\Delta \\mathbf{d} = \\mathbf{d}_\\text{f} - \\mathbf{d}_0."}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-003", "latex": "\\Delta \\mathbf{d} = 0"}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-004", "latex": "\\Delta \\mathbf{d}"}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-005", "latex": "\\Delta \\mathbf{d}_1"}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-006", "latex": "\\Delta \\mathbf{d}_2"}
+{"id": "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-007", "latex": "\\Delta \\mathbf{d} = \\mathbf{d}_\\text{f} - \\mathbf{d}_0 = -1\\ \\text{km}"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-000", "latex": "\\Delta t"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-001", "latex": "\\Delta t = t_\\text{f} - t_0."}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-002", "latex": "v_\\text{avg} = \\frac{\\text{distance}}{\\text{time}}"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-003", "latex": "\\text{time} = \\frac{\\text{distance}}{v_\\text{avg}}.", "known_gap": "OpenStax packs an operator into mtext ('time ='); LaTeX writes text plus <mo>"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-004", "latex": "\\text{distance} = v_\\text{avg} \\times \\text{time}", "known_gap": "OpenStax packs an operator into mtext ('distance =', '× time'); LaTeX writes text plus <mo>"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-005", "latex": "\\begin{array}{rcl} v_\\text{avg} & = & \\frac{\\text{distance}}{\\text{time}} \\\\ & = & \\frac{150\\ \\text{km}}{3.2\\ \\text{h}} \\\\ & = & 47\\ \\text{km/h}. \\end{array}", "note": "multi-line: OpenStax uses a 3-column mtable; latex2mathml 3.81.1 renders \\begin{aligned} as a flat row with a literal '&', so this uses array{rcl}"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-006", "latex": "v_\\text{avg} = \\frac{\\text{distance}}{\\text{time}} = \\frac{5.2\\ \\text{m}}{1.8\\ \\text{s}} = 2.9\\ \\text{m/s}"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-007", "latex": "\\mathbf{v}_\\textbf{avg} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_\\text{f} - \\mathbf{d}_0}{t_\\text{f} - t_0}", "note": "the gold wraps the whole subscript in mstyle bold, so 'avg' is bold too"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-008", "latex": "\\vec{s}"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-009", "latex": "\\mathbf{v}_\\text{avg} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{304\\ \\text{m}}{180\\ \\text{s}} = 1.7\\ \\text{m/s north}"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-010", "latex": "\\begin{array}{rcl} \\mathbf{v}_\\text{avg} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ \\Delta \\mathbf{d} & = & \\mathbf{v}_{avg} \\Delta t \\\\ & = & (2.4\\ \\text{m/s})(46\\ \\text{s}) \\\\ & = & 1.1 \\times 10^2\\ \\text{m east} \\end{array}", "note": "multi-line: OpenStax uses a 3-column mtable; latex2mathml 3.81.1 renders \\begin{aligned} as a flat row with a literal '&', so this uses array{rcl}", "known_gap": "OpenStax packs an operator into mtext ('m/s)(46 s)'); LaTeX writes text plus <mo>"}
+{"id": "openstax/physics/2-2-speed-and-velocity/eq-011", "latex": "\\begin{array}{rcl} \\mathbf{v}_\\text{avg} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ \\Delta t & = & \\frac{\\Delta \\mathbf{d}}{\\mathbf{v}_\\text{avg}} \\\\ & = & \\frac{428\\ \\text{m}}{1.7\\ \\text{m/s}} \\\\ & = & 2.5 \\times 10^2\\ \\text{s} \\end{array}", "note": "multi-line: OpenStax uses a 3-column mtable; latex2mathml 3.81.1 renders \\begin{aligned} as a flat row with a literal '&', so this uses array{rcl}"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-000", "latex": "y = mx + b"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-001", "latex": "\\frac{\\Delta \\mathbf{d}}{\\Delta t}."}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-002", "latex": "\\mathbf{d} = \\mathbf{v}t + \\mathbf{d}_0"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-003", "latex": "\\mathbf{d} = \\mathbf{d}_0 + \\mathbf{v}t."}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-004", "latex": "\\text{slope} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\mathbf{v}", "known_gap": "OpenStax packs an operator into mtext ('slope ='); LaTeX writes text plus <mo>"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-005", "latex": "\\begin{array}{rcl} \\mathbf{v} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ & = & \\frac{2000\\ \\text{m} - 525\\ \\text{m}}{6.4\\ \\text{s} - 0.50\\ \\text{s}} \\\\ & = & 250\\ \\text{m/s} \\end{array},", "note": "multi-line: OpenStax uses a 3-column mtable; latex2mathml 3.81.1 renders \\begin{aligned} as a flat row with a literal '&', so this uses array{rcl}"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-006", "latex": "t = 25\\ \\text{s}"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-007", "latex": "\\begin{array}{rcl} \\text{slope} & = & v_Q = \\frac{\\Delta d_Q}{\\Delta t_Q} \\\\ & = & \\frac{(3120 - 1300)\\ \\text{m}}{(32 - 19)\\ \\text{s}} \\\\ & = & \\frac{1820\\ \\text{m}}{13\\ \\text{s}} \\\\ & = & 140\\ \\text{m/s} \\end{array}", "note": "multi-line: OpenStax uses a 3-column mtable; latex2mathml 3.81.1 renders \\begin{aligned} as a flat row with a literal '&', so this uses array{rcl}", "known_gap": "OpenStax packs an operator into mtext (the '=' column is <mtext>=</mtext>); LaTeX writes text plus <mo>"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-008", "latex": "125\\ \\text{m/s}"}
+{"id": "openstax/physics/2-3-position-vs-time-graphs/eq-009", "latex": "t = 20\\ \\text{s}"}

@@ -1,4 +1,4 @@
-"""Equation scoring: MathML normalisation, exact match and tree-edit-distance similarity.
+r"""Equation scoring: MathML normalisation, exact match and tree-edit-distance similarity.
 
 Ground truth is OpenStax presentation MathML. Predictions are either MathML or LaTeX
 (converted with latex2mathml). Both sides go through the same `normalize()` so that
@@ -8,21 +8,35 @@ Normalisation (strict, the default):
 1. Drop namespaces, `semantics` wrappers, `annotation`/`annotation-xml`, and
    invisible layout elements (`mspace`, `mphantom`, `maligngroup`, `malignmark`).
 2. `mfenced` becomes an `mrow` with explicit `mo` fences and separators.
-3. `mstyle`, `mpadded` and `merror` become plain `mrow` (styling only).
-4. Keep only meaning-bearing attributes (`mathvariant`, `linethickness`, `notation`,
-   `rowspan`, `columnspan`) and serialise them in sorted order.
-5. Token text: Unicode NFC, trimmed, whitespace collapsed; ASCII "-" and "'" in `mo`
+3. `mathvariant` is inherited: on `mstyle` (or any other non-token element) it is pushed
+   down to every token inside (`mi`, `mn`, `mo`, `mtext`, `ms`) that has no
+   `mathvariant` of its own, as MathML specifies. OpenStax writes every bold vector as
+   `<mstyle mathvariant="bold"><mi>d</mi></mstyle>`; latex2mathml writes `\mathbf{d}`
+   as `<mi>U+1D41D</mi>`. Both end up as `<mi mathvariant="bold">d</mi>`.
+4. `mstyle`, `mpadded` and `merror` then become plain, attribute-free `mrow` (styling
+   only), so rule 8 can flatten or unwrap them.
+5. Keep only meaning-bearing attributes (`mathvariant` on tokens, `linethickness`,
+   `notation`, `rowspan`, `columnspan`) and serialise them in sorted order.
+6. Token text: Unicode NFC, trimmed, whitespace collapsed; ASCII "-" and "'" in `mo`
    become U+2212 and U+2032; math alphanumerics (e.g. U+1D42F bold v) become the base
    letter plus `mathvariant`; invisible operators (U+2061-U+2064) are removed.
-6. Redundant `mathvariant` defaults are removed (single-letter `mi` is italic,
-   other tokens are normal).
-7. `mrow` is flattened inside elements that take any number of children (an "inferred
+7. Redundant `mathvariant` defaults are removed after inheritance (single-letter `mi`
+   is italic, other tokens are normal).
+8. `mrow` is flattened inside elements that take any number of children (an "inferred
    mrow": math, mrow, msqrt, mtd, menclose). In fixed-arity slots (mfrac, msub, ...),
    a one-child `mrow` is replaced by its child.
 
 Lenient mode additionally treats `mi`, `mn` and `mtext` as the same token type (OpenStax
 often writes subscripts as `<mtext>0</mtext>` where LaTeX gives `<mn>0</mn>`) and drops
-trailing sentence punctuation (".", ",", ";") at the end of the equation.
+trailing sentence punctuation (".", ",", ";") at the end of the equation: a final
+punctuation-only token of any type (`<mo>.</mo>` or `<mtext>.</mtext>`), or a final
+punctuation mark at the end of the last text token (`<mtext>km/h.</mtext>`), including
+inside the last cell of a final `mtable`.
+
+Known gaps (not normalised; see tests/fixtures/sample_latex_predictions.jsonl):
+OpenStax sometimes packs operators into text (`<mtext>time =</mtext>`,
+`<mtext>m/s)(46 s)</mtext>`), which LaTeX writes as text plus `<mo>`. Whether lenient
+mode should split text on operators is an open scoring decision (ADR 0001, question 3).
 """
 
 from __future__ import annotations
@@ -191,28 +205,34 @@ def _is_empty_token(elem: ET.Element) -> bool:
     return elem.tag in TOKEN_TAGS and not (elem.text or "")
 
 
-def _normalize_node(elem: ET.Element) -> ET.Element | None:
-    """Return a normalised copy of `elem`, or None when it should be dropped."""
+def _normalize_node(elem: ET.Element, inherited_variant: str | None = None) -> ET.Element | None:
+    """Return a normalised copy of `elem`, or None when it should be dropped.
+
+    `inherited_variant` is the nearest ancestor's `mathvariant` (e.g. from `mstyle`).
+    """
     tag = elem.tag
     if tag in DROP_TAGS:
         return None
     if tag == "semantics":
         for child in elem:
             if child.tag not in {"annotation", "annotation-xml"}:
-                return _normalize_node(child)
+                return _normalize_node(child, inherited_variant)
         return None
     if tag == "mfenced":
-        return _normalize_node(_fenced_to_mrow(elem))
-    if tag in TRANSPARENT_TAGS:
-        tag = "mrow"
+        return _normalize_node(_fenced_to_mrow(elem), inherited_variant)
 
-    out = ET.Element(tag, _normalize_attrs(elem))
+    attrs = _normalize_attrs(elem)
 
     if tag in TOKEN_TAGS:
+        out = ET.Element(tag, attrs)
         text = _token_text(elem)
         text, variant = _split_math_alphanumeric(text)
-        if variant and "mathvariant" not in out.attrib:
-            out.set("mathvariant", variant)
+        # Precedence: the token's own attribute, then a styled character, then inherited.
+        if "mathvariant" not in out.attrib:
+            if variant:
+                out.set("mathvariant", variant)
+            elif inherited_variant:
+                out.set("mathvariant", inherited_variant)
         if tag == "mo":
             if text and all(ch in INVISIBLE_OPERATORS for ch in text):
                 return None
@@ -226,7 +246,17 @@ def _normalize_node(elem: ET.Element) -> ET.Element | None:
             del out.attrib["mathvariant"]
         return out
 
-    children = [c for c in (_normalize_node(child) for child in elem) if c is not None]
+    # mathvariant only means something on tokens; elsewhere it is inherited downwards.
+    own_variant = attrs.pop("mathvariant", None)
+    if own_variant is not None:
+        inherited_variant = own_variant
+    if tag in TRANSPARENT_TAGS:
+        tag, attrs = "mrow", {}
+    out = ET.Element(tag, attrs)
+
+    children = [
+        c for c in (_normalize_node(child, inherited_variant) for child in elem) if c is not None
+    ]
 
     if tag in INFERRED_MROW_TAGS:
         flat: list[ET.Element] = []
@@ -246,12 +276,33 @@ def _normalize_node(elem: ET.Element) -> ET.Element | None:
     return out
 
 
+# Containers whose last child is the visual end of the equation.
+_TRAILING_CONTAINERS = {"math", "mrow", "mtable", "mtr", "mtd"}
+
+
+def _strip_trailing_punctuation(node: ET.Element) -> None:
+    """Drop sentence punctuation at the very end of the equation (lenient mode only)."""
+    while len(node):
+        last = node[-1]
+        if last.tag in _TRAILING_CONTAINERS:
+            _strip_trailing_punctuation(last)
+            return
+        if last.tag not in TOKEN_TAGS | {"tok"}:
+            return
+        text = last.text or ""
+        if text and all(ch in TRAILING_PUNCT or ch.isspace() for ch in text):
+            node.remove(last)
+            continue
+        if last.tag in {"mtext", "tok"} and text[-1:] in TRAILING_PUNCT:
+            last.text = text.rstrip("".join(TRAILING_PUNCT)).rstrip()
+        return
+
+
 def _apply_lenient(root: ET.Element) -> None:
     for node in root.iter():
         if node.tag in {"mi", "mn", "mtext"}:
             node.tag = "tok"
-    while len(root) and root[-1].tag == "mo" and (root[-1].text or "") in TRAILING_PUNCT:
-        root.remove(root[-1])
+    _strip_trailing_punctuation(root)
 
 
 def normalize(source: str | ET.Element, *, lenient: bool = False) -> ET.Element:
