@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "generated_by": "a11y-stem gold fetch",
+  "source": "OpenStax (https://openstax.org), CC BY books only",
+  "books": {
+    "physics": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Paul Peter Urone",
+        "Roger Hinrichs"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/physics",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-06",
+      "slug": "physics",
+      "state": "live",
+      "title": "Physics",
+      "uuid": "cce64fde-f448-43b8-ae88-27705cceb0da",
+      "version": "dfdfd7a"
+    }
+  },
+  "files": [
+    {
+      "path": "openstax/physics/2-1-relative-motion-distance-and-displacement.jsonl",
+      "sha256": "edebfbc63bffbd3008b32257320aca5101e709e9f1ab332dab9b4eb60ae668ca",
+      "records": 15,
+      "counts": {
+        "equation": 8,
+        "figure": 6,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-06"
+      ]
+    },
+    {
+      "path": "openstax/physics/2-2-speed-and-velocity.jsonl",
+      "sha256": "9a0578833f891d819fd9b13d5b913060dd534167a55def002963f1b77154b479",
+      "records": 15,
+      "counts": {
+        "equation": 12,
+        "figure": 2,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-06"
+      ]
+    },
+    {
+      "path": "openstax/physics/2-3-position-vs-time-graphs.jsonl",
+      "sha256": "4195ee0f9783f7d3c6d2792d4dc4653c50c754be833c7cadb08bcfba138d3d41",
+      "records": 16,
+      "counts": {
+        "equation": 10,
+        "figure": 5,
+        "table": 1
+      },
+      "retrieved_at": [
+        "2026-10-06"
+      ]
+    }
+  ],
+  "totals": {
+    "equation": 30,
+    "figure": 13,
+    "table": 3
+  }
+}
