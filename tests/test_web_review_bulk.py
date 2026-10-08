@@ -14,6 +14,7 @@ import pytest
 from sqlalchemy import select
 
 from a11y_stem.core.types import Check, Fix, Kind, Status
+from a11y_stem.observability.logging import FIELDS_ATTR
 from a11y_stem.web import review
 from a11y_stem.web.db import ErrorAggregate, ReviewEdit, session_scope
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token
@@ -295,7 +296,8 @@ def test_accept_all_headings(rich, caplog):
     assert '<div class="notice" role="status"><p>Accepted 3 headings.</p></div>' in headings
     assert "Accepted 3 headings." in page[: page.index('class="review-toc"')]
     assert "accept_all" not in headings.split("Accepted 3 headings.")[1]  # nothing left
-    assert "review_bulk" in caplog.text and "accepted=3" in caplog.text
+    bulk = [r for r in caplog.records if r.getMessage() == "review_bulk"]
+    assert len(bulk) == 1 and getattr(bulk[0], FIELDS_ATTR)["accepted"] == 3
     assert "SECRET" not in caplog.text
 
 
@@ -386,7 +388,8 @@ def test_bulk_accept_on_someone_elses_job_is_not_found(rich, caplog):
 def test_bulk_accepts_are_counted_when_the_job_is_deleted(rich):
     post(rich, "headings", action="accept_all")
     response = rich.browser.post(
-        f"/jobs/{rich.job_id}/delete", data={"csrf_token": token(rich.browser)}
+        f"/jobs/{rich.job_id}/delete",
+        data={"csrf_token": token(rich.browser), "confirm": "yes"},
     )
     assert response.status_code == 303
     with session_scope(rich.ctx.factory) as session:

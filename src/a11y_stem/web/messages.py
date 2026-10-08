@@ -92,6 +92,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     '"image of", which screen readers already say, so start with what it shows.',
     ("alt.not_filename", "filename"): "The alt text looks like a file name, so describe what "
     "the figure shows instead.",
+    ("alt.no_bidi_controls", "bidi_control"): "The alt text contains invisible characters that "
+    "reverse the reading direction, so retype it without them.",
     ("alt.no_url_or_markup", "url_or_markup"): "The alt text contains a web address, HTML or "
     "a LaTeX command, so use plain words instead.",
     ("alt.not_placeholder", "placeholder"): 'The alt text is a placeholder (like "image" or '
@@ -126,6 +128,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("html.img_alt", "img_missing_alt"): "An image in the document has no alt attribute.",
     ("html.unique_ids", "duplicate_id"): "Two elements in the document share an id, which can "
     "break links and confuse screen readers.",
+    ("html.list_structure", "list_structure"): "A list in the document is malformed (an empty "
+    "item, or a list inside a paragraph), so screen readers may not announce it as a list.",
     ("html.math_display", "math_missing_display"): "An equation does not say whether it sits "
     "in the text or on its own line.",
     ("html.self_contained", "external_resource"): "The document loads something from another "
