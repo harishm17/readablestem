@@ -162,3 +162,19 @@ def test_a_review_decision_reruns_the_checks_on_the_real_output(site):
     assert "3 accepted, 1 accepted by a reviewer</li>" in about(job.html or "")
     page = site.browser.get(f"/jobs/{site.job_id}").text
     assert f"All {len(result.html_checks)} checks passed" in page
+
+
+@pytest.mark.browser
+def test_the_output_rerendered_after_review_passes_axe(site):
+    """The review browser tests stub the assembler, so they check the review page, not
+    the file a review produces. Here the real file after an edit and a reject
+    goes through axe-core."""
+    from a11y_stem.pipeline.html_checks import axe_checks
+
+    assert review(site, "p1-e9", action="edit", latex="v = 2 t").status_code == 303
+    assert review(site, "p1-e3", action="reject").status_code == 303  # a heading
+    html = site.job(site.job_id).html or ""
+    checks = axe_checks(html)
+    if len(checks) == 1 and checks[0].code == "skipped":
+        pytest.skip("axe-core needs Playwright and its Chromium")
+    assert [c.name for c in checks] == ["axe"] and checks[0].passed, checks
