@@ -265,11 +265,6 @@ def _store_upload(
 # --------------------------------------------------------------------------- status
 
 
-def load_job_view(request: Request, job_id: str, user: CurrentUser) -> JobView:
-    with session_scope(get_ctx(request).factory) as session:
-        return job_view(session, owned_job(session, job_id, user), with_summary=True)
-
-
 def load_job_status(
     request: Request, job_id: str, user: CurrentUser
 ) -> tuple[JobView, JobOutcome | None]:

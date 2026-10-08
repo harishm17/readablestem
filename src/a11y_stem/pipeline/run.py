@@ -32,8 +32,7 @@ Design notes:
   output keeps the page image, flagged), and lists the pages on
   `DocumentResult.image_only_pages`. The web app reports them to the user.
 - Run-level outcomes are recorded on the result, content-free: `stopped_by` (the
-  "budget_<scope>" that stopped model work early, else None) and `html_checks` (the
-  static checks below).
+  "budget_<scope>" that stopped model work early, else None) and `html_checks`.
 - `layout` (WP2) keeps a few opened PDFs cached for cropping. Once the last crop is made
   (or the run fails) the document is released, so a long-lived worker does not keep a
   user's PDF in memory after its job.
