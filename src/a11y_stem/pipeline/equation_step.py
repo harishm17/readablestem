@@ -182,8 +182,11 @@ def strip_trailing_punctuation(latex: str) -> str:
 
 
 # Typesetting artefacts that are not symbols: the dotless i and j a LaTeX accent sits on
-# (\hat{\imath} is the unit vector i-hat) are i and j.
-_DOTLESS = str.maketrans({"\u0131": "i", "\u0237": "j"})
+# (\hat{\imath} is the unit vector i-hat) are i and j. And TeX's capital Delta: the Adobe
+# Glyph List maps the glyph name "Delta" to U+2206 INCREMENT, so every pdfTeX \Delta is
+# U+2206 in the text layer, which NFKC keeps and which is not a letter (Omega and mu come
+# out as U+2126 and U+00B5, which NFKC already turns into the Greek letters).
+_DOTLESS = str.maketrans({"\u0131": "i", "\u0237": "j", "\u2206": "\u0394"})
 
 
 def _symbol_bag(text: str) -> Counter[str]:
@@ -191,7 +194,7 @@ def _symbol_bag(text: str) -> Counter[str]:
 
     Modifier letters (Unicode category Lm, such as the U+02C6 circumflex a LaTeX hat
     accent leaves in a text layer) are accents, not symbols, so they are dropped."""
-    folded = unicodedata.normalize("NFKC", text).casefold().translate(_DOTLESS)
+    folded = unicodedata.normalize("NFKC", text).translate(_DOTLESS).casefold()
     return Counter(ch for ch in folded if ch.isalnum() and unicodedata.category(ch) != "Lm")
 
 

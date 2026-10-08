@@ -136,7 +136,10 @@ are NFKC normalised (math-italic glyphs such as U+1D463 become `v`; `ℝ` become
 case-folded; order and spacing are ignored, so a fraction extracted as "distance time"
 still matches. Accents are not symbols: modifier letters (Unicode category Lm, such as
 the U+02C6 circumflex a LaTeX `\hat` leaves in the text layer) are dropped, and the
-dotless i and j an accent sits on (`\hat{\imath}`) count as i and j.
+dotless i and j an accent sits on (`\hat{\imath}`) count as i and j. pdfTeX's capital
+Delta is U+2206 INCREMENT in the text layer (the Adobe Glyph List's "Delta"), not a
+letter, so it counts as `Δ`; without that every correct `\Delta` from a LaTeX PDF was a
+`symbol_mismatch` (found 2026-10-08 on the problem-set fixture: `∆x ∆t`).
 
 The check `equation.text_layer` (severity warning) fails when the bags differ at all:
 
