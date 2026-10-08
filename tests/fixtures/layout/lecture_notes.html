@@ -1,0 +1,75 @@
+<!doctype html>
+<!--
+  Fixture for tests/test_layout_fixtures.py. Original text written for this project
+  (introductory kinematics, no course material). Regenerate the PDF with
+  `uv run python tests/fixtures/layout/make_fixtures.py`.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Motion in One Dimension: Lecture Notes</title>
+<style>
+  body { font-family: "DejaVu Serif", serif; font-size: 11pt; margin: 0; }
+  h1 { font-size: 22pt; margin: 0 0 12pt 0; }
+  h2 { font-size: 16pt; margin: 14pt 0 8pt 0; }
+  h3 { font-size: 13pt; margin: 12pt 0 6pt 0; }
+  p { margin: 0 0 8pt 0; line-height: 1.35; }
+  math[display="block"] { margin: 10pt 0; }
+  figure { margin: 12pt 0; text-align: center; }
+  figcaption { font-size: 9.5pt; margin-top: 6pt; }
+  .next-page { break-before: page; }
+</style>
+</head>
+<body>
+<h1>Chapter 2: Motion in One Dimension</h1>
+<p>These notes describe motion along a straight line. We track where an object is, how far it
+has moved, and how quickly its position changes. Every quantity comes with a unit, and checking
+units is the fastest way to catch a mistake in a calculation.</p>
+
+<h2>2.1 Position and Displacement</h2>
+<p>Position is measured from a chosen origin. When a cart moves from an initial position
+<math><msub><mi>x</mi><mn>0</mn></msub></math> to a final position
+<math><msub><mi>x</mi><mi>f</mi></msub></math>, its displacement is the change in position:</p>
+<math display="block"><mi>Δ</mi><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>f</mi></msub><mo>−</mo><msub><mi>x</mi><mn>0</mn></msub></math>
+<p>Displacement has a direction. A cart that ends up behind its starting point has a negative
+displacement, even though the distance it travelled is positive.</p>
+
+<h3>Units</h3>
+<p>Positions and displacements are measured in metres. A displacement of
+<math><mn>3</mn><mtext>&#x2009;m</mtext></math> to the left is written as
+<math><mo>−</mo><mn>3</mn><mtext>&#x2009;m</mtext></math> when the positive direction points right.</p>
+
+<h2>2.2 Speed and Velocity</h2>
+<p>Average velocity is displacement divided by the time taken. For a trip that lasts
+<math><mi>Δ</mi><mi>t</mi></math>, the average velocity is
+<math><mi>v</mi><mo>=</mo><mi>Δ</mi><mi>x</mi><mo>/</mo><mi>Δ</mi><mi>t</mi></math>, and its
+unit is metres per second.</p>
+<math display="block"><mi>v</mi><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>x</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></math>
+<p>If we know the kinetic energy of the cart and its mass, its speed follows from</p>
+<math display="block"><mi>v</mi><mo>=</mo><msqrt><mfrac><mrow><mn>2</mn><mi>K</mi></mrow><mi>m</mi></mfrac></msqrt></math>
+
+<figure>
+<svg width="300" height="150" viewBox="0 0 300 150" xmlns="http://www.w3.org/2000/svg">
+  <line x1="30" y1="130" x2="290" y2="130" stroke="black" stroke-width="1.5"/>
+  <line x1="30" y1="130" x2="30" y2="10" stroke="black" stroke-width="1.5"/>
+  <polyline points="30,120 90,95 150,70 210,45 270,20" fill="none" stroke="#1f4e9c" stroke-width="2.5"/>
+  <circle cx="90" cy="95" r="4" fill="#b8341b"/>
+  <circle cx="210" cy="45" r="4" fill="#b8341b"/>
+</svg>
+<figcaption>Figure 2.1 Position against time for a cart moving at constant velocity.</figcaption>
+</figure>
+
+<h2 class="next-page">2.3 Acceleration</h2>
+<p>Acceleration is the rate at which velocity changes. A cart that speeds up from rest to
+<math><mn>6</mn><mtext>&#x2009;m/s</mtext></math> in two seconds has an average acceleration of
+<math><mn>3</mn><mspace width="0.17em"/><mi mathvariant="normal">m</mi><mo>/</mo><msup><mi mathvariant="normal">s</mi><mn>2</mn></msup></math>.</p>
+<math display="block"><mi>a</mi><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>v</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></math>
+<p>When the acceleration is constant, the velocity grows by the same amount every second and
+a graph of velocity against time is a straight line.</p>
+
+<h3>Free fall</h3>
+<p>Near the surface of the Earth, a dropped ball has a nearly constant downward acceleration
+<math><mi>g</mi></math> as long as air resistance is small. Timing a fall over a known height is a
+simple way to estimate it in the lab.</p>
+</body>
+</html>

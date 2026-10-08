@@ -1,0 +1,211 @@
+"""heading_step.heading_fixes and layout.heading_levels (deterministic, no model)."""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+import pytest
+
+from a11y_stem.core.types import Element, Kind, Status
+from a11y_stem.pipeline.heading_step import ACCEPT_AT, heading_fixes, repair_outline
+from a11y_stem.pipeline.layout import (
+    REASON_BOLD_BODY,
+    REASON_LARGER_FONT,
+    REASON_LIST_NUMBER,
+    REASON_NUMBERED,
+    REASON_NUMBERED_LINE,
+    analyze,
+    heading_levels,
+    section_number,
+)
+
+FIXTURES = Path(__file__).parent / "fixtures" / "layout"
+
+
+def heading(
+    order: int, text: str, size: float, *reasons: str, bold: bool = True, kind: Kind = Kind.HEADING
+) -> Element:
+    return Element(
+        id=f"p1-e{order}",
+        kind=kind,
+        page=0,
+        bbox=(72.0, 72.0 + 20 * order, 300.0, 86.0 + 20 * order),
+        order=order,
+        text=text,
+        font_size=size,
+        bold=bold,
+        reasons=list(reasons),
+    )
+
+
+def large(order: int, text: str, size: float, *extra: str) -> Element:
+    return heading(order, text, size, REASON_LARGER_FONT, *extra)
+
+
+@pytest.mark.parametrize(
+    ("raw", "repaired"),
+    [
+        ([], []),
+        ([1, 2, 3, 4, 5, 6], [1, 2, 3, 4, 5, 6]),
+        ([1, 3], [1, 2]),
+        ([1, 6, 6, 2], [1, 2, 2, 2]),
+        ([3], [2]),  # first heading is h1 or h2
+        ([3, 4], [2, 3]),
+        ([1, 3, 3, 2, 3], [1, 2, 2, 2, 3]),  # siblings stay siblings
+        ([2, 1, 3], [2, 1, 2]),  # going back up is fine
+        ([1, 2, 4, 2, 4], [1, 2, 3, 2, 3]),
+    ],
+)
+def test_repair_outline(raw, repaired):
+    assert repair_outline(raw) == repaired
+
+
+def test_heading_levels_cluster_sizes_and_put_bold_lines_below():
+    elements = [
+        large(0, "Chapter 2 Motion", 22.0),
+        large(1, "2.1 Position", 16.0),
+        large(2, "2.2 Velocity", 16.5),  # within 5 % of 16: same level
+        large(3, "Units", 13.0),
+        heading(4, "Worked example", 11.0, REASON_BOLD_BODY),
+        heading(5, "2.2.1 Average speed", 11.0, REASON_BOLD_BODY, REASON_NUMBERED),
+        heading(6, "2.2.1.1 Sign of velocity", 11.0, REASON_BOLD_BODY, REASON_NUMBERED),
+        heading(7, "Not a heading", 30.0, REASON_LARGER_FONT, kind=Kind.PARAGRAPH),
+    ]
+    assert heading_levels(elements) == {
+        "p1-e0": 1,
+        "p1-e1": 2,
+        "p1-e2": 2,
+        "p1-e3": 3,
+        "p1-e4": 4,
+        "p1-e5": 4,
+        "p1-e6": 5,  # one number deeper than "2.2.1" among the bold headings
+    }
+
+
+def test_heading_levels_never_exceed_six():
+    elements = [large(i, f"Heading {i}", 30.0 - 2 * i) for i in range(8)]
+    assert list(heading_levels(elements).values()) == [1, 2, 3, 4, 5, 6, 6, 6]
+
+
+@pytest.mark.parametrize(
+    ("text", "expected"),
+    [
+        ("2.3 Speed and Velocity", (2, False)),
+        ("2.3.1. Average speed", (3, False)),
+        ("Chapter 2: Motion", (1, False)),
+        ("2 Motion in One Dimension", (1, False)),
+        ("1. Measure the ramp", (1, True)),
+        ("3) Time the fall", (1, True)),
+        ("IV. Results", (1, False)),
+        ("A) Units", (1, True)),
+        ("A ball rolls down", None),
+        ("I think so", None),
+        ("2024 was a good year", None),
+        ("Speed and velocity", None),
+    ],
+)
+def test_section_number(text, expected):
+    assert section_number(text) == expected
+
+
+def by_id(elements: list[Element]):
+    fixes = heading_fixes(elements)
+    return {f.element_id: f for f in fixes}
+
+
+def failed_codes(fix) -> list[str]:
+    return [c.code for c in fix.failed_checks]
+
+
+def test_strong_evidence_is_accepted_and_weak_evidence_needs_review():
+    elements = [
+        large(0, "Chapter 2 Motion", 22.0, REASON_NUMBERED),
+        large(1, "Velocity", 16.0),
+        heading(2, "Worked example", 11.0, REASON_BOLD_BODY),
+        heading(3, "2.3.1 Units of speed", 11.0, REASON_BOLD_BODY, REASON_NUMBERED),
+        heading(4, "2.4 Acceleration", 11.0, REASON_NUMBERED_LINE, REASON_NUMBERED, bold=False),
+        large(5, "KINEMATICS SUMMARY", 16.0),
+        large(6, "Ex.", 16.0),
+        heading(7, "1. Setup", 11.0, REASON_BOLD_BODY, REASON_LIST_NUMBER),
+        large(8, "1. Introduction", 16.0, REASON_LIST_NUMBER),
+    ]
+    fixes = by_id(elements)
+    expected = {
+        "p1-e0": (Status.ACCEPTED, 0.95, []),
+        "p1-e1": (Status.ACCEPTED, 0.90, []),
+        "p1-e2": (Status.NEEDS_REVIEW, 0.60, ["heading.weak_evidence"]),
+        "p1-e3": (Status.ACCEPTED, 0.88, []),
+        "p1-e4": (Status.ACCEPTED, 0.88, []),
+        "p1-e5": (Status.NEEDS_REVIEW, 0.75, ["heading.all_caps"]),
+        "p1-e6": (Status.NEEDS_REVIEW, 0.70, ["heading.very_short"]),
+        "p1-e7": (Status.NEEDS_REVIEW, 0.45, ["heading.weak_evidence", "heading.list_like"]),
+        "p1-e8": (Status.ACCEPTED, 0.90, []),  # "1. Introduction" in a large font is fine
+    }
+    for element_id, (status, confidence, codes) in expected.items():
+        fix = fixes[element_id]
+        assert (fix.status, fix.confidence, failed_codes(fix)) == (status, confidence, codes), (
+            element_id
+        )
+        if status == Status.ACCEPTED:
+            assert fix.confidence is not None and fix.confidence >= ACCEPT_AT
+
+
+def test_outline_repair_is_a_check_and_keeps_strong_headings_accepted():
+    elements = [
+        large(0, "Kinematics", 22.0),
+        large(1, "Constant acceleration", 13.0),  # raw level 3: the h2 size appears later
+        large(2, "Summary", 16.0),
+    ]
+    fixes = heading_fixes(elements)
+    assert [f.heading.level for f in fixes if f.heading] == [1, 2, 2]
+    repaired = fixes[1]
+    assert failed_codes(repaired) == ["heading.level_repaired"]
+    assert repaired.status == Status.ACCEPTED and repaired.confidence == 0.87
+    assert failed_codes(fixes[0]) == [] and failed_codes(fixes[2]) == []
+
+
+def test_fixes_follow_reading_order_skip_other_kinds_and_clean_text():
+    elements = [
+        large(2, "Second   heading", 16.0),
+        heading(1, "A paragraph", 11.0, kind=Kind.PARAGRAPH),
+        large(0, " First heading ", 22.0),
+    ]
+    fixes = heading_fixes(elements)
+    assert [(f.element_id, f.heading.text, f.heading.level) for f in fixes if f.heading] == [
+        ("p1-e0", "First heading", 1),
+        ("p1-e2", "Second heading", 2),
+    ]
+    assert all(f.kind == Kind.HEADING and f.calls == [] and f.cost_usd == 0 for f in fixes)
+
+
+def test_empty_heading_text_abstains_with_a_category_code():
+    (fix,) = heading_fixes([large(0, "   ", 20.0)])
+    assert (fix.status, fix.reason, fix.heading, fix.confidence) == (
+        Status.ABSTAINED,
+        "heading.empty_text",
+        None,
+        None,
+    )
+
+
+def test_check_codes_are_content_free_categories():
+    elements = [large(0, "SECRET STUDENT NAME", 20.0), heading(1, "Ex", 11.0, REASON_BOLD_BODY)]
+    for fix in heading_fixes(elements):
+        for check in fix.checks:
+            assert re.fullmatch(r"heading\.[a-z_]+", check.name)
+            assert check.code is None or re.fullmatch(r"heading\.[a-z_]+", check.code)
+            assert check.severity == "warning"
+
+
+def test_worked_example_fixture_outline():
+    layout_ = analyze((FIXTURES / "worked_example.pdf").read_bytes())
+    fixes = heading_fixes(layout_.elements)
+    assert [(f.heading.level, f.heading.text, f.status) for f in fixes if f.heading] == [
+        (1, "Kinematics Review", Status.ACCEPTED),
+        (2, "Constant Acceleration", Status.ACCEPTED),  # h1 -> h3 in the source, repaired
+        (3, "Worked example", Status.NEEDS_REVIEW),  # bold body-size line
+        (2, "Summary", Status.ACCEPTED),
+    ]
+    assert failed_codes(fixes[1]) == ["heading.level_repaired"]
+    assert failed_codes(fixes[2]) == ["heading.level_repaired", "heading.weak_evidence"]

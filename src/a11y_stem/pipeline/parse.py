@@ -1,20 +1,19 @@
-"""PDF page -> elements (stub).
+"""PDF page -> raw elements: the quick, line-level view behind `a11y-stem parse`.
 
-Step 1 of the pipeline: split a page into text blocks, images and
-candidate equation regions. This uses PyMuPDF's text dictionary only. It does not call
-any model yet.
+This module is deliberately simple: PyMuPDF's text dictionary, one element per text run,
+image or maths-looking line, in PyMuPDF block order. It is a debugging aid and the home
+of `equation_score`, the cheap, explainable "does this text look like maths" score.
 
-What this stub does:
-- text blocks with their font size (input for heading detection later),
+The real analysis (reading order, columns, headings, display/inline equations, vector
+fraction bars, figures with captions, running headers) lives in `pipeline.layout`, which
+reuses `equation_score`, `MATH_FONT` and the character sets below. Model calls live in
+`pipeline.equation_step` and `pipeline.figure_step`.
+
+What this module returns:
+- text blocks with their font size,
 - images (bounding box and pixel size; image bytes are not kept),
-- equation candidates: text lines that look like maths by a cheap, explainable score
-  (math fonts, operators, Greek letters, short symbol-like tokens, superscripts).
-
-TODO(vision step, Oct 21-26 per the plan): for each equation candidate and each image,
-render the region with `render_region()`, send it to the vision model, get LaTeX back,
-convert with `a11y_stem.eval.equations.latex_to_mathml`, then validate (LaTeX compiles,
-re-render matches the crop). Equations drawn as vector paths (fraction bars, radicals)
-are not detected yet; `page.get_drawings()` near a candidate is the next signal to add.
+- equation candidates: text lines that look like maths by `equation_score` (math fonts,
+  operators, Greek letters, math-italic letters, short symbol-like tokens, superscripts).
 """
 
 from __future__ import annotations
@@ -28,8 +27,13 @@ import pymupdf
 
 ElementKind = Literal["text", "image", "equation_candidate"]
 
+# Font families used only for maths: TeX (CM*, AMS MSAM/MSBM, txfonts/pxfonts, rsfs,
+# euler), OpenType maths fonts (Cambria Math, Latin Modern Math, STIX Two Math, Noto Sans
+# Math: all contain "Math"), Word/MathType (MT Extra, Euclid) and Symbol.
 MATH_FONT = re.compile(
-    r"(CMMI|CMSY|CMEX|CMBSY|MSAM|MSBM|Math|Symbol|STIX|MTExtra|MT Extra|Euclid)", re.I
+    r"(CMMI|CMSY|CMEX|CMBSY|MSAM|MSBM|Math|Symbol|STIX|MTExtra|MT Extra|Euclid|"
+    r"rsfs|eufm|eurm|txmi|pxmi|txsy|pxsy|txex|pxex|MTMI|MTSY|esint)",
+    re.I,
 )
 RELATIONS = set("=<>\u2264\u2265\u2260\u2248\u2261\u221d\u2192")  # <= >= != ~= == prop ->
 MATH_CHARS = set("+-*/^_()[]{}|=<>") | set(
@@ -41,6 +45,15 @@ MATH_CHARS = set("+-*/^_()[]{}|=<>") | set(
 GREEK = re.compile("[\u0391-\u03a9\u03b1-\u03c9]")
 SUPERSCRIPT_FLAG = 1  # PyMuPDF span flag bit 0
 EQUATION_THRESHOLD = 0.5
+
+
+def is_math_alphanumeric(char: str) -> bool:
+    """Unicode "Mathematical Alphanumeric Symbols" (U+1D400-U+1D7FF), e.g. italic \ud835\udc63.
+
+    Browsers printing MathML and Word's equation editor emit these for variables, so a
+    character in this block is maths whatever font it is in.
+    """
+    return len(char) == 1 and 0x1D400 <= ord(char) <= 0x1D7FF
 
 
 @dataclass
@@ -73,7 +86,9 @@ def equation_score(text: str, fonts: list[str], has_superscript: bool) -> tuple[
     if any(c in RELATIONS for c in chars):
         score += 0.4
         reasons.append("relation symbol")
-    math_ratio = sum(c in MATH_CHARS or bool(GREEK.match(c)) for c in chars) / len(chars)
+    math_ratio = sum(
+        c in MATH_CHARS or bool(GREEK.match(c)) or is_math_alphanumeric(c) for c in chars
+    ) / len(chars)
     if math_ratio >= 0.2:
         score += 0.3
         reasons.append(f"math chars {math_ratio:.0%}")
@@ -198,10 +213,10 @@ def render_region(
 
 
 def transcribe_equation(png: bytes) -> str:
-    """TODO(vision step): image of an equation -> LaTeX via the vision model.
+    """Placeholder from the skeleton; the vision step is `pipeline.equation_step.transcribe`.
 
-    Not implemented in the skeleton. Model, prompt, cost cap per call and fallback model
-    are open decisions (docs/decisions/0001-scope.md). Never send private-inputs/ pages to
-    a provider that trains on inputs or keeps them, and keep tracing off for those runs.
+    Kept so an old caller fails loudly instead of silently getting nothing. Never send
+    private-inputs/ pages to a provider that trains on inputs or keeps them, and keep
+    tracing off for those runs.
     """
-    raise NotImplementedError("vision step not built yet; see module docstring")
+    raise NotImplementedError("use pipeline.equation_step.transcribe (see module docstring)")
