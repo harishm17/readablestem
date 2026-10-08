@@ -180,7 +180,7 @@ def test_image_cache_fetches_once_and_converts_to_png(tmp_path):
 
 def test_image_cache_refuses_other_hosts(tmp_path):
     images = fake_images(tmp_path)
-    with pytest.raises(RenderError, match="openstax.org"):
+    with pytest.raises(RenderError, match=r"openstax\.org"):
         images.raw("https://example.org/x.png")
     assert images.served == []  # type: ignore[attr-defined]
 
@@ -343,6 +343,9 @@ def test_render_page_pdf_has_headings_in_its_text_layer(tmp_path, chromium):
     assert "A red ball on a ramp." not in text
     # Second call is served from the PDF cache.
     assert len(list((tmp_path / "pages").iterdir())) == 1
-    assert render.render_page_pdf(
-        page_source(), images=fake_images(tmp_path), cache_dir=tmp_path / "pages"
-    ) == pdf
+    assert (
+        render.render_page_pdf(
+            page_source(), images=fake_images(tmp_path), cache_dir=tmp_path / "pages"
+        )
+        == pdf
+    )

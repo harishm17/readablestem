@@ -229,6 +229,17 @@ def fake_describe(
     )
 
 
+def eq_fix(element_id: str, latex: str, confidence: float = 0.9) -> Fix:
+    """An accepted equation fix whose MathML is latex2mathml's rendering of `latex`."""
+    return Fix(
+        element_id=element_id,
+        kind=Kind.EQUATION,
+        status=Status.ACCEPTED,
+        confidence=confidence,
+        equation=EquationFix(latex=latex, mathml=latex_to_mathml(latex), speech=""),
+    )
+
+
 def test_fake_png_has_a_readable_size_and_is_unique_per_key():
     from a11y_stem.eval.pipeline_eval import _png_size
 
