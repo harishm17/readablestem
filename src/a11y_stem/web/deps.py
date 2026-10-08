@@ -28,6 +28,7 @@ from a11y_stem.web.worker import ClientFactory, Converter, Worker
 
 CSRF_FIELD = "csrf_token"
 SESSION_USER = "uid"
+SESSION_VERSION = "sv"  # users.session_version when the session was signed in
 SESSION_CSRF = "csrf"
 SESSION_FLASH = "flash"
 
@@ -107,17 +108,21 @@ class CsrfFailed(Exception):
 
 def current_user(request: Request) -> CurrentUser | None:
     """The signed-in user, if they are still on the allowlist (checked on every request,
-    so removing someone takes effect immediately)."""
+    so removing someone takes effect immediately) and the session is not older than
+    their last sign-out (`users.session_version`), so a copied cookie stops working
+    when its owner signs out."""
     if hasattr(request.state, "user"):
         return request.state.user
     user: CurrentUser | None = None
     uid = request.session.get(SESSION_USER)
+    # Sessions signed in before the version existed carry none: version 0, still valid.
+    version = request.session.get(SESSION_VERSION, 0)
     if isinstance(uid, str):
         with session_scope(get_ctx(request).factory) as session:
             row = session.scalar(select(User).where(User.id == uid, User.is_allowed.is_(True)))
-            if row is not None:
+            if row is not None and row.session_version == version:
                 user = CurrentUser(id=row.id, email=row.email, name=row.name, is_admin=row.is_admin)
-        if user is None:  # deleted or removed from the allowlist since signing in
+        if user is None:  # deleted, removed from the allowlist or signed out since
             request.session.pop(SESSION_USER, None)
     request.state.user = user
     return user
@@ -141,10 +146,11 @@ UserDep = Annotated[CurrentUser, Depends(require_user)]
 AdminDep = Annotated[CurrentUser, Depends(require_admin)]
 
 
-def start_session(request: Request, user_id: str) -> None:
+def start_session(request: Request, user_id: str, session_version: int = 0) -> None:
     """Rotate the session on sign-in (drops any pre-login state, issues a new CSRF token)."""
     request.session.clear()
     request.session[SESSION_USER] = user_id
+    request.session[SESSION_VERSION] = session_version
     request.session[SESSION_CSRF] = secrets.token_urlsafe(32)
     if hasattr(request.state, "user"):  # drop the cached anonymous lookup
         del request.state.user

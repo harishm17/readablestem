@@ -62,6 +62,10 @@ class User(Base):
     is_admin: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    # Bumped on sign-out and on removal from the allowlist: a session signed with an
+    # older value (a copied cookie, another browser) no longer signs anyone in. The
+    # server default keeps rows inserted by an older release valid after a rollback.
+    session_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     jobs: Mapped[list[Job]] = relationship(back_populates="user")
 

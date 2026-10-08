@@ -108,8 +108,15 @@ else, admins included, so job ids cannot be probed and admins never see document
   created for them.
 - **Sessions.** Starlette `SessionMiddleware`: a signed cookie `a11y_stem_session`,
   HttpOnly, SameSite=Lax, 7 days, Secure in production. The session is cleared and a new
-  CSRF token issued at sign-in. It holds the user id, the CSRF token, one-time notices
-  (never document content) and Authlib's sign-in state.
+  CSRF token issued at sign-in. It holds the user id, the user's session version, the
+  CSRF token, one-time notices (never document content) and Authlib's sign-in state.
+- **Signing out.** The cookie is signed, not stored, so clearing it in one browser
+  would leave any copy of it valid for its 7 days. Signing out therefore bumps
+  `users.session_version`, and a session signed in with an older version no longer
+  signs anyone in: signing out ends every session of the account (other browsers and
+  copied cookies too). Removal from the allowlist bumps it as well, so old sessions stay
+  ended if the person is allowed back. Sessions from before the column existed carry no
+  version and count as version 0.
 - **CSRF.** Every form that changes something carries a hidden `csrf_token`, compared in
   constant time with the session's. `tests/test_web_auth.py` lists every POST route and
   checks each refuses a forged token, so a new route cannot skip the check unnoticed.
