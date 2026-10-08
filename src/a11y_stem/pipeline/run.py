@@ -61,6 +61,7 @@ from typing import Any
 from pydantic import Field
 
 from a11y_stem.config import ConfigError, Settings
+from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded
 from a11y_stem.core.types import (
     BBox,
@@ -617,6 +618,8 @@ def _stats(
         model_calls=sum(len(f.calls) for f in fixes),
         by_kind=dict(Counter(f.kind.value for f in fixes)),
         by_status=dict(Counter(f.status.value for f in fixes)),
+        by_review=dict(Counter(f.review for f in fixes)),
+        required_decisions=triage.required_decisions(fixes),
         per_page=per_page,
     )
 

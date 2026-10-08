@@ -147,12 +147,63 @@ h1 or h2. Siblings stay siblings (`h1 h3 h3 h2 h3` becomes `h1 h2 h2 h2 h3`).
 | ... + section number | 0.88 | yes |
 
 Penalties: all caps -0.15, fewer than 4 letters -0.20, list-style number without a larger
-font -0.15, outline repaired -0.03. A fix is ACCEPTED only with strong evidence and none of
-the first three penalties (so every accepted heading has confidence >= 0.85, the default
-`AUTO_ACCEPT_CONFIDENCE`); everything else is NEEDS_REVIEW. Checks (all warnings):
-`heading.outline` / `heading.level_repaired`, `heading.evidence` / `heading.weak_evidence`,
-`heading.all_caps`, `heading.length` / `heading.very_short`, `heading.list_like`. An empty
-heading text gives ABSTAINED with reason `heading.empty_text`.
+font -0.15, outline repaired -0.03. A heading is *certain* with strong evidence and none of
+the first three penalties (so its confidence is >= 0.85, the default
+`AUTO_ACCEPT_CONFIDENCE`). Checks (all warnings): `heading.outline` /
+`heading.level_repaired`, `heading.evidence` / `heading.weak_evidence`, `heading.all_caps`,
+`heading.length` / `heading.very_short`, `heading.list_like`. An empty heading text gives
+ABSTAINED with reason `heading.empty_text` (review "required").
+
+**Review tiers** (docs/design/beta-architecture.md "Review tiers"). Every heading is
+written as a heading; the tier only says whether a person must decide:
+
+| Heading | Status | `Fix.review` |
+|---|---|---|
+| certain | ACCEPTED | `none` (`optional` when the outline repair moved it) |
+| uncertain, its label used once | ACCEPTED | `optional`: its failed checks are the notes |
+| uncertain, the same label and style two or more times | NEEDS_REVIEW | `required`, one decision for the group (`group_key`, `group_size`) |
+
+Same label: NFKC, case-folded, letters and digits only ("Teacher Support:" = "teacher
+support"). Same style: font size to the half point, bold or not, larger-font evidence or
+not, and the same proposed level. Certain copies of the label are never in a group. On
+the three gold pages this gives 9 decisions in 43 PDF pages (one per repeated label:
+"Teacher Support", "Solution", "Discussion", "Procedure", "Distance vs. Displacement")
+instead of 61 headings to review.
+
+**Run-in labels.** OpenStax's outline does not count the bold labels inside a worked
+example or lab box ("Solution", "Discussion", "Procedure") as headings, but does count
+the titles of boxes ("Teacher Support", "Worked Example" titles, "Strategy"). On the
+printed gold pages they differ only in ways our print CSS decides, not the book: the
+labels are at exactly body size inside an indented box, the box titles are an h4 at 1.05 x
+body size (or larger, like "Strategy").
+Rules tried (2026-10-08):
+
+| Rule | Gold pages (17 labels among 138 predicted headings; the other 121 are gold headings) | Fixtures (`tests/fixtures/layout`, 4 HTML and 4 LaTeX PDFs; no run-in label) |
+|---|---|---|
+| bold, body size exactly (within 2 %), at most two words | 17 of 17 labels; 1 real heading lost ("Displacement Problems", an h5 at body size) | 1 real heading lost ("Worked example", an h4 at body size in `worked_example.pdf`) |
+| ... and indented more than 3 pt from the page's usual text edge (inside a box) | 15 of 17 (the two "Procedure" on page 2.1 sit at the edge of a page full of boxes); 0 lost | 0 lost |
+
+Neither is reliable: the first loses real headings, the second misses labels as soon as a
+page is mostly boxes, and both signals (font size equal to the body, the box's padding)
+come from `eval/render.py`'s CSS, not from the book, and none of our fixtures has a
+run-in label to test them on. Real documents set labels and headings in many other ways
+(LaTeX `\subsubsection*` is bold at body size at the margin; Word users bold a paragraph
+as a heading), so neither rule is used. Labels stay headings: alone they are
+optional notes, repeated they are one group decision ("Solution" x4 on page 2.2). A real
+OpenStax PDF, or a course PDF with worked examples, is the evidence that could change
+this.
+
+**Known-plain letters** (`Element.regular_letters`, equations only). The letters of an
+equation's text that the PDF draws, not bold, in a font known to have a bold face
+(`_REGULAR_FACE`: Computer Modern CMR/CMMI/CMTI/CMSS, Latin Modern, cm-super, txfonts and
+pxfonts, Times, Nimbus, Liberation, DejaVu, Arial, Helvetica, Calibri, Cambria, Georgia,
+Palatino, Garamond, Charter, Noto, Source, STIX, XITS, TeX Gyre, Libertine, ...). A bold
+reading of such a letter is a scalar read as a vector, which the equation step treats as
+meaning-level. Fonts that cannot show a letter's style in the text layer are left out on
+purpose: MSBM (double-struck), EUSM and RSFS (script), EUFM (fraktur), CMSY
+(calligraphic), Symbol. A letter that is already a styled maths code point says its own
+style and is not listed. On the two-column handout: `𝐯 ∈ Rn` gives `n` (R is MSBM), the
+bold omega gives nothing.
 
 ### Lists
 
@@ -454,8 +505,11 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - **Plain body-size numbered headings with a bare integer** (`3 Forces` in body text,
   not bold) are paragraphs: at body size a bare integer is too often a quantity. They
   are found when bold (as weak evidence) or in a larger font.
-- **Bold table header cells** (`Time`, `Distance`) can still become weak, NEEDS_REVIEW
-  headings; numeric cells no longer do.
+- **Bold table header cells** (`Time`, `Distance`) can still become weak headings (an
+  optional note; a group decision if the same header repeats); numeric cells no longer
+  do.
+- **Bold run-in labels** ("Solution", "Discussion", "Procedure") become weak headings;
+  see "Run-in labels" above for why no rule removes them.
 - **Repeated margin logos drawn as vectors** are recognised only from drawings that lie
   inside the header/footer band; a logo that extends into the body is a figure on every
   page.

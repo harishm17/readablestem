@@ -85,7 +85,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation or figure |
 | GET `/jobs/{id}/review` | owner | Review screen |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
@@ -280,17 +280,45 @@ and scripts.
 Code: `web/routes/review.py` (page and form handling), `web/review.py` (rules: order,
 eligibility, validation), `web/messages.py` (what each code means). Tests:
 `tests/test_web_review.py` (one fix), `tests/test_web_review_bulk.py` (order, landing,
-bulk accept), `tests/test_web_review_messages.py` (every code has a sentence) and
-`tests/test_web_review_browser.py` (axe, reflow, keyboard, no JavaScript; `browser`
-marker).
+bulk accept), `tests/test_web_review_messages.py` (every code has a sentence),
+`tests/test_web_review_triage.py` (decisions, optional checks, heading groups) and
+`tests/test_web_review_browser.py`, `tests/test_web_review_triage_browser.py` (axe,
+reflow, keyboard, no JavaScript; `browser` marker).
 
-**Order.** A reviewer's time should go where a mistake costs a student most, so fixes
-are grouped by kind: equations, then figures, then headings. Within a group, the fixes
-still waiting for a decision come first (needs review, failed and not converted alike),
-in page and reading order; the ones already decided (accepted, edited, rejected) are
-folded into a `<details>` below them. A table of contents at the top links to each group
-and gives its counts. Every fix is numbered within its kind in reading order ("Equation
-3"), so a number stays the same while the list reorders after each decision.
+**Order.** Only meaning-level problems ask for a decision (docs/design/beta-architecture.md
+"Review tiers"), so the page has three sections:
+
+1. **Needs your decision (N)**: equations, then figures, then headings (a mistake there
+   costs a student most), each with the fixes still waiting (needs review, failed and not
+   converted alike) in page and reading order. N counts decisions: a group of repeated
+   headings is one.
+2. **Optional checks (M)**: fixes accepted automatically with a note (`Fix.review ==
+   "optional"`: a bold subscript, a double-struck R the PDF cannot show, a heading with
+   weak evidence, a long alt text), folded into a `<details>`. Each item's summary line is
+   its note in plain English (`web/messages.py`); unfolding it shows the full card, which
+   can still be edited or rejected. Nothing here counts toward "done".
+3. **Accepted or decided**: everything else, folded.
+
+A table of contents at the top links to each section and kind group with its counts.
+Every fix is numbered within its kind in reading order ("Equation 3"), so a number stays
+the same while the list reorders.
+
+**Heading groups.** Repeated headings with weak evidence (the same label and style two or
+more times, `pipeline/heading_step.py`) share a `Fix.group_key` and are one card: "“Teacher
+Support” appears 11 times as a bold line in the body text size. Keep them as headings at
+level 3, or make them bold text?", with **Apply to all 11** (accept each at its proposed
+level), **Make all 11 bold text** (reject each: the output writes `<p><strong>`) and a
+level select with **Set the level for all 11**. The buttons' accessible names include the
+label ("Apply to all 11 headings “Teacher Support” at level 3"). The group's own cards
+are folded inside it ("Decide them one by one"), for the odd one out; once one is decided
+the reviewer lands back on the card, which asks about the rest ("2 still waiting") with
+their cards unfolded (also whenever one of them has an error, so the error summary link
+reaches the field). Apply to all leaves out a heading whose
+level the output would move (it says how many); one level for all is refused as a whole,
+with nothing saved, if the output would move it for any of them. Each changed heading gets
+its own `ReviewEdit`, the HTML is re-rendered once, and the reviewer lands on the next
+decision. A group decision posts to the same route as a single one, with the group key
+(`hg-` + the first member's element id) in place of the element id.
 
 **One fix.** Each card shows:
 
@@ -375,8 +403,11 @@ fix, `result_json` updated, the HTML re-rendered once, then a redirect to
 and re-renders nothing. A choice the page never offers (an unknown threshold, "accept
 all" for equations) is refused with a 422 and an error linked to the threshold select.
 
-**Job page.** "Need your review" is broken down by kind, each linking to its group
-("7 need your review: 3 equations, 1 figure, 3 headings."). The summary also counts
+**Job page.** "Need your decision" counts the decisions still waiting (a heading group
+once; failed and not-converted items too, since each needs a decision) and is broken down
+by kind, each linking to its group ("3 need your decision: 1 equation, 1 figure, 1 group
+of repeated headings."). "Optional checks (accepted; nothing to do)" counts the notes
+nobody has opened; they never count toward done. The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
 HTML file that did not pass, each as a sentence from `web/messages.py` with its code

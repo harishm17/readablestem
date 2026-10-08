@@ -12,7 +12,8 @@
 {% macro group_counts(g) %}
 {%- if g.needs_review %}{{ g.needs_review }} {{ "needs" if g.needs_review == 1 else "need" }} review, {% endif -%}
 {%- if g.not_converted %}{{ g.not_converted }} not converted, {% endif -%}
-{{ g.done|length }} already decided
+{%- if g.optional %}{{ g.optional|length }} with an optional check, {% endif -%}
+{{ g.done|length }} accepted or decided
 {%- endmacro %}
 
 {# The parts of one fix: what was proposed, why it is here, and the decision form.
@@ -36,7 +37,7 @@
 {% endif %}
 {% if item.checks %}
 <div class="explained">
-  <p><strong>What the checks found:</strong></p>
+  <p><strong>{% if item.optional %}Optional check (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
   <ul class="check-list">
     {% for check in item.checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}
@@ -148,6 +149,63 @@
 </form>
 {% endmacro %}
 
+{# One card for repeated headings: one decision for all of the ones still waiting. #}
+{% macro heading_group_card(hg) %}
+{% set key = hg.key %}
+{% set n = hg.waiting %}
+<li id="{{ hg.anchor }}" class="review-item" tabindex="-1">
+  {% for message in hg.notices %}<div class="notice" role="status"><p>{{ message }}</p></div>{% endfor %}
+  <article class="fix-card heading-group status-card-needs_review" aria-labelledby="{{ hg.anchor }}-title">
+    <h4 id="{{ hg.anchor }}-title">Repeated heading: “{{ hg.text }}” <span class="meta">{{ counted(n, "heading", "headings") }}, {{ hg.pages_text }}</span></h4>
+    <p class="group-question">“{{ hg.text }}” appears {{ hg.size }} times {{ hg.style }}{% if n != hg.size %} ({{ n }} still waiting){% endif %}.
+      Keep {{ "it" if n == 1 else "them" }} as {{ "a heading" if n == 1 else "headings" }}{% if hg.level %} at level {{ hg.level }}{% endif %}, or make {{ "it" if n == 1 else "them" }} bold text?</p>
+    <p class="hint">Bold labels that start a paragraph (like “Solution” or “Procedure” in a worked example) are usually not headings; titles of boxes and sections usually are.</p>
+    {% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
+    <div class="button-row" id="group-actions-{{ key }}" tabindex="-1">
+      {% if hg.keep %}
+      <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button type="submit" name="action" value="accept" class="button">Apply to all {{ hg.keep }}<span class="visually-hidden"> {{ "heading" if hg.keep == 1 else "headings" }} “{{ hg.text }}”{% if hg.level %} at level {{ hg.level }}{% endif %}</span></button>
+      </form>
+      {% endif %}
+      <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+        <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+        <button type="submit" name="action" value="reject" class="button-secondary">Make all {{ n }} bold text<span class="visually-hidden"> instead of {{ "a heading" if n == 1 else "headings" }} “{{ hg.text }}”</span></button>
+      </form>
+    </div>
+    {% if hg.keep < n %}<p class="hint">Apply to all leaves out {{ counted(n - hg.keep, "heading", "headings") }} the document would show at another level: choose a level below, or decide {{ "it" if n - hg.keep == 1 else "them" }} one by one.</p>{% endif %}
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="review-form">
+      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+      <input type="hidden" name="action" value="edit">
+      <div class="field{% if hg.error %} field-error{% endif %}">
+        <label for="group-level-{{ key }}">Or choose one level for all {{ n }}</label>
+        <p class="hint" id="group-level-hint-{{ key }}">Level 1 is the top. After the heading before the first of them, level 1{% if hg.level_max > 1 %} to {{ hg.level_max }}{% endif %} fits.</p>
+        <select id="group-level-{{ key }}" name="level" aria-describedby="group-level-hint-{{ key }}{% if hg.error %} group-error-{{ key }}{% endif %}"{% if hg.error %} aria-invalid="true"{% endif %}>
+          {% for lv in range(1, 7) %}
+          <option value="{{ lv }}"{% if hg.values.get("level") == lv|string %} selected{% endif %}>Level {{ lv }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <button type="submit" class="button-secondary">Set the level for all {{ n }}<span class="visually-hidden"> headings “{{ hg.text }}”</span></button>
+    </form>
+    <details class="done-group group-members"{% if hg.open %} open{% endif %}>
+      <summary>Decide them one by one ({{ counted(n, "heading", "headings") }})</summary>
+      <ol class="fix-list">
+        {% for item in hg.members %}
+        <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
+          {% for notice in item.notices %}{{ notice_box(notice) }}{% endfor %}
+          <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
+            <h5 id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %} <span class="meta">on page {{ item.page }}</span>{% endif %}</h5>
+            {{ card_body(item) }}
+          </article>
+        </li>
+        {% endfor %}
+      </ol>
+    </details>
+  </article>
+</li>
+{% endmacro %}
+
 {% macro bulk_forms(g) %}
 {% set select_id = "min-confidence-" ~ g.slug %}
 <div class="bulk-actions">
@@ -166,7 +224,7 @@
     <input type="hidden" name="action" value="accept_confident">
     <div class="field{% if g.error %} field-error{% endif %}">
       <label for="{{ select_id }}">Accept every {{ g.one }} proposal at or above</label>
-      <p class="hint" id="{{ select_id }}-hint">Only proposals waiting for review that passed every required check are included ({{ counted(g.bulk_eligible, g.one, g.many) }} now); {{ g.many }} that could not be converted never are.
+      <p class="hint" id="{{ select_id }}-hint">Only proposals waiting for a decision that passed every required check are included ({{ counted(g.bulk_eligible, g.one, g.many) }} now); {{ g.many }} that could not be converted never are.
         {% if g.bulk_warned %}{{ g.bulk_warned }} of these {{ "has a warning: read it" if g.bulk_warned == 1 else "have warnings: read them" }} on the card first.{% endif %}</p>
       {% if g.error %}<p class="error-message" id="{{ select_id }}-error"><span class="visually-hidden">Error: </span>{{ g.error }}</p>{% endif %}
       <select id="{{ select_id }}" name="min_confidence"
@@ -182,6 +240,19 @@
 </div>
 {% endmacro %}
 
+{# A fix that is folded away: its summary line says what it is and, for an optional
+   check, what the note says; unfolding it shows the full card (still editable). #}
+{% macro folded_item(item, with_notes) %}
+<li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
+  <details class="done-item"{% if item.open %} open{% endif %}>
+    <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %}, page {{ item.page }}{% endif %}: {% if with_notes %}{{ item.notes }}{% else %}{{ item.status_label }}, confidence {{ item.confidence_label }}{% endif %}</summary>
+    <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
+      {{ card_body(item) }}
+    </article>
+  </details>
+</li>
+{% endmacro %}
+
 {% block content %}
 <h1>Review fixes</h1>
 <p class="lede">{{ job.filename }}</p>
@@ -189,18 +260,22 @@
 
 <div id="review-progress" class="review-progress" tabindex="-1">
   {% for notice in notices %}{{ notice_box(notice) }}{% endfor %}
-  <p>{% if remaining %}<strong>{{ remaining }} {{ "fix still needs" if remaining == 1 else "fixes still need" }} a decision:</strong>
-    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your attention.{% endif %}</p>
+  <p>{% if remaining %}<strong>{{ remaining }} {{ "decision is" if remaining == 1 else "decisions are" }} still needed:</strong>
+    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}{% if optional %}
+    {{ counted(optional|length, "optional check", "optional checks") }} can be looked at if you want; {{ "it does" if optional|length == 1 else "they do" }} not hold anything up.{% endif %}</p>
 </div>
 
-<p>Equations come first, then figures, then headings, because mistakes there cost a
-  student most. In each group the fixes waiting for you come first, in page order; the
-  ones already decided are folded away below them. For each fix:</p>
+<p>Only what could change what a student reads needs your decision: an equation or
+  figure that was not converted or that the checks doubt, a bold vector read as a plain
+  letter, a figure without a usable description, and repeated headings (one decision for
+  all copies). Equations come first, then figures, then headings. Small things (a bold
+  subscript, a heading with weak evidence, a long alt text) were accepted and are listed
+  under “Optional checks”. For each fix:</p>
 <ul>
   <li><strong>Accept</strong> keeps the proposal as it is.</li>
   <li><strong>Save edit</strong> checks your change again and, if it passes, uses it.</li>
   <li><strong>Reject</strong> keeps the original from the PDF (as an image, with a note
-    that it was not converted).</li>
+    that it was not converted; a heading becomes ordinary text).</li>
 </ul>
 <p><a href="/jobs/{{ job.id }}">Back to the results</a> ·
   <a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></p>
@@ -211,54 +286,81 @@
 <nav class="review-toc" aria-labelledby="review-toc-title">
   <h2 id="review-toc-title">Sections</h2>
   <ul>
-    {% for g in groups %}
-    <li><a href="#group-{{ g.slug }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
-    {% endfor %}
+    <li><a href="#needs-decision">Needs your decision</a>: {{ remaining }}
+      {% if deciding %}<ul>
+        {% for g in deciding %}
+        <li><a href="#group-{{ g.slug }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
+        {% endfor %}
+      </ul>{% endif %}</li>
+    <li><a href="#optional-checks">Optional checks</a>: {{ optional|length }}</li>
+    <li><a href="#decided">Accepted or decided</a>: {{ done|length }}</li>
   </ul>
 </nav>
 
-{% for g in groups %}
-<section id="group-{{ g.slug }}" class="review-group" aria-labelledby="group-{{ g.slug }}-title" tabindex="-1">
-  <h2 id="group-{{ g.slug }}-title">{{ g.title }} <span class="group-count">({{ g.pending|length }} to decide, {{ g.done|length }} already decided)</span></h2>
-  {% for message in g.notices %}
-  <div class="notice" role="status"><p>{{ message }}</p></div>
-  {% endfor %}
-  {% if g.bulk_eligible or g.error %}{{ bulk_forms(g) }}{% endif %}
-
-  {% if g.pending %}
-  <ol class="fix-list">
-    {% for item in g.pending %}
-    <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
-      {% for notice in item.notices %}{{ notice_box(notice) }}{% endfor %}
-      <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
-        <h3 id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %} <span class="meta">on page {{ item.page }}</span>{% endif %}</h3>
-        {{ card_body(item) }}
-      </article>
-    </li>
+<section id="needs-decision" class="review-section" aria-labelledby="needs-decision-title" tabindex="-1">
+  <h2 id="needs-decision-title">Needs your decision ({{ remaining }})</h2>
+  {% if not deciding %}<p>Nothing is waiting for a decision.</p>{% endif %}
+  {% for g in deciding %}
+  <section id="group-{{ g.slug }}" class="review-group" aria-labelledby="group-{{ g.slug }}-title" tabindex="-1">
+    <h3 id="group-{{ g.slug }}-title">{{ g.title }} <span class="group-count">({{ counted(g.units|length, "decision", "decisions") }})</span></h3>
+    {% for message in g.notices %}
+    <div class="notice" role="status"><p>{{ message }}</p></div>
     {% endfor %}
-  </ol>
-  {% else %}
-  <p>No {{ g.many }} are waiting for a decision.</p>
-  {% endif %}
+    {% if g.bulk_eligible or g.error %}{{ bulk_forms(g) }}{% endif %}
 
-  {% if g.done %}
-  <details class="done-group"{% if g.done_open %} open{% endif %}>
-    <summary>{{ counted(g.done|length, g.one, g.many) }} already decided (accepted, edited or rejected)</summary>
-    <ol class="fix-list done-list">
-      {% for item in g.done %}
+    {% if g.units %}
+    <ol class="fix-list">
+      {% for unit in g.units %}
+      {% if unit.group %}
+      {{ heading_group_card(unit.group) }}
+      {% else %}
+      {% set item = unit.item %}
       <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
-        <details class="done-item"{% if item.open %} open{% endif %}>
-          <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %}, page {{ item.page }}{% endif %}: {{ item.status_label }}, confidence {{ item.confidence_label }}</summary>
-          <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
-            {{ card_body(item) }}
-          </article>
-        </details>
+        {% for notice in item.notices %}{{ notice_box(notice) }}{% endfor %}
+        <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
+          <h4 id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %} <span class="meta">on page {{ item.page }}</span>{% endif %}</h4>
+          {{ card_body(item) }}
+        </article>
       </li>
+      {% endif %}
       {% endfor %}
     </ol>
+    {% else %}
+    <p>No {{ g.many }} are waiting for a decision.</p>
+    {% endif %}
+  </section>
+  {% endfor %}
+</section>
+
+<section id="optional-checks" class="review-section" aria-labelledby="optional-checks-title" tabindex="-1">
+  <h2 id="optional-checks-title">Optional checks ({{ optional|length }})</h2>
+  {% if optional %}
+  <p>These were accepted automatically: the checks found something small that does not
+    change the meaning. Nothing here holds up the document, but you can still change any
+    of them.</p>
+  <details class="done-group"{% if optional_open %} open{% endif %}>
+    <summary>Show the {{ counted(optional|length, "optional check", "optional checks") }}</summary>
+    <ol class="fix-list done-list">
+      {% for item in optional %}{{ folded_item(item, true) }}{% endfor %}
+    </ol>
   </details>
+  {% else %}
+  <p>There are no optional checks.</p>
   {% endif %}
 </section>
-{% endfor %}
+
+<section id="decided" class="review-section" aria-labelledby="decided-title" tabindex="-1">
+  <h2 id="decided-title">Accepted or decided ({{ done|length }})</h2>
+  {% if done %}
+  <details class="done-group"{% if done_open %} open{% endif %}>
+    <summary>{{ counted(done|length, "fix", "fixes") }} accepted automatically or already decided (accepted, edited or rejected)</summary>
+    <ol class="fix-list done-list">
+      {% for item in done %}{{ folded_item(item, false) }}{% endfor %}
+    </ol>
+  </details>
+  {% else %}
+  <p>Nothing has been accepted or decided yet.</p>
+  {% endif %}
+</section>
 {% endif %}
 {% endblock %}

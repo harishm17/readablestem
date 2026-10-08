@@ -87,15 +87,35 @@ def test_mid_confidence_needs_review():
     assert fix.status == Status.NEEDS_REVIEW and fix.figure is not None
 
 
-def test_warning_blocks_acceptance():
+def test_a_style_warning_is_an_optional_note():
+    # "Image of ..." wastes a few words but says the same thing: accepted, with a note.
     fix = run(by_model(main=out("Image of a jet car speeding down a track.", 0.97)))
-    assert fix.status == Status.NEEDS_REVIEW and codes(fix) == {"redundant_prefix"}
+    assert fix.status == Status.ACCEPTED and codes(fix) == {"redundant_prefix"}
+    assert fix.review == "optional"
 
 
-def test_caption_copy_is_flagged():
+def test_a_long_alt_is_an_optional_note():
+    fix = run(by_model(main=out("A jet car on a long desert track. " * 5, 0.97)))
+    assert fix.status == Status.ACCEPTED and codes(fix) == {"too_long"}
+    assert fix.review == "optional"
+
+
+def test_a_note_does_not_lower_the_accept_bar():
+    fix = run(by_model(main=out("Image of a jet car speeding down a track.", 0.7)))
+    assert fix.status == Status.NEEDS_REVIEW and fix.review == "required"
+
+
+def test_caption_copy_needs_a_decision():
+    # A copy of the caption describes nothing the reader does not already hear.
     element = figure_element(caption="Figure 2.9 A U.S. Air Force jet car speeds down a track.")
     fix = run(by_model(main=out("A U.S. Air Force jet car speeds down a track", 0.97)), element)
     assert fix.status == Status.NEEDS_REVIEW and codes(fix) == {"caption_copy"}
+    assert fix.review == "required"
+
+
+def test_clean_accepted_figure_has_nothing_to_review():
+    fix = run(by_model(main=out("A jet car speeds down a desert track.", 0.97)))
+    assert fix.status == Status.ACCEPTED and fix.review == "none"
 
 
 def test_low_confidence_abstains():

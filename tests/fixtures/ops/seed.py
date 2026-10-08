@@ -138,6 +138,14 @@ EXPECTED_DONE_COUNTS = {
     ("figure", "status:accepted"): 1,
     ("figure", "call:gpt-6.1-sol:outcome:ok"): 1,
     ("heading", "status:accepted"): 1,
+    # Review tiers (derived from the status: the fixes are built without `review`).
+    ("equation", "tier:required"): 3,
+    ("equation", "tier:required:unknown_command"): 1,
+    ("equation", "tier:required:low_confidence"): 1,
+    ("equation", "tier:required:other"): 1,  # the sentence code, stored as "other"
+    ("equation", "decisions:required"): 3,
+    ("figure", "tier:none"): 1,
+    ("heading", "tier:none"): 1,
 }
 
 

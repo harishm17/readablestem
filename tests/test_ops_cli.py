@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -104,6 +105,10 @@ def test_weekly_report_prints_the_error_analysis_tables(database, capsys):
     assert "pages converted  2" in out and "cost per page    $0.0030" in out
     assert "equation: 3 fixes by status" in out
     assert "latex.allowed_commands:unknown_command" in out
+    # Review load: 3 equation decisions on 2 pages; why each tier, by code.
+    assert re.search(r"required decisions +3 \(1.50 per page\)", out)
+    assert "equation: review tiers" in out and "equation: why required" in out
+    assert "low_confidence" in out
     assert SENTINEL not in out
 
 

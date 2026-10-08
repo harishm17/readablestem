@@ -402,14 +402,23 @@ def test_thresholds_come_from_settings():
     assert fix.status == Status.NEEDS_REVIEW
 
 
-def test_speech_failure_is_a_warning(monkeypatch):
+def test_speech_failure_is_an_optional_note(monkeypatch):
+    # The speech text is a reading aid on the review screen; the output keeps MathML
+    # only, so a missing reading changes nothing a student gets.
     def broken(_):
         raise SpeechError("x")
 
     monkeypatch.setattr(equation_step, "mathml_to_speech", broken)
     fix = run(by_model(main=out(confidence=0.99)))
-    assert fix.status == Status.NEEDS_REVIEW and codes(fix) == {"speech_failed"}
+    assert fix.status == Status.ACCEPTED and codes(fix) == {"speech_failed"}
+    assert fix.review == "optional"
     assert fix.equation is not None and fix.equation.speech == ""
+
+
+def test_speech_failure_with_low_confidence_still_needs_a_decision(monkeypatch):
+    monkeypatch.setattr(equation_step, "mathml_to_speech", lambda _: "")
+    fix = run(by_model(main=out(confidence=0.7)))
+    assert fix.status == Status.NEEDS_REVIEW and fix.review == "required"
 
 
 # ------------------------------------------------------------- text-layer cross-check
@@ -453,6 +462,71 @@ def test_text_layer_mismatch_on_cheap_model_triggers_escalation():
     assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
     assert fix.status == Status.ACCEPTED and fix.equation is not None
     assert fix.equation.latex == "F = ma"
+
+
+# Review of the triage (2026-10-08): any difference in letters, digits or Greek letters
+# needs a decision, not only a Dice similarity below 0.5. These were all accepted with
+# nothing to review before (similarity 0.86, 0.75, 0.67, and too few symbols).
+SYMBOL_ERRORS = [
+    pytest.param("\U0001d454= 9.80m/s2", r"g = 9.30\ \text{m/s}^2", id="wrong-digit"),
+    pytest.param("\U0001d714= 2\U0001d70b\U0001d453", r"w = 2\pi f", id="greek-misread"),
+    pytest.param(
+        "\U0001d441= \U0001d4410 \U0001d452\u2212\U0001d706\U0001d461",
+        r"N = N_0 e^{-\lambda}",
+        id="dropped-exponent-variable",
+    ),
+    pytest.param("\U0001d465\u2208\u211d", r"x \in \mathbb{N}", id="reals-read-as-naturals"),
+]
+
+
+@pytest.mark.parametrize(("text_layer", "latex"), SYMBOL_ERRORS)
+def test_any_symbol_difference_needs_a_decision(text_layer, latex):
+    fix = run(by_model(main=out(latex, 0.95)), equation_element(text=text_layer))
+    assert codes(fix) == {"symbol_mismatch"}
+    assert fix.status == Status.NEEDS_REVIEW and fix.review == "required"
+    assert fix.confidence == pytest.approx(0.95)  # only a strong mismatch lowers it
+    check = next(c for c in fix.checks if c.name == "equation.text_layer")
+    assert check.severity == "warning" and not check.passed
+
+
+@pytest.mark.parametrize(
+    ("text_layer", "latex"),
+    [
+        ("\U0001d454= 9.80m/s2", r"g = 9.80\ \text{m/s}^2"),
+        ("\U0001d714= 2\U0001d70b\U0001d453", r"\omega = 2\pi f"),
+        ("\U0001d465\u2208\u211d", r"x \in \mathbb{R}"),
+        # A LaTeX hat leaves a modifier circumflex (U+02C6) in the text layer: an accent.
+        ("ATA\u02c6\U0001d431 = AT\U0001d41b", r"A^{T}A\hat{\mathbf{x}} = A^{T}\mathbf{b}"),
+        # \hat{\imath} (the unit vector i-hat) is a dotless i in the text layer.
+        ("\U0001d465\U0001d6a4\u02c6", r"x\hat{i}"),
+        ("x =", "x"),  # one symbol is enough to compare
+    ],
+)
+def test_the_same_symbols_pass(text_layer, latex):
+    fix = run(by_model(main=out(latex, 0.95)), equation_element(text=text_layer))
+    check = next(c for c in fix.checks if c.name == "equation.text_layer")
+    assert check.passed and fix.status == Status.ACCEPTED and fix.review == "none"
+
+
+def test_no_symbols_in_the_text_layer_means_no_symbol_check():
+    fix = run(by_model(main=out("x = 1", 0.95)), equation_element(text="= \u2212"))
+    assert all(c.name != "equation.text_layer" for c in fix.checks)
+    assert fix.status == Status.ACCEPTED
+
+
+def test_symbol_mismatch_on_cheap_model_escalates_and_the_main_answer_wins():
+    client = by_model(cheap=out("x_1", 0.99), main=out("x_0", 0.95))
+    fix = run(client, equation_element(display="inline", text="x0"))
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+    assert fix.equation is not None and fix.equation.latex == "x_0"
+    assert fix.status == Status.ACCEPTED and fix.review == "none"
+
+
+def test_symbol_mismatch_left_after_escalation_needs_a_decision():
+    client = by_model(cheap=out("x_1", 0.99), main=out("x_1", 0.99))
+    fix = run(client, equation_element(display="inline", text="x0"))
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+    assert codes(fix) == {"symbol_mismatch"} and fix.review == "required"
 
 
 def test_text_layer_is_never_sent_to_the_model():

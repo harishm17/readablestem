@@ -2,19 +2,28 @@
 
 Routing: simple inline candidates (inline, text layer <= 25 characters) start on the
 cheap model; display equations and anything the cheap model is unsure about (confidence
-< settings.auto_accept_confidence or a failed error-level check) escalate to the main
-model. The first attempt goes through `models.router.call_with_fallback`, so an outage
-on one model falls back to the other. The escalation is one main-model call with no
-fallback: the main model's fallback is the cheap model, which has already answered this
-exact request, so falling back would pay for the same answer twice. If the escalation
-fails, the cheap answer stands. Every attempt's `ModelCall` ends up on the fix.
+< settings.auto_accept_confidence, a failed error-level check, or any failed text-layer
+check) escalate to the main model. The first attempt goes through
+`models.router.call_with_fallback`, so an outage on one model falls back to the other.
+The escalation is one main-model call with no fallback: the main model's fallback is the
+cheap model, which has already answered this exact request, so falling back would pay
+for the same answer twice. If the escalation fails, the cheap answer stands. Every
+attempt's `ModelCall` ends up on the fix.
 
 Nothing the model says is trusted as-is. Its LaTeX goes through `validate.check_latex`,
 `validate.safe_latex_to_mathml` and `validate.check_mathml`, and is then cross-checked
-against the PDF text layer: the symbols in the text layer (when the PDF has one) and in
-the transcription should mostly be the same. A strong mismatch is the cheapest signal of
-a hallucinated transcription; it adds a warning check and lowers the confidence. The
-text layer is deliberately not sent to the model, so the cross-check stays independent.
+against the PDF text layer: the letters, digits and Greek letters in the text layer
+(when the PDF has one) and in the transcription should be the same. Any difference (one
+wrong digit, a misread Greek letter, a dropped variable) is a failed warning check that
+needs a decision; a strong mismatch, the cheapest signal of a hallucinated
+transcription, also lowers the confidence. The text layer is deliberately not sent to
+the model, so the cross-check stays independent. Letter styles are compared too
+(`text_layer_style`): a bold vector read as a plain scalar (or a letter known to be
+plain read as a bold vector), or a double-struck, script or fraktur letter read as a
+plain one, is meaning-level and is treated like a symbol mismatch; any other style
+difference (the bold subscript of a bold symbol, a bold digit, a double-struck R the
+text layer cannot show) is cosmetic, an optional note only. Any failed text-layer check
+on a cheap-model answer, a cosmetic one included, escalates to the main model.
 
 Status rules, in order:
 1. no parsed output from any attempt -> FAILED, reason "model_<outcome>";
@@ -23,10 +32,13 @@ Status rules, in order:
    (the model abstained, as the prompt asks, rather than producing invalid LaTeX);
 4. LaTeX that fails an error-level check after escalation -> FAILED "invalid_latex";
 5. confidence < settings.abstain_confidence -> ABSTAINED "low_confidence";
-6. confidence >= settings.auto_accept_confidence and no failed check -> ACCEPTED;
-7. otherwise NEEDS_REVIEW.
-Only ACCEPTED and NEEDS_REVIEW fixes carry a proposal (`Fix.equation`). BudgetExceeded
-propagates: the orchestrator decides what happens to the rest of the document.
+6. confidence >= settings.auto_accept_confidence and no failed check other than a note
+   (`NOTE_CODES`: a cosmetic style difference, no speech) -> ACCEPTED, review "none",
+   or "optional" with notes;
+7. otherwise NEEDS_REVIEW (review "required").
+Rules 1-5 are review "required" as well. Only ACCEPTED and NEEDS_REVIEW fixes carry a
+proposal (`Fix.equation`). BudgetExceeded propagates: the orchestrator decides what
+happens to the rest of the document.
 """
 
 from __future__ import annotations
@@ -169,10 +181,18 @@ def strip_trailing_punctuation(latex: str) -> str:
     return text
 
 
+# Typesetting artefacts that are not symbols: the dotless i and j a LaTeX accent sits on
+# (\hat{\imath} is the unit vector i-hat) are i and j.
+_DOTLESS = str.maketrans({"\u0131": "i", "\u0237": "j"})
+
+
 def _symbol_bag(text: str) -> Counter[str]:
-    """Letters, digits and Greek letters, case-folded; math italic glyphs map to ASCII."""
-    folded = unicodedata.normalize("NFKC", text).casefold()
-    return Counter(ch for ch in folded if ch.isalnum())
+    """Letters, digits and Greek letters, case-folded; math italic glyphs map to ASCII.
+
+    Modifier letters (Unicode category Lm, such as the U+02C6 circumflex a LaTeX hat
+    accent leaves in a text layer) are accents, not symbols, so they are dropped."""
+    folded = unicodedata.normalize("NFKC", text).casefold().translate(_DOTLESS)
+    return Counter(ch for ch in folded if ch.isalnum() and unicodedata.category(ch) != "Lm")
 
 
 def _mathml_symbols(mathml: str) -> Counter[str]:
@@ -180,68 +200,194 @@ def _mathml_symbols(mathml: str) -> Counter[str]:
     return _symbol_bag(" ".join(root.itertext()))
 
 
-# A style mismatch (the PDF has a bold d, the transcription a plain d) scales confidence
-# by this factor: enough to escalate a cheap-model answer and to keep the fix in review.
+# A meaning-level style difference (the PDF has a bold d, a vector, and the transcription
+# a plain d, a scalar) scales confidence by this factor: enough to escalate a cheap-model
+# answer and to keep the fix for a person's decision. A cosmetic one changes nothing.
 STYLE_MISMATCH_FACTOR = 0.6
+# Failed checks that are only notes: the fix is still ACCEPTED (review="optional").
+# A cosmetic style difference, and a reading aid for the review screen that could not
+# be made (the MathML in the output is unaffected).
+SPEECH_CODES = frozenset({"speech_failed", "speech_empty"})
+NOTE_CODES = frozenset({"style_cosmetic", *SPEECH_CODES})
 _MATHML_TOKENS = {"mi", "mn", "mo", "mtext", "ms"}
+# Children after the first are scripts (sub/superscripts, limits, a root's index).
+_SCRIPTED = {"msub", "msup", "msubsup", "munder", "mover", "munderover", "mmultiscripts", "mroot"}
+PLAIN = "plain"
+BOLD = "bold"
+# Styles that make a different symbol of a letter (double-struck R, the reals; script L,
+# a Lagrangian; fraktur g, a Lie algebra), unlike sans-serif or monospace: losing one
+# changes what is read.
+LETTER_STYLES = frozenset({"double-struck", "script", "fraktur"})
+
+StyleVerdict = Literal["match", "meaning", "cosmetic"]
 
 
-def _text_styles(text: str) -> set[tuple[str, str]]:
-    """(base letter, style group) for every styled letter, e.g. {("d", "bold")}."""
-    out = set()
-    for ch in text:
-        group = STYLE_GROUPS.get(char_variant(ch) or "")
-        if group:
-            out.add((base_char(ch), group))
+@dataclass
+class _LetterStyles:
+    """How one letter (or digit) is styled on one side, occurrence by occurrence."""
+
+    bold: int = 0  # occurrences in a bold style
+    plain: int = 0  # occurrences in no bold style
+    other: set[str] = field(default_factory=set)  # non-bold style groups (double-struck...)
+    known_plain: bool = False  # PDF only: a plain occurrence is known to be plain
+
+
+@dataclass
+class _MathLetters:
+    """A letter's occurrences in the transcription: as a variable (a one-letter token
+    that is not part of a bold symbol's label) or anywhere else (words like "avg", and
+    the sub/superscripts of a bold base: the f of a bold d_f)."""
+
+    var_bold: int = 0
+    var_plain: int = 0
+    other_bold: int = 0
+    other_plain: int = 0
+    styles: set[str] = field(default_factory=set)  # non-bold style groups
+
+
+def _group(variant: str | None) -> str:
+    return STYLE_GROUPS.get(variant or "", PLAIN)
+
+
+def _layer_letters(text_layer: str, regular: str) -> dict[str, _LetterStyles]:
+    out: dict[str, _LetterStyles] = {}
+    for ch in text_layer:
+        if not ch.isalnum():
+            continue
+        variant = char_variant(ch)
+        base = base_char(ch)
+        entry = out.setdefault(base, _LetterStyles())
+        group = _group(variant)
+        if group == BOLD:
+            entry.bold += 1
+            continue
+        entry.plain += 1
+        if group != PLAIN:
+            entry.other.add(group)
+        # Explicitly plain: a math italic code point (Chromium and Word write them), or a
+        # glyph layout found in a regular font with a bold face (`Element.regular_letters`).
+        if variant == "italic" or base in regular:
+            entry.known_plain = True
     return out
 
 
-def _mathml_styles(mathml: str) -> tuple[set[tuple[str, str]], set[str]]:
-    """Styled letters of a MathML tree (mathvariant inherited, as MathML specifies, or
-    carried by the code point) and every base letter it contains."""
-    styled: set[tuple[str, str]] = set()
-    letters: set[str] = set()
+def _has_bold(elem: Any, inherited: str | None) -> bool:
+    """Does this MathML subtree show a bold letter or digit?"""
+    variant = elem.get("mathvariant") or inherited
+    if elem.tag.rsplit("}", 1)[-1] in _MATHML_TOKENS:
+        chars = (ch for ch in elem.text or "" if ch.isalnum())
+        return any(_group(char_variant(ch) or variant) == BOLD for ch in chars)
+    return any(_has_bold(child, variant) for child in elem)
 
-    def walk(elem: Any, inherited: str | None) -> None:
+
+def _mathml_letters(mathml: str) -> dict[str, _MathLetters]:
+    """Letters of a MathML tree with their styles (mathvariant inherited, as MathML
+    specifies, or carried by the code point) and whether each occurrence is a variable.
+
+    The scripts of a bold base (bold d_f, v_avg, d_0) are its label: a bold or plain f
+    there is the same symbol. The scripts of any other base hold variables of their own:
+    the bold k and r of e^{i k.r}, the bold x of lim_{x -> 0}, a sum over a bold k are
+    vectors."""
+    out: dict[str, _MathLetters] = {}
+
+    def walk(elem: Any, inherited: str | None, label: bool) -> None:
         variant = elem.get("mathvariant") or inherited
         tag = elem.tag.rsplit("}", 1)[-1]
         if tag in _MATHML_TOKENS:
-            for ch in elem.text or "":
-                if not ch.isalnum():
-                    continue
-                own = char_variant(ch)
-                base = base_char(ch)
-                letters.add(base)
-                group = STYLE_GROUPS.get(own or variant or "")
-                if group:
-                    styled.add((base, group))
+            chars = [ch for ch in elem.text or "" if ch.isalnum()]
+            variable = not label and len(chars) == 1
+            for ch in chars:
+                entry = out.setdefault(base_char(ch), _MathLetters())
+                group = _group(char_variant(ch) or variant)
+                if group != BOLD and group != PLAIN:
+                    entry.styles.add(group)
+                if group == BOLD:
+                    if variable:
+                        entry.var_bold += 1
+                    else:
+                        entry.other_bold += 1
+                elif variable:
+                    entry.var_plain += 1
+                else:
+                    entry.other_plain += 1
             return
-        for child in elem:
-            walk(child, variant)
+        children = list(elem)
+        bold_base = tag in _SCRIPTED and bool(children) and _has_bold(children[0], variant)
+        for index, child in enumerate(children):
+            walk(child, variant, label or (bold_base and index > 0))
 
-    walk(DET.fromstring(mathml, forbid_dtd=True), None)
-    return styled, letters
+    walk(DET.fromstring(mathml, forbid_dtd=True), None, False)
+    return out
 
 
-def text_layer_style_mismatch(text_layer: str | None, mathml: str) -> bool | None:
-    """Do the letter styles of the PDF text layer and the transcription disagree?
+def _letter_verdict(pdf: _LetterStyles, got: _MathLetters, letter: str) -> StyleVerdict:
+    """Meaning-level for
+    - a variable (a one-letter token that is not a bold symbol's label, `_mathml_letters`)
+      whose weight differs: a bold letter of the PDF read as a plain variable (a vector
+      read as a scalar), or a letter the PDF shows plain in a known regular font read as
+      a bold variable;
+    - a double-struck, script or fraktur letter of the PDF (its own code point says so,
+      as Chromium and Word write them) read without that style: the reals read as a
+      variable R, a Lagrangian as L.
+    Everything else that differs is cosmetic: digits, the labels of a bold symbol, words,
+    and styles the text layer cannot show (double-struck R from MSBM is a plain "R"
+    there, so `\\mathbb{R}` for it adds a style rather than losing one)."""
+    if (pdf.other & LETTER_STYLES) - got.styles:
+        return "meaning"
+    differs = pdf.other != got.styles
+    if letter.isalpha():
+        lost = pdf.bold - (got.var_bold + got.other_bold)  # bold occurrences not bold now
+        if lost > 0:
+            # Plain PDF occurrences fill scripts and words first, so a plain variable left
+            # over must be a bold one that lost its weight (when unsure, ask).
+            spare_variables = got.var_plain - max(0, pdf.plain - got.other_plain)
+            if spare_variables > 0:
+                return "meaning"
+            differs = True
+        gained = got.var_bold > pdf.bold  # more bold variables than bold PDF letters
+        unmatched_plain = pdf.plain > got.var_plain + got.other_plain  # a plain one went
+        if got.var_bold and (not pdf.bold or (gained and unmatched_plain)):
+            # A letter the PDF shows plain became a bold variable (a scalar, or a vector's
+            # component u_i, read as a vector). Only meaning-level when the PDF is known
+            # to show bold where there is bold; a text layer may also just miss glyphs.
+            if pdf.known_plain:
+                return "meaning"
+            differs = True
+        if got.other_bold > max(0, pdf.bold - got.var_bold):
+            differs = True  # a bold script the PDF does not show bold
+    elif bool(pdf.bold) != bool(got.var_bold + got.other_bold):
+        differs = True  # a digit bold on one side only
+    return "cosmetic" if differs else "match"
 
-    None when the text layer carries no style at all (most PDFs without bold maths, and
-    any text layer from a font that does not mark bold): absence of style is not evidence.
-    Otherwise compares (letter, style) pairs for the letters both sides contain, so a bold
-    vector read as a plain scalar, or a plain scalar made bold, is a mismatch.
+
+def text_layer_style(
+    text_layer: str | None, mathml: str, *, regular_letters: str | None = None
+) -> StyleVerdict | None:
+    """Compare the letter styles of the PDF text layer and the transcription.
+
+    None when the text layer says nothing about style: no styled letter and no letter
+    known to be plain (most PDFs without bold maths; a font that does not mark bold).
+    Otherwise "match", "meaning" (a weight difference on a variable, or a double-struck,
+    script or fraktur letter lost, which changes what a student reads: see
+    `_letter_verdict`) or "cosmetic" (any other difference). Only the letters both sides
+    contain are compared: the text layer may miss or reorder glyphs.
     """
     if not text_layer:
         return None
-    expected = _text_styles(text_layer)
-    if not expected:
+    pdf = _layer_letters(text_layer, regular_letters or "")
+    if not any(s.bold or s.other or s.known_plain for s in pdf.values()):
         return None
-    got, letters = _mathml_styles(mathml)
-    layer_letters = {base_char(ch) for ch in text_layer if ch.isalnum()}
-    shared = layer_letters & letters
-    expected = {pair for pair in expected if pair[0] in shared}
-    got = {pair for pair in got if pair[0] in shared}
-    return expected != got
+    got = _mathml_letters(mathml)
+    verdicts = {_letter_verdict(pdf[ch], got[ch], ch) for ch in pdf.keys() & got.keys()}
+    if "meaning" in verdicts:
+        return "meaning"
+    return "cosmetic" if "cosmetic" in verdicts else "match"
+
+
+def text_layer_style_mismatch(text_layer: str | None, mathml: str) -> bool | None:
+    """Any style difference at all, meaning-level or cosmetic (None: no style info)."""
+    verdict = text_layer_style(text_layer, mathml)
+    return None if verdict is None else verdict != "match"
 
 
 def text_layer_similarity(text_layer: str | None, mathml: str) -> float | None:
@@ -257,6 +403,24 @@ def text_layer_similarity(text_layer: str | None, mathml: str) -> float | None:
     got = _mathml_symbols(mathml)
     total = sum(expected.values()) + sum(got.values())
     return 2 * sum((expected & got).values()) / total if total else None
+
+
+def text_layer_symbols_differ(text_layer: str | None, mathml: str) -> bool | None:
+    """Do the letters, digits and Greek letters of the PDF text layer and the MathML
+    differ at all (as multisets: one wrong digit, one misread Greek letter, a dropped
+    variable)? None when there is no text layer or it has no such symbol.
+
+    Stricter than `text_layer_similarity`. On 181 real model answers with a text layer
+    (the gold sample, the document eval and two converted documents, 2026-10-08) the
+    bags differed for none once accents (modifier letters) were dropped, so a difference
+    is rare and worth a decision.
+    """
+    if not text_layer:
+        return None
+    expected = _symbol_bag(text_layer)
+    if not expected:
+        return None
+    return expected != _mathml_symbols(mathml)
 
 
 @dataclass
@@ -323,40 +487,60 @@ def _evaluate(
         return candidate
     candidate.speech, speech_check = _speech(candidate.mathml)
     candidate.checks.append(speech_check)
-    similarity = text_layer_similarity(element.text, candidate.mathml)
-    if similarity is not None:
-        mismatch = similarity < TEXT_LAYER_MISMATCH_BELOW
+    differ = text_layer_symbols_differ(element.text, candidate.mathml)
+    if differ is not None:
+        similarity = text_layer_similarity(element.text, candidate.mathml)
+        mismatch = similarity is not None and similarity < TEXT_LAYER_MISMATCH_BELOW
+        # A strong mismatch (likely a hallucination) also lowers the confidence; any
+        # other difference in the symbols (a wrong digit, a misread Greek letter) keeps
+        # it but still needs a decision.
+        symbols = "text_layer_mismatch" if mismatch else ("symbol_mismatch" if differ else None)
         candidate.checks.append(
             Check(
                 name="equation.text_layer",
-                passed=not mismatch,
+                passed=symbols is None,
                 severity="warning",
-                code="text_layer_mismatch" if mismatch else None,
+                code=symbols,
             )
         )
-        if mismatch:  # scale towards half confidence as the symbol overlap goes to zero
+        if mismatch and similarity is not None:
+            # scale towards half confidence as the symbol overlap goes to zero
             candidate.confidence = output.confidence * (0.5 + 0.5 * similarity)
-    style_mismatch = text_layer_style_mismatch(element.text, candidate.mathml)
-    if style_mismatch is not None:
+    style = text_layer_style(
+        element.text, candidate.mathml, regular_letters=element.regular_letters
+    )
+    if style is not None:
+        style_code = (
+            None
+            if style == "match"
+            else ("style_mismatch" if style == "meaning" else "style_cosmetic")
+        )
         candidate.checks.append(
             Check(
                 name="equation.text_layer_style",
-                passed=not style_mismatch,
+                passed=style_code is None,
                 severity="warning",
-                code="style_mismatch" if style_mismatch else None,
+                code=style_code,
             )
         )
-        if style_mismatch and candidate.confidence is not None:
+        if style == "meaning" and candidate.confidence is not None:
             candidate.confidence *= STYLE_MISMATCH_FACTOR
     return candidate
 
 
 def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
+    """Ask the main model again when the cheap answer is unsure, unusable, or disagrees
+    with the text layer in any way, a cosmetic style difference included: the style rule
+    is a heuristic, so a second reading is cheaper than a hidden vector-to-scalar error.
+    Only the speech notes do not escalate (they say nothing about the transcription)."""
     if candidate.output is None or candidate.confidence is None:
         return False  # the router already tried the other model as the fallback
     if candidate.calls and candidate.calls[-1].model == settings.main_model:
         return False  # the fallback was the main model: nothing better to ask
-    return candidate.confidence < settings.auto_accept_confidence or not candidate.usable
+    disagrees = any(not c.passed and c.code not in SPEECH_CODES for c in candidate.checks)
+    return (
+        candidate.confidence < settings.auto_accept_confidence or not candidate.usable or disagrees
+    )
 
 
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
@@ -377,7 +561,9 @@ def _fix(
     display: Display,
     settings: Settings,
 ) -> Fix:
-    def make(status: Status, reason: str | None = None, proposal: bool = False) -> Fix:
+    def make(
+        status: Status, reason: str | None = None, proposal: bool = False, review: Any = None
+    ) -> Fix:
         equation = None
         if proposal and candidate.mathml is not None:
             equation = EquationFix(
@@ -395,6 +581,7 @@ def _fix(
             checks=candidate.checks,
             calls=calls,
             reason=reason,
+            review=review,  # None: from the status (waiting -> required)
         )
 
     output, confidence = candidate.output, candidate.confidence
@@ -409,9 +596,11 @@ def _fix(
         return make(Status.FAILED, "invalid_latex")
     if confidence < settings.abstain_confidence:
         return make(Status.ABSTAINED, "low_confidence")
-    failed = any(not c.passed for c in candidate.checks)
-    if confidence >= settings.auto_accept_confidence and not failed:
-        return make(Status.ACCEPTED, proposal=True)
+    failed = [c for c in candidate.checks if not c.passed]
+    if confidence >= settings.auto_accept_confidence and all(c.code in NOTE_CODES for c in failed):
+        # Notes only (a cosmetic style difference, no speech text): accepted, listed as
+        # optional checks on the review screen.
+        return make(Status.ACCEPTED, proposal=True, review="optional" if failed else "none")
     return make(Status.NEEDS_REVIEW, proposal=True)
 
 

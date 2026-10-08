@@ -31,8 +31,9 @@ from pathlib import Path
 from typing import Any
 
 from a11y_stem.config import ConfigError, Settings, get_settings
+from a11y_stem.core import triage
 from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Check, ConversionOutput, Kind, Status
+from a11y_stem.core.types import Check, ConversionOutput, Fix, Kind, Status
 from a11y_stem.models.base import VisionClient
 from a11y_stem.models.pricing import UnknownModelError, price_for
 
@@ -226,6 +227,20 @@ def _fix_table(output: ConversionOutput) -> list[str]:
     return lines
 
 
+def _review_summary(fixes: list[Fix]) -> str:
+    """'3 decisions needed (1 equation, 2 headings), 18 optional checks': what the
+    review screen will ask for (a group of repeated headings is one decision)."""
+    load = triage.review_load(fixes)
+    kinds = ", ".join(
+        f"{n} {kind}{'' if n == 1 else 's'}" for kind, n in sorted(load.required_by_kind.items())
+    )
+    decisions = load.required_decisions
+    text = f"{decisions} {'decision' if decisions == 1 else 'decisions'} needed"
+    if kinds:
+        text += f" ({kinds})"
+    return text + f", {load.optional} optional {'check' if load.optional == 1 else 'checks'}"
+
+
 def _print_summary(
     output: ConversionOutput,
     checks: list[Check],
@@ -246,6 +261,7 @@ def _print_summary(
     print("Fixes:")
     for line in _fix_table(output):
         print(line)
+    print(f"Review:      {_review_summary(result.fixes)}")
     note = "fake client, nothing billed" if fake else f"cap ${cap_usd:.2f}"
     print(f"Model calls: {stats.model_calls}")
     print(f"Cost:        ${stats.cost_usd:.4f} ({note})")

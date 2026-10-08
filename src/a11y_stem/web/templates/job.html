@@ -51,24 +51,25 @@
     <div><dt>Figures</dt><dd>{{ s.by_kind.get("figure", 0) }}</dd></div>
     <div><dt>Headings</dt><dd>{{ s.by_kind.get("heading", 0) }}</dd></div>
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
-    <div><dt>Need your review</dt><dd>{{ s.needs_review }}</dd></div>
+    <div><dt>Need your decision</dt><dd>{{ s.decisions }}</dd></div>
     <div><dt>Accepted automatically</dt><dd>{{ s.accepted }}</dd></div>
+    <div><dt>Optional checks (accepted; nothing to do)</dt><dd>{{ s.optional }}</dd></div>
     <div><dt>Not converted (original kept)</dt><dd>{{ s.not_converted }}</dd></div>
     <div><dt>Reviewed by you (accepted, edited or rejected)</dt><dd>{{ s.reviewed }}</dd></div>
     {# Every attempt, including one interrupted before it could store a result. #}
     <div><dt>Model cost</dt><dd>{{ job.cost_usd|usd }}</dd></div>
   </dl>
-  {% if s.needs_review %}
-  {# One link per kind, straight to that group on the review screen. #}
-  <p id="review-breakdown">{{ s.needs_review }} {{ "needs" if s.needs_review == 1 else "need" }} your review:
+  {% if s.decisions %}
+  {# One link per kind, straight to that group on the review screen. A group of
+     repeated headings is one decision. #}
+  <p id="review-breakdown">{{ s.decisions }} {{ "needs" if s.decisions == 1 else "need" }} your decision:
     {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("heading", "headings")] if s.review_by_kind.get(kind) %}
-    {% set n = s.review_by_kind[kind] %}
-    <a href="/jobs/{{ job.id }}/review#group-{{ many }}">{{ n }} {{ kind if n == 1 else many }}</a>{{ "." if loop.last else "," }}
+    <a href="/jobs/{{ job.id }}/review#group-{{ many }}">{{ s.review_labels.get(kind, s.review_by_kind[kind] ~ " " ~ many) }}</a>{{ "." if loop.last else "," }}
     {% endfor %}
   </p>
   {% endif %}
   <ul class="actions">
-    <li><a class="button" href="/jobs/{{ job.id }}/review">Review fixes{% if s.needs_review %} ({{ s.needs_review }} need review){% endif %}</a></li>
+    <li><a class="button" href="/jobs/{{ job.id }}/review">Review fixes{% if s.decisions %} ({{ s.decisions }} {{ "needs" if s.decisions == 1 else "need" }} your decision){% endif %}</a></li>
     <li><a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></li>
     <li><a href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
   </ul>
@@ -78,7 +79,7 @@
   <h3 id="checks-heading">Automatic checks of the HTML file</h3>
   {% if s.failed_checks %}
   {% set n = s.failed_checks|length %}
-  <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if s.needs_review %} (they run again after each review decision){% endif %}:</p>
+  <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if s.decisions %} (they run again after each review decision){% endif %}:</p>
   <ul class="check-list" aria-labelledby="checks-heading">
     {% for check in s.failed_checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}

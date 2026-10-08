@@ -195,7 +195,7 @@ def test_job_page_breakdown_has_no_serious_or_critical_axe_violations(
 ):
     context, page = open_page(browser, site)
     page.goto(f"{site.base}/jobs/{job}")
-    assert page.get_by_role("link", name="3 equations").is_visible()
+    assert page.get_by_role("link", name="4 equations").is_visible()
     violations = axe_violations(page, axe_source)
     context.close()
     assert not violations, describe(violations)

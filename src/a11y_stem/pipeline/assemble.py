@@ -708,6 +708,11 @@ class _Renderer:
     def heading(self, element: Element) -> str:
         level, text = self.heading_parts(element)
         if level is None:
+            fix = self.fixes.get(element.id)
+            if element.bold and fix is not None and fix.status is Status.REJECTED and text.strip():
+                # A reviewer said this bold line is a label, not a heading ("Make them
+                # bold text"): it stays bold, as in the PDF.
+                return f"<p{self.id_attr(element.id)}><strong>{self.rich(text)}</strong></p>"
             return self.paragraph(element, text)
         level = self.outline.write(level)
         return f"<h{level}{self.id_attr(element.id)}>{self.rich(text)}</h{level}>"

@@ -20,11 +20,15 @@ Status rules, in order:
 2. confidence < settings.abstain_confidence -> ABSTAINED "low_confidence" (the prompt
    asks the model to abstain this way when it cannot read the figure);
 3. non-decorative alt text failing an error-level check -> FAILED "invalid_alt";
-4. ACCEPTED when confidence clears the bar and no check failed; the bar is
+4. ACCEPTED when confidence clears the bar and no check failed other than a note
+   (`NOTE_CODES`: alt text a little long, a redundant "image of"); the bar is
    settings.auto_accept_confidence, raised to DECORATIVE_ACCEPT_CONFIDENCE for
    decorative figures, because marking a figure decorative hides it from screen-reader
-   users entirely;
+   users entirely. Review "optional" with notes, else "none";
 5. otherwise NEEDS_REVIEW.
+Rules 1-3 and 5 are review "required": the figure has no usable description yet (none
+at all, one that failed a check, one the model doubts, a caption copy, or a
+decorative answer that contradicts itself).
 Decorative figures get `FigureFix(alt="", decorative=True)` whatever alt the model wrote.
 A decorative answer that contradicts itself (a chart, diagram or table image; a figure
 with a caption; or a non-empty alt) fails the warning check
@@ -35,6 +39,7 @@ confidence alone.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Any
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -54,6 +59,9 @@ DECORATIVE_ACCEPT_CONFIDENCE = 0.95
 MAX_OUTPUT_TOKENS = 1024
 # Figure types that carry information by definition; "decorative" contradicts them.
 INFORMATIVE_FIGURE_TYPES = frozenset({"chart", "diagram", "table_image"})
+# Failed warning checks that do not change what the description says: the fix is still
+# ACCEPTED (review "optional"). A caption copy is not one: it describes nothing.
+NOTE_CODES = frozenset({"too_long", "redundant_prefix"})
 
 
 class FigureOutput(BaseModel):
@@ -178,7 +186,9 @@ def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
 def _fix(
     element: Element, candidate: _Candidate, calls: list[ModelCall], settings: Settings
 ) -> Fix:
-    def make(status: Status, reason: str | None = None, proposal: bool = False) -> Fix:
+    def make(
+        status: Status, reason: str | None = None, proposal: bool = False, review: Any = None
+    ) -> Fix:
         figure = None
         if proposal and candidate.output is not None:
             figure = FigureFix(
@@ -195,6 +205,7 @@ def _fix(
             checks=candidate.checks,
             calls=calls,
             reason=reason,
+            review=review,  # None: from the status (waiting -> required)
         )
 
     output = candidate.output
@@ -205,9 +216,10 @@ def _fix(
         return make(Status.ABSTAINED, "low_confidence")
     if has_errors(candidate.checks):
         return make(Status.FAILED, "invalid_alt")
-    failed = any(not c.passed for c in candidate.checks)
-    if output.confidence >= _accept_bar(output, settings) and not failed:
-        return make(Status.ACCEPTED, proposal=True)
+    failed = [c for c in candidate.checks if not c.passed]
+    notes_only = all(c.severity == "warning" and c.code in NOTE_CODES for c in failed)
+    if output.confidence >= _accept_bar(output, settings) and notes_only:
+        return make(Status.ACCEPTED, proposal=True, review="optional" if failed else "none")
     return make(Status.NEEDS_REVIEW, proposal=True)
 
 

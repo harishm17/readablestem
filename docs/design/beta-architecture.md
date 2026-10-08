@@ -14,8 +14,10 @@ back one self-contained HTML file where:
 - lists are real `<ul>`/`<ol>` with their nesting and numbering (layout reports each item
   as a `Kind.LIST_ITEM` element; no model call),
 - figures have short alt text (or an explicit "needs a description" flag),
-- every fix carries a confidence and the checks it passed; uncertain ones go to a review
-  screen where the instructor accepts, edits or rejects them.
+- every fix carries a confidence and the checks it passed; the ones whose mistakes would
+  change what a student reads go to a review screen where the instructor accepts, edits
+  or rejects them; small things are accepted and listed as optional checks (see "Review
+  tiers" below).
 
 It "assists". It never claims WCAG/ADA compliance.
 
@@ -48,6 +50,7 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
 |---|---|---|
 | `config.py` | `Settings`, `get_settings()`, `check_production()` | spine |
 | `core/types.py` | `Element`, `Fix`, `Check`, `ModelCall`, `DocumentResult`, `ConversionOutput` | spine |
+| `core/triage.py` | `units`, `required_decisions`, `open_decisions`, `tier_reasons`, `review_load(fixes) -> ReviewLoad` | review triage |
 | `core/budget.py` | `SpendGuard`, `InMemorySpendGuard`, `JobBudget`, `BudgetExceeded` | spine |
 | `models/base.py` | `VisionRequest`, `VisionClient.run(request, schema, *, is_fallback)`, `fence_untrusted` | spine |
 | `models/pricing.py` | `PRICES`, `cost_usd`, `estimate_max_cost_usd` | spine |
@@ -70,6 +73,50 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
 | `observability/*` | `make_tracer(settings)`, `configure_logging(settings)` | WP6 |
 | `eval/render.py`, `eval/pipeline_eval.py`, `eval/judge.py`, `eval/calibration.py`, `eval/gate.py` | eval harness | WP7 |
 | `cli/{convert,serve,ops,eval_cli}.py` | `register(group, top=None)` | WP4/5/6/7 |
+
+## Review tiers ("meaning-level only", decided by Harish 2026-10-08)
+
+Measured on two real documents, only about 5 of 27 review requests mattered: 23 were
+headings with weak evidence (11 of them the same "Teacher Support" label) and 4 were
+letter-style differences, of which only one changed the meaning (a bold omega read as a
+plain omega). So every fix gets a tier, and only meaning-level problems ask for a
+decision.
+
+| Tier (`Fix.review`) | Status | What it means | Examples |
+|---|---|---|---|
+| `required` ("Needs your decision") | NEEDS_REVIEW, FAILED or ABSTAINED | blocks "done", counted on the job page and in ops | failed or abstained conversions (kept as images); equations below the auto-accept confidence after escalation; a text-layer symbol mismatch (any letter, digit or Greek letter that differs); a vector read as a scalar (a letter that is bold in the PDF and a plain variable in the proposal, at base level or in the script of a plain base such as `e^{i𝐤·𝐫}`, or a letter known to be plain made a bold variable); a double-struck, script or fraktur letter the text layer encodes (`ℝ`) read as a plain one; figures without a usable description (abstained, failed, an error-level alt check, a caption copy, a doubtful or self-contradicting decorative answer, low confidence); one decision per group of repeated headings |
+| `optional` ("Optional checks") | ACCEPTED | accepted automatically, listed folded on the review screen with each note in plain English; never blocks "done"; still editable | cosmetic style differences (the bold label of a bold symbol such as `𝐝𝐟`, a bold digit, a style the text layer cannot show such as double-struck R from MSBM, a letter of unknown weight made bold; on a cheap-model answer these still escalate to the main model); a single heading with weak evidence or a repaired level; alt text a little long or starting "image of"; no speech text |
+| `none` | ACCEPTED | nothing to note | |
+
+- **Data model.** `Fix.review: Literal["required", "optional", "none"]`. Results stored
+  before tiers existed load with the tier their status implies (`default_review`:
+  needs_review, failed, abstained -> required; anything else -> none). A reviewer's
+  decision changes `status` (and `reviewed`), never `review`: the tier records what the
+  pipeline asked, and ops counts it. The failed checks of an optional fix are its notes
+  (their codes stay in `checks`). `Fix.optional_note` is "accepted with a note nobody
+  has acted on yet".
+- **Heading groups.** Uncertain headings with the same label (NFKC, case-folded, letters
+  and digits) and the same style (font size to 0.5 pt, weight, larger-font evidence,
+  proposed level) that appear two or more times share `Fix.group_key` (content-free:
+  `"hg-" + the first one's element id`) and `Fix.group_size`, and are NEEDS_REVIEW.
+  They are one decision: the review screen asks once ("Teacher Support appears 11 times
+  as a bold line in the body text size: keep them as headings at level 3, or make them
+  bold text?") and `web.review.apply_group` applies it to every member still waiting.
+- **Counting.** `core.triage` counts decisions (units), not fixes: a group is one unit.
+  `DocumentStats.by_review` and `required_decisions` record the pipeline's tiers;
+  `ops.aggregate` writes `tier:<tier>`, `tier:<tier>:<reason>` and
+  `decisions:required` per step; the eval reports required decisions per page and flag
+  precision and recall against gold (docs/eval.md "Review load").
+- **Bold run-in labels** ("Solution", "Discussion", "Procedure" in an OpenStax worked
+  example) are not headings in OpenStax's outline, but no structural rule separated them
+  from real box headings on independent evidence (docs/layout.md "Run-in labels"), so
+  they are not guessed at: alone they are optional notes, repeated they are a group.
+
+Where it lives: `pipeline/equation_step.py` (`text_layer_symbols_differ`,
+`text_layer_style`, `NOTE_CODES`), `pipeline/heading_step.py` (`group_repeated`),
+`pipeline/figure_step.py` (`NOTE_CODES`), `pipeline/layout.py`
+(`Element.regular_letters`), `core/triage.py`, `web/review.py`, `web/routes/review.py`,
+`web/views.py`, `ops/aggregate.py`, `ops/report.py`, `eval/pipeline_eval.py`.
 
 ## Rules every work package follows
 

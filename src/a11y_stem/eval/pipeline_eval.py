@@ -31,6 +31,14 @@ The report carries what the CI gate needs to compare two runs fairly: pipeline a
 prompt versions, model ids, the gold manifest hash and a hash of the selected item ids.
 Dates come from the caller (`EvalConfig.date`); nothing here reads the wall clock.
 
+Review load (equations, headings, document): how many decisions the pipeline asks a
+person for (`Fix.review == "required"`; a group of repeated headings is one decision),
+how many optional notes it leaves, and how well the required ones point at real errors:
+flag precision (share of required decisions that are actually wrong against gold) and
+flag recall (share of actually wrong items that are required, i.e. real errors a person
+is asked about). Wrong items that are not required are listed in the per-item rows
+(`wrong_not_required`) so they can be read one by one.
+
 Privacy: the gold set is public OpenStax content, so per-item rows may hold text
 (predicted LaTeX, alt text, heading text). Nothing here logs; the CLI prints only
 metrics.
@@ -52,10 +60,17 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from a11y_stem.config import Settings
+from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import Check, Element, Fix, Kind, ModelCall, Status
 from a11y_stem.eval import judge as judge_mod
-from a11y_stem.eval.equations import EquationScore, MathMLError, normalize, score_mathml
+from a11y_stem.eval.equations import (
+    EquationScore,
+    MathMLError,
+    normalize,
+    score_latex,
+    score_mathml,
+)
 from a11y_stem.eval.gold_scoring import iter_gold_records
 from a11y_stem.models.base import VisionClient
 from a11y_stem.pipeline import equation_step, figure_step, heading_step, html_checks, layout, run
@@ -383,6 +398,9 @@ class EvalConfig:
     # The client's budget, when there is one: its record of spend is the source of truth
     # (it includes calls made for an item that was then dropped at a budget stop).
     budget: JobBudget | None = None
+    # Gold equation ids the scorer marks wrong even for known-correct LaTeX (normalisation
+    # gaps, `scorer_gap_ids`): review-load metrics are also given without them.
+    scorer_gaps: frozenset[str] = frozenset()
 
 
 @dataclass
@@ -459,6 +477,79 @@ def _missing_score(gold_mathml: str) -> EquationScore:
     return EquationScore(False, False, size, 0.0, size, 0, "no proposal")
 
 
+# ===================================================================== review load
+
+
+def scorer_gap_ids(records: Iterable[dict], predictions: Path) -> frozenset[str]:
+    """Gold equations whose known-correct LaTeX (one JSON line per equation: `id`,
+    `latex`, as in tests/fixtures/sample_latex_predictions.jsonl) still fails
+    exact_lenient: any transcription of them scores wrong, so a "wrong" one there says
+    nothing about the model or the flags. Empty when the file is missing."""
+    if not predictions.is_file():
+        return frozenset()
+    gold = {r["id"]: r["mathml"] for r in records if r.get("kind") == "equation"}
+    gaps = set()
+    for line in predictions.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        if row.get("id") in gold and not score_latex(row["latex"], gold[row["id"]]).exact_lenient:
+            gaps.add(row["id"])
+    return frozenset(gaps)
+
+
+def flag_metrics(units: Iterable[Sequence[Any]]) -> dict:
+    """Flag precision and recall over decision units.
+
+    Each unit is (required, wrong members[, ...]): one equation is (required, 0 or 1);
+    a group of repeated headings is one unit with the number of its headings that are
+    wrong. Precision = required units with at least one wrong member / required units.
+    Recall = wrong members inside required units / all wrong members (a real error a
+    person is asked about counts as caught).
+    """
+    units = [(bool(u[0]), int(u[1])) for u in units]
+    required = [wrong for flagged, wrong in units if flagged]
+    wrong = sum(w for _, w in units)
+    caught = sum(required)
+    useful = sum(1 for w in required if w)
+    return {
+        "units": len(units),
+        "required_units": len(required),
+        "required_units_wrong": useful,
+        "wrong": wrong,
+        "wrong_required": caught,
+        "flag_precision": _safe_div(useful, len(required)),
+        "flag_recall": _safe_div(caught, wrong),
+    }
+
+
+def load_counts(fixes: Sequence[Fix]) -> dict:
+    """The pipeline's review tiers for one unit of work (`core.triage.review_load`)."""
+    return triage.review_load(fixes).as_dict()
+
+
+def _sum_loads(loads: Iterable[dict]) -> dict:
+    total = triage.ReviewLoad()
+    for load in loads:
+        total.add(
+            triage.ReviewLoad(
+                required_decisions=load["required_decisions"],
+                required_fixes=load["required_fixes"],
+                optional=load["optional"],
+                none=load["none"],
+                required_by_kind=Counter(load["required_by_kind"]),
+                optional_by_kind=Counter(load["optional_by_kind"]),
+                required_by_reason=Counter(load["required_by_reason"]),
+                optional_by_reason=Counter(load["optional_by_reason"]),
+            )
+        )
+    return total.as_dict()
+
+
+def _per(n: float, d: float) -> float | None:
+    return round(n / d, 4) if d else None
+
+
 # ======================================================================= equations
 
 
@@ -486,6 +577,11 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "failed_checks": _failed_codes(fix.checks),
         "pred_latex": proposal.latex if proposal is not None else None,
         "pred_mathml": proposal.mathml if proposal is not None else None,
+        # Review load: the tier the pipeline gave it, why, and whether it is wrong.
+        "review": fix.review,
+        "tier_reasons": triage.tier_reasons(fix),
+        "wrong": not score.exact_lenient,
+        "wrong_not_required": not score.exact_lenient and fix.review != "required",
         **_calls_summary(fix.calls),
     }
 
@@ -554,7 +650,58 @@ def equation_metrics(items: Sequence[dict]) -> dict:
         "by_route": _group_rates(items, "route", ROUTES),
         "by_display": _group_rates(items, "display", ["block", "inline"]),
         "selective": selective_table(items),
+        "review_load": equation_review_load(items),
     }
+
+
+def equation_review_load(items: Sequence[dict]) -> dict:
+    """Required decisions and optional notes per equation and per section (a gold page;
+    the equations task prints no PDF pages, see the document task for per-PDF-page
+    numbers), and flag precision/recall with "wrong" = not exact_lenient, also without
+    the scorer's known gaps (`scorer_gap` on the item)."""
+    n = len(items)
+    sections = len({_section_of(i.get("id", "")) for i in items})
+    required = sum(i.get("review") == "required" for i in items)
+    optional = sum(i.get("review") == "optional" for i in items)
+    units = [(i.get("review") == "required", int(not i["exact_lenient"])) for i in items]
+    clean = [
+        (i.get("review") == "required", int(not i["exact_lenient"]))
+        for i in items
+        if not i.get("scorer_gap")
+    ]
+    reasons: dict[str, Counter[str]] = {"required": Counter(), "optional": Counter()}
+    for item in items:
+        if item.get("review") in reasons:
+            reasons[item["review"]].update(item.get("tier_reasons", []))
+    return {
+        "required": required,
+        "optional": optional,
+        "required_per_item": _per(required, n),
+        "optional_per_item": _per(optional, n),
+        "sections": sections,
+        "required_per_section": _per(required, sections),
+        "optional_per_section": _per(optional, sections),
+        "required_by_reason": dict(sorted(reasons["required"].items())),
+        "optional_by_reason": dict(sorted(reasons["optional"].items())),
+        "flags": flag_metrics(units),
+        "scorer_gaps": sorted(i.get("id", "") for i in items if i.get("scorer_gap")),
+        "flags_excluding_scorer_gaps": flag_metrics(clean),
+        "wrong_not_required": [
+            {
+                "id": i.get("id"),
+                "review": i.get("review"),
+                "reasons": i.get("tier_reasons", []),
+                "scorer_gap": bool(i.get("scorer_gap")),
+            }
+            for i in items
+            if not i["exact_lenient"] and i.get("review") != "required"
+        ],
+    }
+
+
+def _section_of(item_id: str) -> str:
+    """'openstax/physics/2-1-x/eq-003' -> 'openstax/physics/2-1-x'."""
+    return item_id.rsplit("/", 1)[0]
 
 
 @dataclass(frozen=True)
@@ -604,7 +751,9 @@ def _eval_equations(
         stopped = budget_reason(fix)
         if stopped:
             return items, stopped
-        items.append(equation_item(record, fix, cfg.settings))
+        item = equation_item(record, fix, cfg.settings)
+        item["scorer_gap"] = record["id"] in cfg.scorer_gaps
+        items.append(item)
     return items, None
 
 
@@ -616,10 +765,48 @@ KEPT_HEADING_STATUSES = {Status.ACCEPTED, Status.NEEDS_REVIEW, Status.EDITED}
 def predicted_headings(fixes: Sequence[Fix]) -> list[dict]:
     """Headings the pipeline would emit: heading fixes it did not abstain on or fail."""
     return [
-        {"level": f.heading.level, "text": f.heading.text, "status": f.status.value}
+        {
+            "level": f.heading.level,
+            "text": f.heading.text,
+            "status": f.status.value,
+            "review": f.review,
+            "group_key": f.group_key,
+            "tier_reasons": triage.tier_reasons(f),
+        }
         for f in fixes
         if f.heading is not None and f.status in KEPT_HEADING_STATUSES
     ]
+
+
+def heading_flags(item: dict, predicted: Sequence[dict]) -> dict:
+    """Review flags of one page's predicted headings against its gold match (`item` from
+    `heading_page_item`). Wrong = not a gold heading, or matched at the wrong relative
+    level. A group of repeated headings is one unit (one decision)."""
+    matched = {i: pair for i, pair in zip(item["matched_pred"], item["pairs"], strict=True)}
+    units: dict[str, list[bool]] = {}
+    required: dict[str, bool] = {}
+    wrong_not_required = []
+    for index, heading in enumerate(predicted):
+        pair = matched.get(index)
+        wrong = pair is None or not pair["level_correct"]
+        key = heading.get("group_key") or f"single-{index}"
+        units.setdefault(key, []).append(wrong)
+        flagged = heading.get("review") == "required"
+        required[key] = required.get(key, False) or flagged
+        if wrong and not flagged:
+            wrong_not_required.append(
+                {
+                    "text": heading["text"],
+                    "level": heading["level"],
+                    "status": heading.get("status"),
+                    "review": heading.get("review"),
+                    "reasons": heading.get("tier_reasons", []),
+                    "why_wrong": "not_a_gold_heading" if pair is None else "wrong_level",
+                    "gold_level": pair["gold_level"] if pair is not None else None,
+                }
+            )
+    flags = [(required[key], sum(members)) for key, members in units.items()]
+    return {"units": [list(f) for f in flags], "wrong_not_required": wrong_not_required}
 
 
 def heading_page_item(page_id: str, gold: Sequence[dict], predicted: Sequence[dict]) -> dict:
@@ -661,6 +848,7 @@ def heading_page_item(page_id: str, gold: Sequence[dict], predicted: Sequence[di
         "matched": len(pairs),
         "level_correct": sum(1 for m in matched if m["level_correct"]),
         "pairs": matched,
+        "matched_pred": [pi for _, pi, _ in pairs],
         "missed": [
             {"text": g["text"], "level": g["level"], "context": g.get("context")}
             for i, g in enumerate(gold)
@@ -739,6 +927,31 @@ def heading_metrics(items: Sequence[dict]) -> dict:
             for i in items
         ],
         "page_errors": _page_errors(items),
+        "review_load": heading_review_load(items),
+    }
+
+
+def heading_review_load(items: Sequence[dict]) -> dict:
+    """Required decisions and optional notes per section (gold page) and per PDF page,
+    and flag precision/recall (`heading_flags`) over every page."""
+    loads = [i["review"] for i in items if "review" in i]
+    load = _sum_loads(loads)
+    sections = len(items)
+    pdf_pages = sum(i.get("pdf_pages", 0) for i in items)
+    units = [u for i in items for u in i.get("flags", {}).get("units", [])]
+    return {
+        **load,
+        "sections": sections,
+        "pdf_pages": pdf_pages,
+        "required_per_section": _per(load["required_decisions"], sections),
+        "required_per_pdf_page": _per(load["required_decisions"], pdf_pages),
+        "optional_per_pdf_page": _per(load["optional"], pdf_pages),
+        "flags": flag_metrics(units),
+        "wrong_not_required": [
+            {"page": i["id"], **w}
+            for i in items
+            for w in i.get("flags", {}).get("wrong_not_required", [])
+        ],
     }
 
 
@@ -762,13 +975,20 @@ def _eval_headings(
     for page, pdf in zip(units, pdfs, strict=True):
         gold = _of_kind(page, "heading")
         error = None
+        fixes: list[Fix] = []
+        pdf_pages = 0
         try:
             analysed = layout.analyze(pdf)
-            predicted = predicted_headings(heading_step.heading_fixes(analysed.elements))
+            fixes = heading_step.heading_fixes(analysed.elements)
+            pdf_pages = analysed.page_count
+            predicted = predicted_headings(fixes)
         except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
             predicted, error = [], exc.code
         item = heading_page_item(_page_id(page), gold, predicted)
         item["error"] = error
+        item["pdf_pages"] = pdf_pages
+        item["review"] = load_counts(fixes)
+        item["flags"] = heading_flags(item, predicted)
         items.append(item)
     return items, None
 
@@ -953,6 +1173,9 @@ def document_page_item(
                 "status": fix.status.value if fix is not None else None,
                 "exact_lenient": result.exact_lenient,
                 "teds": result.teds,
+                "review": fix.review if fix is not None else None,
+                "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
+                "pred_latex": proposal.latex if proposal is not None else None,
             }
         )
     matched_gold = {gi for gi, _, _ in pairs}
@@ -1170,6 +1393,60 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "axe_skipped_pages": sum(i["axe_status"] == "skipped" for i in items),
         "axe_error_pages": sum(i["axe_status"] == "error" for i in items),
         "page_errors": _page_errors(items),
+        "review_load": document_review_load(items),
+    }
+
+
+def document_review_load(items: Sequence[dict]) -> dict:
+    """Required decisions (every kind; a heading group counts once) and optional notes
+    per PDF page and per section, plus flag precision/recall for the equations matched
+    to gold (wrong = not exact_lenient; also without the scorer's known gaps) and the
+    headings (wrong = not a gold heading or wrong level). Figures and equations with no
+    gold partner have no answer key here, so they count in the load but not in the
+    flags."""
+    load = _sum_loads(i["review"] for i in items if "review" in i)
+    sections = len(items)
+    pdf_pages = sum(i.get("pdf_pages", 0) for i in items)
+    pairs = [p for i in items for p in i.get("pairs", [])]
+    equations = [(p.get("review") == "required", int(not p["exact_lenient"])) for p in pairs]
+    clean = [
+        (p.get("review") == "required", int(not p["exact_lenient"]))
+        for p in pairs
+        if not p.get("scorer_gap")
+    ]
+    headings = [u for i in items for u in i.get("heading_flags", {}).get("units", [])]
+    wrong_equations = [
+        {
+            "page": i["id"],
+            "kind": "equation",
+            "gold_id": p["gold_id"],
+            "review": p.get("review"),
+            "reasons": p.get("tier_reasons", []),
+            "scorer_gap": bool(p.get("scorer_gap")),
+            "pred_latex": p.get("pred_latex"),
+        }
+        for i in items
+        for p in i.get("pairs", [])
+        if not p["exact_lenient"] and p.get("review") != "required"
+    ]
+    wrong_headings = [
+        {"page": i["id"], "kind": "heading", **w}
+        for i in items
+        for w in i.get("heading_flags", {}).get("wrong_not_required", [])
+    ]
+    return {
+        **load,
+        "sections": sections,
+        "pdf_pages": pdf_pages,
+        "required_per_section": _per(load["required_decisions"], sections),
+        "required_per_pdf_page": _per(load["required_decisions"], pdf_pages),
+        "optional_per_pdf_page": _per(load["optional"], pdf_pages),
+        "equation_flags": flag_metrics(equations),
+        "equation_flags_excluding_scorer_gaps": flag_metrics(clean),
+        "heading_flags": flag_metrics(headings),
+        "flags": flag_metrics([*equations, *headings]),
+        "flags_excluding_scorer_gaps": flag_metrics([*clean, *headings]),
+        "wrong_not_required": [*wrong_equations, *wrong_headings],
     }
 
 
@@ -1201,6 +1478,12 @@ def _eval_document(
             html_checks.static_checks(result.html),
             html_checks.axe_checks(result.html),
         )
+        for pair in item["pairs"]:
+            pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
+        item["review"] = load_counts(result.fixes)
+        headings = predicted_headings(result.fixes)
+        heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
+        item["heading_flags"] = heading_flags(heading_item, headings)
         calls = [c for f in result.fixes for c in f.calls]
         item.update(_calls_summary(calls))
         item["latency_ms"] = result.stats.latency_ms or item["latency_ms"]
@@ -1409,6 +1692,38 @@ HEADLINE = {
 }  # fmt: skip
 
 
+def _review_rows(task: str, load: dict) -> list[tuple[str, Any]]:
+    """The headline review-load numbers of one report (`*_review_load`)."""
+    if task == "equations":
+        flags, clean = load["flags"], load["flags_excluding_scorer_gaps"]
+        return [
+            ("required", load["required"]),
+            ("required_per_section", load["required_per_section"]),
+            ("optional", load["optional"]),
+            ("flag_precision", flags["flag_precision"]),
+            ("flag_recall", flags["flag_recall"]),
+            ("flag_precision_excluding_scorer_gaps", clean["flag_precision"]),
+            ("flag_recall_excluding_scorer_gaps", clean["flag_recall"]),
+            ("wrong_not_required", len(load["wrong_not_required"])),
+        ]
+    rows: list[tuple[str, Any]] = [
+        ("required_decisions", load["required_decisions"]),
+        ("required_per_pdf_page", load["required_per_pdf_page"]),
+        ("optional", load["optional"]),
+        ("optional_per_pdf_page", load["optional_per_pdf_page"]),
+        ("flag_precision", load["flags"]["flag_precision"]),
+        ("flag_recall", load["flags"]["flag_recall"]),
+    ]
+    if task == "document":
+        clean = load["flags_excluding_scorer_gaps"]
+        rows += [
+            ("flag_precision_excluding_scorer_gaps", clean["flag_precision"]),
+            ("flag_recall_excluding_scorer_gaps", clean["flag_recall"]),
+        ]
+    rows.append(("wrong_not_required", len(load["wrong_not_required"])))
+    return rows
+
+
 def format_markdown(report: dict) -> str:
     """Human summary of a report (metrics only; no document text)."""
     metrics = report["metrics"]
@@ -1441,6 +1756,9 @@ def format_markdown(report: dict) -> str:
             f"Budget recorded ${cost['budget_spent_usd']:.4f}: ${cost['dropped_usd']:.4f} "
             "went to items dropped at the budget stop."
         )
+    if "review_load" in metrics:
+        lines += ["", "### Review load", ""]
+        lines += _table(["metric", "value"], _review_rows(report["task"], metrics["review_load"]))
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]
         lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())

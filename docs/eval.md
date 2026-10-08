@@ -153,6 +153,12 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `by_display` | same, per gold `display` (block, inline) |
 | `selective` | for t = 0.50, 0.55, ..., 0.95: keep only proposals with confidence >= t. `coverage` = kept / n; `accuracy` = `exact_lenient` among kept (n/a when none kept); `kept`; `mean_teds` among kept. A useful confidence makes accuracy rise with t |
 
+`review_load` (see "Review load" below): `required`, `optional`, per item and per
+section, the reasons for each tier, `flags` and `flags_excluding_scorer_gaps`
+(precision and recall with wrong = not `exact_lenient`), `scorer_gaps` and
+`wrong_not_required`. Per item in the JSONL: `review`, `tier_reasons`, `wrong`,
+`wrong_not_required`, `scorer_gap`.
+
 Ceiling: scored with known-correct LaTeX for all 30 sample equations, the scorer gives
 exact_lenient 0.83, exact_strict 0.43, mean TEDS 0.87 (`make eval-latex-check`; 5 known
 normalisation gaps). A perfect transcriber cannot score higher on this sample until
@@ -180,6 +186,7 @@ maximised. Order matters because one page repeats "Teacher Support" 22 times (an
 | `recall_by_context` | recall per enclosing box (`body` = none); `os-teacher` holds 50 of 121 gold headings |
 | `per_page` | precision, recall and counts per page |
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing" (recall 0 for it), it does not stop the run |
+| `review_load` | see "Review load": decisions per section and per PDF page (`pdf_pages` from `layout.analyze`), optional notes per PDF page, `flags` with wrong = not a gold heading or matched at the wrong relative level, `wrong_not_required` (text, level, status, tier reasons, `why_wrong`: `not_a_gold_heading` or `wrong_level`) |
 
 ### figures
 
@@ -240,12 +247,35 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `axe_skipped_pages` | pages where axe could not run: `axe_checks` returned its single "axe" check coded `skipped` (Playwright or Chromium not installed) |
 | `axe_error_pages` | pages where axe broke: a single failed "axe" check (WP4 codes it `axe_error`). Neither case counts as zero violations. Rule results are named `axe.<rule>`, so a failure of axe's real `skip-link` rule still counts as a violation |
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
+| `review_load` | see "Review load": every kind's decisions per section and per PDF page, optional notes per PDF page, `equation_flags` (matched equations, wrong = not `exact_lenient`; also `equation_flags_excluding_scorer_gaps`), `heading_flags` (the headings task's rule, on the same PDF), `flags` and `flags_excluding_scorer_gaps` (both together), and `wrong_not_required` |
 
 TODO(Harish): document precision is now limited mostly by prose maths (in
 document-run1, 25 inline formulas OpenStax wrote as HTML, with no gold MathML). Decide
 whether to add them to the gold set (hand-written MathML for those spans) or keep
 scoring them apart as `detection_precision_excluding_prose_math`; the report gives both
 numbers until then.
+
+### Review load (equations, headings, document)
+
+How much the pipeline asks of a person, and whether it asks about the right things
+(docs/design/beta-architecture.md "Review tiers").
+
+| Metric | Definition |
+|---|---|
+| `required_decisions` (`required` for equations) | fixes with `Fix.review == "required"`, a group of repeated headings counted once (`core.triage.units`) |
+| `required_per_pdf_page`, `required_per_section` | the same divided by the PDF pages converted, or by the gold sections (the equations task prints no pages: per item and per section only) |
+| `optional`, `optional_per_pdf_page` | fixes accepted with an optional note |
+| `required_by_reason`, `optional_by_reason` | `core.triage.tier_reasons`: failed check codes, `Fix.reason`, `heading.repeated_label`, `below_accept` |
+| `flag_precision` | required *decisions* with at least one wrong member / required decisions (a group of 11 correct headings is one imprecise decision) |
+| `flag_recall` | wrong items inside required decisions / all wrong items: the share of real errors a person is asked about |
+| `..._excluding_scorer_gaps` | the same without the 5 sample equations whose known-correct LaTeX (`tests/fixtures/sample_latex_predictions.jsonl`) still fails `exact_lenient` (`scorer_gap_ids`): any transcription of them scores wrong |
+| `wrong_not_required` | every wrong item that was not required, with its tier and reasons, to read one by one |
+
+Wrong = not `exact_lenient` for an equation (only equations matched to gold in the
+document task); not a gold heading, or matched at the wrong relative level, for a
+heading. Figures and unmatched equations have no answer key in these tasks: they count
+in the load, not in the flags. A gold heading the pipeline missed is not an item a
+person could be asked about, so it is not in flag recall (it is in heading recall).
 
 ### Judge calibration (`eval calibrate`)
 
@@ -451,6 +481,104 @@ deterministic check against the PDF's own text layer is what separates right fro
 The figures judge went from pass 0.46 to 0.92 when it was given the image: the text-only
 judge counted correct details missing from the reference as errors, and in one case the
 reference itself was wrong (it says five miles; the caption says 10 km round trip).
+
+## Review triage (2026-10-08, "meaning-level only")
+
+Before: `feat/beta-app` at 4d574fb (every NEEDS_REVIEW, FAILED and ABSTAINED fix needed a
+decision). After: `feat/review-triage`. Same day, same prompts (`equation-df0e12f1`,
+`figure-ac51f42d`) and models; headings with the fake client (no model calls). The before
+numbers apply the same metric code to the before run's own fixes (stored without tiers,
+so their tier is the one their status implied). Reports: `/tmp/triage-<task>.json`
+(after), `/tmp/triage-before/` (before); not committed.
+
+| Measure | Before | After |
+|---|---|---|
+| equations: required decisions (30 equations, 3 sections) | 2 (0.67 per section) | 1 (0.33 per section) |
+| equations: optional notes | 0 | 1 |
+| equations: flag precision / recall | 0.50 (1/2) / 0.14 (1/7) | 1.00 (1/1) / 0.13 (1/8) |
+| ... excluding the 5 scorer gaps | 0.50 (1/2) / 0.50 (1/2) | 1.00 (1/1) / 0.33 (1/3) |
+| equations: exact_lenient | 0.767 | 0.733 |
+| headings: required decisions (3 sections, 43 PDF pages) | 61 (1.42 per page) | 9 (0.21 per page) |
+| headings: optional notes | 0 | 20 (0.47 per page) |
+| headings: flag precision / recall | 0.30 (18/61) / 1.00 (18/18) | 0.56 (5/9) / 0.78 (14/18) |
+| document: required decisions (43 PDF pages) | 65 (1.51 per page) | 10 (0.23 per page) |
+| document: optional notes | 0 | 23 (0.53 per page) |
+| document: flag precision / recall, all | 0.32 (20/63) / 0.77 (20/26) | 0.60 (6/10) / 0.60 (15/25) |
+| ... excluding scorer gaps | 0.32 (20/63) / 0.95 (20/21) | 0.60 (6/10) / 0.75 (15/20) |
+| document: equations only, excluding scorer gaps | 1.00 (2/2) / 0.67 (2/3) | 1.00 (1/1) / 0.50 (1/2) |
+| convert, OpenStax 2.1 (16 pages) | 25 | 3 (heading groups: Teacher Support x11, Procedure x2, Distance vs. Displacement x2); 10 optional |
+| convert, LaTeX two-column handout (1 page) | 2 | 2 (bold omega read as plain, twice); 3 optional (double-struck R) |
+
+The model answers differ from run to run (the after equations run dropped the bold of
+`Δ𝐝` in 2.1 eq-000 even after escalation, and the after convert read the handout's bold
+omega as plain twice). Applied to the *same* before answers, the new style rule keeps
+exactly the meaning-level flags (2.3 eq-002 `\mathbf{d} = vt + ...`, a bold v read as
+plain; the handout's bold omega) and turns the cosmetic ones into notes (`d_0` and `d_f`
+with bold subscripts, 2.2 eq-007's bold "avg" subscript, `\mathbb{R}^n`).
+
+Every wrong item that is not required after the change, and why:
+
+- equations: the 5 scorer gaps (2.2 eq-003, eq-004, eq-010; 2.3 eq-004, eq-007); 2.2
+  eq-007, whose only difference from the gold is the bold subscript "avg" (cosmetic by
+  the policy, an optional note); 2.3 eq-005 (equations task only), a comma after the
+  second row instead of after the array (punctuation, not flagged before either).
+- headings: "Solution" and "Discussion" on 2.1 and "Procedure" on 2.3, run-in labels used
+  once on their page (optional notes: no reliable run-in rule, docs/layout.md "Run-in
+  labels"), and "Displacement Problems" on 2.1, a gold h5 written two levels too high
+  (a level is an optional note).
+
+Targets: required decisions per page 0.21-0.23 on the gold sections, 0.19 on OpenStax 2.1,
+2 on the one-page handout (both real errors), 0.29 over the two documents (target about 1).
+Flag precision 0.56-0.60 on the gold sections, 0.60 on the two documents (3 useful of 5:
+the Procedure group and the two omegas), up from 0.30-0.32 and 0.19 (target 0.5). Flag
+recall of meaning-level errors: no real error *in these eval items* newly hidden; recall
+over all wrong items drops (document 0.95 -> 0.75 excluding scorer gaps) because single
+run-in labels, a heading level and a bold subscript are now optional notes, as the
+policy decides.
+
+### After the review of the triage (same day)
+
+A review found meaning-level errors outside the eval items that the first version let
+through, reproduced with real layout on a Chromium-printed PDF and FakeVisionClient
+answers at confidence 0.95: one wrong digit (9.80 read as 9.30), `ω` read as `w`, the
+`t` dropped from `e^{-λt}` and `ℝ` read as `ℕ` were accepted with nothing to review (the
+symbol check only fired below a Dice similarity of 0.5); a bold `𝐤·𝐫` in an exponent
+read plain, and an encoded `ℝ` read as a plain `R`, were optional notes. Fixed
+(docs/steps.md "Text-layer cross-check" and "Letter-style check"): any difference in
+letters, digits and Greek letters is required (`symbol_mismatch`); a bold letter in the
+script of a plain base is a variable; an encoded double-struck, script or fraktur letter
+read plain is meaning-level; and every failed text-layer check on a cheap-model answer,
+a cosmetic one too, escalates to the main model. Still cosmetic, as the policy says: a
+bold digit, also the lone zero vector `𝟎` read as `0` (it escalates, but if the main
+model also reads `0` it is an optional note).
+
+Applied to the 181 recorded real answers above (equations task, document task, both
+converts), the new rules change no tier. Re-run with real models (commit 6508901, same
+prompts and models; reports in `/tmp/triage-review/`, not committed; $0.30 spent,
+including a document run stopped by its own `--max-usd` reservation cap and re-run at
+`--concurrency 1`):
+
+| Measure | First triage | After the review |
+|---|---|---|
+| equations: required / optional | 1 / 1 | 0 / 1 |
+| equations: exact_lenient | 0.733 | 0.767 |
+| equations: escalated route / cost | 5 / $0.048 | 6 / $0.053 |
+| document: required decisions (43 PDF pages) / optional | 10 (0.23 per page) / 23 | 9 (0.21 per page) / 23 |
+| document: flag precision / recall, excluding scorer gaps | 0.60 (6/10) / 0.75 (15/20) | 0.56 (5/9) / 0.70 (14/20) |
+| convert, OpenStax 2.1 (16 pages) | 3 decisions, 10 optional, 43 calls, $0.028 | 3 decisions, 10 optional, 42 calls, $0.028 |
+| convert, LaTeX handout (1 page) | 2 decisions, 3 optional, 32 calls, $0.019 | 1 decision, 3 optional, 34 calls, $0.020 |
+
+The differences are model variance, not the rules: the first runs' extra required
+equations were a bold `Δ𝐝` the main model read plain (2.1 eq-000, equations task), a 2.3
+eq-005 answer at confidence 0.84 (document task) and the second bold omega of the
+handout; this time the models read them right or surer. Every escalation in the
+equations task was a cheap answer that dropped a bold `𝐝` (meaning-level, escalated
+before as well); the sixth is one more of those. The headings are unchanged (no model
+calls). The cosmetic notes (OpenStax `𝐝𝟎` and `𝐝𝐟`, the handout's three MSBM
+`\mathbb{R}`) now go to the main model as well, which wrote the same thing, so they stay
+optional notes (5 more main-model calls over the two documents, a few tenths of a cent;
+the call totals also move with the other escalations). The bold omega that remains is
+still required. No `symbol_mismatch` fired in any run.
 
 ## What the numbers do not show
 

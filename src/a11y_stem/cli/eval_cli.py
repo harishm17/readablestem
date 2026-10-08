@@ -26,6 +26,9 @@ EVAL_CACHE = Path(".cache/eval")
 OPENSTAX_CACHE = Path(".cache/openstax")
 DEMO_DIR = Path("src/a11y_stem/web/static/demo")
 WEEKLY_DIR = Path(".local") / "eval" / "weekly"  # git-ignored; commit a report on purpose
+# Known-correct LaTeX for every sample equation (`make eval-latex-check`): an equation it
+# still fails is a scorer gap, left out of the "excluding scorer gaps" review flags.
+SCORER_CHECK = Path("tests/fixtures/sample_latex_predictions.jsonl")
 DEFAULT_MAX_CALLS = 5000
 # Same as eval.pipeline_eval.TASKS (a test checks); kept here so building the parser
 # does not import the pipeline.
@@ -199,6 +202,9 @@ def _run_pipeline(
             gold_label=gold_label,
             concurrency=args.concurrency,
             budget=budget,
+            scorer_gaps=pe.scorer_gap_ids(pe.load_gold(gold_dir), _default(SCORER_CHECK))
+            if args.task in {"equations", "document"}
+            else frozenset(),
         )
         try:
             run = pe.run_pipeline_eval(config)

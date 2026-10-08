@@ -44,7 +44,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 
 | Element | Converted | Not converted (ABSTAINED, FAILED, REJECTED, no fix) |
 |---|---|---|
-| Heading | `<h1>`-`<h6>` from the heading fix | `<p>` with the original text |
+| Heading | `<h1>`-`<h6>` from the heading fix | `<p>` with the original text; a bold line a reviewer rejected ("Make them bold text") is `<p><strong>`, bold as in the PDF |
 | Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
@@ -170,7 +170,8 @@ right.
 - If there is no crop, the extracted text (if any) is shown in monospace with "The
   original image is not available."
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
-  where they are handled.
+  where they are handled. So are fixes accepted with an optional note
+  (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
 
 ## Inline equations
 

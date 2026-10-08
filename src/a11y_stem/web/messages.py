@@ -79,8 +79,15 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "equation itself may still be right.",
     ("equation.text_layer", "text_layer_mismatch"): "The symbols in this transcription differ "
     "a lot from the text stored in the PDF, so compare it with the image symbol by symbol.",
-    ("equation.text_layer_style", "style_mismatch"): "A letter is bold in the PDF but not in "
-    "this transcription (or the other way round), so check the vector names.",
+    ("equation.text_layer", "symbol_mismatch"): "A letter, digit or Greek letter in this "
+    "transcription differs from the text stored in the PDF (a wrong digit, a misread or "
+    "missing symbol), so compare it with the image symbol by symbol.",
+    ("equation.text_layer_style", "style_mismatch"): "A style that carries meaning differs "
+    "from the PDF (a bold letter, a vector, is plain here, a plain one became bold, or a "
+    "double-struck letter such as the R of the reals became plain), so check those letters.",
+    ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
+    "only where it does not change the meaning (a bold subscript or digit, or a style such "
+    "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
     # Alt text (pipeline.validate.check_alt)
     ("alt.decorative", "decorative_with_text"): "A decorative figure must have empty alt "
     "text, so clear the text or untick Decorative.",
@@ -189,6 +196,9 @@ UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the 
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
 
 SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth checking"}
+# Failed checks of a fix accepted with optional notes (`Fix.review == "optional"`): they
+# never block anything, so they are labelled as notes, not by severity.
+NOTE_LABEL = "Note"
 
 # Confidence words. "High" starts at the default auto-accept bar
 # (Settings.auto_accept_confidence), so a "High" item in review was held back by a check,

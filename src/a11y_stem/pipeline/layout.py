@@ -70,7 +70,7 @@ from itertools import count, pairwise
 
 import pymupdf
 
-from a11y_stem.core.mathchars import styled_char
+from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.types import BBox, Element, Kind, inline_marker
 from a11y_stem.pipeline.parse import (
     EQUATION_THRESHOLD,
@@ -241,6 +241,20 @@ _BOLD_FONT = re.compile(
     re.IGNORECASE,
 )
 _ITALIC_FONT = re.compile(r"italic|oblique|cmti|cmsl|sfti|-it$|,it|ital", re.IGNORECASE)
+# Regular-weight text and maths fonts known to have a bold face that PDFs name as bold
+# (CMBX, Times-Bold, DejaVuSerif-Bold, ...), or OpenType maths fonts that write bold as
+# Unicode maths bold. A letter drawn in one of them, not bold, is known to be plain, so
+# the equation step may treat a bold reading of it as a real difference. Fonts that
+# cannot show a letter's style in the text layer (MSBM double-struck, EUSM and RSFS
+# script, EUFM fraktur, CMSY calligraphic, Symbol) are deliberately not in the list.
+_REGULAR_FACE = re.compile(
+    r"^(?:cmr\d|cmmi\d|cmti\d|cmsl\d|cmss\d|cmssi\d|cmu|lmroman|lmmathitalic|lmsans|"
+    r"latinmodern|sfrm|sfti|sfss|txr|txmi|pxr|pxmi|times|nimbus|liberation|dejavu|arial|"
+    r"helvetica|calibri|cambria|carlito|caladea|georgia|palatino|bookantiqua|garamond|"
+    r"charter|verdana|tahoma|segoe|noto(?:serif|sans)|sourceserif|sourcesans|opensans|"
+    r"roboto|lato|stix|xits|texgyre|linlibertine|libertinus|minion|myriad|utopia)",
+    re.IGNORECASE,
+)
 _MONO_FONT = re.compile(r"mono|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
 _MARKUP = re.compile(r"</?[A-Za-z][\w:.-]*\s*/?>|</")
 _BOLD_FLAG = 16
@@ -751,6 +765,14 @@ class _Char:
         this so the equation step can check that a bold vector stayed bold."""
         return styled_char(self.c, "bold") if self.bold else self.c
 
+    @property
+    def known_regular(self) -> bool:
+        """A letter known to be plain: not bold, in a font with a bold face, and not a
+        styled maths code point (a maths bold or double-struck letter says its own style)."""
+        if not self.c.isalpha() or self.bold or char_variant(self.c) not in (None, "italic"):
+            return False
+        return bool(_REGULAR_FACE.match(self.font.split("+", 1)[-1].replace(" ", "")))
+
 
 @lru_cache(maxsize=1024)
 def _font_traits(font: str) -> tuple[bool, bool, bool, bool]:
@@ -762,6 +784,12 @@ def _font_traits(font: str) -> tuple[bool, bool, bool, bool]:
         bool(MATH_FONT.search(name)),
         bool(_MONO_FONT.search(name)),
     )
+
+
+def _regular_letters(chars: Iterable[_Char]) -> str | None:
+    """`Element.regular_letters` of an equation: its letters known to be plain."""
+    letters = sorted({base_char(c.c) for c in chars if c.known_regular})
+    return "".join(letters) or None
 
 
 def _char_class(ch: _Char) -> str:
@@ -1644,6 +1672,7 @@ class _Inline:
     score: float
     reasons: list[str]
     font_size: float
+    regular: str | None = None  # `Element.regular_letters`
 
 
 def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
@@ -2870,6 +2899,7 @@ class _Block:
     marker: _Marker | None = None  # list items: the marker of the first row
     origin: float = 0.0  # list items: left edge of their column's text (`_column_origins`)
     label: str | None = None  # display equations: the equation number beside them
+    regular: str | None = None  # display equations: `Element.regular_letters`
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -2987,6 +3017,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
             score=max([score, *(r.score for r in rows)]),
             reasons=reasons,
             label=" ".join(r.clean for r in labels) or None,
+            regular=_regular_letters(ink),
         )
     text = _join_text(rows)
     letters = sum(c.isalpha() for c in text)
@@ -3140,7 +3171,9 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
             box = _clear_of_punctuation(_union((c.x0, c.y0, c.x1, c.y1) for c in ink), row, end)
-            row_pieces.append(_Inline(box, text, score, reasons, _dominant_size([row])))
+            row_pieces.append(
+                _Inline(box, text, score, reasons, _dominant_size([row]), _regular_letters(ink))
+            )
             cursor = end
         row_pieces.append("".join(c.c for c in row.chars[cursor:]))
         _append_row(pieces, row_pieces)
@@ -3496,6 +3529,7 @@ def _to_elements(pages: list[_PageBlocks], ctx: _Context) -> list[Element]:
                             reasons=inline.reasons,
                             display="inline",
                             parent_id=element_id,
+                            regular_letters=inline.regular,
                         )
                     )
                 continue
@@ -3515,6 +3549,7 @@ def _to_elements(pages: list[_PageBlocks], ctx: _Context) -> list[Element]:
                     display="block" if kind == Kind.EQUATION else None,
                     equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
+                    regular_letters=block.regular if kind == Kind.EQUATION else None,
                 )
             )
     return elements

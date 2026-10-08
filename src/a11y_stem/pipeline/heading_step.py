@@ -3,7 +3,7 @@
 Turns `Kind.HEADING` elements into `Fix(kind=HEADING, heading=HeadingFix(level, text))`.
 Levels come from layout clustering (`layout.heading_levels`); this step repairs the outline
 so it never skips a level going down (h1 -> h3 becomes h1 -> h2) and the first heading is
-h1 or h2, and marks uncertain ones NEEDS_REVIEW.
+h1 or h2, and decides which headings need a person's decision.
 
 Evidence and confidence (also in docs/layout.md):
 
@@ -20,14 +20,34 @@ At body size, layout only gives the "numbered section" reason for a real section
 numbered headings.
 
 Penalties: all caps -0.15, fewer than 4 letters -0.20, list-style number ("1.", "A)")
-without a larger font -0.15, outline repaired -0.03. A fix is ACCEPTED only with strong
-evidence and none of the first three penalties, which keeps every accepted heading at
->= 0.85 (the default `Settings.auto_accept_confidence`); everything else is NEEDS_REVIEW.
-Check codes are content-free categories ("heading.level_repaired", "heading.weak_evidence").
+without a larger font -0.15, outline repaired -0.03. A heading is *certain* only with
+strong evidence and none of the first three penalties (confidence >= 0.85, the default
+`Settings.auto_accept_confidence`). Check codes are content-free categories
+("heading.level_repaired", "heading.weak_evidence").
+
+Review tiers ("meaning-level only" policy, 2026-10-08). Every heading is written as a
+heading either way; the tier only says whether a person must decide:
+
+- certain: ACCEPTED, review "none" ("optional" when the outline repair moved it);
+- uncertain and on its own: ACCEPTED, review "optional" (its checks are the notes): a
+  single heading with weak evidence, or a level, is cheap to fix later;
+- uncertain and repeated: when the same label (normalised text) with the same style
+  (font size, weight, evidence, level) is uncertain two or more times ("Teacher Support"
+  as a small bold line in every box), the copies make one group: NEEDS_REVIEW, review
+  "required", sharing `group_key` ("hg-" + the first one's element id) and `group_size`.
+  The review screen asks once: keep them all as headings at that level, choose another
+  level, or make them all plain bold text. One wrong guess repeated eleven times is worth
+  a decision; a label used once is not.
+
+Bold run-in labels ("Solution", "Discussion", "Procedure" in an OpenStax worked example)
+are not headings in OpenStax's gold outline, but no structural rule separated them from
+real box headings reliably (docs/layout.md, "Run-in labels"), so they are not guessed
+at: on their own they are optional notes, repeated they form a group like any label.
 """
 
 from __future__ import annotations
 
+import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
 
@@ -41,6 +61,8 @@ from a11y_stem.pipeline.layout import (
 
 ACCEPT_AT = 0.85  # matches the default Settings.auto_accept_confidence
 MIN_LETTERS = 4  # fewer letters than this ("Ex.", "A") is too little to trust
+MIN_GROUP = 2  # uncertain copies of one label that make a group decision
+GROUP_PREFIX = "hg-"
 
 
 def heading_fixes(elements: list[Element]) -> list[Fix]:
@@ -48,7 +70,9 @@ def heading_fixes(elements: list[Element]) -> list[Fix]:
     headings = sorted((e for e in elements if e.kind == Kind.HEADING), key=lambda e: e.order)
     raw = heading_levels(headings)
     levels = repair_outline([raw[h.id] for h in headings])
-    return [_fix(h, raw[h.id], level) for h, level in zip(headings, levels, strict=True)]
+    fixes = [_fix(h, raw[h.id], level) for h, level in zip(headings, levels, strict=True)]
+    group_repeated(headings, fixes)
+    return fixes
 
 
 def repair_outline(levels: Sequence[int]) -> list[int]:
@@ -67,6 +91,51 @@ def repair_outline(levels: Sequence[int]) -> list[int]:
         open_parents.append((raw, level))
         repaired.append(level)
     return repaired
+
+
+def label_key(text: str) -> str:
+    """A heading's label for grouping: NFKC, case-folded, letters and digits only."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    return " ".join("".join(ch if ch.isalnum() else " " for ch in folded).split())
+
+
+def style_key(element: Element, level: int) -> tuple[float | None, bool, bool, int]:
+    """What makes two copies of a label look the same: font size to the half point,
+    weight, whether the font is larger than body text, and the proposed level."""
+    size = round(element.font_size * 2) / 2 if element.font_size else None
+    return (size, element.bold, REASON_LARGER_FONT in element.reasons, level)
+
+
+def group_repeated(headings: Sequence[Element], fixes: Sequence[Fix]) -> None:
+    """Turn repeated uncertain labels into one required decision per label (in place).
+
+    Uncertain = the optional single headings `_fix` made with a failed evidence or
+    shape check (not the certain ones whose only note is the outline repair).
+    """
+    groups: dict[tuple, list[Fix]] = {}
+    for element, fix in zip(headings, fixes, strict=True):
+        if fix.heading is None or not _uncertain(fix):
+            continue
+        key = (label_key(fix.heading.text), style_key(element, fix.heading.level))
+        groups.setdefault(key, []).append(fix)
+    for members in groups.values():
+        if len(members) < MIN_GROUP:
+            continue
+        group_key = GROUP_PREFIX + members[0].element_id
+        for fix in members:
+            fix.status = Status.NEEDS_REVIEW
+            fix.review = "required"
+            fix.group_key = group_key
+            fix.group_size = len(members)
+
+
+UNCERTAIN_CODES = frozenset(
+    {"heading.weak_evidence", "heading.all_caps", "heading.very_short", "heading.list_like"}
+)
+
+
+def _uncertain(fix: Fix) -> bool:
+    return any(c.code in UNCERTAIN_CODES for c in fix.failed_checks)
 
 
 @dataclass(frozen=True)
@@ -127,6 +196,7 @@ def _fix(element: Element, raw_level: int, level: int) -> Fix:
             status=Status.ABSTAINED,
             reason="heading.empty_text",
             checks=[Check(name="heading.text", passed=False, code="heading.empty_text")],
+            review="required",
         )
     evidence = _evidence(element, text)
     repaired = level != raw_level
@@ -137,12 +207,14 @@ def _fix(element: Element, raw_level: int, level: int) -> Fix:
         _check("heading.length", not evidence.very_short, "heading.very_short"),
         _check("heading.list_like", not evidence.maybe_list_item, "heading.list_like"),
     ]
-    accepted = evidence.strong and not evidence.weak_flags
+    # Accepted either way (a group of repeated labels becomes NEEDS_REVIEW later, in
+    # `group_repeated`); any failed check is an optional note.
     return Fix(
         element_id=element.id,
         kind=Kind.HEADING,
-        status=Status.ACCEPTED if accepted else Status.NEEDS_REVIEW,
+        status=Status.ACCEPTED,
         confidence=evidence.confidence(repaired),
         heading=HeadingFix(level=level, text=text),
         checks=checks,
+        review="optional" if any(not c.passed for c in checks) else "none",
     )
