@@ -1,12 +1,160 @@
-"""CLI: a11y-stem serve, users allow|deny|list, db upgrade (WP5 implements)."""
+"""CLI: `a11y-stem serve`, `a11y-stem users allow|deny|list`, `a11y-stem db upgrade`.
+
+- serve: runs the web app with uvicorn (`create_app` as a factory, so settings are read
+  at start-up, and `--reload` works).
+- users: manages the sign-in allowlist in the database named by DATABASE_URL. In dev the
+  tables are created on first use; in production the schema must be migrated first.
+- db upgrade: applies the Alembic migrations in migrations/ (`alembic upgrade head`).
+"""
 
 from __future__ import annotations
 
 import argparse
+import os
+import sys
 
 
 def register(
     group: argparse._SubParsersAction, top: argparse._SubParsersAction | None = None
 ) -> None:
     """Add this module's subcommands to `group` (top-level). Called by cli.main."""
-    return None
+    serve = group.add_parser("serve", help="run the web app (uvicorn)")
+    serve.add_argument("--host", default="127.0.0.1", help="bind address (default 127.0.0.1)")
+    serve.add_argument(
+        "--port",
+        type=int,
+        default=int(os.environ.get("PORT", "8000")),
+        help="port (default: $PORT or 8000)",
+    )
+    serve.add_argument("--reload", action="store_true", help="restart on code changes (dev)")
+    serve.set_defaults(func=_cmd_serve)
+
+    users = group.add_parser("users", help="manage the sign-in allowlist").add_subparsers(
+        dest="users_command", required=True
+    )
+    allow = users.add_parser("allow", help="allow an email address to sign in")
+    allow.add_argument("email")
+    allow.add_argument("--admin", action="store_true", help="also make them an admin")
+    allow.set_defaults(func=_cmd_users_allow)
+    deny = users.add_parser("deny", help="remove an email address from the allowlist")
+    deny.add_argument("email")
+    deny.set_defaults(func=_cmd_users_deny)
+    users.add_parser("list", help="list allowed users").set_defaults(func=_cmd_users_list)
+
+    db = group.add_parser("db", help="database schema").add_subparsers(
+        dest="db_command", required=True
+    )
+    db.add_parser("upgrade", help="apply migrations (alembic upgrade head)").set_defaults(
+        func=_cmd_db_upgrade
+    )
+
+
+def _error(message: str) -> int:
+    print(f"error: {message}", file=sys.stderr)
+    return 2
+
+
+def _cmd_serve(args: argparse.Namespace) -> int:
+    import uvicorn
+
+    uvicorn.run(
+        "a11y_stem.web.app:create_app",
+        factory=True,
+        host=args.host,
+        port=args.port,
+        reload=args.reload,
+        proxy_headers=True,
+        server_header=False,
+    )
+    return 0
+
+
+def _factory():
+    """Session factory for DATABASE_URL, with the schema prepared for the environment."""
+    from a11y_stem.config import get_settings
+    from a11y_stem.web.database import prepare_database
+    from a11y_stem.web.db import make_engine, make_sessionmaker
+
+    settings = get_settings()
+    engine = make_engine(settings.database_url)
+    prepare_database(engine, settings)
+    return make_sessionmaker(engine)
+
+
+def _cmd_users_allow(args: argparse.Namespace) -> int:
+    from a11y_stem.config import ConfigError
+    from a11y_stem.web.auth import normalise_email, set_allowed
+    from a11y_stem.web.db import session_scope
+
+    email = normalise_email(args.email)
+    if email is None:
+        return _error(f"not an email address: {args.email!r}")
+    try:
+        factory = _factory()
+    except ConfigError as exc:
+        return _error(str(exc))
+    with session_scope(factory) as session:
+        set_allowed(session, email, allowed=True, admin=True if args.admin else None)
+    print(f"allowed {email}{' (admin)' if args.admin else ''}")
+    return 0
+
+
+def _cmd_users_deny(args: argparse.Namespace) -> int:
+    from a11y_stem.config import ConfigError
+    from a11y_stem.web.auth import normalise_email, set_allowed
+    from a11y_stem.web.db import session_scope
+
+    email = normalise_email(args.email)
+    if email is None:
+        return _error(f"not an email address: {args.email!r}")
+    try:
+        factory = _factory()
+    except ConfigError as exc:
+        return _error(str(exc))
+    with session_scope(factory) as session:
+        user = set_allowed(session, email, allowed=False)
+    if user is None:
+        return _error(f"{email} is not a known user")
+    print(f"removed {email} from the allowlist")
+    return 0
+
+
+def _cmd_users_list(args: argparse.Namespace) -> int:
+    from sqlalchemy import select
+
+    from a11y_stem.config import ConfigError
+    from a11y_stem.web.db import User, session_scope
+
+    try:
+        factory = _factory()
+    except ConfigError as exc:
+        return _error(str(exc))
+    with session_scope(factory) as session:
+        users = session.scalars(
+            select(User).where(User.is_allowed.is_(True)).order_by(User.email)
+        ).all()
+        rows = [(u.email, "admin" if u.is_admin else "user", u.last_login_at) for u in users]
+    if not rows:
+        print("no allowed users")
+        return 0
+    width = max(len(email) for email, _, _ in rows) + 2
+    print(f"{'email':<{width}} {'role':<6} last sign-in")
+    for email, role, last in rows:
+        shown = last.strftime("%Y-%m-%d %H:%M") if last else "never"
+        print(f"{email:<{width}} {role:<6} {shown}")
+    return 0
+
+
+def _cmd_db_upgrade(args: argparse.Namespace) -> int:
+    from alembic import command
+
+    from a11y_stem.config import ConfigError, get_settings
+    from a11y_stem.web.database import alembic_config
+
+    try:
+        config = alembic_config(get_settings().database_url)
+    except ConfigError as exc:
+        return _error(str(exc))
+    command.upgrade(config, "head")
+    print("database schema is at the latest migration")
+    return 0

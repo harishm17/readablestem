@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}Admin{% endblock %}
+{% block content %}
+<h1>Admin</h1>
+{% include "_error_summary.html" %}
+<p>Numbers and category codes only: nothing here shows document content.</p>
+
+<section aria-labelledby="spend-heading">
+  <h2 id="spend-heading">Model spend today ({{ spend.day.isoformat() }}, UTC)</h2>
+  <dl class="summary-list">
+    <div><dt>Spent</dt><dd>{{ spend.spent_usd|usd }}</dd></div>
+    <div><dt>Held for calls in progress</dt><dd>{{ spend.held_usd|usd }}</dd></div>
+    <div><dt>Daily cap</dt><dd>{% if spend.cap_usd is not none %}{{ spend.cap_usd|usd }}{% else %}None set (development){% endif %}</dd></div>
+    <div><dt>Left today</dt><dd>{% if spend.remaining_usd is not none %}{{ spend.remaining_usd|usd }}{% else %}No limit{% endif %}</dd></div>
+  </dl>
+</section>
+
+<section aria-labelledby="queue-heading">
+  <h2 id="queue-heading">Queue</h2>
+  <dl class="summary-list">
+    <div><dt>Waiting</dt><dd>{{ queue.queued }}</dd></div>
+    <div><dt>Converting</dt><dd>{{ queue.running }}</dd></div>
+    <div><dt>Finished (not yet deleted)</dt><dd>{{ queue.done }}</dd></div>
+    <div><dt>Stopped (not yet deleted)</dt><dd>{{ queue.failed }}</dd></div>
+  </dl>
+</section>
+
+<section aria-labelledby="allowlist-heading">
+  <h2 id="allowlist-heading">Allowlist</h2>
+  <p>People who may sign in. Addresses in <code>ADMIN_EMAILS</code> are made admins again
+    every time the app starts.</p>
+  <form method="post" action="/admin/allowlist" novalidate class="stack-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field{% if email_error %} field-error{% endif %}">
+      <label for="allow-email">Email address to allow</label>
+      {% if email_error %}<p class="error-message" id="allow-email-error"><span class="visually-hidden">Error: </span>{{ email_error }}</p>{% endif %}
+      <input type="email" id="allow-email" name="email" autocomplete="off" spellcheck="false"
+             value="{{ email_value }}"{% if email_error %} aria-invalid="true" aria-describedby="allow-email-error"{% endif %}>
+    </div>
+    <div class="field checkbox-field">
+      <input type="checkbox" id="allow-admin" name="admin" value="on" aria-describedby="allow-admin-hint">
+      <label for="allow-admin">Make this person an admin</label>
+      <p class="hint" id="allow-admin-hint">Leave it unticked to keep the role of someone who is already listed.</p>
+    </div>
+    <button type="submit" class="button">Allow</button>
+  </form>
+
+  <div class="table-scroll">
+  <table>
+    <caption class="visually-hidden">People on the allowlist</caption>
+    <thead>
+      <tr><th scope="col">Email</th><th scope="col">Role</th><th scope="col">Last sign-in</th><th scope="col">Remove</th></tr>
+    </thead>
+    <tbody>
+      {% for person in users %}
+      <tr>
+        <th scope="row">{{ person.email }}</th>
+        <td>{{ "Admin" if person.is_admin else "Instructor" }}</td>
+        <td>{{ person.last_login_at|utc if person.last_login_at else "Never" }}</td>
+        <td>
+          {% if person.email != user.email %}
+          <form method="post" action="/admin/allowlist/remove" class="inline-form">
+            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+            <input type="hidden" name="email" value="{{ person.email }}">
+            <button type="submit" class="button-secondary">Remove<span class="visually-hidden"> {{ person.email }}</span></button>
+          </form>
+          {% else %}
+          You
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+</section>
+
+<section aria-labelledby="aggregates-heading">
+  <h2 id="aggregates-heading">Recent counts (last {{ aggregate_days }} days)</h2>
+  {% if aggregates %}
+  <div class="table-scroll">
+  <table>
+    <caption class="visually-hidden">Daily counts by step and category</caption>
+    <thead>
+      <tr><th scope="col">Day (UTC)</th><th scope="col">Step</th><th scope="col">Category</th><th scope="col" class="num">Count</th></tr>
+    </thead>
+    <tbody>
+      {% for row in aggregates %}
+      <tr><td>{{ row.day.isoformat() }}</td><td>{{ row.step }}</td><td><code>{{ row.category }}</code></td><td class="num">{{ row.count }}</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No counts yet. They are written by the daily aggregation before documents are deleted.</p>
+  {% endif %}
+</section>
+{% endblock %}

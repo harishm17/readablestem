@@ -1,0 +1,83 @@
+{% extends "base.html" %}
+{% set field_errors = field_errors|default({}) %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}My documents{% endblock %}
+{% block content %}
+<h1>My documents</h1>
+{% include "_error_summary.html" %}
+
+{% if spend_closed %}
+<div class="notice notice-warning">
+  <h2>Conversions are paused for today</h2>
+  <p>Today's budget for conversions has been used up. Uploads open again after midnight UTC.
+    Documents already in the queue may stop early.</p>
+</div>
+{% endif %}
+
+<section aria-labelledby="upload-heading">
+  <h2 id="upload-heading">Convert a PDF</h2>
+  <form method="post" action="/jobs" enctype="multipart/form-data" novalidate class="upload-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% set pdf_error = field_errors.get("pdf") %}
+    <div class="field{% if pdf_error %} field-error{% endif %}">
+      <label for="pdf">PDF file</label>
+      <p class="hint" id="pdf-hint">Up to {{ max_upload_mb }} MB and {{ max_pages }} pages.
+        {% if pages_left is not none %}You can convert {{ pages_left }} more
+        {{ "page" if pages_left == 1 else "pages" }} today.{% endif %}
+        Only upload materials you wrote or may adapt, with no student records.</p>
+      {% if pdf_error %}
+      <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
+      {% endif %}
+      <input type="file" id="pdf" name="pdf" accept="application/pdf,.pdf"
+             aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
+    </div>
+    <div class="field checkbox-field">
+      <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint">
+      <label for="keep">Keep my document and results for {{ opt_in_days }} days to help improve the tool</label>
+      <p class="hint" id="keep-hint">Off unless you tick it. If you leave it unticked, your
+        document and results are deleted after {{ retention_hours }} hours.
+        Either way, uploads are never used to train AI models.</p>
+    </div>
+    <button type="submit" class="button">Upload and convert</button>
+  </form>
+</section>
+
+<section aria-labelledby="jobs-heading">
+  <h2 id="jobs-heading">Your documents</h2>
+  {% if jobs %}
+  <div class="table-scroll">
+  <table>
+    <caption class="visually-hidden">Your documents, newest first</caption>
+    <thead>
+      <tr>
+        <th scope="col">Document</th>
+        <th scope="col">Uploaded</th>
+        <th scope="col">Status</th>
+        <th scope="col">Pages</th>
+        <th scope="col">Deleted automatically</th>
+        <th scope="col">Delete now</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for job in jobs %}
+      <tr>
+        <th scope="row"><a href="/jobs/{{ job.id }}">{{ job.filename }}</a></th>
+        <td>{{ job.created_at|utc }}</td>
+        <td><span class="status-badge status-{{ job.status }}">{{ job.status_label }}</span></td>
+        <td>{{ job.page_count }}</td>
+        <td>{{ job.retain_until|utc }}</td>
+        <td>
+          <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
+            <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+            <button type="submit" class="button-secondary">Delete<span class="visually-hidden"> {{ job.filename }}</span></button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>You have not uploaded any documents yet.</p>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>{{ message }}</p>
+{% if status == 403 and contact_email %}
+<p>If you think this is a mistake, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
+{% endif %}
+<ul class="actions">
+  {% if job_id %}<li><a href="/jobs/{{ job_id }}">Back to the document's status</a></li>{% endif %}
+  {% if user %}<li><a href="/app">Go to my documents</a></li>{% endif %}
+  <li><a href="/">Go to the home page</a></li>
+</ul>
+{% endblock %}

@@ -1,0 +1,48 @@
+{% extends "base.html" %}
+{% block title %}Terms of use{% endblock %}
+{% block content %}
+<h1>Terms of use</h1>
+<p class="draft-note"><strong>Draft, to be reviewed by Harish.</strong> These terms describe
+  how the beta works today; the wording is not final.</p>
+
+<h2>The service</h2>
+<p>a11y-stem is a free beta, open by invitation to a small group of instructors. It may
+  change, pause or stop at any time. Daily limits apply to pages and uploads, and the
+  service pauses for the day when its budget for AI model calls is used up.</p>
+
+<h2>What it does, and what it does not</h2>
+<p>The tool assists you in making course materials more accessible: it proposes MathML for
+  equations, a repaired heading outline and short alt text for figures, each with a
+  confidence score. Proposals can be wrong. Check the output, using the review screen,
+  before you share it with students. The tool does not certify that a document meets any
+  accessibility standard or law, and it does not replace an accessibility review.</p>
+
+<h2>Your materials</h2>
+<ul>
+  <li>Upload only materials you wrote or have the right to adapt.</li>
+  <li>Never upload student records, graded work or anything with students' personal
+    information in it.</li>
+  <li>You keep all rights to your materials and to the converted output. By uploading, you
+    let the service process them to produce the conversion, and keep them for the time
+    described in the <a href="/privacy">privacy notice</a>.</li>
+</ul>
+
+<h2>Fair use</h2>
+<p>Do not try to get around the limits, sign-in or security of the service, or use it to
+  process material you are not allowed to share. Access can be removed if the service is
+  misused.</p>
+
+<h2>Open source</h2>
+<p>The code is free software. It uses PyMuPDF under the GNU Affero General Public License
+  v3, and the complete source code of this service is published at
+  <a href="{{ source_url }}">{{ source_url }}</a>.</p>
+
+<h2>No warranty</h2>
+<p>The service is provided as it is, without any warranty. To the extent the law allows,
+  the people who run it are not liable for losses that come from using it.</p>
+
+<h2>Contact</h2>
+<p>For takedown requests, rights concerns or questions{% if contact_email %}, email
+  <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}, use the contact
+  address of this service{% endif %}.</p>
+{% endblock %}

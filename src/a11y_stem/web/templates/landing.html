@@ -1,0 +1,34 @@
+{% extends "base.html" %}
+{% block title %}Accessible HTML from STEM course PDFs{% endblock %}
+{% block content %}
+<h1>Turn STEM course PDFs into accessible HTML</h1>
+<p class="lede">a11y-stem assists instructors with making their course materials accessible.
+  Upload a PDF of your own notes, slides or problem sets, and get back one HTML file where:</p>
+<ul>
+  <li>equations are MathML, which screen readers can read aloud and let students explore,</li>
+  <li>headings are real headings, in a repaired outline,</li>
+  <li>figures have short alt text, or a clear flag where a description is still needed.</li>
+</ul>
+<p>Every change comes with a confidence score and the automatic checks it passed. Anything
+  uncertain goes to a review screen, where you accept, edit or reject it. The tool assists
+  you; it does not replace your judgement or a full accessibility review of your course.</p>
+
+<h2>Try it</h2>
+{% if user %}
+<p><a class="button" href="/app">Go to my documents</a></p>
+{% else %}
+{% include "_signin.html" %}
+{% endif %}
+<p>Or <a href="/demo">look at a demo conversion</a> first (no sign-in needed).</p>
+
+<h2>Who can use it</h2>
+<p>The beta is open to a small group of instructors, by invitation. Upload only materials
+  you wrote or have the right to adapt, and never upload student records or anything with
+  students' personal information in it.</p>
+
+<h2>What happens to your documents</h2>
+<p>Your PDF and everything made from it are deleted after {{ retention_hours }} hours, or
+  after {{ opt_in_days }} days if you choose to let us keep them to improve the tool. You can
+  delete them yourself at any time. Uploads are never used to train AI models.
+  <a href="/privacy">Read the privacy notice</a>.</p>
+{% endblock %}

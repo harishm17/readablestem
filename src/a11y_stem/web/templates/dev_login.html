@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}{% if error %}Error: {% endif %}Development sign-in{% endblock %}
+{% block content %}
+<h1>Development sign-in</h1>
+{% if error %}
+{% with errors = [{"field_id": "email", "message": error}] %}{% include "_error_summary.html" %}{% endwith %}
+{% endif %}
+<p>This server runs in development mode, so you can sign in with any email address and no
+  password. The allowlist still applies: the address must be allowed (for example with
+  <code>a11y-stem users allow EMAIL</code>, or listed in <code>ADMIN_EMAILS</code>).</p>
+<form method="post" action="/dev-login" novalidate>
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <div class="field{% if error %} field-error{% endif %}">
+    <label for="email">Email address</label>
+    {% if error %}<p class="error-message" id="email-error"><span class="visually-hidden">Error: </span>{{ error }}</p>{% endif %}
+    <input type="email" id="email" name="email" autocomplete="email" spellcheck="false"
+           value="{{ email }}"{% if error %} aria-invalid="true" aria-describedby="email-error"{% endif %}>
+  </div>
+  <button type="submit" class="button">Sign in</button>
+</form>
+{% endblock %}

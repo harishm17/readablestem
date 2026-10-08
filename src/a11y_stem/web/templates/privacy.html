@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+{% block title %}Privacy{% endblock %}
+{% block content %}
+<h1>Privacy</h1>
+<p class="draft-note"><strong>Draft, to be reviewed by Harish.</strong> This page describes
+  how the beta actually behaves today; the wording is not final.</p>
+
+<h2>Who runs this</h2>
+<p>a11y-stem is a free, open-source beta run by Harish, an individual developer, not a
+  company or a university.{% if contact_email %} Contact:
+  <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
+
+<h2>What you may upload</h2>
+<p>Course materials you wrote yourself, or have the right to adapt, such as lecture notes,
+  slides and problem sets. Do not upload student records, graded work, or anything else
+  with students' personal information in it.</p>
+
+<h2>What is stored, and for how long</h2>
+<p>For each upload we store: the PDF and its file name, images cut from it (equations and
+  figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
+  converted HTML, and your review decisions.</p>
+<ul>
+  <li>All of it is deleted automatically <strong>{{ retention_hours }} hours</strong> after
+    upload.</li>
+  <li>If you tick "Keep my document and results for {{ opt_in_days }} days to help improve
+    the tool", it is deleted after <strong>{{ opt_in_days }} days</strong> instead. During
+    that time Harish may look at the conversion results to find and fix mistakes in the
+    tool. The box is unticked unless you tick it.</li>
+  <li>You can delete a document and everything made from it at any time with
+    "Delete now".</li>
+</ul>
+
+<h2>Who else sees your documents</h2>
+<ul>
+  <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures,
+    images of those parts of the page, and a little of the nearby text, are sent to
+    OpenAI's API. OpenAI states that it does not use API data to train its models by
+    default; see OpenAI's own API data policies for how long it keeps requests.</li>
+  <li><strong>Google Cloud</strong> hosts the app and its database.</li>
+  <li>No one else. Uploads are never used to train AI models, sold or shared.</li>
+</ul>
+
+<h2>Your account</h2>
+<p>You sign in with Google. We receive your email address, your name, and whether Google
+  has verified the address. For people on the beta list we store the email address, name,
+  and the time of the last sign-in. If you sign in and are not on the list, nothing is
+  stored about you.</p>
+
+<h2>Cookies</h2>
+<p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.
+  There are no analytics, advertising or third-party tracking cookies.</p>
+
+<h2>What is logged</h2>
+<p>Logs record what happened, not what was in your document: event names, random ids,
+  page and fix counts, timings, model costs and error categories (for example
+  <code>unknown_command</code>). They never contain document text, images, LaTeX, alt
+  text, file names or your email address. Before documents are deleted, daily counts (for
+  example, how many equations needed review) are added to totals that contain no content.</p>
+
+<h2>Requests, takedowns and rights</h2>
+<p>To have your data deleted, to report material that should not be here, or for any
+  rights concern{% if contact_email %}, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% else %}, use the contact address of this service{% endif %}.</p>
+{% endblock %}

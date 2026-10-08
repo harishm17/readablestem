@@ -1,0 +1,12 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block content %}
+<h1>Sign in</h1>
+<p>Sign in with the Google account your invitation was sent to. The beta is open to a small
+  group of instructors.</p>
+{% include "_signin.html" %}
+{% if contact_email %}
+<p>Not invited yet? Email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> to ask
+  for access.</p>
+{% endif %}
+{% endblock %}
