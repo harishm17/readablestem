@@ -225,3 +225,17 @@ def test_a_folded_script_stays_one_block_after_the_glyphs_it_follows():
     assert "".join(c.c for c in layout._insert_script(host, denominator)) == "x=abcd"
     subscript = [layout._Char("0", 5.0, 3, 8.5, 10, 11, 7.0, "Helv", 0)]  # right after "x"
     assert "".join(c.c for c in layout._insert_script(host, subscript)) == "x0=ab"
+
+
+def test_cutting_a_number_off_a_list_item_row_keeps_the_item():
+    marker = layout._Marker("(a)", True, 4, 120.0)
+    chars = [
+        layout._Char(c, 100 + 6 * i, 90, 106 + 6 * i, 100, 98, 10.0, "Helv", 0)
+        for i, c in enumerate("(a) x = 1 + y")
+    ]
+    chars += [
+        layout._Char(c, 300 + 6 * i, 90, 306 + 6 * i, 100, 98, 10.0, "Helv", 0)
+        for i, c in enumerate("(3)")
+    ]
+    first, number = layout._split_labels([layout._Row(chars, marker=marker)])
+    assert first.marker is marker and number.text == "(3)"

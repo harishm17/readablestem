@@ -2251,7 +2251,7 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
                 or all(c.c in ",.;:" for c in before)  # the comma that ends the maths
             )
         ):
-            out.append(_Row(row.chars[:start], column=row.column))
+            out.append(_Row(row.chars[:start], column=row.column, marker=row.marker))
             out.append(_Row(row.chars[start:], column=row.column))
         else:
             out.append(row)
