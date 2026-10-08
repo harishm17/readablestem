@@ -16,16 +16,19 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
    columns resuming below them at the same height).
 4. PyMuPDF lines on one baseline are merged into rows (it splits justified text and
    inline maths into several "lines"). Rows are put in reading order and grouped into
-   runs: paragraphs, headings, display equations, captions. PyMuPDF's own blocks are not
-   trusted: they glue captions onto the next paragraph and a fraction's denominator onto
-   the text below it.
+   runs: paragraphs, list items, headings, display equations, captions. PyMuPDF's own
+   blocks are not trusted: they glue captions onto the next paragraph and a fraction's
+   denominator onto the text below it. A row starting with a bullet, a drawn bullet or
+   an ordered marker confirmed by a sibling starts a list item (`_list_markers`).
 5. Equations: rows that score as maths (`parse.equation_score`) and contain no prose word
-   are display equations; vertically adjacent maths rows and short rows tied together by
-   a vector fraction bar or radical become one region, with an equation number beside it
-   ("(2.4)", "Eq. 2.4", or a bare "2.4" to its right). Inside paragraphs, runs of maths
-   characters (maths fonts, math-italic letters, Greek, maths symbols) or an italic single
-   letter next to an operator become inline equations, and the paragraph text gets
-   `core.types.inline_marker(id)` in their place.
+   are display-equation rows. Rows on one fraction bar or radical, or side by side on one
+   baseline, form lines; stacked lines form one display equation when one continues the
+   other (starts with "="), is not a whole equation, or has its relation aligned with it
+   (`_equation_regions`). An equation number beside it ("(2.4)", "Eq. 2.4", or a bare
+   "2.4" to its right) becomes `Element.equation_label`, outside the box and the text.
+   Inside paragraphs and list items, runs of maths characters (maths fonts, math-italic
+   letters, Greek, maths symbols) or an italic single letter next to an operator become
+   inline equations, and the text gets `core.types.inline_marker(id)` in their place.
 6. Figures: raster images and clusters of vector drawings, minus equation rules, text
    underlines, page borders and boxes or tables drawn around text (rounded or not).
    Short labels inside or right next to a figure belong to it; running text never does,

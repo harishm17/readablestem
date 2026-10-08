@@ -1,7 +1,7 @@
 # Layout analysis (`pipeline/layout.py`, `pipeline/heading_step.py`)
 
-Step 1 of the conversion: a PDF becomes a list of `Element`s (headings, paragraphs, display
-and inline equations, figures) in reading order, with no model call. Everything later
+Step 1 of the conversion: a PDF becomes a list of `Element`s (headings, paragraphs, list
+items, display and inline equations, figures) in reading order, with no model call. Everything later
 (equation transcription, alt text, HTML assembly) works from these elements and from crops
 of their boxes. The code is deterministic: the same PDF always gives the same elements.
 
@@ -21,9 +21,15 @@ Element conventions:
   An inline equation gets the id right after its paragraph (`p1-e3` paragraph, `p1-e4` and
   `p1-e5` its inline equations, `p1-e6` the next block).
 - **`order`** is the position in the whole document (0, 1, 2, ... across pages).
-- **Inline equations** have `display="inline"` and `parent_id` = the paragraph id; the
-  paragraph `text` contains `core.types.inline_marker(id)` (`⟦p1-e4⟧`) where the maths was.
-  Display equations have `display="block"` and no parent.
+- **Inline equations** have `display="inline"` and `parent_id` = the paragraph (or list
+  item) id; the parent's `text` contains `core.types.inline_marker(id)` (`⟦p1-e4⟧`) where
+  the maths was. Display equations have `display="block"` and no parent.
+- **Equation numbers** ("2.4", "(2.4)", "[2.4]", "Eq. 2.4") of a display equation are in
+  `equation_label`, as printed, and are not in its `text` or `bbox`, so they are not in
+  the crop the model transcribes.
+- **List items** are `Kind.LIST_ITEM` with `list_marker` (as printed: "•", "a.", "(iii)",
+  a drawn bullet reported as "•", "◦" or "▪"), `list_ordered` and `list_level` (1 = top);
+  `text` does not include the marker.
 - **Boxes** are PDF points in display space: the page's `/Rotate` is applied, so a
   landscape page reports `(792, 612)` in `page_sizes` and `crop` uses the boxes as they are.
   The origin is the top-left of the CropBox; content outside it is ignored and figure boxes
@@ -60,10 +66,20 @@ Element conventions:
    A gap of at least 8 pt in the middle half that no narrow line touches (or at most two,
    so a centred title does not hide the columns) is a gutter, if each side has at least
    three lines sharing a left edge and the typical line on each side is at least 30 % of the
-   text width (two table columns are not text columns). Margin-band lines are ignored here.
+   text width (two table columns are not text columns). Lines for that test are boxes that
+   overlap vertically by half the smaller height: TeX splits a line with inline maths into
+   pieces whose bottom edges differ, and measured piece by piece a full LaTeX column
+   looked like a column of short cells. Margin-band lines are ignored here.
 4. **Rows.** PyMuPDF splits one visual line into several "lines" (justified text, font
    changes in inline maths). Fragments on the same baseline are joined, never across the
-   gutter; small sub/superscript fragments are folded into their line.
+   gutter. Small sub/superscript fragments are folded into their line as one block, after
+   the glyphs that start before their right edge (a sub/superscript lands after its base,
+   a small fraction's denominator after its numerator). A fragment is a script only if
+   every glyph in it is small: a denominator "v" with a small "avg" is not, and folding
+   it had interleaved it with the line above ("dis v ta avg nce"). A fragment of at most
+   four glyphs with a big operator (∫ ∑ ∏ √) joins the line it sits in, before the
+   first glyph to its right: TeX sets the sign of an inline `$\int_0^1 x^2\,dx$` on a
+   baseline of its own, and left alone it became a display equation of its own.
 5. **Reading order.** One column: top to bottom, left to right within a line. Two columns:
    left column, then right column, segment by segment. Items that cross the gutter are
    full-width and close a segment. A narrow item is full-width too when it sits at a
@@ -77,9 +93,13 @@ Element conventions:
 6. **Runs.** Rows in reading order are grouped: a row continues the paragraph above when the
    font size matches (within 1 pt or 12 %), the baseline step is at most 1.3 x the typical
    body line pitch, it starts within the paragraph's horizontal span, it is not a first-line
-   indent after a short line (LaTeX paragraphs), and it does not start with a bullet or a
-   `Figure N` caption. A change between bold and regular, or into or out of heading size,
-   ends a run. PyMuPDF's own blocks are not used: they glue a caption to the next
+   indent after a short line (LaTeX paragraphs), and it does not start a list item or a
+   `Figure N` caption. A row continuing a list item never starts left of the item's
+   marker (so the paragraph after a list is not swallowed by its last item). A change
+   between bold and regular, or into or out of heading size, ends a run. A single
+   display-equation row that starts at the paragraph's left margin at the usual line
+   pitch is the last line of the sentence above (`... exactly one solution,` / `x =
+   A⁻¹b.`), not a display equation: its maths becomes inline equations of the paragraph. PyMuPDF's own blocks are not used: they glue a caption to the next
    paragraph and a fraction's denominator to the text under it.
 7. **Paragraph text.** Rows are joined with spaces. `veloc-` + `ity` becomes `velocity` (a
    letter, a hyphen at the line end and a lowercase start); `Newton-` + `Raphson` keeps the
@@ -134,6 +154,39 @@ the first three penalties (so every accepted heading has confidence >= 0.85, the
 `heading.all_caps`, `heading.length` / `heading.very_short`, `heading.list_like`. An empty
 heading text gives ABSTAINED with reason `heading.empty_text`.
 
+### Lists
+
+A row starts a list item when it begins with a marker followed by the item's text
+within 3 x font size:
+
+- a bullet glyph (`•` `◦` `▪` `▫` `■` `□` `●` `○` `‣` `⁃` `➢` `✓` `►` `▸` `▶` `▹` `◆`,
+  Word's private-use Symbol bullet, beamer's AMS triangle `▶`);
+- a bullet drawn as a small shape (at most 0.6 x font size) just left of the row at its
+  height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
+  filled squares "▪";
+- a line-start dash or star (`-` `–` `—` `*` `∗`, LaTeX's second and third levels) or a
+  middle dot (`·`, Word's Symbol bullet as extracted);
+- an ordered marker: `1.` `2)` `(3)`, `a.` `b)` `(c)`, `A.`, `iv.` `(ii)` `IV)`. OpenStax's
+  "3 ." (number and full stop in separate spans) is read as "3.".
+
+A bullet glyph, a drawn bullet, or a number before a capital letter ("3. Measure") is
+enough. Letters, roman numerals, other numbers and line-start dashes need a sibling: a row
+anywhere in the document (lists cross pages) with the same kind of marker printed the same
+way, the next or previous value ("b." for "a."; the same glyph for a dash) and the marker
+or the item text starting within 3 pt in x. "i" is both a letter and a roman numeral; its
+siblings decide. So "A ball rolls", "2.5 metres is", "2.3 Speed", a lone "B. Smith" or
+"I. Newton", and a wrapped sentence that happens to start a line with a dash, stay
+paragraphs. Headings are decided first: "1. Introduction" in a large font is a heading.
+
+The item text starts after the marker; continuation lines join the item (a hanging
+indent is fine). **Levels** come from the left edge of the item text, which is the same
+for every item of one level even when the markers are right-aligned (LaTeX's "(i)",
+"(ii)", "(iii)"): consecutive items in reading order form one list, a deeper indent
+(more than 0.6 x body size) opens a level, a shallower one closes levels until one
+matches. A display equation inside an item does not end the list; any other block does.
+A list item's row is never a display equation ("b. - 40 m/s" had become one): maths in
+it becomes inline equations with the item as their parent.
+
 ### Equations
 
 Every character is classified: **maths** (a maths font such as CMMI, CMSY, MSBM, STIX,
@@ -160,19 +213,75 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   rectangles) and stroked square-root shapes. A rule counts when maths rows touch it and it
   is not much wider than they are (a table rule beside a `>4` cell does not count). A bar
   that starts at the top-right corner of a `√` glyph is reported as `"radical sign"`.
-- Vertically adjacent maths rows (gap at most 0.8 x font size) form one display region; the
-  box covers every row and every rule it uses. A single row of at most two characters
-  without a maths character (`>4`, `+8`) is not an equation.
+- **Display equations** are built from maths rows in two steps (`_equation_regions`):
+  1. *Lines.* Rows touching one fraction bar or radical (numerator, denominator,
+     radicand), the main row at the bar's height (the `v =` before a fraction, within 4
+     font sizes of it), rows on one baseline up to 6 font sizes apart (the columns of an
+     aligned row) and a lone `,` or `.` overlapping a row (Chromium sets the full stop
+     after a fraction on a baseline of its own) form one line.
+  2. *Equations.* Lines are stacked top to bottom. A line joins the equation above when
+     the gap is at most 0.8 x font size (1.2 x when it starts with a relation or
+     operator), they overlap horizontally, at most one of them has an equation number,
+     and either the line starts with `=`, `+`, `−`, `×` ... (the next row of a
+     derivation), or one of the two lines is not a whole equation (no relation with
+     something on both sides: a numerator, `f(x) =`), or one is at script size (the
+     limits under a sum), or both are whole equations whose first relations are aligned
+     within 0.3 x font size (an `align` system). Two whole equations stacked close but
+     centred on their own (`time = d / v` over `d = v × time`), two numbered equations
+     (each row of a numbered `align`) and equations at paragraph spacing stay apart.
+
+  The box covers every row and the rules the equation uses (no rule of a neighbouring
+  equation). A single row of at most two characters without a maths character (`>4`,
+  `+8`) is not an equation.
+- **Equation numbers.** A row that reads as an equation number and touches no rule goes
+  to the line it sits beside (`_number_beside`, nearest vertical centre first), unless
+  that line ends with a relation or operator (`x =   2.4`: the number is its right-hand
+  side). It becomes `equation_label` and stays out of the text and box. A number merged
+  into a maths row (`_merge_baselines` joins pieces up to 4 font sizes apart: `= 2000 m −
+  525 m ,   2.8`) is first cut off when it stands at least one font size clear of maths
+  (or of the comma that ends it) that does not end in a relation. A number inside the
+  maths that is not beside any line stays part of it.
 - **Inline equations** inside paragraph rows: a stretch of maths-capable characters
   (maths characters, digits, operators, brackets, single letters, sub/superscripts, a decimal
   point or a comma inside brackets), trimmed of spaces, trailing operators and punctuation,
-  unbalanced brackets and a leading or trailing English `a`/`A`/`I`. It is kept only with
-  evidence: a maths character; an italic single letter with an operator, script or Greek
-  letter; a single letter with a sub/superscript (`x²`); a signed number (`−3`); or a
-  relation with operands on both sides (`x = 5`, not markup such as `<a><b/>`). A lone
-  italic word, `[3]`, `10-12` and `2019` are not maths. List bullets (`•`, `▪`, Word's
-  private-use Symbol bullet U+F0B7, and a `·` or `∙` that starts a line) are never maths,
-  even in the Symbol font Word draws them in.
+  unbalanced brackets and a leading or trailing English `a`/`A`/`I`. It never starts with
+  an operator that cannot start an expression (`/ * ^ = <` ...: `/h)] = 40` is the tail
+  of a plain-text formula cut by a line break) or ends with one (including `−` and `×`).
+  It is kept only with evidence: a maths character; an italic single letter with an
+  operator (a leading sign does not count: `-49 m` with an italic unit is a quantity) or
+  script or Greek letter; a single letter with a sub/superscript (`x²`); a signed number
+  with a real minus sign (`−3`); or a relation with operands on both sides (`x = 5`, not
+  markup such as `<a><b/>`). Without a maths character the run's brackets must also
+  open and close in order. A lone italic word, `[3]`, `10-12` and `2019` are not maths.
+  TeX's spacing accents (the hat of `x̂`, tilde, bar, dot) do not end a run; maths
+  function names (`sin`, `lim`, `proj`, `rank`, `diag` ...) are not English words. List
+  bullets (`•`, `▪`, Word's private-use Symbol bullet U+F0B7, and a `·` or `∙` that
+  starts a line) are never maths, even in the Symbol font Word draws them in.
+- When `,` `.` `;` or `:` follows an inline equation, its box's right edge moves left by
+  up to `CROP_PAD` (crop's default padding, 2 pt) so the padded crop ends where the
+  punctuation starts and still holds every glyph. The mark stays in the paragraph after
+  the marker; if the crop showed it, the model transcribed it as well ("d0 , ,").
+  `equation_step` also strips such a mark from the end of inline LaTeX.
+
+### TeX and beamer
+
+Checked on `tests/fixtures/layout/latex/` (Tectonic, Computer Modern and beamer's Latin
+Modern Sans):
+
+- CMMI, CMSY, CMEX and CMBSY are maths fonts; CMBX, CMB, CMMIB (`\bm`, `\boldsymbol`)
+  and CMBSY are bold, so bold vectors keep their weight in the text layer (`𝐯`).
+- TeX's `\neq` is a zero-width negation slash (U+0338) over `=`; text cleaning joins it
+  into `≠` (and `≮`, `∉`, ...). The text-font capital Delta (OT1 CMR) extracts as U+2206
+  and counts as a maths symbol.
+- MuPDF's superscript flag is set on any span that starts above the previous one, which
+  in TeX output is most of a line after an inline fraction, so a character is a script
+  only if it is smaller, or flagged and raised by at least 0.2 x font size.
+- Beamer sets maths letters in Latin Modern Sans Oblique, a text font. Short italic runs
+  (at most three letters) are variables, not words, when the row also has upright
+  letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
+  not the English word. Beamer captions have no number ("Figure: ...") and still attach.
+
+
 
 ### Figures
 
@@ -188,11 +297,13 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   markers) and without bar-chart bars, with two or more text rows inside, is a box or
   table. A rounded rectangle (at least 60 % of its outline straight horizontal and
   vertical lines) is a box, not a curve, so a rounded callout around text is not a figure.
-  One tick icon in a table cell does not make the table a figure. Equation rules are taken
-  out first.
+  One tick icon in a table cell does not make the table a figure. A small mark just left
+  of a text row at its height is a drawn list bullet, not a curve of a figure. Equation
+  rules are taken out first.
 - Overlapping figures merge (a photo with arrows drawn on it). Text inside a figure, and
-  short labels (at most 25 characters) within 0.6 x font size of its edge, belong to it and
-  grow its box. Running text does not: two prose lines (3+ English words each) that read as
+  short labels (at most 25 characters) within 0.6 x font size of its edge or across it (a
+  tick label half inside the box), belong to it and grow its box. A maths row is a label
+  only when it is at most three glyphs (an axis variable `x` in CMMI). Running text does not: two prose lines (3+ English words each) that read as
   consecutive lines of one paragraph, or a title-sized line (1.15 x body, 2+ words), stay in
   the reading flow. A raster image with such text on it is a background, a panel or a
   watermark: it is dropped as a figure and the text keeps its place in the outline.
@@ -285,8 +396,9 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   editor) is found inside paragraphs only through the relation rule; `d/t` alone is not.
 - **A display equation line with words** (`x = 1 if y > 0`) becomes a short paragraph with
   inline maths, not one display equation.
-- **A wrapped sentence whose last line is only maths** (`... the speed is` / `v = d/t.`) is
-  read as a display equation.
+- **A wrapped sentence whose last line is only maths** is read as a display equation when
+  that line is indented or set off by extra space; at the paragraph's margin and line
+  pitch it is inline.
 - **Very short documents** learn the "typical line pitch" from very few lines; with one
   two-line paragraph the paragraph gap itself becomes the typical pitch and separate
   paragraphs can merge.
@@ -294,6 +406,21 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   math-italic `𝑔`); only paragraphs get inline equation elements.
 - **Paragraphs split across pages** stay two elements (an element has one page and box).
 - **Inline maths that wraps across lines** becomes two inline equations.
+- **A lone bold letter** in running text (`for some nonzero vector x`, `\mathbf{x}` in
+  CMBX) is not recognised as maths: one upright letter with nothing around it is too
+  ambiguous.
+- **Maths written as text** (OpenStax writes `d₀`, `t = 0 s`, `y = mx + b` in HTML, not
+  MathML) is found and converted like any inline maths; the gold set has no MathML for
+  it, so it counts against detection precision in the document eval (reported as
+  `prose_math`).
+- **Lists:** a marker on a line of its own above its text (OpenStax prints exercise
+  numbers that way) is not an item: the number stays at the start of a paragraph. Bullets
+  that are raster images are not recognised. A list that the PDF numbers with a gap, or
+  in brackets, is reproduced with printed markers. A single item with a letter or roman
+  marker and no sibling stays a paragraph.
+- **Equation numbers** to the left of an equation are found only in brackets (`(2.4)`);
+  a number that is the only thing on a line between two equations attaches to the
+  nearer one.
 - **Tables** are not a separate element kind: cell text becomes paragraphs (read left to
   right, row by row) and drawn grids are ignored. A two-column table with long cells can
   look like text columns.
@@ -336,3 +463,16 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   headings, equation numbers, two-column order, Symbol bullets, logos, watermarks, text
   over images and panels, fake markers, MuPDF's stdout, margin headings, and the cost of
   a dense fragment page.
+- `tests/test_layout_lists.py` (bullets, ordered markers, siblings, nesting, false lists),
+  `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
+  `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline
+  maths) pin the layout v2 fixes from the eval pages and the smoke test.
+- `tests/test_layout_latex.py` checks four documents written for the tests and compiled
+  by Tectonic, in `tests/fixtures/layout/latex/`: article notes (numbered equations,
+  `align`, limits, inline integrals, nested itemize/enumerate, a TikZ figure), a problem
+  set ((a)/A./(i) lists, a three-row derivation, `2.1`-style numbers), beamer slides
+  (triangle bullets, sans-serif maths, a captioned figure) and a two-column handout
+  (matrices, bold vectors, `\neq`, a numbered projection). The `.tex` files are the
+  source; rebuild with `uv run python tests/fixtures/layout/latex/make_pdfs.py --tectonic
+  PATH` (deterministic, byte-identical with the same Tectonic version; PDFs must stay
+  under 300 KB).
