@@ -38,6 +38,10 @@ body {
 .wrap { max-width: 64rem; margin: 0 auto; padding: 0 1.25rem; }
 
 h1, h2, h3 { line-height: 1.25; }
+/* File names ("Ch2_Kinematics_lecture_notes_final_v3.pdf") and codes often have no
+   break points. `anywhere` (unlike `break-word`) also lowers the min-content width, so
+   flex and grid items shrink too: no sideways scrolling at 320 CSS px (WCAG 1.4.10). */
+h1, h2, h3, .lede, summary, .error-summary, .error-message { overflow-wrap: anywhere; }
 h1 { font-size: 2rem; margin: 1.5rem 0 1rem; }
 h2 { font-size: 1.4rem; margin: 2rem 0 0.75rem; }
 h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
@@ -204,7 +208,9 @@ progress { width: 16rem; height: 1.1rem; }
 .fix-meta dd { margin: 0; }
 .check-list { margin: 0; padding-left: 1.2rem; }
 .fix-body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 1rem 2rem; align-items: start; }
-@media (max-width: 48rem) { .fix-body { grid-template-columns: 1fr; } }
+/* minmax(0, ...), not 1fr: a 1fr column never shrinks below its content's min-content
+   width, so a wide equation would widen the page instead of scrolling in its own box. */
+@media (max-width: 48rem) { .fix-body { grid-template-columns: minmax(0, 1fr); } }
 .crop { margin: 0.5rem 0; }
 .crop img { max-width: 100%; height: auto; border: 1px solid var(--rule); background: #fff; }
 .crop figcaption { color: var(--muted); font-size: 0.9rem; }
@@ -215,3 +221,35 @@ progress { width: 16rem; height: 1.1rem; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* Review screen: progress, sections, groups, bulk accept, folded decided fixes.
+   Document text (headings, alt text, captions) and codes can be long unbroken strings. */
+.review-progress { margin: 1rem 0; }
+.review-progress, .review-toc, .review-group, .fix-card { overflow-wrap: anywhere; }
+.review-toc { background: var(--panel); border-radius: var(--radius); padding: 0.25rem 1.25rem 0.75rem; margin: 1.5rem 0; }
+.review-toc h2 { font-size: 1.15rem; margin: 0.75rem 0 0.25rem; }
+.review-toc ul { margin: 0; padding-left: 1.2rem; }
+.review-group { border-top: 2px solid var(--rule); margin-top: 2.5rem; }
+.review-group:focus { outline: none; }
+.group-count { font-weight: 400; color: var(--muted); font-size: 1rem; }
+.bulk-actions { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.25rem 1.25rem 1rem; margin: 1rem 0 1.5rem; }
+.bulk-form { margin: 0.75rem 0; }
+.bulk-form .field { margin-bottom: 0.5rem; }
+.bulk-form .hint { max-width: 44rem; }
+.part-label { font-weight: 700; margin: 0.75rem 0 0.35rem; }
+.fix-card h3 { font-size: 1.2rem; margin-top: 1rem; }
+.explained { margin: 0.5rem 0; }
+.explained p { margin: 0.25rem 0; }
+.check-list li { margin: 0.25rem 0; }
+.code-line { display: block; color: var(--muted); font-size: 0.85rem; }
+.changed-note { border-left: 5px solid var(--ok); background: var(--panel); padding: 0.4rem 0.9rem; margin: 0.75rem 0; }
+.heading-proposal { background: var(--panel); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 600; }
+.prose-input { font-family: inherit; }
+.review-item { scroll-margin-top: 0.5rem; }
+.review-item:focus { outline: none; }
+.done-group { margin: 1rem 0 0.5rem; }
+.done-group > summary, .done-item > summary { cursor: pointer; padding: 0.4rem 0; }
+.done-group > summary { font-weight: 600; }
+.done-list { margin: 0.5rem 0 0 1rem; }
+.done-item { border-bottom: 1px solid var(--rule); }
+.done-item > .fix-card { margin-top: 0.5rem; }

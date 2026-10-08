@@ -7,7 +7,7 @@ tests share one wording.
 from __future__ import annotations
 
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
@@ -76,6 +76,9 @@ class ResultSummary:
     not_converted: int
     reviewed: int
     cost_usd: float
+    # Fixes with status needs_review per kind ("equation" -> 6), for the per-kind links
+    # into the review screen's groups.
+    review_by_kind: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
@@ -135,6 +138,9 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
         not_converted=statuses[Status.ABSTAINED] + statuses[Status.FAILED],
         reviewed=statuses[Status.EDITED] + statuses[Status.REJECTED],
         cost_usd=result.stats.cost_usd,
+        review_by_kind=dict(
+            Counter(f.kind.value for f in result.fixes if f.status is Status.NEEDS_REVIEW)
+        ),
     )
 
 

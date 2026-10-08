@@ -44,6 +44,15 @@
     <div><dt>Reviewed by you</dt><dd>{{ s.reviewed }}</dd></div>
     <div><dt>Model cost</dt><dd>{{ s.cost_usd|usd }}</dd></div>
   </dl>
+  {% if s.needs_review %}
+  {# One link per kind, straight to that group on the review screen. #}
+  <p id="review-breakdown">{{ s.needs_review }} {{ "needs" if s.needs_review == 1 else "need" }} your review:
+    {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("heading", "headings")] if s.review_by_kind.get(kind) %}
+    {% set n = s.review_by_kind[kind] %}
+    <a href="/jobs/{{ job.id }}/review#group-{{ many }}">{{ n }} {{ kind if n == 1 else many }}</a>{{ "." if loop.last else "," }}
+    {% endfor %}
+  </p>
+  {% endif %}
   <ul class="actions">
     <li><a class="button" href="/jobs/{{ job.id }}/review">Review fixes{% if s.needs_review %} ({{ s.needs_review }} need review){% endif %}</a></li>
     <li><a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></li>
