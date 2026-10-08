@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{% endblock %} | a11y-stem</title>
+  <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true, "selfRequestsOnly": true}'>
+  <link rel="stylesheet" href="/static/app.css">
+  <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+  {% set active = active|default("") %}
+  <header class="site-header">
+    <div class="wrap header-row">
+      <a class="brand" href="/">a11y-stem</a>
+      <nav aria-label="Main">
+        <ul class="nav-list">
+          <li><a href="/"{% if active == "home" %} aria-current="page"{% endif %}>Home</a></li>
+          <li><a href="/demo"{% if active == "demo" %} aria-current="page"{% endif %}>Demo</a></li>
+          {% if user %}
+          <li><a href="/app"{% if active == "app" %} aria-current="page"{% endif %}>My documents</a></li>
+          {% if user.is_admin %}
+          <li><a href="/admin"{% if active == "admin" %} aria-current="page"{% endif %}>Admin</a></li>
+          {% endif %}
+          {% endif %}
+        </ul>
+      </nav>
+      <div class="account">
+        {% if user %}
+        <form method="post" action="/logout" class="inline-form">
+          <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+          <span class="signed-in">Signed in as {{ user.email }}</span>
+          <button type="submit" class="link-button">Sign out</button>
+        </form>
+        {% else %}
+        <a href="/login">Sign in</a>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main id="main" class="wrap" tabindex="-1">
+    {% for item in flash if not item.element_id %}
+    <div class="notice" role="status"><p>{{ item.message }}</p></div>
+    {% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="wrap">
+      <nav aria-label="Footer">
+        <ul class="nav-list">
+          <li><a href="/privacy"{% if active == "privacy" %} aria-current="page"{% endif %}>Privacy</a></li>
+          <li><a href="/terms"{% if active == "terms" %} aria-current="page"{% endif %}>Terms</a></li>
+          <li><a href="/limits"{% if active == "limits" %} aria-current="page"{% endif %}>Known limits</a></li>
+          <li><a href="{{ source_url }}">Source code</a></li>
+        </ul>
+      </nav>
+      <p class="small">a11y-stem is free, open-source software. It uses PyMuPDF, which is licensed
+        under the GNU Affero General Public License v3, so the complete source code of this
+        service is published at the "Source code" link above.</p>
+    </div>
+  </footer>
+</body>
+</html>

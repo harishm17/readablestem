@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}{{ job.status_label }}: {{ job.filename }}{% endblock %}
+{% block head %}
+{% if not job.finished %}
+{# Without JavaScript, reload every few seconds until the job finishes. With it, htmx
+   polls the status fragment instead (a <noscript> meta only applies without scripts). #}
+<noscript><meta http-equiv="refresh" content="5"></noscript>
+{% endif %}
+{% endblock %}
+{% block content %}
+<h1>{{ job.filename }}</h1>
+<div id="job-status-region" role="status">
+  {% include "_job_status.html" %}
+</div>
+{% if not job.finished %}
+<p>This page updates by itself every few seconds. You can also
+  <a href="/jobs/{{ job.id }}">refresh the status</a>, or leave and come back later.</p>
+{% endif %}
+
+{% if job.status == "done" and job.summary %}
+{% set s = job.summary %}
+<section aria-labelledby="results-heading">
+  <h2 id="results-heading">Results</h2>
+  <dl class="summary-list">
+    <div><dt>Pages</dt><dd>{{ s.pages }}</dd></div>
+    <div><dt>Equations</dt><dd>{{ s.by_kind.get("equation", 0) }}</dd></div>
+    <div><dt>Figures</dt><dd>{{ s.by_kind.get("figure", 0) }}</dd></div>
+    <div><dt>Headings</dt><dd>{{ s.by_kind.get("heading", 0) }}</dd></div>
+    <div><dt>Need your review</dt><dd>{{ s.needs_review }}</dd></div>
+    <div><dt>Accepted automatically</dt><dd>{{ s.accepted }}</dd></div>
+    <div><dt>Not converted (original kept)</dt><dd>{{ s.not_converted }}</dd></div>
+    <div><dt>Reviewed by you</dt><dd>{{ s.reviewed }}</dd></div>
+    <div><dt>Model cost</dt><dd>{{ s.cost_usd|usd }}</dd></div>
+  </dl>
+  <ul class="actions">
+    <li><a class="button" href="/jobs/{{ job.id }}/review">Review fixes{% if s.needs_review %} ({{ s.needs_review }} need review){% endif %}</a></li>
+    <li><a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></li>
+    <li><a href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
+  </ul>
+  <p class="hint">The converted document is a single HTML file with the equations, headings
+    and figure descriptions built in. Check it before you share it with students.</p>
+</section>
+{% elif job.status == "failed" %}
+<section aria-labelledby="failed-heading">
+  <h2 id="failed-heading">Why the conversion stopped</h2>
+  <p>{{ job.status_detail }}</p>
+  <p class="hint">Error code: <code>{{ job.error_code or "unknown" }}</code></p>
+</section>
+{% endif %}
+
+<section aria-labelledby="delete-heading">
+  <h2 id="delete-heading">Deleting this document</h2>
+  <p>This document and everything made from it will be deleted automatically on
+    {{ job.retain_until|utc }}{% if job.opt_in %} (you chose to keep it for longer to help
+    improve the tool){% endif %}.</p>
+  <form method="post" action="/jobs/{{ job.id }}/delete">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-danger">Delete now</button>
+  </form>
+</section>
+{% endblock %}

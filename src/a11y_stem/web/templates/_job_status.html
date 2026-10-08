@@ -1,0 +1,10 @@
+<div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ job.version }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <p><span class="status-badge status-{{ job.status }}">{{ job.status_label }}</span>
+    {{ job.status_detail }}</p>
+  {% if job.status == "running" and job.page_count %}
+  <p class="progress-row">
+    <label for="job-progress">Pages converted</label>
+    <progress id="job-progress" max="{{ job.page_count }}" value="{{ job.pages_done }}">{{ job.pages_done }} of {{ job.page_count }}</progress>
+  </p>
+  {% endif %}
+</div>

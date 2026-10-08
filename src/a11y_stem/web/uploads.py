@@ -1,0 +1,180 @@
+"""Upload intake: size limit while streaming, PDF magic bytes, readability and page count.
+
+Uploads are untrusted bytes from the internet, so:
+
+- The size limit is enforced *while the body streams in* (`read_upload_form`), not after
+  the whole body has been buffered. A Content-Length over the limit is refused before
+  reading anything.
+- The file is kept in memory (never spooled to disk) and is only stored once every check
+  has passed.
+- The PDF is opened in a short-lived child process (`inspect_pdf_isolated`, see
+  `web.pdf_probe`): a malformed file that crashes or hangs MuPDF takes down a child, not
+  the web server.
+
+Every rejection is an `UploadRejected` with a category `code`, safe to log.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import unicodedata
+from collections.abc import AsyncGenerator
+from dataclasses import dataclass
+
+from starlette.datastructures import UploadFile
+from starlette.formparsers import MultiPartException, MultiPartParser
+from starlette.requests import Request
+
+from a11y_stem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
+
+# Room for the multipart boundaries and the small text fields around the file itself.
+FORM_OVERHEAD_BYTES = 64 * 1024
+INSPECT_TIMEOUT_S = 30.0
+
+# Status code per rejection code.
+REJECTION_STATUS = {
+    "missing_file": 400,
+    "bad_form": 400,
+    "empty": 400,
+    "not_pdf": 415,
+    "too_large": 413,
+    "encrypted": 422,
+    "unreadable": 422,
+    "no_pages": 422,
+    "too_many_pages": 422,
+}
+
+
+class UploadRejected(Exception):
+    """The upload cannot be accepted. `code` is a category (see REJECTION_STATUS)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
+
+    @property
+    def status_code(self) -> int:
+        return REJECTION_STATUS.get(self.code, 400)
+
+
+@dataclass
+class UploadForm:
+    fields: dict[str, str]
+    filename: str
+    data: bytes | None  # None when no file was chosen
+
+
+def max_upload_bytes(max_upload_mb: int) -> int:
+    return max_upload_mb * 1024 * 1024
+
+
+class _InMemoryParser(MultiPartParser):
+    # Keep the file in memory (the default spools to a temp file after 1 MB) so document
+    # bytes never touch the server's disk. Memory is bounded by the streaming limit.
+    spool_max_size = 2**31
+
+
+async def read_upload_form(request: Request, *, max_bytes: int) -> UploadForm:
+    """Parse a multipart upload with one file, refusing more than `max_bytes` of file data.
+
+    Raises UploadRejected("too_large") as soon as the body exceeds the limit (plus a
+    little room for the form fields), and UploadRejected("bad_form") for malformed bodies.
+    """
+    limit = max_bytes + FORM_OVERHEAD_BYTES
+    declared = request.headers.get("content-length")
+    if declared is not None and declared.isdigit() and int(declared) > limit:
+        raise UploadRejected("too_large")
+    content_type = request.headers.get("content-type", "")
+    if not content_type.startswith("multipart/form-data"):
+        raise UploadRejected("bad_form")
+
+    async def limited() -> AsyncGenerator[bytes]:
+        received = 0
+        async for chunk in request.stream():
+            received += len(chunk)
+            if received > limit:
+                raise UploadRejected("too_large")
+            yield chunk
+
+    parser = _InMemoryParser(
+        request.headers, limited(), max_files=1, max_fields=20, max_part_size=64 * 1024
+    )
+    try:
+        form = await parser.parse()
+    except MultiPartException:
+        raise UploadRejected("bad_form") from None
+    try:
+        fields: dict[str, str] = {}
+        upload: UploadFile | None = None
+        for key, value in form.multi_items():
+            if isinstance(value, str):
+                fields.setdefault(key, value)
+            elif key == "pdf" and upload is None:
+                upload = value
+        if upload is None or not upload.filename:
+            return UploadForm(fields=fields, filename="", data=None)
+        data = await upload.read()
+        if len(data) > max_bytes:
+            raise UploadRejected("too_large")
+        return UploadForm(fields=fields, filename=safe_filename(upload.filename), data=data)
+    finally:
+        await form.close()
+
+
+def safe_filename(raw: str | None, *, limit: int = 200) -> str:
+    """Display name for an uploaded file: base name only, no control characters, bounded.
+
+    The filename is document-derived: it is shown to its owner and deleted with the job,
+    never logged.
+    """
+    name = (raw or "").replace("\\", "/").rsplit("/", 1)[-1]
+    name = "".join(ch for ch in name if unicodedata.category(ch)[0] != "C").strip()
+    if len(name) > limit:
+        stem, dot, ext = name.rpartition(".")
+        short_ext = dot and len(ext) <= 10
+        name = (stem[: limit - len(ext) - 1] + dot + ext) if short_ext else name[:limit]
+    return name or "document.pdf"
+
+
+def inspect_pdf(data: bytes, *, max_pages: int) -> int:
+    """Return the page count, or raise UploadRejected. In-process: prefer the isolated one."""
+    try:
+        return probe(data, max_pages=max_pages)
+    except ProbeRejected as exc:
+        raise UploadRejected(exc.code) from None
+
+
+# --------------------------------------------------------------------------- isolation
+
+
+def inspect_pdf_isolated(
+    data: bytes, *, max_pages: int, timeout_s: float = INSPECT_TIMEOUT_S
+) -> int:
+    """`inspect_pdf` in a child process (`web.pdf_probe`); a crash or hang is "unreadable".
+
+    Cheap checks (empty, magic bytes) run here first so obvious junk never starts a child.
+    Costs about 0.1 s per upload. Call it from a worker thread, not the event loop.
+    """
+    if not data:
+        raise UploadRejected("empty")
+    if not looks_like_pdf(data):
+        raise UploadRejected("not_pdf")
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "a11y_stem.web.pdf_probe", str(max_pages)],
+            input=data,
+            capture_output=True,  # MuPDF's own messages are discarded, never logged
+            timeout=timeout_s,
+            check=False,
+        )
+        answer = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
+    except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):
+        raise UploadRejected("unreadable") from None
+    if not isinstance(answer, dict):
+        raise UploadRejected("unreadable")
+    if answer.get("ok") is True and isinstance(answer.get("pages"), int):
+        return answer["pages"]
+    code = answer.get("code")
+    raise UploadRejected(code if code in REJECTION_STATUS else "unreadable")

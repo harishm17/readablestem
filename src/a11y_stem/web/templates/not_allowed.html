@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Not on the beta list yet{% endblock %}
+{% block content %}
+<h1>You are not on the beta list yet</h1>
+<p>Thank you for your interest. You signed in as <strong>{{ email }}</strong>, and that
+  address is not on the list for this beta. The beta is open to a small group of
+  instructors, by invitation.</p>
+{% if contact_email %}
+<p>To ask for access, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.
+  Please mention the course you would like to use it for.</p>
+{% endif %}
+<p>We did not keep your email address. In the meantime you can
+  <a href="/demo">look at a demo conversion</a>.</p>
+{% endblock %}
