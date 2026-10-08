@@ -127,6 +127,7 @@ _STRONG_MATH = frozenset(
     "\u2032\u2033\u2220\u22a5\u2225\u27e8\u27e9"  # primes angle perp parallel brackets
 )
 _OPERATORS = frozenset("+-*/=<>^_|~")
+_SIGNS = frozenset("\u2212\u00b1\u2213")  # minus, plus-minus, minus-plus
 _BRACKETS = frozenset("()[]{}")
 _OPENING = frozenset("([{")
 _SCRIPT_DIGITS = frozenset(
@@ -152,9 +153,12 @@ _BOLD_FONT = re.compile(
     r"bold|black|heavy|semibold|demi|cmbx|cmb\d|sfbx|-medi$|\bbd\b|,bd|-bd", re.IGNORECASE
 )
 _ITALIC_FONT = re.compile(r"italic|oblique|cmti|cmsl|sfti|-it$|,it|ital", re.IGNORECASE)
+_MONO_FONT = re.compile(r"mono|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
+_MARKUP = re.compile(r"</?[A-Za-z][\w:.-]*\s*/?>|</")
 _BOLD_FLAG = 16
 _ITALIC_FLAG = 2
 _SUPERSCRIPT_FLAG = 1
+_MONO_FLAG = 8
 
 _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a time
 
@@ -426,37 +430,50 @@ class _Char:
 
     @property
     def math(self) -> bool:
-        """Maths whatever the context: maths font, math-italic letter, Greek, symbol."""
+        """Maths whatever the context: maths font, math-italic letter, Greek, symbol.
+
+        A minus or plus-minus sign in a text font is not enough on its own: groff prints
+        command-line options as "\u2212d", and dashes come out as minus signs too.
+        """
         c = self.c
-        return not self.blank and (
-            _font_traits(self.font)[2]
-            or is_math_alphanumeric(c)
-            or c in _STRONG_MATH
-            or bool(GREEK.match(c))
+        if self.blank:
+            return False
+        if _font_traits(self.font)[2]:
+            return True
+        return c not in _SIGNS and (
+            is_math_alphanumeric(c) or c in _STRONG_MATH or bool(GREEK.match(c))
         )
+
+    @property
+    def mono(self) -> bool:
+        return bool(self.flags & _MONO_FLAG) or _font_traits(self.font)[3]
 
 
 @lru_cache(maxsize=1024)
-def _font_traits(font: str) -> tuple[bool, bool, bool]:
-    """(bold, italic, maths) from a font name such as "ABCDEF+DejaVuSerif-Bold"."""
+def _font_traits(font: str) -> tuple[bool, bool, bool, bool]:
+    """(bold, italic, maths, monospaced) from a font name like "ABCDEF+DejaVuSerif-Bold"."""
     name = font.split("+", 1)[-1]
     return (
         bool(_BOLD_FONT.search(name)),
         bool(_ITALIC_FONT.search(name)),
         bool(MATH_FONT.search(name)),
+        bool(_MONO_FONT.search(name)),
     )
 
 
 def _char_class(ch: _Char) -> str:
-    """W space, M maths, D digit, O operator, B bracket, L letter, P other."""
+    """W space, C code (monospaced), M maths, D digit, O operator, B bracket, L letter,
+    P other."""
     c = ch.c
     if ch.blank:
         return "W"
     if ch.math:
         return "M"
+    if ch.mono:
+        return "C"  # code listings are full of "x = 5"; never maths
     if c.isdigit() or c in _SCRIPT_DIGITS:
         return "D"
-    if c in _OPERATORS:
+    if c in _OPERATORS or c in _SIGNS:
         return "O"
     if c in _BRACKETS:
         return "B"
@@ -960,7 +977,7 @@ def _classify_row(row: _Row) -> None:
     ink = [i for i, c in enumerate(row.chars) if not c.blank]
     ratio = sum(info.mathy(i) for i in ink) / max(1, len(ink))
     prose = _prose_words(row, info)
-    if row.vertical:
+    if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
@@ -1084,7 +1101,11 @@ def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) 
         for i in range(start, end - 1)
     ):
         return ["letter with sub/superscript"]
+    if any(chars[i].c in _SIGNS and chars[i + 1].c.isdigit() for i in range(start, end - 1)):
+        return ["signed number"]
     text = "".join(chars[i].c for i in idx)
+    if _MARKUP.search(text):
+        return []  # "<a><b/></a>" in a paragraph about XML is not a comparison
     for relation in RELATIONS:
         if relation in text:
             left, _, right = text.partition(relation)
@@ -1193,6 +1214,9 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
         near = _rule_rows(rule, mathish)
         if not near:
             continue
+        widest = max(r.x1 - r.x0 for r in near)
+        if rule.bbox[2] - rule.bbox[0] > 1.5 * widest + 2 * max(r.size for r in near):
+            continue  # a table rule or separator next to a short maths-looking cell
         middle = (rule.bbox[1] + rule.bbox[3]) / 2
         above = any(r.y1 <= middle + 0.5 for r in near)
         below = any(r.y0 >= middle - 0.5 for r in near)
@@ -1454,9 +1478,11 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     rows = run.rows
     box = _union(r.bbox for r in rows)
     size = _dominant_size(rows)
-    if run.kind == "math":
+    ink = [c for r in rows for c in r.ink]
+    # A lone ">4" or "+8" (a table cell, a stray sign) is too little to call an equation.
+    trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
+    if run.kind == "math" and not trivial:
         text = _clean(" ".join(r.text for r in rows))
-        ink = [c for r in rows for c in r.ink]
         script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
         score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
         if len(rows) > 1:

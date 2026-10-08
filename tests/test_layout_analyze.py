@@ -185,6 +185,41 @@ def test_bullets_start_new_paragraphs():
     ]
 
 
+def test_first_line_indent_separates_paragraphs_without_a_gap():
+    """LaTeX style: no space between paragraphs, the first line of each is indented."""
+
+    def fill(page):
+        y = write(
+            page,
+            90,
+            100,
+            ["Momentum is mass times velocity, and it is conserved in every"],
+        )
+        y = write(page, 72, y, ["collision between the carts on the track."])
+        y = write(page, 90, y, ["Kinetic energy is conserved only when the collision is fully"])
+        write(page, 72, y, ["elastic, which real carts never quite manage."])
+
+    assert texts(analyze(one_page(fill)).elements) == [
+        "Momentum is mass times velocity, and it is conserved in every collision between the "
+        "carts on the track.",
+        "Kinetic energy is conserved only when the collision is fully elastic, which real carts "
+        "never quite manage.",
+    ]
+
+
+def test_a_bare_chapter_number_above_the_title_joins_it():
+    def fill(page):
+        page.insert_text((72, 90), "4", fontsize=36, fontname="hebo")
+        page.insert_text((72, 130), "Energy and Work", fontsize=24, fontname="hebo")
+        write(page, 72, 170, ["Work is done when a force moves its point of application."])
+
+    elements = analyze(one_page(fill)).elements
+    assert [(e.kind, e.text) for e in elements] == [
+        (Kind.HEADING, "4 Energy and Work"),
+        (Kind.PARAGRAPH, "Work is done when a force moves its point of application."),
+    ]
+
+
 # ---------------------------------------------------------------- display equations
 
 
@@ -296,6 +331,49 @@ def test_superscripts_count_as_maths_but_italic_words_citations_and_ranges_do_no
         "This is important: see [3] and pages 10-12 of the 2019 edition, a classic. "
         f"The area is {inline_marker(square.id)} square metres."
     )
+
+
+def test_code_option_dashes_and_markup_are_not_maths():
+    def fill(page):
+        page.insert_text((72, 100), "x = 5", fontsize=BODY, fontname="cour")  # code listing
+        page.insert_text((72, 115), "y = x + 1", fontsize=BODY, fontname="cour")
+        page.insert_htmlbox(
+            pymupdf.Rect(72, 140, 540, 200),
+            "<p>Run the tool with \u2212v for verbose output and \u2212q to stop.</p>"
+            "<p>The element &lt;a&gt;&lt;b/&gt;&lt;/a&gt; nests b inside a for this example.</p>",
+        )
+
+    elements = analyze(one_page(fill)).elements
+    assert {e.kind for e in elements} == {Kind.PARAGRAPH}  # no equation of any kind
+    assert texts(elements)[0] == "x = 5 y = x + 1"  # the code rows stay text
+    prose = " ".join(texts(elements)[1:])
+    assert "Run the tool with \u2212v for verbose output and \u2212q to stop." in prose
+    assert "The element <a><b/></a> nests b inside a for this example." in prose
+
+
+def test_signed_numbers_are_inline_maths():
+    elements = analyze(
+        html_page("<p>The cart ends at \u22123 m, so its displacement is negative.</p>")
+    ).elements
+    paragraph, number = elements
+    assert (number.text, number.reasons) == ("\u22123 m", ["signed number"])
+    assert paragraph.text == (
+        f"The cart ends at {inline_marker(number.id)}, so its displacement is negative."
+    )
+
+
+def test_a_wide_table_rule_next_to_a_short_cell_is_not_a_fraction_bar():
+    def fill(page):
+        write(page, 72, 100, ["Offsets in the table below are counted in bytes from the start."])
+        page.draw_line((72, 140), (540, 140), width=0.5)
+        page.insert_text((300, 152), ">4", fontsize=BODY)
+        page.draw_line((72, 158), (540, 158), width=0.5)
+
+    elements = analyze(one_page(fill)).elements
+    assert [(e.kind, e.text) for e in elements] == [
+        (Kind.PARAGRAPH, "Offsets in the table below are counted in bytes from the start."),
+        (Kind.PARAGRAPH, ">4"),
+    ]
 
 
 # ---------------------------------------------------------------- figures
