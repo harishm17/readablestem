@@ -308,18 +308,22 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
 
 @router.get("/jobs/{job_id}/status")
 def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Response:
-    """Status fragment polled by htmx. 204 (no swap) while nothing changed; once the job
-    finishes, HX-Refresh reloads the page so the results appear."""
+    """Status fragment polled by htmx. 204 (no swap) while nothing changed.
+
+    Once the job finishes, the fragment says so and links to the results instead of
+    reloading the page (HX-Refresh did that before): a reload nobody asked for sends a
+    screen reader back to the top of the page and loses the reader's place, while the
+    status region already announces the change and the link is one step away.
+    """
     job, outcome = load_job_status(request, job_id, user)
-    context = status_context(job, outcome)
+    context = status_context(job, outcome) | {"results_link": job.finished}
     if v and v == context["status_version"]:
         return Response(status_code=204)
-    htmx = request.headers.get("HX-Request") == "true"
-    if htmx:  # htmx sets document.title from a top-level <title> in the fragment
+    if request.headers.get("HX-Request") == "true":
+        # htmx sets document.title from a top-level <title> in the fragment.
         label = outcome.label if outcome is not None else job.status_label
         context["page_title"] = f"{label}: {job.filename}"
-    headers = {"HX-Refresh": "true"} if job.finished and htmx else None
-    return render(request, "_job_status.html", context, headers=headers)
+    return render(request, "_job_status.html", context)
 
 
 # --------------------------------------------------------------------------- results

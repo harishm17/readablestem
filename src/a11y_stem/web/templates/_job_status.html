@@ -9,6 +9,10 @@
 <div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
   <p><span class="status-badge status-{{ job.status }}">{{ outcome.label if outcome else job.status_label }}</span>
     {{ outcome.message if outcome else job.status_detail }}</p>
+  {% if results_link|default(false) %}
+  {# Only in the polled fragment: the full page shows the results itself. #}
+  <p><a href="/jobs/{{ job.id }}">{{ "Show the results" if job.status == "done" else "Show why it stopped" }}</a></p>
+  {% endif %}
   {% if job.status == "running" and job.page_count %}
   <p class="progress-row">
     <label for="job-progress">Pages converted</label>

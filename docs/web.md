@@ -421,7 +421,10 @@ README) and configured to need no `eval`, inject no `<style>` and keep no histor
 ## Accessibility of the app itself
 
 Server-rendered pages that work without JavaScript: htmx only polls the job status
-(every 3 s, 204 while unchanged, a full reload when the job finishes). Without
+(every 3 s, 204 while unchanged). When the job finishes the status box, a live region,
+says so and links to the results ("Show the results", or "Show why it stopped"); the
+page is not reloaded under the reader, which would send a screen reader back to the
+top. Without
 JavaScript the status page does not reload by itself, because a reload the user did not
 choose sends a screen reader back to the top each time (WCAG 2.2.1, failure F41; axe
 rule `meta-refresh`, critical). It has a "refresh the status" link and, inside

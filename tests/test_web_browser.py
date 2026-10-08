@@ -304,9 +304,15 @@ def test_status_updates_live_with_htmx_then_shows_results(site, browser):
     job_id = upload_pdf(page, site.base)
     assert "Waiting" in page.locator("#job-status").inner_text()
     assert site.run_worker() == job_id
-    # htmx polls every 3 s; once finished, HX-Refresh reloads the page with the results.
-    page.wait_for_selector("#results-heading", timeout=15000)
+    # htmx polls every 3 s; once finished, the status (a live region) says so and links
+    # to the results, without reloading the page under the reader.
+    link = page.locator("#job-status").get_by_role("link", name="Show the results")
+    link.wait_for(timeout=15000)
     assert "Finished" in page.locator("#job-status").inner_text()
+    assert page.locator("#results-heading").count() == 0
+    assert page.title() == "Finished: notes.pdf | a11y-stem"
+    link.click()
+    page.wait_for_selector("#results-heading")
     context.close()
 
 
