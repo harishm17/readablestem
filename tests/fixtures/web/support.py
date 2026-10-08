@@ -160,6 +160,18 @@ def fake_output() -> ConversionOutput:
     return ConversionOutput(result=fake_result(), crops={"p1-e3": PNG, "p1-e4": PNG, "p1-e5": PNG})
 
 
+def output_with_nul() -> ConversionOutput:
+    """`fake_output()` with NUL characters (they occur in text extracted from PDFs) in the
+    HTML, an element's text and an alt text. Postgres refuses NUL in text and JSON."""
+    output = fake_output()
+    result = output.result
+    result.html = result.html.replace("SECRET-DOC-TEXT", "SECRET-DOC-TEXT\x00tail")
+    result.elements[1].text = "para\x00graph"
+    assert result.fixes[3].figure is not None
+    result.fixes[3].figure.alt = "alt\x00text"
+    return output
+
+
 class FakeConverter:
     """Stands in for `pipeline.run.convert_pdf`; records calls, can raise instead."""
 

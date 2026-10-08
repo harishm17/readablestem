@@ -10,6 +10,7 @@ from __future__ import annotations
 import base64
 import hashlib
 import io
+import re
 import socket
 import tarfile
 import threading
@@ -135,6 +136,31 @@ def axe_violations(page, axe_source: str) -> list[dict]:
     return [v for v in results["violations"] if v["impact"] in BLOCKING_IMPACTS]
 
 
+def no_js_violations(browser, site, path: str, axe_source: str) -> list[dict]:
+    """axe on a page as a browser without JavaScript sees it.
+
+    With scripting off, <noscript> content is live markup, but axe cannot run there (its
+    timers never fire). So the page is loaded with JavaScript off, its DOM is taken with
+    the <noscript> wrappers removed and the scripts dropped, and axe checks that copy in a
+    normal page on the same origin (so the stylesheet still applies)."""
+    nojs = browser.new_context(java_script_enabled=False)
+    page = nojs.new_page()
+    sign_in(page, site.base, ALICE)
+    response = page.goto(site.base + path)
+    assert response is not None and response.status == 200
+    html = page.content()
+    nojs.close()
+    html = re.sub(r"<script\b[^>]*>.*?</script>", "", html, flags=re.S)
+    html = html.replace("<noscript>", "").replace("</noscript>", "")
+    context = browser.new_context(bypass_csp=True, java_script_enabled=True)
+    page = context.new_page()
+    page.goto(site.base + "/privacy")
+    page.set_content(html)
+    violations = axe_violations(page, axe_source)
+    context.close()
+    return violations
+
+
 def describe(violations: list[dict]) -> str:
     return "\n".join(
         f"{v['id']} ({v['impact']}): {v['help']} -> {[n['target'] for n in v['nodes']][:3]}"
@@ -169,6 +195,42 @@ def test_pages_have_no_serious_or_critical_axe_violations(
     assert response is not None and response.status == 200
     violations = axe_violations(page, axe_source)
     context.close()
+    assert not violations, describe(violations)
+
+
+@pytest.fixture
+def queued_job(site, browser):
+    """A job left waiting in the queue (no worker runs), deleted afterwards so later tests
+    find only their own jobs in the queue."""
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    job_id = upload_pdf(page, site.base)
+    yield job_id
+    page.goto(f"{site.base}/jobs/{job_id}")
+    page.get_by_role("button", name="Delete now").click()
+    context.close()
+
+
+def test_an_unfinished_job_page_has_no_serious_axe_violations(
+    site, browser, queued_job, axe_source
+):
+    context = browser.new_context(bypass_csp=True)
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/jobs/{queued_job}")
+    assert "Waiting" in page.locator("#job-status").inner_text()
+    violations = axe_violations(page, axe_source)
+    context.close()
+    assert not violations, describe(violations)
+
+
+def test_an_unfinished_job_page_without_javascript_has_no_serious_axe_violations(
+    site, browser, queued_job, axe_source
+):
+    """Without JavaScript the page used to reload itself every 5 s: axe "meta-refresh",
+    critical (WCAG 2.2.1, F41). Reloading is now only on request."""
+    violations = no_js_violations(browser, site, f"/jobs/{queued_job}", axe_source)
     assert not violations, describe(violations)
 
 
@@ -249,7 +311,10 @@ def test_everything_works_without_javascript(site, browser):
     page = context.new_page()
     sign_in(page, site.base, ALICE)
     job_id = upload_pdf(page, site.base)
-    assert page.locator('meta[http-equiv="refresh"]').count() == 1  # noscript fallback
+    assert page.locator('meta[http-equiv="refresh"]').count() == 0  # no unrequested reloads
+    page.get_by_role("link", name="Reload this page every 15 seconds").click()
+    assert page.locator('meta[http-equiv="refresh"]').count() == 1  # the user opted in
+    assert page.get_by_role("link", name="Stop reloading this page").is_visible()
     assert site.run_worker() == job_id
     page.reload()
     assert page.locator("#results-heading").is_visible()

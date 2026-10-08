@@ -157,7 +157,8 @@ def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
 
 def test_job_page_works_without_javascript(pages):
     queued = pages["/jobs/{id} queued"]
-    assert '<noscript><meta http-equiv="refresh" content="5"></noscript>' in queued
+    assert "http-equiv" not in queued  # reloading is opt-in (WCAG 2.2.1)
+    assert re.search(r'<noscript>\s*<p><a href="/jobs/[0-9a-f]{32}\?auto=1">', queued)
     assert 'role="status"' in queued
     done = pages["/jobs/{id}"]
     assert "noscript" not in done

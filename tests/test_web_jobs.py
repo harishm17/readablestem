@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+import re
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -283,18 +284,30 @@ def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
 # --------------------------------------------------------------------------- status
 
 
-def test_job_page_polls_with_htmx_and_falls_back_to_meta_refresh_while_running(web):
+def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
     page = web.browser.get(f"/jobs/{job_id}").text
     assert f'hx-get="/jobs/{job_id}/status?v=queued-0-0"' in page
-    assert '<noscript><meta http-equiv="refresh" content="5"></noscript>' in page
+    # No reload the user did not ask for (WCAG 2.2.1, F41); a no-JS user can opt in.
+    assert "http-equiv" not in page
     assert f'<a href="/jobs/{job_id}">refresh the status</a>' in page
+    assert re.search(
+        rf'<noscript>\s*<p><a href="/jobs/{job_id}\?auto=1">Reload this page every 15 seconds',
+        page,
+    )
     assert "next in line" in page
 
+    auto = web.browser.get(f"/jobs/{job_id}?auto=1").text
+    assert '<noscript><meta http-equiv="refresh" content="15"></noscript>' in auto
+    assert f'<a href="/jobs/{job_id}">Stop reloading this page</a>' in auto
+    assert f'<a href="/jobs/{job_id}?auto=1">refresh the status</a>' in auto
+    assert "http-equiv" not in web.browser.get(f"/jobs/{job_id}?auto=yes").text
+
     web.run_worker()
-    done = web.browser.get(f"/jobs/{job_id}").text
-    assert "http-equiv" not in done and "hx-get" not in done
-    assert "Results" in done and "Need your review" in done
+    for path in (f"/jobs/{job_id}", f"/jobs/{job_id}?auto=1"):
+        done = web.browser.get(path).text
+        assert "http-equiv" not in done and "hx-get" not in done and "noscript" not in done
+        assert "Results" in done and "Need your review" in done
 
 
 def test_status_fragment_is_204_until_something_changes(web):

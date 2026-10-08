@@ -112,19 +112,22 @@ def test_session_cookie_is_httponly_lax_and_lasts_seven_days(web):
     assert "secure" not in cookie  # https_only only in production
 
 
+def prod_settings(tmp_path, **overrides):
+    values = {
+        "env": "prod",
+        "dev_login_enabled": False,
+        "database_url": "postgresql+psycopg://u:p@127.0.0.1:1/never",
+        "base_url": "https://beta.example.org",
+        "session_secret": "s" * 40,
+        "google_client_id": "client-id",
+        "google_client_secret": "client-secret",
+        "openai_api_key": "sk-test",
+    }
+    return make_settings(tmp_path, **(values | overrides))
+
+
 def test_production_cookie_is_secure_and_hsts_is_on(tmp_path):
-    settings = make_settings(
-        tmp_path,
-        env="prod",
-        dev_login_enabled=False,
-        database_url="postgresql+psycopg://u:p@127.0.0.1:1/never",
-        base_url="https://beta.example.org",
-        session_secret="s" * 40,
-        google_client_id="client-id",
-        google_client_secret="client-secret",
-        openai_api_key="sk-test",
-    )
-    app = create_app(settings)  # no lifespan: nothing connects to the database
+    app = create_app(prod_settings(tmp_path))  # no lifespan: nothing connects to the database
     options = {m.cls: m.kwargs for m in app.user_middleware}
     assert options[SessionMiddleware]["https_only"] is True
     assert options[SessionMiddleware]["max_age"] == 7 * 24 * 3600
@@ -136,6 +139,36 @@ def test_production_refuses_to_start_without_its_limits(tmp_path):
 
     with pytest.raises(ConfigError):
         create_app(make_settings(tmp_path, env="prod", dev_login_enabled=False))
+
+
+@pytest.mark.parametrize(
+    ("overrides", "named"),
+    [
+        ({"session_secret": "", "cron_token": ""}, "SESSION_SECRET, CRON_TOKEN"),
+        ({"cron_token": "   "}, "CRON_TOKEN"),
+        ({"google_client_secret": ""}, "GOOGLE_CLIENT_SECRET"),
+        ({"openai_api_key": ""}, "OPENAI_API_KEY"),
+        ({"session_secret": "short"}, "SESSION_SECRET must be at least 32"),
+    ],
+)
+def test_production_refuses_empty_or_weak_secrets(tmp_path, overrides, named):
+    """`SecretStr("") == ""` is False, so `check_production` alone let these through."""
+    from a11y_stem.config import ConfigError
+
+    settings = prod_settings(tmp_path, **overrides)
+    settings.check_production()  # the spine check passes...
+    with pytest.raises(ConfigError, match=named) as refused:
+        create_app(settings)  # ...the web app does not
+    assert "s" * 40 not in str(refused.value) and "sk-test" not in str(refused.value)
+
+
+def test_production_never_falls_back_to_a_random_session_secret(tmp_path):
+    from a11y_stem.config import ConfigError
+    from a11y_stem.web.app import _session_secret
+
+    with pytest.raises(ConfigError):
+        _session_secret(prod_settings(tmp_path, session_secret=None))
+    assert len(_session_secret(make_settings(tmp_path, session_secret=None))) >= 32  # dev/test
 
 
 def test_dev_login_is_404_unless_enabled(tmp_path):

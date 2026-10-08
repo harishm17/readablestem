@@ -22,7 +22,13 @@ from a11y_stem.web import db
 from a11y_stem.web.quota import pages_used, try_consume_pages
 from a11y_stem.web.spend import DbSpendGuard
 from a11y_stem.web.worker import Worker
-from fixtures.web.support import FakeConverter, fake_client_factory, make_pdf, make_settings
+from fixtures.web.support import (
+    FakeConverter,
+    fake_client_factory,
+    make_pdf,
+    make_settings,
+    output_with_nul,
+)
 
 pytestmark = pytest.mark.postgres
 
@@ -217,6 +223,23 @@ def test_worker_stores_results_with_postgres_types(factory, tmp_path):
         session.delete(job)
     with db.session_scope(factory) as session:
         assert session.scalar(select(db.Blob).where(db.Blob.job_id == job_id)) is None
+
+
+def test_worker_stores_a_result_whose_text_contains_nul(factory, tmp_path):
+    """Postgres refuses U+0000 in text; the worker strips it instead of failing the store
+    (which used to leave the job running and convert it again on every lease expiry)."""
+    [job_id] = queue_jobs(factory, 1)
+    worker = make_worker(factory, tmp_path)
+    converter = FakeConverter(output_with_nul())
+    worker.converter = converter
+    assert worker.run_once() == job_id
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, job_id)
+        assert job is not None and job.status == "done", job.error_code if job else None
+        assert job.html is not None and "SECRET-DOC-TEXTtail" in job.html
+        assert job.result_json is not None
+        assert job.result_json["elements"][1]["text"] == "paragraph"
+    assert len(converter.calls) == 1
 
 
 def test_initial_migration_matches_the_models_on_postgres(pg_url):

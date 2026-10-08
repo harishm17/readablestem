@@ -39,9 +39,9 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 
 | Setting | Used for |
 |---|---|
-| `ENV` | `dev`, `test` or `prod`. Production refuses to start without its limits and secrets (`Settings.check_production`) |
+| `ENV` | `dev`, `test` or `prod`. Production refuses to start without its limits and secrets (`Settings.check_production`, plus `web.app.check_web_secrets`, which also refuses empty secrets) |
 | `DATABASE_URL` | SQLite locally, Postgres (`postgresql+psycopg://...`) in production |
-| `SESSION_SECRET` | Signs the session cookie. Required in production |
+| `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `BASE_URL` | Builds the OAuth redirect URI, `${BASE_URL}/auth/callback` |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
@@ -51,7 +51,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB` | Upload limits |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted (24 h, or 30 days if the user opts in) |
-| `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge` |
+| `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`. Required (non-empty) in production, or the purge would never run |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer source link (AGPL notice); contact on the 403, privacy and terms pages |
 
@@ -117,8 +117,10 @@ else, admins included, so job ids cannot be probed and admins never see document
 3. the CSRF token;
 4. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
    child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
-   hang in MuPDF kills the child, not the server. Password-protected, unreadable or empty
-   files and more than `MAX_PAGES_PER_JOB` pages are refused (422);
+   hang in MuPDF *while opening the file and counting pages* kills the child, not the
+   server. Password-protected, unreadable or empty files and more than
+   `MAX_PAGES_PER_JOB` pages are refused (422). The conversion itself is not isolated
+   this way; see "Limits of the worker" below;
 5. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (429 if over).
 
@@ -146,30 +148,61 @@ hold stays until the day ends: the cap errs on the side of spending less.
 
 A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
-- **Claiming.** Oldest queued job first. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED`
-  then an UPDATE in the same transaction. SQLite: a conditional UPDATE
-  (`WHERE status = 'queued'`) whose rowcount says who won.
-- **Leases.** A claimed job gets `lease_until = now + 120 s`, extended by a heartbeat
-  thread every 40 s and on each progress callback. Before each claim the worker requeues
-  RUNNING jobs whose lease ran out; after 3 attempts a job is failed with
-  `lease_expired` instead.
+- **Claiming.** Fewest attempts first, then oldest, so a retried job goes behind fresh
+  ones. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
+  transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
+  says who won.
+- **Leases.** A claimed job gets `lease_until = now + 120 s`. The conversion runs on its
+  own thread; the worker thread waits for it and extends the lease every 40 s, and each
+  progress callback extends it too. Before each claim the worker requeues RUNNING jobs
+  whose lease ran out; after 3 attempts a job is failed with `lease_expired` instead.
+- **Time limit.** `JOB_BASE_S + JOB_PER_PAGE_S * pages` (300 s + 90 s per page, so
+  50 minutes for 30 pages; constants in `web/worker.py`, not settings yet). Past it the
+  worker stops extending the lease, cancels the conversion, fails the job with `timeout`
+  and goes on to the next job.
+- **Cancellation.** When the job stops being this worker's (the user pressed "Delete
+  now", retention purged it, or another worker requeued it after a lost lease) the
+  conversion is cancelled. The job budget checks ownership in the database before every
+  spend reservation, so no further crop or nearby text is sent to the model; the
+  heartbeat and the progress callback check it too. Cancellation raises
+  `worker.JobCancelled`, a `BudgetExceeded` with scope `cancelled`, so the model client
+  sends nothing and `convert_pdf` cancels its queued steps; the progress callback's
+  exception aborts the run. Model calls already in flight finish. The outcome is
+  "discarded", not a failure.
 - **Running.** `converter(pdf_bytes, settings=..., client=client_factory(settings,
-  JobBudget(DbSpendGuard, MAX_USD_PER_JOB, MAX_MODEL_CALLS_PER_JOB)), progress=...)`.
-  The defaults are `pipeline.run.convert_pdf` and `models.make_vision_client`; tests pass
-  fakes to `create_app`.
+  budget), progress=...)`, where `budget` is a `JobBudget` over the daily `DbSpendGuard`
+  with what is left of `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB` for this job. The
+  caps are per job, not per attempt: spend and calls so far are written to
+  `Job.cost_usd` and `Job.model_calls` on every heartbeat and progress callback, and a
+  retried attempt starts from them. The defaults are `pipeline.run.convert_pdf` and
+  `models.make_vision_client`; tests pass fakes to `create_app`.
 - **Storing.** `result_json` (the `DocumentResult` without `html`), `html`, crops as
-  `Blob(kind="crop")`, `cost_usd`, `model_calls`, status `done`. Only if this worker still
-  owns the job (same attempt, still running), so a job deleted or requeued meanwhile is
-  not brought back.
+  `Blob(kind="crop")`, `cost_usd` and `model_calls` (all attempts), status `done`. Only
+  if this worker still owns the job (same attempt, still running), so a job deleted or
+  requeued meanwhile is not brought back. NUL characters (they occur in text extracted
+  from PDFs, and Postgres refuses them) are removed first. If the write fails, a
+  transient error (`OperationalError`) is retried once; after that the job is failed
+  with `store_failed` instead of being left running, which would convert it again.
 - **Failure codes** (`Job.error_code`, shown on the job page with a plain explanation):
 
   | Code | Cause |
   |---|---|
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
+  | `timeout` | The conversion ran past its time limit |
+  | `store_failed` | The result could not be written to the database |
   | `lease_expired` | The job was interrupted 3 times |
   | `upload_missing` | The upload blob was gone |
   | `internal_error` | Anything else |
+
+**Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
+web process, not in a child process like the upload probe. A conversion stuck in native
+code cannot be stopped from Python: after its time limit the job is failed and the queue
+moves on, but the stuck thread stays (logged as `conversion_abandoned`) until the
+process restarts. A PDF that crashes MuPDF during conversion takes the whole process
+down; the job is retried after its lease expires, behind fresh jobs, and failed with
+`lease_expired` after 3 attempts. Running the conversion in a killable child process is
+the fix; it is not built yet.
 
 `Worker.run_once()` and `process_next_job(...)` process one job synchronously, for tests
 and scripts.
@@ -225,12 +258,16 @@ README) and configured to need no `eval`, inject no `<style>` and keep no histor
 
 Server-rendered pages that work without JavaScript: htmx only polls the job status
 (every 3 s, 204 while unchanged, a full reload when the job finishes). Without
-JavaScript a `<noscript>` meta refresh reloads the status page every 5 s until the job
-finishes, and there is a "refresh the status" link. Every page has a skip link, one
+JavaScript the status page does not reload by itself, because a reload the user did not
+choose sends a screen reader back to the top each time (WCAG 2.2.1, failure F41; axe
+rule `meta-refresh`, critical). It has a "refresh the status" link and, inside
+`<noscript>`, an opt-in link to `/jobs/{id}?auto=1`, which adds a 15 s `<noscript>` meta
+refresh until the job finishes and shows a "Stop reloading this page" link. Every page has a skip link, one
 `<main>`, a labelled navigation, unique titles (prefixed "Error:" when a form has errors),
 labels on every control, error summaries linked to fields, visible focus rings, and
 status written in words, not colour alone. `tests/test_web_browser.py` runs axe-core on
-every page (zero serious or critical violations) and walks the upload-to-review flow
+every page (zero serious or critical violations), including an unfinished job page with
+JavaScript on and as a no-JS browser parses it, and walks the upload-to-review flow
 with JavaScript off.
 
 ## Privacy

@@ -49,6 +49,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 NOT_FOUND = ("Page not found", "There is nothing at this address, or it is not yours to see.")
+# Opt-in reload interval for the job page without JavaScript: long enough to hear the
+# status before the page starts over.
+AUTO_RELOAD_S = 15
 
 
 def upload_error_message(code: str, ctx: AppContext) -> str:
@@ -210,9 +213,12 @@ def load_job_view(request: Request, job_id: str, user: CurrentUser) -> JobView:
 
 
 @router.get("/jobs/{job_id}")
-def job_page(request: Request, job_id: str, user: UserDep) -> Response:
+def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Response:
+    """Status page. Without JavaScript it reloads itself only if the user opted in
+    (`?auto=1`, offered in a <noscript> link); htmx polls otherwise."""
     job = load_job_view(request, job_id, user)
-    return render(request, "job.html", {"job": job, "active": "app"})
+    context = {"job": job, "active": "app", "auto_reload": auto == "1"}
+    return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
 
 
 @router.get("/jobs/{job_id}/status")

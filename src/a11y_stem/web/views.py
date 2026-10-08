@@ -53,6 +53,10 @@ JOB_ERROR_MESSAGES = {
     "too_many_pages": "The PDF has too many pages.",
     "no_pages": "The PDF has no pages.",
     "lease_expired": "The conversion was interrupted several times and has been stopped.",
+    "timeout": "The conversion took longer than a document of this size is allowed and was "
+    "stopped. Try splitting it into smaller parts.",
+    "store_failed": "The conversion finished but its results could not be saved. Please "
+    "upload the document again.",
     "upload_missing": "The uploaded file was no longer available.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
     "of your document's content.",

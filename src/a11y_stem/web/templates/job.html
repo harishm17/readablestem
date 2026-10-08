@@ -1,10 +1,12 @@
 {% extends "base.html" %}
 {% block title %}{{ job.status_label }}: {{ job.filename }}{% endblock %}
 {% block head %}
-{% if not job.finished %}
-{# Without JavaScript, reload every few seconds until the job finishes. With it, htmx
-   polls the status fragment instead (a <noscript> meta only applies without scripts). #}
-<noscript><meta http-equiv="refresh" content="5"></noscript>
+{% if auto_reload and not job.finished %}
+{# Without JavaScript, and only when the user asked for it (?auto=1), reload until the
+   job finishes. A reload that the user did not choose fails WCAG 2.2.1 (F41): it sends
+   a screen reader back to the top of the page every time. With JavaScript, htmx polls
+   the status fragment instead (a <noscript> meta only applies without scripts). #}
+<noscript><meta http-equiv="refresh" content="{{ auto_reload_s }}"></noscript>
 {% endif %}
 {% endblock %}
 {% block content %}
@@ -13,8 +15,18 @@
   {% include "_job_status.html" %}
 </div>
 {% if not job.finished %}
-<p>This page updates by itself every few seconds. You can also
-  <a href="/jobs/{{ job.id }}">refresh the status</a>, or leave and come back later.</p>
+<p>With JavaScript on, the status above updates by itself. You can also
+  <a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">refresh the status</a>,
+  or leave and come back later.</p>
+<noscript>
+  {% if auto_reload %}
+  <p>This page reloads every {{ auto_reload_s }} seconds until the conversion finishes.
+    <a href="/jobs/{{ job.id }}">Stop reloading this page</a></p>
+  {% else %}
+  <p><a href="/jobs/{{ job.id }}?auto=1">Reload this page every {{ auto_reload_s }} seconds
+    until the conversion finishes</a></p>
+  {% endif %}
+</noscript>
 {% endif %}
 
 {% if job.status == "done" and job.summary %}

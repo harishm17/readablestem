@@ -29,7 +29,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
 
-from a11y_stem.config import Settings, get_settings
+from a11y_stem.config import ConfigError, Settings, get_settings
 from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
 from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
@@ -60,6 +60,7 @@ STATIC_DIR = WEB_DIR / "static"
 
 SESSION_COOKIE = "a11y_stem_session"
 SESSION_MAX_AGE_S = 7 * 24 * 60 * 60
+MIN_SESSION_SECRET_CHARS = 32
 
 ERROR_TEXT = {
     400: ("Something was wrong with that request", "Please go back and try again."),
@@ -156,11 +157,43 @@ def _plain_500_page() -> Response:
 # --------------------------------------------------------------------------- app
 
 
+def check_web_secrets(settings: Settings) -> None:
+    """Production start check for the secrets themselves, on top of `check_production`.
+
+    `Settings.check_production` tests `value in (None, "")`, and a `SecretStr("")` (an
+    empty SESSION_SECRET=, say) is not equal to "", so an empty secret passes it. Here an
+    empty session secret would silently become a random one per process (users signed
+    out on every restart, sign-in failing across instances) and an empty cron token would
+    refuse the scheduler for ever, so the 24-hour purge would never run.
+    """
+    if settings.env != "prod":
+        return
+    secrets_needed = {
+        "SESSION_SECRET": settings.session_secret,
+        "GOOGLE_CLIENT_SECRET": settings.google_client_secret,
+        "CRON_TOKEN": settings.cron_token,
+        "OPENAI_API_KEY": settings.openai_api_key,
+    }
+    empty = [
+        name
+        for name, value in secrets_needed.items()
+        if value is None or not value.get_secret_value().strip()
+    ]
+    if empty:
+        raise ConfigError("production start refused; empty: " + ", ".join(empty))
+    session_secret = settings.session_secret.get_secret_value() if settings.session_secret else ""
+    if len(session_secret) < MIN_SESSION_SECRET_CHARS:
+        raise ConfigError(
+            f"SESSION_SECRET must be at least {MIN_SESSION_SECRET_CHARS} characters in production"
+        )
+
+
 def _session_secret(settings: Settings) -> str:
     if settings.session_secret is not None and settings.session_secret.get_secret_value():
         return settings.session_secret.get_secret_value()
-    # dev/test only (production refuses to start without SESSION_SECRET): sessions end
-    # when the process restarts, which is fine locally.
+    if settings.env == "prod":  # check_web_secrets already refused this; never fall back
+        raise ConfigError("SESSION_SECRET is required in production")
+    # dev/test only: sessions end when the process restarts, which is fine locally.
     return secrets.token_urlsafe(32)
 
 
@@ -183,6 +216,7 @@ def create_app(
     """Build the web app. Tests pass a fake converter and client factory."""
     settings = settings or get_settings()
     settings.check_production()
+    check_web_secrets(settings)
     engine = make_engine(settings.database_url)
     factory = make_sessionmaker(engine)
     ctx = AppContext(
