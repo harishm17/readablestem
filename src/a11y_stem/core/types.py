@@ -5,9 +5,10 @@ that needs work gets a `Fix` (what the pipeline proposes, how sure it is, which 
 passed, and what the model calls cost). The assembler turns elements + fixes into
 accessible HTML. `DocumentResult` is the whole thing, serialisable to JSON.
 
-Privacy rule for this module: `Check.code`, `Fix.reason`, `ModelCall.outcome` and
-`Fix.group_key` are category codes or ids (e.g. "unknown_command", "hg-p3-e7"), never
-document text, so they can be logged and aggregated after the document itself is deleted.
+Privacy rule for this module: `Check.code`, `Fix.reason`, `ModelCall.outcome`,
+`Fix.group_key` and `Verification` are category codes, ids or numbers (e.g.
+"unknown_command", "hg-p3-e7"), never document text, so they can be logged and aggregated
+after the document itself is deleted.
 """
 
 from __future__ import annotations
@@ -110,6 +111,44 @@ class ModelCall(BaseModel):
     outcome: Outcome = "ok"
 
 
+class Verification(BaseModel):
+    """One answer of the second automated check (`models.verifier`). Content-free.
+
+    Kept apart from `Fix.calls`: those are the attempts that produced the proposal, and
+    routing, escalation and the eval's route counts read them. This records a probability
+    question asked about the proposal afterwards (OpenAI Decisions API).
+
+    - `check`: what was asked, "figure_alt" (does the alt text match the image) or
+      "equation_match" (does the LaTeX match the equation image);
+    - `stage`: "final" (the proposal on the fix) or "cheap" (an equation's cheap-model
+      answer, before it was escalated);
+    - `mode`: "note" (may add an optional note to an accepted fix) or "shadow" (recorded
+      only; changes nothing);
+    - `outcome`: "ok" when every question was answered, else why not (`Outcome` codes:
+      refused, timeout, api_error, invalid_output, budget_exceeded). Anything but "ok"
+      leaves the fix exactly as it would be without the check (fail-open);
+    - `probabilities`: answer code -> probability ("ok", "factual_error"; "match",
+      "cosmetic", "meaning_changing"). Not calibrated: a ranking signal, compared with
+      thresholds from settings, never shown to a reader as a confidence;
+    - `flagged`: the threshold said "possible mismatch" (None when not judged).
+
+    Codes are plain strings, not literals, so a result written by a newer release with a
+    check this one does not know still loads.
+    """
+
+    check: str
+    stage: str = "final"
+    mode: str = "note"
+    outcome: str = "ok"
+    probabilities: dict[str, float] = Field(default_factory=dict)
+    flagged: bool | None = None
+    model: str = ""
+    version: str = ""  # "<check>-<sha8>" of the question wording, like prompt versions
+    input_tokens: int = 0
+    cost_usd: float = 0.0
+    latency_ms: int = 0
+
+
 class EquationFix(BaseModel):
     latex: str
     mathml: str  # presentation MathML, <math> root, display attribute set
@@ -185,6 +224,9 @@ class Fix(BaseModel):
     # size, and the review screen asks once for the whole group. None when on its own.
     group_key: str | None = None
     group_size: int | None = None
+    # The second automated check's answers about this fix (see `Verification`). Empty
+    # when it did not run, and in results stored before it existed.
+    verifications: list[Verification] = Field(default_factory=list)
 
     @model_validator(mode="before")
     @classmethod
@@ -195,7 +237,12 @@ class Fix(BaseModel):
 
     @property
     def cost_usd(self) -> float:
-        return sum(c.cost_usd for c in self.calls)
+        """Everything this fix cost: its model calls and its second-check requests."""
+        return sum(c.cost_usd for c in self.calls) + self.verifier_cost_usd
+
+    @property
+    def verifier_cost_usd(self) -> float:
+        return sum(v.cost_usd for v in self.verifications)
 
     @property
     def pending(self) -> bool:
