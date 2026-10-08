@@ -207,10 +207,18 @@ class HeadingGroupView:
     values: dict[str, str] = field(default_factory=dict)
     error: str | None = None
     notices: list[str] = field(default_factory=list)
+    members_open: bool = False  # one of them was just decided on its own
 
     @property
     def waiting(self) -> int:
         return len(self.members)
+
+    @property
+    def open(self) -> bool:
+        """The folded cards of its headings are unfolded when the reviewer is working
+        through them one by one, or one has an error to correct (its error summary link
+        must reach the field)."""
+        return self.members_open or any(m.errors for m in self.members)
 
     @property
     def pages_text(self) -> str:
@@ -461,9 +469,11 @@ def _place_flashes(
         landing = next_to_review(result, changed.element_id)
         landing_fix = result.fix_for(landing) if landing else None
         if landing_fix is not None and landing_fix.group_key in cards:
-            cards[landing_fix.group_key].notices.append(
-                f"{notice.label}: {message}" if notice.label else message
-            )
+            card = cards[landing_fix.group_key]
+            card.notices.append(f"{notice.label}: {message}" if notice.label else message)
+            changed_fix = result.fix_for(target)
+            if changed_fix is not None and changed_fix.group_key == card.key:
+                card.members_open = True  # deciding them one by one: keep them in view
         elif landing in items:
             items[landing].notices.append(notice)
         top.append(notice)

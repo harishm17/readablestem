@@ -199,21 +199,28 @@ def item_numbers(result: DocumentResult) -> dict[str, int]:
 def next_to_review(result: DocumentResult, element_id: str) -> str | None:
     """The first decision still waiting after `element_id` in review order, wrapping
     round to the first one; None when nothing is left. A group of headings is one
-    decision, named by its first member still waiting (`review_anchor` finds its card)."""
+    decision, named by its first member still waiting (`review_anchor` finds its card).
+
+    After one heading of a group was decided on its own, the rest of its group is still
+    the decision at hand, so that comes first."""
     position = _positions(result)
     fix = result.fix_for(element_id)
     own_group = fix.group_key if fix is not None else None
+    if own_group:
+        rest = [
+            f.element_id for f in pending_members(result, own_group) if f.element_id != element_id
+        ]
+        if rest:
+            return rest[0]
     heads = [
         unit[0].element_id
         for g in group_fixes(result)
         for unit in g.units
-        if unit[0].element_id != element_id and not (own_group and unit[0].group_key == own_group)
+        if unit[0].element_id != element_id
     ]
     here = position.get(element_id)
     later = [e for e in heads if here is not None and position[e] > here]
     remaining = later or heads
-    if not remaining and own_group:  # the rest of the group just decided is still waiting
-        remaining = [f.element_id for f in pending_members(result, own_group)]
     return remaining[0] if remaining else None
 
 

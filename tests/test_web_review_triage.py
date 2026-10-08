@@ -177,11 +177,17 @@ def test_decisions_count_a_heading_group_once():
     assert [[f.element_id for f in g.optional] for g in groups] == [["p1-e2"], ["p2-e1"]]
 
 
-def test_next_decision_after_a_group_member_skips_the_rest_of_its_group():
+def test_the_next_decision_counts_a_group_once():
     result = triage_output().result
     assert review.next_to_review(result, "p2-e2") == "p1-e1"  # the group, by its first
     assert review.review_anchor(result, "p1-e1") == f"group-card-{GROUP}"
-    assert review.next_to_review(result, "p1-e1") == "p2-e2"
+    # One heading of the group decided on its own: the rest of the group comes first.
+    assert review.next_to_review(result, "p1-e1") == "p2-e0"
+    for fix in result.fixes:
+        if fix.group_key == GROUP:
+            fix.status = Status.ACCEPTED
+    # The whole group decided: the next decision after it.
+    assert review.next_to_review(result, "p3-e0") == "p2-e2"
     assert review.review_anchor(result, "p2-e2") == "item-p2-e2"
 
 
@@ -315,9 +321,13 @@ def test_a_level_that_skips_is_refused_for_the_whole_group(tri):
 
 
 def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
-    assert post(tri, "p2-e0", action="reject").status_code == 303
+    response = post(tri, "p2-e0", action="reject")
+    assert response.headers["location"] == f"/jobs/{tri.job_id}/review#group-card-{GROUP}"
     page = page_of(tri)
     card = group_card(page)
+    # Working through them one by one: their cards stay unfolded, with a link back.
+    assert '<details class="done-group group-members" open>' in card
+    assert "Heading 3 on page 2: Rejected." in card
     assert "appears 3 times as a bold line in the body text size (2 still waiting)." in card
     assert "Apply to all 2" in card and "Make all 2 bold text" in card
     assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page
@@ -369,3 +379,12 @@ def test_an_optional_check_can_still_be_edited(tri):
     page = page_of(tri)
     assert '<h2 id="optional-checks-title">Optional checks (1)</h2>' in page
     assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page  # unchanged
+
+
+def test_an_error_on_one_heading_of_a_group_unfolds_the_group(tri):
+    response = post(tri, "p3-e0", action="edit", level="6")
+    assert response.status_code == 422
+    card = group_card(response.text)
+    assert '<details class="done-group group-members" open>' in card
+    assert 'id="level-error-p3-e0"' in card
+    assert '<a href="#level-p3-e0">' in response.text  # the error summary reaches it

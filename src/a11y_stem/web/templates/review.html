@@ -188,7 +188,7 @@
       </div>
       <button type="submit" class="button-secondary">Set the level for all {{ n }}<span class="visually-hidden"> headings “{{ hg.text }}”</span></button>
     </form>
-    <details class="done-group group-members">
+    <details class="done-group group-members"{% if hg.open %} open{% endif %}>
       <summary>Decide them one by one ({{ counted(n, "heading", "headings") }})</summary>
       <ol class="fix-list">
         {% for item in hg.members %}
