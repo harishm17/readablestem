@@ -216,6 +216,8 @@ objects were three times slower). A crop takes about 0.1 s.
 - **Very short documents** learn the "typical line pitch" from very few lines; with one
   two-line paragraph the paragraph gap itself becomes the typical pitch and separate
   paragraphs can merge.
+- **Maths inside headings and captions** stays as characters in their text (for example a
+  math-italic `𝑔`); only paragraphs get inline equation elements.
 - **Paragraphs split across pages** stay two elements (an element has one page and box).
 - **Inline maths that wraps across lines** becomes two inline equations.
 - **Tables** are not a separate element kind: cell text becomes paragraphs (read left to
