@@ -560,6 +560,8 @@ def test_fix_codes_and_reasons_are_content_free():
         (r"v_0 \; ;", "v_0"),
         ("t = 0~s:", "t = 0~s"),
         ("a,.", "a"),
+        (r"1.5\ \text{s}?", r"1.5\ \text{s}"),  # "how far does it fall in 1.5 s?"
+        ("n!", "n!"),  # a factorial, not an exclamation
         (r"x\,", r"x\,"),  # a thin space, not a comma
         (r"a \\,", r"a \\"),  # a comma after a line break is a comma
         (",", ","),  # nothing would be left

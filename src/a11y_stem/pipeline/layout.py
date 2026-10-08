@@ -3031,7 +3031,7 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
 
 def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
     """Pull an inline equation's right edge in so its padded crop stops short of the
-    punctuation that follows it ("d_0," in "positions d_0, d_f and ...").
+    punctuation that follows it ("d_0," in "positions d_0, d_f and ...", "in 1.5 s?").
 
     The comma stays in the paragraph text after the equation's marker; if the crop shows
     it too, the model transcribes it and the output reads "d0, ,". The edge moves left by
@@ -3039,7 +3039,7 @@ def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
     equation.
     """
     after = next((c for c in row.chars[end:] if not c.blank), None)
-    if after is None or after.c not in ",.;:":
+    if after is None or after.c not in ",.;:?":
         return box
     x1 = max(min(box[2], after.x0 - CROP_PAD), box[2] - CROP_PAD, box[0] + 0.5)
     return (box[0], box[1], x1, box[3])

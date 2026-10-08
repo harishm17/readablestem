@@ -257,7 +257,7 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   function names (`sin`, `lim`, `proj`, `rank`, `diag` ...) are not English words. List
   bullets (`•`, `▪`, Word's private-use Symbol bullet U+F0B7, and a `·` or `∙` that
   starts a line) are never maths, even in the Symbol font Word draws them in.
-- When `,` `.` `;` or `:` follows an inline equation, its box's right edge moves left by
+- When `,` `.` `;` `:` or `?` follows an inline equation, its box's right edge moves left by
   up to `CROP_PAD` (crop's default padding, 2 pt) so the padded crop ends where the
   punctuation starts and still holds every glyph. The mark stays in the paragraph after
   the marker; if the crop showed it, the model transcribed it as well ("d0 , ,").

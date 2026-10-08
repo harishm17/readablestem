@@ -148,16 +148,17 @@ _TRAILING_SPACING = re.compile(r"(?:\s|~|\\[,;:! ]|\\q?quad(?![A-Za-z]))+$")
 
 
 def strip_trailing_punctuation(latex: str) -> str:
-    r"""Drop sentence punctuation (, . ; :) from the end of an inline transcription.
+    r"""Drop sentence punctuation (, . ; : ?) from the end of an inline transcription.
 
     The paragraph text keeps the mark that follows an inline equation's marker, so if
     the model also transcribes it (the crop showed part of it) the output reads
     "d0, ,". Spacing left in front of the mark goes with it. A mark after a backslash is
     a command (\, \; \: are spaces) and stays; so does LaTeX that would be left empty.
-    Display equations keep their punctuation: it is part of the line the reader sees.
+    "!" stays: after maths it is a factorial. Display equations keep their punctuation:
+    it is part of the line the reader sees.
     """
     text = latex.rstrip()
-    while text and text[-1] in ",.;:":
+    while text and text[-1] in ",.;:?":
         backslashes = len(text[:-1]) - len(text[:-1].rstrip("\\"))
         if backslashes % 2:
             break  # "\," is a thin space, not a comma
