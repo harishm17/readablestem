@@ -318,10 +318,10 @@ def test_bullets_in_the_symbol_font_are_not_inline_maths():
         write(page, 72, 160, ["Some ordinary body text follows the list on the page."])
 
     elements = analyze(one_page(fill)).elements
-    assert [(e.kind, e.text) for e in elements] == [
-        (Kind.PARAGRAPH, f"\u00b7 {items[0]}"),  # Symbol's bullet extracts as a middle dot
-        (Kind.PARAGRAPH, f"\u00b7 {items[1]}"),
-        (Kind.PARAGRAPH, "Some ordinary body text follows the list on the page."),
+    assert [(e.kind, e.list_marker, e.text) for e in elements] == [
+        (Kind.LIST_ITEM, "\u00b7", items[0]),  # Symbol's bullet extracts as a middle dot
+        (Kind.LIST_ITEM, "\u00b7", items[1]),
+        (Kind.PARAGRAPH, None, "Some ordinary body text follows the list on the page."),
     ]
 
 
