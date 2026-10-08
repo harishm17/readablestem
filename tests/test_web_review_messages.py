@@ -270,9 +270,21 @@ def test_no_message_for_a_code_the_pipeline_no_longer_emits(emitted):
     assert sorted(set(REASON_MESSAGES) - reasons) == []
 
 
-def test_messages_are_single_plain_sentences():
-    for text in [*CHECK_MESSAGES.values(), *REASON_MESSAGES.values()]:
+# A full stop, question or exclamation mark followed by a capital starts a second sentence.
+SENTENCE_BREAK = re.compile(r"[.!?]\s+[A-Z]")
+
+
+def test_messages_are_one_plain_sentence_each():
+    texts = [
+        *CHECK_MESSAGES.values(),
+        *REASON_MESSAGES.values(),
+        messages.UNKNOWN_CHECK_MESSAGE,
+        messages.UNKNOWN_REASON_MESSAGE,
+        messages.AXE_RULE_MESSAGE.format(rule="color-contrast"),
+    ]
+    for text in texts:
         assert text[0].isupper() and text.endswith("."), text
+        assert not SENTENCE_BREAK.search(text), f"more than one sentence: {text}"
         assert len(text) <= 220, text
         assert "compl" + "iant" not in text.lower()
         assert "_" not in text, f"looks like a code, not a sentence: {text}"

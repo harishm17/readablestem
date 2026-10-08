@@ -154,11 +154,6 @@ def group_fixes(result: DocumentResult) -> list[FixGroup]:
     return groups
 
 
-def review_order(result: DocumentResult) -> list[Fix]:
-    """Every reviewable fix in the order the review screen lists it."""
-    return [f for g in group_fixes(result) for f in (*g.pending, *g.done)]
-
-
 def item_numbers(result: DocumentResult) -> dict[str, int]:
     """element_id -> 1-based number within its kind, in reading order. Stable while the
     reviewer works (unlike a position in the review order, which changes after every

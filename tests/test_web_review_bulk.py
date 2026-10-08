@@ -255,10 +255,11 @@ def test_parse_bulk_accepts_the_offered_choices():
 def test_bulk_forms_show_how_many_each_choice_accepts(rich):
     page = page_of(rich)
     equations = group(page, "equations")
-    assert '<option value="90">90% confidence (0 equations)</option>' in equations
-    assert '<option value="80" selected>80% confidence (1 equation)</option>' in equations
-    assert '<option value="60">60% confidence (2 equations)</option>' in equations
-    assert "1 of them has a warning: read it on the card first." in equations
+    assert '<option value="90">90% (0 equations)</option>' in equations
+    assert '<option value="80" selected>80% (1 equation)</option>' in equations
+    assert '<option value="60">60% (2 equations)</option>' in equations
+    assert "passed every required check are included (2 equations now)" in equations
+    assert "1 of these has a warning: read it on the card first." in equations
     assert "Accept all" not in equations  # only headings get "accept all"
     assert '<label for="min-confidence-equations">' in equations
     headings = group(page, "headings")

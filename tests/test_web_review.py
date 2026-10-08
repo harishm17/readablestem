@@ -523,7 +523,7 @@ def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
         job.result_json = data.model_dump(mode="json", exclude={"html"})
     figure = card(review_page(web), "p1-e4")
     assert 'value="accept"' not in figure
-    assert "<strong>Must be fixed:</strong> The alt text is long." in figure
+    assert "<strong>Must be fixed:</strong> The alt text is long: aim for 150" in figure
     response = post(web, "p1-e4", action="accept")
     assert response.status_code == 422
     assert "failed a required check" in response.text

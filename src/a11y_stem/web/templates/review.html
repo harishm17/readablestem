@@ -155,13 +155,14 @@
     <input type="hidden" name="action" value="accept_confident">
     <div class="field{% if g.error %} field-error{% endif %}">
       <label for="{{ select_id }}">Accept every {{ g.one }} proposal at or above</label>
-      <p class="hint" id="{{ select_id }}-hint">Only proposals still waiting that passed every required check are counted; {{ g.many }} that could not be converted never are.
-        {% if g.bulk_warned %}{{ g.bulk_warned }} of them {{ "has" if g.bulk_warned == 1 else "have" }} a warning: read it on the card first.{% endif %}</p>
+      <p class="hint" id="{{ select_id }}-hint">Only proposals waiting for review that passed every required check are included ({{ counted(g.bulk_eligible, g.one, g.many) }} now); {{ g.many }} that could not be converted never are.
+        {% if g.bulk_warned %}{{ g.bulk_warned }} of these {{ "has a warning: read it" if g.bulk_warned == 1 else "have warnings: read them" }} on the card first.{% endif %}</p>
       {% if g.error %}<p class="error-message" id="{{ select_id }}-error"><span class="visually-hidden">Error: </span>{{ g.error }}</p>{% endif %}
       <select id="{{ select_id }}" name="min_confidence"
               aria-describedby="{{ select_id }}-hint{% if g.error %} {{ select_id }}-error{% endif %}"{% if g.error %} aria-invalid="true"{% endif %}>
         {% for option in g.bulk_options %}
-        <option value="{{ option.percent }}"{% if option.selected %} selected{% endif %}>{{ option.percent }}% confidence ({{ counted(option.count, g.one, g.many) }})</option>
+        {# Short enough to fit a 320 px screen; the label says "at or above". #}
+        <option value="{{ option.percent }}"{% if option.selected %} selected{% endif %}>{{ option.percent }}% ({{ counted(option.count, g.one, g.many) }})</option>
         {% endfor %}
       </select>
     </div>

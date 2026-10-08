@@ -24,33 +24,33 @@ from a11y_stem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX
 # went wrong; a code alone can be ambiguous ("empty" LaTeX vs "empty" alt text).
 CHECK_MESSAGES: dict[tuple[str, str], str] = {
     # LaTeX (pipeline.validate.check_latex)
-    ("latex.not_empty", "empty"): "The transcription is empty. Type the LaTeX for this "
+    ("latex.not_empty", "empty"): "The transcription is empty: type the LaTeX for this "
     "equation, or reject it to keep the image.",
-    ("latex.length", "too_long"): f"The LaTeX is longer than {MAX_LATEX_CHARS:,} characters. "
-    "Check whether more than one equation was transcribed.",
+    ("latex.length", "too_long"): f"The LaTeX is longer than {MAX_LATEX_CHARS:,} characters, "
+    "which usually means more than one equation was transcribed.",
     ("latex.balanced_braces", "unbalanced_braces"): "A { has no matching } (or the other way "
     "round).",
     ("latex.balanced_environments", "unbalanced_env"): "A \\begin{...} has no matching "
     "\\end{...} (or the other way round).",
-    ("latex.no_math_delimiters", "math_delimiter"): "The LaTeX contains a $ sign. Remove the "
+    ("latex.no_math_delimiters", "math_delimiter"): "The LaTeX contains a $ sign: remove the "
     "$...$ delimiters and keep only the maths.",
     ("latex.no_comments", "comment"): "The LaTeX contains a % comment, which hides the rest of "
-    "the line. Write a percent sign as \\%.",
+    "the line (write a percent sign as \\%).",
     ("latex.no_forbidden_commands", "forbidden_command"): "The LaTeX uses a command that could "
     "read files or change settings, so it is never allowed.",
     ("latex.allowed_commands", "unknown_command"): "The LaTeX uses a command that is not on "
-    "the list of supported maths commands. Check for a typo or rewrite it.",
+    "the list of supported maths commands, so check for a typo or rewrite it.",
     ("latex.allowed_environments", "unknown_environment"): "The LaTeX uses an environment "
     "(\\begin{...}) that is not supported.",
     ("latex.command_arguments", "bad_argument"): "A command has an argument in a form that is "
     "not supported, for example a \\hspace width.",
     ("latex.plain_text_arguments", "markup_in_text"): "Text inside \\text{...} contains "
     "characters that would turn into markup.",
-    ("latex.converts", "conversion_failed"): "The LaTeX could not be converted to MathML. Look "
-    "for a missing argument or a typo.",
+    ("latex.converts", "conversion_failed"): "The LaTeX could not be converted to MathML, "
+    "often because of a missing argument or a typo.",
     # MathML (pipeline.validate.check_mathml)
-    ("mathml.size", "too_large"): "The MathML is far too large for one equation. Check whether "
-    "the transcription repeats itself.",
+    ("mathml.size", "too_large"): "The MathML is far too large for one equation, which "
+    "usually means the transcription repeats itself.",
     ("mathml.well_formed", "forbidden_xml"): "The MathML uses XML features that are not "
     "allowed, such as entity definitions.",
     ("mathml.well_formed", "not_well_formed"): "The MathML is not valid XML, so it cannot be "
@@ -71,44 +71,44 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("mathml.structure", "bad_arity"): "A fraction, root, subscript or similar has the wrong "
     "number of parts, often because an argument is missing.",
     ("mathml.converted", "unconverted_command"): "Part of the LaTeX was copied through as text "
-    "instead of becoming maths. Check for an unsupported command.",
+    "instead of becoming maths, often because of an unsupported command.",
     # Equations (pipeline.equation_step)
-    ("speech.generated", "speech_failed"): "The spoken version could not be made. The "
+    ("speech.generated", "speech_failed"): "The spoken version could not be made, though the "
     "equation itself may still be right.",
-    ("speech.generated", "speech_empty"): "The spoken version came out empty. The equation "
-    "itself may still be right.",
+    ("speech.generated", "speech_empty"): "The spoken version came out empty, though the "
+    "equation itself may still be right.",
     ("equation.text_layer", "text_layer_mismatch"): "The symbols in this transcription differ "
-    "a lot from the text stored in the PDF. Compare it with the image symbol by symbol.",
+    "a lot from the text stored in the PDF, so compare it with the image symbol by symbol.",
     ("equation.text_layer_style", "style_mismatch"): "A letter is bold in the PDF but not in "
-    "this transcription (or the other way round). Check vector names.",
+    "this transcription (or the other way round), so check the vector names.",
     # Alt text (pipeline.validate.check_alt)
     ("alt.decorative", "decorative_with_text"): "A decorative figure must have empty alt "
-    "text. Clear the text, or untick Decorative.",
-    ("alt.not_empty", "empty"): "The alt text is empty. Describe the figure, or mark it as "
+    "text, so clear the text or untick Decorative.",
+    ("alt.not_empty", "empty"): "The alt text is empty: describe the figure, or mark it as "
     "decorative.",
-    ("alt.length", "too_long"): f"The alt text is long. Aim for {ALT_WARN_CHARS} characters or "
-    f"fewer; over {ALT_MAX_CHARS} it cannot be saved.",
+    ("alt.length", "too_long"): f"The alt text is long: aim for {ALT_WARN_CHARS} characters or "
+    f"fewer (over {ALT_MAX_CHARS} it cannot be saved).",
     ("alt.no_redundant_prefix", "redundant_prefix"): "The alt text starts with words like "
-    '"image of". Screen readers already say it is an image, so start with what it shows.',
-    ("alt.not_filename", "filename"): "The alt text looks like a file name. Describe what the "
-    "figure shows instead.",
+    '"image of", which screen readers already say, so start with what it shows.',
+    ("alt.not_filename", "filename"): "The alt text looks like a file name, so describe what "
+    "the figure shows instead.",
     ("alt.no_url_or_markup", "url_or_markup"): "The alt text contains a web address, HTML or "
-    "a LaTeX command. Use plain words.",
+    "a LaTeX command, so use plain words instead.",
     ("alt.not_placeholder", "placeholder"): 'The alt text is a placeholder (like "image" or '
     '"Figure 2") and says nothing about the figure.',
     ("alt.not_caption_copy", "caption_copy"): "The alt text repeats the caption, which is read "
-    "out anyway. Say what the figure shows instead.",
+    "out anyway, so say what the figure shows instead.",
     # Figures (pipeline.figure_step)
     ("figure.decorative_consistency", "decorative_conflict"): "The figure was marked "
-    "decorative, but it looks like it carries information (a chart, a caption or a "
-    "description). Check before hiding it from screen readers.",
+    "decorative but looks like it carries information (a chart, a caption or a "
+    "description), so check before hiding it from screen readers.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",
     ("heading.outline", "heading.level_repaired"): "The level was changed so the outline does "
-    "not skip a level. Check it fits the sections around it.",
+    "not skip a level, so check it fits the sections around it.",
     ("heading.evidence", "heading.weak_evidence"): "Only weak signs say this is a heading "
-    "(bold at body size, no larger font or section number). Check it is not a label in "
+    "(bold at body size, no larger font or section number), so check it is not a label in "
     "the text.",
     ("heading.all_caps", "heading.all_caps"): "The text is all capitals, which is often a "
     "label or running header rather than a section heading.",
@@ -129,7 +129,7 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("html.math_display", "math_missing_display"): "An equation does not say whether it sits "
     "in the text or on its own line.",
     ("html.self_contained", "external_resource"): "The document loads something from another "
-    "site; it should work on its own.",
+    "site, but it should work on its own.",
     ("html.wording", "banned_wording"): "The document text promises more than this tool can "
     "back up (for example that it meets a legal standard).",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
@@ -148,14 +148,14 @@ AXE_RULE_MESSAGE = (
 # Fix.reason: why there is no usable proposal (ABSTAINED or FAILED).
 REASON_MESSAGES: dict[str, str] = {
     # Equation and figure steps
-    "low_confidence": "The model was not sure enough to make a proposal. Write one yourself, "
-    "or reject it to keep the original from the PDF.",
-    "not_equation": "The model judged that this is not an equation. If it is, type the LaTeX; "
-    "if not, reject it to keep the original.",
-    "invalid_latex": "The model's LaTeX failed a required check (listed below). Correct it, or "
-    "reject it to keep the image.",
-    "invalid_alt": "The model's alt text failed a required check (listed below). Write new alt "
-    "text, or reject it to keep the figure flagged.",
+    "low_confidence": "The model was not sure enough to make a proposal, so write one "
+    "yourself or reject it to keep the original from the PDF.",
+    "not_equation": "The model judged that this is not an equation: if it is, type the LaTeX, "
+    "and if not, reject it to keep the original.",
+    "invalid_latex": "The model's LaTeX failed a required check (listed below), so correct it "
+    "or reject it to keep the image.",
+    "invalid_alt": "The model's alt text failed a required check (listed below), so write new "
+    "alt text or reject it to keep the figure flagged.",
     # f"model_{outcome}" for every models.base Outcome: no usable answer from any attempt
     "model_ok": "The model answered, but its answer could not be used.",
     "model_refused": "The model declined to answer for this item.",
@@ -169,7 +169,7 @@ REASON_MESSAGES: dict[str, str] = {
     "heading.empty_text": "This heading has no text, so it cannot be used as a heading.",
     # Orchestrator (pipeline.run)
     "internal_error": "Something went wrong while this item was processed, so the original "
-    "is kept. You can still fill it in yourself.",
+    "is kept, but you can still fill it in yourself.",
     "crop_error": "The image of this item could not be cut out of the PDF, so the model never "
     "saw it.",
     # f"budget_{scope}" for every BudgetExceeded scope (core.budget, web.worker)
@@ -181,7 +181,7 @@ REASON_MESSAGES: dict[str, str] = {
     "budget_unknown": "A spending limit was reached before this item was converted.",
 }
 
-UNKNOWN_CHECK_MESSAGE = "A check did not pass. Compare the proposal with the original closely."
+UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
 
 SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth checking"}
