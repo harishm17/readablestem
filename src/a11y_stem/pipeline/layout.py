@@ -106,7 +106,7 @@ PAGE_NUMBER = re.compile(
 )
 EQUATION_NUMBER = re.compile(r"^\(\s*[\dA-Za-z]{1,3}(?:[.\-]\d{1,3})*[a-z]?\s*\)$")
 _BULLET = re.compile(
-    r"^(?:[\u2022\u25e6\u25aa\u25cf\u2023\u2043\u2219*]\s|\(?\d{1,2}[.)]\s|\([a-z]\)\s"
+    r"^(?:[\u2022\u00b7\u25e6\u25aa\u25cf\u2023\u2043\u2219*]\s|\(?\d{1,2}[.)]\s|\([a-z]\)\s"
     r"|[a-z]\)\s|\([ivx]{1,4}\)\s)"
 )
 _LANG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$")
@@ -115,7 +115,6 @@ _JUNK_TITLE = re.compile(
     r"|slide\s*\d+$|title$|no title$)|\.(?:pdf|docx?|pptx?|tex|odt|rtf|txt|html?|key)$",
     re.IGNORECASE,
 )
-_HYPHENS = "-\u2010\u00ad"
 _INVISIBLE = dict.fromkeys(map(ord, "\u00ad\u200b\u200c\u200d\u2060\ufeff"))
 
 # Character classes for maths detection. Symbols that only occur in maths:
@@ -272,21 +271,22 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             level, top = level + 1, size
         level_of[size] = level
     below = level + 1
-    depths = [
-        number[0]
-        for e in headings
-        if REASON_LARGER_FONT not in e.reasons and (number := section_number(e.text or ""))
-    ]
-    shallowest = min(depths, default=1)
+    depth = {e.id: _section_depth(e) for e in headings if REASON_LARGER_FONT not in e.reasons}
+    shallowest = min((d for d in depth.values() if d), default=1)
     levels: dict[str, int] = {}
     for e in headings:
         if REASON_LARGER_FONT in e.reasons:
             raw = level_of[round(e.font_size or 0.0, 1)]
         else:
-            number = section_number(e.text or "")
-            raw = below + (number[0] - shallowest if number else 0)
+            raw = below + max(0, (depth[e.id] or shallowest) - shallowest)
         levels[e.id] = max(1, min(6, raw))
     return levels
+
+
+def _section_depth(element: Element) -> int | None:
+    """Depth of a real section number ("2.3.1" -> 3); list-style "1." does not count."""
+    number = section_number(element.text or "")
+    return number[0] if number and not number[1] else None
 
 
 def section_number(text: str) -> tuple[int, bool] | None:
@@ -744,7 +744,18 @@ def _find_gutter(boxes: list[BBox]) -> tuple[float, float] | None:
     if width < 150:
         return None
     narrow = [b for b in boxes if b[2] - b[0] <= 0.55 * width]
-    allowed = max(2, len(narrow) // 10)
+    # Strictest first: with crossings allowed, the gap would also take in the ragged ends
+    # of the longest left-column lines.
+    for allowed in range(max(2, len(narrow) // 10) + 1):
+        gutter = _gutter_with(narrow, allowed, left, width)
+        if gutter is not None:
+            return gutter
+    return None
+
+
+def _gutter_with(
+    narrow: list[BBox], allowed: int, left: float, width: float
+) -> tuple[float, float] | None:
     best: tuple[float, float] | None = None
     for gap0, gap1 in _sparse_intervals(narrow, allowed):
         middle = (gap0 + gap1) / 2
@@ -1155,8 +1166,9 @@ def _rule_rows(rule: _Path, rows: list[_Row]) -> list[_Row]:
     for row in rows:
         if row.kind not in ("math", "frag") or row.absorbed:
             continue
+        # Half of the shorter one: a numerator sits on its bar, a bar sits over a radicand.
         overlap = min(row.x1, x1 + 1) - max(row.x0, x0 - 1)
-        if overlap < 0.5 * max(1.0, row.x1 - row.x0) and not (
+        if overlap < 0.5 * max(1.0, min(row.x1 - row.x0, x1 - x0)) and not (
             rule.kind == "radical" and overlap > 0
         ):
             continue
@@ -1508,24 +1520,30 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
 
 
 def _join_text(rows: Sequence[_Row]) -> str:
-    """Rows joined with spaces; "veloc-" + "ity" becomes "velocity" (lowercase next)."""
+    """Rows joined with spaces, end-of-line hyphenation repaired (see `_line_break`)."""
     out = ""
     for row in rows:
         text = " ".join(row.text.split())  # soft hyphens survive until the final _clean
         if out:
-            if out.endswith("\u00ad") or _breaks_word(out, text):
-                out = out[:-1]
-            else:
-                out += " "
+            out, separator = _line_break(out, text)
+            out += separator
         out += text
     return _clean(out)
 
 
-def _breaks_word(before: str, after: str) -> bool:
-    """A line ending "letter-" followed by a lowercase start is one hyphenated word."""
-    return (
-        len(before) > 1 and before[-1] in "-\u2010" and before[-2].isalpha() and after[:1].islower()
-    )
+def _line_break(before: str, after: str) -> tuple[str, str]:
+    """(`before` with any hyphen removed, separator) for joining two lines of a paragraph.
+
+    "veloc-" + "ity" -> "velocity": a letter, a hyphen at the line end and a lowercase
+    start make one word. "Newton-" + "Raphson" keeps its hyphen but gets no space. A soft
+    hyphen always disappears. Anything else is joined with a space. ("well-" + "known"
+    becomes "wellknown": without a dictionary that case cannot be told apart.)
+    """
+    if before.endswith("\u00ad"):
+        return before[:-1], ""
+    if len(before) > 1 and before[-1] in "-\u2010" and before[-2].isalpha():
+        return (before[:-1], "") if after[:1].islower() else (before, "")
+    return before, " "
 
 
 def _merge_style_splits(blocks: list[_Block], runs: list[_Run]) -> list[_Block]:
@@ -1602,12 +1620,10 @@ def _append_row(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) ->
         return
     last, first = pieces[-1], row_pieces[0] if row_pieces else ""
     if isinstance(last, str) and isinstance(first, str):
-        tail, head = last.rstrip(), first.lstrip()
-        if tail.endswith("\u00ad") or _breaks_word(tail, head):
-            pieces[-1] = tail[:-1]
-            row_pieces[0] = head
-        else:
-            pieces[-1] = tail + " "
+        tail, separator = _line_break(last.rstrip(), first.lstrip())
+        pieces[-1] = tail + separator
+        if not separator:
+            row_pieces[0] = first.lstrip()
     else:
         pieces.append(" ")
     pieces.extend(row_pieces)
@@ -1778,8 +1794,19 @@ def _add_rules(block: _Block, rules: list[_Path]) -> None:
             hits.append(rule)
     if hits:
         block.bbox = _union([block.bbox, *(r.bbox for r in hits)])
-        kinds = {"hrule": "fraction bar", "radical": "radical sign"}
-        block.reasons = sorted({*block.reasons, *(kinds[r.kind] for r in hits)})
+        roots = [c for r in block.rows for c in r.ink if c.c == "\u221a"]
+        block.reasons = sorted({*block.reasons, *(_rule_reason(r, roots) for r in hits)})
+
+
+def _rule_reason(rule: _Path, roots: list[_Char]) -> str:
+    """A bar starting at the top-right corner of a square-root glyph is its vinculum."""
+    if rule.kind == "radical":
+        return "radical sign"
+    x0, y0, _, _ = rule.bbox
+    for root in roots:
+        if abs(root.x1 - x0) <= 3 and abs(root.y0 - y0) <= 2:
+            return "radical sign"
+    return "fraction bar"
 
 
 def _has_content(pieces: list[str | _Inline]) -> bool:
