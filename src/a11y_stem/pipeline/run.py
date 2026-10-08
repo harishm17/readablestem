@@ -12,6 +12,10 @@ Design notes:
 - One element's failure never sinks the document. A step that raises becomes a FAILED
   fix with reason "internal_error" (a crop that fails: "crop_error"). The exception
   message is not logged: it may quote document text.
+- A misconfigured run is different: `config.ConfigError` (no API key; WP1's client reads
+  it on its first call) or `pricing.UnknownModelError` (an unpriced model) would fail
+  every element the same way, so the first one stops the run and is re-raised. The
+  caller reports one clear error instead of a document with everything flagged.
 - A `BudgetExceeded` from any step (or a step returning reason "budget_<scope>") stops
   new model work: queued tasks are cancelled and every element not yet processed
   becomes FAILED with reason "budget_<scope>". The document is still assembled, with
@@ -21,8 +25,13 @@ Design notes:
   counts stay true.
 - Static checks of the HTML are returned on `PipelineOutput.checks` (a subclass of
   `ConversionOutput`), because `DocumentResult` has no field for them yet.
-- Tracer spans (document, headings, page, step, assemble) carry ids, page numbers,
-  models, costs, statuses and reason codes, never document text.
+- `layout` (WP2) keeps a few opened PDFs cached for cropping. Once the last crop is made
+  (or the run fails) the document is released, so a long-lived worker does not keep a
+  user's PDF in memory after its job.
+- Tracer spans (document, headings, page, step, model_call, assemble) carry ids, page
+  numbers, models, token counts, costs, statuses and reason codes, never document text.
+  Attributes are scalars only (WP6 drops anything else); each model request gets its own
+  `model_call` span opened with `model=`, which WP6 records as a Langfuse generation.
 """
 
 from __future__ import annotations
@@ -42,7 +51,7 @@ from typing import Any
 
 from pydantic import Field
 
-from a11y_stem.config import Settings
+from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded
 from a11y_stem.core.types import (
     Check,
@@ -58,6 +67,7 @@ from a11y_stem.core.types import (
     inline_marker,
 )
 from a11y_stem.models.base import T, VisionClient, VisionRequest
+from a11y_stem.models.pricing import UnknownModelError
 from a11y_stem.observability.tracing import NoopTracer, Tracer
 from a11y_stem.pipeline import (
     assemble,
@@ -78,6 +88,9 @@ ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 CONTEXT_CHARS = 600
 _TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING)
 _MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE)
+# Errors that mean the run itself is misconfigured, not that one element is hard: they
+# stop the run and propagate (see the module docstring).
+FATAL_ERRORS: tuple[type[Exception], ...] = (ConfigError, UnknownModelError)
 
 
 class PipelineOutput(ConversionOutput):
@@ -95,34 +108,71 @@ class PipelineOutput(ConversionOutput):
 
 
 class _RecordingClient:
-    """Passes requests to the real client and keeps every `ModelCall` it returns."""
+    """Passes requests to the real client and keeps every `ModelCall` it returns.
 
-    def __init__(self, inner: VisionClient) -> None:
+    Each request also gets a `model_call` span. It is opened with `model=` (known from the
+    request before anything is sent) so a WP6 tracer records it as a generation, and it
+    is closed with the call's tokens, cost and outcome.
+    """
+
+    def __init__(self, inner: VisionClient, tracer: Tracer) -> None:
         self._inner = inner
+        self._tracer = tracer
         self.calls: list[ModelCall] = []
 
     def run(
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
     ) -> tuple[T | None, ModelCall]:
-        parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
-        self.calls.append(call)
+        with _span(
+            self._tracer,
+            "model_call",
+            step=request.step,
+            model=request.model,
+            prompt_version=request.prompt_version,
+            is_fallback=is_fallback,
+        ) as span:
+            parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+            self.calls.append(call)
+            _annotate(
+                span,
+                model=call.model,
+                outcome=call.outcome,
+                attempt=call.attempt,
+                input_tokens=call.input_tokens,
+                cached_input_tokens=call.cached_input_tokens,
+                output_tokens=call.output_tokens,
+                reasoning_tokens=call.reasoning_tokens,
+                cost_usd=call.cost_usd,
+                latency_ms=call.latency_ms,
+            )
         return parsed, call
 
     def __getattr__(self, name: str) -> Any:  # anything else a step may read
         return getattr(self._inner, name)
 
 
-class _BudgetStop:
-    """Set once by the first BudgetExceeded; read by workers and the scheduler."""
+class _Stop:
+    """Run-wide stop signals, set by workers and read by workers and the scheduler.
+
+    `scope`: the first refused spend reservation; the rest of the run fails
+    "budget_<scope>" and the document is still assembled. `fatal`: the first
+    configuration error (`FATAL_ERRORS`); no further step runs and the run re-raises it.
+    """
 
     def __init__(self) -> None:
         self._lock = threading.Lock()
         self.scope: str | None = None
+        self.fatal: Exception | None = None
 
     def trip(self, scope: str) -> None:
         with self._lock:
             if self.scope is None:
                 self.scope = scope
+
+    def abort(self, exc: Exception) -> None:
+        with self._lock:
+            if self.fatal is None:
+                self.fatal = exc
 
     def reason(self) -> str:
         return f"budget_{self.scope or 'unknown'}"
@@ -146,14 +196,41 @@ def _budget_scope(fix: Fix) -> str | None:
     return None
 
 
+_SCALARS = (str, int, float, bool)
+
+
 def _annotate(span: Any, **attrs: Any) -> None:
-    """Add result attributes to a span if the tracer supports it. Never raises."""
-    update = getattr(span, "update", None)
-    if callable(update):
-        try:
-            update(**attrs)
-        except Exception:  # tracing must never break a conversion
-            log.debug("span update failed", exc_info=False)
+    """Add result attributes to an open span. Never raises.
+
+    WP6's span handle takes `set(**attrs)`; `update(**attrs)` is accepted too (simpler
+    tracers). Only scalar values are sent and None is left out: WP6 keeps numbers,
+    booleans and short code-like strings and silently drops anything else, so a dict or
+    list here would just disappear.
+    """
+    method = getattr(span, "set", None)
+    if not callable(method):
+        method = getattr(span, "update", None)
+    if not callable(method):
+        return
+    values = {key: value for key, value in attrs.items() if isinstance(value, _SCALARS)}
+    if not values:
+        return
+    try:
+        method(**values)
+    except Exception:  # tracing must never break a conversion
+        log.debug("span update failed", exc_info=False)
+
+
+def _status_counts(prefix: str, fixes: Iterable[Fix]) -> dict[str, int]:
+    """{"<prefix>_accepted": 3, ...}: per-status counts as flat scalar span attributes."""
+    counts = Counter(fix.status.value for fix in fixes)
+    return {f"{prefix}_{status}": n for status, n in sorted(counts.items())}
+
+
+def _single_model(calls: Iterable[ModelCall]) -> str | None:
+    """The model a step used, if it used exactly one (each call has its own span)."""
+    models = {call.model for call in calls}
+    return models.pop() if len(models) == 1 else None
 
 
 @contextmanager
@@ -296,16 +373,29 @@ def _validated(fix: object, element: Element, calls: list[ModelCall]) -> Fix:
 
 
 def _run_step(
-    task: _Task, *, client: VisionClient, settings: Settings, stop: _BudgetStop, tracer: Tracer
+    task: _Task, *, client: VisionClient, settings: Settings, stop: _Stop, tracer: Tracer
 ) -> _Done:
-    """Worker body: one element through its step. Never raises (except BaseException)."""
+    """Worker body: one element through its step.
+
+    Raises only `FATAL_ERRORS` (after setting `stop.fatal`) and BaseException; any other
+    exception becomes a FAILED fix.
+    """
     element = task.element
+    if stop.fatal is not None:  # the run is failing; this result is never used
+        return _Done(element, _failed(element, "internal_error"), 0)
     if stop.scope is not None:  # budget gone while this task was queued
         return _Done(element, _failed(element, stop.reason()), 0)
     step_name, step = _step_for(element.kind)
-    recorder = _RecordingClient(client)
+    recorder = _RecordingClient(client, tracer)
     started = time.perf_counter()
-    with _span(tracer, "step", step=step_name, element_id=element.id, page=element.page) as span:
+    with _span(
+        tracer,
+        "step",
+        step=step_name,
+        kind=element.kind.value,
+        element_id=element.id,
+        page=element.page,
+    ) as span:
         try:
             fix = step(
                 element,
@@ -317,6 +407,10 @@ def _run_step(
         except BudgetExceeded as exc:
             stop.trip(exc.scope)
             fix = _failed(element, f"budget_{exc.scope}", recorder.calls)
+        except FATAL_ERRORS as exc:  # misconfigured: every element would fail the same way
+            log.warning("%s step stopped the run: %s", step_name, type(exc).__name__)
+            stop.abort(exc)
+            raise
         except Exception as exc:  # isolate: one element never sinks the document
             log.warning("%s step failed: %s", step_name, type(exc).__name__)
             fix = _failed(element, "internal_error", recorder.calls)
@@ -324,15 +418,17 @@ def _run_step(
             fix = _validated(fix, element, recorder.calls)
             if (scope := _budget_scope(fix)) is not None:
                 stop.trip(scope)
+        elapsed_ms = round((time.perf_counter() - started) * 1000)
         _annotate(
             span,
             status=fix.status.value,
             reason=fix.reason,
-            model=",".join(sorted({c.model for c in fix.calls})) or None,
+            model=_single_model(fix.calls),
             calls=len(fix.calls),
             cost_usd=fix.cost_usd,
+            latency_ms=elapsed_ms,
         )
-    return _Done(element, fix, round((time.perf_counter() - started) * 1000))
+    return _Done(element, fix, elapsed_ms)
 
 
 def _heading_fixes(elements: list[Element], tracer: Tracer) -> list[Fix]:
@@ -343,7 +439,7 @@ def _heading_fixes(elements: list[Element], tracer: Tracer) -> list[Fix]:
         except Exception as exc:
             log.warning("heading step failed: %s", type(exc).__name__)
             fixes = [_failed(e, "internal_error") for e in headings]
-        _annotate(span, statuses=dict(Counter(f.status.value for f in fixes)))
+        _annotate(span, fixes=len(fixes), **_status_counts("fixes", fixes))
     return fixes
 
 
@@ -391,7 +487,7 @@ class _Run:
     pages: _Pages
     contexts: dict[str, str | None]
     pool: ThreadPoolExecutor
-    stop: _BudgetStop
+    stop: _Stop
     fixes: dict[str, Fix]
     crops: dict[str, bytes]
     page_ms: Counter[int]
@@ -406,6 +502,7 @@ class _Run:
         self.pages.submitted(page)
 
     def crop_and_submit(self, element: Element) -> None:
+        self.raise_if_fatal()
         try:
             png = layout.crop(self.pdf_bytes, element)
         except Exception as exc:
@@ -441,15 +538,21 @@ class _Run:
                 return
             for future in done:
                 self.record(future, self.futures.pop(future))
+            self.raise_if_fatal()
             if self.stop.scope is not None:
                 for future in self.futures:
                     future.cancel()
+
+    def raise_if_fatal(self) -> None:
+        """Re-raise a worker's configuration error here (the pool is then shut down)."""
+        if self.stop.fatal is not None:
+            raise self.stop.fatal
 
     def record(self, future: Future[_Done], element: Element) -> None:
         if future.cancelled():
             self.fixes[element.id] = _failed(element, self.stop.reason())
         else:
-            done = future.result()
+            done = future.result()  # re-raises a FATAL_ERRORS from the worker
             self.fixes[element.id] = done.fix
             self.page_ms[element.page] += done.elapsed_ms
         self.pages.finished(element.page)
@@ -520,6 +623,49 @@ def _prompt_versions(fixes: list[Fix]) -> dict[str, str]:
 # --------------------------------------------------------------------------- entry point
 
 
+class _CachedDocument:
+    """Releases `layout`'s cached copy of one PDF, once.
+
+    WP2's `layout` keeps a few opened documents (and their bytes) so crops do not reopen
+    the file, and asks the pipeline to call `release(pdf_bytes)` when a document is done
+    so user content does not stay in a long-lived worker's memory. Looked up at call
+    time: a `layout` without `release` (the stub, a test fake) is fine.
+    """
+
+    def __init__(self, pdf_bytes: bytes) -> None:
+        self._pdf_bytes = pdf_bytes
+        self._released = False
+
+    def release(self) -> None:
+        if self._released:
+            return
+        self._released = True
+        release = getattr(layout, "release", None)
+        if not callable(release):
+            return
+        try:
+            release(self._pdf_bytes)
+        except Exception as exc:  # a cache problem must not fail the conversion
+            log.warning("layout.release failed: %s", type(exc).__name__)
+
+
+def _process(
+    run: _Run, elements: list[Element], page_list: list[int], cached: _CachedDocument
+) -> None:
+    """Crop page by page on this thread, run the steps in the pool, collect every result."""
+    by_page: defaultdict[int, list[Element]] = defaultdict(list)
+    for element in elements:
+        by_page[element.page].append(element)
+    try:
+        for page in page_list:
+            run.process_page(page, by_page[page])
+            run.collect(block=False)  # report finished pages while cropping the rest
+        cached.release()  # every crop is made; the steps only need the PNGs
+        run.collect(block=True)
+    finally:
+        run.pool.shutdown(wait=True, cancel_futures=True)
+
+
 def convert_pdf(
     pdf_bytes: bytes,
     *,
@@ -529,46 +675,50 @@ def convert_pdf(
     progress: ProgressFn | None = None,
     tracer: Tracer | None = None,
     concurrency: int = 4,
+    notice: str | None = None,
+    source_note: str | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
     Raises `layout.LayoutError` when the PDF cannot be read (or has more than
-    `settings.max_pages_per_job` pages); nothing else from the steps escapes. Calls
-    `progress(pages_done, pages_total)` on the calling thread each time a page's steps
-    have all finished. An exception from `progress` aborts the run (queued steps are
-    cancelled, running ones finish) and propagates.
+    `settings.max_pages_per_job` pages), and `config.ConfigError` or
+    `pricing.UnknownModelError` when the model client is misconfigured (no API key, an
+    unpriced model): the first one stops the run, since every element would fail the
+    same way. Nothing else from the steps escapes. Calls `progress(pages_done,
+    pages_total)` on the calling thread each time a page's steps have all finished. An
+    exception from `progress` aborts the run (queued steps are cancelled, running ones
+    finish) and propagates.
+
+    `notice` is plain text shown at the top of the HTML (the CLI uses it to mark an
+    offline test run); `source_note` is plain text for its "About this conversion"
+    section, e.g. an OpenStax attribution.
     """
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
-        doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
-        elements = sorted(doc.elements, key=lambda e: e.order)
-        page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
-        fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
-        run = _Run(
-            pdf_bytes=pdf_bytes,
-            settings=settings,
-            client=client,
-            tracer=tracer,
-            pages=_Pages(page_list, progress),
-            contexts=context_texts(elements),
-            pool=ThreadPoolExecutor(max_workers=max(1, concurrency), thread_name_prefix="step"),
-            stop=_BudgetStop(),
-            fixes=fixes,
-            crops={},
-            page_ms=Counter(),
-            futures={},
-        )
-        by_page: defaultdict[int, list[Element]] = defaultdict(list)
-        for element in elements:
-            by_page[element.page].append(element)
+        cached = _CachedDocument(pdf_bytes)
         try:
-            for page in page_list:
-                run.process_page(page, by_page[page])
-                run.collect(block=False)  # report finished pages while cropping the rest
-            run.collect(block=True)
+            doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
+            elements = sorted(doc.elements, key=lambda e: e.order)
+            page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
+            fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
+            run = _Run(
+                pdf_bytes=pdf_bytes,
+                settings=settings,
+                client=client,
+                tracer=tracer,
+                pages=_Pages(page_list, progress),
+                contexts=context_texts(elements),
+                pool=ThreadPoolExecutor(max_workers=max(1, concurrency), thread_name_prefix="step"),
+                stop=_Stop(),
+                fixes=fixes,
+                crops={},
+                page_ms=Counter(),
+                futures={},
+            )
+            _process(run, elements, page_list, cached)
         finally:
-            run.pool.shutdown(wait=True, cancel_futures=True)
+            cached.release()  # also when analysis, a step or `progress` failed
 
         ordered = _ordered_fixes(elements, run.fixes)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
@@ -578,6 +728,8 @@ def convert_pdf(
                 elements=elements,
                 fixes=ordered,
                 crops=run.crops,
+                source_note=source_note,
+                notice=notice,
             )
             checks = html_checks.static_checks(html)
         wall_ms = round((time.perf_counter() - started) * 1000)
@@ -585,11 +737,13 @@ def convert_pdf(
         _annotate(
             doc_span,
             pages=stats.pages,
+            fixes=len(ordered),
             model_calls=stats.model_calls,
             cost_usd=stats.cost_usd,
-            by_status=stats.by_status,
-            budget_stop=run.stop.scope,
-            checks_failed=[c.code for c in checks if not c.passed],
+            latency_ms=stats.latency_ms,
+            reason=run.stop.reason() if run.stop.scope is not None else None,
+            checks_failed=sum(1 for c in checks if not c.passed),
+            **_status_counts("fixes", ordered),
         )
     log.info(
         "convert_pdf done: pages=%d fixes=%d calls=%d cost_usd=%.4f latency_ms=%d",

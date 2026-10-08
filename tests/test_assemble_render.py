@@ -49,7 +49,9 @@ def load_sample() -> tuple[str, str, list[Element], list[Fix], dict[str, bytes]]
     return data["title"], data["lang"], elements, fixes, crops
 
 
-def render(elements, fixes, crops=None, *, title="T", lang="en", source_note=None) -> str:
+def render(
+    elements, fixes, crops=None, *, title="T", lang="en", source_note=None, notice=None
+) -> str:
     return render_html(
         title=title,
         lang=lang,
@@ -57,6 +59,7 @@ def render(elements, fixes, crops=None, *, title="T", lang="en", source_note=Non
         fixes=fixes,
         crops=crops or {},
         source_note=source_note,
+        notice=notice,
     )
 
 
@@ -246,6 +249,57 @@ def test_outline_never_skips_a_level_after_a_rejection():
     html = render([e for e, _ in pairs], [f for _, f in pairs])
     assert re.findall(r'<h(\d) id="[a-d]"', html) == ["1", "2", "3"]
     assert static_checks(html)[3].passed  # html.heading_order
+
+
+def outline(html: str) -> list[str]:
+    return [tag for tag, _ in re.findall(r'<(h\d|p) id="([a-z])"', html)]
+
+
+def test_outline_keeps_siblings_after_a_rejection():
+    # Chapter > [Section 1, rejected] > Sub 1.1, Sub 1.2; then Section 2.
+    pairs = [
+        heading("a", 0, 1),
+        heading("b", 1, 2, Status.REJECTED),
+        heading("c", 2, 3),
+        heading("d", 3, 3),
+        heading("e", 4, 2),
+    ]
+    html = render([e for e, _ in pairs], [f for _, f in pairs])
+    # Sub 1.2 stays a sibling of Sub 1.1 (not its child); Section 2 is back at h2.
+    assert outline(html) == ["h1", "p", "h2", "h2", "h2"]
+    assert all(c.passed for c in static_checks(html))
+
+
+def test_outline_moves_a_rejected_headings_subtree_up_together():
+    levels = [1, 2, 3, 4, 3, 2, 3]
+    pairs = [
+        heading(eid, order, level, Status.REJECTED if eid == "b" else Status.ACCEPTED)
+        for order, (eid, level) in enumerate(zip("abcdefg", levels, strict=True))
+    ]
+    html = render([e for e, _ in pairs], [f for _, f in pairs])
+    assert outline(html) == ["h1", "p", "h2", "h3", "h2", "h2", "h3"]
+    assert all(c.passed for c in static_checks(html))
+
+
+def test_outline_without_rejections_is_unchanged():
+    levels = [1, 2, 3, 3, 2, 3, 1, 2]
+    pairs = [
+        heading(eid, o, lv) for o, (eid, lv) in enumerate(zip("abcdefgh", levels, strict=True))
+    ]
+    html = render([e for e, _ in pairs], [f for _, f in pairs])
+    assert outline(html) == [f"h{level}" for level in levels]
+
+
+def test_notice_is_the_first_thing_in_main_and_is_escaped():
+    element, fix = heading("a", 0, 1)
+    html = render([element], [fix], notice="Offline <b>test</b> run:\n placeholders.")
+    after_main = html.split("<main>\n", 1)[1]
+    assert after_main.startswith(
+        '<p class="notice a11y-stem" role="note"><span class="flag-label">Note:</span> '
+        "Offline &lt;b&gt;test&lt;/b&gt; run: placeholders.</p>\n<h1"
+    )
+    assert all(c.passed for c in static_checks(html))
+    assert 'class="notice' not in render([element], [fix], notice="  ")
 
 
 def test_heading_without_a_fix_is_a_paragraph():

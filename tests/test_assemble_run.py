@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import contextlib
 import logging
+import re
 import threading
 import time
 from dataclasses import dataclass, field
@@ -17,7 +18,7 @@ import pytest
 from latex2mathml.converter import convert
 from pydantic import BaseModel
 
-from a11y_stem.config import Settings
+from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from a11y_stem.core.types import (
     Element,
@@ -31,6 +32,7 @@ from a11y_stem.core.types import (
 )
 from a11y_stem.models.base import VisionRequest
 from a11y_stem.models.fake import FakeVisionClient
+from a11y_stem.models.pricing import UnknownModelError
 from a11y_stem.pipeline import equation_step, figure_step, heading_step, layout, run
 from a11y_stem.pipeline.layout import Layout, LayoutError
 from a11y_stem.pipeline.run import CONTEXT_CHARS, PipelineOutput, convert_pdf
@@ -104,6 +106,7 @@ class FakePipeline:
     raise_in_step: dict[str, BaseException] = field(default_factory=dict)
     raise_in_crop: set[str] = field(default_factory=set)
     calls_per_step: int = 1
+    step_models: tuple[str, ...] = ("gpt-6.1-sol",)  # model per call, cycled
     barrier: threading.Barrier | None = None
     step_delay_s: float = 0.0
     analyze_kwargs: dict[str, Any] = field(default_factory=dict)
@@ -166,10 +169,10 @@ class FakePipeline:
 
     def _ask(self, client, step, prompt_version, png, context_text, schema):
         calls, parsed = [], None
-        for _ in range(self.calls_per_step):  # e.g. cheap model, then main model
+        for n in range(self.calls_per_step):  # e.g. cheap model, then main model
             request = VisionRequest(
                 step=step,
-                model="gpt-6.1-sol",
+                model=self.step_models[n % len(self.step_models)],
                 prompt_version=prompt_version,
                 instructions="fixed instructions",
                 images=[png],
@@ -505,6 +508,116 @@ def test_layout_errors_propagate(monkeypatch):
     assert exc.value.code == "encrypted"
 
 
+class SetupFailsClient:
+    """A client whose setup fails on its first request, as WP1's does without a key
+    (`require_openai_key()` runs inside `run`) or with an unpriced model."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.runs = 0
+        self._lock = threading.Lock()
+
+    def run(self, request, schema, *, is_fallback=False):
+        with self._lock:
+            self.runs += 1
+        raise self.error
+
+
+@pytest.mark.parametrize(
+    "error", [ConfigError("OPENAI_API_KEY is not set"), UnknownModelError("no price")]
+)
+def test_configuration_errors_stop_the_run_instead_of_failing_each_element(
+    monkeypatch, caplog, error
+):
+    fake = FakePipeline().install(monkeypatch)
+    client = SetupFailsClient(error)
+    with caplog.at_level(logging.WARNING), pytest.raises(type(error)):
+        convert_pdf(b"%PDF", settings=settings(), client=client, concurrency=1)
+    assert client.runs == 1 and len(fake.stepped) == 1  # not once per element
+    assert "stopped the run" in caplog.text and str(error) not in caplog.text
+
+
+def test_configuration_error_with_more_workers_still_stops_early(monkeypatch):
+    fake = FakePipeline(step_delay_s=0.02).install(monkeypatch)
+    client = SetupFailsClient(ConfigError("OPENAI_API_KEY is not set"))
+    with pytest.raises(ConfigError):
+        convert_pdf(b"%PDF", settings=settings(), client=client, concurrency=2)
+    # Two in flight when the first one failed; nothing started after that.
+    assert client.runs <= 2 < len(MODEL_IDS) and len(fake.stepped) <= 2
+
+
+def install_release(monkeypatch, events: list[tuple[str, Any]]) -> None:
+    """A `layout.release` like WP2's (the stub in this package has none) that logs calls."""
+    monkeypatch.setattr(layout, "release", lambda pdf: events.append(("release", pdf)), False)
+
+
+def test_the_document_is_released_from_layout_once_cropping_is_done(monkeypatch):
+    fake = FakePipeline(step_delay_s=0.02).install(monkeypatch)
+    events: list[tuple[str, Any]] = []
+    cropped, stepped = fake.crop, fake.transcribe
+
+    def crop(pdf_bytes, element, **kw):
+        events.append(("crop", element.id))
+        return cropped(pdf_bytes, element, **kw)
+
+    def transcribe(element, png, **kw):
+        fix = stepped(element, png, **kw)
+        events.append(("step_done", element.id))
+        return fix
+
+    monkeypatch.setattr(layout, "crop", crop)
+    monkeypatch.setattr(equation_step, "transcribe", transcribe)
+    install_release(monkeypatch, events)
+    pdf = b"%PDF-1.7 user document"
+    convert_pdf(pdf, settings=settings(), client=fake_client(), concurrency=1)
+
+    releases = [i for i, (name, _) in enumerate(events) if name == "release"]
+    assert len(releases) == 1 and events[releases[0]][1] is pdf
+    last_crop = max(i for i, (name, _) in enumerate(events) if name == "crop")
+    last_step = max(i for i, (name, _) in enumerate(events) if name == "step_done")
+    assert last_crop < releases[0] < last_step  # not held while waiting on the model
+
+
+def raise_in_analyze(monkeypatch):
+    def unreadable(pdf_bytes, *, pages=None, max_pages=None):
+        raise LayoutError("too_many_pages", "too long")
+
+    monkeypatch.setattr(layout, "analyze", unreadable)
+    return LayoutError, {}
+
+
+def raise_in_progress(monkeypatch):
+    def progress(done, total):
+        raise RuntimeError("job cancelled")
+
+    return RuntimeError, {"progress": progress}
+
+
+def raise_in_client(monkeypatch):
+    return ConfigError, {"client": SetupFailsClient(ConfigError("OPENAI_API_KEY is not set"))}
+
+
+@pytest.mark.parametrize("failure", [raise_in_analyze, raise_in_progress, raise_in_client])
+def test_the_document_is_released_when_the_run_fails(monkeypatch, failure):
+    FakePipeline().install(monkeypatch)
+    events: list[tuple[str, Any]] = []
+    install_release(monkeypatch, events)
+    error, kwargs = failure(monkeypatch)
+    kwargs.setdefault("client", fake_client())
+    with pytest.raises(error):
+        convert_pdf(b"%PDF", settings=settings(), **kwargs)
+    assert [name for name, _ in events] == ["release"]
+
+
+def test_a_failing_release_does_not_fail_the_conversion(fake, monkeypatch):
+    def release(pdf_bytes):
+        raise RuntimeError(SECRET)
+
+    monkeypatch.setattr(layout, "release", release, raising=False)
+    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client())
+    assert {f.status for f in output.result.fixes} == {Status.ACCEPTED}
+
+
 class RecordingTracer:
     def __init__(self) -> None:
         self.spans: list[tuple[str, dict[str, Any]]] = []
@@ -535,13 +648,92 @@ def test_tracer_spans_are_content_free(fake):
     step = next(attrs for name, attrs in tracer.spans if name == "step")
     assert {"step", "element_id", "page", "status", "model", "cost_usd", "calls"} <= set(step)
     document = next(attrs for name, attrs in tracer.spans if name == "document")
-    assert document["model_calls"] == 5 and document["budget_stop"] is None
+    assert document["model_calls"] == 5 and "reason" not in document  # no budget stop
     everything = repr(tracer.spans)
     for element in sample_layout().elements:
         for text in (element.text, element.caption):
             if text:
                 assert text not in everything
     assert "A cart on a ramp." not in everything and "frac" not in everything
+
+
+class SetTracer:
+    """Shaped like WP6's tracer: the span handle has only `set(**attrs)`."""
+
+    def __init__(self) -> None:
+        self.spans: list[tuple[str, dict[str, Any], dict[str, Any]]] = []  # name, open, all
+        self._lock = threading.Lock()
+
+    @contextlib.contextmanager
+    def span(self, name: str, **attrs: Any):
+        record = (name, dict(attrs), dict(attrs))
+        with self._lock:
+            self.spans.append(record)
+
+        class Handle:
+            def set(self, **more: Any) -> None:
+                record[2].update(more)
+
+        yield Handle()
+
+    def flush(self) -> None:
+        return None
+
+    def named(self, name: str) -> list[dict[str, Any]]:
+        return [attrs for span, _, attrs in self.spans if span == name]
+
+
+# WP6 keeps numbers, booleans and strings matching this; it silently drops anything else.
+WP6_CODE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:\-]{0,79}$")
+
+
+def wp6_keeps(value: Any) -> bool:
+    return isinstance(value, bool | int | float) or (
+        isinstance(value, str) and WP6_CODE.match(value) is not None
+    )
+
+
+def test_span_results_reach_a_set_style_handle_as_scalars(fake):
+    tracer = SetTracer()
+    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
+    steps = tracer.named("step")
+    assert len(steps) == len(MODEL_IDS)
+    for step in steps:
+        assert step["status"] == "accepted" and step["model"] == "gpt-6.1-sol"
+        assert step["cost_usd"] > 0 and step["calls"] == 1 and "latency_ms" in step
+    (document,) = tracer.named("document")
+    assert document["pages"] == 3 and document["model_calls"] == 5
+    assert document["cost_usd"] == output.result.stats.cost_usd
+    assert document["fixes_accepted"] == 7 and document["checks_failed"] == 0
+    (headings,) = tracer.named("headings")
+    assert headings["fixes_accepted"] == 2
+    for _, _, attrs in tracer.spans:
+        assert all(wp6_keeps(v) for v in attrs.values()), attrs
+
+
+def test_each_model_request_gets_a_span_opened_with_its_model(fake):
+    fake.calls_per_step, fake.step_models = 2, ("gpt-6-luna", "gpt-6.1-sol")
+    tracer = SetTracer()
+    convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
+    calls = [(opened, attrs) for name, opened, attrs in tracer.spans if name == "model_call"]
+    assert len(calls) == 2 * len(MODEL_IDS)
+    # `model` at open time is what makes a WP6 span a Langfuse generation (cost views).
+    assert sorted({opened["model"] for opened, _ in calls}) == ["gpt-6-luna", "gpt-6.1-sol"]
+    for opened, attrs in calls:
+        assert opened["step"] in ("equation", "figure") and opened["is_fallback"] is False
+        assert attrs["outcome"] == "ok" and attrs["cost_usd"] > 0 and "input_tokens" in attrs
+    for step in tracer.named("step"):  # two models: no joined "a,b" string on the step
+        assert "model" not in step and step["calls"] == 2
+
+
+def test_budget_stop_reason_is_on_the_document_span(fake):
+    tracer = SetTracer()
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=100), max_usd=100, max_calls=2)
+    convert_pdf(
+        b"%PDF", settings=settings(), client=fake_client(budget), tracer=tracer, concurrency=1
+    )
+    (document,) = tracer.named("document")
+    assert document["reason"] == "budget_job_calls" and document["fixes_failed"] == 3
 
 
 class FailingTracer:

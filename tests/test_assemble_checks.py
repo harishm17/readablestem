@@ -39,7 +39,7 @@ def failed_codes(html: str) -> list[str | None]:
     return [c.code for c in static_checks(html) if not c.passed]
 
 
-def sample_html() -> str:
+def sample_html(notice: str | None = None) -> str:
     data = json.loads(FIXTURE.read_text(encoding="utf-8"))
     elements = [Element.model_validate(e) for e in data["elements"]]
     pixmap = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 60, 20), False)
@@ -52,6 +52,7 @@ def sample_html() -> str:
         fixes=[Fix.model_validate(f) for f in data["fixes"]],
         crops=crops,
         source_note="Sample written for tests.",
+        notice=notice,
     )
 
 
@@ -248,6 +249,15 @@ def test_axe_finds_no_serious_problems_in_an_assembled_document():
     checks = axe_or_skip(sample_html())
     assert [c for c in checks if c.severity == "error" and not c.passed] == []
     assert checks == [html_checks.Check(name="axe", passed=True)]  # no warnings either
+
+
+@pytest.mark.browser
+def test_axe_finds_no_problems_with_the_offline_run_notice():
+    from a11y_stem.cli.convert import FAKE_NOTICE
+
+    html = sample_html(notice=FAKE_NOTICE)
+    assert 'class="notice' in html
+    assert axe_or_skip(html) == [html_checks.Check(name="axe", passed=True)]
 
 
 @pytest.mark.browser

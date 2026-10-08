@@ -26,11 +26,33 @@ from a11y_stem.core.types import (
 )
 from a11y_stem.models.base import VisionRequest
 from a11y_stem.models.fake import FakeVisionClient
+from a11y_stem.models.pricing import UnknownModelError
 from a11y_stem.pipeline import equation_step, figure_step, heading_step, html_checks, layout
 from a11y_stem.pipeline.layout import Layout, LayoutError
 
 TITLE = "Private lecture notes on kinematics"
 PARAGRAPH = "Confidential paragraph text from the instructor."
+TEST_KEY = "sk-test-not-a-real-key"
+
+
+def cli_settings(**kw: Any) -> Settings:
+    """Settings for a CLI run: no .env, a dummy API key unless the test says otherwise."""
+    kw.setdefault("openai_api_key", TEST_KEY)
+    return Settings(_env_file=None, **kw)  # type: ignore[call-arg]
+
+
+class LazyKeyClient:
+    """Shaped like WP1's OpenAIVisionClient: construction never needs a key; the first
+    `run()` reads it (`settings.require_openai_key()`) and raises ConfigError."""
+
+    def __init__(self, settings: Settings) -> None:
+        self.settings = settings
+        self.runs = 0
+
+    def run(self, request, schema, *, is_fallback=False):
+        self.runs += 1
+        self.settings.require_openai_key()
+        raise AssertionError("a real request was attempted")
 
 
 @pytest.fixture
@@ -106,7 +128,7 @@ def pipeline(monkeypatch) -> Pipeline:
     monkeypatch.setattr(heading_step, "heading_fixes", fake.heading_fixes)
     monkeypatch.setattr(equation_step, "transcribe", fake.transcribe)
     monkeypatch.setattr(figure_step, "describe", fake.transcribe)
-    monkeypatch.setattr(convert_cli, "get_settings", lambda: Settings(_env_file=None))
+    monkeypatch.setattr(convert_cli, "get_settings", cli_settings)
     monkeypatch.delattr(models, "make_vision_client", raising=False)
     return fake
 
@@ -128,6 +150,9 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
     html = out.read_text(encoding="utf-8")
     assert html.startswith("<!doctype html>") and PARAGRAPH in html
     assert html.count('<math display="block">') == 2
+    # Placeholder answers must not pass for a conversion: the file says so first.
+    assert html.index(convert_cli.FAKE_NOTICE) < html.index(PARAGRAPH)
+    assert '<main>\n<p class="notice a11y-stem" role="note">' in html
 
     data = json.loads(report.read_text(encoding="utf-8"))
     assert set(data) == {"result", "checks", "axe"}
@@ -170,11 +195,12 @@ def test_uses_the_model_client_factory_when_present(pdf, tmp_path, pipeline, mon
     assert seen["budget"].guard.cap_usd == 0.5
     assert seen["budget"].calls == 2  # the steps' calls went through this budget
     assert "Cost:        $" in capsys.readouterr().out
+    assert 'class="notice' not in (tmp_path / "o.html").read_text(encoding="utf-8")
 
 
 def test_budget_stop_is_reported(pdf, tmp_path, pipeline, monkeypatch, capsys):
     monkeypatch.setattr(
-        convert_cli, "get_settings", lambda: Settings(_env_file=None, max_model_calls_per_job=1)
+        convert_cli, "get_settings", lambda: cli_settings(max_model_calls_per_job=1)
     )
     assert run(pdf, "--out", tmp_path / "o.html", "--fake") == 0
     out = capsys.readouterr().out
@@ -235,12 +261,65 @@ def test_max_usd_without_a_model_client_is_an_error(pdf, tmp_path, pipeline, cap
 
 
 def test_missing_api_key_is_an_error(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    # WP1's real factory never raises: its client reads the key on the first request.
+    clients: list[LazyKeyClient] = []
+
     def factory(settings, budget, *, fake):
-        raise ConfigError("OPENAI_API_KEY is not set (put it in .env; never commit it)")
+        clients.append(LazyKeyClient(settings))
+        return clients[-1]
 
     monkeypatch.setattr(models, "make_vision_client", factory, raising=False)
+    monkeypatch.setattr(convert_cli, "get_settings", lambda: cli_settings(openai_api_key=None))
     assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "1") == 2
-    assert "error: OPENAI_API_KEY is not set" in capsys.readouterr().err
+    err = capsys.readouterr().err
+    assert err.startswith("error: OPENAI_API_KEY is not set")
+    assert "step failed" not in err and not (tmp_path / "o.html").exists()
+    assert sum(c.runs for c in clients) == 0  # caught before any element was processed
+
+
+@pytest.mark.parametrize(
+    ("error", "message"),
+    [
+        (ConfigError("OPENAI_API_KEY is not set (in .env)"), "OPENAI_API_KEY is not set (in .env)"),
+        (UnknownModelError("no price for model 'gpt-x'"), "no price for model 'gpt-x'"),
+    ],
+)
+def test_client_setup_error_on_the_first_request_is_an_error(
+    pdf, tmp_path, pipeline, monkeypatch, capsys, error, message
+):
+    runs: list[str] = []
+
+    class SetupFails:
+        def run(self, request, schema, *, is_fallback=False):
+            runs.append(request.step)
+            raise error
+
+    monkeypatch.setattr(
+        models, "make_vision_client", lambda s, b, *, fake: SetupFails(), raising=False
+    )
+    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "1") == 2
+    captured = capsys.readouterr()
+    assert f"error: {message}\n" in captured.err and "Fixes:" not in captured.out
+    assert not (tmp_path / "o.html").exists()  # no file with every item flagged
+    assert len(runs) == 1  # the run stopped at the first element
+
+
+def test_unpriced_model_is_an_error_before_converting(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    monkeypatch.setattr(
+        models,
+        "make_vision_client",
+        lambda settings, budget, *, fake: FakeVisionClient(budget=budget),
+        raising=False,
+    )
+    monkeypatch.setattr(convert_cli, "get_settings", lambda: cli_settings(main_model="gpt-x"))
+    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "1") == 2
+    assert capsys.readouterr().err.startswith("error: no price for model 'gpt-x'")
+    assert pipeline.analyze_pages is None and not (tmp_path / "o.html").exists()
+
+
+def test_fake_needs_no_api_key(pdf, tmp_path, pipeline, monkeypatch):
+    monkeypatch.setattr(convert_cli, "get_settings", lambda: cli_settings(openai_api_key=None))
+    assert run(pdf, "--out", tmp_path / "o.html", "--fake") == 0
 
 
 @pytest.mark.parametrize(

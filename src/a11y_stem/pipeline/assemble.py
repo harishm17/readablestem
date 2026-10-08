@@ -11,7 +11,8 @@ What the output looks like and why is in docs/output.md. In short:
 - Anything not converted (ABSTAINED, FAILED, REJECTED, or MathML the sanitiser refused)
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
-- A closing "About this conversion" section with counts by kind and status.
+- A closing "About this conversion" section with counts by kind and status, and an
+  optional `notice` at the top (e.g. "offline test run": placeholders, not conversions).
 
 Security (rule 2 of docs/design/beta-architecture.md): all document and model text is
 escaped with `html.escape`. MathML is never pasted as a string: `sanitize_mathml` parses
@@ -270,7 +271,8 @@ class _Renderer:
     used_ids: set[str] = field(default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID})
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
-    last_heading: int = 0
+    # Open headings as (level from the fix, level written), outermost first.
+    outline: list[tuple[int, int]] = field(default_factory=list)
 
     # ----- ids and text
 
@@ -330,11 +332,24 @@ class _Renderer:
         level, text = self.heading_parts(element)
         if level is None:
             return self.paragraph(element, text)
-        # A rejected heading can open a gap in the outline (h1 -> h3); never skip down.
-        if self.last_heading:
-            level = min(level, self.last_heading + 1)
-        self.last_heading = level
+        level = self.outline_level(level)
         return f"<h{level}{self.id_attr(element.id)}>{self.rich(text)}</h{level}>"
+
+    def outline_level(self, level: int) -> int:
+        """Level to write for a heading the fixes put at `level`; never skips down.
+
+        A rejected or failed heading (written as a paragraph) can open a gap: h1, [h2],
+        h3. Clamping to "previous heading + 1" closes it but turns siblings into parent
+        and child (h1, [h2], h3 a, h3 b -> h1, h2 a, h3 b). So headings still open are
+        kept on a stack: a heading first closes those at its own level or deeper, then
+        goes at most one level below the one left open. Siblings get the same level, and
+        the children of a rejected heading all move up together.
+        """
+        while self.outline and self.outline[-1][0] >= level:
+            self.outline.pop()
+        written = min(level, self.outline[-1][1] + 1) if self.outline else level
+        self.outline.append((level, written))
+        return written
 
     def converted_mathml(
         self, element: Element, display: Display, *, with_id: bool
@@ -446,6 +461,16 @@ def _placed_equations(
     return found & equation_ids
 
 
+def _notice(text: str | None) -> str | None:
+    """A note at the top of `<main>`, outlined and labelled (not colour alone)."""
+    if not text or not text.strip():
+        return None
+    return (
+        f'<p class="notice {AUTHORED_CLASS}" role="note">'
+        f'<span class="flag-label">Note:</span> {_escape(" ".join(text.split()))}</p>'
+    )
+
+
 def _about_section(fixes: list[Fix], flagged: int, source_note: str | None) -> str:
     counts = Counter((fix.kind, fix.status) for fix in fixes)
     items = []
@@ -496,6 +521,7 @@ figure { margin: 1.5em 0; }
 figure img { display: block; }
 figcaption { margin-top: 0.5em; }
 .flagged { border: 3px dashed #8a3c00; border-radius: 4px; padding: 0.75rem; margin: 1.5em 0; }
+.notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
 .flagged figure { margin: 0; }
 .flagged > img { display: block; margin: 0 auto; }
 .flagged-inline { border: 2px dashed #8a3c00; padding: 0 0.2em; }
@@ -517,6 +543,7 @@ def render_html(
     fixes: list[Fix],
     crops: dict[str, bytes],
     source_note: str | None = None,
+    notice: str | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -524,7 +551,9 @@ def render_html(
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
     element ids to PNG bytes; they are embedded as data: URIs only where an image is
     shown (figures, and equations that were not converted). `source_note` is plain text
-    for the about section, e.g. an OpenStax attribution.
+    for the about section, e.g. an OpenStax attribution. `notice` is plain text shown
+    first in `<main>` as a labelled note, for something every reader must see before
+    the content (the CLI marks offline test runs, whose answers are placeholders).
     """
     ordered = sorted(elements, key=lambda e: e.order)
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
@@ -548,6 +577,7 @@ def render_html(
             "</head>",
             "<body>",
             "<main>",
+            *([note] if (note := _notice(notice)) else []),
             *body,
             about,
             "</main>",

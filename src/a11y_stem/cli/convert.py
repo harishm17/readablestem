@@ -3,7 +3,12 @@
 Runs the whole pipeline on one PDF and writes one HTML file. Model spend is capped twice
 (docs/design/beta-architecture.md rule 3): `--max-usd` sets an in-memory spend guard
 for this run, and `MAX_USD_PER_JOB` / `MAX_MODEL_CALLS_PER_JOB` cap the job. `--fake`
-uses the offline fake model client instead (no API key, nothing billed).
+uses the offline fake model client instead (no API key, nothing billed); its answers are
+placeholders, so the HTML then opens with a note saying it is an offline test run.
+
+A real run checks its setup before converting anything: no OPENAI_API_KEY or a model
+without a price is `error: ...` and exit 2. (WP1's client only reads the key on its first
+request; without this check, every equation and figure would just come back flagged.)
 
 Output on the terminal is content-free: counts, cost, time and check codes, plus the
 paths given and written. Document text (title, paragraphs, alt text, LaTeX) is never
@@ -23,10 +28,23 @@ from a11y_stem.config import ConfigError, Settings, get_settings
 from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
 from a11y_stem.core.types import Check, ConversionOutput, Kind, Status
 from a11y_stem.models.base import VisionClient
+from a11y_stem.models.pricing import UnknownModelError, price_for
+
+# Shown at the top of the HTML from a --fake run: the offline client's answers are
+# placeholders (WP1's OFFLINE_DEFAULTS), and the CLI has no review step to catch them.
+FAKE_NOTICE = (
+    "Offline test run: equations and figure descriptions in this file are placeholders "
+    "from a fake model, not conversions. Do not publish it."
+)
 
 
 class _CliError(Exception):
     """Bad input or setup: printed as `error: ...`, exit code 2."""
+
+
+def _setup_message(exc: Exception) -> str:
+    # UnknownModelError is a KeyError, whose str() is the repr of its message.
+    return str(exc.args[0]) if exc.args else type(exc).__name__
 
 
 def _positive_usd(value: str) -> float:
@@ -94,6 +112,20 @@ def _parse_pages(spec: str | None, page_count: int, path: Path) -> list[int] | N
     return [n - 1 for n in sorted(set(numbers))]  # document order, each page once
 
 
+def _check_model_setup(settings: Settings) -> None:
+    """Fail before converting if a real run cannot make a single model call.
+
+    The real client reads the API key lazily and prices each request as it goes, so
+    neither problem would surface until the steps run, one element at a time.
+    """
+    try:
+        settings.require_openai_key()  # the key itself is not kept or printed
+        for model in dict.fromkeys([settings.main_model, settings.cheap_model]):
+            price_for(model)
+    except (ConfigError, UnknownModelError) as exc:
+        raise _CliError(_setup_message(exc)) from None
+
+
 def _make_client(settings: Settings, budget: JobBudget, *, fake: bool) -> VisionClient:
     """The model client from `models.make_vision_client` (WP1).
 
@@ -109,8 +141,8 @@ def _make_client(settings: Settings, budget: JobBudget, *, fake: bool) -> Vision
         return FakeVisionClient(budget=budget)
     try:
         return factory(settings, budget, fake=fake)
-    except ConfigError as exc:
-        raise _CliError(str(exc)) from None
+    except (ConfigError, UnknownModelError) as exc:
+        raise _CliError(_setup_message(exc)) from None
 
 
 # --------------------------------------------------------------------------- output
@@ -224,7 +256,7 @@ def _cmd_convert(args: argparse.Namespace) -> int:
 def _convert(args: argparse.Namespace) -> int:
     from a11y_stem.pipeline.html_checks import axe_checks, static_checks
     from a11y_stem.pipeline.layout import LayoutError
-    from a11y_stem.pipeline.run import PipelineOutput, convert_pdf
+    from a11y_stem.pipeline.run import FATAL_ERRORS, PipelineOutput, convert_pdf
 
     settings = get_settings()
     if not args.pdf.is_file():
@@ -247,11 +279,20 @@ def _convert(args: argparse.Namespace) -> int:
         max_usd=settings.max_usd_per_job,
         max_calls=settings.max_model_calls_per_job,
     )
+    if not args.fake:
+        _check_model_setup(settings)
     client = _make_client(settings, budget, fake=args.fake)
     try:
         output = convert_pdf(
-            pdf_bytes, settings=settings, client=client, pages=pages, progress=_progress
+            pdf_bytes,
+            settings=settings,
+            client=client,
+            pages=pages,
+            progress=_progress,
+            notice=FAKE_NOTICE if args.fake else None,
         )
+    except FATAL_ERRORS as exc:  # the client's own setup failed on its first request
+        raise _CliError(_setup_message(exc)) from None
     except LayoutError as exc:
         hint = (
             f" (more than MAX_PAGES_PER_JOB={settings.max_pages_per_job}; pick pages with --pages)"

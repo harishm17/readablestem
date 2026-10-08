@@ -17,6 +17,7 @@ on it. The pipeline that feeds it is in `docs/design/beta-architecture.md`.
 </head>
 <body>
 <main>
+  <p class="notice a11y-stem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
   <section id="about-conversion" ...>About this conversion</section>
 </main>
@@ -35,6 +36,9 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
 - If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
+- An optional plain-text `notice` opens `<main>` as a labelled, outlined note ("Note:
+  ..."). The CLI uses it for `--fake` runs, whose answers are placeholders: the file has
+  to say so before any content, because the CLI has no review step.
 
 ## How each element is written
 
@@ -127,10 +131,20 @@ hostile cases above are stripped or rejected.
 
 ## Headings
 
-Levels come from the heading fixes (WP2), which already repair the outline. The assembler
-clamps levels once more so the output never skips down a level (h1 then h3 becomes h1
-then h2): a reviewer rejecting a heading can reopen a gap the heading step had closed.
-The first heading keeps its level. Rejected headings become paragraphs.
+Levels come from the heading fixes (WP2), which already repair the outline. A reviewer
+rejecting a heading (or a heading fix that failed) can reopen a gap the heading step had
+closed, since rejected headings become paragraphs. So the assembler repairs the outline
+once more, keeping the headings still open on a stack: a heading first closes those at
+its own level or deeper, then goes at most one level below the one left open. The output
+never skips down a level, siblings keep the same level, and the children of a rejected
+heading move up together:
+
+| From the fixes | Written |
+|---|---|
+| h1 Chapter, ~~h2 Section 1~~, h3 Sub 1.1, h3 Sub 1.2, h2 Section 2 | h1, p, h2, h2, h2 |
+
+(Clamping to "previous heading + 1" alone would make Sub 1.2 a child of Sub 1.1.) The
+first heading keeps its level; an outline with no gaps is written unchanged.
 
 ## About this conversion
 
@@ -211,20 +225,36 @@ writes them to `--report`. Anyone holding only a `DocumentResult` can recompute 
    markers become `[equation]`.
 5. A step that raises becomes FAILED `internal_error`; a crop that fails, FAILED
    `crop_error`. Only the exception type is logged, never its message (it may quote the
-   document).
+   document). The exception is a misconfigured run: `config.ConfigError` (no
+   OPENAI_API_KEY; WP1's client reads it on its first request) or
+   `pricing.UnknownModelError` (an unpriced model) would fail every element the same
+   way, so the first one stops the run (queued steps are cancelled, nothing new starts)
+   and `convert_pdf` re-raises it. The CLI turns it into `error: ...`; the web worker
+   fails the job instead of storing a document with everything flagged.
 6. The first `BudgetExceeded` (or a step returning reason `budget_<scope>`) stops new model
    work: queued steps are cancelled, and everything not yet processed becomes FAILED
    `budget_<scope>` with its crop kept. Calls a step made before the refusal were billed,
    so a recording wrapper around the client keeps them on the FAILED fix.
 7. `progress(pages_done, pages_total)` runs on the calling thread when all of a page's
    steps have finished. An exception from it aborts the run.
-8. `render_html`, then `static_checks`.
+8. Once the last crop is made, `layout.release(pdf_bytes)` drops WP2's cached copy of
+   the PDF (also when the run fails), so a long-lived worker does not keep a user's
+   document in memory until newer jobs evict it.
+9. `render_html` (with the caller's optional `notice` and `source_note`), then
+   `static_checks`.
 
 Stats: document `latency_ms` is wall-clock time for the whole run; page `latency_ms` is
 the summed time inside that page's steps (pages overlap in the pool, so per-page wall time
 would mislead). `prompt_versions` are the versions the calls actually used, else the
-step modules' `PROMPT_VERSION`. Tracer spans (`document`, `headings`, `page`, `step`,
-`assemble`) carry ids, pages, models, costs, statuses and reason codes only.
+step modules' `PROMPT_VERSION`.
+
+Tracer spans (`document`, `headings`, `page`, `step`, `model_call`, `assemble`) carry ids,
+pages, models, token counts, costs, statuses and reason codes only. Results are added with
+the span handle's `set(**attrs)` (WP6; `update` is accepted too) as scalars: counts per
+status are flat keys such as `fixes_accepted`, and a budget stop is `reason`. Each model
+request gets a `model_call` span opened with `model=`, which WP6 records as a Langfuse
+generation (with tokens and cost), so per-request cost shows in Langfuse's cost views. A
+`step` span carries `model` only when the step used one model.
 
 ## CLI
 
@@ -233,7 +263,12 @@ a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [
 ```
 
 `--max-usd` caps this run with an in-memory spend guard; `MAX_USD_PER_JOB` and
-`MAX_MODEL_CALLS_PER_JOB` cap it too. `--fake` uses the offline fake client. Progress
+`MAX_MODEL_CALLS_PER_JOB` cap it too. Before converting, a real run checks that
+OPENAI_API_KEY is set and that MAIN_MODEL and CHEAP_MODEL have prices: either problem is
+`error: ...` and exit 2, and nothing is written. `--fake` uses the offline fake client
+(no key needed); its answers are placeholders, so the HTML opens with the note "Offline
+test run: equations and figure descriptions in this file are placeholders from a fake
+model, not conversions. Do not publish it." Progress
 ("page 1/1 done") goes to stderr; the summary on stdout is content-free. A run with
 `--fake --report notes.json --axe` (fake layout and steps, as in the CLI tests):
 
