@@ -36,7 +36,7 @@ from collections.abc import Iterable
 from datetime import UTC, date, datetime
 
 from pydantic import ValidationError
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, sessionmaker
@@ -165,21 +165,36 @@ def _upsert_portable(session: Session, rows: Iterable[dict]) -> None:
 
 
 def _aggregate_batch(session: Session, now: datetime) -> int:
-    jobs = session.scalars(
-        select(Job)
+    """Count one batch and mark it aggregated, in the caller's transaction.
+
+    Selects only the columns it needs (never the stored HTML). Upserts run in sorted
+    order so concurrent runs take row locks in the same order and cannot deadlock.
+    """
+    jobs = session.execute(
+        select(
+            Job.id,
+            Job.status,
+            Job.error_code,
+            Job.page_count,
+            Job.result_json,
+            Job.finished_at,
+            Job.created_at,
+        )
         .where(Job.status.in_(FINISHED), Job.aggregated.is_(False))
         .order_by(Job.finished_at, Job.id)
         .limit(BATCH_SIZE)
         .with_for_update(skip_locked=True)
     ).all()
+    if not jobs:
+        return 0
     by_day: dict[date, Counter[Key]] = {}
     for job in jobs:
         day = utc_day(job.finished_at or job.created_at, now)
         counts = job_counts(job.status, job.error_code, job.page_count, job.result_json)
         by_day.setdefault(day, Counter()).update(counts)
-        job.aggregated = True
     for day, counts in sorted(by_day.items()):
         upsert_counts(session, day, counts)
+    session.execute(update(Job).where(Job.id.in_([job.id for job in jobs])).values(aggregated=True))
     return len(jobs)
 
 
