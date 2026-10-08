@@ -27,7 +27,7 @@ HERE = Path(__file__).resolve().parent
 FIXED_DATE = "D:20261007000000Z"  # so a re-print only differs where the content does
 HEADER = (
     '<div style="font-size:8pt;width:100%;text-align:center;font-family:serif;">'
-    "PHYS 101 · Motion notes</div>"
+    "PHYS 101 \u00b7 Motion notes</div>"
 )
 FOOTER = (
     '<div style="font-size:8pt;width:100%;text-align:center;font-family:serif;">'

@@ -16,10 +16,9 @@ Evidence and confidence (also in docs/layout.md):
 
 Penalties: all caps -0.15, fewer than 4 letters -0.20, list-style number ("1.", "A)")
 without a larger font -0.15, outline repaired -0.03. A fix is ACCEPTED only with strong
-evidence and none of the
-first three penalties, which keeps every accepted heading at >= 0.85 (the default
-`Settings.auto_accept_confidence`); everything else is NEEDS_REVIEW. Check codes are
-content-free categories ("heading.level_repaired", "heading.weak_evidence", ...).
+evidence and none of the first three penalties, which keeps every accepted heading at
+>= 0.85 (the default `Settings.auto_accept_confidence`); everything else is NEEDS_REVIEW.
+Check codes are content-free categories ("heading.level_repaired", "heading.weak_evidence").
 """
 
 from __future__ import annotations
@@ -29,11 +28,9 @@ from dataclasses import dataclass
 
 from a11y_stem.core.types import Check, Element, Fix, HeadingFix, Kind, Status
 from a11y_stem.pipeline.layout import (
-    REASON_BOLD_BODY,
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
     REASON_NUMBERED,
-    REASON_NUMBERED_LINE,
     heading_levels,
 )
 
@@ -81,7 +78,7 @@ class _Evidence:
 
     @property
     def maybe_list_item(self) -> bool:
-        """ "1. Measure the cart" at body size reads like a list item; in a large font,
+        """A body-size "1. Measure the cart" reads like a list item; in a large font,
         "1. Introduction" is an ordinary heading style."""
         return self.list_like and not self.larger_font
 
@@ -100,10 +97,9 @@ class _Evidence:
 
 
 def _evidence(element: Element, text: str) -> _Evidence:
+    """Evidence from layout's reason codes; a heading without any is weak by default."""
     reasons = set(element.reasons)
     letters = [c for c in text if c.isalpha()]
-    if not reasons & {REASON_LARGER_FONT, REASON_BOLD_BODY, REASON_NUMBERED_LINE}:
-        reasons.add(REASON_BOLD_BODY)  # unknown origin: treat as the weakest kind
     return _Evidence(
         larger_font=REASON_LARGER_FONT in reasons,
         numbered=REASON_NUMBERED in reasons,

@@ -41,7 +41,7 @@ from collections import Counter, OrderedDict
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
-from itertools import pairwise
+from itertools import count, pairwise
 
 import pymupdf
 
@@ -117,12 +117,13 @@ _JUNK_TITLE = re.compile(
 )
 _INVISIBLE = dict.fromkeys(map(ord, "\u00ad\u200b\u200c\u200d\u2060\ufeff"))
 
-# Character classes for maths detection. Symbols that only occur in maths:
+# Character classes for maths detection. Symbols that only occur in maths (signs such as
+# the minus are in _SIGNS: in a text font they also print dashes and option flags):
 _STRONG_MATH = frozenset(
     "\u2211\u220f\u222b\u222e\u221a\u2202\u2207\u221e"  # sum prod int oint sqrt partial nabla inf
     "\u2264\u2265\u2260\u2248\u2261\u221d"  # <= >= != approx equiv proportional
     "\u2192\u2190\u2194\u21d2\u21d4"  # arrows
-    "\u22c5\u00d7\u00f7\u00b1\u2213\u2212"  # cdot times div pm mp minus
+    "\u22c5\u00d7\u00f7"  # cdot times div
     "\u2208\u2209\u2282\u2286\u2283\u2287\u222a\u2229\u2200\u2203"  # sets and quantifiers
     "\u2032\u2033\u2220\u22a5\u2225\u27e8\u27e9"  # primes angle perp parallel brackets
 )
@@ -440,9 +441,7 @@ class _Char:
             return False
         if _font_traits(self.font)[2]:
             return True
-        return c not in _SIGNS and (
-            is_math_alphanumeric(c) or c in _STRONG_MATH or bool(GREEK.match(c))
-        )
+        return is_math_alphanumeric(c) or c in _STRONG_MATH or bool(GREEK.match(c))
 
     @property
     def mono(self) -> bool:
@@ -1165,7 +1164,9 @@ def _page_paths(page: pymupdf.Page) -> list[_Path]:
     return paths
 
 
-def _radical_like(segments: list[tuple[float, float, float, float]], box: BBox, items) -> bool:
+def _radical_like(
+    segments: list[tuple[float, float, float, float]], box: BBox, items: Sequence[object]
+) -> bool:
     """A stroked square-root sign: lines only, a steep diagonal and a bar along the top."""
     if len(segments) < 2 or len(segments) != len(items) or box[3] - box[1] > 60:
         return False
@@ -1727,10 +1728,7 @@ def _prepare_rows(
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
-    rows = _merge_baselines(kept, gutter)
-    for row in rows:
-        row.column = _column_of(row.bbox, gutter)
-    return rows, gutter
+    return _merge_baselines(kept, gutter), gutter
 
 
 def _page_blocks(
@@ -1894,7 +1892,7 @@ def _to_elements(pages: list[_PageBlocks]) -> list[Element]:
     """Blocks -> Elements with ids "p{page+1}-e{index}" and a global reading order."""
     elements: list[Element] = []
     for page in pages:
-        ids = (f"p{page.number + 1}-e{index}" for index in range(1_000_000))
+        ids = (f"p{page.number + 1}-e{index}" for index in count())
         for block in page.blocks:
             element_id = next(ids)
             if block.kind == Kind.PARAGRAPH:
