@@ -14,6 +14,8 @@ from pathlib import Path
 
 import pytest
 
+from a11y_stem.web.database import utc_today
+from a11y_stem.web.db import SpendDay, session_scope
 from a11y_stem.web.security import VIEW_CSP
 from fixtures.web.support import ADMIN, ALICE, WebEnv, job_id_from, login, make_pdf, upload
 
@@ -63,7 +65,16 @@ def pages(tmp_path_factory) -> dict[str, str]:
     env = WebEnv(tmp_path_factory.mktemp("pages"))
     out: dict[str, str] = {}
     with env.running() as anon:
-        for path in ("/", "/demo", "/privacy", "/terms", "/limits", "/login", "/dev-login"):
+        for path in (
+            "/",
+            "/demo",
+            "/privacy",
+            "/terms",
+            "/limits",
+            "/status",
+            "/login",
+            "/dev-login",
+        ):
             out[path] = anon.get(path).text
         out["404"] = anon.get("/missing").text
         out["not_allowed"] = login(env.client(), "stranger@example.org").text
@@ -92,7 +103,7 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         assert '<a class="skip-link" href="#main">Skip to main content</a>' in html, name
         assert '<main id="main"' in html, name
         assert page.count("header") == 1 and page.count("footer") == 1, name
-        for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"'):
+        for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"', 'href="/status"'):
             assert link in html, (name, link)
         assert 'href="https://github.com/harishm17/a11y-stem">Source code</a>' in html, name
         assert "GNU Affero General Public License" in html, name
@@ -134,8 +145,62 @@ def test_privacy_and_terms_are_drafts_describing_real_behaviour(pages):
     assert "student records" in terms and "assists" in terms
 
 
+def test_privacy_page_states_the_purge_window_and_backups(pages):
+    privacy = " ".join(pages["/privacy"].split())
+    assert "an hourly clean-up then removes it from the database" in privacy
+    assert "one backup is kept" in privacy and "up to about one more day" in privacy
+    assert "TODO(Harish)" not in pages["/privacy"]  # the decision note is a template comment
+    assert "Langfuse" not in privacy  # only named when traces are actually sent there
+
+
+class StubTracer:
+    def flush(self) -> None:
+        pass
+
+
+def test_privacy_page_names_langfuse_when_tracing_is_on(tmp_path, monkeypatch):
+    from a11y_stem.web import app as app_module
+
+    monkeypatch.setattr(app_module, "make_tracer", lambda settings: StubTracer())
+    env = WebEnv(tmp_path, tracing_enabled=True)
+    with env.running() as client:
+        privacy = " ".join(client.get("/privacy").text.split())
+    assert "<strong>Langfuse</strong>" in privacy and "never contain document text" in privacy
+
+
+def test_status_page_says_whether_conversions_are_open(tmp_path):
+    env = WebEnv(tmp_path)
+    with env.running() as client:
+        page = " ".join(client.get("/status").text.split())
+        assert "Up" in page and "Open" in page and "Documents waiting</dt><dd>0" in page
+        with session_scope(env.ctx.factory) as session:
+            session.add(SpendDay(day=utc_today(), spent_usd=5.0, held_usd=0.0))
+        page = " ".join(client.get("/status").text.split())
+        assert "Paused: today" in page
+
+
 def test_limits_page_is_left_for_harish(pages):
     assert "TODO(Harish)" in pages["/limits"]
+
+
+def test_launch_check_lists_what_is_unfinished(capsys):
+    from a11y_stem.cli.main import main
+    from a11y_stem.ops.launch import launch_blockers
+
+    items = launch_blockers()
+    assert "web/templates/limits.html: still has a TODO(Harish) note" in items
+    assert main(["ops", "launch-check"]) == 1
+    out = capsys.readouterr().out
+    assert "limits.html" in out and f"launch_blockers={len(items) + 1}" in out  # + baseline
+
+
+def test_a_placeholder_demo_is_not_counted_as_done(tmp_path, monkeypatch):
+    from a11y_stem.ops import launch
+
+    demo = tmp_path / "index.html"
+    demo.write_text('<p data-a11y-stem-demo="placeholder">x</p>')
+    monkeypatch.setattr(launch, "DEMO_PAGE", demo)
+    assert any("placeholder output" in item for item in launch.launch_blockers())
 
 
 def test_demo_page_without_a_demo_file(pages):

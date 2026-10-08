@@ -1,4 +1,4 @@
-"""CLI commands: a11y-stem ops aggregate|purge|cron.
+"""CLI commands: a11y-stem ops aggregate|purge|cron|launch-check.
 
 The same tasks the web app runs on Cloud Scheduler's hourly call, for running by hand or
 from a Cloud Run job. Output is counts only, as `key=value` pairs on one line; database
@@ -31,6 +31,10 @@ def register(
     sub.add_parser(
         "cron", help="aggregate, then purge (purge runs even if aggregation fails)"
     ).set_defaults(func=_cmd_cron)
+    sub.add_parser(
+        "launch-check",
+        help="list what is unfinished before real users: draft pages, demo, eval baseline",
+    ).set_defaults(func=_cmd_launch_check)
 
 
 def _factory() -> sessionmaker[Session]:
@@ -92,3 +96,15 @@ def _cmd_cron(args: argparse.Namespace) -> int:
     shown = "failed" if aggregated is None else str(aggregated)
     print(f"aggregated_jobs={shown} {_purge_line(stats)}")
     return 1 if aggregated is None else 0
+
+
+def _cmd_launch_check(args: argparse.Namespace) -> int:
+    """Exit 1 while anything is unfinished (ops.launch); no database needed."""
+    from a11y_stem.cli.main import project_root
+    from a11y_stem.ops.launch import launch_blockers
+
+    items = launch_blockers(project_root())
+    for item in items:
+        print(f"- {item}")
+    print(f"launch_blockers={len(items)}")
+    return 1 if items else 0

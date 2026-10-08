@@ -61,6 +61,46 @@ def test_users_allow_list_and_deny(settings, capsys):
     assert "not a known user" in capsys.readouterr().err
 
 
+def test_users_delete_erases_the_account_and_every_document(settings, capsys):
+    """The privacy page offers deletion on request; this is how it is done."""
+    from datetime import timedelta
+
+    from a11y_stem.web.db import ErrorAggregate, Job, User
+
+    assert main(["users", "allow", "prof@example.org"]) == 0
+    engine = db.make_engine(settings.database_url)
+    factory = db.make_sessionmaker(engine)
+    with db.session_scope(factory) as session:
+        user = session.scalar(select(User).where(User.email == "prof@example.org"))
+        assert user is not None
+        now = db.utcnow()
+        job = Job(
+            user_id=user.id,
+            filename="notes.pdf",
+            status="failed",
+            error_code="timeout",
+            retain_until=now + timedelta(hours=24),
+            finished_at=now,
+        )
+        session.add(job)
+        session.flush()
+        session.add(
+            db.Blob(job_id=job.id, kind="upload", media_type="application/pdf", content=b"%PDF-")
+        )
+    assert main(["users", "delete", "prof@example.org"]) == 2  # needs --yes
+    assert "--yes" in capsys.readouterr().err
+    assert main(["users", "delete", "prof@example.org", "--yes"]) == 0
+    assert "jobs_deleted=1 blobs_deleted=1" in capsys.readouterr().out
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(User)) is None
+        assert session.scalar(select(Job)) is None
+        assert session.scalar(select(db.Blob)) is None
+        # The content-free counts survive.
+        assert session.scalar(select(ErrorAggregate).where(ErrorAggregate.step == "job"))
+    engine.dispose()
+    assert main(["users", "delete", "prof@example.org", "--yes"]) == 2
+
+
 def test_users_allow_rejects_a_malformed_email(settings, capsys):
     assert main(["users", "allow", "not-an-email"]) == 2
     assert "not an email address" in capsys.readouterr().err

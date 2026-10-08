@@ -1,9 +1,13 @@
-"""CLI: `a11y-stem serve`, `a11y-stem users allow|deny|list`, `a11y-stem db upgrade`.
+"""CLI: `a11y-stem serve`, `a11y-stem users allow|deny|delete|list`, `a11y-stem db upgrade`.
 
 - serve: runs the web app with uvicorn (`create_app` as a factory, so settings are read
   at start-up, and `--reload` works).
 - users: manages the sign-in allowlist in the database named by DATABASE_URL. In dev the
   tables are created on first use; in production the schema must be migrated first.
+  `deny` removes someone from the allowlist and stops their queued and running jobs;
+  `delete` also erases them (a data-deletion request): every job with everything derived
+  from it (through `ops.retention.delete_jobs`, so counts are kept), their review edits
+  and their account row. Only content-free aggregates and daily counters remain.
 - db upgrade: applies the Alembic migrations in migrations/ (`alembic upgrade head`).
 """
 
@@ -39,6 +43,15 @@ def register(
     deny = users.add_parser("deny", help="remove an email address from the allowlist")
     deny.add_argument("email")
     deny.set_defaults(func=_cmd_users_deny)
+    erase = users.add_parser(
+        "delete",
+        help="erase someone: their account, every document and everything made from it",
+    )
+    erase.add_argument("email")
+    erase.add_argument(
+        "--yes", action="store_true", help="confirm: this cannot be undone (backups age out)"
+    )
+    erase.set_defaults(func=_cmd_users_delete)
     users.add_parser("list", help="list allowed users").set_defaults(func=_cmd_users_list)
 
     db = group.add_parser("db", help="database schema").add_subparsers(
@@ -119,6 +132,37 @@ def _cmd_users_deny(args: argparse.Namespace) -> int:
     if user is None:
         return _error(f"{email} is not a known user")
     print(f"removed {email} from the allowlist")
+    return 0
+
+
+def _cmd_users_delete(args: argparse.Namespace) -> int:
+    from sqlalchemy import select
+
+    from a11y_stem.config import ConfigError
+    from a11y_stem.ops.retention import delete_jobs
+    from a11y_stem.web.auth import normalise_email
+    from a11y_stem.web.db import Job, ReviewEdit, User, session_scope
+
+    email = normalise_email(args.email)
+    if email is None:
+        return _error(f"not an email address: {args.email!r}")
+    if not args.yes:
+        return _error("this erases the account and every document; add --yes to confirm")
+    try:
+        factory = _factory()
+    except ConfigError as exc:
+        return _error(str(exc))
+    with session_scope(factory) as session:
+        user = session.scalar(select(User).where(User.email == email))
+        if user is None:
+            return _error(f"{email} is not a known user")
+        job_ids = list(session.scalars(select(Job.id).where(Job.user_id == user.id)))
+        stats = delete_jobs(session, job_ids)
+        # Edits they made are deleted with their jobs; this catches any left elsewhere.
+        for edit in session.scalars(select(ReviewEdit).where(ReviewEdit.user_id == user.id)):
+            session.delete(edit)
+        session.delete(user)
+    print(f"deleted {email}: jobs_deleted={stats.jobs_deleted} blobs_deleted={stats.blobs_deleted}")
     return 0
 
 

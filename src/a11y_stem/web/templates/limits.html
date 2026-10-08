@@ -2,7 +2,12 @@
 {% block title %}Known limits{% endblock %}
 {% block content %}
 <h1>Known limits</h1>
-{# TODO(Harish): write the known-limits copy (architecture rule 8: Harish writes it). #}
+{# TODO(Harish): write the known-limits copy (architecture rule 8: Harish writes it).
+   Facts to cover, from the code as it is: scanned pages (no OCR: refused when the whole
+   PDF is scanned, kept as flagged images when some pages are); the hosted app runs the
+   static HTML checks on every conversion but axe-core only in CI and the eval harness
+   (no browser in the image); pages larger than 1.7 m are refused; docs/output.md
+   "Engineering limits" and docs/steps.md "Known limits" list the rest. #}
 <p class="draft-note"><strong>TODO(Harish):</strong> this page will list what the tool
   cannot do yet. It is being written.</p>
 {% endblock %}

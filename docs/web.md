@@ -69,8 +69,9 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 |---|---|---|
 | GET `/` | anyone | What the tool does, sign-in, link to the demo |
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
-| GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour, marked "Draft, to be reviewed by Harish" |
+| GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `a11y-stem ops launch-check` lists what is still unfinished on the public pages |
 | GET `/limits` | anyone | Known limits: a `TODO(Harish)` placeholder until Harish writes it |
+| GET `/status` | anyone | Service status: up, conversions open or paused for today, documents waiting and converting (numbers only; 503 when the database does not answer) |
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; 403 page if not allowlisted or email not verified |

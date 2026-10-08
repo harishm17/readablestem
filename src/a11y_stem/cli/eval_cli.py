@@ -339,7 +339,13 @@ def build_demo(
     )
     output = run.convert_pdf(pdf, settings=settings, client=client)
     result = output.result
-    html = render.wrap_demo_html(result.html, page, date=date)
+    html = render.wrap_demo_html(
+        result.html,
+        page,
+        date=date,
+        source_url=getattr(settings, "source_url", None),
+        placeholder=client_label == "fake",
+    )
     (out_dir / "index.html").write_text(html, encoding="utf-8")
     not_attempted = sum(
         1

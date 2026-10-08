@@ -32,6 +32,7 @@ from starlette.responses import HTMLResponse
 from a11y_stem.config import ConfigError, Settings, get_settings
 from a11y_stem.observability.logging import configure_logging, request_logging_middleware
 from a11y_stem.observability.tracing import NoopTracer, Tracer, make_tracer
+from a11y_stem.ops.launch import launch_blockers
 from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
 from a11y_stem.web.database import as_utc, prepare_database
@@ -239,6 +240,9 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await run_in_threadpool(prepare_database, engine, settings)
         await run_in_threadpool(seed_admins, factory, settings.admin_email_list)
+        if settings.env == "prod" and (blockers := launch_blockers()):
+            # Not a refusal: a staging deploy runs as prod before the copy is final.
+            log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
         if settings.run_worker:
             ctx.worker = Worker(
                 settings,
