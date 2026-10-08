@@ -269,7 +269,7 @@ def test_a_lone_short_line_without_maths_neighbours_stays_text():
     assert paragraph.text == "The final speed of the cart after the ramp is 12 m/s."
 
 
-def test_adjacent_maths_lines_and_an_equation_number_merge_into_one_region():
+def test_adjacent_maths_lines_merge_and_the_equation_number_is_kept_apart():
     def fill(page):
         write(page, 72, 100, ["The position after the cart has rolled for two seconds:"])
         page.insert_text((250, 140), "x = v t + 2", fontsize=12)
@@ -280,8 +280,10 @@ def test_adjacent_maths_lines_and_an_equation_number_merge_into_one_region():
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
     equation = elements[1]
-    assert equation.text == "x = v t + 2 (2.1) = 14 m"
-    assert equation.bbox[2] > 520  # the equation number is part of the region
+    assert equation.text == "x = v t + 2 = 14 m"
+    assert equation.equation_label == "(2.1)"
+    assert "equation number" in equation.reasons
+    assert equation.bbox[2] < 400  # the number is outside the box, so outside the crop
 
 
 # ---------------------------------------------------------------- inline maths

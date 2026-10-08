@@ -207,14 +207,16 @@ def fraction_with_label(label: str) -> bytes:
 
 
 @pytest.mark.parametrize("label", ["(2.4)", "2.4", "2.4a", "[2.4]", "Eq. 2.4"])
-def test_an_equation_number_beside_a_fraction_stays_in_the_equation(label):
+def test_an_equation_number_beside_a_fraction_is_its_label_not_its_text(label):
     elements = analyze(fraction_with_label(label)).elements
     assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
     equation = elements[1]
-    assert equation.text == f"d v = {label} t"  # numerator, main row, number, denominator
+    assert equation.text == "d v = t"  # numerator, main row, denominator
+    assert equation.equation_label == label
     assert "fraction bar" in equation.reasons
     x0, y0, x1, y1 = equation.bbox
-    assert x0 <= 281 and y0 <= 128 and x1 >= 530 and y1 >= 152  # the crop includes t
+    assert x0 <= 281 and y0 <= 128 and y1 >= 152  # the crop includes t ...
+    assert x1 < 330  # ... but not the number at x = 520
 
 
 def test_a_bare_equation_number_halfway_down_a_fraction_belongs_to_it():
@@ -231,8 +233,9 @@ def test_a_bare_equation_number_halfway_down_a_fraction_belongs_to_it():
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
     equation = elements[1]
-    assert "2.4" in (equation.text or "") and "3 lines merged" in equation.reasons
-    assert equation.bbox[1] <= 125 and equation.bbox[3] >= 140 and equation.bbox[2] >= 330
+    assert equation.equation_label == "2.4" and "2.4" not in (equation.text or "")
+    assert "2 lines merged" in equation.reasons
+    assert equation.bbox[1] <= 125 and equation.bbox[3] >= 140 and equation.bbox[2] < 310
 
 
 def test_a_bare_decimal_away_from_any_maths_stays_text():

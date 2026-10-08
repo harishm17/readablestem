@@ -821,6 +821,7 @@ class _Row:
     reasons: list[str] = field(default_factory=list)
     absorbed: bool = False  # belongs to a figure (labels, text inside a diagram)
     marker: _Marker | None = None  # the row starts a list item (see _list_markers)
+    region: _Region | None = None  # the display equation it belongs to (_equation_regions)
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -1007,6 +1008,9 @@ def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> l
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     """Fold small sub/superscript fragments into the row they belong to.
 
+    A fragment is a script only if every glyph in it is small: a subscripted variable
+    such as a fraction's denominator "v_avg" is mostly script-size letters, but its "v"
+    is not, and folding it into the line above would interleave the two by x.
     Hosts are looked up in a vertical window around each fragment (rows are sorted by
     top edge), in the same order a full scan would visit them.
     """
@@ -1019,6 +1023,7 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     for i, small in enumerate(rows):
         if small.vertical or len(small.clean) > 12 or i in merged:
             continue
+        glyph = max(c.size for c in small.ink)  # the largest glyph, see the docstring
         best = None
         centre = (small.y0 + small.y1) / 2
         # A host's box grows when a script joins it, by at most about one font size.
@@ -1026,7 +1031,7 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
         hi = bisect.bisect_right(tops, centre + 2 * largest)
         for j in range(lo, hi):
             host = rows[j]
-            if j == i or j in dropped or host.vertical or small.size > SCRIPT_RATIO * host.size:
+            if j == i or j in dropped or host.vertical or glyph > SCRIPT_RATIO * host.size:
                 continue
             host = merged.get(j, host)
             near_y = host.y0 - 0.5 * host.size <= centre <= host.y1 + 0.5 * host.size
@@ -1036,10 +1041,21 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
                 break
         if best is not None:
             host = merged.get(best, rows[best])
-            chars = sorted(host.chars + small.chars, key=lambda c: c.x0)
-            merged[best] = _Row(chars, column=host.column)
+            merged[best] = _Row(_insert_script(host.chars, small.chars), column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
+
+
+def _insert_script(host: list[_Char], script: list[_Char]) -> list[_Char]:
+    """`script`'s characters as one block, after the host glyphs that start before its
+    right edge. A sub/superscript lands right after its base; the denominator of a small
+    fraction lands after its numerator instead of being interleaved with it by x."""
+    end = max(c.x1 for c in script)
+    at = 0
+    for i, c in enumerate(host):
+        if not c.blank and c.x0 < end - 0.01:
+            at = i + 1
+    return [*host[:at], *script, *host[at:]]
 
 
 # ============================================================================ margins
@@ -1503,12 +1519,16 @@ def _classify_row(row: _Row) -> None:
     superscript = any(info.script)
     row.score, row.reasons = equation_score(text, fonts, superscript)
     ink = [i for i, c in enumerate(row.chars) if not c.blank]
-    ratio = sum(info.mathy(i) for i in ink) / max(1, len(ink))
+    # Punctuation after maths ("v ." at the end of a displayed fraction) counts neither way.
+    counted = [i for i in ink if row.chars[i].c not in ",.;:"]
+    ratio = sum(info.mathy(i) for i in counted) / max(1, len(counted))
     prose = _prose_words(row, info)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
     elif row.marker is not None:
         row.kind = "text"  # a list item ("b. - 40 m/s"): maths in it is inline
+    elif not counted:
+        row.kind = "frag"  # a lone "," or "." belongs to the maths it ends, if any
     elif _is_equation_number(text):
         row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
@@ -2111,6 +2131,280 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
     return not bare or row.x0 - box[2] >= 1.0 * size
 
 
+# ============================================================================ display equations
+
+# Signs that continue the line above when a maths line starts with them ("= 250 m/s" under
+# "v = ...", "+ c" under a long sum).
+_CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
+MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
+MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
+
+
+def _split_labels(rows: list[_Row]) -> list[_Row]:
+    """Cut an equation number off the end of a maths row into a row of its own.
+
+    `_merge_baselines` joins pieces of a line up to 4 x font size apart, so an equation
+    number set close to its equation ("= 2000 m - 525 m ,   2.8") arrives as part of the
+    row. It is cut off when the last token reads as an equation number, stands at least
+    one font size clear of the rest, and the rest has maths in it (or is only the comma
+    that ends the maths) and does not end in a relation or operator ("x =   2.4" keeps its
+    right-hand side). Whether it is an equation number is decided later, by where it
+    sits (`_equation_regions`).
+    """
+    out: list[_Row] = []
+    for row in rows:
+        tokens = _tokens(row)
+        if row.vertical or len(tokens) < 2:
+            out.append(row)
+            continue
+        start = tokens[-1][0]
+        before = [c for c in row.chars[:start] if not c.blank]
+        label = _clean("".join(c.c for c in row.chars[start:]))
+        if (
+            _is_equation_number(label)
+            and before
+            and row.chars[start].x0 - before[-1].x1 >= 1.0 * row.size
+            and before[-1].c not in _CONTINUATION_SIGNS
+            and (
+                any(c.math or c.c in _ROW_RELATIONS or c.c in _SIGNS for c in before)
+                or all(c.c in ",.;:" for c in before)  # the comma that ends the maths
+            )
+        ):
+            out.append(_Row(row.chars[:start], column=row.column))
+            out.append(_Row(row.chars[start:], column=row.column))
+        else:
+            out.append(row)
+    return out
+
+
+@dataclass(eq=False)
+class _Region:
+    """One display equation: the maths rows that belong together, the rules it uses
+    (fraction bars, radicals) and the rows of its equation number, kept apart."""
+
+    rows: list[_Row] = field(default_factory=list)
+    rules: list[_Path] = field(default_factory=list)
+    labels: list[_Row] = field(default_factory=list)
+    box: BBox = (0.0, 0.0, 0.0, 0.0)  # rows and rules, while lines are being stacked
+
+
+@dataclass(eq=False)
+class _Line:
+    """Maths rows of one line of a display equation: a main row, the numerators and
+    denominators of its fractions, and the columns of an aligned row."""
+
+    rows: list[_Row]
+    rules: list[_Path]
+    labels: list[_Row] = field(default_factory=list)
+
+    @cached_property
+    def box(self) -> BBox:
+        return _union([*(r.bbox for r in self.rows), *(p.bbox for p in self.rules)])
+
+    @cached_property
+    def size(self) -> float:
+        return max(r.size for r in self.rows)
+
+    @cached_property
+    def ink(self) -> list[_Char]:
+        return sorted((c for r in self.rows for c in r.ink), key=lambda c: c.x0)
+
+    @cached_property
+    def relations(self) -> list[_Char]:
+        """Relation signs at full size (not in a sub/superscript), left to right."""
+        return [
+            c
+            for r in self.rows
+            for c in r.ink
+            if c.c in _ROW_RELATIONS and not r.is_script(c) and c.size >= 0.75 * self.size
+        ]
+
+    @cached_property
+    def complete(self) -> bool:
+        """An equation on its own: a relation with something on both sides."""
+        ink = self.ink
+        return any(
+            ink[0].x1 <= rel.x0 + 0.5 and ink[-1].x0 >= rel.x1 - 0.5 for rel in self.relations
+        )
+
+    @cached_property
+    def continues(self) -> bool:
+        """Starts with a relation or operator: the next line of the equation above."""
+        return self.ink[0].c in _CONTINUATION_SIGNS
+
+    @cached_property
+    def relation_x(self) -> float | None:
+        return min((c.x0 for c in self.relations), default=None)
+
+
+def _same_line(a: _Row, b: _Row) -> bool:
+    """Two maths rows side by side on one line, in the same column: on one baseline at
+    most MAX_COLUMN_GAP font sizes apart (aligned columns, an operator in its own span),
+    or a lone punctuation mark next to a row it overlaps vertically (Chromium sets the
+    full stop after a fraction on a baseline of its own)."""
+    if a.column != b.column:
+        return False
+    size = max(a.size, b.size)
+    gap = max(a.x0 - b.x1, b.x0 - a.x1)
+    if abs(a.baseline - b.baseline) <= 0.4 * size and gap <= MAX_COLUMN_GAP * size:
+        return True
+    lone = a if _punctuation_only(a) else b if _punctuation_only(b) else None
+    if lone is None or gap > 1.5 * size:
+        return False
+    other = b if lone is a else a
+    return min(lone.y1, other.y1) - max(lone.y0, other.y0) >= 0.5 * lone.height
+
+
+def _punctuation_only(row: _Row) -> bool:
+    return all(c.c in ",.;:" for c in row.ink)
+
+
+def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
+    """Group the page's maths rows into display equations; sets `row.region`.
+
+    1. Lines: rows touching one fraction bar or radical (numerator, denominator,
+       radicand) and the main row at the bar's height, plus rows side by side on one
+       baseline, are one line. Equation numbers ("2.4", "(3)") are not in any line:
+       each goes to the line it sits beside (`_number_beside`), nearest centre first.
+    2. Equations: a line joins the equation above it when the gap is at most
+       MAX_LINE_GAP x font size, they overlap horizontally, at most one of them has an
+       equation number, and the line either continues the one above (starts with "="
+       or an operator), or one of the two is not a whole equation (no relation with
+       something on both sides), or both are whole equations with their first relations
+       aligned (the rows of an aligned derivation). Two whole equations stacked close
+       together but centred on their own ("time = d / v" over "d = v t") stay apart.
+    """
+    maths = [r for r in rows if r.kind == "math" and not r.absorbed and not r.vertical]
+    if not maths:
+        return []
+    parent = list(range(len(maths)))
+    position = {id(r): i for i, r in enumerate(maths)}
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    index = _RowIndex(maths)
+    on_rule: dict[int, list[_Path]] = {}
+    for rule in rules:
+        near = _rule_rows(rule, index)
+        if not near:
+            continue
+        middle = (rule.bbox[1] + rule.bbox[3]) / 2
+        level = [
+            r
+            for r in index.near(middle, middle)
+            if r.y0 <= middle <= r.y1
+            and r.column == near[0].column
+            and max(r.x0 - rule.bbox[2], rule.bbox[0] - r.x1) <= 4 * r.size
+            and not (_is_equation_number(r.clean) and r.x0 - rule.bbox[2] >= r.size)
+        ]
+        members = [*near, *(r for r in level if r not in near)]
+        for row in members:
+            on_rule.setdefault(id(row), []).append(rule)
+            parent[find(position[id(row)])] = find(position[id(members[0])])
+    labels = [r for r in maths if id(r) not in on_rule and _is_equation_number(r.clean)]
+    label_ids = {id(r) for r in labels}
+    body = sorted((r for r in maths if id(r) not in label_ids), key=lambda r: r.baseline)
+    window = index.largest  # rows of one line: a shared baseline, or a lone full stop
+    for i, row in enumerate(body):
+        for other in body[i + 1 :]:
+            if other.baseline - row.baseline > window:
+                break
+            if _same_line(row, other):
+                parent[find(position[id(other)])] = find(position[id(row)])
+    groups: dict[int, list[_Row]] = {}
+    for row in body:
+        groups.setdefault(find(position[id(row)]), []).append(row)
+    lines = [
+        _Line(members, list({id(p): p for r in members for p in on_rule.get(id(r), [])}.values()))
+        for members in groups.values()
+    ]
+    for label in labels:
+        centre = (label.y0 + label.y1) / 2
+        beside = [
+            line
+            for line in lines
+            if line.rows[0].column == label.column
+            and _number_beside(label, line.box, line.size)
+            and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+        ]
+        if beside:
+            nearest = min(beside, key=lambda ln: abs((ln.box[1] + ln.box[3]) / 2 - centre))
+            nearest.labels.append(label)
+        else:
+            lines.append(_Line([label], []))  # a number inside the maths, not beside it
+    return _stack_lines(lines)
+
+
+def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
+    """Does `line` continue the display equation whose last line is `above` (box `box`)?
+
+    A line that starts with "=" or an operator may sit a little further down (half as
+    far again): nothing else starts a line that way.
+    """
+    size = max(above.size, line.size)
+    reach = MAX_LINE_GAP * size * (1.5 if line.continues else 1.0)
+    if line.box[1] - box[3] > reach or line.rows[0].column != above.rows[0].column:
+        return False
+    if line.box[0] > box[2] + size or line.box[2] < box[0] - size:
+        return False
+    if above.labels and line.labels:
+        return False  # two numbered equations
+    if line.continues or not (above.complete and line.complete):
+        return True
+    x0, x1 = above.relation_x, line.relation_x
+    return x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size
+
+
+def _stack_lines(lines: list[_Line]) -> list[_Region]:
+    """Join lines into display equations top to bottom (see `_equation_regions`)."""
+    regions: list[_Region] = []
+    last: list[_Line] = []  # the lowest line of each region so far
+    active: list[int] = []  # regions whose bottom is still within reach
+    for line in sorted(lines, key=lambda ln: (ln.box[1], ln.box[0])):
+        reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
+        active = [k for k in active if regions[k].box[3] >= reach]
+        host = next(
+            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line)), None
+        )
+        if host is None:
+            regions.append(_Region(box=line.box))
+            last.append(line)
+            active.append(len(regions) - 1)
+            host = len(regions) - 1
+        region = regions[host]
+        region.rows.extend(line.rows)
+        region.rules.extend(p for p in line.rules if p not in region.rules)
+        region.labels.extend(line.labels)
+        region.box = _union([region.box, line.box])
+        if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
+            last[host] = line  # a stray mark does not stand for the line above
+    for region in regions:
+        for row in [*region.rows, *region.labels]:
+            row.region = region
+    return regions
+
+
+def _contiguous_regions(ordered: list[_Row]) -> list[_Row]:
+    """Reading order with each display equation's rows together, at the place of its
+    first row, and equation numbers taken out of the flow."""
+    members: dict[int, list[_Row]] = {}
+    for row in ordered:
+        if row.region is not None and row not in row.region.labels:
+            members.setdefault(id(row.region), []).append(row)
+    out: list[_Row] = []
+    for row in ordered:
+        region = row.region
+        if region is None:
+            out.append(row)
+        elif id(region) in members:
+            out.extend(members.pop(id(region)))
+    return out
+
+
 # ============================================================================ figures
 
 
@@ -2420,8 +2714,8 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
-            if run.kind == "math" and row.kind == "math" and _joins_equation(run, row):
-                run.add(row)
+            if run.kind == "math" and row.kind == "math" and row.region is prev.region:
+                run.add(row)  # rows of one display equation (`_contiguous_regions`)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx)
             if geometric and _same_style(prev, row, ctx):
@@ -2435,15 +2729,6 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
         else:
             runs.append(_Run([row], row.kind, block_start=True))
     return runs
-
-
-def _joins_equation(run: _Run, row: _Row) -> bool:
-    box = run.box
-    size = max(row.size, run.rows[-1].size)
-    gap_y = row.y0 - box[3]
-    horizontal = row.x0 <= box[2] + 3 * size and row.x1 >= box[0] - 3 * size
-    same_line = min(row.y1, box[3]) - max(row.y0, box[1]) >= 0.5 * row.height
-    return (gap_y <= 0.8 * size and horizontal) or same_line or _number_beside(row, box, size)
 
 
 def _title_like(text: str) -> bool:
@@ -2469,6 +2754,10 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
         score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
         if len(rows) > 1:
             reasons.append(f"{len(rows)} lines merged")
+        region = rows[0].region
+        labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
+        if labels:
+            reasons.append("equation number")
         return _Block(
             Kind.EQUATION,
             box,
@@ -2477,6 +2766,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
             font_size=size,
             score=max([score, *(r.score for r in rows)]),
             reasons=reasons,
+            label=" ".join(r.clean for r in labels) or None,
         )
     text = _join_text(rows)
     letters = sum(c.isalpha() for c in text)
@@ -2738,6 +3028,7 @@ def _page_blocks(
     margins: _MarginFilter,
 ) -> _PageBlocks:
     page_rect = page.rect
+    rows = _split_labels(rows)
     for row in rows:
         _classify_row(row)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
@@ -2751,14 +3042,16 @@ def _page_blocks(
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     figures = [f for f in figures if _absorb_labels(f, rows, ctx)]
     text_rows = [r for r in rows if not r.absorbed]
+    _equation_regions(text_rows, used_rules)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, [f.bbox for f in figures])
-    ordered = [text_rows[i] for i in order]
+    ordered = _contiguous_regions([text_rows[i] for i in order])
     runs = _runs(ordered, ctx)
     blocks = [_classify_run(run, ctx) for run in runs]
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
     for block in blocks:
-        if block.kind == Kind.EQUATION:
-            _add_rules(block, used_rules)
+        region = block.rows[0].region if block.rows else None
+        if block.kind == Kind.EQUATION and region is not None:
+            _add_rules(block, region.rules)
     _attach_captions(blocks, figures)
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:
