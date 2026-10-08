@@ -170,8 +170,10 @@ hold stays until the day ends: the cap errs on the side of spending less.
 
 A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
-- **Claiming.** Fewest attempts first, then oldest, so a retried job goes behind fresh
-  ones. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
+- **Claiming.** Fewest attempts first, then oldest (then id), so a retried job goes
+  behind fresh ones. The queue position on the job page ("2 documents ahead of yours",
+  `views.queue_ahead`) counts in the same order, also skipping the jobs of people no
+  longer allowed. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
   someone also fails their queued and running jobs with `access_removed`.
@@ -302,11 +304,31 @@ and gives its counts. Every fix is numbered within its kind in reading order ("E
   "Reject" buttons whose accessible names include the fix ("Reject figure 2").
 
 A decision is one transaction: lock the job row, apply the decision (`web/review.py`),
-validate edits with `pipeline.validate` (`check_latex`, `safe_latex_to_mathml`,
-`check_mathml`, `check_alt`), store a `ReviewEdit`, set the fix status (`accepted`,
-`edited`, `rejected`) in `result_json`, and re-render the job's HTML with
-`pipeline.assemble.render_html`. A failed check re-shows the page (422) with the
-reviewer's input and an error summary linked to the field; nothing is saved.
+clean and validate edits the way model output is (`equation_step.clean_latex`, then
+`pipeline.validate`'s `check_latex`, `safe_latex_to_mathml`, `check_mathml`; alt text
+through `validate.clean_alt`, then `check_alt`), store a `ReviewEdit`, set the fix status
+(`accepted`, `edited`, `rejected`) and `Fix.reviewed` in `result_json`, re-render the
+job's HTML with `pipeline.assemble.render_html` and re-run its static checks
+(`result_json.html_checks`, listed on the job page). A failed check re-shows the page
+(422) with the reviewer's input as typed and an error summary linked to the field;
+nothing is saved.
+
+- **Accept by a reviewer.** It keeps the status `accepted` (the proposal is used as it
+  is) and sets `Fix.reviewed`, so the job page counts it under "Reviewed by you", not
+  "Accepted automatically", the card says "Accepted by you" and the output's About
+  section says "accepted by a reviewer". `reviewed` defaults to false, so results
+  stored before it existed still load (their edited and rejected fixes still count as
+  reviewed).
+- **Cleaning.** A reviewer who pastes `$v_f = v_0 + at$` gets `v_f = v_0 + at`, and
+  `50% of g` is stored as `50\% of g` (a bare `%` would make the converter drop the rest
+  of the line). Alt text loses invisible format characters (bidi controls, zero-width
+  spaces), so what is stored is exactly what `check_alt` judged.
+- **Heading levels.** Only `1` to `6` (ASCII digits; `²` used to be a 500). The output
+  never skips a level (`assemble.Outline`, see docs/output.md "Headings"), so a level
+  more than one below the heading before it would be stored as one level and shown as
+  another. It is refused with the level it would be shown at and the levels that fit
+  ("Choose a level from 1 to 3, or change the heading before it first"); the form's
+  hint says the same before saving. The first heading may take any level.
 
 After a decision the browser is redirected (303) to `#item-<id>` of the next fix still
 waiting, after this one in review order and wrapping round to the first, or to
@@ -335,7 +357,15 @@ and re-renders nothing. A choice the page never offers (an unknown threshold, "a
 all" for equations) is refused with a 422 and an error linked to the threshold select.
 
 **Job page.** "Need your review" is broken down by kind, each linking to its group
-("7 need your review: 3 equations, 1 figure, 3 headings.").
+("7 need your review: 3 equations, 1 figure, 3 headings."). The summary also counts
+list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
+including one interrupted before it stored a result) and lists the static checks of the
+HTML file that did not pass, each as a sentence from `web/messages.py` with its code
+("All 11 checks passed" otherwise). An incomplete or failed job's outcome
+(`web/outcome.py`: "Stopped early", "Finished, with pages not converted", a scanned or
+empty PDF) replaces the plain status in the page title, the status box and the
+"Why the conversion stopped" section, and a finished but incomplete job gets a note at
+the top of its results.
 
 **Messages.** `web/messages.py` maps every `(Check.name, Check.code)` pair and every
 `Fix.reason` the pipeline can emit to one plain sentence that says what is wrong and

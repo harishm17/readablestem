@@ -80,6 +80,9 @@ STATUS_LABELS = {
     Status.FAILED: "not converted (error or spending limit)",
     Status.REJECTED: "rejected by a reviewer",
 }
+# A reviewer's Accept keeps Status.ACCEPTED (`Fix.reviewed` is set); counted apart from
+# the pipeline's automatic acceptance, after it.
+REVIEWER_ACCEPTED_LABEL = "accepted by a reviewer"
 
 _MARKER_OPEN, _MARKER_CLOSE = INLINE_MARKER.split("{id}")
 # One inline-equation marker (`core.types.inline_marker`); group 1 is the element id.
@@ -383,6 +386,68 @@ def _list_levels(items: list[Element]) -> list[int]:
     return levels
 
 
+# --------------------------------------------------------------------------- headings
+
+
+def heading_parts(element: Element, fix: Fix | None) -> tuple[int | None, str]:
+    """(level, text) for a heading element; level None means it is written as <p>
+    (no fix, rejected or not converted, or no text)."""
+    if fix is None or fix.heading is None or fix.status in NOT_CONVERTED:
+        return None, element.text or ""
+    text = fix.heading.text if fix.heading.text.strip() else element.text or ""
+    return (fix.heading.level if text.strip() else None), text
+
+
+@dataclass
+class Outline:
+    """The outline repair: the level each heading is written at; never skips down.
+
+    A rejected or failed heading (written as a paragraph) can open a gap: h1, [h2],
+    h3. Clamping to "previous heading + 1" closes it but turns siblings into parent
+    and child (h1, [h2], h3 a, h3 b -> h1, h2 a, h3 b). So headings still open are
+    kept on a stack: a heading first closes those at its own level or deeper, then
+    goes at most one level below the one left open. Siblings get the same level, and
+    the children of a rejected heading all move up together. The first heading keeps
+    its level.
+
+    The review screen uses `would_write` to refuse a level this repair would change.
+    """
+
+    # Open headings as (level from the fix, level written), outermost first. Both
+    # increase strictly from the bottom of the stack to the top.
+    open: list[tuple[int, int]] = field(default_factory=list)
+
+    def would_write(self, level: int) -> int:
+        """The level a heading at `level` would be written at next (no change)."""
+        parents = [entry for entry in self.open if entry[0] < level]
+        return min(level, parents[-1][1] + 1) if parents else level
+
+    def write(self, level: int) -> int:
+        """Write the next heading: its level in the output."""
+        written = self.would_write(level)
+        while self.open and self.open[-1][0] >= level:
+            self.open.pop()
+        self.open.append((level, written))
+        return written
+
+
+def outline_before(elements: list[Element], fixes: list[Fix], element_id: str) -> Outline:
+    """The outline as `render_html` has it just before the element `element_id` (reading
+    order; the first fix for an id wins, as in `render_html`)."""
+    first: dict[str, Fix] = {}
+    for fix in fixes:
+        first.setdefault(fix.element_id, fix)
+    outline = Outline()
+    for element in sorted(elements, key=lambda e: e.order):
+        if element.id == element_id:
+            break
+        if element.kind is Kind.HEADING:
+            level, _ = heading_parts(element, first.get(element.id))
+            if level is not None:
+                outline.write(level)
+    return outline
+
+
 # --------------------------------------------------------------------------- renderer
 
 
@@ -394,8 +459,7 @@ class _Renderer:
     used_ids: set[str] = field(default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID})
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
-    # Open headings as (level from the fix, level written), outermost first.
-    outline: list[tuple[int, int]] = field(default_factory=list)
+    outline: Outline = field(default_factory=Outline)
 
     # ----- ids and text
 
@@ -426,12 +490,7 @@ class _Renderer:
         return "".join(out)
 
     def heading_parts(self, element: Element) -> tuple[int | None, str]:
-        """(level, text) for a heading element; level None means render it as <p>."""
-        fix = self.fixes.get(element.id)
-        if fix is None or fix.heading is None or fix.status in NOT_CONVERTED:
-            return None, element.text or ""
-        text = fix.heading.text if fix.heading.text.strip() else element.text or ""
-        return (fix.heading.level if text.strip() else None), text
+        return heading_parts(element, self.fixes.get(element.id))
 
     # ----- elements
 
@@ -551,24 +610,8 @@ class _Renderer:
         level, text = self.heading_parts(element)
         if level is None:
             return self.paragraph(element, text)
-        level = self.outline_level(level)
+        level = self.outline.write(level)
         return f"<h{level}{self.id_attr(element.id)}>{self.rich(text)}</h{level}>"
-
-    def outline_level(self, level: int) -> int:
-        """Level to write for a heading the fixes put at `level`; never skips down.
-
-        A rejected or failed heading (written as a paragraph) can open a gap: h1, [h2],
-        h3. Clamping to "previous heading + 1" closes it but turns siblings into parent
-        and child (h1, [h2], h3 a, h3 b -> h1, h2 a, h3 b). So headings still open are
-        kept on a stack: a heading first closes those at its own level or deeper, then
-        goes at most one level below the one left open. Siblings get the same level, and
-        the children of a rejected heading all move up together.
-        """
-        while self.outline and self.outline[-1][0] >= level:
-            self.outline.pop()
-        written = min(level, self.outline[-1][1] + 1) if self.outline else level
-        self.outline.append((level, written))
-        return written
 
     def converted_mathml(
         self, element: Element, display: Display, *, with_id: bool
@@ -692,16 +735,26 @@ def _notice(text: str | None) -> str | None:
     )
 
 
+def _status_label(fix: Fix) -> str:
+    return REVIEWER_ACCEPTED_LABEL if fix.accepted_by_reviewer else STATUS_LABELS[fix.status]
+
+
+# Order of the per-status counts in the about section.
+_LABEL_ORDER = [STATUS_LABELS[Status.ACCEPTED], REVIEWER_ACCEPTED_LABEL] + [
+    STATUS_LABELS[s] for s in Status if s is not Status.ACCEPTED
+]
+
+
 def _about_section(fixes: list[Fix], flagged: int, source_note: str | None) -> str:
-    counts = Counter((fix.kind, fix.status) for fix in fixes)
+    counts = Counter((fix.kind, _status_label(fix)) for fix in fixes)
     items = []
     for kind, label in KIND_LABELS.items():
         total = sum(n for (k, _), n in counts.items() if k is kind)
         if not total:
             continue
         parts = [
-            f"{counts[(kind, status)]} {STATUS_LABELS[status]}"
-            for status in Status
+            f"{counts[(kind, status)]} {status}"
+            for status in _LABEL_ORDER
             if counts[(kind, status)]
         ]
         items.append(f"<li>{label} ({total}): {', '.join(parts)}</li>")

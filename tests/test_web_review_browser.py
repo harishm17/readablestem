@@ -25,7 +25,7 @@ from collections.abc import Iterator
 import pytest
 
 from a11y_stem.core.types import ConversionOutput
-from a11y_stem.web.views import FIX_STATUS_LABELS
+from a11y_stem.web.views import FIX_STATUS_LABELS, REVIEWER_ACCEPTED_LABEL
 from fixtures.web.support import ALICE, WebEnv, make_pdf
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import axe_violations, describe, free_port, sign_in
@@ -40,7 +40,8 @@ sync_api = pytest.importorskip("playwright.sync_api")
 LONG_NAME = "Physics_Unit_2_Kinematics_Lecture_Notes_With_Worked_Examples_Fall_2026_FINAL_v3.pdf"
 NARROW = {"width": 320, "height": 640}
 WIDE = {"width": 1280, "height": 900}
-STATUS_WORDS = set(FIX_STATUS_LABELS.values())  # "Needs review", "Rejected: original kept", ...
+# "Needs review", "Rejected: original kept", ..., "Accepted by you"
+STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL}
 
 
 def wide_equation() -> str:

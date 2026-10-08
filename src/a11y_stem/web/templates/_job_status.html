@@ -1,5 +1,6 @@
 {# `outcome` (web/outcome.py) replaces the plain status when a finished job is incomplete
-   (a spend cap stopped it, scanned pages) or a queued job waits for tomorrow's budget. #}
+   (a spend cap stopped it, scanned pages), a failed job has its own explanation, or a
+   queued job waits for tomorrow's budget. #}
 {% set outcome = outcome|default(none) %}
 {# Only in the htmx fragment: htmx moves a top-level <title> into the document title, so
    the tab title follows the status ("Converting: notes.pdf") as the box does. #}

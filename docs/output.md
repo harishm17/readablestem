@@ -198,7 +198,9 @@ heading move up together:
 | h1 Chapter, ~~h2 Section 1~~, h3 Sub 1.1, h3 Sub 1.2, h2 Section 2 | h1, p, h2, h2, h2 |
 
 (Clamping to "previous heading + 1" alone would make Sub 1.2 a child of Sub 1.1.) The
-first heading keeps its level; an outline with no gaps is written unchanged.
+first heading keeps its level; an outline with no gaps is written unchanged. The repair
+is `assemble.Outline`; the review screen asks it (`would_write`) before saving a new
+heading level, and refuses a level the output would show differently.
 
 ## About this conversion
 
@@ -207,7 +209,8 @@ The last section of `<main>` contains:
 - "This file was produced with a11y-stem, which assists with accessibility; review it
   before publishing."
 - counts per kind and status (e.g. "Equations (5): 2 accepted, 1 not converted (model
-  unsure), ..."),
+  unsure), ..."); a reviewer's Accept (`Fix.reviewed`) is counted apart from the
+  pipeline's, as "accepted by a reviewer",
 - how many items are flagged and what the flags look like,
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
@@ -262,10 +265,11 @@ content. Without Playwright or its Chromium it returns one
 `Check(name="axe", passed=True, severity="warning", code="skipped")`. A run takes about
 a second.
 
-`DocumentResult` has no field for these yet, so `convert_pdf` returns them on
-`run.PipelineOutput.checks` (a subclass of `ConversionOutput`). The CLI prints them and
-writes them to `--report`. Anyone holding only a `DocumentResult` can recompute them:
-`static_checks(result.html)` is deterministic and fast.
+`convert_pdf` stores the static checks on `DocumentResult.html_checks` (and, for older
+callers, on `run.PipelineOutput.checks`). The CLI prints them and writes them to
+`--report`; the web app lists the failed ones on the job page and re-runs them after
+every review decision re-renders the file. `static_checks(result.html)` is deterministic
+and fast, so anyone holding only the HTML can recompute them.
 
 ## How `convert_pdf` fills it in
 

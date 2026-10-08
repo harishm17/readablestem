@@ -21,6 +21,7 @@ from sqlalchemy import select
 from a11y_stem.core.types import DocumentResult, Kind
 from a11y_stem.models import make_vision_client
 from a11y_stem.ops.aggregate import aggregate_finished
+from a11y_stem.pipeline.html_checks import static_checks
 from a11y_stem.web.app import create_app
 from a11y_stem.web.db import Blob, ErrorAggregate, Job, ReviewEdit, session_scope
 from a11y_stem.web.review import rerender_html
@@ -147,3 +148,17 @@ def test_review_then_aggregate_then_delete(site):
         assert session.scalar(select(Blob).where(Blob.job_id == site.job_id)) is None
         rows = {(r.step, r.category): r.count for r in session.scalars(select(ErrorAggregate))}
     assert rows[("heading", "review:reject")] == 1  # review actions are counted at deletion
+
+
+def test_a_review_decision_reruns_the_checks_on_the_real_output(site):
+    """The review screen's browser tests stub the assembler; here the re-rendered file is
+    the real one, and the job page lists the checks of what the user downloads."""
+    assert review(site, "p1-e3", action="accept").status_code == 303  # a heading
+    job = site.job(site.job_id)
+    result = DocumentResult.model_validate(job.result_json)
+    assert result.html_checks == static_checks(job.html or "")
+    assert result.html_checks and all(c.passed for c in result.html_checks)
+    assert result.fix_for("p1-e3").reviewed  # type: ignore[union-attr]
+    assert "3 accepted, 1 accepted by a reviewer</li>" in about(job.html or "")
+    page = site.browser.get(f"/jobs/{site.job_id}").text
+    assert f"All {len(result.html_checks)} checks passed" in page

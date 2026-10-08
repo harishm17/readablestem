@@ -118,8 +118,13 @@
   {% set err = item.errors.get("level") %}
   <div class="field{% if err %} field-error{% endif %}">
     <label for="level-{{ eid }}">Level for {{ name }}</label>
+    {% if item.heading_max_level %}
+    {# The output never skips a level, so a deeper level would be shown as another. #}
+    <p class="hint" id="level-hint-{{ eid }}">Level 1 is the top. After the heading before it, this one can be level 1{% if item.heading_max_level > 1 %} to {{ item.heading_max_level }}{% endif %}.</p>
+    {% endif %}
     {% if err %}<p class="error-message" id="level-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-    <select id="level-{{ eid }}" name="level"{% if err %} aria-invalid="true" aria-describedby="level-error-{{ eid }}"{% endif %}>
+    {% set described = (["level-hint-" ~ eid] if item.heading_max_level else []) + (["level-error-" ~ eid] if err else []) %}
+    <select id="level-{{ eid }}" name="level"{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if err %} aria-invalid="true"{% endif %}>
       {% for n in range(1, 7) %}
       <option value="{{ n }}"{% if item.values.get("level") == n|string %} selected{% endif %}>Level {{ n }}</option>
       {% endfor %}

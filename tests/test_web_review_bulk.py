@@ -338,7 +338,8 @@ def test_accept_by_confidence(rich):
 
 def test_bulk_never_overrides_a_reviewers_decision(rich):
     post(rich, "p1-e3", action="reject")
-    post(rich, "p2-e0", action="edit", level="3")
+    # Level 2: after the rejected h2, level 3 would skip a level and is refused.
+    assert post(rich, "p2-e0", action="edit", level="2").status_code == 303
     post(rich, "headings", action="accept_all")
     after = statuses(rich)
     assert (after["p1-e3"], after["p2-e0"], after["p3-e3"]) == ("rejected", "edited", "accepted")

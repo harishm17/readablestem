@@ -39,7 +39,11 @@ class Kind(StrEnum):
 
 
 class Status(StrEnum):
-    """Lifecycle of a fix. The first four are set by the pipeline, the last two by review."""
+    """Lifecycle of a fix. The first four are set by the pipeline, the last two by review.
+
+    A reviewer's "Accept" also sets ACCEPTED (the proposal is used as it is, exactly as
+    when the pipeline accepts it); `Fix.reviewed` tells the two apart.
+    """
 
     ACCEPTED = "accepted"  # passed every error-level check, confidence >= auto threshold
     NEEDS_REVIEW = "needs_review"  # usable proposal, but low confidence or a warning
@@ -141,10 +145,23 @@ class Fix(BaseModel):
     checks: list[Check] = Field(default_factory=list)
     calls: list[ModelCall] = Field(default_factory=list)
     reason: str | None = None  # category code for ABSTAINED / FAILED
+    # True once a reviewer accepted, edited or rejected this fix on the review screen.
+    # Defaults to False so results stored before the field existed still load.
+    reviewed: bool = False
 
     @property
     def cost_usd(self) -> float:
         return sum(c.cost_usd for c in self.calls)
+
+    @property
+    def accepted_by_reviewer(self) -> bool:
+        return self.status is Status.ACCEPTED and self.reviewed
+
+    @property
+    def decided_by_reviewer(self) -> bool:
+        """Accepted, edited or rejected by a reviewer (EDITED and REJECTED only come from
+        review, also in results stored before `reviewed` existed)."""
+        return self.reviewed or self.status in {Status.EDITED, Status.REJECTED}
 
     @property
     def failed_checks(self) -> list[Check]:

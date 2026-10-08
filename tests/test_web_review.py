@@ -304,7 +304,8 @@ def test_decided_fixes_are_folded_away(web):
         headings
     )
     assert (
-        '<summary id="fix-title-p1-e0">Heading 1, page 1: Accepted, confidence High (100%)'
+        '<summary id="fix-title-p1-e0">Heading 1, page 1: Accepted automatically, '
+        "confidence High (100%)"
         "</summary>" in headings
     )
 
@@ -592,3 +593,204 @@ def test_sanitizer_refuses_anything_unexpected(bad):
     with pytest.raises(UnsafeMathML):
         sanitize_mathml(bad)
     assert try_sanitize_mathml(bad) is None
+
+
+# --------------------------------------------------------------------------- cleaning
+
+
+@pytest.mark.parametrize(
+    ("typed", "stored"),
+    [
+        ("$v_f = v_0 + at$", "v_f = v_0 + at"),  # dollars a reviewer pasted in
+        ("\\[ x^2 \\]", "x^2"),
+        ("50% of g", "50\\% of g"),  # a bare % would end the line as a comment
+    ],
+)
+def test_reviewer_latex_is_cleaned_like_model_output(web, typed, stored):
+    assert post(web, "p1-e3", action="edit", latex=typed).status_code == 303
+    assert web.pipeline.latex_checked == [stored]  # validated as it is stored
+    fix = result(web).fix_for("p1-e3")
+    assert fix is not None and fix.equation is not None and fix.equation.latex == stored
+
+
+def test_refused_latex_is_shown_back_as_the_reviewer_typed_it(web):
+    response = post(web, "p1-e3", action="edit", latex="$\\bad{y}$")
+    assert response.status_code == 422
+    assert "$\\bad{y}$</textarea>" in response.text
+    assert web.pipeline.latex_checked == ["\\bad{y}"]
+
+
+def test_latex_that_is_only_a_wrapper_is_refused_as_empty(web):
+    response = post(web, "p1-e5", action="edit", latex="$$")
+    assert response.status_code == 422
+    assert "Enter the LaTeX" in response.text
+
+
+def test_reviewer_alt_text_is_cleaned_like_model_output(web):
+    """Bidi controls and zero-width characters are invisible but change what a screen
+    reader says; check_alt refuses them uncleaned, so the reviewer's text is cleaned
+    first and what is stored is exactly what was checked."""
+    typed = "A line\u202e rising\u200b steadily\u2066"
+    assert post(web, "p1-e4", action="edit", alt=typed).status_code == 303
+    assert web.pipeline.alt_checked == [
+        ("A line rising steadily", False, "Figure 1 SECRET-CAPTION")
+    ]
+    fix = result(web).fix_for("p1-e4")
+    assert fix is not None and fix.figure is not None
+    assert fix.figure.alt == "A line rising steadily"
+
+
+# --------------------------------------------------------------------------- heading levels
+
+
+@pytest.mark.parametrize("level", ["\u00b2", "\u0663", "0", "7", "1 ", "+2", "", "\uff11"])
+def test_heading_level_accepts_only_the_digits_1_to_6(web, level):
+    """ "\u00b2".isdigit() is True and int("\u00b2") raises: that was a 500."""
+    response = post(web, "p1-e0", action="edit", level=level)
+    assert response.status_code == 422
+    assert "Choose a heading level from 1 to 6." in response.text
+
+
+def outline_output() -> ConversionOutput:
+    """h1 Motion, h2 Speed, h3 Units, then a paragraph: a clean outline."""
+    output = rich_output()
+    headings = [("p1-e0", 1), ("p1-e1", 2), ("p1-e2", 3)]
+    output.result.elements = [
+        Element(id=eid, kind=Kind.HEADING, page=0, bbox=(0, i, 1, i + 1), order=i,
+                text=f"SECRET-HEADING {eid}")
+        for i, (eid, _) in enumerate(headings)
+    ] + [Element(id="p1-e3", kind=Kind.PARAGRAPH, page=0, bbox=(0, 3, 1, 4), order=3,
+                 text="SECRET-DOC-TEXT")]  # fmt: skip
+    output.result.fixes = [
+        Fix(element_id=eid, kind=Kind.HEADING, status=Status.NEEDS_REVIEW, confidence=0.6,
+            heading=HeadingFix(level=level, text=f"SECRET-HEADING {eid}"))
+        for eid, level in headings
+    ]  # fmt: skip
+    output.crops = {}
+    return output
+
+
+@pytest.fixture
+def outline(tmp_path, monkeypatch):
+    fake = install_fake_pipeline(monkeypatch)
+    env = WebEnv(tmp_path)
+    env.converter.output = outline_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.pipeline = fake
+        env.job_id = job_id_from(upload(client, make_pdf(1)))
+        env.run_worker()
+        yield env
+
+
+def levels(env) -> dict[str, int]:
+    return {f.element_id: f.heading.level for f in result(env).fixes if f.heading}
+
+
+def test_a_level_the_outline_repair_would_change_is_refused(outline):
+    """The output never skips a level: h1, h2, then h4 would be written as h3. Storing
+    4 and showing 3 would make the review screen disagree with the document."""
+    response = post(outline, "p1-e2", action="edit", level="4")
+    assert response.status_code == 422
+    assert (
+        "Level 4 would skip a level after the heading before it, so the document would "
+        "show it as level 3. Choose a level from 1 to 3, or change the heading before it "
+        "first."
+    ) in response.text
+    assert '<a href="#level-p1-e2">' in response.text
+    assert levels(outline) == {"p1-e0": 1, "p1-e1": 2, "p1-e2": 3}
+    assert edits(outline) == [] and outline.pipeline.rendered == []
+    for level, written in (("2", 2), ("1", 1)):  # siblings and parents always fit
+        assert post(outline, "p1-e2", action="edit", level=level).status_code == 303
+        assert levels(outline)["p1-e2"] == written
+
+
+def test_a_rejected_parent_changes_which_levels_fit(outline):
+    assert post(outline, "p1-e1", action="reject").status_code == 303  # h2 -> paragraph
+    response = post(outline, "p1-e2", action="edit", level="3")
+    assert response.status_code == 422
+    assert "show it as level 2. Choose a level from 1 to 2" in response.text
+    assert post(outline, "p1-e2", action="edit", level="2").status_code == 303
+
+
+def test_the_first_heading_may_take_any_level(outline):
+    assert post(outline, "p1-e0", action="edit", level="3").status_code == 303
+    assert levels(outline)["p1-e0"] == 3
+
+
+def test_the_review_page_says_which_levels_fit(outline):
+    page = review_page(outline)
+    assert "this one can be level 1 to 6." in card(page, "p1-e0")  # the first heading
+    assert "this one can be level 1 to 2." in card(page, "p1-e1")
+    third = card(page, "p1-e2")
+    assert "this one can be level 1 to 3." in third
+    assert 'aria-describedby="level-hint-p1-e2"' in third
+
+
+def test_levels_that_fit_are_always_1_to_n():
+    """The refusal message says "from 1 to n": check it for every outline of up to five
+    headings at levels 1 to 6, with some rejected."""
+    import itertools
+
+    from a11y_stem.web.review import heading_level_written, heading_levels_that_fit
+
+    def doc(spec: tuple[int | None, ...]) -> DocumentResult:
+        elements = [
+            Element(id=f"p1-e{i}", kind=Kind.HEADING, page=0, bbox=(0, 0, 1, 1), order=i,
+                    text="t")
+            for i in range(len(spec) + 1)
+        ]  # fmt: skip
+        fixes = [
+            Fix(element_id=f"p1-e{i}", kind=Kind.HEADING,
+                status=Status.REJECTED if level is None else Status.ACCEPTED,
+                heading=HeadingFix(level=level or 1, text="t"))
+            for i, level in enumerate((*spec, 1))
+        ]  # fmt: skip
+        return DocumentResult(
+            pipeline_version="t",
+            elements=elements,
+            fixes=fixes,
+            stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
+        )
+
+    for n in range(5):
+        for spec in itertools.product((None, 1, 2, 3, 4, 5, 6), repeat=n):
+            data = doc(spec)
+            last = f"p1-e{n}"
+            fits = heading_levels_that_fit(data, last)
+            assert fits == list(range(1, len(fits) + 1)), spec
+            for level in range(1, 7):
+                written = heading_level_written(data, last, level)
+                assert (written == level) == (level in fits), spec
+
+
+# --------------------------------------------------------------------------- after a decision
+
+
+def test_static_checks_are_rerun_on_the_rerendered_html(web):
+    from a11y_stem.pipeline.html_checks import static_checks
+
+    assert post(web, "p1-e3", action="accept").status_code == 303
+    job = web.job(web.job_id)
+    stored = DocumentResult.model_validate(job.result_json).html_checks
+    assert stored and stored == static_checks(job.html or "")
+    # The fake assembler writes a bare page: the stored checks are of that page.
+    assert not next(c for c in stored if c.name == "html.lang").passed
+
+
+def test_a_reviewers_accept_is_marked_as_the_reviewers(web):
+    assert post(web, "p1-e3", action="accept").status_code == 303
+    fixes = {f.element_id: f for f in result(web).fixes}
+    assert fixes["p1-e3"].status is Status.ACCEPTED and fixes["p1-e3"].reviewed
+    assert fixes["p1-e2"].status is Status.ACCEPTED and not fixes["p1-e2"].reviewed
+    assert post(web, "p1-e4", action="reject").status_code == 303
+    assert result(web).fix_for("p1-e4").reviewed  # type: ignore[union-attr]
+    decided = card(review_page(web), "p1-e3")
+    assert "Accepted by you" in decided
+
+
+def test_the_review_page_is_not_announced_as_my_documents(web):
+    assert 'aria-current="page"' not in review_page(web)
+    assert 'aria-current="page"' in web.browser.get("/app").text

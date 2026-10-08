@@ -5,9 +5,12 @@ The web route owns the transaction; this module owns the rules:
 - accept: only a fix with a proposal that passed every error-level check (an abstained
   fix has nothing to accept, and an invalid proposal must be edited, which re-validates
   it; the reviewer can also keep the original by rejecting it),
-- edit: the reviewer's LaTeX / alt text / heading level goes through the same
-  deterministic validators as model output (`pipeline.validate`) before it is stored;
-  error-level failures are shown back to the reviewer, nothing is saved,
+- edit: the reviewer's LaTeX / alt text / heading level goes through the same cleaning
+  and deterministic validators as model output (`equation_step.clean_latex`,
+  `validate.clean_alt`, `pipeline.validate`) before it is stored; error-level failures
+  are shown back to the reviewer, nothing is saved. A heading level the output's
+  outline repair would change (one that skips a level after the heading before it) is
+  refused, with the levels that fit,
 - reject: the original stays in the document, flagged,
 - bulk accept: many fixes of one kind at once, but only the ones a single "Accept" could
   take (NEEDS_REVIEW, a proposal, no failed error-level check). FAILED and ABSTAINED
@@ -25,6 +28,7 @@ so tests (and other work packages' stubs) can be swapped in with monkeypatch.
 from __future__ import annotations
 
 import logging
+import re
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
@@ -228,8 +232,9 @@ def apply_review(
         message += "Edit it, or reject it to keep the original."
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
     if action == "edit":
-        warnings = _edit(fix, element, form)
+        warnings = _edit(result, fix, element, form)
     fix.status = STATUS_FOR_ACTION[action]
+    fix.reviewed = True  # a reviewer's Accept is not the pipeline's automatic one
     _recount(result)
     return ReviewChange(
         fix=fix, action=action, before=before, after=snapshot(fix), warnings=warnings
@@ -240,13 +245,15 @@ def _recount(result: DocumentResult) -> None:
     result.stats.by_status = dict(Counter(f.status.value for f in result.fixes))
 
 
-def _edit(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
+def _edit(
+    result: DocumentResult, fix: Fix, element: Element | None, form: Mapping[str, str]
+) -> list[Check]:
     if fix.kind is Kind.EQUATION:
         return _edit_equation(fix, element, form)
     if fix.kind is Kind.FIGURE:
         return _edit_figure(fix, element, form)
     if fix.kind is Kind.HEADING:
-        return _edit_heading(fix, element, form)
+        return _edit_heading(result, fix, element, form)
     raise ReviewInvalid([FieldError(field_id("actions", fix.element_id), "This cannot be edited.")])
 
 
@@ -255,11 +262,15 @@ def _blocking(checks: list[Check]) -> list[Check]:
 
 
 def _edit_equation(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
-    from a11y_stem.pipeline import validate
+    from a11y_stem.pipeline import equation_step, validate
 
     fid = field_id("latex", fix.element_id)
-    latex = form.get("latex", "").strip()
-    values = {"latex": latex}
+    typed = form.get("latex", "").strip()
+    values = {"latex": typed}  # re-shown as typed when it is refused
+    # The cleaning model output gets: "$v = at$" loses its dollars, and a bare "%" (a
+    # percent sign here, a comment to the converter) is escaped instead of silently
+    # dropping the rest of the line.
+    latex = equation_step.clean_latex(typed)
     if not latex:
         raise ReviewInvalid([FieldError(fid, "Enter the LaTeX for this equation.")], values)
     if len(latex) > MAX_LATEX_CHARS:
@@ -307,7 +318,9 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
     from a11y_stem.pipeline import validate
 
     fid = field_id("alt", fix.element_id)
-    alt = " ".join(form.get("alt", "").split())
+    # What is stored is exactly what check_alt judges: invisible format characters (bidi
+    # controls, zero-width spaces) removed and whitespace collapsed, as for model output.
+    alt = validate.clean_alt(form.get("alt", ""))
     decorative = form.get("decorative") in {"on", "true", "1"}
     values = {"alt": alt, "decorative": "on" if decorative else ""}
     if decorative:
@@ -333,18 +346,76 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
     return [c for c in checks if not c.passed]
 
 
-def _edit_heading(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
+_LEVEL = re.compile(r"[1-6]")  # ASCII only: "²".isdigit() is True, int("²") fails
+
+
+def heading_level_written(result: DocumentResult, element_id: str, level: int) -> int:
+    """The level the output would show for this heading if it were given `level`.
+
+    The assembler repairs the outline (`assemble.Outline`): a heading more than one
+    level below the heading still open before it is moved up. Accepting such a level
+    would store one level and show another, so review refuses it.
+    """
+    from a11y_stem.pipeline import assemble
+
+    outline = assemble.outline_before(result.elements, result.fixes, element_id)
+    return outline.would_write(level)
+
+
+def highest_heading_levels(result: DocumentResult) -> dict[str, int]:
+    """element_id -> the highest level number each heading can take without the outline
+    repair changing it (the review page's hint). One pass in reading order, the way
+    `assemble.render_html` writes the headings."""
+    from a11y_stem.pipeline import assemble
+
+    first: dict[str, Fix] = {}
+    for fix in result.fixes:
+        first.setdefault(fix.element_id, fix)
+    outline = assemble.Outline()
+    highest: dict[str, int] = {}
+    for element in sorted(result.elements, key=lambda e: e.order):
+        if element.kind is not Kind.HEADING:
+            continue
+        fits = [n for n in range(1, 7) if outline.would_write(n) == n]
+        highest.setdefault(element.id, max(fits))
+        level, _ = assemble.heading_parts(element, first.get(element.id))
+        if level is not None:
+            outline.write(level)
+    return highest
+
+
+def heading_levels_that_fit(result: DocumentResult, element_id: str) -> list[int]:
+    """Levels the output keeps as they are for this heading: always 1 to n (n is at
+    least 1; the first heading may take any level)."""
+    return [
+        level for level in range(1, 7) if heading_level_written(result, element_id, level) == level
+    ]
+
+
+def _edit_heading(
+    result: DocumentResult, fix: Fix, element: Element | None, form: Mapping[str, str]
+) -> list[Check]:
     fid = field_id("level", fix.element_id)
     raw = form.get("level", "")
-    if not raw.isdigit() or not 1 <= int(raw) <= 6:
+    if not _LEVEL.fullmatch(raw):
         raise ReviewInvalid(
             [FieldError(fid, "Choose a heading level from 1 to 6.")], {"level": raw}
         )
+    level = int(raw)
+    written = heading_level_written(result, fix.element_id, level)
+    if written != level:
+        highest = max(heading_levels_that_fit(result, fix.element_id))
+        message = (
+            f"Level {level} would skip a level after the heading before it, so the "
+            f"document would show it as level {written}. Choose a level from 1 to "
+            f"{highest}, or change the heading before it first."
+        )
+        raise ReviewInvalid([FieldError(fid, message)], {"level": raw})
     if fix.heading is not None:
         text = fix.heading.text
     else:
         text = (element.text if element else None) or ""
-    fix.heading = HeadingFix(level=int(raw), text=text)
+    fix.heading = HeadingFix(level=level, text=text)
     return []
 
 
@@ -404,6 +475,7 @@ def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[Revi
     for fix in bulk_candidates(result, request):
         before = snapshot(fix)
         fix.status = Status.ACCEPTED
+        fix.reviewed = True
         changes.append(ReviewChange(fix=fix, action="accept", before=before, after=snapshot(fix)))
     if changes:
         _recount(result)
@@ -414,10 +486,14 @@ def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[Revi
 
 
 def rerender_html(result: DocumentResult, crops: dict[str, bytes]) -> str:
-    """The output HTML after a review decision, from the same assembler the pipeline uses."""
-    from a11y_stem.pipeline import assemble
+    """The output HTML after a review decision, from the same assembler the pipeline uses.
 
-    return assemble.render_html(
+    The static checks of the new HTML replace `result.html_checks`, so the job page lists
+    the checks of the file the user downloads, not of the one before the review.
+    """
+    from a11y_stem.pipeline import assemble, html_checks
+
+    html = assemble.render_html(
         title=result.title,
         lang=result.lang,
         elements=result.elements,
@@ -425,3 +501,5 @@ def rerender_html(result: DocumentResult, crops: dict[str, bytes]) -> str:
         crops=crops,
         source_note=None,
     )
+    result.html_checks = html_checks.static_checks(html)
+    return html

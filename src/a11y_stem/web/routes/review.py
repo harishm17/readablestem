@@ -64,6 +64,7 @@ from a11y_stem.web.review import (
     bulk_eligible,
     can_accept,
     group_fixes,
+    highest_heading_levels,
     item_numbers,
     kind_for_slug,
     needs_attention,
@@ -72,7 +73,7 @@ from a11y_stem.web.review import (
     rerender_html,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
-from a11y_stem.web.views import FIX_STATUS_LABELS, KIND_LABELS, JobView, job_view
+from a11y_stem.web.views import KIND_LABELS, JobView, fix_status_label, job_view
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -131,6 +132,8 @@ class ReviewItem:
     caption: str | None
     heading_level: int | None
     heading_text: str | None
+    # Headings: levels 1 to this one keep their place in the outline (web.review).
+    heading_max_level: int | None
     can_accept: bool
     values: dict[str, str]
     errors: dict[str, str] = field(default_factory=dict)  # field prefix -> message
@@ -190,6 +193,7 @@ def _item(
     number: int,
     job_id: str,
     crop_ids: set[str],
+    max_level: int | None = None,
 ) -> ReviewItem:
     values: dict[str, str] = {}
     if fix.equation is not None:
@@ -205,7 +209,7 @@ def _item(
         label=f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
         page=(element.page + 1) if element else 0,
         status=fix.status.value,
-        status_label=FIX_STATUS_LABELS.get(fix.status, fix.status.value),
+        status_label=fix_status_label(fix),
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c) for c in fix.failed_checks],
@@ -220,6 +224,7 @@ def _item(
         caption=element.caption if element and fix.kind is Kind.FIGURE else None,
         heading_level=fix.heading.level if fix.heading else None,
         heading_text=fix.heading.text if fix.heading else (element.text if element else None),
+        heading_max_level=max_level if fix.kind is Kind.HEADING else None,
         can_accept=can_accept(fix) and fix.status is not Status.ACCEPTED,
         values=values,
     )
@@ -332,8 +337,16 @@ def _page(
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     fix_groups = group_fixes(result)
+    max_levels = highest_heading_levels(result)
     items = {
-        f.element_id: _item(f, elements.get(f.element_id), numbers[f.element_id], view.id, crop_ids)
+        f.element_id: _item(
+            f,
+            elements.get(f.element_id),
+            numbers[f.element_id],
+            view.id,
+            crop_ids,
+            max_levels.get(f.element_id),
+        )
         for g in fix_groups
         for f in (*g.pending, *g.done)
     }
@@ -352,7 +365,8 @@ def _page(
         "remaining": sum(len(g.pending) for g in fix_groups),
         "remaining_by_kind": [counted(len(g.pending), g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
-        "active": "app",
+        # No `active` nav item: this page is not "My documents" itself, so the link
+        # must not be announced as the current page (aria-current="page").
     }
     return render(request, "review.html", context, status_code=status_code)
 
