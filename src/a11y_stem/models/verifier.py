@@ -422,11 +422,12 @@ class FakeVerifier:
         default: Mapping[str, float],
         request: DecisionRequest,
     ) -> VerifierVerdict:
+        from a11y_stem.models.decisions_client import reservation_usd
         from a11y_stem.models.pricing import decisions_cost_usd
 
         cost = 0.0
         if self.budget is not None:
-            estimate = _estimate(self.model, request)
+            estimate = reservation_usd(self.model, request)
             try:
                 reservation = self.budget.reserve(estimate)
             except BudgetExceeded:
@@ -442,18 +443,6 @@ class FakeVerifier:
         return VerifierVerdict(
             check, probabilities, "ok", self.model, version, FAKE_INPUT_TOKENS, cost, 1
         )
-
-
-def _estimate(model: str, request: DecisionRequest) -> float:
-    from a11y_stem.models.decisions_client import ImagePart, TextPart
-    from a11y_stem.models.pricing import estimate_decisions_max_cost_usd
-
-    return estimate_decisions_max_cost_usd(
-        model,
-        n_images=sum(isinstance(p, ImagePart) for p in request.parts),
-        text_chars=sum(len(p.text) for p in request.parts if isinstance(p, TextPart)),
-        question_chars=[q.chars for q in request.questions],
-    )
 
 
 def make_verifier(settings: Settings, budget: JobBudget, *, fake: bool = False) -> Verifier:

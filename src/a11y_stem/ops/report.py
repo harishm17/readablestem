@@ -4,9 +4,10 @@
 outcomes, pages, cost per page and conversion times; the review load (decisions a
 person had to make per page, optional notes per page, by step); per step (equation,
 figure, heading) the status and review-tier mix, the most frequent reasons for each tier,
-failed checks and reasons, and model call outcomes; failed static checks of the output
-HTML. Each table is plain text, so it can be
-pasted into a weekly note as is.
+failed checks and reasons, and model call outcomes; the second automated check
+(answers, flags and score histogram per check and stage, its spend per page) and the
+daily Decisions canary; failed static checks of the output HTML. Each table is plain
+text, so it can be pasted into a weekly note as is.
 """
 
 from __future__ import annotations
@@ -75,6 +76,30 @@ def _review_load(counts: dict[tuple[str, str], int], pages: int) -> list[tuple[s
     return rows
 
 
+def _second_check(counts: dict[tuple[str, str], int], step: str) -> list[tuple[str, str]]:
+    """Answers of the second automated check for one step, per check and stage:
+    outcomes, flags and the score histogram (counts only, as aggregated)."""
+    rows: list[tuple[str, str]] = []
+    found = sorted(
+        (c.removeprefix("verify:"), n)
+        for (s, c), n in counts.items()
+        if s == step and c.startswith("verify:") and c != "verify:cost_microusd"
+    )
+    rows += [(label, str(n)) for label, n in found]
+    micro = counts.get((step, "verify:cost_microusd"), 0)
+    if micro:
+        rows.append(("cost", f"${micro / 1e6:.4f}"))
+    return rows
+
+
+def _canary(counts: dict[tuple[str, str], int]) -> list[tuple[str, str]]:
+    return [
+        (c.removeprefix("decisions:"), str(n))
+        for (s, c), n in sorted(counts.items())
+        if s == "canary" and c.startswith("decisions:")
+    ]
+
+
 def render_report(counts: dict[tuple[str, str], int], *, since: date, until: date) -> str:
     """The report text for already-loaded counts (see `load_counts`)."""
     job = {c: n for (s, c), n in counts.items() if s == "job"}
@@ -127,6 +152,15 @@ def render_report(counts: dict[tuple[str, str], int], *, since: date, until: dat
         lines += _table(f"{step}: top reasons", _top(counts, step, "reason:"))
         lines += _table(f"{step}: model calls", _top(counts, step, "call:"))
         lines += _table(f"{step}: review actions", _top(counts, step, "review:"))
+        if step != "heading":
+            lines += _table(f"{step}: second automated check", _second_check(counts, step))
+    verify_micro = sum(counts.get((s, "verify:cost_microusd"), 0) for s in STEPS)
+    if verify_micro:
+        per_page = f" (${verify_micro / 1e6 / pages:.5f} per page)" if pages else ""
+        lines += _table(
+            "Second automated check: spend", [("total", f"${verify_micro / 1e6:.4f}{per_page}")]
+        )
+    lines += _table("Decisions canary (days run, drift, failed)", _canary(counts))
     lines += _table("Output HTML: failed static checks", _top(counts, "document", "check:"))
     return "\n".join(lines).rstrip() + "\n"
 

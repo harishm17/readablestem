@@ -35,8 +35,12 @@ def _router(monkeypatch):
 
 
 def figure_out(alt=ALT, confidence=0.95, *, decorative=False, figure_type="chart"):
-    return {"figure_type": figure_type, "decorative": decorative, "alt": alt,
-            "confidence": confidence}  # fmt: skip
+    return {
+        "figure_type": figure_type,
+        "decorative": decorative,
+        "alt": alt,
+        "confidence": confidence,
+    }
 
 
 def figure_client(answer, verifier=None) -> FakeVisionClient:
@@ -73,7 +77,11 @@ def test_an_accepted_figure_with_no_contradiction_stays_as_it_was():
     assert check.passed and check.severity == "warning"
     (record,) = fix.verifications
     assert (record.check, record.stage, record.mode, record.outcome) == (
-        FIGURE_CHECK, "final", "note", "ok")  # fmt: skip
+        FIGURE_CHECK,
+        "final",
+        "note",
+        "ok",
+    )
     assert record.probabilities == {"ok": 0.95, "factual_error": 0.03}
     assert record.flagged is False
     assert verifier.requests == [(FIGURE_CHECK, ALT)]
@@ -88,7 +96,10 @@ def test_a_possible_mismatch_is_an_optional_note_never_a_decision(ok, fe):
     assert fix.confidence == pytest.approx(0.95)
     (check,) = fix.failed_checks
     assert (check.name, check.code, check.severity) == (
-        "figure.second_check", "second_check_mismatch", "warning")  # fmt: skip
+        "figure.second_check",
+        "second_check_mismatch",
+        "warning",
+    )
     assert explain_check(check).text == NOTE
     assert fix.verifications[0].flagged is True
     # Everything but the note is what the figure would have been without the check.
@@ -109,8 +120,9 @@ def test_existing_notes_stay_and_the_flag_adds_one():
     assert {c.code for c in fix.failed_checks} == {"too_long", "second_check_mismatch"}
 
 
-@pytest.mark.parametrize("outcome", ["timeout", "api_error", "refused", "invalid_output",
-                                     "skipped"])  # fmt: skip
+@pytest.mark.parametrize(
+    "outcome", ["timeout", "api_error", "refused", "invalid_output", "skipped"]
+)
 def test_no_answer_leaves_the_figure_exactly_as_today(outcome):
     verifier = FakeVerifier(outcomes={FIGURE_CHECK: outcome})
     fix = describe_with(figure_out(), verifier)
@@ -123,9 +135,10 @@ def test_no_answer_leaves_the_figure_exactly_as_today(outcome):
 def test_no_budget_left_for_the_check_is_fail_open_too():
     job = JobBudget(InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=1)
     client = FakeVisionClient(
-        responders={"figure": lambda req: figure_out()}, budget=job,
+        responders={"figure": lambda req: figure_out()},
+        budget=job,
         verifier=FakeVerifier(budget=job),
-    )  # fmt: skip
+    )
     fix = describe(figure_element(), PNG, client=client, settings=SETTINGS)
     assert fix.status is Status.ACCEPTED and fix.review == "none"
     assert fix.verifications[0].outcome == "budget_exceeded"
@@ -187,15 +200,14 @@ SCENARIOS = {
     # name: (element, answers)
     "main accepted": (equation_element(text="F = ma"), {"main": eq_out()}),
     "main needs review": (equation_element(), {"main": eq_out(confidence=0.7)}),
-    "cheap accepted": (
-        equation_element(display="inline", text="F = ma"), {"cheap": eq_out()}),
+    "cheap accepted": (equation_element(display="inline", text="F = ma"), {"cheap": eq_out()}),
     "cheap escalated": (
         equation_element(display="inline", text="F = ma"),
         {"cheap": eq_out(confidence=0.6), "main": eq_out(r"F = m \cdot a")},
     ),
     "invalid latex": (equation_element(), {"main": eq_out(r"\input{x}")}),
     "refused": (equation_element(), {}),
-}  # fmt: skip
+}
 
 
 @pytest.mark.parametrize("name", SCENARIOS)
@@ -294,8 +306,19 @@ def test_the_committed_demo_report_still_loads():
 
 def test_a_result_with_an_unknown_future_check_still_loads():
     fix = Fix.model_validate(
-        {"element_id": "p1-e1", "kind": "equation", "status": "accepted",
-         "verifications": [{"check": "future_check", "stage": "later", "mode": "gate",
-                            "outcome": "new_outcome", "probabilities": {"x": 0.5}}]}
-    )  # fmt: skip
+        {
+            "element_id": "p1-e1",
+            "kind": "equation",
+            "status": "accepted",
+            "verifications": [
+                {
+                    "check": "future_check",
+                    "stage": "later",
+                    "mode": "gate",
+                    "outcome": "new_outcome",
+                    "probabilities": {"x": 0.5},
+                }
+            ],
+        }
+    )
     assert fix.verifications[0].check == "future_check"

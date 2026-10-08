@@ -1,0 +1,198 @@
+{
+ "cases": {
+  "equation-circle-match": {
+   "answers": {
+    "verdict": {
+     "cosmetic": 0.03,
+     "match": 0.93,
+     "meaning_changing": 0.04
+    }
+   },
+   "request_sha": "823849778831bb2fa30e99fe4cb9998d0a712260b0fa8cc16c3a7326ec2a1b78"
+  },
+  "equation-circle-wrong-digits": {
+   "answers": {
+    "verdict": {
+     "cosmetic": 0.01,
+     "match": 0.02,
+     "meaning_changing": 0.97
+    }
+   },
+   "request_sha": "60e04978d507d8423ba16c21ef74b0bc9dd7ff0f4dfeb78ee156dbf72cef7b4f"
+  },
+  "equation-emc2-match": {
+   "answers": {
+    "verdict": {
+     "cosmetic": 0.02,
+     "match": 0.96,
+     "meaning_changing": 0.02
+    }
+   },
+   "request_sha": "96ad9f2a538ed9dd1a51b5fe62b321afc6fd58202e457f272cb0418435785df4"
+  },
+  "equation-emc2-wrong-exponent": {
+   "answers": {
+    "verdict": {
+     "cosmetic": 0.0,
+     "match": 0.01,
+     "meaning_changing": 0.99
+    }
+   },
+   "request_sha": "fe43a13d38836e2a31c0636abcea5d5d81d42004cccf9a9a120395866c8adebb"
+  },
+  "equation-fma-match": {
+   "answers": {
+    "verdict": {
+     "cosmetic": 0.01,
+     "match": 0.98,
+     "meaning_changing": 0.01
+    }
+   },
+   "request_sha": "b9912c887b47e1cba76541d058ed3d37bc95278f8223a8a5ba5ebbece1443692"
+  },
+  "equation-fma-wrong-operator": {
+   "answers": {
+    "verdict": {
+     "cosmetic": 0.01,
+     "match": 0.02,
+     "meaning_changing": 0.97
+    }
+   },
+   "request_sha": "c39da9054bb67fa3e6ea2c604f30e69a503c82ffd35f88980a111a7b79acb353"
+  },
+  "figure-arrow-correct": {
+   "answers": {
+    "fe": {
+     "true": 0.0
+    },
+    "ok": {
+     "true": 0.95
+    }
+   },
+   "request_sha": "133a39b648a4f2805f9c32f291790cfe8e6c24a19db1993290cca3191c1b0f5e"
+  },
+  "figure-arrow-generic": {
+   "answers": {
+    "fe": {
+     "true": 0.0
+    },
+    "ok": {
+     "true": 0.0
+    }
+   },
+   "request_sha": "9a202bbc9b86962937b9186fd7734cf05ea5f92ab347c2ce9b4fbeedeaeeff09"
+  },
+  "figure-arrow-wrong-direction": {
+   "answers": {
+    "fe": {
+     "true": 1.0
+    },
+    "ok": {
+     "true": 0.0
+    }
+   },
+   "request_sha": "6c091296b987e79fceaaff6fd9d0fea7bff907fc10f9175a2ae73cafaef60b8a"
+  },
+  "figure-bars-correct": {
+   "answers": {
+    "fe": {
+     "true": 0.0
+    },
+    "ok": {
+     "true": 1.0
+    }
+   },
+   "request_sha": "5c55b51d8ee74ca34ad126ce90252570b796515715fac2a63f6deb1544365d26"
+  },
+  "figure-bars-other-image": {
+   "answers": {
+    "fe": {
+     "true": 1.0
+    },
+    "ok": {
+     "true": 0.0
+    }
+   },
+   "request_sha": "9c458e30b4f41091e9a5ca89ae63725ab13c1f728dfb4d882ceae419646f4a20"
+  },
+  "figure-bars-wrong-value": {
+   "answers": {
+    "fe": {
+     "true": 1.0
+    },
+    "ok": {
+     "true": 0.01
+    }
+   },
+   "request_sha": "05f9ad4a26c9eb117d019007141ee17e79d3f5c627fe966c71ee72dc40750f7e"
+  },
+  "text-boiling-false": {
+   "answers": {
+    "true": {
+     "true": 0.0
+    }
+   },
+   "request_sha": "8960c80aa910ffd602b65f5e17d7531739003e0bbf20a4b240d332dc0cb73593"
+  },
+  "text-light-false": {
+   "answers": {
+    "true": {
+     "true": 0.0
+    }
+   },
+   "request_sha": "0aeb32cadb2b9bf009f3771ac9e1163ec5c5fd6e80ce244f8566bd72c1eecf8f"
+  },
+  "text-power-true": {
+   "answers": {
+    "true": {
+     "true": 1.0
+    }
+   },
+   "request_sha": "8e1f582755332acd37792b7f0aa66a6d817a35249ff948953770579e18f271ef"
+  },
+  "text-product-false": {
+   "answers": {
+    "true": {
+     "true": 0.06
+    }
+   },
+   "request_sha": "407900146e595973ed5bdf23dbff64dfffde591ca3ba6dc4cac9f18b44ca85fe"
+  },
+  "text-product-true": {
+   "answers": {
+    "true": {
+     "true": 1.0
+    }
+   },
+   "request_sha": "0552741690eea945d522ef5334488849474e1008e599318c507be7cf2cd22076"
+  },
+  "text-root-true": {
+   "answers": {
+    "true": {
+     "true": 1.0
+    }
+   },
+   "request_sha": "2440e468a5a17bbfbcb557ad11591686e7870939faca6af26fcce3f51ce6761b"
+  },
+  "text-triangle-false": {
+   "answers": {
+    "true": {
+     "true": 0.0
+    }
+   },
+   "request_sha": "3291eb745df61211cf5e3f08408c16ce59b39ebb679109c515f647e260c98a84"
+  },
+  "text-units-true": {
+   "answers": {
+    "true": {
+     "true": 1.0
+    }
+   },
+   "request_sha": "cc9754550991da8d2c7bb7bf459b6dc4b0d368c9179272ebed2f52439e1cce76"
+  }
+ },
+ "model": "gpt-6-luna",
+ "recorded": "2026-10-08",
+ "schema": 1,
+ "tolerance": 0.02
+}

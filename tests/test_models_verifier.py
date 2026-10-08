@@ -187,8 +187,9 @@ def test_end_to_end_over_the_real_sdk():
             {"type": "predicate", "name": "ok", "probability": 0.31},
             {"type": "predicate", "name": "fe", "probability": 0.88},
         ]
-        return httpx2.Response(200, json={"model": "gpt-6-luna", "answers": answers,
-                                          "usage": {"input_tokens": 700}})  # fmt: skip
+        return httpx2.Response(
+            200, json={"model": "gpt-6-luna", "answers": answers, "usage": {"input_tokens": 700}}
+        )
 
     sdk = openai.OpenAI(
         api_key="sk-test",
@@ -222,8 +223,12 @@ def test_verification_records_are_content_free_numbers_and_codes():
 
 def test_fake_verifier_answers_records_and_charges_the_budget():
     job = budget()
-    fake = FakeVerifier(budget=job, responder=lambda check, text: {"ok": 0.2, "factual_error": 0.9}
-                        if "wrong" in text else None)  # fmt: skip
+    fake = FakeVerifier(
+        budget=job,
+        responder=lambda check, text: (
+            {"ok": 0.2, "factual_error": 0.9} if "wrong" in text else None
+        ),
+    )
     right = fake.figure_alt(PNG, alt="right", caption=None)
     wrong = fake.figure_alt(PNG, alt="wrong", caption=None)
     assert figure_score(right.probabilities) > 0.5 > figure_score(wrong.probabilities)  # type: ignore[operator]

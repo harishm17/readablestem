@@ -225,12 +225,7 @@ class DecisionsClient:
         model = self.model
         decisions_price_for(model)  # unpriced model: refuse before reserving
         sdk = self._client()
-        estimate = estimate_decisions_max_cost_usd(
-            model,
-            n_images=sum(isinstance(p, ImagePart) for p in request.parts),
-            text_chars=sum(len(p.text) for p in request.parts if isinstance(p, TextPart)),
-            question_chars=[q.chars for q in request.questions],
-        )
+        estimate = reservation_usd(model, request)
         started = time.perf_counter()
         reservation = self._budget.reserve(estimate)  # BudgetExceeded: nothing was sent
         try:
@@ -317,6 +312,17 @@ class DecisionsClient:
 
 
 # ------------------------------------------------------------------------- request
+
+
+def reservation_usd(model: str, request: DecisionRequest) -> float:
+    """What `decide` reserves before sending `request`: its worst-case cost (images
+    once, the text parts once, every question by its own length)."""
+    return estimate_decisions_max_cost_usd(
+        model,
+        n_images=sum(isinstance(p, ImagePart) for p in request.parts),
+        text_chars=sum(len(p.text) for p in request.parts if isinstance(p, TextPart)),
+        question_chars=[q.chars for q in request.questions],
+    )
 
 
 def request_content(request: DecisionRequest) -> list[dict[str, Any]]:
