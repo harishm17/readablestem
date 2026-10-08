@@ -429,6 +429,7 @@ forms or reading our cookies.
 The app pages have no inline scripts, styles or event handlers (a test scans the
 templates). htmx is vendored at `web/static/vendor/` (version, hashes and licence in its
 README) and configured to need no `eval`, inject no `<style>` and keep no history cache.
+Our own script, `web/static/app.js`, only places error summary links (below).
 
 ## Accessibility of the app itself
 
@@ -450,13 +451,22 @@ the first one-time notice after a redirect ("deleted"), because a live region pr
 page load is not announced. While htmx polls, the status fragment carries a `<title>`
 that htmx moves into the document title, so the tab title follows the status.
 
+Following an error summary link would scroll the control to the top of the window and
+cut off its label, hint and error message. `app.js` (as the GOV.UK error summary does)
+scrolls the start of the field's `.field` wrapper to the top instead and focuses the
+control without scrolling again; when the field is taller than the window (320 x 256,
+which is 400% zoom, where a heading-level error alone wraps to 170 px) the focused
+control stays in view with as much of the field as fits above it. Without JavaScript,
+`scroll-margin-top: 8rem` on form controls keeps the label in view on wider screens.
+
 `tests/test_web_browser.py` runs axe-core on every page (zero serious or critical
 violations), including an unfinished job page with JavaScript on and as a no-JS browser
 parses it; runs the WCAG 2.2 AA and best-practice rules at moderate and above; checks
 every page at 320 CSS px with a long underscored file name, with and without the WCAG
 1.4.12 text-spacing override; checks where focus goes after errors and after deleting,
 and that following an error summary link leaves the field's label and error message in
-view (`scroll-margin-top` on form controls); and walks the upload-to-review flow with
+view, with and without JavaScript (`test_web_review_browser.py` does the same for the
+heading-level and LaTeX errors at 320 CSS px); and walks the upload-to-review flow with
 JavaScript off.
 
 ## Privacy

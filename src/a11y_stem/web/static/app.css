@@ -143,7 +143,9 @@ input[type="text"], input[type="email"], textarea, select, input[type="file"] {
 }
 input[type="text"], input[type="email"], textarea { width: 40rem; }
 /* An error summary link focuses its field at the top of the window; keep the label,
-   hint and error message above it in view too. */
+   hint and error message above it in view too. Only the fallback without JavaScript:
+   app.js scrolls the whole field into view, which a fixed margin cannot do on a narrow
+   screen where those lines wrap. */
 input, select, textarea { scroll-margin-top: 8rem; }
 textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .checkbox-field { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.6rem; align-items: start; }
