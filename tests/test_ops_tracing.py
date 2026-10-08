@@ -6,9 +6,13 @@ exporter in place of the network one, so they check exactly what would be sent.
 
 from __future__ import annotations
 
+import base64
+import contextvars
 import json
+import os
 import sys
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from structlog.testing import capture_logs
@@ -117,7 +121,23 @@ def test_noop_tracer_accepts_attributes_and_updates():
     tracer = NoopTracer()
     with tracer.span("convert", job_id="j1") as span:
         span.set(outcome="ok")
+        span.update(status="done")  # the name pipeline.run uses
     tracer.flush()
+
+
+def test_counts_must_be_numbers_and_models_may_be_listed():
+    assert safe_attributes(
+        {
+            "calls": 2,
+            "model_calls": 6,
+            "fixes": "3",  # counts are never strings
+            "elements": True,
+            "model": "gpt-6-luna,gpt-6.1-sol",
+        }
+    ) == {"calls": 2, "model_calls": 6, "model": "gpt-6-luna,gpt-6.1-sol"}
+    assert safe_attributes({"model": f"gpt-6-luna,{SENTINEL} said"}) == {}
+    assert safe_attributes({"model": ",".join(["m"] * 9)}) == {}
+    assert exportable_key("langfuse.observation.metadata.calls")
 
 
 def test_tracing_is_off_by_default():
@@ -264,6 +284,95 @@ def test_direct_sdk_misuse_is_still_masked_at_export(exported):
     assert "langfuse.observation.output" not in attrs
     assert attrs["langfuse.observation.metadata.job_id"] == "j1"
     assert SENTINEL not in dump([span])
+
+
+def _annotate(span, **attrs) -> None:
+    """pipeline.run's `_annotate` (wp/4-assemble): it calls `update`, not `set`."""
+    update = getattr(span, "update", None)
+    if callable(update):
+        update(**attrs)
+
+
+def test_pipeline_step_spans_become_generations_annotated_after_start(exported):
+    """pipeline.run opens a step span with step/element_id/page and only learns the model,
+    status and cost when the step returns."""
+    tracer, _client, read = exported
+    with tracer.span("step", step="equation", element_id="p1-e2", page=0) as span:
+        _annotate(
+            span,
+            status="needs_review",
+            reason=None,
+            model="gpt-6-luna,gpt-6.1-sol",
+            calls=2,
+            cost_usd=0.002,
+        )
+    with tracer.span("headings", count=3) as span:
+        _annotate(span, statuses={"accepted": 3})  # a dict: dropped
+
+    spans = {s.name: dict(s.attributes or {}) for s in read()}
+    step = spans["step"]
+    assert step["langfuse.observation.type"] == "generation"
+    assert step["langfuse.observation.model.name"] == "gpt-6-luna,gpt-6.1-sol"
+    assert json.loads(step["langfuse.observation.cost_details"]) == {"total": 0.002}
+    assert step["langfuse.observation.metadata.status"] == "needs_review"
+    assert step["langfuse.observation.metadata.calls"] == 2
+    headings = spans["headings"]
+    assert headings["langfuse.observation.type"] == "span"
+    assert headings["langfuse.observation.metadata.count"] == 3
+    assert not any("statuses" in k for k in headings)
+
+
+def test_step_spans_in_pool_threads_nest_when_run_in_a_copied_context(exported):
+    """The documented contract for thread fan-out (pipeline.run follows it)."""
+    tracer, _client, read = exported
+
+    def step(i: int) -> None:
+        with tracer.span("step", step="figure", element_id=f"p1-e{i}"):
+            pass
+
+    with tracer.span("document"), ThreadPoolExecutor(max_workers=2) as pool:
+        futures = [pool.submit(contextvars.copy_context().run, step, i) for i in range(3)]
+        for future in futures:
+            future.result()
+
+    spans = read()
+    (document,) = [s for s in spans if s.name == "document"]
+    steps = [s for s in spans if s.name == "step"]
+    assert len(steps) == 3
+    for span in steps:
+        assert span.parent is not None and span.parent.span_id == document.context.span_id
+        assert span.context.trace_id == document.context.trace_id
+
+
+def test_direct_sdk_misuse_cannot_upload_media_or_export_status_and_events(exported):
+    """Channels the attribute hooks cannot see: Langfuse's media upload (base64 data URIs
+    in a payload are uploaded before `mask` runs), the span status description, events
+    and the span name."""
+    from opentelemetry import trace
+    from opentelemetry.trace import StatusCode
+
+    _tracer, client, read = exported
+    png = base64.b64encode(b"\x89PNG\r\n\x1a\n" + SENTINEL.encode() * 8).decode()
+    with client.start_as_current_observation(
+        name=f"direct {SENTINEL}",
+        input={"image": f"data:image/png;base64,{png}"},
+        output=f"data:image/png;base64,{png}",
+    ) as observation:
+        observation.update(level="ERROR", status_message=f"bad LaTeX {LATEX}")
+        try:
+            raise ValueError(SENTINEL)
+        except ValueError as exc:
+            trace.get_current_span().record_exception(exc)
+
+    assert os.environ["LANGFUSE_MEDIA_UPLOAD_ENABLED"] == "false"
+    # SDK internals, checked so an SDK change that ignores the switch fails loudly here.
+    assert client._resources._media_upload_queue.qsize() == 0  # type: ignore[union-attr]
+    (span,) = read()
+    assert span.name == "span"
+    assert span.status.status_code == StatusCode.ERROR
+    assert span.status.description is None
+    assert not span.events
+    assert SENTINEL not in dump([span]) and png[:40] not in dump([span])
 
 
 def test_make_tracer_builds_a_langfuse_tracer_when_configured(monkeypatch):

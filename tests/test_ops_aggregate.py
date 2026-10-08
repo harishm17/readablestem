@@ -8,7 +8,7 @@ from datetime import UTC, date, datetime, timedelta, timezone
 import pytest
 
 from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import Fix, Kind, ModelCall, Status
+from a11y_stem.core.types import Check, Fix, Kind, ModelCall, Status
 from a11y_stem.ops import aggregate
 from a11y_stem.ops.aggregate import aggregate_finished, code, fix_counts, job_counts, utc_day
 from a11y_stem.web import db
@@ -21,6 +21,7 @@ from fixtures.ops.seed import (
     add_job,
     add_user,
     aggregate_rows,
+    review,
     sentinel_result,
 )
 
@@ -133,6 +134,45 @@ def test_no_document_text_reaches_the_aggregate_table(factory):
             assert SENTINEL not in f"{row.step} {row.category}".lower()
             assert len(row.step) <= 32 and len(row.category) <= 64
         assert ("job", "error:other") in aggregate_rows(s)
+
+
+def test_reviews_before_aggregation_do_not_change_the_pipeline_counts(factory):
+    """Reviewers act minutes after a job finishes and the cron is hourly. A review
+    rewrites the stored result (status; an edit replaces the checks), so aggregation
+    must count the fixes as the pipeline left them."""
+    with db.session_scope(factory) as s:
+        job_id = add_job(s, add_user(s), result=sentinel_result())
+        review(s, job_id, "p1-e1", "accept", at=NOW)  # needs_review -> accepted
+        review(s, job_id, "p1-e1", "reject", at=NOW + timedelta(minutes=1))
+        review(
+            s,
+            job_id,
+            "p2-e3",  # needs_review, its failed check replaced by the reviewer's
+            "edit",
+            checks=[Check(name="latex.length", passed=False, code="too_long")],
+            at=NOW + timedelta(minutes=2),
+        )
+        review(s, job_id, "p2-e1", "reject", at=NOW)  # accepted -> rejected
+
+    assert aggregate_finished(factory, NOW + timedelta(hours=1)) == 1
+
+    expected = dict(EXPECTED_DONE_COUNTS)
+    del expected[("equation", "check:latex.allowed_commands:other")]  # p2-e3's, replaced
+    expected[("equation", "aggregate:checks_edited")] = 1
+    with db.session_scope(factory) as s:
+        rows = aggregate_rows(s)
+    assert rows == expected
+    assert rows[("equation", "status:needs_review")] == 2
+    assert not any(":edited" in c or ":rejected" in c or "too_long" in c for _, c in rows)
+
+
+def test_review_snapshots_without_a_status_are_ignored(factory):
+    with db.session_scope(factory) as s:
+        job_id = add_job(s, add_user(s), result=sentinel_result(), edits=[("p1-e1", "accept")])
+    aggregate_finished(factory, NOW)
+    with db.session_scope(factory) as s:
+        assert aggregate_rows(s) == EXPECTED_DONE_COUNTS
+        assert s.get(db.Job, job_id).aggregated
 
 
 def test_large_backlog_is_processed_in_batches(factory, monkeypatch):

@@ -201,6 +201,49 @@ def add_job(
     return job.id
 
 
+REVIEW_STATUS = {"accept": Status.ACCEPTED, "edit": Status.EDITED, "reject": Status.REJECTED}
+
+
+def review(
+    session: Session,
+    job_id: str,
+    element_id: str,
+    action: str,
+    *,
+    checks: list[Check] | None = None,
+    at: datetime | None = None,
+) -> None:
+    """What the web app's review does (wp/5-web web/review.py `apply_review` and
+    routes/review.py): rewrite the fix in the stored result in place (status; an edit also
+    replaces the checks) and store a ReviewEdit with before/after snapshots."""
+    job = session.get(db.Job, job_id)
+    assert job is not None and job.result_json is not None
+    result = DocumentResult.model_validate(job.result_json)
+    fix = result.fix_for(element_id)
+    assert fix is not None
+
+    def snapshot() -> dict:
+        return fix.model_dump(mode="json", include={"status", "equation", "figure", "heading"})
+
+    before = snapshot()
+    if action == "edit":
+        fix.checks = checks or []
+    fix.status = REVIEW_STATUS[action]
+    job.result_json = result.model_dump(mode="json", exclude={"html"})
+    session.add(
+        db.ReviewEdit(
+            job_id=job_id,
+            user_id=job.user_id,
+            element_id=element_id,
+            action=action,
+            before=before,
+            after=snapshot(),
+            created_at=at or NOW,
+        )
+    )
+    session.flush()
+
+
 def aggregate_rows(session: Session) -> dict[tuple[str, str], int]:
     """Every (step, category) -> count, summed over days."""
     totals: dict[tuple[str, str], int] = {}

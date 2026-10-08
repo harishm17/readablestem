@@ -5,10 +5,11 @@ are the ones Cloud Logging understands. Every record, from our own code or a thi
 library, goes through the same processor chain, and two processors in it exist only to
 keep course material out of the logs:
 
-- `privacy_filter` drops any key that names content (`text`, `latex`, `alt`, `email`, ...,
-  also inside compound names like `alt_text` or `user_email`), turns values that are not
-  plain data into a type marker (so a pydantic `Element` cannot leak through its repr) and
-  truncates long strings.
+- `privacy_filter` drops any key that names content (`text`, `latex`, `alt`, `email`,
+  `title`, ..., also in the plural, inside compound names like `alt_text`, `user_email`,
+  `admin_emails` or `alttext`, and in any spelling such as `MathML` or `fileName`), turns
+  values that are not plain data into a type marker (so a pydantic `Element` cannot leak
+  through its repr) and truncates long strings.
 - `exception_codes` replaces a traceback with the exception's type and code locations.
   Exception messages are dropped: a pydantic error on model output, for example, quotes
   the LaTeX it rejected.
@@ -16,7 +17,13 @@ keep course material out of the logs:
 Below WARNING only our own loggers (and uvicorn's and alembic's lifecycle lines) are
 written: third-party DEBUG and INFO lines print URLs with query strings (the OpenAI SDK's
 httpx2 does) or request bodies, so LOG_LEVEL=DEBUG never turns them on. Uvicorn's access
-log is disabled for the same reason; `request_logging_middleware` logs the route template.
+log is dropped for the same reason; `request_logging_middleware` logs the route template.
+
+With uvicorn: call `configure_logging(settings)` in the app factory and start uvicorn
+with `**uvicorn_log_options()` (no `log_config`, no access log). If uvicorn still applies
+its default `log_config`, before or after `configure_logging`, its records are routed
+through this chain anyway and its access lines dropped (logger filters survive
+dictConfig); nothing is written by uvicorn's own plain-text handlers.
 """
 
 from __future__ import annotations
@@ -40,8 +47,9 @@ if TYPE_CHECKING:
 
     from a11y_stem.config import Settings
 
-# Key words that name document content. A key is dropped when any of its words (split on
-# "_", "-", "." and case changes) is one of these.
+# Key words that name document content or personal data (`title` is the document's
+# title; `name` a user's or a file's; `path`, `url` and `query` can carry a filename or an
+# email address). See `is_denied_key` for how a key is matched against them.
 DENYLIST = frozenset(
     {
         "text",
@@ -56,10 +64,22 @@ DENYLIST = frozenset(
         "context",
         "prompt",
         "speech",
+        "title",
+        "name",
+        "body",
+        "path",
+        "url",
+        "query",
     }
 )
 # Keys that contain a denylisted word but describe content without holding it.
 SAFE_KEYS = frozenset({"prompt_version", "prompt_versions"})
+# Denylisted words this long also match at the end of a key written without separators
+# ("alttext", "adminemails", "doctitle"). Shorter ones ("alt", "url") would match too much.
+_SUFFIX_MIN = 4
+# The only underscore keys passed through untouched: ProcessorFormatter's own bookkeeping,
+# removed again by `remove_processors_meta` before rendering.
+_FORMATTER_KEYS = frozenset({"_record", "_from_structlog"})
 MAX_STRING = 200
 TRUNCATION_MARK = "...[truncated]"
 MAX_DEPTH = 4
@@ -97,13 +117,43 @@ _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 # --------------------------------------------------------------------------- processors
 
 
+def _denied_word(word: str) -> bool:
+    """A denylisted word, singular or plural ("email", "emails", "latexes", "queries")."""
+    if not word:
+        return False
+    return (
+        word in DENYLIST
+        or (word.endswith("s") and word[:-1] in DENYLIST)
+        or (word.endswith("es") and word[:-2] in DENYLIST)
+        or (word.endswith("ies") and word[:-3] + "y" in DENYLIST)
+    )
+
+
+_SUFFIXES = tuple(
+    word + ending for word in DENYLIST if len(word) >= _SUFFIX_MIN for ending in ("", "s", "es")
+)
+
+
 def is_denied_key(key: str) -> bool:
-    """True when a log key names document content (exact word match, any position)."""
+    """True when a log key names document content.
+
+    A key is denied when any of its words is a denylisted word or its plural. Words are
+    split on non-alphanumerics and on case changes ("alt_text", "contextText"), and also
+    read with case changes ignored, so "MathML" and "LaTeX" are the words they name rather
+    than "math"+"ml". The key with separators removed is checked too ("file_name",
+    "fileName" -> "filename"), including for a denylisted word at its end ("alttext").
+    """
     lowered = key.lower()
     if lowered in SAFE_KEYS:
         return False
-    words = _WORD_SPLIT.split(_CAMEL.sub("_", key).lower())
-    return any(word in DENYLIST for word in words)
+    words = {
+        *_WORD_SPLIT.split(_CAMEL.sub("_", key).lower()),
+        *_WORD_SPLIT.split(lowered),
+    }
+    if any(_denied_word(word) for word in words):
+        return True
+    joined = _WORD_SPLIT.sub("", lowered)
+    return _denied_word(joined) or joined.endswith(_SUFFIXES)
 
 
 def _truncate(value: str) -> str:
@@ -136,7 +186,7 @@ def privacy_filter(_: WrappedLogger, __: str, event_dict: EventDict) -> EventDic
     """structlog processor: drop content keys, keep plain data, truncate long strings."""
     cleaned: EventDict = {}
     for key, value in event_dict.items():
-        if key.startswith("_"):  # structlog/ProcessorFormatter internals (_record, ...)
+        if key in _FORMATTER_KEYS:  # the LogRecord itself, never rendered
             cleaned[key] = value
         elif key in _STRUCTURAL or not is_denied_key(key):
             cleaned[key] = _scrub(value)
@@ -224,11 +274,61 @@ class _StdoutHandler(logging.StreamHandler):
         return None
 
 
+class _ThroughOurHandler(logging.Filter):
+    """Logger filter: hand the record to our root handler, keep it from the logger's own.
+
+    `uvicorn.run` with its default `log_config` runs `logging.config.dictConfig`, which
+    gives the "uvicorn" and "uvicorn.access" loggers plain-text stream handlers and stops
+    propagation, whether that happens before or after `configure_logging`. dictConfig
+    replaces handlers but keeps logger filters, so this filter still sees every record
+    and sends it through the privacy chain. Returning False stops the logger from also
+    passing the record on, so each record is written once whichever way uvicorn is set up.
+    """
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        ours = [h for h in logging.getLogger().handlers if getattr(h, _HANDLER_FLAG, False)]
+        if not ours:  # our handler was removed: fall back to the logger's normal path
+            return True
+        for handler in ours:
+            if record.levelno >= handler.level:
+                handler.handle(record)
+        return False
+
+
+class _DropAll(logging.Filter):
+    """Logger filter for uvicorn's access log: its lines hold the full path and query."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return False
+
+
+# Where uvicorn creates records (filters run only on the logger a record starts at).
+_UVICORN_ROUTED = ("uvicorn", "uvicorn.error", "uvicorn.asgi")
+_UVICORN_ACCESS = "uvicorn.access"
+
+
+def _add_filter_once(logger: logging.Logger, kind: type[logging.Filter]) -> None:
+    if not any(isinstance(f, kind) for f in logger.filters):
+        logger.addFilter(kind())
+
+
+def uvicorn_log_options() -> dict[str, Any]:
+    """Keyword arguments for `uvicorn.run` / `uvicorn.Config`: leave logging to us.
+
+    `uvicorn.run(app, **uvicorn_log_options(), ...)`, then `configure_logging(settings)`
+    in the app factory. `configure_logging` also works against uvicorn's default
+    `log_config` (see `_ThroughOurHandler`); these options just stop uvicorn from setting
+    up handlers that would never be used.
+    """
+    return {"log_config": None, "access_log": False}
+
+
 def configure_logging(settings: Settings | None = None) -> None:
     """JSON logs to stdout at `settings.log_level`. Safe to call more than once.
 
     One root handler renders both structlog and stdlib records, so uvicorn, SQLAlchemy and
     Langfuse warnings get the same severity mapping and privacy filter as our own lines.
+    Uvicorn's records go through it even if uvicorn configures its own logging later.
     """
     level_name = (settings.log_level if settings is not None else "INFO").upper()
     level = logging.getLevelNamesMapping().get(level_name, logging.INFO)
@@ -255,12 +355,17 @@ def configure_logging(settings: Settings | None = None) -> None:
 
     for name in _QUIET_LOGGERS:
         logging.getLogger(name).setLevel(max(level, logging.WARNING))
-    # Uvicorn's own handlers would bypass the chain; let its records reach the root handler.
-    for name in ("uvicorn", "uvicorn.error"):
+    # Uvicorn's own handlers would bypass the chain: remove them now, and route its records
+    # through our handler with logger filters, which survive a later dictConfig.
+    for name in _UVICORN_ROUTED:
         uv_logger = logging.getLogger(name)
         uv_logger.handlers.clear()
         uv_logger.propagate = True
-    logging.getLogger("uvicorn.access").disabled = True
+        _add_filter_once(uv_logger, _ThroughOurHandler)
+    access = logging.getLogger(_UVICORN_ACCESS)
+    access.handlers.clear()
+    access.disabled = True
+    _add_filter_once(access, _DropAll)
 
     structlog.configure(
         processors=[

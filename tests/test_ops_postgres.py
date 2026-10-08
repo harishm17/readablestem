@@ -135,11 +135,45 @@ def test_purge_cascades_and_counts_reviews_on_postgres(factory, monkeypatch):
             add_job(s, user, retain_until=expired, aggregated=True, blobs=1)
         add_job(s, user, retain_until=NOW + timedelta(hours=1), blobs=1)
 
+    # The never-aggregated job is counted in the delete's transaction (its edit snapshot
+    # has no status, so only its checks are replaced by "aggregate:checks_edited").
     assert purge_expired(factory, NOW) == PurgeStats(
-        jobs_deleted=4, blobs_deleted=5, unaggregated_deleted=1
+        jobs_deleted=4, blobs_deleted=5, unaggregated_deleted=0
     )
+    expected = dict(EXPECTED_DONE_COUNTS)
+    del expected[("equation", "check:latex.allowed_commands:unknown_command")]  # p1-e1's
+    expected[("equation", "aggregate:checks_edited")] = 1
+    expected[("equation", "review:edit")] = 1
     with db.session_scope(factory) as s:
         assert s.query(db.Job).count() == 1
         assert s.query(db.Blob).count() == 1
         assert s.query(db.ReviewEdit).count() == 0
-        assert aggregate_rows(s) == {("equation", "review:edit"): 1}
+        assert aggregate_rows(s) == expected
+
+
+def test_delete_now_waits_for_a_cron_run_and_never_counts_twice(factory):
+    """A user's "delete now" locks the job row (no SKIP LOCKED): while a cron run holds
+    it, the delete waits, then sees `aggregated=True` and counts nothing again."""
+    with db.session_scope(factory) as s:
+        job_id = add_job(s, add_user(s), result=sentinel_result())
+
+    cron = factory()
+    try:
+        assert aggregate._aggregate_batch(cron, NOW) == 1  # holds the row lock, uncommitted
+        result: list[PurgeStats] = []
+
+        def delete_now() -> None:
+            with db.session_scope(factory) as s:
+                result.append(retention.delete_jobs(s, [job_id], NOW))
+
+        worker = threading.Thread(target=delete_now)
+        worker.start()
+        worker.join(timeout=1)
+        assert worker.is_alive()  # blocked on the cron's lock
+        cron.commit()
+        worker.join(timeout=10)
+    finally:
+        cron.close()
+    assert result == [PurgeStats(jobs_deleted=1, blobs_deleted=0, unaggregated_deleted=0)]
+    with db.session_scope(factory) as s:
+        assert aggregate_rows(s) == EXPECTED_DONE_COUNTS

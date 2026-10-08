@@ -10,7 +10,7 @@ import structlog
 
 from a11y_stem.cli.main import build_parser, main
 from a11y_stem.config import get_settings
-from a11y_stem.ops import retention
+from a11y_stem.ops import aggregate
 from a11y_stem.web import db
 from fixtures.ops.seed import SENTINEL, add_job, add_user, sentinel_result
 
@@ -86,7 +86,7 @@ def test_cron_purges_and_fails_when_aggregation_fails(database, capsys, monkeypa
     def broken(*_args, **_kwargs):
         raise RuntimeError("aggregation bug")
 
-    monkeypatch.setattr(retention, "aggregate_finished", broken)
+    monkeypatch.setattr(aggregate, "job_counts", broken)  # the cron and the purge both fail
     assert main(["ops", "cron"]) == 1
     assert last_line(capsys) == (
         "aggregated_jobs=failed jobs_deleted=1 blobs_deleted=2 unaggregated_deleted=1"

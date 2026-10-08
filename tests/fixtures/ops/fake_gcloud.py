@@ -56,10 +56,15 @@ def main() -> int:
         fh.write(json.dumps(record) + "\n")
 
     fmt, have = flag(args, "format"), created()
+    backups = STATE / "retained_backups.txt"  # Cloud SQL keeps 7 unless told otherwise
+    if words[:2] == ["sql", "instances"] and (kept := flag(args, "retained-backups-count")):
+        backups.write_text(kept)
     if words[:3] == ["secrets", "versions", "access"]:
         print(CRON_TOKEN)
     elif "describe" in words:
-        if "connectionName" in fmt:
+        if "retainedBackups" in fmt:
+            print(backups.read_text() if backups.exists() else "7")
+        elif "connectionName" in fmt:
             print("proj:us-central1:a11y-stem-db")
         elif "projectNumber" in fmt:
             print("123456789")

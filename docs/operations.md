@@ -33,18 +33,32 @@ job past that time together with everything derived from the document: the uploa
 the crops, the result JSON, the HTML, the filename and the review edits. It deletes the
 child rows itself and does not rely on the database cascade alone.
 
-Deletion does not wait for statistics. If a job reaches its deadline before it was
-aggregated (aggregation kept failing, say), it is deleted anyway and counted in
-`unaggregated_deleted`. A non-zero value there means some counts are missing; it never
-means a document was kept.
+Every deletion goes through `ops.retention.delete_jobs(session, job_ids)`: the hourly
+purge, and the web app's "delete now" (`POST /jobs/{job_id}/delete` must call
+`delete_jobs(session, [job.id])` in its transaction rather than `session.delete(job)`).
+In the same transaction, before deleting, it aggregates a finished job that was not
+aggregated yet (a user can review, download and delete within the hour, before the cron
+runs) and counts the job's review actions. Deleting a row any other way loses those
+counts without a trace.
 
-What survives deletion: users and the allowlist, the daily spend and quota counters, and
-the content-free aggregates below.
+Deletion does not wait for statistics. If counting fails at that point (an aggregation
+bug, say), the job is deleted anyway and counted in `unaggregated_deleted`. A non-zero
+value there means some counts are missing; it never means a document was kept.
+
+What survives deletion: users and the allowlist, the daily spend and quota counters, the
+content-free aggregates below, and database backups. A backup holds every document that
+existed when it ran, so a deleted document stays in the backups taken before its
+deletion until they are dropped. The deploy keeps one daily backup and no
+point-in-time-recovery logs, so that is up to about a day after the purge
+([deploy.md](deploy.md), "Backups and deleted documents"); the privacy page has to say so
+(or backups have to be off).
 
 ## Error aggregates
 
 `error_aggregates` has one row per (UTC day, step, category) with a count. The day is the
-day the job finished. Categories:
+day the job finished. Fixes are counted as the pipeline left them, even if a reviewer
+acted before the hourly run: a review rewrites the stored result, so each fix's status is
+read from the `before` snapshot of its earliest review. Categories:
 
 | Step | Category | Counts |
 |---|---|---|
@@ -55,6 +69,7 @@ day the job finished. Categories:
 | same | `call:fallback` | calls made on the other model after a failure |
 | same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
+| same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran |
 | `job` | `status:done`, `status:failed` | finished jobs |
 | `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted` |
 | `job` | `pages` | pages converted (a sum, not a count of jobs) |
@@ -109,7 +124,7 @@ resource.labels.service_name="a11y-stem"`):
 | Anything wrong? | `severity>=WARNING` |
 | Server errors | `jsonPayload.message="request" AND jsonPayload.status>=500` |
 | Slow pages | `jsonPayload.message="request" AND jsonPayload.latency_ms>5000` |
-| Hourly cleanup | `jsonPayload.message=("aggregate_done" OR "purge_done" OR "aggregate_failed")` |
+| Hourly cleanup | `jsonPayload.message=("aggregate_done" OR "purge_done" OR "aggregate_failed" OR "aggregate_on_delete_failed")` |
 | Tracing problems | `jsonPayload.message=("tracing_disabled" OR "trace_failed")` |
 
 ### What can never be in a log line
@@ -117,9 +132,12 @@ resource.labels.service_name="a11y-stem"`):
 Logs are about the system, not the documents. The chain in
 `observability/logging.py` enforces it for every logger, ours or a library's:
 
-- Keys that name content are dropped: `text`, `latex`, `mathml`, `alt`, `html`,
-  `filename`, `email`, `content`, `caption`, `context`, `prompt`, `speech`, also as a
-  word inside a longer key (`alt_text`, `user_email`, `contextText`). `prompt_version` is
+- Keys that name content or personal data are dropped: `text`, `latex`, `mathml`, `alt`,
+  `html`, `filename`, `email`, `content`, `caption`, `context`, `prompt`, `speech`,
+  `title`, `name`, `body`, `path`, `url`, `query`. Also in the plural (`emails`), as a
+  word inside a longer key (`alt_text`, `admin_emails`, `contextText`), at the end of a
+  key without separators (`alttext`, `doctitle`), and in any spelling (`MathML`, `LaTeX`,
+  `file_name`, `fileName`). Keys starting with `_` get no exemption. `prompt_version` is
   the one allowed exception.
 - Values must be plain data. Objects become a type marker (`"<Element>"`), so a model or
   a path cannot leak through its `repr`. Strings are cut at 200 characters.
@@ -130,6 +148,15 @@ Logs are about the system, not the documents. The chain in
   (the OpenAI SDK's `httpx2`, `httpx`, SQLAlchemy) stay quiet even with `LOG_LEVEL=DEBUG`.
 - Uvicorn's access log is off; `request_logging_middleware` logs the route template
   (`/jobs/{job_id}`), never the path, query string or headers.
+
+Wiring it into the web app: call `configure_logging(settings)` in `create_app`, and
+start uvicorn with `uvicorn.run(..., **uvicorn_log_options())` (that is,
+`log_config=None, access_log=False`). Nothing else needs to call it in the server
+process. Uvicorn's default `log_config` would install plain-text handlers that print the
+full path and query string (the OAuth callback's `?code=...`) and tracebacks with their
+messages; `configure_logging` routes uvicorn's records through the chain above and drops
+its access lines whether uvicorn configures logging before or after it, but until
+`configure_logging` has run at all, uvicorn's handlers are the only ones there.
 
 Writing a log line:
 
@@ -159,17 +186,27 @@ or the client cannot start, the app logs `tracing_disabled` with a `reason` and 
 on without traces. Keep it off for any run on `private-inputs/`.
 
 What a span can carry is an allowlist (`ALLOWED_ATTRIBUTES` in
-`observability/tracing.py`): ids, step, kind, model, prompt version, attempt, fallback
-flag, status, outcome, reason, error type, confidence, token counts, `cost_usd`,
-`latency_ms`, page numbers. String values must look like codes. It is enforced three
-times: when the span is written, in the Langfuse `mask` hook (inputs and outputs become
-`[masked]`), and in the export hook, which deletes any other attribute before anything
-leaves the process. Spans opened with `model=` become Langfuse generations, so cost and
-token views work. Exceptions are recorded as level ERROR with the exception type only.
+`observability/tracing.py`): ids, step, kind, model (or a comma-separated list of the
+models a step used), prompt version, attempt, fallback flag, status, outcome, reason,
+error type, confidence, token counts, `cost_usd`, `latency_ms`, page numbers, plus
+counts (`calls`, `model_calls`, `elements`, `tasks`, `fixes`, `count`; numbers only).
+String values must look like codes. It is enforced three times: when the span is written,
+in the Langfuse `mask` hook (inputs and outputs become `[masked]`), and in the export
+hook, which deletes any other attribute before anything leaves the process. For code
+that calls the Langfuse SDK directly, the client also drops span status descriptions,
+events and link attributes before export, renames spans whose name is not code-like, and
+has Langfuse's media upload (which would send base64 images found in a payload straight
+to Langfuse) switched off.
 
-Spans started in worker threads nest under the job's span only if the thread runs in a
-copy of the caller's context (`contextvars.copy_context().run(...)`); otherwise each
-step shows up as its own trace.
+Span handles take attributes with `.set(...)` or `.update(...)` (the same method), also
+after the span started. A span opened with `model=`, or with `step=` one of `equation`,
+`figure`, `judge`, is a Langfuse generation, so the model, tokens and `cost_usd` set on
+it later show up in Langfuse's cost views. Exceptions are recorded as level ERROR with
+the exception type only.
+
+Spans started in worker threads nest under the job's span only if each task runs in its
+own copy of the caller's context (`pool.submit(contextvars.copy_context().run, work)`);
+otherwise each step shows up as its own trace. `pipeline.run` does this.
 
 ## When something goes wrong
 
@@ -180,7 +217,7 @@ step shows up as its own trace.
 | Conversions fail with `reason:budget_daily` | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed. Raise the cap only on purpose; it resets at 00:00 UTC |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`) |
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
-| Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then and are counted in `unaggregated_deleted` if they expire first |
+| Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
 | `unaggregated_deleted` above 0 | The cron history | Some statistics are lost for those jobs; nothing else to do |
 | Purge itself failing | `purge_done` missing for over an hour | Treat as a privacy incident: run `a11y-stem ops purge` by hand, then fix the cause |
 | Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections; keep `--max-instances=2` or move to `db-g1-small` (50) |
@@ -195,7 +232,7 @@ step shows up as its own trace.
 | `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest` (offline; Postgres tests use the embedded server on 3.12) |
 | `postgres` | `pytest -m postgres` against a Postgres 16 service container |
 | `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
-| `docker` | Builds the image (no push) and checks the entry point and non-root user |
+| `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as Cloud Build's `--tag` build may use), and checks the entry point and non-root user |
 | `eval-gate` | `a11y-stem eval gate` when `data/eval/latest.json` and `baseline.json` are committed |
 | `secret-scan` | gitleaks over the full history |
 

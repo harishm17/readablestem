@@ -123,6 +123,13 @@ jobs:
           persist-credentials: false
       - name: Build the image
         run: docker build --tag a11y-stem:ci .
+      # deploy.sh builds with `gcloud builds submit --tag`: a plain `docker build` in Cloud
+      # Build's docker 20.10 image, which can use the legacy builder. This runner defaults
+      # to BuildKit, so build once more without it to catch BuildKit-only syntax.
+      - name: Build again with the legacy builder (as Cloud Build may)
+        env:
+          DOCKER_BUILDKIT: "0"
+        run: docker build --tag a11y-stem:legacy .
       - name: Smoke test the entry point and the non-root user
         run: |
           docker run --rm a11y-stem:ci a11y-stem --version

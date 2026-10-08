@@ -145,6 +145,34 @@ def test_service_flags_and_environment(env):
     assert f"--headers=X-Cron-Token={CRON_TOKEN}" in cron["argv"]
 
 
+def test_cloud_sql_backups_do_not_outlive_retention_by_a_week(env):
+    """Every daily backup holds the documents present when it ran; Cloud SQL keeps 7 by
+    default, so a purged upload would survive for a week. Keep one, and no PITR logs."""
+    assert run(env, "database").returncode == 0
+    (create,) = [c for c in calls(env) if c["argv"][2:5] == ["sql", "instances", "create"]]
+    assert "--retained-backups-count=1" in create["argv"]
+    assert not any("point-in-time" in a for a in create["argv"])
+    assert not any("transaction-log" in a for a in create["argv"])
+
+    rerun = len(calls(env))
+    assert run(env, "database").returncode == 0  # already 1: nothing to patch
+    assert not [c for c in commands(env)[rerun:] if "sql instances patch" in c]
+
+
+def test_an_existing_instance_is_brought_down_to_the_backup_setting(env):
+    state = Path(env["FAKE_GCLOUD_DIR"])
+    (state / "created.txt").write_text("sql instances\nsql databases\n")  # made with 7
+    env["SQL_RETAINED_BACKUPS"] = "2"
+    result = run(env, "database")
+    assert result.returncode == 0, result.stderr
+    (patch,) = [c for c in calls(env) if c["argv"][2:5] == ["sql", "instances", "patch"]]
+    assert "--retained-backups-count=2" in patch["argv"]
+    assert "7 -> 2" in result.stdout
+
+    env["SQL_RETAINED_BACKUPS"] = "0"
+    assert "SQL_RETAINED_BACKUPS must be" in run(env, "database").stderr
+
+
 def test_external_database_skips_cloud_sql(env):
     env["DB_MODE"] = "external"
     env["EXTERNAL_DATABASE_URL"] = "postgresql+psycopg://u:pw@db.example.org/a11y"

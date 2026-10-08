@@ -119,8 +119,8 @@ in order (run any subset with `./deploy/deploy.sh STEP ...`):
 | `apis` | Enables Cloud Run, Artifact Registry, Cloud Build, Compute, Secret Manager, Cloud SQL Admin, Cloud Scheduler, Monitoring, Billing Budgets and IAM |
 | `iam` | Creates the `a11y-stem-run` service account (Cloud SQL client, secret accessor); gives the build account `roles/cloudbuild.builds.builder` |
 | `registry` | Creates the Docker repository in Artifact Registry |
-| `build` | `gcloud builds submit --tag ...`: Cloud Build builds the `Dockerfile` (tag = git commit) |
-| `database` | Cloud SQL Postgres 16, `db-f1-micro`, Enterprise edition (shared-core tiers need it; Postgres 16+ defaults to Enterprise Plus), daily backups; database `a11y`. Skipped with `DB_MODE=external` |
+| `build` | `gcloud builds submit --tag ...`: Cloud Build builds the `Dockerfile` (tag = git commit). This runs a plain `docker build` in Cloud Build's docker 20.10 image, which may use the legacy builder, so the Dockerfile uses no BuildKit-only syntax (CI builds it both ways) |
+| `database` | Cloud SQL Postgres 16, `db-f1-micro`, Enterprise edition (shared-core tiers need it; Postgres 16+ defaults to Enterprise Plus); database `a11y`. Daily backups, of which only `SQL_RETAINED_BACKUPS` (default 1) are kept, and no point-in-time recovery (see "Backups and deleted documents" below). An existing instance is patched down to that count. Skipped with `DB_MODE=external` |
 | `secrets` | `openai-api-key`, `google-client-secret` (prompted), `session-secret`, `cron-token` (random), `database-url` (built from a random database password, or your external URL). Existing secrets are kept |
 | `migrate` | Cloud Run job `a11y-stem-migrate` runs `a11y-stem db upgrade`, and waits for it |
 | `service` | `gcloud run deploy` with `--min-instances=1 --max-instances=2 --no-cpu-throttling --concurrency=20 --memory=1Gi --timeout=900`, a `/healthz` startup probe, the env vars and the five secrets |
@@ -133,6 +133,27 @@ process, so one instance is always up and its CPU stays allocated between reques
 `--max-instances=2` bounds both cost and database connections. On db-f1-micro Postgres
 allows 25 connections, which two instances at the default pool size come close to; see
 operations.md before raising the instance count.
+
+### Backups and deleted documents
+
+Uploaded PDFs, results and filenames live in the database, so every backup holds the
+documents that existed when it ran. Retention deletes a document from the live database
+on time, but a backup taken before that keeps it until the backup itself is deleted.
+Cloud SQL keeps 7 daily backups by default, which would stretch the app's "deleted after
+`RETENTION_HOURS`" to about a week. The script keeps one (`SQL_RETAINED_BACKUPS=1`): a
+deleted document can then remain in that backup for up to about a day after the purge
+(until the next daily backup replaces it), and a restore can still go back one day.
+Point-in-time recovery stays off (the gcloud default for the Enterprise edition): its
+transaction logs would keep deleted documents for days as well.
+
+TODO(Harish): pick the trade-off and make the privacy page agree with it. Either keep one
+backup and say so ("deleted documents can remain in a database backup for up to one more
+day"), or set `SQL_RETAINED_BACKUPS` higher and state that window, or turn automated
+backups off for the beta (`gcloud sql instances patch a11y-stem-db --no-backup`) and keep
+the current wording. The privacy page today promises deletion after `RETENTION_HOURS`
+without mentioning backups.
+
+With `DB_MODE=external`, the same applies to your provider's backups.
 
 Secrets never appear in the script's output. Two caveats: the generated database
 password is passed to `gcloud sql users create` as an argument (gcloud has no stdin
@@ -235,7 +256,9 @@ gcloud sql backups list --filter=instance:a11y-stem-db --project="$PROJECT_ID"
 gcloud sql backups restore BACKUP_ID --restore-instance=a11y-stem-db --project="$PROJECT_ID"
 ```
 
-A restore also brings back documents that retention had already deleted; run
+Only `SQL_RETAINED_BACKUPS` backups exist (one by default), so a restore goes back at
+most that many days. A restore also brings back documents that retention had already
+deleted; run
 `gcloud scheduler jobs run a11y-stem-cron --location="$REGION"` right after so they are
 purged again.
 

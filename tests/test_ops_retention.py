@@ -1,4 +1,5 @@
-"""ops.retention: purge cascade, unaggregated count, review counts, cron ordering (SQLite)."""
+"""ops.retention: purge cascade, counting before deletion (purge and "delete now"), review
+counts, cron ordering (SQLite)."""
 
 from __future__ import annotations
 
@@ -7,8 +8,9 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import create_engine
 
-from a11y_stem.ops import retention
-from a11y_stem.ops.retention import PurgeStats, aggregate_and_purge, purge_expired
+from a11y_stem.ops import aggregate, retention
+from a11y_stem.ops.aggregate import aggregate_finished
+from a11y_stem.ops.retention import PurgeStats, aggregate_and_purge, delete_jobs, purge_expired
 from a11y_stem.web import db
 from fixtures.ops.seed import (
     EXPECTED_DONE_COUNTS,
@@ -17,6 +19,7 @@ from fixtures.ops.seed import (
     add_job,
     add_user,
     aggregate_rows,
+    review,
     sentinel_result,
 )
 
@@ -52,22 +55,87 @@ def test_purge_deletes_expired_jobs_with_everything_derived(factory):
 
     stats = purge_expired(factory, NOW)
 
-    assert stats == PurgeStats(jobs_deleted=3, blobs_deleted=3, unaggregated_deleted=1)
+    # The never-aggregated job is counted before it goes, so nothing is lost.
+    assert stats == PurgeStats(jobs_deleted=3, blobs_deleted=3, unaggregated_deleted=0)
     assert counts(factory) == (1, 1, 1, 1)  # users are account data, not document data
     with db.session_scope(factory) as s:
         assert s.query(db.Job).one().id == keep
+        rows = aggregate_rows(s)
+    assert rows[("job", "status:done")] == 1  # the queued job is not a finished one
+    assert rows[("unknown", "review:edit")] == 1
     assert purge_expired(factory, NOW) == PurgeStats(0, 0, 0)
 
 
-def test_purge_runs_for_unaggregated_jobs_and_says_so(factory):
+def test_purge_counts_unaggregated_jobs_before_deleting_them(factory):
     with db.session_scope(factory) as s:
         user = add_user(s)
         add_job(s, user, retain_until=EXPIRED, result=sentinel_result())
         add_job(s, user, retain_until=EXPIRED, status=db.JobStatus.FAILED, error_code="encrypted")
     stats = purge_expired(factory, NOW)
-    assert stats.jobs_deleted == 2 and stats.unaggregated_deleted == 2
+    assert stats.jobs_deleted == 2 and stats.unaggregated_deleted == 0
+    expected = dict(EXPECTED_DONE_COUNTS)
+    expected[("job", "status:failed")] = 1
+    expected[("job", "error:encrypted")] = 1
+    expected[("job", "pages")] += 2
     with db.session_scope(factory) as s:
-        assert s.query(db.ErrorAggregate).count() == 0  # nothing was counted, by design
+        assert aggregate_rows(s) == expected
+
+
+def test_purge_deletes_even_when_counting_fails_and_says_so(factory, monkeypatch, capsys):
+    with db.session_scope(factory) as s:
+        user = add_user(s)
+        add_job(s, user, retain_until=EXPIRED, result=sentinel_result(), blobs=1)
+        add_job(s, user, retain_until=EXPIRED, status=db.JobStatus.FAILED, error_code="encrypted")
+
+    def broken(*_args, **_kwargs):
+        raise RuntimeError(f"aggregation bug near {SENTINEL}")
+
+    monkeypatch.setattr(aggregate, "job_counts", broken)
+    stats = purge_expired(factory, NOW)
+    assert stats == PurgeStats(jobs_deleted=2, blobs_deleted=1, unaggregated_deleted=2)
+    assert counts(factory)[:3] == (0, 0, 0)
+    with db.session_scope(factory) as s:
+        assert s.query(db.ErrorAggregate).count() == 0  # rolled back with its savepoint
+    out = capsys.readouterr().out
+    assert "aggregate_on_delete_failed" in out and SENTINEL not in out
+
+
+def test_delete_now_counts_the_job_and_its_reviews(factory):
+    """The web app's "delete now": a user reviews, downloads and deletes within the hour,
+    before the cron has aggregated the job. Its counts and review actions must survive."""
+    with db.session_scope(factory) as s:
+        user = add_user(s)
+        job_id = add_job(s, user, result=sentinel_result(), retain_until=KEPT, blobs=2)
+        review(s, job_id, "p1-e1", "accept")  # needs_review -> accepted in the result
+        running = add_job(s, user, status=db.JobStatus.RUNNING, finished_at=None)
+
+    with db.session_scope(factory) as s:
+        stats = delete_jobs(s, [job_id, "no-such-job"], NOW)
+    assert stats == PurgeStats(jobs_deleted=1, blobs_deleted=2, unaggregated_deleted=0)
+    with db.session_scope(factory) as s:
+        assert delete_jobs(s, [running], NOW) == PurgeStats(1, 0, 0)  # nothing to count
+        assert delete_jobs(s, [], NOW) == PurgeStats(0, 0, 0)
+
+    expected = dict(EXPECTED_DONE_COUNTS)
+    expected[("equation", "review:accept")] = 1
+    with db.session_scope(factory) as s:
+        assert aggregate_rows(s) == expected  # p1-e1 still counted as needs_review
+        assert s.query(db.Job).count() == 0
+    assert aggregate_finished(factory, NOW) == 0  # nothing left to count twice
+
+
+def test_delete_now_after_aggregation_counts_only_the_reviews(factory):
+    with db.session_scope(factory) as s:
+        job_id = add_job(s, add_user(s), result=sentinel_result())
+    assert aggregate_finished(factory, NOW) == 1
+    with db.session_scope(factory) as s:
+        review(s, job_id, "p2-e1", "reject")
+    with db.session_scope(factory) as s:
+        delete_jobs(s, [job_id], NOW)
+    expected = dict(EXPECTED_DONE_COUNTS)
+    expected[("figure", "review:reject")] = 1
+    with db.session_scope(factory) as s:
+        assert aggregate_rows(s) == expected
 
 
 def test_boundary_is_strictly_before_now(factory):
@@ -154,7 +222,7 @@ def test_cron_still_purges_when_aggregation_fails(factory, monkeypatch, capsys):
     def broken(*_args, **_kwargs):
         raise RuntimeError("aggregation bug")
 
-    monkeypatch.setattr(retention, "aggregate_finished", broken)
+    monkeypatch.setattr(aggregate, "job_counts", broken)  # the cron and the purge both fail
     aggregated, stats = aggregate_and_purge(factory, NOW)
     assert aggregated is None
     assert stats == PurgeStats(jobs_deleted=1, blobs_deleted=1, unaggregated_deleted=1)

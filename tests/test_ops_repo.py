@@ -8,6 +8,8 @@ lock file, and nothing private in the Docker build context.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -100,6 +102,36 @@ def test_dockerfile_builds_a_locked_non_root_image():
     assert "USER 10001:10001" in text
     assert 'CMD ["a11y-stem", "serve", "--host", "0.0.0.0", "--port", "8080"]' in text
     assert "EXPOSE 8080" in text
+
+
+def test_dockerfile_builds_without_buildkit():
+    """deploy.sh builds with `gcloud builds submit --tag`, a plain `docker build` in Cloud
+    Build's docker 20.10 image that may use the legacy builder, which rejects these."""
+    lines = [ln.strip() for ln in (ROOT / "Dockerfile").read_text().splitlines()]
+    instructions = [ln for ln in lines if ln and not ln.startswith("#")]
+    for line in instructions:
+        assert "--mount=" not in line, line
+        assert not re.match(r"(COPY|ADD)\b.*--(chmod|link|parents|exclude)\b", line), line
+        assert "<<" not in line, line  # heredocs
+        assert not re.match(r"RUN\s+--(network|security)\b", line), line
+    assert not any(ln.lower().startswith("# syntax=") for ln in lines)
+
+    steps = workflow(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]["docker"]["steps"]
+    assert any(
+        s.get("env", {}).get("DOCKER_BUILDKIT") == "0" and "docker build" in s.get("run", "")
+        for s in steps
+    )
+
+
+def test_type_check_gate_is_green():
+    """CI's lint-test job fails on any ty diagnostic, warnings included."""
+    ty = shutil.which("ty")
+    if ty is None:
+        pytest.skip("ty is not installed (dev group)")
+    result = subprocess.run(
+        [ty, "check", "src"], cwd=ROOT, capture_output=True, text=True, timeout=120, check=False
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
 
 
 def test_dockerignore_keeps_private_and_local_files_out():

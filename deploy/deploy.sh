@@ -64,12 +64,19 @@ load_config() {
   SQL_TIER=${SQL_TIER:-db-f1-micro}
   SQL_DATABASE=${SQL_DATABASE:-a11y}
   SQL_USER=${SQL_USER:-a11y}
+  # Daily backups kept. Each one holds every document present when it was taken, so a
+  # purged document survives in backups until they roll over (docs/operations.md,
+  # "Retention"). One keeps that to about a day and still allows a restore.
+  SQL_RETAINED_BACKUPS=${SQL_RETAINED_BACKUPS:-1}
   BUDGET_USD=${BUDGET_USD:-25}
   CRON_SCHEDULE=${CRON_SCHEDULE:-0 * * * *}
   case "$DB_MODE" in
     cloudsql | external) ;;
     *) die "DB_MODE must be cloudsql or external" ;;
   esac
+  if ! [[ "$SQL_RETAINED_BACKUPS" =~ ^[1-9][0-9]*$ ]] || [ "$SQL_RETAINED_BACKUPS" -gt 365 ]; then
+    die "SQL_RETAINED_BACKUPS must be a whole number from 1 to 365"
+  fi
 
   RUN_SA="$SERVICE-run@$PROJECT_ID.iam.gserviceaccount.com"
   if [ -z "${IMAGE_TAG:-}" ]; then
@@ -137,7 +144,9 @@ step_registry() {
 step_build() {
   step "Building $IMAGE with Cloud Build"
   # The upload skips what .gitignore lists (.env, private-inputs/, .local/); the Docker
-  # build then applies .dockerignore.
+  # build then applies .dockerignore. --tag runs a plain `docker build` in Cloud Build's
+  # docker 20.10 image, which may use the legacy builder: the Dockerfile must not use
+  # BuildKit-only syntax (CI builds it with DOCKER_BUILDKIT=0 to check).
   gc builds submit --region="$REGION" --tag="$IMAGE" .
 }
 
@@ -147,15 +156,26 @@ step_database() {
     return
   fi
   step "Cloud SQL instance $SQL_INSTANCE ($SQL_TIER)"
+  local kept
   if exists sql instances describe "$SQL_INSTANCE"; then
     note "exists"
+    # An instance created before this setting keeps Cloud SQL's default of 7 backups;
+    # bring it down. Backup retention changes do not restart the instance.
+    kept=$(gc sql instances describe "$SQL_INSTANCE" \
+      --format='value(settings.backupConfiguration.backupRetentionSettings.retainedBackups)')
+    if [ "$kept" != "$SQL_RETAINED_BACKUPS" ]; then
+      gc sql instances patch "$SQL_INSTANCE" --retained-backups-count="$SQL_RETAINED_BACKUPS"
+      note "daily backups kept: ${kept:-unknown} -> $SQL_RETAINED_BACKUPS"
+    fi
   else
     # Shared-core tiers need the Enterprise edition; Postgres 16+ defaults to Enterprise Plus.
+    # Point-in-time recovery stays off (the gcloud default for the Enterprise edition): its
+    # transaction logs would keep deleted documents for days.
     note "creating (takes about ten minutes)"
     gc sql instances create "$SQL_INSTANCE" --database-version=POSTGRES_16 \
       --edition=enterprise --tier="$SQL_TIER" --region="$REGION" \
       --storage-size=10 --storage-auto-increase --availability-type=zonal \
-      --backup-start-time=08:00
+      --backup-start-time=08:00 --retained-backups-count="$SQL_RETAINED_BACKUPS"
   fi
   if exists sql databases describe "$SQL_DATABASE" --instance="$SQL_INSTANCE"; then
     note "database $SQL_DATABASE exists"

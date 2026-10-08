@@ -14,6 +14,12 @@ Masking is an allowlist, applied three times so that one mistake is not a leak:
 3. The export-stage `mask_otel_spans` hook deletes every OpenTelemetry attribute that is
    not structural Langfuse data or an allowlisted metadata key.
 
+The two hooks only see attributes and payloads, so the client is also built to close the
+other ways out, for code that calls the Langfuse SDK directly: its private
+`TracerProvider` hands exporters a copy of each span without the status description,
+events and link attributes (and with a code-like name), and Langfuse's media upload,
+which sends base64 data URIs found in a payload before the `mask` hook runs, is off.
+
 The client gets its own OpenTelemetry `TracerProvider` and exports only spans it created
 itself, so a library instrumented elsewhere (an OpenAI auto-instrumentor, say) cannot send
 prompts through it. Exceptions are recorded as level ERROR plus the exception type; they
@@ -23,6 +29,7 @@ never reach OpenTelemetry's own exception recording, which would copy the messag
 from __future__ import annotations
 
 import math
+import os
 import re
 from collections.abc import Generator, Mapping
 from contextlib import AbstractContextManager, contextmanager
@@ -33,9 +40,13 @@ from a11y_stem.observability.logging import get_logger
 if TYPE_CHECKING:
     from langfuse import Langfuse
     from langfuse.types import MaskOtelSpansParams, MaskOtelSpansResult
+    from opentelemetry.sdk.trace import TracerProvider
     from opentelemetry.sdk.trace.export import SpanExporter
 
     from a11y_stem.config import Settings
+
+# Read by the Langfuse SDK when a client starts (langfuse/_client/environment_variables.py).
+_MEDIA_UPLOAD_ENV = "LANGFUSE_MEDIA_UPLOAD_ENABLED"
 
 ALLOWED_ATTRIBUTES = frozenset(
     {
@@ -68,10 +79,17 @@ ALLOWED_ATTRIBUTES = frozenset(
         "pages",
     }
 )
+# Counts: numbers only, never strings.
+COUNT_ATTRIBUTES = frozenset({"calls", "model_calls", "elements", "tasks", "fixes", "count"})
+# Steps that call a model. A span opened with one of these as `step` (or with `model=`)
+# becomes a Langfuse generation, so the model, tokens and cost set on it later land in
+# Langfuse's cost views. The type is fixed when the span starts, so it is decided then.
+GENERATION_STEPS = frozenset({"equation", "figure", "judge"})
 # A code-like string: no spaces, no LaTeX, short. Model names, prompt versions, hex ids,
 # element ids and category codes all match; sentences and formulas do not.
 _CODE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:\-]{0,79}$")
 _SPAN_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_.:\-]{0,63}$")
+_MAX_MODELS = 4  # `model` may list the models a step used: "gpt-6-luna,gpt-6.1-sol"
 MASKED = "[masked]"
 
 AttributeValue = str | bool | int | float
@@ -82,8 +100,18 @@ class SpanHandle(Protocol):
         """Add (allowlisted) attributes after the span started, e.g. tokens and outcome."""
         ...
 
+    def update(self, **attrs: Any) -> None:
+        """Same as `set` (the name the pipeline uses)."""
+        ...
+
 
 class Tracer(Protocol):
+    """Spans nest through `contextvars`. Work fanned out to a thread pool nests under the
+    caller's span only if each task runs in a copy of the caller's context:
+    `pool.submit(contextvars.copy_context().run, work)` (one copy per task); otherwise
+    each task's span starts a trace of its own.
+    """
+
     def span(self, name: str, **attrs: Any) -> Any:  # context manager yielding a SpanHandle
         ...
 
@@ -95,17 +123,30 @@ class Tracer(Protocol):
 
 def safe_attributes(attrs: Mapping[str, Any]) -> dict[str, AttributeValue]:
     """Allowlisted keys with plain values only. Everything else is dropped silently."""
-    return {
-        key: value for key, value in attrs.items() if key in ALLOWED_ATTRIBUTES and _plain(value)
-    }
+    return {key: value for key, value in attrs.items() if _allowed(key, value)}
+
+
+def _allowed(key: str, value: Any) -> bool:
+    if key in COUNT_ATTRIBUTES:
+        return _number(value)
+    if key == "model" and isinstance(value, str) and "," in value:
+        models = value.split(",")
+        return len(models) <= _MAX_MODELS and all(_plain(m) for m in models)
+    return key in ALLOWED_ATTRIBUTES and _plain(value)
+
+
+def _number(value: Any) -> bool:
+    if isinstance(value, bool):
+        return False
+    if isinstance(value, int):
+        return True
+    return isinstance(value, float) and math.isfinite(value)
 
 
 def _plain(value: Any) -> bool:
     """Numbers, booleans and code-like strings; never free text or objects."""
-    if isinstance(value, bool | int):
+    if isinstance(value, bool) or _number(value):
         return True
-    if isinstance(value, float):
-        return math.isfinite(value)
     return isinstance(value, str) and _CODE.match(value) is not None
 
 
@@ -144,7 +185,8 @@ def exportable_key(key: str) -> bool:
     if key in _STRUCTURAL_KEYS:
         return True
     if key.startswith(_METADATA_PREFIX):
-        return key.removeprefix(_METADATA_PREFIX) in ALLOWED_ATTRIBUTES
+        name = key.removeprefix(_METADATA_PREFIX)
+        return name in ALLOWED_ATTRIBUTES or name in COUNT_ATTRIBUTES
     return False
 
 
@@ -166,6 +208,8 @@ def mask_otel_spans(*, params: MaskOtelSpansParams) -> MaskOtelSpansResult:
 class _NoopSpan:
     def set(self, **attrs: Any) -> None:
         return None
+
+    update = set
 
 
 class NoopTracer:
@@ -199,6 +243,9 @@ class _LangfuseSpan:
             self._observation.update(**update)
         except Exception as exc:  # tracing must never break a conversion
             _log_failure("update", exc)
+
+    # `pipeline.run` annotates spans with `span.update(...)`.
+    update = set
 
     def fail(self, exc: BaseException) -> None:
         self.set(error_type=type(exc).__name__)
@@ -234,8 +281,10 @@ def _generation_fields(meta: Mapping[str, AttributeValue]) -> dict[str, Any]:
 class LangfuseTracer:
     """`Tracer` backed by a Langfuse v4 client (OpenTelemetry under the hood).
 
-    A span opened with `model=` becomes a Langfuse "generation", so token counts and
-    `cost_usd` show up in Langfuse's cost views; other spans are plain spans.
+    A span opened with `model=`, or with `step=` a model step ("equation", "figure",
+    "judge"), becomes a Langfuse "generation", so the model, token counts and `cost_usd`
+    set on it, even after it started, show up in Langfuse's cost views; other spans are
+    plain spans.
     """
 
     def __init__(self, client: Langfuse) -> None:
@@ -244,7 +293,7 @@ class LangfuseTracer:
     @contextmanager
     def span(self, name: str, **attrs: Any) -> Generator[SpanHandle]:
         safe = safe_attributes(attrs)
-        is_generation = "model" in safe
+        is_generation = "model" in safe or safe.get("step") in GENERATION_STEPS
         manager: AbstractContextManager[Any] | None = None
         try:
             if is_generation:
@@ -293,15 +342,77 @@ class LangfuseTracer:
 # --------------------------------------------------------------------------- factory
 
 
+def _content_free_tracer_provider() -> TracerProvider:
+    """A private TracerProvider whose span processors only ever see content-free spans.
+
+    `mask_otel_spans` can change attributes only, but an OpenTelemetry span carries more:
+    a status description (`update(status_message=...)` sets it), events
+    (`record_exception` copies the exception message into one), link attributes and its
+    name. Every processor added to this provider (Langfuse adds its exporting one) gets a
+    copy of each finished span without the description, events and link attributes, and
+    with "span" for a name that is not code-like. Uses public OpenTelemetry API only.
+    """
+    from opentelemetry.sdk.trace import ReadableSpan, SpanProcessor, TracerProvider
+    from opentelemetry.trace import Link, Status
+
+    def scrub(span: ReadableSpan) -> ReadableSpan:
+        return ReadableSpan(
+            name=safe_span_name(span.name),
+            context=span.context,
+            parent=span.parent,
+            resource=span.resource,
+            attributes=span.attributes,
+            events=(),
+            links=tuple(Link(link.context) for link in span.links),
+            kind=span.kind,
+            status=Status(span.status.status_code),
+            start_time=span.start_time,
+            end_time=span.end_time,
+            instrumentation_scope=span.instrumentation_scope,
+        )
+
+    class ScrubbingProcessor(SpanProcessor):
+        def __init__(self, inner: SpanProcessor) -> None:
+            self._inner = inner
+
+        def on_start(self, span: Any, parent_context: Any = None) -> None:
+            self._inner.on_start(span, parent_context=parent_context)
+
+        def _on_ending(self, span: Any) -> None:
+            ending = getattr(self._inner, "_on_ending", None)
+            if callable(ending):
+                ending(span)
+
+        def on_end(self, span: ReadableSpan) -> None:
+            self._inner.on_end(scrub(span))
+
+        def shutdown(self) -> None:
+            self._inner.shutdown()
+
+        def force_flush(self, timeout_millis: int = 30000) -> bool:
+            return self._inner.force_flush(timeout_millis)
+
+    class ContentFreeTracerProvider(TracerProvider):
+        def add_span_processor(self, span_processor: SpanProcessor) -> None:
+            super().add_span_processor(ScrubbingProcessor(span_processor))
+
+    return ContentFreeTracerProvider()
+
+
 def build_langfuse_client(
     settings: Settings, *, span_exporter: SpanExporter | None = None
 ) -> Langfuse:
     """A masked Langfuse client with a private TracerProvider. Raises ImportError if the
     `tracing` extra is not installed. `span_exporter` replaces the network exporter (tests).
+
+    Media upload is switched off. Langfuse otherwise finds base64 data URIs (a page crop,
+    say) in input, output and metadata and uploads them straight to its media storage,
+    before the `mask` hook runs and outside the span export that `mask_otel_spans` sees.
+    The SDK reads the switch from the environment only, when the client starts.
     """
+    os.environ[_MEDIA_UPLOAD_ENV] = "false"
     from langfuse import Langfuse
     from langfuse.span_filter import is_langfuse_span
-    from opentelemetry.sdk.trace import TracerProvider
 
     secret = settings.langfuse_secret_key
     return Langfuse(
@@ -312,7 +423,7 @@ def build_langfuse_client(
         mask=mask_payload,
         mask_otel_spans=mask_otel_spans,
         should_export_span=is_langfuse_span,
-        tracer_provider=TracerProvider(),
+        tracer_provider=_content_free_tracer_provider(),
         span_exporter=span_exporter,
     )
 
