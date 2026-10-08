@@ -1186,7 +1186,7 @@ def _eval_document(
             return items, f"budget_{exc.scope}"
         except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
             item = document_page_item(_page_id(page), _of_kind(page, "equation"), [], {}, [], [])
-            items.append(item | _calls_summary([]) | {"error": exc.code})
+            items.append(item | _calls_summary([]) | {"error": exc.code, "pdf_pages": 0})
             continue
         result = output.result
         stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
@@ -1205,6 +1205,9 @@ def _eval_document(
         item.update(_calls_summary(calls))
         item["latency_ms"] = result.stats.latency_ms or item["latency_ms"]
         item["prompt_versions"] = dict(result.prompt_versions) or item["prompt_versions"]
+        # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
+        # page is the figure to compare with production (`ops report`), not per item.
+        item["pdf_pages"] = result.stats.pages
         items.append(item)
     return items, None
 
@@ -1255,6 +1258,16 @@ def _prompt_versions(task: str, items: Sequence[dict]) -> dict[str, str]:
     return dict(sorted(versions.items()))
 
 
+# What one item is, for the cost line. A document item is an OpenStax section (one
+# gold "page"), printed to a PDF of 13-16 pages; its cost per PDF page is reported too.
+COST_UNITS = {"equations": "equation", "figures": "figure", "document": "section"}
+LATENCY_BASIS = {
+    "document": "wall-clock conversion of each section's PDF (layout, crops, model calls "
+    "and assembly; DocumentStats.latency_ms)",
+}
+DEFAULT_LATENCY_BASIS = "sum of model-call latencies per item (excludes rendering)"
+
+
 def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
     """Cost of the finished items, plus what the budget recorded for the whole run.
 
@@ -1266,7 +1279,7 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
     step_cost = sum(i.get("cost_usd", 0.0) for i in items)
     judge_cost = sum(i.get("judge_cost_usd", 0.0) for i in items)
     n = len(items)
-    unit = {"equations": "equation", "figures": "figure"}.get(task, "page")
+    unit = COST_UNITS.get(task, "page")
     calls = sum(i.get("model_calls", 0) for i in items)
     if task == "figures":
         calls += sum(1 for i in items if i.get("judge_prompt_version"))
@@ -1279,6 +1292,10 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
     }
     if task == "figures":
         out["judge_usd"] = judge_cost
+    if task == "document":
+        pdf_pages = sum(i.get("pdf_pages", 0) for i in items)
+        out["pdf_pages"] = pdf_pages
+        out["per_pdf_page_usd"] = step_cost / pdf_pages if pdf_pages else None
     if budget is not None:
         out["budget_spent_usd"] = budget.spent_usd
         out["budget_calls"] = budget.calls
@@ -1318,7 +1335,7 @@ def build_report(
         "metrics": METRICS[task](items),
         "cost": _cost(task, items, cfg.budget),
         "latency_ms": latency_summary(latencies)
-        | {"basis": "sum of model-call latencies per item (excludes rendering)"},
+        | {"basis": LATENCY_BASIS.get(task, DEFAULT_LATENCY_BASIS)},
     }
 
 
@@ -1410,8 +1427,14 @@ def format_markdown(report: dict) -> str:
         "",
         f"Cost: ${cost['total_usd']:.4f} total, "
         f"${_fmt(cost['per_item_usd'], 5)} per {cost['per_item_unit']} (pipeline), "
-        f"{cost['model_calls']} model calls. "
-        f"Latency p50 {_fmt(latency['p50'], 0)} ms, p95 {_fmt(latency['p95'], 0)} ms.",
+        + (
+            f"${_fmt(cost['per_pdf_page_usd'], 5)} per PDF page ({cost['pdf_pages']} pages), "
+            if "per_pdf_page_usd" in cost
+            else ""
+        )
+        + f"{cost['model_calls']} model calls. "
+        f"Latency p50 {_fmt(latency['p50'], 0)} ms, p95 {_fmt(latency['p95'], 0)} ms"
+        + (f" ({latency['basis']})." if latency.get("basis") else "."),
     ]
     if cost.get("dropped_usd"):
         lines.append(

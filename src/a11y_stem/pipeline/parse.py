@@ -48,7 +48,7 @@ EQUATION_THRESHOLD = 0.5
 
 
 def is_math_alphanumeric(char: str) -> bool:
-    """Unicode "Mathematical Alphanumeric Symbols" (U+1D400-U+1D7FF), e.g. italic \ud835\udc63.
+    """Unicode "Mathematical Alphanumeric Symbols" (U+1D400-U+1D7FF), e.g. italic \U0001d463.
 
     Browsers printing MathML and Word's equation editor emit these for variables, so a
     character in this block is maths whatever font it is in.

@@ -356,7 +356,10 @@ def test_status_fragment_is_204_until_something_changes(web):
         f"/jobs/{job_id}/status?v=queued-0-0", headers={"HX-Request": "true"}
     )
     assert finished.status_code == 200
-    assert finished.headers["hx-refresh"] == "true"  # reload to show the results
+    # No reload nobody asked for: the announced status links to the results instead.
+    assert "hx-refresh" not in finished.headers
+    assert f'<p><a href="/jobs/{job_id}">Show the results</a></p>' in finished.text
+    assert "Show the results" not in web.browser.get(f"/jobs/{job_id}").text
     # htmx takes the document title from the fragment, so the tab title follows it.
     assert finished.text.startswith("<title>Finished: notes.pdf | a11y-stem</title>")
     assert "<title>" not in fragment.text  # not without htmx (it would be in <body>)

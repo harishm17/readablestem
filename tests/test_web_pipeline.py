@@ -21,6 +21,7 @@ from sqlalchemy import select
 from a11y_stem.core.types import DocumentResult, Kind
 from a11y_stem.models import make_vision_client
 from a11y_stem.ops.aggregate import aggregate_finished
+from a11y_stem.pipeline.html_checks import static_checks
 from a11y_stem.web.app import create_app
 from a11y_stem.web.db import Blob, ErrorAggregate, Job, ReviewEdit, session_scope
 from a11y_stem.web.review import rerender_html
@@ -147,3 +148,33 @@ def test_review_then_aggregate_then_delete(site):
         assert session.scalar(select(Blob).where(Blob.job_id == site.job_id)) is None
         rows = {(r.step, r.category): r.count for r in session.scalars(select(ErrorAggregate))}
     assert rows[("heading", "review:reject")] == 1  # review actions are counted at deletion
+
+
+def test_a_review_decision_reruns_the_checks_on_the_real_output(site):
+    """The review screen's browser tests stub the assembler; here the re-rendered file is
+    the real one, and the job page lists the checks of what the user downloads."""
+    assert review(site, "p1-e3", action="accept").status_code == 303  # a heading
+    job = site.job(site.job_id)
+    result = DocumentResult.model_validate(job.result_json)
+    assert result.html_checks == static_checks(job.html or "")
+    assert result.html_checks and all(c.passed for c in result.html_checks)
+    assert result.fix_for("p1-e3").reviewed  # type: ignore[union-attr]
+    assert "3 accepted, 1 accepted by a reviewer</li>" in about(job.html or "")
+    page = site.browser.get(f"/jobs/{site.job_id}").text
+    assert f"All {len(result.html_checks)} checks passed" in page
+
+
+@pytest.mark.browser
+def test_the_output_rerendered_after_review_passes_axe(site):
+    """The review browser tests stub the assembler, so they check the review page, not
+    the file a review produces. Here the real file after an edit and a reject
+    goes through axe-core."""
+    from a11y_stem.pipeline.html_checks import axe_checks
+
+    assert review(site, "p1-e9", action="edit", latex="v = 2 t").status_code == 303
+    assert review(site, "p1-e3", action="reject").status_code == 303  # a heading
+    html = site.job(site.job_id).html or ""
+    checks = axe_checks(html)
+    if len(checks) == 1 and checks[0].code == "skipped":
+        pytest.skip("axe-core needs Playwright and its Chromium")
+    assert [c.name for c in checks] == ["axe"] and checks[0].passed, checks

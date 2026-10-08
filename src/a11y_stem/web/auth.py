@@ -94,6 +94,8 @@ def set_allowed(
     user.is_allowed = allowed
     if not allowed:
         user.is_admin = False
+        # Signed-in sessions end now and stay ended if they are allowed back later.
+        user.session_version += 1
         stop_jobs_of(session, user.id, "access_removed")
     elif admin is not None:
         user.is_admin = admin
@@ -119,8 +121,11 @@ def seed_admins(factory: sessionmaker[Session], emails: list[str]) -> None:
                 set_allowed(session, email, allowed=True, admin=True)
 
 
-def allowed_user_id(factory: sessionmaker[Session], email: str, name: str | None) -> str | None:
-    """Record the sign-in for an allowlisted user and return their id, else None."""
+def allowed_user(
+    factory: sessionmaker[Session], email: str, name: str | None
+) -> tuple[str, int] | None:
+    """Record the sign-in for an allowlisted user and return (id, session version),
+    else None."""
     with session_scope(factory) as session:
         user = session.scalar(select(User).where(User.email == email))
         if user is None or not user.is_allowed:
@@ -128,16 +133,28 @@ def allowed_user_id(factory: sessionmaker[Session], email: str, name: str | None
         user.last_login_at = utcnow()
         if name:
             user.name = name[:200]
-        return user.id
+        return user.id, user.session_version
+
+
+def end_sessions(factory: sessionmaker[Session], user_id: str) -> None:
+    """Sign the user out everywhere: every session signed in before now stops working."""
+    with session_scope(factory) as session:
+        session.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(session_version=User.session_version + 1)
+            .execution_options(synchronize_session=False)
+        )
 
 
 def finish_login(request: Request, email: str, name: str | None) -> Response:
     ctx = get_ctx(request)
-    user_id = allowed_user_id(ctx.factory, email, name)
-    if user_id is None:
+    found = allowed_user(ctx.factory, email, name)
+    if found is None:
         log_event(logger, "login_refused", reason="not_allowlisted")
         return render(request, "not_allowed.html", {"email": email}, status_code=403)
-    start_session(request, user_id)
+    user_id, version = found
+    start_session(request, user_id, version)
     log_event(logger, "login", user_id=user_id)
     return RedirectResponse("/app", status_code=303)
 
@@ -218,5 +235,12 @@ def dev_login(request: Request, email: Annotated[str, Form()] = "") -> Response:
 
 @router.post("/logout", dependencies=[Depends(require_csrf)])
 def logout(request: Request) -> Response:
+    """Sign out, here and everywhere: the cookie is signed, not stored, so clearing it
+    in this browser would leave a copy of it valid for 7 days. Bumping the user's
+    session version ends every session they have (other browsers too)."""
+    user = current_user(request)
+    if user is not None:
+        end_sessions(get_ctx(request).factory, user.id)
+        log_event(logger, "logout", user_id=user.id)
     request.session.clear()
     return RedirectResponse("/", status_code=303)

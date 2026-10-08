@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+from itertools import pairwise
 
 import pytest
 from alembic import command
@@ -37,7 +38,31 @@ def test_alembic_ini_is_found_and_there_is_one_head():
     heads = migration_heads()
     assert heads is not None and len(heads) == 1
     script = ScriptDirectory.from_config(alembic_config())
-    assert [rev.revision for rev in script.walk_revisions()] == list(heads)  # one so far
+    # One straight line from the head back to the initial schema: no branches to merge.
+    revisions = list(script.walk_revisions())
+    assert {revisions[0].revision} == set(heads) and revisions[-1].down_revision is None
+    for newer, older in pairwise(revisions):
+        assert newer.down_revision == older.revision
+
+
+def test_an_older_release_can_still_add_users_after_the_session_version_migration(tmp_path):
+    """Traffic rollback (docs/deploy.md): the old code inserts users without
+    session_version; the server default must fill it in."""
+    url = f"sqlite:///{tmp_path}/rollback.db"
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(
+                text(
+                    "INSERT INTO users (id, email, is_allowed, is_admin, created_at) "
+                    "VALUES ('u1', 'a@example.org', 1, 0, '2026-10-08 00:00:00')"
+                )
+            )
+            version = conn.execute(text("SELECT session_version FROM users")).scalar_one()
+        assert version == 0
+    finally:
+        engine.dispose()
 
 
 def test_initial_migration_matches_the_models_on_sqlite(tmp_path):

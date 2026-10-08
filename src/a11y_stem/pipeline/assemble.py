@@ -80,6 +80,9 @@ STATUS_LABELS = {
     Status.FAILED: "not converted (error or spending limit)",
     Status.REJECTED: "rejected by a reviewer",
 }
+# A reviewer's Accept keeps Status.ACCEPTED (`Fix.reviewed` is set); counted apart from
+# the pipeline's automatic acceptance, after it.
+REVIEWER_ACCEPTED_LABEL = "accepted by a reviewer"
 
 _MARKER_OPEN, _MARKER_CLOSE = INLINE_MARKER.split("{id}")
 # One inline-equation marker (`core.types.inline_marker`); group 1 is the element id.
@@ -222,6 +225,82 @@ def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = N
     return f'<math display="{display}"{id_attr}>{inner}</math>'
 
 
+# --------------------------------------------------------------------------- width
+
+# Rough advance widths in em, for deciding which display equations may be wider than a
+# phone screen (see `WIDE_EQUATION_EM`). Erring wide is cheap: one more tab stop.
+_RELATIONS = frozenset(
+    "=<>\u2264\u2265\u2260\u2248\u2261\u2245\u223c\u221d"
+    "\u2192\u2190\u2194\u21d2\u21d0\u21d4\u2208\u2209\u2282\u2286\u2283\u2287"
+)
+_BINARY = frozenset("+-\u2212\u00d7\u00b7\u00f7\u00b1\u2213\u2218\u2217\u222a\u2229\u2227\u2228")
+_SCRIPT_SCALE = 0.71  # scriptlevel 1 is about 71% of the base size
+
+
+def _token_em(name: str, text: str) -> float:
+    chars = len(text.strip())
+    if name == "mo":
+        stripped = text.strip()
+        if stripped in _RELATIONS:
+            return 0.6 + 0.56  # a thick space either side
+        if stripped in _BINARY:
+            return 0.6 + 0.44  # a medium space either side
+        return 0.45 * chars + (0.17 if stripped in {",", ";"} else 0.0)
+    if name == "ms":
+        chars += 2  # the quotes
+    return 0.6 * chars + 0.25 * text.strip().count(" ")
+
+
+def _width_em(node: XmlElement) -> float:
+    _, name = _split_tag(node.tag) if isinstance(node.tag, str) else ("", "")
+    children = list(node)
+    if name in {"mi", "mn", "mo", "mtext", "ms"}:
+        return _token_em(name, "".join(node.itertext()))
+    if name == "mspace":
+        width = node.attrib.get("width", "")
+        return float(width[:-2]) if re.fullmatch(r"\d+(\.\d+)?em", width) else 0.0
+    widths = [_width_em(child) for child in children]
+    if not widths:
+        return 0.0
+    if name == "mfrac":
+        return max(widths) + 0.2
+    if name in {"msub", "msup"}:
+        return widths[0] + _SCRIPT_SCALE * sum(widths[1:])
+    if name == "msubsup":
+        return widths[0] + _SCRIPT_SCALE * max(widths[1:], default=0.0)
+    if name in {"munder", "mover", "munderover"}:
+        return max([widths[0], *(_SCRIPT_SCALE * w for w in widths[1:])])
+    if name == "msqrt":
+        return sum(widths) + 1.0
+    if name == "mroot":
+        return widths[0] + _SCRIPT_SCALE * sum(widths[1:]) + 1.0
+    if name == "menclose":
+        return sum(widths) + 0.5
+    if name == "mmultiscripts":
+        return widths[0] + _SCRIPT_SCALE * sum(widths[1:]) / 2
+    if name == "mtable":
+        columns: list[float] = []  # widest cell per column
+        for row in children:
+            for i, cell in enumerate(row):
+                if i == len(columns):
+                    columns.append(0.0)
+                columns[i] = max(columns[i], _width_em(cell))
+        return sum(columns) + 0.8 * max(0, len(columns) - 1)
+    return sum(widths)  # rows, styles and anything else laid out in a line
+
+
+def estimate_width_em(mathml: str) -> float:
+    """Approximate rendered width of (sanitised) MathML in em of its own font size."""
+    try:
+        root = SafeET.fromstring(mathml, forbid_dtd=True)
+    except (ParseError, DefusedXmlException, ValueError):
+        return 0.0
+    try:
+        return _width_em(root)
+    except RecursionError:  # the sanitiser caps depth at 64; this is belt and braces
+        return float("inf")
+
+
 # --------------------------------------------------------------------------- helpers
 
 
@@ -270,6 +349,29 @@ def _equation_label(label: str | None) -> str:
         f'<span class="visually-hidden {AUTHORED_CLASS}">Equation </span>'
         f"{_escape(' '.join(label.split()))}</span>"
     )
+
+
+# A display equation estimated at least this wide (em of its own font) may not fit a
+# 320 CSS px screen: the column is then 288 px and the maths 19.8 px, so 14.5 em fit.
+# The estimate came within -18% / +44% of Chromium's widths for the gold equations, and
+# maths fonts differ between systems, hence the margin.
+WIDE_EQUATION_EM = 11.0
+
+
+def _scroller_attrs(mathml: str, label: str | None) -> str:
+    """Attributes that make a wide equation's box a named tab stop ("" if not wide).
+
+    `.equation` (display) and `.equation-scroll` (inline) scroll sideways when the
+    maths is wider than the screen (WCAG 1.4.10: the equation scrolls, not the page).
+    Keyboard users can only scroll a box that can take focus (axe
+    `scrollable-region-focusable`), but a tab stop on every equation would make a long
+    document tedious to tab through, so only equations that may be too wide for a
+    phone get one, named "Equation" (plus its number) for the focus.
+    """
+    if estimate_width_em(mathml) < WIDE_EQUATION_EM:
+        return ""
+    name = f"Equation {' '.join(label.split())}" if label and label.strip() else "Equation"
+    return f' tabindex="0" role="group" aria-label="{_escape(name)}"'
 
 
 def _fix_attrs(fix: Fix | None, reason: str | None) -> str:
@@ -383,6 +485,68 @@ def _list_levels(items: list[Element]) -> list[int]:
     return levels
 
 
+# --------------------------------------------------------------------------- headings
+
+
+def heading_parts(element: Element, fix: Fix | None) -> tuple[int | None, str]:
+    """(level, text) for a heading element; level None means it is written as <p>
+    (no fix, rejected or not converted, or no text)."""
+    if fix is None or fix.heading is None or fix.status in NOT_CONVERTED:
+        return None, element.text or ""
+    text = fix.heading.text if fix.heading.text.strip() else element.text or ""
+    return (fix.heading.level if text.strip() else None), text
+
+
+@dataclass
+class Outline:
+    """The outline repair: the level each heading is written at; never skips down.
+
+    A rejected or failed heading (written as a paragraph) can open a gap: h1, [h2],
+    h3. Clamping to "previous heading + 1" closes it but turns siblings into parent
+    and child (h1, [h2], h3 a, h3 b -> h1, h2 a, h3 b). So headings still open are
+    kept on a stack: a heading first closes those at its own level or deeper, then
+    goes at most one level below the one left open. Siblings get the same level, and
+    the children of a rejected heading all move up together. The first heading keeps
+    its level.
+
+    The review screen uses `would_write` to refuse a level this repair would change.
+    """
+
+    # Open headings as (level from the fix, level written), outermost first. Both
+    # increase strictly from the bottom of the stack to the top.
+    open: list[tuple[int, int]] = field(default_factory=list)
+
+    def would_write(self, level: int) -> int:
+        """The level a heading at `level` would be written at next (no change)."""
+        parents = [entry for entry in self.open if entry[0] < level]
+        return min(level, parents[-1][1] + 1) if parents else level
+
+    def write(self, level: int) -> int:
+        """Write the next heading: its level in the output."""
+        written = self.would_write(level)
+        while self.open and self.open[-1][0] >= level:
+            self.open.pop()
+        self.open.append((level, written))
+        return written
+
+
+def outline_before(elements: list[Element], fixes: list[Fix], element_id: str) -> Outline:
+    """The outline as `render_html` has it just before the element `element_id` (reading
+    order; the first fix for an id wins, as in `render_html`)."""
+    first: dict[str, Fix] = {}
+    for fix in fixes:
+        first.setdefault(fix.element_id, fix)
+    outline = Outline()
+    for element in sorted(elements, key=lambda e: e.order):
+        if element.id == element_id:
+            break
+        if element.kind is Kind.HEADING:
+            level, _ = heading_parts(element, first.get(element.id))
+            if level is not None:
+                outline.write(level)
+    return outline
+
+
 # --------------------------------------------------------------------------- renderer
 
 
@@ -394,8 +558,7 @@ class _Renderer:
     used_ids: set[str] = field(default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID})
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
-    # Open headings as (level from the fix, level written), outermost first.
-    outline: list[tuple[int, int]] = field(default_factory=list)
+    outline: Outline = field(default_factory=Outline)
 
     # ----- ids and text
 
@@ -426,12 +589,7 @@ class _Renderer:
         return "".join(out)
 
     def heading_parts(self, element: Element) -> tuple[int | None, str]:
-        """(level, text) for a heading element; level None means render it as <p>."""
-        fix = self.fixes.get(element.id)
-        if fix is None or fix.heading is None or fix.status in NOT_CONVERTED:
-            return None, element.text or ""
-        text = fix.heading.text if fix.heading.text.strip() else element.text or ""
-        return (fix.heading.level if text.strip() else None), text
+        return heading_parts(element, self.fixes.get(element.id))
 
     # ----- elements
 
@@ -551,24 +709,8 @@ class _Renderer:
         level, text = self.heading_parts(element)
         if level is None:
             return self.paragraph(element, text)
-        level = self.outline_level(level)
+        level = self.outline.write(level)
         return f"<h{level}{self.id_attr(element.id)}>{self.rich(text)}</h{level}>"
-
-    def outline_level(self, level: int) -> int:
-        """Level to write for a heading the fixes put at `level`; never skips down.
-
-        A rejected or failed heading (written as a paragraph) can open a gap: h1, [h2],
-        h3. Clamping to "previous heading + 1" closes it but turns siblings into parent
-        and child (h1, [h2], h3 a, h3 b -> h1, h2 a, h3 b). So headings still open are
-        kept on a stack: a heading first closes those at its own level or deeper, then
-        goes at most one level below the one left open. Siblings get the same level, and
-        the children of a rejected heading all move up together.
-        """
-        while self.outline and self.outline[-1][0] >= level:
-            self.outline.pop()
-        written = min(level, self.outline[-1][1] + 1) if self.outline else level
-        self.outline.append((level, written))
-        return written
 
     def converted_mathml(
         self, element: Element, display: Display, *, with_id: bool
@@ -594,13 +736,19 @@ class _Renderer:
         label = _equation_label(element.equation_label)
         if mathml is not None:
             css = "equation equation-labelled" if label else "equation"
-            return f'<div class="{css}"{self.id_attr(element.id)}>{mathml}{label}</div>'
+            attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
+            return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
         original = self.original(element, EQUATION_NOT_CONVERTED_ALT) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
     def inline_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "inline", with_id=True)
         if mathml is not None:
+            # A long one would widen the page: it scrolls in a box of its own instead
+            # (only those, since a scroll box sits on the text's baseline differently).
+            scroller = _scroller_attrs(mathml, None)
+            if scroller:
+                return f'<span class="equation-scroll"{scroller}>{mathml}</span>'
             return mathml
         self.flagged.add(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
@@ -692,16 +840,26 @@ def _notice(text: str | None) -> str | None:
     )
 
 
+def _status_label(fix: Fix) -> str:
+    return REVIEWER_ACCEPTED_LABEL if fix.accepted_by_reviewer else STATUS_LABELS[fix.status]
+
+
+# Order of the per-status counts in the about section.
+_LABEL_ORDER = [STATUS_LABELS[Status.ACCEPTED], REVIEWER_ACCEPTED_LABEL] + [
+    STATUS_LABELS[s] for s in Status if s is not Status.ACCEPTED
+]
+
+
 def _about_section(fixes: list[Fix], flagged: int, source_note: str | None) -> str:
-    counts = Counter((fix.kind, fix.status) for fix in fixes)
+    counts = Counter((fix.kind, _status_label(fix)) for fix in fixes)
     items = []
     for kind, label in KIND_LABELS.items():
         total = sum(n for (k, _), n in counts.items() if k is kind)
         if not total:
             continue
         parts = [
-            f"{counts[(kind, status)]} {STATUS_LABELS[status]}"
-            for status in Status
+            f"{counts[(kind, status)]} {status}"
+            for status in _LABEL_ORDER
             if counts[(kind, status)]
         ]
         items.append(f"<li>{label} ({total}): {', '.join(parts)}</li>")
@@ -735,7 +893,10 @@ main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wra
 h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
-.equation { margin: 1em 0; text-align: center; }
+.equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
+  overflow-x: auto; overflow-y: hidden; }
+.equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
+  overflow-x: auto; overflow-y: hidden; }
 .equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
 .equation-labelled > math { flex: 1 0 auto; }
 .equation-label { flex: none; margin-left: auto; }

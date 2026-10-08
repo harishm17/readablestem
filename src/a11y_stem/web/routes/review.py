@@ -56,6 +56,7 @@ from a11y_stem.web.review import (
     BulkRequest,
     FieldError,
     FixGroup,
+    HeadingPlace,
     ReviewChange,
     ReviewInvalid,
     apply_bulk_accept,
@@ -64,6 +65,8 @@ from a11y_stem.web.review import (
     bulk_eligible,
     can_accept,
     group_fixes,
+    heading_moved,
+    heading_places,
     item_numbers,
     kind_for_slug,
     needs_attention,
@@ -72,7 +75,7 @@ from a11y_stem.web.review import (
     rerender_html,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
-from a11y_stem.web.views import FIX_STATUS_LABELS, KIND_LABELS, JobView, job_view
+from a11y_stem.web.views import KIND_LABELS, JobView, fix_status_label, job_view
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -131,6 +134,12 @@ class ReviewItem:
     caption: str | None
     heading_level: int | None
     heading_text: str | None
+    # Headings: levels 1 to this one keep their place in the outline (web.review).
+    heading_max_level: int | None
+    # Headings the outline repair moves: the level the output writes instead, and
+    # whether it is written as a heading now (else it would be, if accepted again).
+    heading_shown: int | None
+    heading_in_document: bool
     can_accept: bool
     values: dict[str, str]
     errors: dict[str, str] = field(default_factory=dict)  # field prefix -> message
@@ -166,6 +175,7 @@ class GroupView:
     needs_review: int
     not_converted: int
     accept_all: int  # proposals "Accept all" would take; 0 when it is not offered
+    moved: int  # headings left out of bulk accept: the output writes another level
     bulk_options: list[BulkOption]
     bulk_eligible: int  # proposals any bulk accept could take
     bulk_warned: int  # ... of which have a failed warning-level check
@@ -190,7 +200,10 @@ def _item(
     number: int,
     job_id: str,
     crop_ids: set[str],
+    place: HeadingPlace | None = None,
 ) -> ReviewItem:
+    place = place if fix.kind is Kind.HEADING else None
+    moved = place is not None and place.moved
     values: dict[str, str] = {}
     if fix.equation is not None:
         values["latex"] = fix.equation.latex
@@ -198,14 +211,16 @@ def _item(
         values["alt"] = fix.figure.alt
         values["decorative"] = "on" if fix.figure.decorative else ""
     if fix.heading is not None:
-        values["level"] = str(fix.heading.level)
+        # The select offers the level the document shows, not one it would move.
+        suggested = place.suggested if place is not None else None
+        values["level"] = str(suggested or fix.heading.level)
     return ReviewItem(
         element_id=fix.element_id,
         kind=fix.kind.value,
         label=f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
         page=(element.page + 1) if element else 0,
         status=fix.status.value,
-        status_label=FIX_STATUS_LABELS.get(fix.status, fix.status.value),
+        status_label=fix_status_label(fix),
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c) for c in fix.failed_checks],
@@ -220,7 +235,11 @@ def _item(
         caption=element.caption if element and fix.kind is Kind.FIGURE else None,
         heading_level=fix.heading.level if fix.heading else None,
         heading_text=fix.heading.text if fix.heading else (element.text if element else None),
-        can_accept=can_accept(fix) and fix.status is not Status.ACCEPTED,
+        heading_max_level=place.highest if place is not None else None,
+        heading_shown=place.written if place is not None and moved else None,
+        heading_in_document=place is not None and place.in_document,
+        # Accepting a level the output moves is refused (web.review), so not offered.
+        can_accept=can_accept(fix) and fix.status is not Status.ACCEPTED and not moved,
         values=values,
     )
 
@@ -230,9 +249,11 @@ def _check_view(check: Check) -> CheckView:
     return CheckView(explained.text, explained.code, severity_label(check))
 
 
-def _group(group: FixGroup, items: dict[str, ReviewItem]) -> GroupView:
+def _group(
+    group: FixGroup, items: dict[str, ReviewItem], places: dict[str, HeadingPlace]
+) -> GroupView:
     one, many = NOUNS[group.kind]
-    eligible = [f for f in group.pending if bulk_eligible(f)]
+    eligible = [f for f in group.pending if bulk_eligible(f, places)]
     options = [
         BulkOption(t, sum(at_or_above(f, t) for f in eligible), t == BULK_DEFAULT_THRESHOLD)
         for t in BULK_THRESHOLDS
@@ -247,6 +268,10 @@ def _group(group: FixGroup, items: dict[str, ReviewItem]) -> GroupView:
         needs_review=sum(f.status is Status.NEEDS_REVIEW for f in group.pending),
         not_converted=sum(f.status in NOT_CONVERTED for f in group.pending),
         accept_all=len(eligible) if group.kind in ACCEPT_ALL_KINDS else 0,
+        moved=sum(
+            f.status is Status.NEEDS_REVIEW and can_accept(f) and heading_moved(f, places)
+            for f in group.pending
+        ),
         bulk_options=options,
         bulk_eligible=len(eligible),
         bulk_warned=sum(bool(f.failed_checks) for f in eligible),
@@ -332,12 +357,20 @@ def _page(
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     fix_groups = group_fixes(result)
+    places = heading_places(result)
     items = {
-        f.element_id: _item(f, elements.get(f.element_id), numbers[f.element_id], view.id, crop_ids)
+        f.element_id: _item(
+            f,
+            elements.get(f.element_id),
+            numbers[f.element_id],
+            view.id,
+            crop_ids,
+            places.get(f.element_id),
+        )
         for g in fix_groups
         for f in (*g.pending, *g.done)
     }
-    groups = {g.slug: _group(g, items) for g in fix_groups}
+    groups = {g.slug: _group(g, items, places) for g in fix_groups}
     top = _place_flashes(pop_flash(request), result, items, groups)
     errors: list[FieldError] = []
     if invalid is not None:
@@ -352,7 +385,8 @@ def _page(
         "remaining": sum(len(g.pending) for g in fix_groups),
         "remaining_by_kind": [counted(len(g.pending), g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
-        "active": "app",
+        # No `active` nav item: this page is not "My documents" itself, so the link
+        # must not be announced as the current page (aria-current="page").
     }
     return render(request, "review.html", context, status_code=status_code)
 
@@ -418,6 +452,7 @@ def review_action(
         n = len(change.warnings)
         message += f" {n} {'check gives a warning' if n == 1 else 'checks give warnings'}: "
         message += "see the notes on it."
+    message += _moved_message(change.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     landing = next_to_review(result, element_id)
     anchor = f"item-{landing}" if landing else "review-progress"
@@ -452,6 +487,23 @@ def _bulk_action(
     )
     flash(request, _bulk_message(bulk, len(changes)), element_id=GROUP_FLASH + slug)
     return RedirectResponse(f"/jobs/{job_id}/review#group-{slug}", status_code=303)
+
+
+MOVED_NAMED = 5  # name up to this many moved headings; count any more
+
+
+def _moved_message(moved: list[str], numbers: dict[str, int]) -> str:
+    """' Heading 3 is now shown at a different level.': the other headings a heading
+    decision moved in the output, so the change to them is not silent."""
+    if not moved:
+        return ""
+    if len(moved) > MOVED_NAMED:
+        return f" {len(moved)} later headings are now shown at a different level."
+    names = [str(numbers[eid]) for eid in moved]
+    if len(names) == 1:
+        return f" Heading {names[0]} is now shown at a different level."
+    listed = ", ".join(names[:-1]) + " and " + names[-1]
+    return f" Headings {listed} are now shown at a different level."
 
 
 def _bulk_message(bulk: BulkRequest, n: int) -> str:

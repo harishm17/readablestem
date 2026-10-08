@@ -107,6 +107,13 @@ DOCUMENT_CACHE_SIZE = 4
 DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
 PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render the pages
 PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
+# ... but never more than this many pixels on the long side (crop's own cap), so a huge
+# page box (MuPDF accepts 18000 pt) does not need a gigabyte of pixels: the display list,
+# where the crash is, is built whatever the zoom.
+PROBE_MAX_SIDE_PX = 2048
+# Address space the probe child may use (768 MB, like the upload probe in
+# web/pdf_probe.py), plus room for the PDF itself, which it holds twice.
+PROBE_MEMORY_BYTES = 768 * 1024 * 1024
 CROP_PAD = 2.0  # crop's default padding around an element box (pt)
 
 TEXT_FLAGS = (
@@ -563,18 +570,30 @@ PROBED_MEMORY = 64  # documents remembered
 # crash (MuPDF aborting the process) or a hang matters, so they are swallowed per page.
 _PROBE_SCRIPT = """
 import sys
+try:  # cap this process's address space first (Linux, macOS; best effort elsewhere)
+    import resource
+    limit = int(sys.argv[5])
+    soft, hard = resource.getrlimit(resource.RLIMIT_AS)
+    if hard != resource.RLIM_INFINITY:
+        limit = min(limit, hard)
+    if soft == resource.RLIM_INFINITY or soft > limit:
+        resource.setrlimit(resource.RLIMIT_AS, (limit, hard))
+except (ImportError, ValueError, OSError):
+    pass
 import pymupdf
 pymupdf.TOOLS.mupdf_display_errors(False)
 pymupdf.TOOLS.mupdf_display_warnings(False)
 doc = pymupdf.open(stream=sys.stdin.buffer.read(), filetype="pdf")
-zoom = float(sys.argv[2])
+zoom, max_side = float(sys.argv[2]), float(sys.argv[4])
 for number in map(int, sys.argv[1].split(",")):
     try:
         page = doc[number]
         page.get_text("rawdict", flags=int(sys.argv[3]))
         page.get_cdrawings()
         page.get_image_info()
-        page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
+        side = max(page.rect.width, page.rect.height, 1.0)
+        scale = min(zoom, max_side / side)
+        page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
     except Exception:
         pass
 sys.stdout.write("ok")
@@ -601,7 +620,9 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
     building a page's display list) although they open and parse without an error. In the
     worker, that would take the web server down with it, and again on every retry of the
     job. A page that rendered in a child renders here too: MuPDF is deterministic. The
-    child's output is discarded (its error messages may quote the PDF).
+    child's output is discarded (its error messages may quote the PDF). The child caps
+    its own memory and renders at most `PROBE_MAX_SIDE_PX` on a page's long side, so a
+    huge page box costs megabytes, not a gigabyte.
     """
     command = [
         sys.executable,
@@ -611,6 +632,8 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
         ",".join(map(str, pages)),
         str(PROBE_ZOOM),
         str(TEXT_FLAGS),
+        str(PROBE_MAX_SIDE_PX),
+        str(PROBE_MEMORY_BYTES + 2 * len(pdf_bytes)),
     ]
     try:
         result = subprocess.run(

@@ -123,13 +123,16 @@ Conventions for every task:
   run one after another). It excludes rendering and local processing. The document task
   is different: its item is one OpenStax *section* printed to a PDF of 13-16 pages, and
   its latency is `DocumentStats.latency_ms`, the wall-clock time of converting that whole
-  PDF. (The report's `latency_ms.basis` string still says "sum of model-call latencies"
-  for every task; that string lives in `eval/pipeline_eval.py`.)
-- **Cost per page.** For the document task `per_item_usd` is per *section*, not per PDF
-  page: the first real run cost $0.161 for 3 sections of 16, 14 and 13 PDF pages, which
-  is $0.054 per section but **$0.0037 per PDF page**. Quote the per-PDF-page figure for
-  anything about running cost. In production, `ops report` gives cost per converted page
-  from the aggregates.
+  PDF. The report's `latency_ms.basis` says which one applies.
+- **Cost per page.** For the document task `per_item_usd` is per *section*
+  (`per_item_unit` is `section`), not per PDF page, so the report also gives
+  `cost.pdf_pages` (the PDF pages converted, from `DocumentStats.pages`; a section the
+  layout could not read adds none) and `cost.per_pdf_page_usd`. The first real run cost
+  $0.161 for 3 sections of 16, 14 and 13 PDF pages: $0.054 per section but **$0.0037
+  per PDF page**. Quote the per-PDF-page figure for anything about running cost; it is
+  the one `ops report` gives in production (cost per converted page from the
+  aggregates). The gate's `document_cost` still compares `per_item_usd`, which is fine
+  for runs over the same sections.
 
 ### equations
 
@@ -228,12 +231,21 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `matched_exact_lenient` | `exact_lenient` over matched pairs (no proposal = wrong) |
 | `matched_mean_teds` | mean TEDS over matched pairs |
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
+| `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (maths OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
+| `detection_precision_excluding_prose_math` | matched / (predicted - `prose_math`): an estimate, since the gold cannot confirm those are formulas |
+| `split_gold_equations` | gold equations the pipeline found as several pieces |
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
 | `axe_violations` | same for `html_checks.axe_checks`, over the pages where axe ran |
 | `axe_checked_pages` | pages where axe-core really ran (`axe_violations` is over these) |
 | `axe_skipped_pages` | pages where axe could not run: `axe_checks` returned its single "axe" check coded `skipped` (Playwright or Chromium not installed) |
 | `axe_error_pages` | pages where axe broke: a single failed "axe" check (WP4 codes it `axe_error`). Neither case counts as zero violations. Rule results are named `axe.<rule>`, so a failure of axe's real `skip-link` rule still counts as a violation |
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
+
+TODO(Harish): document precision is now limited mostly by prose maths (in
+document-run1, 25 inline formulas OpenStax wrote as HTML, with no gold MathML). Decide
+whether to add them to the gold set (hand-written MathML for those spans) or keep
+scoring them apart as `detection_precision_excluding_prose_math`; the report gives both
+numbers until then.
 
 ### Judge calibration (`eval calibrate`)
 
@@ -396,6 +408,12 @@ manual-only on purpose), and whether opted-in production pages should join the s
 once their review labels exist as gold.
 
 Public demo (do not commit the output until the page is chosen):
+
+TODO(Harish): choose the demo page and approve the spend for a real-model build
+(about $0.05 for one section at the first document run's cost), then commit the
+output. Until then `/demo` shows the "being prepared" page and `ops launch-check`
+lists the demo as unfinished; a `--fake` build is marked as a placeholder and is
+flagged too.
 
 ```
 uv run a11y-stem demo build --page 2-2-speed-and-velocity --max-usd 1.00

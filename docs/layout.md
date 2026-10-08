@@ -357,7 +357,12 @@ one is committed as `tests/fixtures/layout/damaged_render_abort.pdf`). In the wo
 thread inside the web process that would take the server down, and again on each retry
 of the job. So before a page is extracted or rendered in this process, a child process
 (`sys.executable -I -c ...`, PDF on stdin) extracts it the same way and renders it once at
-72 dpi (`_probe_pages`). A child that dies (any non-zero exit) or runs longer than
+72 dpi (`_probe_pages`), at most `PROBE_MAX_SIDE_PX` (2048) pixels on the long side, with
+its address space capped at `PROBE_MEMORY_BYTES` (768 MB, plus twice the PDF's size):
+MuPDF accepts page boxes far past the PDF maximum, and an 18000 pt page at 72 dpi was a
+1 GB pixmap. The display list, where the crash is, is built whatever the zoom; a render
+that runs out of memory under the cap is a Python error there and ignored like the
+others. A child that dies (any non-zero exit) or runs longer than
 `PROBE_TIMEOUT_S` (60 s) makes the file `LayoutError("unreadable")`; Python exceptions in
 the child are ignored, because only crashes and hangs matter there. `analyze` probes the
 selected pages; `crop` probes a page `analyze` did not cover. Which pages passed is kept
@@ -388,9 +393,9 @@ opened documents (4 at most), keyed by the identity of the bytes object and, fai
 by its SHA-256, so cropping every element of a PDF parses it once. The cache holds user
 content, so an entry unused for `DOCUMENT_CACHE_TTL_S` (120 s) is closed by a daemon timer
 even if nobody calls `release`: an idle worker does not keep the last jobs' PDFs past the
-retention purge. **For WP4:** `pipeline.run.convert_pdf` should still call
-`layout.release(pdf_bytes)` in a `finally` when the job ends; `release` is not in the
-contract table of `docs/design/beta-architecture.md` yet (that file is outside WP2).
+retention purge. `pipeline.run.convert_pdf` also calls `layout.release(pdf_bytes)` in a
+`finally` when the job ends (`release` is in the contract table of
+`docs/design/beta-architecture.md`).
 
 Crops render at `dpi` on a white background; when the long side would exceed `max_side_px`,
 the zoom drops so it fits (one pixel of headroom absorbs MuPDF's rounding).

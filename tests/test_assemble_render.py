@@ -26,6 +26,7 @@ from a11y_stem.pipeline.assemble import (
     ABOUT_WORDING,
     EQUATION_NOT_CONVERTED_ALT,
     FIGURE_NOT_DESCRIBED_ALT,
+    outline_before,
     render_html,
     sanitize_mathml,
 )
@@ -575,6 +576,22 @@ def test_about_section_counts_by_kind_and_status(sample_html):
     assert "<li>Figures (3): 2 accepted, 1 not converted (model unsure)</li>" in about
     assert "<p>4 items could not be converted." in about
     assert "<p>Test note.</p>" in about
+
+
+def test_about_section_tells_a_reviewers_accept_from_an_automatic_one():
+    pairs = [heading("a", 0, 1), heading("b", 1, 2), heading("c", 2, 2, Status.NEEDS_REVIEW)]
+    pairs[1][1].reviewed = True  # accepted on the review screen
+    html = render([e for e, _ in pairs], [f for _, f in pairs])
+    assert "<li>Headings (3): 1 accepted, 1 accepted by a reviewer, 1 needs review</li>" in html
+
+
+def test_outline_would_write_matches_what_is_written():
+    pairs = [heading("a", 0, 1), heading("b", 1, 2, Status.REJECTED), heading("c", 2, 3)]
+    elements, fixes = [e for e, _ in pairs], [f for _, f in pairs]
+    before_c = outline_before(elements, fixes, "c")
+    assert [before_c.would_write(n) for n in range(1, 7)] == [1, 2, 2, 2, 2, 2]
+    assert outline(render(elements, fixes)) == ["h1", "p", "h2"]  # c: 3 written as 2
+    assert outline_before(elements, fixes, "a").open == []
 
 
 def test_about_section_without_fixes_and_defaults():

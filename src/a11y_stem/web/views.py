@@ -11,12 +11,14 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
-from a11y_stem.core.types import DocumentResult, Kind, Status
+from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
 from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Job, JobStatus
+from a11y_stem.web.db import Job, JobStatus, User
+from a11y_stem.web.messages import Explained, explain_check, severity_label
+from a11y_stem.web.outcome import FAILED_MESSAGES
 
 STATUS_LABELS: dict[str, str] = {
     JobStatus.QUEUED.value: "Waiting",
@@ -26,19 +28,29 @@ STATUS_LABELS: dict[str, str] = {
 }
 
 FIX_STATUS_LABELS = {
-    Status.ACCEPTED: "Accepted",
+    Status.ACCEPTED: "Accepted automatically",
     Status.NEEDS_REVIEW: "Needs review",
     Status.ABSTAINED: "Not converted (no confident proposal)",
     Status.FAILED: "Not converted (error)",
     Status.EDITED: "Edited by you",
     Status.REJECTED: "Rejected: original kept",
 }
+# A reviewer's Accept shares Status.ACCEPTED with the pipeline's (Fix.reviewed differs).
+REVIEWER_ACCEPTED_LABEL = "Accepted by you"
+
+
+def fix_status_label(fix: Fix) -> str:
+    if fix.accepted_by_reviewer:
+        return REVIEWER_ACCEPTED_LABEL
+    return FIX_STATUS_LABELS.get(fix.status, fix.status.value)
+
 
 KIND_LABELS = {
     Kind.EQUATION: "Equation",
     Kind.FIGURE: "Figure",
     Kind.HEADING: "Heading",
     Kind.PARAGRAPH: "Paragraph",
+    Kind.LIST_ITEM: "List item",
 }
 
 JOB_ERROR_MESSAGES = {
@@ -60,6 +72,9 @@ JOB_ERROR_MESSAGES = {
     "upload_missing": "The uploaded file was no longer available.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
     "of your document's content.",
+    # Codes with a longer explanation of what to do next (scanned PDFs, no model key,
+    # removed access, ...) share their wording with the status box.
+    **FAILED_MESSAGES,
 }
 
 
@@ -68,17 +83,30 @@ def job_error_message(code: str | None) -> str:
 
 
 @dataclass
+class CheckLine:
+    """One failed check of the output HTML, as the job page lists it."""
+
+    text: str  # what it means (web.messages)
+    code: str  # "name: code"
+    severity: str  # "Must be fixed" or "Worth checking"
+
+
+@dataclass
 class ResultSummary:
     pages: int
-    by_kind: dict[str, int]
+    by_kind: dict[str, int]  # fixes per kind
     needs_review: int
-    accepted: int
+    accepted: int  # accepted automatically by the pipeline
     not_converted: int
-    reviewed: int
-    cost_usd: float
+    reviewed: int  # accepted, edited or rejected by the reviewer
     # Fixes with status needs_review per kind ("equation" -> 6), for the per-kind links
     # into the review screen's groups.
     review_by_kind: dict[str, int] = field(default_factory=dict)
+    list_items: int = 0  # list item elements (no fixes: lists are rebuilt as they are)
+    # Static checks of the stored HTML (re-run after every review decision): how many
+    # ran, and the ones that failed. `checks_run` is 0 for results stored without them.
+    checks_run: int = 0
+    failed_checks: list[CheckLine] = field(default_factory=list)
 
 
 @dataclass
@@ -125,36 +153,54 @@ class JobView:
         return job_error_message(self.error_code)
 
 
+def _check_line(explained: Explained, severity: str) -> CheckLine:
+    return CheckLine(explained.text, explained.code, severity)
+
+
 def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
     if not result_json:
         return None
     result = DocumentResult.model_validate(result_json)
     statuses = Counter(f.status for f in result.fixes)
+    failed = [c for c in result.html_checks if not c.passed]
     return ResultSummary(
         pages=result.stats.pages,
         by_kind=dict(Counter(f.kind.value for f in result.fixes)),
         needs_review=statuses[Status.NEEDS_REVIEW],
-        accepted=statuses[Status.ACCEPTED],
+        accepted=sum(f.status is Status.ACCEPTED and not f.reviewed for f in result.fixes),
         not_converted=statuses[Status.ABSTAINED] + statuses[Status.FAILED],
-        reviewed=statuses[Status.EDITED] + statuses[Status.REJECTED],
-        cost_usd=result.stats.cost_usd,
+        reviewed=sum(f.decided_by_reviewer for f in result.fixes),
         review_by_kind=dict(
             Counter(f.kind.value for f in result.fixes if f.status is Status.NEEDS_REVIEW)
         ),
+        list_items=sum(e.kind is Kind.LIST_ITEM for e in result.elements),
+        checks_run=len(result.html_checks),
+        failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],
+    )
+
+
+def queue_ahead(session: Session, job: Job) -> int:
+    """Queued jobs the worker will claim before this one: the same order as
+    `Worker.claim` (fewest attempts, then oldest, then id), and like it only jobs whose
+    owner is still allowed."""
+    return int(
+        session.scalar(
+            select(func.count())
+            .select_from(Job)
+            .join(User, User.id == Job.user_id)
+            .where(
+                Job.status == JobStatus.QUEUED,
+                User.is_allowed.is_(True),
+                tuple_(Job.attempts, Job.created_at, Job.id)
+                < tuple_(job.attempts, job.created_at, job.id),
+            )
+        )
+        or 0
     )
 
 
 def job_view(session: Session, job: Job, *, with_summary: bool = False) -> JobView:
-    ahead = 0
-    if job.status == JobStatus.QUEUED:
-        ahead = int(
-            session.scalar(
-                select(func.count())
-                .select_from(Job)
-                .where(Job.status == JobStatus.QUEUED, Job.created_at < job.created_at)
-            )
-            or 0
-        )
+    ahead = queue_ahead(session, job) if job.status == JobStatus.QUEUED else 0
     return JobView(
         id=job.id,
         filename=job.filename,

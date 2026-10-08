@@ -210,6 +210,58 @@ def test_removing_someone_from_the_allowlist_ends_their_access_immediately(web):
     assert web.browser.get("/app").status_code == 303
 
 
+def copy_of(web, browser):
+    """Another browser holding a copy of `browser`'s session cookie."""
+    other = web.client()
+    for name, value in browser.cookies.items():
+        other.cookies.set(name, value)
+    return other
+
+
+def sign_out(browser) -> None:
+    token = csrf_from(browser.get("/app").text)
+    assert browser.post("/logout", data={"csrf_token": token}).status_code == 303
+
+
+def test_signing_out_ends_copied_sessions_too(web):
+    """The cookie is signed, not stored server-side: clearing it in one browser used to
+    leave every copy of it (another device, a stolen cookie) valid for 7 days."""
+    web.allow(ALICE)
+    login(web.browser, ALICE)
+    copied = copy_of(web, web.browser)
+    assert copied.get("/app").status_code == 200
+    sign_out(web.browser)
+    assert copied.get("/app").status_code == 303  # sent to sign in
+    login(web.browser, ALICE)  # signing in again works, and only the new session counts
+    assert web.browser.get("/app").status_code == 200
+    assert copied.get("/app").status_code == 303
+    copied.close()
+
+
+def test_a_session_from_before_removal_stays_ended_when_allowed_back(web):
+    from a11y_stem.web.auth import set_allowed
+
+    web.allow(ALICE)
+    login(web.browser, ALICE)
+    copied = copy_of(web, web.browser)
+    with session_scope(web.ctx.factory) as session:
+        set_allowed(session, ALICE, allowed=False)
+    web.allow(ALICE)
+    assert copied.get("/app").status_code == 303
+    copied.close()
+
+
+def test_signing_out_does_not_touch_other_people(web):
+    web.allow(ALICE)
+    web.allow(BOB)
+    login(web.browser, ALICE)
+    bob = web.client()
+    login(bob, BOB)
+    sign_out(web.browser)
+    assert bob.get("/app").status_code == 200
+    bob.close()
+
+
 def test_admin_page_is_admins_only(web):
     web.allow(ALICE)
     login(web.browser, ALICE)

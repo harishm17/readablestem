@@ -47,7 +47,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 | Heading | `<h1>`-`<h6>` from the heading fix | `<p>` with the original text |
 | Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
-| Inline equation | `<math display="inline">` inside the paragraph or list item | the crop inline, outlined, with "(equation not converted)" |
+| Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
 | Figure | `<figure><img alt="..."><figcaption>` | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
@@ -126,6 +126,32 @@ when both do not fit (a long equation on a 320 px screen) the number moves to th
 line, right-aligned, instead of being painted over (WCAG 1.4.10). An equation that was
 not converted keeps its number too, after the original image in the flagged box.
 
+## Wide equations
+
+An equation cannot wrap, so one wider than the screen scrolls sideways in its own box
+and the page does not (WCAG 1.4.10, reflow at 320 CSS px). Every display equation's
+`<div class="equation">` scrolls when it has to (`overflow-x: auto`). A box can only be
+scrolled from the keyboard if it can take focus, but a tab stop on every equation makes
+a long document tedious to tab through, so only equations that may be too wide for a
+phone become named tab stops:
+
+```html
+<div class="equation" id="p3-e5" tabindex="0" role="group" aria-label="Equation (2.4)">
+  <math display="block">...</math>...</div>
+<p>The sum <span class="equation-scroll" tabindex="0" role="group" aria-label="Equation">
+  <math display="inline" id="p3-e7">...</math></span> is long.</p>
+```
+
+Which ones is an estimate from the MathML (`assemble.estimate_width_em`: token widths,
+fractions as wide as their wider part, scripts at 71%, table columns): at least
+`WIDE_EQUATION_EM` (11 em of the maths font), against the 14.5 em that fit in the 288 px
+column of a 320 px screen. On the gold equations the estimate was within -18% and +44%
+of Chromium's widths; the margin covers other maths fonts. A wide inline equation gets
+its own scroll box (`.equation-scroll`, an inline block); short ones stay plain, since
+a scroll box sits on the line differently. `tests/test_assemble_wide.py` checks in
+Chromium at 320 px that the page does not scroll sideways, that every gold equation
+that overflows is a tab stop, that arrow keys scroll it, and axe.
+
 ## Flagged items
 
 Anything the pipeline could not convert keeps the original crop. Sighted readers lose
@@ -198,7 +224,10 @@ heading move up together:
 | h1 Chapter, ~~h2 Section 1~~, h3 Sub 1.1, h3 Sub 1.2, h2 Section 2 | h1, p, h2, h2, h2 |
 
 (Clamping to "previous heading + 1" alone would make Sub 1.2 a child of Sub 1.1.) The
-first heading keeps its level; an outline with no gaps is written unchanged.
+first heading keeps its level; an outline with no gaps is written unchanged. The repair
+is `assemble.Outline`; the review screen asks it (`would_write`) before saving or
+accepting a heading level, refuses a level the output would show differently, and shows
+the level the output writes when a change to an earlier heading moved it.
 
 ## About this conversion
 
@@ -207,7 +236,8 @@ The last section of `<main>` contains:
 - "This file was produced with a11y-stem, which assists with accessibility; review it
   before publishing."
 - counts per kind and status (e.g. "Equations (5): 2 accepted, 1 not converted (model
-  unsure), ..."),
+  unsure), ..."); a reviewer's Accept (`Fix.reviewed`) is counted apart from the
+  pipeline's, as "accepted by a reviewer",
 - how many items are flagged and what the flags look like,
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
@@ -225,6 +255,8 @@ About 35 lines of inline CSS:
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
   (about 17:1 contrast);
 - images at their printed size (PDF points x 96/72) and never wider than the column;
+- display equations scroll sideways inside their `.equation` box when wider than the
+  screen (see "Wide equations");
 - block maths keep the browser's own `display: block math` and centring (overriding
   `display` on `<math>` breaks MathML layout);
 - lists with a hanging indent for printed markers (reset for anything nested in such an
@@ -262,10 +294,11 @@ content. Without Playwright or its Chromium it returns one
 `Check(name="axe", passed=True, severity="warning", code="skipped")`. A run takes about
 a second.
 
-`DocumentResult` has no field for these yet, so `convert_pdf` returns them on
-`run.PipelineOutput.checks` (a subclass of `ConversionOutput`). The CLI prints them and
-writes them to `--report`. Anyone holding only a `DocumentResult` can recompute them:
-`static_checks(result.html)` is deterministic and fast.
+`convert_pdf` stores the static checks on `DocumentResult.html_checks` (and, for older
+callers, on `run.PipelineOutput.checks`). The CLI prints them and writes them to
+`--report`; the web app lists the failed ones on the job page and re-runs them after
+every review decision re-renders the file. `static_checks(result.html)` is deterministic
+and fast, so anyone holding only the HTML can recompute them.
 
 ## How `convert_pdf` fills it in
 
@@ -279,8 +312,9 @@ writes them to `--report`. Anyone holding only a `DocumentResult` can recompute 
    `ThreadPoolExecutor(concurrency)`. Cropping page N+1 overlaps the model calls for
    page N.
 4. Each step gets ~600 characters of neighbouring text as untrusted `context_text`: for an
-   inline equation, its paragraph around the marker (`[this equation]` marks the spot);
-   otherwise the end of the previous text element and the start of the next. Other
+   inline equation, its paragraph or list item around the marker (`[this equation]`
+   marks the spot); otherwise the end of the previous text element (paragraph, heading or
+   list item) and the start of the next. Other
    markers become `[equation]`.
 5. A step that raises becomes FAILED `internal_error`; a crop that fails, FAILED
    `crop_error`. Only the exception type is logged, never its message (it may quote the
@@ -318,7 +352,8 @@ generation (with tokens and cost), so per-request cost shows in Langfuse's cost 
 ## CLI
 
 ```
-a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--report OUT.json] [--axe]
+a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
+                  [--report OUT.json] [--axe]
 ```
 
 `--max-usd` caps this run with an in-memory spend guard; `MAX_USD_PER_JOB` and
@@ -333,7 +368,7 @@ model, not conversions. Do not publish it." Progress
 
 ```
 Pages:       1
-Elements:    4 (1 headings, 1 paragraphs, 2 equations, 0 figures)
+Elements:    4 (1 headings, 1 paragraphs, 0 list items, 2 equations, 0 figures)
 Fixes:
   kind        accepted
   heading            1
@@ -355,12 +390,21 @@ When a limit stops the run, the summary names it, e.g. `Budget: stopped early
 which reports the scope `daily` because it stands in for the web app's daily cap.
 `--out` and `--report` may not be the input PDF or each other.
 
+`--concurrency` (default 4, at most 16) is how many equation and figure steps run at
+once. Every model request first reserves its worst-case cost and settles to the real
+cost when it returns, so the reservations of the steps in flight count against
+`--max-usd` until they settle. A small cap therefore fills before it is spent: with
+`--max-usd 0.10` and 4 steps of about $0.02 worst case each, a real run refused a call
+after $0.016 of real spend. When the run cap stops a real run with more than one step at
+once, the summary says so and suggests `--concurrency 1`, which reserves one call at a
+time.
+
 ## Engineering limits (input for the known-limits copy)
 
 TODO(Harish): turn these into the public known-limits copy.
 
-- A very wide display equation widens the page instead of scrolling inside its own box (a
-  scroll box would need `tabindex` to be keyboard-reachable on every equation).
+- An equation wider than the screen does not wrap: it scrolls sideways inside its own
+  box (a tab stop when it may not fit a phone screen).
 - NEEDS_REVIEW items look like converted ones in an export made before review.
 - Tables are not rebuilt; a table that layout reports as a figure becomes an image with
   alt text.

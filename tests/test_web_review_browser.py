@@ -7,6 +7,7 @@
 - status is written in words, not shown by colour alone;
 - no sideways scrolling at 320 CSS px (WCAG 1.4.10), even with a file name that has no
   break points and an equation wider than the screen;
+- at 320 CSS px, an error summary link shows the field with its label (app.js);
 - decisions and bulk accept work without JavaScript and land where the reviewer expects.
 
 Run with: uv run pytest -m browser tests/test_web_review_browser.py
@@ -25,7 +26,7 @@ from collections.abc import Iterator
 import pytest
 
 from a11y_stem.core.types import ConversionOutput
-from a11y_stem.web.views import FIX_STATUS_LABELS
+from a11y_stem.web.views import FIX_STATUS_LABELS, REVIEWER_ACCEPTED_LABEL
 from fixtures.web.support import ALICE, WebEnv, make_pdf
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import axe_violations, describe, free_port, sign_in
@@ -40,7 +41,8 @@ sync_api = pytest.importorskip("playwright.sync_api")
 LONG_NAME = "Physics_Unit_2_Kinematics_Lecture_Notes_With_Worked_Examples_Fall_2026_FINAL_v3.pdf"
 NARROW = {"width": 320, "height": 640}
 WIDE = {"width": 1280, "height": 900}
-STATUS_WORDS = set(FIX_STATUS_LABELS.values())  # "Needs review", "Rejected: original kept", ...
+# "Needs review", "Rejected: original kept", ..., "Accepted by you"
+STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL}
 
 
 def wide_equation() -> str:
@@ -226,6 +228,68 @@ def test_no_sideways_scrolling_at_320_css_px(site, browser, job):
     assert preview.evaluate("e => e.scrollWidth > e.clientWidth")
     assert sideways_overflow(page) == 0
     context.close()
+
+
+ZOOM_400 = {"width": 320, "height": 256}  # 1280 x 1024 at 400%
+
+
+def follow_summary_link(page, control_id: str) -> dict[str, tuple[float, float]]:
+    """Follow the error summary's link to `control_id` from the top of the page; the
+    (top, bottom) in the window of the field's label, hint, error message and control."""
+    page.evaluate("window.scrollTo(0, 0)")
+    page.locator(f'.error-summary a[href="#{control_id}"]').click()
+    assert page.evaluate("document.activeElement.id") == control_id
+    prefix, element_id = control_id.split("-", 1)
+    parts = {}
+    for part, selector in (
+        ("label", f'label[for="{control_id}"]'),
+        ("hint", f"#{prefix}-hint-{element_id}"),
+        ("error", f"#{prefix}-error-{element_id}"),
+        ("control", f"#{control_id}"),
+    ):
+        box = page.locator(selector).bounding_box()
+        assert box is not None, part
+        parts[part] = (box["y"], box["y"] + box["height"])
+    return parts
+
+
+@pytest.mark.parametrize(
+    ("viewport", "field_fits"), [(NARROW, True), (ZOOM_400, False)], ids=["320x640", "320x256"]
+)
+def test_an_error_summary_link_shows_the_field_with_its_label_at_320_css_px(
+    site, browser, job, viewport, field_fits
+):
+    """At 320 CSS px a field's label, hint and error message wrap to about 300 px, more
+    than the CSS scroll-margin-top: following a summary link focused the control with
+    its label 160 px above the window. app.js scrolls the whole field into view. When
+    the field is taller than the window (400% zoom) the focused control stays in view,
+    with as much of the field as fits above it.
+
+    Its own context, without bypass_csp: the Content-Security-Policy must allow app.js.
+    """
+    context = browser.new_context(viewport=viewport)
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    url = review_url(site, job)
+    page.goto(url)
+    page.get_by_label("Level for heading 2").select_option("6")
+    page.get_by_role("button", name="Save edit to heading 2").click()
+    fields = {"heading level": follow_summary_link(page, "level-p1-e3")}
+    page.goto(url)
+    page.get_by_label("LaTeX for equation 1").fill("\\input{secret}")
+    page.get_by_role("button", name="Save edit to equation 1").click()
+    fields["LaTeX"] = follow_summary_link(page, "latex-p1-e1")
+    context.close()
+
+    height = viewport["height"]
+    for name, parts in fields.items():
+        top, bottom = parts["control"]
+        assert top >= 0 and bottom <= height, (name, parts)  # focus is in view
+        if field_fits:
+            assert all(y0 >= 0 and y1 <= height for y0, y1 in parts.values()), (name, parts)
+        else:
+            assert parts["label"][0] < 0, (name, parts)  # the field really is too tall
+            assert bottom >= height - 16, (name, parts)  # all that fits above the control
 
 
 # --------------------------------------------------------------------------- names

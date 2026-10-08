@@ -304,9 +304,15 @@ def test_status_updates_live_with_htmx_then_shows_results(site, browser):
     job_id = upload_pdf(page, site.base)
     assert "Waiting" in page.locator("#job-status").inner_text()
     assert site.run_worker() == job_id
-    # htmx polls every 3 s; once finished, HX-Refresh reloads the page with the results.
-    page.wait_for_selector("#results-heading", timeout=15000)
+    # htmx polls every 3 s; once finished, the status (a live region) says so and links
+    # to the results, without reloading the page under the reader.
+    link = page.locator("#job-status").get_by_role("link", name="Show the results")
+    link.wait_for(timeout=15000)
     assert "Finished" in page.locator("#job-status").inner_text()
+    assert page.locator("#results-heading").count() == 0
+    assert page.title() == "Finished: notes.pdf | a11y-stem"
+    link.click()
+    page.wait_for_selector("#results-heading")
     context.close()
 
 
@@ -358,6 +364,50 @@ def test_the_error_summary_takes_focus_after_every_failed_form(site, browser):
     context.close()
 
 
+@pytest.mark.parametrize("javascript", [False, True], ids=["no-js", "js"])
+def test_an_error_summary_link_keeps_the_fields_label_and_error_in_view(site, browser, javascript):
+    """Following a summary link scrolls the field to the top of the window, so the label
+    and the error message above it are scrolled out of view and the user lands on an
+    unlabelled box. Without JavaScript, scroll-margin-top on form controls keeps them in
+    view; with it, app.js scrolls the whole field into view, whatever the margin (the
+    narrow screens a fixed margin cannot cover are in test_web_review_browser.py)."""
+    # bypass_csp: only for the style injected below.
+    context = browser.new_context(
+        viewport={"width": 1000, "height": 400}, bypass_csp=True, java_script_enabled=javascript
+    )
+    page = context.new_page()
+    sign_in(page, site.base, ADMIN)
+    page.goto(f"{site.base}/admin")
+    page.get_by_label("Email address to allow").fill("not an email")
+    page.get_by_role("button", name="Allow", exact=True).click()
+
+    def follow_summary_link() -> tuple[float, float]:
+        page.evaluate("window.scrollTo(0, 0)")
+        page.locator('.error-summary a[href="#allow-email"]').click()
+        assert page.evaluate("document.activeElement.id") == "allow-email"
+        label = page.locator('label[for="allow-email"]').bounding_box()
+        error = page.locator("#allow-email-error").bounding_box()
+        assert label is not None and error is not None
+        return label["y"], error["y"]
+
+    label_y, error_y = follow_summary_link()
+    assert label_y >= 0 and error_y >= 0
+    # Without the margin the same click hides them (so the page did scroll), unless the
+    # script places the field. (add_style_tag waits for a load event that never fires
+    # with JavaScript off.)
+    page.evaluate(
+        """css => { const s = document.createElement('style'); s.textContent = css;
+                    document.head.append(s); }""",
+        "input { scroll-margin-top: 0 !important; }",
+    )
+    label_y, error_y = follow_summary_link()
+    if javascript:
+        assert label_y >= 0 and error_y >= 0, (label_y, error_y)
+    else:
+        assert label_y < 0 and error_y < 0, (label_y, error_y)
+    context.close()
+
+
 def test_deleting_asks_first_then_the_notice_takes_focus(site, browser):
     context = browser.new_context()
     page = context.new_page()
@@ -384,10 +434,6 @@ TEXT_SPACING = (
     "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; "
     "word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }"
 )
-APP_CSS = (
-    "needs app.css (owned by the review-ux stream): overflow-wrap on long names, "
-    "position: relative on .table-scroll"
-)
 
 
 @pytest.fixture(scope="module")
@@ -411,25 +457,21 @@ PUBLIC = ("/", "/privacy", "/terms", "/limits", "/status", "/login", "/dev-login
 
 
 def _reflow_params():
-    pages = [*PUBLIC, "/app", "/admin", "/jobs/{id}"]
-    # Known failures, each fixed only in app.css: the long file name in the job page's
-    # <h1> and the documents table; the visually hidden button text that escapes
-    # .table-scroll on /app and /admin; the source URL on /terms with wider spacing.
-    owned = {"/app", "/admin", "/jobs/{id}", "/terms +text-spacing"}
     for spacing in (False, True):
         suffix = " +text-spacing" if spacing else ""
-        for path in pages:
-            if path + suffix in owned or path in owned:
-                mark = pytest.mark.xfail(reason=APP_CSS, strict=False)
-                yield pytest.param(path, spacing, id=path + suffix, marks=mark)
-            else:
-                yield pytest.param(path, spacing, id=path + suffix)
+        for path in [*PUBLIC, "/app", "/admin", "/jobs/{id}"]:
+            yield pytest.param(path, spacing, id=path + suffix)
 
 
 @pytest.mark.parametrize(("path", "spacing"), list(_reflow_params()))
 def test_pages_reflow_at_320_css_pixels(site, browser, long_named_job, path, spacing):
     """WCAG 1.4.10: at 320 CSS px (400% zoom) nothing may need sideways scrolling, also
-    with a long file name and with the 1.4.12 text-spacing override."""
+    with a long file name and with the 1.4.12 text-spacing override.
+
+    What it took (app.css): the long file name wraps anywhere in headings and table row
+    headers; the visually hidden "Delete <file>" text stays inside its .table-scroll box
+    (position: relative) instead of widening /app and /admin; the source URL on /terms
+    wraps (break-word on the body)."""
     context = browser.new_context(viewport={"width": 320, "height": 256}, bypass_csp=True)
     page = context.new_page()
     if path not in PUBLIC:

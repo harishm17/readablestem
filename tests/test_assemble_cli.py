@@ -162,7 +162,7 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
 
     for line in (
         "Pages:       1",
-        "Elements:    4 (1 headings, 1 paragraphs, 2 equations, 0 figures)",
+        "Elements:    4 (1 headings, 1 paragraphs, 0 list items, 2 equations, 0 figures)",
         "Model calls: 2",
         "(fake client, nothing billed)",
         "Checks:      static 11/11 passed",
@@ -222,6 +222,69 @@ def test_run_cap_is_named_as_the_max_usd_cap(pdf, tmp_path, pipeline, monkeypatc
     out = capsys.readouterr().out
     assert "stopped early (budget_daily: the --max-usd cap for this run); 2 item(s)" in out
     assert "Model calls: 0" in out
+
+
+def test_a_small_run_cap_suggests_fewer_steps_at_once(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    """Each step in flight holds a worst-case reservation against --max-usd, so with a
+    small cap the reservations, not the spend, stop the run."""
+    monkeypatch.setattr(
+        models,
+        "make_vision_client",
+        lambda settings, budget, *, fake: FakeVisionClient(budget=budget),
+        raising=False,
+    )
+    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "0.0001") == 0
+    assert "with a small --max-usd try --concurrency 1" in capsys.readouterr().out
+    args = ("--max-usd", "0.0001", "--concurrency", "1")
+    assert run(pdf, "--out", tmp_path / "p.html", *args) == 0
+    assert "try --concurrency" not in capsys.readouterr().out
+
+
+def test_concurrency_is_passed_to_the_pipeline(pdf, tmp_path, pipeline, monkeypatch):
+    from a11y_stem.pipeline import run as run_module
+
+    seen: list[int] = []
+    real = run_module.convert_pdf
+
+    def recording(pdf_bytes, **kwargs):
+        seen.append(kwargs["concurrency"])
+        return real(pdf_bytes, **kwargs)
+
+    monkeypatch.setattr(run_module, "convert_pdf", recording)
+    assert run(pdf, "--out", tmp_path / "a.html", "--fake") == 0
+    assert run(pdf, "--out", tmp_path / "b.html", "--fake", "--concurrency", "1") == 0
+    assert seen == [4, 1]
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "17", "two", "1.5"])
+def test_concurrency_must_be_a_small_positive_number(pdf, tmp_path, value, capsys):
+    with pytest.raises(SystemExit) as exit_info:
+        build_parser().parse_args(
+            ["convert", str(pdf), "--out", str(tmp_path / "o.html"), "--fake",
+             "--concurrency", value]
+        )  # fmt: skip
+    assert exit_info.value.code == 2
+    assert "--concurrency" in capsys.readouterr().err
+
+
+def test_list_items_are_counted_in_the_summary(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    analyze = pipeline.analyze
+
+    def with_list(pdf_bytes, *, pages=None, max_pages=None) -> Layout:
+        found = analyze(pdf_bytes, pages=pages, max_pages=max_pages)
+        box = (72.0, 100.0, 200.0, 110.0)
+        found.elements += [
+            Element(id=f"p1-e{4 + i}", kind=Kind.LIST_ITEM, page=0, bbox=box, order=4 + i,
+                    text=f"item {i}", list_marker="\u2022", list_ordered=False, list_level=1)
+            for i in range(3)
+        ]  # fmt: skip
+        return found
+
+    monkeypatch.setattr(layout, "analyze", with_list)
+    assert run(pdf, "--out", tmp_path / "o.html", "--fake") == 0
+    out = capsys.readouterr().out
+    assert "Elements:    7 (1 headings, 1 paragraphs, 3 list items, 2 equations, 0 figures)" in out
+    assert "item 0" not in out  # counts only, never the text
 
 
 def test_axe_flag_runs_axe_and_summarises_rule_ids(pdf, tmp_path, pipeline, monkeypatch, capsys):

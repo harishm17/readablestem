@@ -1,5 +1,10 @@
 {% extends "base.html" %}
-{% block title %}{{ job.status_label }}: {{ job.filename }}{% endblock %}
+{# `outcome` (web/outcome.py): a finished job that is incomplete (a spend cap stopped it,
+   scanned pages), a failed job with its own explanation (scanned, no content, ...), or
+   a queued job waiting for tomorrow's budget. It replaces the plain status everywhere
+   on this page: title, status box and the sections below. #}
+{% set outcome = outcome|default(none) %}
+{% block title %}{{ outcome.label if outcome else job.status_label }}: {{ job.filename }}{% endblock %}
 {% block head %}
 {% if auto_reload and not job.finished %}
 {# Without JavaScript, and only when the user asked for it (?auto=1), reload until the
@@ -33,16 +38,25 @@
 {% set s = job.summary %}
 <section aria-labelledby="results-heading">
   <h2 id="results-heading">Results</h2>
+  {% if outcome and outcome.partial %}
+  <div class="notice notice-warning" id="partial-note">
+    <p><strong>{{ outcome.label }}:</strong> part of this document was not converted. The
+      status above says why and what to do; the HTML keeps those parts as images of the
+      original, marked “Not converted”.</p>
+  </div>
+  {% endif %}
   <dl class="summary-list">
     <div><dt>Pages</dt><dd>{{ s.pages }}</dd></div>
     <div><dt>Equations</dt><dd>{{ s.by_kind.get("equation", 0) }}</dd></div>
     <div><dt>Figures</dt><dd>{{ s.by_kind.get("figure", 0) }}</dd></div>
     <div><dt>Headings</dt><dd>{{ s.by_kind.get("heading", 0) }}</dd></div>
+    <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
     <div><dt>Need your review</dt><dd>{{ s.needs_review }}</dd></div>
     <div><dt>Accepted automatically</dt><dd>{{ s.accepted }}</dd></div>
     <div><dt>Not converted (original kept)</dt><dd>{{ s.not_converted }}</dd></div>
-    <div><dt>Reviewed by you</dt><dd>{{ s.reviewed }}</dd></div>
-    <div><dt>Model cost</dt><dd>{{ s.cost_usd|usd }}</dd></div>
+    <div><dt>Reviewed by you (accepted, edited or rejected)</dt><dd>{{ s.reviewed }}</dd></div>
+    {# Every attempt, including one interrupted before it could store a result. #}
+    <div><dt>Model cost</dt><dd>{{ job.cost_usd|usd }}</dd></div>
   </dl>
   {% if s.needs_review %}
   {# One link per kind, straight to that group on the review screen. #}
@@ -60,11 +74,27 @@
   </ul>
   <p class="hint">The converted document is a single HTML file with the equations, headings
     and figure descriptions built in. Check it before you share it with students.</p>
+  {% if s.checks_run %}
+  <h3 id="checks-heading">Automatic checks of the HTML file</h3>
+  {% if s.failed_checks %}
+  {% set n = s.failed_checks|length %}
+  <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if s.needs_review %} (they run again after each review decision){% endif %}:</p>
+  <ul class="check-list" aria-labelledby="checks-heading">
+    {% for check in s.failed_checks %}
+    <li><strong>{{ check.severity }}:</strong> {{ check.text }}
+      <span class="code-line">Code: <code>{{ check.code }}</code></span></li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p>All {{ s.checks_run }} checks passed. They look at the structure of the file (language,
+    title, headings, lists, image alt attributes), not at whether its content is right.</p>
+  {% endif %}
+  {% endif %}
 </section>
 {% elif job.status == "failed" %}
 <section aria-labelledby="failed-heading">
   <h2 id="failed-heading">Why the conversion stopped</h2>
-  <p>{{ job.status_detail }}</p>
+  <p>{{ outcome.message if outcome else job.status_detail }}</p>
   <p class="hint">Error code: <code>{{ job.error_code or "unknown" }}</code></p>
 </section>
 {% endif %}

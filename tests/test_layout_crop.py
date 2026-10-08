@@ -3,6 +3,8 @@ the child-process probe that keeps a crashing PDF from taking the process down."
 
 from __future__ import annotations
 
+import subprocess
+import sys
 import time
 from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
@@ -270,3 +272,63 @@ def test_the_probe_output_is_discarded(monkeypatch, unprobed, capfd):
         analyze(block_pdf())
     out, err = capfd.readouterr()
     assert "Secret" not in out + err
+
+
+# Runs in a fresh interpreter, so RUSAGE_CHILDREN sees only the probe child it starts.
+PROBE_PEAK = """
+import resource, sys
+import pymupdf
+from a11y_stem.pipeline import layout
+side, max_side, memory = float(sys.argv[1]), float(sys.argv[2]), int(sys.argv[3])
+doc = pymupdf.open()
+page = doc.new_page(width=200, height=200)
+page.insert_text((20, 40), "Big page")
+page.set_mediabox(pymupdf.Rect(0, 0, side, side))
+layout.PROBE_MAX_SIDE_PX = max_side
+layout.PROBE_MEMORY_BYTES = memory
+layout._probe_pages(doc.tobytes(), [0])  # LayoutError if the child died
+print(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)
+"""
+MIB = 1024 * 1024
+
+
+def probe_peak_mib(
+    side: float,
+    max_side: float = layout.PROBE_MAX_SIDE_PX,
+    memory: int = layout.PROBE_MEMORY_BYTES,
+) -> float:
+    """Peak resident memory of the probe child for one page `side` points square."""
+    done = subprocess.run(
+        [sys.executable, "-c", PROBE_PEAK, str(side), str(max_side), str(memory)],
+        capture_output=True,
+        text=True,
+        timeout=120,
+        check=True,
+    )
+    return int(done.stdout.strip()) / 1024  # ru_maxrss is in KiB on Linux
+
+
+linux_only = pytest.mark.skipif(sys.platform != "linux", reason="ru_maxrss units, RLIMIT_AS")
+
+
+@linux_only
+def test_a_huge_page_box_is_probed_with_a_bounded_render():
+    """MuPDF accepts page boxes far past the PDF maximum. The probe rendered whole pages
+    at 72 dpi: an 18000 pt page was an 18000 x 18000 pixmap, about 1 GB. The upload probe
+    refuses such pages, but the CLI and eval convert files that never went through it."""
+    assert probe_peak_mib(18000) < 200
+
+
+@linux_only
+def test_the_probe_render_is_capped_in_pixels():
+    capped = probe_peak_mib(9000)
+    uncapped = probe_peak_mib(9000, max_side=10**6)  # the old behaviour: 9000 px square
+    assert capped < 200 and uncapped > capped + 150, (capped, uncapped)
+
+
+@linux_only
+def test_the_probe_child_caps_its_own_address_space():
+    """Without the pixel cap an 18000 pt page needs ~1 GB of pixels; under a 400 MB
+    limit the allocation fails inside the child (a Python error there is ignored) and
+    the child never grows past it."""
+    assert probe_peak_mib(18000, max_side=10**6, memory=400 * MIB) < 450

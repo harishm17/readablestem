@@ -37,7 +37,10 @@ edit only changes the level and keeps the pipeline's checks (web/review.py), and
 corrected headings are the most useful ones for calibration.
 
 Review actions ("review:edit") are counted by `ops.retention` when the job is deleted,
-because reviewers can act until then.
+because reviewers can act until then. The document checks are those stored with the
+result when it is aggregated: a review decision re-renders the HTML and re-runs them
+(web/review.py `rerender_html`), and there is no snapshot of the pipeline's own, so a
+job reviewed before the hourly aggregation counts the checks of its reviewed file.
 
 Every code part is checked against `CODE_PATTERN`; anything else (a sentence, LaTeX, an
 email) is recorded as "other", so a bug upstream cannot write text into this table.

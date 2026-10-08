@@ -20,19 +20,10 @@ SOURCES = sorted(
     p for folder in ("src", "tests", "migrations") for p in (ROOT / folder).rglob("*.py")
 )
 
-# Known offenders in files another work stream owns right now; each must be fixed there.
-# Non-strict, so the fix landing makes this an XPASS rather than a failure.
-PENDING = {
-    "src/a11y_stem/pipeline/parse.py": "surrogate escapes in is_math_alphanumeric's "
-    "docstring (layout-v2 stream owns parse.py)",
-}
-
 
 def _params():
     for path in SOURCES:
-        rel = path.relative_to(ROOT).as_posix()
-        marks = [pytest.mark.xfail(reason=PENDING[rel], strict=False)] if rel in PENDING else []
-        yield pytest.param(path, id=rel, marks=marks)
+        yield pytest.param(path, id=path.relative_to(ROOT).as_posix())
 
 
 def bad_string_lines(source: str) -> list[int]:
@@ -56,8 +47,3 @@ def test_the_check_catches_surrogate_escapes():
 def test_string_literals_are_valid_utf8(path: Path):
     bad = bad_string_lines(path.read_text(encoding="utf-8"))
     assert not bad, f"lone surrogate escapes on lines {bad}; write the character itself"
-
-
-def test_pending_entries_still_exist():
-    for rel in PENDING:
-        assert (ROOT / rel).is_file(), rel

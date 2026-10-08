@@ -108,8 +108,15 @@ else, admins included, so job ids cannot be probed and admins never see document
   created for them.
 - **Sessions.** Starlette `SessionMiddleware`: a signed cookie `a11y_stem_session`,
   HttpOnly, SameSite=Lax, 7 days, Secure in production. The session is cleared and a new
-  CSRF token issued at sign-in. It holds the user id, the CSRF token, one-time notices
-  (never document content) and Authlib's sign-in state.
+  CSRF token issued at sign-in. It holds the user id, the user's session version, the
+  CSRF token, one-time notices (never document content) and Authlib's sign-in state.
+- **Signing out.** The cookie is signed, not stored, so clearing it in one browser
+  would leave any copy of it valid for its 7 days. Signing out therefore bumps
+  `users.session_version`, and a session signed in with an older version no longer
+  signs anyone in: signing out ends every session of the account (other browsers and
+  copied cookies too). Removal from the allowlist bumps it as well, so old sessions stay
+  ended if the person is allowed back. Sessions from before the column existed carry no
+  version and count as version 0.
 - **CSRF.** Every form that changes something carries a hidden `csrf_token`, compared in
   constant time with the session's. `tests/test_web_auth.py` lists every POST route and
   checks each refuses a forged token, so a new route cannot skip the check unnoticed.
@@ -170,8 +177,10 @@ hold stays until the day ends: the cap errs on the side of spending less.
 
 A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
-- **Claiming.** Fewest attempts first, then oldest, so a retried job goes behind fresh
-  ones. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
+- **Claiming.** Fewest attempts first, then oldest (then id), so a retried job goes
+  behind fresh ones. The queue position on the job page ("2 documents ahead of yours",
+  `views.queue_ahead`) counts in the same order, also skipping the jobs of people no
+  longer allowed. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
   someone also fails their queued and running jobs with `access_removed`.
@@ -302,11 +311,41 @@ and gives its counts. Every fix is numbered within its kind in reading order ("E
   "Reject" buttons whose accessible names include the fix ("Reject figure 2").
 
 A decision is one transaction: lock the job row, apply the decision (`web/review.py`),
-validate edits with `pipeline.validate` (`check_latex`, `safe_latex_to_mathml`,
-`check_mathml`, `check_alt`), store a `ReviewEdit`, set the fix status (`accepted`,
-`edited`, `rejected`) in `result_json`, and re-render the job's HTML with
-`pipeline.assemble.render_html`. A failed check re-shows the page (422) with the
-reviewer's input and an error summary linked to the field; nothing is saved.
+clean and validate edits the way model output is (`equation_step.clean_latex`, then
+`pipeline.validate`'s `check_latex`, `safe_latex_to_mathml`, `check_mathml`; alt text
+through `validate.clean_alt`, then `check_alt`), store a `ReviewEdit`, set the fix status
+(`accepted`, `edited`, `rejected`) and `Fix.reviewed` in `result_json`, re-render the
+job's HTML with `pipeline.assemble.render_html` and re-run its static checks
+(`result_json.html_checks`, listed on the job page). A failed check re-shows the page
+(422) with the reviewer's input as typed and an error summary linked to the field;
+nothing is saved.
+
+- **Accept by a reviewer.** It keeps the status `accepted` (the proposal is used as it
+  is) and sets `Fix.reviewed`, so the job page counts it under "Reviewed by you", not
+  "Accepted automatically", the card says "Accepted by you" and the output's About
+  section says "accepted by a reviewer". `reviewed` defaults to false, so results
+  stored before it existed still load (their edited and rejected fixes still count as
+  reviewed).
+- **Cleaning.** A reviewer who pastes `$v_f = v_0 + at$` gets `v_f = v_0 + at`, and
+  `50% of g` is stored as `50\% of g` (a bare `%` would make the converter drop the rest
+  of the line). Alt text loses invisible format characters (bidi controls, zero-width
+  spaces), so what is stored is exactly what `check_alt` judged.
+- **Heading levels.** Only `1` to `6` (ASCII digits; `²` used to be a 500). The output
+  never skips a level (`assemble.Outline`, see docs/output.md "Headings"), so a level
+  more than one below the heading before it would be stored as one level and shown as
+  another. It is refused with the level it would be shown at and the levels that fit
+  ("Choose a level from 1 to 3, or change the heading before it first"); the form's
+  hint says the same before saving. The first heading may take any level. Rejecting or
+  changing a heading can move later ones (the children of a rejected heading move up
+  together), so Accept, as well as Save edit, refuses a proposed level the output would
+  move, and the card has no Accept button for it. The card shows the level the document
+  writes ("In the document: level 2."; for a rejected heading, "If accepted, it would be
+  level 2.") and its select offers that level. A decision that moves other headings says
+  which ("Heading 3 is now shown at a different level."). Stored levels are not
+  rewritten: restoring a rejected heading puts its children back where they were.
+  `web.review.heading_places` is the one pass that gives every heading's written level;
+  a test checks it against the assembler's output for every outline of up to four
+  headings.
 
 After a decision the browser is redirected (303) to `#item-<id>` of the next fix still
 waiting, after this one in review order and wrapping round to the first, or to
@@ -322,8 +361,10 @@ The landing item has `tabindex="-1"`, so the next Tab reaches that link.
   to spot and fix later, a wrong equation or alt text is not.
 
 Only fixes a single "Accept" could take are included: status `needs_review`, a proposal,
-and no failed error-level check. Failed and not-converted fixes, and fixes the reviewer
-already decided, are never touched. The threshold compares the whole percentage the page
+no failed error-level check and, for a heading, a level the output writes as it is
+("Not included: 1 heading the document shows at another level than the one proposed").
+Failed and not-converted fixes, and fixes the reviewer already decided, are never
+touched. The threshold compares the whole percentage the page
 shows (0.795 is shown as 80%, so it is "at or above 80%"). Bulk accept posts to the same
 route as a single decision, with the group (`equations`, `figures`, `headings`) in
 place of the element id (element ids look like `p3-e12`, so the two cannot collide).
@@ -335,7 +376,15 @@ and re-renders nothing. A choice the page never offers (an unknown threshold, "a
 all" for equations) is refused with a 422 and an error linked to the threshold select.
 
 **Job page.** "Need your review" is broken down by kind, each linking to its group
-("7 need your review: 3 equations, 1 figure, 3 headings.").
+("7 need your review: 3 equations, 1 figure, 3 headings."). The summary also counts
+list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
+including one interrupted before it stored a result) and lists the static checks of the
+HTML file that did not pass, each as a sentence from `web/messages.py` with its code
+("All 11 checks passed" otherwise). An incomplete or failed job's outcome
+(`web/outcome.py`: "Stopped early", "Finished, with pages not converted", a scanned or
+empty PDF) replaces the plain status in the page title, the status box and the
+"Why the conversion stopped" section, and a finished but incomplete job gets a note at
+the top of its results.
 
 **Messages.** `web/messages.py` maps every `(Check.name, Check.code)` pair and every
 `Fix.reason` the pipeline can emit to one plain sentence that says what is wrong and
@@ -345,8 +394,10 @@ until it has a sentence, and a sentence whose code no longer exists fails it too
 unknown code still gets a neutral sentence plus the code.
 
 **Narrow screens.** Long file names, codes and document text wrap
-(`overflow-wrap: anywhere` on headings, ledes, summaries, error text and the review
-cards), so neither the job page nor the review page scrolls sideways at 320 CSS px.
+(`overflow-wrap: anywhere` on headings, ledes, summaries, error text, table row headers
+and the review cards; `break-word` everywhere else), so no page scrolls sideways at 320
+CSS px. A table wider than the screen scrolls inside its own `.table-scroll` box, which
+is `position: relative` so the visually hidden button text in it cannot widen the page.
 
 ## Security headers
 
@@ -378,11 +429,15 @@ forms or reading our cookies.
 The app pages have no inline scripts, styles or event handlers (a test scans the
 templates). htmx is vendored at `web/static/vendor/` (version, hashes and licence in its
 README) and configured to need no `eval`, inject no `<style>` and keep no history cache.
+Our own script, `web/static/app.js`, only places error summary links (below).
 
 ## Accessibility of the app itself
 
 Server-rendered pages that work without JavaScript: htmx only polls the job status
-(every 3 s, 204 while unchanged, a full reload when the job finishes). Without
+(every 3 s, 204 while unchanged). When the job finishes the status box, a live region,
+says so and links to the results ("Show the results", or "Show why it stopped"); the
+page is not reloaded under the reader, which would send a screen reader back to the
+top. Without
 JavaScript the status page does not reload by itself, because a reload the user did not
 choose sends a screen reader back to the top each time (WCAG 2.2.1, failure F41; axe
 rule `meta-refresh`, critical). It has a "refresh the status" link and, inside
@@ -396,13 +451,23 @@ the first one-time notice after a redirect ("deleted"), because a live region pr
 page load is not announced. While htmx polls, the status fragment carries a `<title>`
 that htmx moves into the document title, so the tab title follows the status.
 
+Following an error summary link would scroll the control to the top of the window and
+cut off its label, hint and error message. `app.js` (as the GOV.UK error summary does)
+scrolls the start of the field's `.field` wrapper to the top instead and focuses the
+control without scrolling again; when the field is taller than the window (320 x 256,
+which is 400% zoom, where a heading-level error alone wraps to 170 px) the focused
+control stays in view with as much of the field as fits above it. Without JavaScript,
+`scroll-margin-top: 8rem` on form controls keeps the label in view on wider screens.
+
 `tests/test_web_browser.py` runs axe-core on every page (zero serious or critical
 violations), including an unfinished job page with JavaScript on and as a no-JS browser
 parses it; runs the WCAG 2.2 AA and best-practice rules at moderate and above; checks
 every page at 320 CSS px with a long underscored file name, with and without the WCAG
-1.4.12 text-spacing override (pages whose fix is in `app.css` are expected failures
-until that lands); checks where focus goes after errors and after deleting; and walks the
-upload-to-review flow with JavaScript off.
+1.4.12 text-spacing override; checks where focus goes after errors and after deleting,
+and that following an error summary link leaves the field's label and error message in
+view, with and without JavaScript (`test_web_review_browser.py` does the same for the
+heading-level and LaTeX errors at 320 CSS px); and walks the upload-to-review flow with
+JavaScript off.
 
 ## Privacy
 

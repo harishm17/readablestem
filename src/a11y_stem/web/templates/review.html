@@ -85,6 +85,11 @@
     <p class="part-label">Heading text</p>
     <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
     {% if item.heading_level %}<p>Proposed level: {{ item.heading_level }}</p>{% endif %}
+    {% if item.heading_shown %}
+    {# The outline repair (web.review.heading_places) writes another level: say which. #}
+    <p><strong>{% if item.heading_in_document %}In the document: level {{ item.heading_shown }}.{% else %}If accepted, it would be level {{ item.heading_shown }}.{% endif %}</strong>
+      Level {{ item.heading_level }} would skip a level after the heading before it, which the document never does.</p>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -118,8 +123,13 @@
   {% set err = item.errors.get("level") %}
   <div class="field{% if err %} field-error{% endif %}">
     <label for="level-{{ eid }}">Level for {{ name }}</label>
+    {% if item.heading_max_level %}
+    {# The output never skips a level, so a deeper level would be shown as another. #}
+    <p class="hint" id="level-hint-{{ eid }}">Level 1 is the top. After the heading before it, this one can be level 1{% if item.heading_max_level > 1 %} to {{ item.heading_max_level }}{% endif %}.</p>
+    {% endif %}
     {% if err %}<p class="error-message" id="level-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-    <select id="level-{{ eid }}" name="level"{% if err %} aria-invalid="true" aria-describedby="level-error-{{ eid }}"{% endif %}>
+    {% set described = (["level-hint-" ~ eid] if item.heading_max_level else []) + (["level-error-" ~ eid] if err else []) %}
+    <select id="level-{{ eid }}" name="level"{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if err %} aria-invalid="true"{% endif %}>
       {% for n in range(1, 7) %}
       <option value="{{ n }}"{% if item.values.get("level") == n|string %} selected{% endif %}>Level {{ n }}</option>
       {% endfor %}
@@ -148,6 +158,7 @@
     <input type="hidden" name="action" value="accept_all">
     <button type="submit" class="button-secondary">Accept all {{ counted(g.accept_all, "remaining " ~ g.one, "remaining " ~ g.many) }}</button>
     {% if g.not_converted %}<p class="hint">Not included: {{ counted(g.not_converted, g.one, g.many) }} that could not be converted.</p>{% endif %}
+    {% if g.moved %}<p class="hint">Not included: {{ counted(g.moved, g.one, g.many) }} the document shows at another level than the one proposed. Choose a level on {{ "its card" if g.moved == 1 else "their cards" }}.</p>{% endif %}
   </form>
   {% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ g.slug }}" class="bulk-form">

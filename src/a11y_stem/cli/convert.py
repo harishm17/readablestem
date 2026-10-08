@@ -6,6 +6,12 @@ for this run, and `MAX_USD_PER_JOB` / `MAX_MODEL_CALLS_PER_JOB` cap the job. `--
 uses the offline fake model client instead (no API key, nothing billed); its answers are
 placeholders, so the HTML then opens with a note saying it is an offline test run.
 
+`--concurrency` (default 4) is how many model steps run at once. Each one reserves its
+worst-case cost before its request is sent and settles to the real cost afterwards, so
+with a small `--max-usd` the concurrent reservations, not the spend, fill the cap: at 4
+steps of about $0.02 worst case each, a $0.10 cap refused a call after $0.016 had been
+spent. For a small cap, lower the concurrency (1 reserves one call at a time).
+
 A real run checks its setup before converting anything: no OPENAI_API_KEY or a model
 without a price is `error: ...` and exit 2. (WP1's client only reads the key on its first
 request; without this check, every equation and figure would just come back flagged.)
@@ -38,6 +44,11 @@ FAKE_NOTICE = (
 )
 
 
+# Same default as pipeline.run.convert_pdf and the web worker.
+DEFAULT_CONCURRENCY = 4
+MAX_CONCURRENCY = 16
+
+
 class _CliError(Exception):
     """Bad input or setup: printed as `error: ...`, exit code 2."""
 
@@ -54,6 +65,16 @@ def _positive_usd(value: str) -> float:
         raise argparse.ArgumentTypeError(f"expected an amount in USD, got {value!r}") from None
     if not number > 0 or number == float("inf"):
         raise argparse.ArgumentTypeError(f"must be more than 0, got {value}")
+    return number
+
+
+def _positive_int(value: str) -> int:
+    try:
+        number = int(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a whole number, got {value!r}") from None
+    if not 1 <= number <= MAX_CONCURRENCY:
+        raise argparse.ArgumentTypeError(f"must be 1 to {MAX_CONCURRENCY}, got {value}")
     return number
 
 
@@ -76,6 +97,13 @@ def register(
     )
     spend.add_argument(
         "--fake", action="store_true", help="offline fake model client: no API calls, no cost"
+    )
+    convert.add_argument(
+        "--concurrency",
+        type=_positive_int,
+        default=DEFAULT_CONCURRENCY,
+        help="model steps run at once (default %(default)s); each reserves its worst-case "
+        "cost from --max-usd until it settles, so a small cap fills sooner with more",
     )
     convert.add_argument("--report", type=Path, help="also write the full result as JSON")
     convert.add_argument(
@@ -205,14 +233,15 @@ def _print_summary(
     *,
     fake: bool,
     cap_usd: float,
+    concurrency: int = DEFAULT_CONCURRENCY,
 ) -> None:
     result, stats = output.result, output.result.stats
     kinds = {k: sum(1 for e in result.elements if e.kind is k) for k in Kind}
     print(f"Pages:       {stats.pages}")
     print(
         f"Elements:    {len(result.elements)} ({kinds[Kind.HEADING]} headings, "
-        f"{kinds[Kind.PARAGRAPH]} paragraphs, {kinds[Kind.EQUATION]} equations, "
-        f"{kinds[Kind.FIGURE]} figures)"
+        f"{kinds[Kind.PARAGRAPH]} paragraphs, {kinds[Kind.LIST_ITEM]} list items, "
+        f"{kinds[Kind.EQUATION]} equations, {kinds[Kind.FIGURE]} figures)"
     )
     print("Fixes:")
     for line in _fix_table(output):
@@ -227,6 +256,12 @@ def _print_summary(
         stopped = sum(1 for r in reasons if r in budget)
         limits = ", ".join(f"{r}: {_BUDGET_LIMITS.get(r, 'spend limit')}" for r in budget)
         print(f"Budget:      stopped early ({limits}); {stopped} item(s) kept as originals")
+        if "budget_daily" in budget and not fake and concurrency > 1:
+            # Reservations of in-flight steps count against the cap until they settle.
+            print(
+                f"             {concurrency} steps at once each hold a worst-case "
+                "reservation; with a small --max-usd try --concurrency 1"
+            )
     print(f"Checks:      static {_check_summary(checks)}")
     if axe is not None:
         print(f"             axe-core {_axe_summary(axe)}")
@@ -293,6 +328,7 @@ def _convert(args: argparse.Namespace) -> int:
             pages=pages,
             progress=_progress,
             tracer=tracer,
+            concurrency=args.concurrency,
             notice=FAKE_NOTICE if args.fake else None,
         )
     except FATAL_ERRORS as exc:  # the client's own setup failed on its first request
@@ -316,7 +352,12 @@ def _convert(args: argparse.Namespace) -> int:
         _write_report(args.report, output, checks, axe)
 
     _print_summary(
-        output, checks, axe, fake=args.fake, cap_usd=min(cap_usd, settings.max_usd_per_job)
+        output,
+        checks,
+        axe,
+        fake=args.fake,
+        cap_usd=min(cap_usd, settings.max_usd_per_job),
+        concurrency=args.concurrency,
     )
     print(f"wrote {args.out}")
     if args.report:
