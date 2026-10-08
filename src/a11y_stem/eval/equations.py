@@ -155,18 +155,28 @@ def _token_text(elem: ET.Element) -> str:
     return " ".join(text.split())
 
 
-def _split_math_alphanumeric(text: str) -> tuple[str, str | None]:
-    """U+1D42F (bold small v) -> ('v', 'bold'). (text, None) if not one styled char."""
-    if len(text) != 1:
-        return text, None
-    name = unicodedata.name(text, "")
+def _char_variant(ch: str) -> str | None:
+    name = unicodedata.name(ch, "")
     if not name.startswith("MATHEMATICAL "):
-        return text, None
+        return None
     rest = name[len("MATHEMATICAL ") :]
     for prefix, variant in _MATH_ALNUM_VARIANTS:
         if rest.startswith(prefix):
-            return unicodedata.normalize("NFKC", text), variant
-    return text, None
+            return variant
+    return None
+
+
+def _split_math_alphanumeric(text: str) -> tuple[str, str | None]:
+    """U+1D42F (bold small v) -> ('v', 'bold'); a run of same-style letters too:
+    U+1D41A U+1D42F U+1D420 ('avg' in bold) -> ('avg', 'bold'), as `\\mathbf{avg}` or a
+    bold <mtext> gives. (text, None) when any character is unstyled or the styles mix."""
+    chars = [ch for ch in text if not ch.isspace()]
+    if not chars:
+        return text, None
+    variants = {_char_variant(ch) for ch in chars}
+    if len(variants) != 1 or None in variants:
+        return text, None
+    return unicodedata.normalize("NFKC", text), variants.pop()
 
 
 def _normalize_attrs(elem: ET.Element) -> dict[str, str]:

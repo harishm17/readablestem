@@ -73,6 +73,10 @@ select = [
 # Maths text legitimately uses these (U+2212 minus sign, U+2032 prime, U+0394 Delta).
 allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
+[tool.ruff.lint.per-file-ignores]
+# The Unicode "holes" table maps letters to their look-alike styled forms on purpose.
+"src/a11y_stem/core/mathchars.py" = ["RUF001"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra -m 'not network and not live_model and not browser'"

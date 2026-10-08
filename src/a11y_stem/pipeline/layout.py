@@ -67,6 +67,7 @@ from itertools import count, pairwise
 
 import pymupdf
 
+from a11y_stem.core.mathchars import styled_char
 from a11y_stem.core.types import BBox, Element, Kind, inline_marker
 from a11y_stem.pipeline.parse import (
     EQUATION_THRESHOLD,
@@ -694,6 +695,13 @@ class _Char:
     def mono(self) -> bool:
         return bool(self.flags & _MONO_FLAG) or _font_traits(self.font)[3]
 
+    @property
+    def styled(self) -> str:
+        """The character with its bold weight kept as a Unicode math letter (bold d ->
+        U+1D41D), as Chromium-printed PDFs already store it. Equation text layers use
+        this so the equation step can check that a bold vector stayed bold."""
+        return styled_char(self.c, "bold") if self.bold else self.c
+
 
 @lru_cache(maxsize=1024)
 def _font_traits(font: str) -> tuple[bool, bool, bool, bool]:
@@ -793,6 +801,11 @@ class _Row:
     @cached_property
     def text(self) -> str:
         return "".join(c.c for c in self.chars)
+
+    @cached_property
+    def styled_text(self) -> str:
+        """`text` with bold letters as Unicode math bold (equation text layers only)."""
+        return "".join(c.styled for c in self.chars)
 
     @cached_property
     def clean(self) -> str:
@@ -2081,7 +2094,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     # A lone ">4" or "+8" (a table cell, a stray sign) is too little to call an equation.
     trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
     if run.kind == "math" and not trivial:
-        text = _clean(" ".join(r.text for r in rows))
+        text = _clean(" ".join(r.styled_text for r in rows))
         script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
         score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
         if len(rows) > 1:
@@ -2235,7 +2248,7 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
         for start, end, reasons in _inline_runs(row):
             row_pieces.append("".join(c.c for c in row.chars[cursor:start]))
             chars = row.chars[start:end]
-            text = _clean("".join(c.c for c in chars))
+            text = _clean("".join(c.styled for c in chars))
             ink = [c for c in chars if not c.blank]
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))

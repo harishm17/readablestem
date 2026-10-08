@@ -40,13 +40,14 @@ from urllib.parse import urljoin
 
 import defusedxml.ElementTree as SafeET
 
+from a11y_stem.core.mathchars import styled_char
 from a11y_stem.gold.openstax import USER_AGENT
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 OPENSTAX_ORIGIN = "https://openstax.org/"
 DEFAULT_CACHE = Path(".cache")  # relative to the working directory; the CLI passes paths
 # Bump when the printable layout or the equation page changes, so caches miss.
-RENDER_VERSION = "r1"
+RENDER_VERSION = "r2"  # r2: mathvariant drawn as Unicode math letters
 Paper = Literal["Letter", "A4"]
 
 
@@ -103,11 +104,36 @@ def _clean_math_tree(elem: ET.Element) -> ET.Element | None:
     return out
 
 
+# MathML Core (what Chromium implements) only honours mathvariant="normal". OpenStax marks
+# every vector as <mstyle mathvariant="bold">, which Chromium would draw as plain italic,
+# so the model would be scored against a style it was never shown. Resolve mathvariant
+# (inherited, as MathML specifies) into Unicode mathematical alphanumerics instead: bold
+# d becomes U+1D41D, which every math font draws bold and the scorer maps back to
+# mathvariant="bold".
+_TOKEN_TAGS = {"mi", "mn", "mo", "mtext", "ms"}
+
+
+def _apply_mathvariant(elem: ET.Element, inherited: str | None = None) -> None:
+    """Push mathvariant down to tokens and rewrite their text as styled code points."""
+    own = elem.attrib.pop("mathvariant", None)
+    variant = own or inherited
+    tag = _local(elem.tag)
+    if tag in _TOKEN_TAGS:
+        if variant == "normal" and tag == "mi":
+            elem.set("mathvariant", "normal")  # the one value MathML Core supports
+        elif variant and variant != "normal" and elem.text:
+            elem.text = "".join(styled_char(ch, variant) for ch in elem.text)
+        return
+    for child in elem:
+        _apply_mathvariant(child, variant)
+
+
 def clean_math_element(elem: ET.Element) -> ET.Element:
     """Allowlisted copy of a parsed <math> tree: MathML elements and styling attributes only.
 
     Scripts, links, event handlers and foreign markup cannot survive this, so a MathML
     string from anywhere (gold, or a model prediction) is safe to put in a page.
+    `mathvariant` is resolved into Unicode math letters so Chromium draws it.
     """
     if _local(elem.tag) != "math":
         raise RenderError("not a <math> element")
@@ -115,6 +141,7 @@ def clean_math_element(elem: ET.Element) -> ET.Element:
     if cleaned is None:  # pragma: no cover - <math> is always allowed
         raise RenderError("empty MathML")
     cleaned.tail = None
+    _apply_mathvariant(cleaned)
     return cleaned
 
 

@@ -35,12 +35,13 @@ import re
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
-from typing import Literal
+from typing import Any, Literal
 
 import defusedxml.ElementTree as DET
 from pydantic import BaseModel, ConfigDict, Field
 
 from a11y_stem.config import Settings
+from a11y_stem.core.mathchars import STYLE_GROUPS, base_char, char_variant
 from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
@@ -153,6 +154,70 @@ def _mathml_symbols(mathml: str) -> Counter[str]:
     return _symbol_bag(" ".join(root.itertext()))
 
 
+# A style mismatch (the PDF has a bold d, the transcription a plain d) scales confidence
+# by this factor: enough to escalate a cheap-model answer and to keep the fix in review.
+STYLE_MISMATCH_FACTOR = 0.6
+_MATHML_TOKENS = {"mi", "mn", "mo", "mtext", "ms"}
+
+
+def _text_styles(text: str) -> set[tuple[str, str]]:
+    """(base letter, style group) for every styled letter, e.g. {("d", "bold")}."""
+    out = set()
+    for ch in text:
+        group = STYLE_GROUPS.get(char_variant(ch) or "")
+        if group:
+            out.add((base_char(ch), group))
+    return out
+
+
+def _mathml_styles(mathml: str) -> tuple[set[tuple[str, str]], set[str]]:
+    """Styled letters of a MathML tree (mathvariant inherited, as MathML specifies, or
+    carried by the code point) and every base letter it contains."""
+    styled: set[tuple[str, str]] = set()
+    letters: set[str] = set()
+
+    def walk(elem: Any, inherited: str | None) -> None:
+        variant = elem.get("mathvariant") or inherited
+        tag = elem.tag.rsplit("}", 1)[-1]
+        if tag in _MATHML_TOKENS:
+            for ch in elem.text or "":
+                if not ch.isalnum():
+                    continue
+                own = char_variant(ch)
+                base = base_char(ch)
+                letters.add(base)
+                group = STYLE_GROUPS.get(own or variant or "")
+                if group:
+                    styled.add((base, group))
+            return
+        for child in elem:
+            walk(child, variant)
+
+    walk(DET.fromstring(mathml, forbid_dtd=True), None)
+    return styled, letters
+
+
+def text_layer_style_mismatch(text_layer: str | None, mathml: str) -> bool | None:
+    """Do the letter styles of the PDF text layer and the transcription disagree?
+
+    None when the text layer carries no style at all (most PDFs without bold maths, and
+    any text layer from a font that does not mark bold): absence of style is not evidence.
+    Otherwise compares (letter, style) pairs for the letters both sides contain, so a bold
+    vector read as a plain scalar, or a plain scalar made bold, is a mismatch.
+    """
+    if not text_layer:
+        return None
+    expected = _text_styles(text_layer)
+    if not expected:
+        return None
+    got, letters = _mathml_styles(mathml)
+    layer_letters = {base_char(ch) for ch in text_layer if ch.isalnum()}
+    shared = layer_letters & letters
+    expected = {pair for pair in expected if pair[0] in shared}
+    got = {pair for pair in got if pair[0] in shared}
+    return expected != got
+
+
 def text_layer_similarity(text_layer: str | None, mathml: str) -> float | None:
     """Dice similarity of the symbol bags of the PDF text layer and the MathML.
 
@@ -243,6 +308,18 @@ def _evaluate(
         )
         if mismatch:  # scale towards half confidence as the symbol overlap goes to zero
             candidate.confidence = output.confidence * (0.5 + 0.5 * similarity)
+    style_mismatch = text_layer_style_mismatch(element.text, candidate.mathml)
+    if style_mismatch is not None:
+        candidate.checks.append(
+            Check(
+                name="equation.text_layer_style",
+                passed=not style_mismatch,
+                severity="warning",
+                code="style_mismatch" if style_mismatch else None,
+            )
+        )
+        if style_mismatch and candidate.confidence is not None:
+            candidate.confidence *= STYLE_MISMATCH_FACTOR
     return candidate
 
 
