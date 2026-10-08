@@ -436,25 +436,43 @@ class _Renderer:
     # ----- elements
 
     def render_all(self, ordered: list[Element]) -> list[str]:
-        """Every element in reading order; consecutive list items become one list."""
+        """Every element in reading order; consecutive list items become one list.
+
+        A display equation between two list items belongs to the item before it (layout
+        does not end a list there either) and is written inside that item, so the list
+        and its nesting go on after it. One after the last item stays outside the list.
+        """
         chunks: list[str] = []
         i = 0
         while i < len(ordered):
             if ordered[i].kind is Kind.LIST_ITEM:
                 items: list[Element] = []
-                while i < len(ordered) and (
-                    ordered[i].kind is Kind.LIST_ITEM or ordered[i].id in self.placed
-                ):
-                    if ordered[i].kind is Kind.LIST_ITEM:
-                        items.append(ordered[i])
-                    i += 1  # an item's inline equations are written inside it
-                chunks.append(self.lists(items))
+                inside: dict[str, list[Element]] = {}
+                while i < len(ordered):
+                    element = ordered[i]
+                    if element.kind is Kind.LIST_ITEM:
+                        items.append(element)
+                    elif element.id in self.placed:
+                        pass  # an item's inline equations are written inside it
+                    elif element.kind is Kind.EQUATION and self.list_goes_on(ordered, i):
+                        inside.setdefault(items[-1].id, []).append(element)
+                    else:
+                        break
+                    i += 1
+                chunks.append(self.lists(items, inside))
                 continue
             chunk = self.render(ordered[i])
             if chunk:
                 chunks.append(chunk)
             i += 1
         return chunks
+
+    def list_goes_on(self, ordered: list[Element], start: int) -> bool:
+        """Is the next element after the equations from `start` on a list item?"""
+        for element in ordered[start:]:
+            if element.kind is not Kind.EQUATION:
+                return element.kind is Kind.LIST_ITEM
+        return False
 
     def render(self, element: Element) -> str:
         if element.kind is Kind.HEADING:
@@ -474,17 +492,19 @@ class _Renderer:
             return ""
         return f"<p{self.id_attr(element.id)}>{self.rich(text)}</p>"
 
-    def lists(self, items: list[Element]) -> str:
+    def lists(self, items: list[Element], inside: dict[str, list[Element]] | None = None) -> str:
         """Consecutive list items as nested lists.
 
-        A deeper item nests inside the item before it (`_list_levels`). At one level,
-        siblings of one family (`_family`) share a list. A regular ordered list ("a.",
-        "b.", ... or "3.", "4.", ...) is an `<ol>` with `type` and `start`, and the
-        browser prints the markers; any other ordered list ("(a)", "3)", a gap in the
-        numbering) keeps its printed markers as text in a list with `list-style: none`
-        and `role="list"` (Safari drops list semantics without a list style otherwise).
+        A deeper item nests inside the item before it (`_list_levels`), after the
+        display equations `inside` puts in that item. At one level, siblings of one
+        family (`_family`) share a list. A regular ordered list ("a.", "b.", ... or "3.",
+        "4.", ...) is an `<ol>` with `type` and `start`, and the browser prints the
+        markers; any other ordered list ("(a)", "3)", a gap in the numbering) keeps its
+        printed markers as text in a list with `list-style: none` and `role="list"`
+        (Safari drops list semantics without a list style otherwise).
         """
         levels = _list_levels(items)
+        inside = inside or {}
 
         def build(start: int, level: int) -> tuple[str, int]:
             out, i = [], start
@@ -493,9 +513,10 @@ class _Renderer:
                 members: list[tuple[Element, str]] = []
                 while i < len(items) and levels[i] == level and _family(items[i]) == family:
                     item, i = items[i], i + 1
-                    nested = ""
+                    nested = "".join(self.block_equation(e) for e in inside.get(item.id, []))
                     if i < len(items) and levels[i] > level:
-                        nested, i = build(i, level + 1)
+                        deeper, i = build(i, level + 1)
+                        nested += deeper
                     members.append((item, nested))
                 out.append(self.one_list([m for m, _ in members], [n for _, n in members]))
             return "".join(out), i
@@ -715,15 +736,16 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
 .equation { margin: 1em 0; text-align: center; }
-.equation-labelled { display: flex; align-items: center; gap: 1em; }
-.equation-labelled > math { flex: 1 1 auto; min-width: 0; }
-.equation-label { flex: none; }
+.equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
+.equation-labelled > math { flex: 1 0 auto; }
+.equation-label { flex: none; margin-left: auto; }
 math { font-size: 1.1em; }
 math[display="block"] { margin: 0 auto; }
 ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
 li > ul, li > ol { margin: 0.25em 0 0; }
 .printed-markers { list-style: none; }
 .printed-markers > li { text-indent: -1.75em; padding-left: 1.75em; }
+.printed-markers > li > * { text-indent: 0; }
 .list-marker { display: inline-block; min-width: 1.5em; text-indent: 0; }
 .visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip-path: inset(50%); white-space: nowrap; }

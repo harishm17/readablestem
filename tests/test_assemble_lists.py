@@ -191,6 +191,39 @@ def test_assembled_lists_pass_the_static_checks():
     assert all(c.passed for c in static_checks(html))
 
 
+def test_a_display_equation_between_items_stays_inside_the_item_before_it():
+    """Layout keeps a list open across a display equation; the HTML used to end the
+    list there and re-base the rest, so a level-2 item after the equation became a
+    sibling of the level-1 item that follows it."""
+    eq = equation(3)
+    elements = [
+        item(0, "\u2022", "Write down the second law:"),
+        item(1, "\u2013", "the net force on the cart is", level=2),
+        eq,
+        item(4, "\u2013", "the friction force is small.", level=2),
+        item(5, "\u2022", "Solve for the acceleration."),
+    ]
+    html = body(elements, [accepted(eq)])
+    assert list_tags(html) == (
+        '<ul><li id="p1-e0"><ul><li id="p1-e1"></li><li id="p1-e4"></li></ul></li>'
+        '<li id="p1-e5"></li></ul>'
+    )
+    before_next_item = html.split('<li id="p1-e4">')[0]
+    assert before_next_item.endswith(
+        'the net force on the cart is<div class="equation" id="p1-e3"><math display="block">'
+        "<mi>x</mi><mo>=</mo><mn>5</mn></math></div></li>"
+    )
+    rendered = render_html(title="T", lang="en", elements=elements, fixes=[accepted(eq)], crops={})
+    assert all(c.passed for c in static_checks(rendered))
+
+
+def test_a_display_equation_after_the_last_item_stays_outside_the_list():
+    eq = equation(1)
+    elements = [item(0, "1.", "Measure the ramp."), eq, paragraph(2, "Then go on.")]
+    html = body(elements, [accepted(eq)])
+    assert html.startswith('<ol><li id="p1-e0">Measure the ramp.</li></ol><div class="equation"')
+
+
 # ---------------------------------------------------------------- equation numbers
 
 
@@ -243,3 +276,94 @@ def test_axe_finds_no_problems_with_nested_lists_and_numbered_equations():
     if checks == [] or (len(checks) == 1 and checks[0].code == "skipped"):
         pytest.skip("axe-core needs Playwright and its Chromium")
     assert [c.name for c in checks] == ["axe"] and checks[0].passed
+
+
+# ---------------------------------------------------------------- layout in Chromium
+
+
+def measure(html: str, width: int, script: str):
+    """Run `script` on `html` in headless Chromium with a viewport `width` px wide."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch()
+        except sync_api.Error:
+            pytest.skip("Playwright's Chromium is not installed")
+        try:
+            page = browser.new_page(viewport={"width": width, "height": 600})
+            page.set_content(html)
+            return page.evaluate(script)
+        finally:
+            browser.close()
+
+
+# 2-3's worked example: wider than a 320 px screen leaves beside a number.
+WIDE_MATHML = (
+    '<math display="block"><mi>v</mi><mo>=</mo><mfrac><mrow><mi>\u0394</mi><mi>d</mi></mrow>'
+    "<mrow><mi>\u0394</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><mn>2000</mn>"
+    "<mtext> m</mtext><mo>\u2212</mo><mn>525</mn><mtext> m</mtext></mrow><mrow><mn>6.4</mn>"
+    "<mtext> s</mtext><mo>\u2212</mo><mn>0.50</mn><mtext> s</mtext></mrow></mfrac><mo>=</mo>"
+    "<mn>250</mn><mtext> m/s</mtext></math>"
+)
+INK_AND_LABEL = """() => {
+  const math = document.querySelector('.equation-labelled > math');
+  let ink = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const node of math.querySelectorAll('*')) {
+    const r = node.getBoundingClientRect();
+    if (r.width && r.height) {
+      ink = [Math.min(ink[0], r.left), Math.min(ink[1], r.top),
+             Math.max(ink[2], r.right), Math.max(ink[3], r.bottom)];
+    }
+  }
+  const l = document.querySelector('.equation-label').getBoundingClientRect();
+  return {ink, label: [l.left, l.top, l.right, l.bottom]};
+}"""
+
+
+@pytest.mark.browser
+@pytest.mark.parametrize("width", [320, 1280])
+def test_an_equation_number_is_never_drawn_over_its_maths(width):
+    """At 320 px the flex row let the <math> box shrink below its content, which then
+    spilled over the number ("250 m/s" painted on "2.4"): a WCAG 1.4.10 reflow failure.
+    The number now wraps below the maths when both do not fit on one line."""
+    eq = equation(0, label="2.4")
+    fix = Fix(
+        element_id=eq.id,
+        kind=Kind.EQUATION,
+        status=Status.ACCEPTED,
+        confidence=0.95,
+        equation=EquationFix(latex="v", mathml=WIDE_MATHML, speech="v", display="block"),
+    )
+    html = render_html(title="T", lang="en", elements=[eq], fixes=[fix], crops={})
+    boxes = measure(html, width, INK_AND_LABEL)
+    (x0, y0, x1, y1), (lx0, ly0, lx1, ly1) = boxes["ink"], boxes["label"]
+    assert x1 <= lx0 or lx1 <= x0 or y1 <= ly0 or ly1 <= y0, boxes  # the boxes do not meet
+    if width == 1280:
+        assert lx0 >= x1 and ly0 < y1  # beside the maths when there is room
+
+
+@pytest.mark.browser
+def test_a_nested_list_in_a_printed_marker_item_is_not_pulled_left():
+    """text-indent is inherited: the -1.75em of a printed-marker item moved the first
+    line of every nested item left, and its bullet covered the first letters."""
+    elements = [
+        item(0, "(a)", "Find the speed of the cart at the bottom of the ramp."),
+        item(1, "\u2022", "Nested item that uses the energy method.", level=2),
+        item(2, "(b)", "Find the time the cart takes."),
+    ]
+    html = render_html(title="T", lang="en", elements=elements, fixes=[], crops={})
+    nested = measure(
+        html,
+        320,
+        """() => {
+          const li = document.getElementById('p1-e1');
+          const range = document.createRange();
+          range.setStart(li.firstChild, 0);
+          range.setEnd(li.firstChild, 1);
+          const style = getComputedStyle(li);
+          const left = li.getBoundingClientRect().left + parseFloat(style.paddingLeft);
+          return {indent: style.textIndent, left, glyph: range.getBoundingClientRect().left};
+        }""",
+    )
+    assert nested["indent"] == "0px"
+    assert abs(nested["glyph"] - nested["left"]) < 1, nested

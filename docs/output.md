@@ -95,8 +95,10 @@ as printed (`list_marker`: "•", "a.", "(iii)"), `list_ordered` and `list_level
   marker as text in `<span class="list-marker">` inside a list with `list-style: none`
   and `role="list"` (Safari drops the list semantics of a list without a list style).
 - A paragraph or heading between items ends the list; a numbered list that resumes
-  after it gets `start`, so the numbers stay right. A display equation inside an item
-  also ends the list in the HTML (layout keeps the nesting level across it).
+  after it gets `start`, so the numbers stay right. A display equation between two items
+  is written inside the item before it (after its text, before any nested list), so the
+  list and its nesting go on after it, as layout reports them. A display equation after
+  the last item stays outside the list.
 
 ```html
 <ol><li id="p1-e34">Compute <math ...>...</math> with the fundamental theorem.</li>
@@ -118,9 +120,11 @@ reader says "Equation (2.4)" rather than a bare number:
   <span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.4</span></div>
 ```
 
-The wrapper is a flex row: the maths takes the remaining width and stays centred, the
-number sits at the right. An equation that was not converted keeps its number too,
-after the original image in the flagged box.
+The wrapper is a flex row that wraps: the maths takes the remaining width and stays
+centred, the number sits at the right. The maths never shrinks below its own width, so
+when both do not fit (a long equation on a 320 px screen) the number moves to the next
+line, right-aligned, instead of being painted over (WCAG 1.4.10). An equation that was
+not converted keeps its number too, after the original image in the flagged box.
 
 ## Flagged items
 
@@ -223,8 +227,9 @@ About 35 lines of inline CSS:
 - images at their printed size (PDF points x 96/72) and never wider than the column;
 - block maths keep the browser's own `display: block math` and centring (overriding
   `display` on `<math>` breaks MathML layout);
-- lists with a hanging indent for printed markers, equation numbers to the right of
-  their equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
+- lists with a hanging indent for printed markers (reset for anything nested in such an
+  item, since `text-indent` is inherited), equation numbers to the right of their
+  equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
   readers still read it);
 - a visible `:focus-visible` outline and a print rule that keeps flagged boxes together.
 
