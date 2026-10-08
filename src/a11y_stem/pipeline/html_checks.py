@@ -261,7 +261,7 @@ def axe_checks(html: str) -> list[Check]:
                 violations = page.evaluate(_AXE_RUN, list(AXE_TAGS))
             finally:
                 browser.close()
-    except PlaywrightError as exc:
+    except Exception as exc:  # a broken browser setup must never fail a conversion
         log.warning("axe_checks failed: %s", type(exc).__name__)
         return [Check(name="axe", passed=False, severity="warning", code="axe_error")]
     return violations_to_checks(violations)

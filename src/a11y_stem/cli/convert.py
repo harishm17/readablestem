@@ -91,7 +91,7 @@ def _parse_pages(spec: str | None, page_count: int, path: Path) -> list[int] | N
     if bad or not numbers:
         shown = ", ".join(map(str, bad)) or repr(spec)
         raise _CliError(f"page(s) {shown} out of range; {path} has pages 1-{page_count}")
-    return [n - 1 for n in dict.fromkeys(numbers)]
+    return [n - 1 for n in sorted(set(numbers))]  # document order, each page once
 
 
 def _make_client(settings: Settings, budget: JobBudget, *, fake: bool) -> VisionClient:

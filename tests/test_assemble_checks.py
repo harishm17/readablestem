@@ -189,6 +189,39 @@ def test_axe_is_skipped_when_the_browser_is_missing(monkeypatch):
     assert axe_checks(doc("<p>x</p>")) == [AXE_SKIPPED]
 
 
+def test_axe_failure_after_launch_is_a_warning_not_a_crash(monkeypatch):
+    sync_api = pytest.importorskip("playwright.sync_api")
+
+    class Browser:
+        closed = False
+
+        def new_context(self, **kw):
+            raise OSError("renderer crashed")
+
+        def close(self):
+            Browser.closed = True
+
+    class Chromium:
+        def launch(self):
+            return Browser()
+
+    class FakePlaywright:
+        chromium = Chromium()
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *exc):
+            return False
+
+    monkeypatch.setattr(sync_api, "sync_playwright", FakePlaywright)
+    checks = axe_checks(doc("<p>x</p>"))
+    assert [(c.name, c.passed, c.severity, c.code) for c in checks] == [
+        ("axe", False, "warning", "axe_error")
+    ]
+    assert Browser.closed
+
+
 def test_vendored_axe_matches_the_recorded_checksum():
     data = (VENDOR / "axe.min.js").read_bytes()
     assert hashlib.sha256(data).hexdigest() == AXE_SHA256

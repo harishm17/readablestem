@@ -542,3 +542,15 @@ def test_tracer_spans_are_content_free(fake):
             if text:
                 assert text not in everything
     assert "A cart on a ramp." not in everything and "frac" not in everything
+
+
+def test_a_broken_tracer_never_stops_a_conversion(fake):
+    class BrokenTracer:
+        def span(self, name, **attrs):
+            raise RuntimeError("tracing backend down")
+
+        def flush(self) -> None:
+            return None
+
+    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=BrokenTracer())
+    assert {f.status for f in output.result.fixes} == {Status.ACCEPTED}

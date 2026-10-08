@@ -33,9 +33,9 @@ import threading
 import time
 from bisect import bisect_left
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from contextlib import AbstractContextManager
+from contextlib import ExitStack, contextmanager
 from dataclasses import dataclass
 from functools import partial
 from typing import Any
@@ -158,8 +158,16 @@ def _annotate(span: Any, **attrs: Any) -> None:
             log.debug("span update failed", exc_info=False)
 
 
-def _span(tracer: Tracer, name: str, **attrs: Any) -> AbstractContextManager[Any]:
-    return tracer.span(name, **attrs)
+@contextmanager
+def _span(tracer: Tracer, name: str, **attrs: Any) -> Generator[Any]:
+    """`tracer.span`, except that a tracer failing to open a span never stops the work."""
+    with ExitStack() as stack:
+        try:
+            span = stack.enter_context(tracer.span(name, **attrs))
+        except Exception:
+            log.debug("tracer could not open a %s span", name)
+            span = None
+        yield span
 
 
 # --------------------------------------------------------------------------- context

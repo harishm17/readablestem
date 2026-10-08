@@ -151,9 +151,10 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
     assert "page 1/1 done" in captured.err
 
 
-def test_pages_are_one_based_on_the_command_line(pdf, tmp_path, pipeline):
-    assert run(pdf, "--out", tmp_path / "o.html", "--fake", "--pages", "2") == 0
-    assert pipeline.analyze_pages == [1]
+@pytest.mark.parametrize(("pages", "expected"), [("2", [1]), ("2,1,2", [0, 1])])
+def test_pages_are_one_based_and_in_document_order(pdf, tmp_path, pipeline, pages, expected):
+    assert run(pdf, "--out", tmp_path / "o.html", "--fake", "--pages", pages) == 0
+    assert pipeline.analyze_pages == expected
 
 
 def test_uses_the_model_client_factory_when_present(pdf, tmp_path, pipeline, monkeypatch, capsys):
