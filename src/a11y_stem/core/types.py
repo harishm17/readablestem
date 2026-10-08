@@ -33,6 +33,9 @@ class Kind(StrEnum):
     PARAGRAPH = "paragraph"
     EQUATION = "equation"
     FIGURE = "figure"
+    # One item of a bulleted or numbered list (deterministic, no Fix). Consecutive items
+    # with the same `list_level` and `list_ordered` form one <ul>/<ol> in the output.
+    LIST_ITEM = "list_item"
 
 
 class Status(StrEnum):
@@ -116,6 +119,14 @@ class Element(BaseModel):
     reasons: list[str] = Field(default_factory=list)
     display: Literal["block", "inline"] | None = None  # equations only
     parent_id: str | None = None  # inline equations: id of the containing paragraph
+    # Display equations: the equation number printed beside it ("2.4", "(3)"), kept out
+    # of the equation's bbox and text so it is not transcribed as part of the maths.
+    equation_label: str | None = None
+    # List items: the marker as printed ("a.", "3)", "•"), whether the list is ordered,
+    # and the nesting level (1 = top level). `text` excludes the marker.
+    list_marker: str | None = None
+    list_ordered: bool | None = None
+    list_level: int | None = None
     caption: str | None = None  # figures: nearby "Figure N ..." text, if found
 
 
