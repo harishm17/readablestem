@@ -71,6 +71,9 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `call:fallback` | calls made on the other model after a failure |
 | same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
+| same | `tier:<tier>` | fixes by review tier as the pipeline left them (`required`, `optional`, `none`; `Fix.review`, see docs/design/beta-architecture.md "Review tiers") |
+| same | `tier:<tier>:<reason>` | why each required or optional fix has its tier: each failed check code, its `Fix.reason`, `heading.repeated_label` for a member of a group of repeated headings, or `below_accept` when only the confidence held it back (`core.triage.tier_reasons`) |
+| same | `decisions:required` | decisions the pipeline asked a person for: one per required fix, but one per group of repeated headings (`sum(decisions:required) / sum(pages)` is the review load per page) |
 | same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran (a heading edit keeps them; checks in the earliest `before` snapshot are counted when it has them) |
 | `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
@@ -105,6 +108,17 @@ SELECT day,
          / nullif(sum(count) FILTER (WHERE category LIKE 'status:%'), 0) AS review_rate
 FROM error_aggregates WHERE step = 'equation' GROUP BY day ORDER BY day;
 
+-- Review load: required decisions and optional notes per converted page, last 30 days
+SELECT sum(count) FILTER (WHERE category = 'decisions:required')::float
+         / nullif((SELECT sum(count) FROM error_aggregates
+                   WHERE step = 'job' AND category = 'pages' AND day >= current_date - 30), 0)
+         AS decisions_per_page,
+       sum(count) FILTER (WHERE category = 'tier:optional')::float
+         / nullif((SELECT sum(count) FROM error_aggregates
+                   WHERE step = 'job' AND category = 'pages' AND day >= current_date - 30), 0)
+         AS optional_per_page
+FROM error_aggregates WHERE day >= current_date - 30;
+
 -- Model reliability: outcomes per model
 SELECT category, sum(count) FROM error_aggregates
 WHERE category LIKE 'call:%:outcome:%' GROUP BY category ORDER BY 2 DESC;
@@ -116,7 +130,9 @@ FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 ```
 
 `a11y-stem ops report --days 7` prints the weekly error-analysis tables from these rows
-(through the Cloud SQL Auth Proxy, like the other `ops` commands).
+(through the Cloud SQL Auth Proxy, like the other `ops` commands), including the review
+load (required decisions and optional notes per page, by step) and, per step, the tier
+mix and the most frequent reasons for each tier.
 
 ## Logs
 

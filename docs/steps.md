@@ -7,7 +7,9 @@ figure}.md`; tests: `tests/test_steps_*.py`.
 
 The steps assist a reviewer. They never treat model output as correct on its own: every
 proposal passes through validators, carries a confidence and the checks it passed, and
-anything uncertain goes to the review screen.
+anything that could change what a student reads goes to the review screen as a decision
+(`Fix.review == "required"`). Differences that do not change the meaning are accepted with
+an optional note (`"optional"`; docs/design/beta-architecture.md "Review tiers").
 
 ## At a glance
 
@@ -75,8 +77,9 @@ kept; its `calls` include every attempt.
 ## Status rules
 
 Thresholds come from settings: `auto_accept_confidence` (default 0.85) and
-`abstain_confidence` (default 0.4). A fix is only ACCEPTED when no check failed at all;
-a failed warning sends it to review.
+`abstain_confidence` (default 0.4). A fix is only ACCEPTED when no check failed other
+than a note (`NOTE_CODES` of each step); it then has `review="optional"` if a note
+failed, else `"none"`. Every other status has `review="required"`.
 
 ### Equations (first matching rule wins)
 
@@ -87,7 +90,7 @@ a failed warning sends it to review.
 | 3 | Empty LaTeX and confidence < abstain threshold | ABSTAINED | `low_confidence` |
 | 4 | LaTeX fails an error-level check or does not convert (after escalation) | FAILED | `invalid_latex` |
 | 5 | Confidence < `abstain_confidence` | ABSTAINED | `low_confidence` |
-| 6 | Confidence >= `auto_accept_confidence` and no failed check | ACCEPTED | |
+| 6 | Confidence >= `auto_accept_confidence` and no failed check other than a note: `style_cosmetic`, `speech_failed`, `speech_empty` | ACCEPTED (review `optional` with notes, else `none`) | |
 | 7 | Otherwise | NEEDS_REVIEW | |
 
 Rule 3 exists because the prompt asks the model to abstain with low confidence when it
@@ -104,8 +107,11 @@ fixes have `equation=None`; the original crop stays in the output, flagged.
 | 1 | No parsed output | FAILED | `model_<outcome>` |
 | 2 | Confidence < `abstain_confidence` | ABSTAINED | `low_confidence` |
 | 3 | Not decorative and the alt text fails an error-level check | FAILED | `invalid_alt` |
-| 4 | Confidence >= the accept bar and no failed check | ACCEPTED | |
+| 4 | Confidence >= the accept bar and no failed check other than a warning note: `too_long` (150-300 characters), `redundant_prefix` | ACCEPTED (review `optional` with notes, else `none`) | |
 | 5 | Otherwise | NEEDS_REVIEW | |
+
+A caption copy (`caption_copy`) is not a note: it describes nothing the reader does not
+already hear, so the figure has no usable description and needs a decision.
 
 The accept bar is `auto_accept_confidence`, raised to 0.95 (`DECORATIVE_ACCEPT_CONFIDENCE`)
 for decorative figures: marking a figure decorative hides it from screen-reader users
@@ -134,6 +140,36 @@ fix gets a failed warning check (`equation.text_layer`, code `text_layer_mismatc
 its confidence is scaled by `0.5 + 0.5 * similarity`. On the cheap model that usually
 triggers escalation. Example: text layer "F = ma", transcription `E = mc^2` gives
 similarity 0.29, so a 0.95 confidence drops to 0.61.
+
+## Letter-style check (equations)
+
+The text layer also says how letters are styled: layout writes a bold letter as a
+Unicode maths bold one (`𝐝`), and Chromium and Word print maths letters as styled code
+points (italic `𝑣`, bold `𝐯`). `text_layer_style(text_layer, mathml, regular_letters=...)`
+compares the styles of the letters both sides contain, occurrence by occurrence, and
+returns `None` (the text layer says nothing about style), `"match"`, `"meaning"` or
+`"cosmetic"`:
+
+- **Meaning-level** (check `equation.text_layer_style`, code `style_mismatch`; confidence
+  scaled by 0.6, so a cheap answer escalates, and the fix needs a decision): a variable (a
+  one-letter token outside sub/superscripts and limits) whose weight changed:
+  - a letter that is bold in the PDF read as a plain variable: a vector read as a scalar
+    (`𝛚` -> `\omega`; `𝐝 = 𝐝0` -> `\mathbf{d} = d_0`). Plain occurrences in the PDF
+    are matched to scripts and words first, so when in doubt it asks;
+  - a letter known to be plain made a bold variable: a scalar read as a vector. Known
+    plain = a math italic code point, or a letter layout found, not bold, in a regular
+    font with a bold face (`Element.regular_letters`: Computer Modern CMR/CMMI, Times,
+    DejaVu, STIX, ...; docs/layout.md).
+- **Cosmetic** (code `style_cosmetic`; an optional note, no confidence change, no
+  escalation): every other difference: a bold subscript, superscript or word (`𝐝𝐟` ->
+  `\mathbf{d}_{\text{f}}`, a bold "avg"), a bold digit (`𝐝𝟎` -> `\mathbf{d}_0`), a style
+  the text layer cannot show (MSBM's double-struck R is a plain `R` there, so
+  `\mathbb{R}` differs), and a plain letter of unknown weight made bold (a font that
+  does not mark bold says nothing).
+
+Measured cases (2026-10-08): OpenStax 2.1's `d_0` and `d_f` with bold subscripts and the
+LaTeX handout's `\mathbb{R}^n` are cosmetic; the handout's bold omega read as `\omega` is
+meaning-level. `tests/test_style_check.py` pins each.
 
 ## Validators and codes
 
@@ -261,7 +297,8 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 
 Sentence punctuation at the very end of the equation is not read. Unreadable input
 raises `SpeechError` with a content-free message. In the equation step a speech failure
-is a warning (`speech.generated`, code `speech_failed`), not an error.
+is a warning (`speech.generated`, code `speech_failed`), not an error, and only an optional
+note: the output keeps MathML only, so a missing reading aid changes nothing a student gets.
 
 ## Privacy
 
