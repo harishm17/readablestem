@@ -42,6 +42,7 @@ import difflib
 import hashlib
 import json
 import math
+import re
 import struct
 import unicodedata
 from collections import Counter, defaultdict
@@ -912,9 +913,11 @@ def document_page_item(
     Predictions without a gold match are not all the same kind of mistake, so each one
     gets a reason (`unmatched_reason`): a "fragment" (a piece of a gold equation the
     layout cut apart, or text that cannot be a whole formula: it starts or ends with an
-    operator, or its brackets do not balance), "prose_math" (an inline formula that is
-    whole, typically maths the source wrote as text, so the gold has no MathML for it),
-    or "other". A gold equation is "split" when two or more predictions are pieces of it.
+    operator, or its brackets do not balance), "prose_math" (a whole inline formula with
+    evidence that it is one: a relation, a variable with an index or a script, an italic
+    variable with an operator; typically maths the source wrote as text, so the gold has
+    no MathML for it), or "other" (a bare quantity, a lone symbol, anything else). A
+    gold equation is "split" when two or more predictions are pieces of it.
     """
     predicted = sorted((e for e in elements if e.kind == Kind.EQUATION), key=lambda e: e.order)
     gold_sigs = [math_signature(g["mathml"]) for g in gold]
@@ -1041,6 +1044,12 @@ def _split_gold(
 
 
 def _unmatched_reason(element: Element, sigs: tuple[str, str], piece: bool) -> str:
+    """ "fragment", "prose_math" or "other" for a prediction with no gold match.
+
+    "prose_math" needs positive evidence that the inline run is a formula
+    (`_formula_evidence`), so it is not a catch-all: a bare quantity ("-49 m", "2.5",
+    "125 m/s") or a lone symbol ("(Delta)") is "other", inline or not.
+    """
     text = sigs[1] or sigs[0]
     broken = (
         not text
@@ -1050,7 +1059,35 @@ def _unmatched_reason(element: Element, sigs: tuple[str, str], piece: bool) -> s
     )
     if piece or broken:
         return "fragment"
-    return "prose_math" if element.display == "inline" else "other"
+    if element.display == "inline" and _formula_evidence(element, text):
+        return "prose_math"
+    return "other"
+
+
+# Layout's reasons for an inline run that say it is a formula, not just maths-like.
+_FORMULA_REASONS = frozenset(
+    {"relation between operands", "letter with sub/superscript", "italic variable with operator"}
+)
+_RELATION_SIGNS = frozenset("=<>\u2264\u2265\u2260\u2248\u2261")
+# A number with a unit and nothing else, in signature form (no spaces, minus as "-"):
+# "-49m", "2.5", "125m/s", "9.8m/s2", "20%".
+_QUANTITY = re.compile(r"[-+\u00b1]?\d[\d.,]*(?:[^\W\d_]+\d*(?:[/\u00b7\u22c5][^\W\d_]+\d*)*)?%?")
+_INDEXED_VARIABLE = re.compile(r"[^\W\d_]\d+")  # "d0", "x2": a variable and its index
+
+
+def _formula_evidence(element: Element, text: str) -> bool:
+    """Is an inline prediction a formula (maths the source wrote as text), not a bare
+    quantity or a lone symbol? It must have a relation with operands on both sides
+    ("t=0s"), a letter carrying an index ("d0"), or layout's word for the same (a
+    script, an italic variable next to an operator: `_FORMULA_REASONS`)."""
+    if _QUANTITY.fullmatch(text):
+        return False
+    if _FORMULA_REASONS & set(element.reasons):
+        return True
+    for i, c in enumerate(text):
+        if c in _RELATION_SIGNS and any(x.isalnum() for x in text[:i]):
+            return any(x.isalnum() for x in text[i + 1 :])
+    return bool(_INDEXED_VARIABLE.fullmatch(text))
 
 
 def _brackets_broken(text: str) -> bool:
@@ -1116,7 +1153,9 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "matched_mean_teds": mean(p["teds"] for p in pairs),
         "end_to_end_exact_lenient": _safe_div(sum(p["exact_lenient"] for p in pairs), gold),
         # Why the unmatched predictions did not match, and the precision without the
-        # whole inline formulas the gold has no MathML for (maths written as text).
+        # inline formulas the gold has no MathML for (maths written as text). A
+        # prediction is prose_math only with evidence that it is a formula
+        # (`_formula_evidence`); the gold cannot confirm that, so this is an estimate.
         "unmatched_predicted": pred - matched,
         "unmatched_by_reason": unmatched,
         "detection_precision_excluding_prose_math": _safe_div(

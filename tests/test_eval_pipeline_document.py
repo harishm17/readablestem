@@ -73,6 +73,33 @@ def test_whole_inline_maths_without_gold_is_prose_maths_and_broken_pieces_are_fr
     }
 
 
+def test_prose_maths_needs_evidence_of_a_formula_and_quantities_are_other():
+    """prose_math was a catch-all for unmatched inline predictions, so precision
+    "excluding prose maths" was 1.0 by construction. Bare quantities and lone symbols
+    (the fragment false positives of the smoke test) are "other" now."""
+    texts = {
+        "-49 m": [],
+        "\u2212 40 m/s": ["signed number"],
+        "2.5": [],
+        "(\u0394)": ["math font or symbol"],
+        "125m/s": ["italic variable with operator"],
+        "9.8 m/s2": ["letter with sub/superscript"],
+        "t = 0 s": [],
+        "\U0001d42d0": [],  # bold d with subscript 0, as text
+        "v f": ["letter with sub/superscript"],
+        "x + y": ["italic variable with operator"],
+    }
+    predicted = [
+        element(i, text, "inline", parent="p1-e99").model_copy(update={"reasons": reasons})
+        for i, (text, reasons) in enumerate(texts.items())
+    ]
+    item = page([], predicted)
+    reasons = [u["reason"] for u in item["unmatched"]]
+    assert reasons == [*["other"] * 6, *["prose_math"] * 4]
+    metrics = pe.document_metrics([item])
+    assert metrics["detection_precision_excluding_prose_math"] == 0.0  # 0 of 6, not 0 of 0
+
+
 def test_a_split_inline_equation_needs_its_pieces_in_the_same_paragraph():
     gold = [equation("p-1", 0, '<math display="inline"><mi>x</mi><mo>=</mo><mn>2</mn></math>',
                      "inline")]  # fmt: skip
