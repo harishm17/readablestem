@@ -202,9 +202,15 @@ def test_calibrate_template_then_agreement(tmp_path, capsys):
     assert json.loads(out_json.read_text())["n"] == 2
 
 
-def test_calibrate_needs_inputs(capsys):
+def test_calibrate_needs_inputs(tmp_path, capsys):
     assert main(["eval", "calibrate"]) == 2
     assert "--judge and --labels" in capsys.readouterr().err
+    sheet = str(tmp_path / "labels.csv")
+    assert main(["eval", "calibrate", "--write-template", sheet]) == 2
+    assert "needs --judge" in capsys.readouterr().err
+    missing = str(tmp_path / "nope.jsonl")
+    assert main(["eval", "calibrate", "--judge", missing, "--write-template", sheet]) == 2
+    assert "file not found" in capsys.readouterr().err
 
 
 def test_calibrate_probes_with_the_fake_client(tmp_path, capsys):

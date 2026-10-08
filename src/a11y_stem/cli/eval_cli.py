@@ -198,23 +198,20 @@ def _cmd_gate(args: argparse.Namespace) -> int:
 def _cmd_calibrate(args: argparse.Namespace) -> int:
     from a11y_stem.eval import calibration as cal
 
-    if args.write_template:
-        if not args.judge:
-            return _error("--write-template needs --judge judged.jsonl (from eval pipeline)")
-        judged = cal.load_judged(args.judge)
-        count = cal.write_label_template(judged.values(), args.write_template)
-        print(f"wrote {count} rows to {args.write_template} (fill human_pass and notes)")
-        return 0
     if args.probes:
         return _calibrate_probes(args)
-    if not (args.judge and args.labels):
+    if args.write_template and not args.judge:
+        return _error("--write-template needs --judge judged.jsonl (from eval pipeline)")
+    if not args.write_template and not (args.judge and args.labels):
         return _error("give --judge and --labels, or --write-template, or --probes")
     try:
+        judged = cal.load_judged(args.judge)
+        if args.write_template:
+            count = cal.write_label_template(judged.values(), args.write_template)
+            print(f"wrote {count} rows to {args.write_template} (fill human_pass and notes)")
+            return 0
         report = cal.agreement_report(
-            cal.load_judged(args.judge),
-            cal.load_labels(args.labels),
-            n_boot=args.n_boot,
-            seed=args.seed,
+            judged, cal.load_labels(args.labels), n_boot=args.n_boot, seed=args.seed
         )
     except FileNotFoundError as exc:
         return _error(f"file not found: {exc.filename}")
