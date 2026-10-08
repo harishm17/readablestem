@@ -379,7 +379,11 @@ embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Bro
 need `uv run playwright install chromium`; axe-core is downloaded once from the npm
 registry, checked against its published integrity hash and cached in `.cache/axe-core/`.
 
-The other work packages' functions the web app calls (`pipeline.validate`,
-`pipeline.speech`, `pipeline.assemble`, `ops.aggregate`, `ops.retention`) are
-monkeypatched in these tests; the converter and model client are fakes passed to
-`create_app`.
+Most of these tests monkeypatch the other work packages' functions the web app calls
+(`pipeline.validate`, `pipeline.speech`, `pipeline.assemble`, `ops.aggregate`,
+`ops.retention`) and pass a fake converter and model client to `create_app`. Two files
+run the real thing with the offline model client: `tests/test_web_pipeline.py` drives
+`tests/fixtures/layout/worked_example.pdf` through upload, worker, review, aggregation and
+deletion (the stored HTML equals a review re-render, crops are keyed by element id, an
+inline equation edited in review stays in its paragraph), and `tests/test_web_outcomes.py`
+covers budget stops, scanned pages and removed users with `pipeline.run.convert_pdf`.
