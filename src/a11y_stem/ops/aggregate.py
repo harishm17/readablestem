@@ -14,6 +14,12 @@ Rows are (day, step, category, count). `step` is the fix kind ("equation", "figu
     equation  call:gpt-6-luna:outcome:timeout           one per model call attempt
     equation  call:fallback                             calls made as a fallback
     equation  call:escalated                            fixes re-asked on another model
+    equation  tier:required | tier:optional | tier:none  fixes by review tier (Fix.review)
+    equation  tier:required:style_mismatch              why: each failed check code,
+    heading   tier:optional:heading.weak_evidence       Fix.reason, heading.repeated_label
+                                                        or below_accept (core.triage)
+    heading   decisions:required                        required decisions: a group of
+                                                        repeated headings counts once
     job       status:done | status:failed               jobs
     job       error:encrypted                           Job.error_code (also outcome codes
                                                         of done jobs, e.g. budget_daily)
@@ -25,11 +31,14 @@ Rows are (day, step, category, count). `step` is the fix kind ("equation", "figu
     document  check:heading.order:skipped_level         failed static HTML checks
     equation  aggregate:checks_edited                   checks lost to an earlier edit
 
-So production cost per page is sum(cost_microusd) / sum(pages) / 1e6 over any days.
+So production cost per page is sum(cost_microusd) / sum(pages) / 1e6 over any days, and
+the review load per page is sum(decisions:required) / sum(pages) (`ops report`).
 
 Fixes are counted as the pipeline left them, even when a reviewer acted before the cron
-ran. A review rewrites the stored result in place (the status becomes accepted, edited or
-rejected; an edit replaces the checks), so each fix's status is taken from the `before`
+ran. Tiers too: a review never changes `Fix.review`; a result stored before tiers existed
+gets its tier from the pipeline's status (`core.types.default_review`). A review rewrites
+the stored result in place (the status becomes accepted, edited or rejected; an edit
+replaces the checks), so each fix's status is taken from the `before`
 snapshot of its earliest `ReviewEdit`, and its checks too when the snapshot has them.
 Otherwise an edit's replaced checks cannot be recovered and that fix's checks are counted
 as "aggregate:checks_edited" instead of the reviewer's, except for headings: a heading
@@ -63,7 +72,8 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from a11y_stem.core.types import Check, DocumentResult, Fix, Kind
+from a11y_stem.core import triage
+from a11y_stem.core.types import Check, DocumentResult, Fix, Kind, Review, default_review
 from a11y_stem.observability.logging import get_logger
 from a11y_stem.web.db import ErrorAggregate, Job, JobStatus, ReviewEdit, session_scope
 
@@ -112,9 +122,12 @@ KEEPS_CHECKS_ON_EDIT = frozenset({Kind.HEADING})
 LATENCY_BUCKETS_S = (60, 120, 300, 600)  # upper bounds; the last bucket is "ge600s"
 
 
-def fix_counts(fix: Fix, reviewed: Reviewed | None = None) -> Counter[Key]:
+def fix_counts(
+    fix: Fix, reviewed: Reviewed | None = None, tier: Review | None = None
+) -> Counter[Key]:
     """Categories for one fix (see the module docstring for the list), as the pipeline
-    produced it: `reviewed` undoes what a reviewer changed in the stored result."""
+    produced it: `reviewed` undoes what a reviewer changed in the stored result, `tier`
+    replaces `fix.review` (`pipeline_tiers`)."""
     step = code(fix.kind.value)
     counts: Counter[Key] = Counter()
     status = fix.status.value
@@ -135,6 +148,16 @@ def fix_counts(fix: Fix, reviewed: Reviewed | None = None) -> Counter[Key]:
     else:
         for check in checks:
             counts[_key(step, "check", code(check.name), code(check.code or "failed"))] += 1
+    tier = tier or fix.review
+    counts[_key(step, "tier", code(tier))] += 1
+    if tier != "none":
+        # Why, from the pipeline's own checks; lost to an earlier edit, only its reason.
+        tiered = fix.model_copy(update={"review": tier, "checks": checks or []})
+        reasons = triage.tier_reasons(tiered)
+        if checks is None:
+            reasons = [r for r in reasons if r != triage.BELOW_ACCEPT] or ["checks_edited"]
+        for reason in reasons:
+            counts[_key(step, "tier", code(tier), code(reason))] += 1
     if fix.reason:
         counts[_key(step, "reason", code(fix.reason))] += 1
     for call in fix.calls:
@@ -184,9 +207,32 @@ def job_counts(
     for check in result.html_checks:
         if not check.passed:
             counts[_key("document", "check", code(check.name), code(check.code or "failed"))] += 1
+    tiers = pipeline_tiers(result, result_json, reviewed)
     for fix in result.fixes:
-        counts.update(fix_counts(fix, reviewed))
+        counts.update(fix_counts(fix, reviewed, tiers[id(fix)]))
+    required = [f for f in result.fixes if tiers[id(f)] == "required"]
+    for unit in triage.units(required):
+        counts[_key(code(unit[0].kind.value), "decisions", "required")] += 1
     return counts
+
+
+def pipeline_tiers(
+    result: DocumentResult, result_json: object, reviewed: Reviewed | None
+) -> dict[int, Review]:
+    """id(fix) -> the review tier the pipeline gave it. Stored with the fix since tiers
+    exist; for an older result, from the status the pipeline left (before any review)."""
+    raw = result_json.get("fixes") if isinstance(result_json, Mapping) else None
+    stored = [f.get("review") if isinstance(f, Mapping) else None for f in raw or []]
+    tiers: dict[int, Review] = {}
+    for index, fix in enumerate(result.fixes):
+        if index < len(stored) and stored[index] is not None:
+            tiers[id(fix)] = fix.review
+            continue
+        status = fix.status.value
+        if reviewed is not None:
+            status = reviewed.status.get(fix.element_id, status)
+        tiers[id(fix)] = default_review(status)
+    return tiers
 
 
 def _latency_bucket(latency_ms: int) -> str:

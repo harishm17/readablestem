@@ -402,14 +402,23 @@ def test_thresholds_come_from_settings():
     assert fix.status == Status.NEEDS_REVIEW
 
 
-def test_speech_failure_is_a_warning(monkeypatch):
+def test_speech_failure_is_an_optional_note(monkeypatch):
+    # The speech text is a reading aid on the review screen; the output keeps MathML
+    # only, so a missing reading changes nothing a student gets.
     def broken(_):
         raise SpeechError("x")
 
     monkeypatch.setattr(equation_step, "mathml_to_speech", broken)
     fix = run(by_model(main=out(confidence=0.99)))
-    assert fix.status == Status.NEEDS_REVIEW and codes(fix) == {"speech_failed"}
+    assert fix.status == Status.ACCEPTED and codes(fix) == {"speech_failed"}
+    assert fix.review == "optional"
     assert fix.equation is not None and fix.equation.speech == ""
+
+
+def test_speech_failure_with_low_confidence_still_needs_a_decision(monkeypatch):
+    monkeypatch.setattr(equation_step, "mathml_to_speech", lambda _: "")
+    fix = run(by_model(main=out(confidence=0.7)))
+    assert fix.status == Status.NEEDS_REVIEW and fix.review == "required"
 
 
 # ------------------------------------------------------------- text-layer cross-check

@@ -247,19 +247,24 @@ def rich_output() -> ConversionOutput:
 # --------------------------------------------------------------------------- page
 
 
-def test_groups_by_kind_with_pending_fixes_first(web):
+def test_decisions_first_by_kind_then_optional_then_accepted(web):
     page = review_page(web)
-    # Equations (pending p1-e3 needs review, p1-e5 not converted; decided p1-e2), then the
-    # figure, then the accepted heading. Paragraphs are not fixes.
-    assert cards(page) == ["p1-e3", "p1-e5", "p1-e2", "p1-e4", "p1-e0"]
+    # Needs a decision: equations (p1-e3 needs review, p1-e5 not converted), then the
+    # figure. Then the accepted ones (p1-e2, the heading). Paragraphs are not fixes.
+    assert cards(page) == ["p1-e3", "p1-e5", "p1-e4", "p1-e2", "p1-e0"]
+    assert page.index('id="needs-decision"') < page.index('id="group-equations"')
     assert page.index('id="group-equations"') < page.index('id="group-figures"')
-    assert page.index('id="group-figures"') < page.index('id="group-headings"')
+    assert page.index('id="group-figures"') < page.index('id="optional-checks"')
+    assert page.index('id="optional-checks"') < page.index('id="decided"')
+    assert 'id="group-headings"' not in page  # no heading needs a decision
+    assert '<h2 id="needs-decision-title">Needs your decision (3)</h2>' in page
+    assert '<h2 id="optional-checks-title">Optional checks (0)</h2>' in page
 
 
 def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     page = review_page(web)
     equation = card(page, "p1-e3")
-    assert '<h3 id="fix-title-p1-e3">Equation 2 <span class="meta">on page 1</span></h3>' in (
+    assert '<h4 id="fix-title-p1-e3">Equation 2 <span class="meta">on page 1</span></h4>' in (
         equation
     )  # numbered in reading order: the inline p1-e2 is equation 1
     assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in equation
@@ -298,33 +303,36 @@ def test_buttons_name_the_fix_they_act_on(web):
 
 def test_decided_fixes_are_folded_away(web):
     page = review_page(web)
-    headings = page[page.index('id="group-headings"') :]
-    assert '<details class="done-group">' in headings  # closed: no "open" attribute
-    assert "<summary>1 heading already decided (accepted, edited or rejected)</summary>" in (
-        headings
+    decided = page[page.index('id="decided"') :]
+    assert '<details class="done-group">' in decided  # closed: no "open" attribute
+    assert (
+        "<summary>2 fixes accepted automatically or already decided (accepted, edited or "
+        "rejected)</summary>" in decided
     )
     assert (
         '<summary id="fix-title-p1-e0">Heading 1, page 1: Accepted automatically, '
         "confidence High (100%)"
-        "</summary>" in headings
+        "</summary>" in decided
     )
 
 
 def test_page_has_a_table_of_contents_with_counts(web):
     page = review_page(web)
     toc = page[page.index('<nav class="review-toc"') : page.index("</nav>", page.index("toc"))]
+    assert '<a href="#needs-decision">Needs your decision</a>: 3' in toc
     assert (
         '<a href="#group-equations">Equations</a>: 1 needs review, 1 not converted, '
-        "1 already decided" in toc
+        "1 accepted or decided" in toc
     )
-    assert '<a href="#group-figures">Figures</a>: 1 needs review, 0 already decided' in toc
-    assert '<a href="#group-headings">Headings</a>: 1 already decided' in toc
+    assert '<a href="#group-figures">Figures</a>: 1 needs review, 0 accepted or decided' in toc
+    assert '<a href="#optional-checks">Optional checks</a>: 0' in toc
+    assert '<a href="#decided">Accepted or decided</a>: 2' in toc
     assert (
-        '<h2 id="group-equations-title">Equations <span class="group-count">(2 to decide, '
-        "1 already decided)</span></h2>" in page
+        '<h3 id="group-equations-title">Equations <span class="group-count">(2 decisions)'
+        "</span></h3>" in page
     )
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert "3 fixes still need a decision:</strong>\n    2 equations, 1 figure." in progress
+    assert "3 decisions are still needed:</strong>\n    2 equations, 1 figure." in progress
 
 
 def test_job_page_breaks_down_what_needs_review_by_kind(web):
@@ -332,10 +340,11 @@ def test_job_page_breaks_down_what_needs_review_by_kind(web):
     breakdown = page[
         page.index('id="review-breakdown"') : page.index("</p>", page.index("breakdown"))
     ]
-    assert "2 need your review:" in breakdown
-    assert f'<a href="/jobs/{web.job_id}/review#group-equations">1 equation</a>,' in breakdown
+    # Not converted counts too: it needs a decision (write it, or keep the original).
+    assert "3 need your decision:" in breakdown
+    assert f'<a href="/jobs/{web.job_id}/review#group-equations">2 equations</a>,' in breakdown
     assert f'<a href="/jobs/{web.job_id}/review#group-figures">1 figure</a>.' in breakdown
-    assert "heading" not in breakdown  # none need review
+    assert "heading" not in breakdown  # none need a decision
 
 
 # --------------------------------------------------------------------------- actions
@@ -357,19 +366,19 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     assert job.html is not None and "p1-e3:accepted" in job.html
     assert "crops=3" in job.html  # the stored crops are passed to the assembler
     page = review_page(web)
-    assert cards(page) == ["p1-e5", "p1-e2", "p1-e3", "p1-e4", "p1-e0"]
+    assert cards(page) == ["p1-e5", "p1-e4", "p1-e2", "p1-e3", "p1-e0"]
     # The notice sits where the redirect lands, linked back to the fix that changed.
     landing = card(page, "p1-e5")
     assert '<a href="#item-p1-e3">Equation 2 on page 1</a>: Accepted.' in landing
     assert landing.index("Accepted.") < landing.index('<article id="fix-p1-e5"')
-    # The changed fix is decided now: its group's folded list opens to show it.
+    # The changed fix is decided now: the folded list of decided fixes opens to show it.
     changed = card(page, "p1-e3")
     assert '<details class="done-item" open>' in changed
     assert "<strong>Just changed:</strong> Accepted." in changed
     assert '<details class="done-group" open>' in page
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     assert "Accepted." in progress
-    assert "2 fixes still need a decision" in progress
+    assert "2 decisions are still needed" in progress
 
 
 def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
@@ -380,7 +389,7 @@ def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     page = review_page(web)
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Rejected.' in progress
-    assert "Nothing left that needs your attention." in progress
+    assert "Nothing left that needs your decision." in progress
 
 
 def test_saving_an_equation_edit_validates_and_stores_it(web):

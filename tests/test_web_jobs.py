@@ -341,7 +341,7 @@ def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request
     for path in (f"/jobs/{job_id}", f"/jobs/{job_id}?auto=1"):
         done = web.browser.get(path).text
         assert "http-equiv" not in done and "hx-get" not in done and "noscript" not in done
-        assert "Results" in done and "Need your review" in done
+        assert "Results" in done and "Need your decision" in done
 
 
 def test_status_fragment_is_204_until_something_changes(web):

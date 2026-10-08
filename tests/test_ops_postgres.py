@@ -143,6 +143,8 @@ def test_purge_cascades_and_counts_reviews_on_postgres(factory, monkeypatch):
     expected = dict(EXPECTED_DONE_COUNTS)
     del expected[("equation", "check:latex.allowed_commands:unknown_command")]  # p1-e1's
     expected[("equation", "aggregate:checks_edited")] = 1
+    del expected[("equation", "tier:required:unknown_command")]  # the reason was that check
+    expected[("equation", "tier:required:checks_edited")] = 1
     expected[("equation", "review:edit")] = 1
     with db.session_scope(factory) as s:
         assert s.query(db.Job).count() == 1

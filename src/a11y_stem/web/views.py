@@ -14,6 +14,7 @@ from typing import Any
 from sqlalchemy import func, select, tuple_
 from sqlalchemy.orm import Session
 
+from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Job, JobStatus, User
@@ -99,9 +100,15 @@ class ResultSummary:
     accepted: int  # accepted automatically by the pipeline
     not_converted: int
     reviewed: int  # accepted, edited or rejected by the reviewer
-    # Fixes with status needs_review per kind ("equation" -> 6), for the per-kind links
-    # into the review screen's groups.
+    # Decisions still waiting (what "done" waits for): every fix waiting for a decision
+    # (needs review, failed, not converted), a group of repeated headings counted once.
+    # Per kind ("equation" -> 2) for the links into the review screen's groups.
+    decisions: int = 0
     review_by_kind: dict[str, int] = field(default_factory=dict)
+    review_labels: dict[str, str] = field(default_factory=dict)  # "1 group of headings"
+    # Accepted automatically with an optional note nobody has looked at: never counted
+    # toward "done".
+    optional: int = 0
     list_items: int = 0  # list item elements (no fixes: lists are rebuilt as they are)
     # Static checks of the stored HTML (re-run after every review decision): how many
     # ran, and the ones that failed. `checks_run` is 0 for results stored without them.
@@ -153,6 +160,25 @@ class JobView:
         return job_error_message(self.error_code)
 
 
+DECISION_NOUNS = {
+    Kind.EQUATION: ("equation", "equations"),
+    Kind.FIGURE: ("figure", "figures"),
+    Kind.HEADING: ("heading", "headings"),
+}
+
+
+def decisions_label(units: list[list[Fix]], kind: Kind) -> str:
+    """'2 equations', '1 group of repeated headings', '3 headings and 1 group of
+    repeated headings': decisions of one kind (a heading group is one decision)."""
+    one, many = DECISION_NOUNS[kind]
+    groups = sum(1 for unit in units if unit[0].group_key)
+    singles = len(units) - groups
+    parts = [f"{singles} {one if singles == 1 else many}"] if singles else []
+    if groups:
+        parts.append(f"{groups} {'group' if groups == 1 else 'groups'} of repeated {many}")
+    return " and ".join(parts)
+
+
 def _check_line(explained: Explained, severity: str) -> CheckLine:
     return CheckLine(explained.text, explained.code, severity)
 
@@ -162,6 +188,7 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
         return None
     result = DocumentResult.model_validate(result_json)
     statuses = Counter(f.status for f in result.fixes)
+    waiting = triage.units(f for f in result.fixes if f.pending)
     failed = [c for c in result.html_checks if not c.passed]
     return ResultSummary(
         pages=result.stats.pages,
@@ -170,9 +197,14 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
         accepted=sum(f.status is Status.ACCEPTED and not f.reviewed for f in result.fixes),
         not_converted=statuses[Status.ABSTAINED] + statuses[Status.FAILED],
         reviewed=sum(f.decided_by_reviewer for f in result.fixes),
-        review_by_kind=dict(
-            Counter(f.kind.value for f in result.fixes if f.status is Status.NEEDS_REVIEW)
-        ),
+        decisions=triage.open_decisions(result.fixes),
+        review_by_kind=dict(Counter(unit[0].kind.value for unit in waiting)),
+        review_labels={
+            kind.value: decisions_label([u for u in waiting if u[0].kind is kind], kind)
+            for kind in DECISION_NOUNS
+            if any(u[0].kind is kind for u in waiting)
+        },
+        optional=sum(f.optional_note for f in result.fixes),
         list_items=sum(e.kind is Kind.LIST_ITEM for e in result.elements),
         checks_run=len(result.html_checks),
         failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],

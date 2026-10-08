@@ -5,17 +5,17 @@ that needs work gets a `Fix` (what the pipeline proposes, how sure it is, which 
 passed, and what the model calls cost). The assembler turns elements + fixes into
 accessible HTML. `DocumentResult` is the whole thing, serialisable to JSON.
 
-Privacy rule for this module: `Check.code`, `Fix.reason` and `ModelCall.outcome` are
-category codes (e.g. "unknown_command"), never document text, so they can be logged and
-aggregated after the document itself is deleted.
+Privacy rule for this module: `Check.code`, `Fix.reason`, `ModelCall.outcome` and
+`Fix.group_key` are category codes or ids (e.g. "unknown_command", "hg-p3-e7"), never
+document text, so they can be logged and aggregated after the document itself is deleted.
 """
 
 from __future__ import annotations
 
 from enum import StrEnum
-from typing import Literal
+from typing import Any, Literal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 BBox = tuple[float, float, float, float]  # x0, y0, x1, y1 in PDF points
 
@@ -45,12 +45,36 @@ class Status(StrEnum):
     when the pipeline accepts it); `Fix.reviewed` tells the two apart.
     """
 
-    ACCEPTED = "accepted"  # passed every error-level check, confidence >= auto threshold
-    NEEDS_REVIEW = "needs_review"  # usable proposal, but low confidence or a warning
+    # Used as proposed: nothing needs a person's decision. It may still carry optional
+    # notes (failed warning checks that do not change the meaning; `Fix.review`).
+    ACCEPTED = "accepted"
+    NEEDS_REVIEW = "needs_review"  # usable proposal that needs a decision (`review`)
     ABSTAINED = "abstained"  # no trustworthy proposal; the original stays, flagged
     FAILED = "failed"  # model/budget/validation error; the original stays, flagged
     EDITED = "edited"  # a reviewer changed the proposal
     REJECTED = "rejected"  # a reviewer rejected it; the original stays
+
+
+# Statuses that wait for a person's decision. The pipeline gives them `review="required"`.
+PENDING_STATUSES = frozenset({Status.NEEDS_REVIEW, Status.FAILED, Status.ABSTAINED})
+
+# Review tier of a fix, set by the pipeline ("meaning-level only" policy, 2026-10-08):
+#   required  a person must decide (NEEDS_REVIEW, FAILED or ABSTAINED): a wrong answer
+#             would change what a student reads, or nothing usable was produced;
+#   optional  accepted automatically, with a note a reviewer may look at (a cosmetic
+#             style difference, a heading with weak evidence, a warning-only check);
+#   none      accepted automatically, nothing to note.
+# A reviewer's decision changes `status`, never `review`: the tier records what the
+# pipeline asked for (ops aggregates count it).
+Review = Literal["required", "optional", "none"]
+
+
+def default_review(status: Status | str | None) -> Review:
+    """The tier of a fix stored before tiers existed: waiting -> required, else none."""
+    try:
+        return "required" if Status(status) in PENDING_STATUSES else "none"
+    except ValueError:
+        return "none"
 
 
 class Check(BaseModel):
@@ -132,6 +156,11 @@ class Element(BaseModel):
     list_ordered: bool | None = None
     list_level: int | None = None
     caption: str | None = None  # figures: nearby "Figure N ..." text, if found
+    # Equations: letters of `text` the PDF draws, not bold, in a font known to have a bold
+    # face (Computer Modern, Times, ...), sorted, no repeats. Such a letter is known to be
+    # plain, so a bold reading of it (a scalar read as a vector) is a real difference.
+    # None when layout did not record it (older results, equations built outside layout).
+    regular_letters: str | None = None
 
 
 class Fix(BaseModel):
@@ -148,10 +177,35 @@ class Fix(BaseModel):
     # True once a reviewer accepted, edited or rejected this fix on the review screen.
     # Defaults to False so results stored before the field existed still load.
     reviewed: bool = False
+    # Review tier (see `Review`). Results stored before tiers existed get it from their
+    # status (`default_review`): needs_review, failed, abstained -> required, else none.
+    review: Review = "none"
+    # Repeated headings decided together: every heading with the same label and style that
+    # needed a decision shares this id ("hg-" + the first one's element id) and the group's
+    # size, and the review screen asks once for the whole group. None when on its own.
+    group_key: str | None = None
+    group_size: int | None = None
+
+    @model_validator(mode="before")
+    @classmethod
+    def _review_from_status(cls, data: Any) -> Any:
+        if isinstance(data, dict) and data.get("review") is None:
+            return {**data, "review": default_review(data.get("status"))}
+        return data
 
     @property
     def cost_usd(self) -> float:
         return sum(c.cost_usd for c in self.calls)
+
+    @property
+    def pending(self) -> bool:
+        """Waiting for a person's decision (counts toward "not done yet")."""
+        return self.status in PENDING_STATUSES
+
+    @property
+    def optional_note(self) -> bool:
+        """Accepted automatically with an optional note no reviewer has acted on yet."""
+        return self.review == "optional" and self.status is Status.ACCEPTED and not self.reviewed
 
     @property
     def accepted_by_reviewer(self) -> bool:
@@ -183,6 +237,11 @@ class DocumentStats(BaseModel):
     model_calls: int
     by_kind: dict[str, int] = Field(default_factory=dict)  # fixes per Kind
     by_status: dict[str, int] = Field(default_factory=dict)  # fixes per Status
+    # Fixes per review tier ("required", "optional", "none") as the pipeline left them,
+    # and the decisions the required ones make (a heading group counts once). Empty and
+    # None in results stored before tiers existed (`core.triage` recomputes them).
+    by_review: dict[str, int] = Field(default_factory=dict)
+    required_decisions: int | None = None
     per_page: list[PageStats] = Field(default_factory=list)
 
 

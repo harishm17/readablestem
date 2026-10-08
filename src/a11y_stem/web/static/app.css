@@ -248,7 +248,12 @@ progress { width: 16rem; height: 1.1rem; }
 .bulk-form .field { margin-bottom: 0.5rem; }
 .bulk-form .hint { max-width: 44rem; }
 .part-label { font-weight: 700; margin: 0.75rem 0 0.35rem; }
-.fix-card h3 { font-size: 1.2rem; margin-top: 1rem; }
+.fix-card h3, .fix-card h4 { font-size: 1.2rem; margin-top: 1rem; }
+.fix-card h5 { font-size: 1.1rem; margin-top: 1rem; }
+.review-section { margin-top: 2.5rem; }
+.review-section:focus { outline: none; }
+.heading-group .group-question { font-size: 1.1rem; }
+.group-members { margin-top: 1rem; }
 .explained { margin: 0.5rem 0; }
 .explained p { margin: 0.25rem 0; }
 .check-list li { margin: 0.25rem 0; }

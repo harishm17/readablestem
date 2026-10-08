@@ -118,7 +118,7 @@ def failed_codes(fix) -> list[str]:
     return [c.code for c in fix.failed_checks]
 
 
-def test_strong_evidence_is_accepted_and_weak_evidence_needs_review():
+def test_every_heading_is_accepted_and_uncertain_ones_carry_notes():
     elements = [
         large(0, "Chapter 2 Motion", 22.0, REASON_NUMBERED),
         large(1, "Velocity", 16.0),
@@ -131,24 +131,69 @@ def test_strong_evidence_is_accepted_and_weak_evidence_needs_review():
         large(8, "1. Introduction", 16.0, REASON_LIST_NUMBER),
     ]
     fixes = by_id(elements)
+    # Every label is used once, so no decision is required: a single uncertain heading
+    # is an optional note (its confidence and checks say why).
     expected = {
-        "p1-e0": (Status.ACCEPTED, 0.95, []),
-        "p1-e1": (Status.ACCEPTED, 0.90, []),
-        "p1-e2": (Status.NEEDS_REVIEW, 0.60, ["heading.weak_evidence"]),
-        "p1-e3": (Status.ACCEPTED, 0.88, []),
-        "p1-e4": (Status.ACCEPTED, 0.88, []),
-        "p1-e5": (Status.NEEDS_REVIEW, 0.75, ["heading.all_caps"]),
-        "p1-e6": (Status.NEEDS_REVIEW, 0.70, ["heading.very_short"]),
-        "p1-e7": (Status.NEEDS_REVIEW, 0.45, ["heading.weak_evidence", "heading.list_like"]),
-        "p1-e8": (Status.ACCEPTED, 0.90, []),  # "1. Introduction" in a large font is fine
+        "p1-e0": (0.95, []),
+        "p1-e1": (0.90, []),
+        "p1-e2": (0.60, ["heading.weak_evidence"]),
+        "p1-e3": (0.88, []),
+        "p1-e4": (0.88, []),
+        "p1-e5": (0.75, ["heading.all_caps"]),
+        "p1-e6": (0.70, ["heading.very_short"]),
+        "p1-e7": (0.45, ["heading.weak_evidence", "heading.list_like"]),
+        "p1-e8": (0.90, []),  # "1. Introduction" in a large font is fine
     }
-    for element_id, (status, confidence, codes) in expected.items():
+    for element_id, (confidence, codes) in expected.items():
         fix = fixes[element_id]
-        assert (fix.status, fix.confidence, failed_codes(fix)) == (status, confidence, codes), (
-            element_id
-        )
-        if status == Status.ACCEPTED:
+        assert (fix.status, fix.confidence, failed_codes(fix)) == (
+            Status.ACCEPTED,
+            confidence,
+            codes,
+        ), element_id
+        assert fix.review == ("optional" if codes else "none"), element_id
+        assert fix.group_key is None and fix.group_size is None
+        if not codes:
             assert fix.confidence is not None and fix.confidence >= ACCEPT_AT
+
+
+def test_repeated_uncertain_labels_make_one_group_decision():
+    elements = [
+        large(0, "Motion", 18.0),
+        large(1, "Teacher Support", 14.0),
+        heading(2, "Teacher Support", 11.0, REASON_BOLD_BODY),
+        heading(3, "Solution", 11.0, REASON_BOLD_BODY),
+        large(4, "Teacher Support", 14.0),
+        heading(5, "teacher  support:", 11.0, REASON_BOLD_BODY),  # same label, normalised
+        heading(6, "Teacher Support", 10.0, REASON_BOLD_BODY),  # another style: not grouped
+        heading(7, "Teacher Support", 11.0, REASON_BOLD_BODY),
+    ]
+    fixes = by_id(elements)
+    members = ["p1-e2", "p1-e5", "p1-e7"]
+    for element_id in members:
+        fix = fixes[element_id]
+        assert (fix.status, fix.review, fix.group_key, fix.group_size) == (
+            Status.NEEDS_REVIEW,
+            "required",
+            "hg-p1-e2",
+            3,
+        ), element_id
+        assert fix.heading is not None and fix.heading.level == 3
+    # Certain copies of the same words are not part of it, nor is a label used once.
+    assert fixes["p1-e1"].status is Status.ACCEPTED and fixes["p1-e1"].group_key is None
+    for element_id in ("p1-e3", "p1-e6"):
+        assert fixes[element_id].status is Status.ACCEPTED
+        assert fixes[element_id].review == "optional"
+        assert fixes[element_id].group_key is None
+    assert re.fullmatch(r"hg-p\d+-e\d+", fixes["p1-e2"].group_key or "")
+
+
+def test_repeated_certain_headings_are_not_grouped():
+    elements = [large(0, "Summary", 16.0), large(1, "Summary", 16.0)]
+    assert [(f.status, f.review, f.group_key) for f in heading_fixes(elements)] == [
+        (Status.ACCEPTED, "none", None),
+        (Status.ACCEPTED, "none", None),
+    ]
 
 
 def test_outline_repair_is_a_check_and_keeps_strong_headings_accepted():
@@ -162,6 +207,7 @@ def test_outline_repair_is_a_check_and_keeps_strong_headings_accepted():
     repaired = fixes[1]
     assert failed_codes(repaired) == ["heading.level_repaired"]
     assert repaired.status == Status.ACCEPTED and repaired.confidence == 0.87
+    assert repaired.review == "optional"  # a level is cheap to change later
     assert failed_codes(fixes[0]) == [] and failed_codes(fixes[2]) == []
 
 
@@ -181,11 +227,12 @@ def test_fixes_follow_reading_order_skip_other_kinds_and_clean_text():
 
 def test_empty_heading_text_abstains_with_a_category_code():
     (fix,) = heading_fixes([large(0, "   ", 20.0)])
-    assert (fix.status, fix.reason, fix.heading, fix.confidence) == (
+    assert (fix.status, fix.reason, fix.heading, fix.confidence, fix.review) == (
         Status.ABSTAINED,
         "heading.empty_text",
         None,
         None,
+        "required",
     )
 
 
@@ -204,8 +251,9 @@ def test_worked_example_fixture_outline():
     assert [(f.heading.level, f.heading.text, f.status) for f in fixes if f.heading] == [
         (1, "Kinematics Review", Status.ACCEPTED),
         (2, "Constant Acceleration", Status.ACCEPTED),  # h1 -> h3 in the source, repaired
-        (3, "Worked example", Status.NEEDS_REVIEW),  # bold body-size line
+        (3, "Worked example", Status.ACCEPTED),  # bold body-size line: an optional note
         (2, "Summary", Status.ACCEPTED),
     ]
     assert failed_codes(fixes[1]) == ["heading.level_repaired"]
     assert failed_codes(fixes[2]) == ["heading.level_repaired", "heading.weak_evidence"]
+    assert [f.review for f in fixes] == ["none", "optional", "optional", "none"]

@@ -224,7 +224,8 @@ def test_flag_reason_is_omitted_when_the_fix_has_none(sample_html):
 def test_headings_follow_fixes_and_rejected_ones_become_paragraphs(sample_html):
     assert '<h1 id="p1-e0">2.2 Speed and Velocity</h1>' in sample_html
     assert '<h2 id="p2-e0">Instantaneous velocity</h2>' in sample_html  # needs_review: kept
-    assert '<p id="p2-e3">NOTE TO STUDENTS</p>' in sample_html
+    # A rejected bold heading is bold text, as in the PDF ("Make them bold text").
+    assert '<p id="p2-e3"><strong>NOTE TO STUDENTS</strong></p>' in sample_html
 
 
 def heading(eid: str, order: int, level: int, status=Status.ACCEPTED) -> tuple[Element, Fix]:

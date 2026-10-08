@@ -134,8 +134,12 @@ def test_review_then_aggregate_then_delete(site):
     assert aggregate_finished(site.ctx.factory) == 1
     with session_scope(site.ctx.factory) as session:
         rows = {(r.step, r.category): r.count for r in session.scalars(select(ErrorAggregate))}
-    # Counted as the pipeline left it (needs_review), not as the reviewer changed it.
-    assert rows[("heading", "status:needs_review")] == 1
+    # Counted as the pipeline left it (accepted with an optional note: a single heading
+    # with weak evidence), not as the reviewer changed it.
+    assert rows[("heading", "status:accepted")] == 4
+    assert rows[("heading", "tier:optional")] == 2
+    assert rows[("heading", "tier:optional:heading.weak_evidence")] == 1
+    assert ("heading", "status:rejected") not in rows
     assert rows[("equation", "status:abstained")] == 3
     assert rows[("job", "pages")] == 1 and rows[("job", "status:done")] == 1
     token = csrf_from(site.browser.get(f"/jobs/{site.job_id}").text)

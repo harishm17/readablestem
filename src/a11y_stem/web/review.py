@@ -26,8 +26,13 @@ a decision moved.
 
 It also decides the order of the review screen. A reviewer's time should go where the
 risk is, so fixes are grouped by kind (equations, then figures, then headings); within a
-group the ones still waiting for a decision come first, in page and reading order, and
-the ones already decided follow (collapsed on the page).
+group the ones still waiting for a decision come first, in page and reading order, then
+the ones accepted with an optional note (`Fix.review == "optional"`), then the ones
+already accepted or decided (both collapsed on the page).
+
+Decisions, not fixes, are what a reviewer makes: repeated headings that share a
+`Fix.group_key` (`pipeline.heading_step`) are one decision. `apply_group` keeps them all
+as headings, gives them all one level, or makes them all bold text, in one transaction.
 
 Validators, speech and the HTML assembler are looked up on their modules at call time,
 so tests (and other work packages' stubs) can be swapped in with monkeypatch.
@@ -42,7 +47,9 @@ from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Any
 
+from a11y_stem.core import triage
 from a11y_stem.core.types import (
+    PENDING_STATUSES,
     Check,
     DocumentResult,
     Element,
@@ -67,7 +74,7 @@ GROUP_SLUGS = {Kind.EQUATION: "equations", Kind.FIGURE: "figures", Kind.HEADING:
 GROUP_KINDS = tuple(GROUP_SLUGS)
 # Waiting for a decision: a proposal to check, or nothing usable (the reviewer can write
 # one, or reject to confirm the original stays).
-PENDING = frozenset({Status.NEEDS_REVIEW, Status.FAILED, Status.ABSTAINED})
+PENDING = PENDING_STATUSES
 NOT_CONVERTED = frozenset({Status.FAILED, Status.ABSTAINED})
 
 # Bulk accept. "Accept all" is only offered for headings: a wrong heading level is cheap
@@ -114,11 +121,17 @@ class FixGroup:
 
     kind: Kind
     pending: list[Fix]  # waiting for a decision, page and reading order
-    done: list[Fix]  # accepted, edited or rejected, page and reading order
+    done: list[Fix]  # accepted (no note), edited or rejected, page and reading order
+    optional: list[Fix] = field(default_factory=list)  # accepted with an optional note
 
     @property
     def slug(self) -> str:
         return GROUP_SLUGS[self.kind]
+
+    @property
+    def units(self) -> list[list[Fix]]:
+        """The decisions waiting: one per fix, one per group of repeated headings."""
+        return triage.units(self.pending)
 
 
 @dataclass(frozen=True)
@@ -163,8 +176,9 @@ def group_fixes(result: DocumentResult) -> list[FixGroup]:
         )
         if fixes:
             pending = [f for f in fixes if f.status in PENDING]
-            done = [f for f in fixes if f.status not in PENDING]
-            groups.append(FixGroup(kind, pending, done))
+            optional = [f for f in fixes if f.status not in PENDING and f.optional_note]
+            done = [f for f in fixes if f.status not in PENDING and not f.optional_note]
+            groups.append(FixGroup(kind, pending, done, optional))
     return groups
 
 
@@ -183,14 +197,37 @@ def item_numbers(result: DocumentResult) -> dict[str, int]:
 
 
 def next_to_review(result: DocumentResult, element_id: str) -> str | None:
-    """The first fix still waiting for a decision after `element_id` in review order,
-    wrapping round to the first one; None when nothing is left."""
+    """The first decision still waiting after `element_id` in review order, wrapping
+    round to the first one; None when nothing is left. A group of headings is one
+    decision, named by its first member still waiting (`review_anchor` finds its card)."""
     position = _positions(result)
-    pending = [f.element_id for g in group_fixes(result) for f in g.pending]
+    fix = result.fix_for(element_id)
+    own_group = fix.group_key if fix is not None else None
+    heads = [
+        unit[0].element_id
+        for g in group_fixes(result)
+        for unit in g.units
+        if unit[0].element_id != element_id and not (own_group and unit[0].group_key == own_group)
+    ]
     here = position.get(element_id)
-    later = [e for e in pending if here is not None and position[e] > here and e != element_id]
-    remaining = later or [e for e in pending if e != element_id]
+    later = [e for e in heads if here is not None and position[e] > here]
+    remaining = later or heads
+    if not remaining and own_group:  # the rest of the group just decided is still waiting
+        remaining = [f.element_id for f in pending_members(result, own_group)]
     return remaining[0] if remaining else None
+
+
+def review_anchor(result: DocumentResult, element_id: str) -> str:
+    """The id of the card that shows this fix on the review screen while it waits: its
+    own, or its heading group's."""
+    fix = result.fix_for(element_id)
+    if fix is not None and fix.group_key and fix.pending:
+        return group_anchor(fix.group_key)
+    return f"item-{element_id}"
+
+
+def group_anchor(group_key: str) -> str:
+    return f"group-card-{group_key}"
 
 
 # --------------------------------------------------------------------------- one fix
@@ -502,6 +539,90 @@ def _edit_heading(
         text = (element.text if element else None) or ""
     fix.heading = HeadingFix(level=level, text=text)
     return []
+
+
+# --------------------------------------------------------------------------- heading groups
+
+GROUP_PREFIX = "hg-"  # pipeline.heading_step.GROUP_PREFIX (element ids start with "p")
+
+
+def is_group_key(target: str) -> bool:
+    return target.startswith(GROUP_PREFIX)
+
+
+def group_members(result: DocumentResult, group_key: str) -> list[Fix]:
+    """Every heading of one group, in reading order."""
+    position = _positions(result)
+    members = [f for f in result.fixes if f.group_key == group_key and f.kind is Kind.HEADING]
+    return sorted(members, key=lambda f: position[f.element_id])
+
+
+def pending_members(result: DocumentResult, group_key: str) -> list[Fix]:
+    return [f for f in group_members(result, group_key) if f.pending]
+
+
+@dataclass
+class GroupOutcome:
+    changes: list[ReviewChange]
+    left: list[Fix]  # members still waiting (their level would move: decide them one by one)
+
+
+def apply_group(
+    result: DocumentResult, group_key: str, action: str, form: Mapping[str, str]
+) -> GroupOutcome:
+    """One decision for every heading of a group still waiting, in reading order:
+
+    - accept: keep each as a heading at its proposed level (one the output would write
+      at another level is left waiting, as bulk accept does);
+    - edit: give each the level in `form["level"]`; refused as a whole (nothing saved) if
+      the output would move that level for any of them;
+    - reject: make each plain bold text (not a heading).
+
+    Raises LookupError for an unknown group and ReviewInvalid for a bad level.
+    """
+    members = pending_members(result, group_key)
+    if not group_members(result, group_key):
+        raise LookupError(group_key)
+    fid = field_id("group-level", group_key)
+    if action not in ACTIONS:
+        raise ReviewInvalid([FieldError(field_id("group-actions", group_key), "Choose an action.")])
+    level = None
+    if action == "edit":
+        raw = form.get("level", "")
+        if not _LEVEL.fullmatch(raw):
+            raise ReviewInvalid([FieldError(fid, "Choose a heading level from 1 to 6.")])
+        level = int(raw)
+    changes: list[ReviewChange] = []
+    left: list[Fix] = []
+    for fix in members:
+        before = snapshot(fix)
+        if action == "accept":
+            if not can_accept(fix) or fix.heading is None:
+                left.append(fix)
+                continue
+            if heading_level_written(result, fix.element_id, fix.heading.level) != (
+                fix.heading.level
+            ):
+                left.append(fix)
+                continue
+        elif action == "edit" and level is not None:
+            written = heading_level_written(result, fix.element_id, level)
+            if written != level:
+                highest = max(heading_levels_that_fit(result, fix.element_id))
+                message = (
+                    f"Level {level} would skip a level after the heading before one of "
+                    f"these, so the document would show it as level {written}. Choose a "
+                    f"level from 1 to {highest} for all of them, or decide them one by one."
+                )
+                raise ReviewInvalid([FieldError(fid, message)], {"level": raw})
+            text = fix.heading.text if fix.heading is not None else ""
+            fix.heading = HeadingFix(level=level, text=text)
+        fix.status = STATUS_FOR_ACTION[action]
+        fix.reviewed = True
+        changes.append(ReviewChange(fix=fix, action=action, before=before, after=snapshot(fix)))
+    if changes:
+        _recount(result)
+    return GroupOutcome(changes, left)
 
 
 # --------------------------------------------------------------------------- bulk

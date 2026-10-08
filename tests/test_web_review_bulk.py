@@ -112,24 +112,22 @@ def test_next_to_review_goes_forward_then_wraps_round():
 # --------------------------------------------------------------------------- order (page)
 
 
-def test_page_lists_groups_in_priority_order(rich):
+def test_page_lists_decisions_by_kind_then_the_decided_ones(rich):
     page = page_of(rich)
-    decided = {"equations": ["p2-e3", "p3-e4"], "figures": ["p3-e5"], "headings": ["p1-e0"]}
-    assert cards(page) == [
-        *EQUATIONS_PENDING,
-        *decided["equations"],
-        *FIGURES_PENDING,
-        *decided["figures"],
-        *HEADINGS_PENDING,
-        *decided["headings"],
-    ]
-    for slug, ids in decided.items():
-        folded = group(page, slug).split('<details class="done-group">', 1)[1]
-        assert re.findall(r'<article id="fix-([\w-]+)"', folded) == ids
+    decided = ["p2-e3", "p3-e4", "p3-e5", "p1-e0"]  # equations, figures, headings
+    assert cards(page) == [*EQUATIONS_PENDING, *FIGURES_PENDING, *HEADINGS_PENDING, *decided]
+    for slug, ids in (
+        ("equations", EQUATIONS_PENDING),
+        ("figures", FIGURES_PENDING),
+        ("headings", HEADINGS_PENDING),
+    ):
+        assert re.findall(r'<article id="fix-([\w-]+)"', group(page, slug)) == ids
+    folded = page[page.index('id="decided"') :].split('<details class="done-group">', 1)[1]
+    assert re.findall(r'<article id="fix-([\w-]+)"', folded) == decided
 
 
 def test_labels_stay_the_same_after_a_decision(rich):
-    title = '<h3 id="fix-title-p2-e2">Equation 3 <span class="meta">on page 2</span></h3>'
+    title = '<h4 id="fix-title-p2-e2">Equation 3 <span class="meta">on page 2</span></h4>'
     assert title in page_of(rich)
     assert post(rich, "p1-e1", action="accept").status_code == 303
     assert title in page_of(rich)  # not renumbered by the move of equation 1
@@ -146,7 +144,7 @@ def test_confidence_is_a_word_and_a_number(rich):
 def test_checks_and_reasons_are_explained_not_coded(rich):
     page = page_of(rich)
     style = card(page, "p2-e2")
-    assert "A letter is bold in the PDF but not in this transcription" in style
+    assert "A letter that is bold in the PDF (a vector) is plain in this transcription" in style
     assert "<code>equation.text_layer_style: style_mismatch</code>" in style
     heading = card(page, "p1-e3")
     assert "Only weak signs say this is a heading" in heading
@@ -162,10 +160,11 @@ def test_checks_and_reasons_are_explained_not_coded(rich):
 def test_job_page_links_each_kind_to_its_group(rich):
     page = rich.browser.get(f"/jobs/{rich.job_id}").text
     base = f"/jobs/{rich.job_id}/review"
-    assert "7 need your review:" in page
-    assert f'<a href="{base}#group-equations">3 equations</a>,' in page
-    assert f'<a href="{base}#group-figures">1 figure</a>,' in page
-    assert f'<a href="{base}#group-headings">3 headings</a>.' in page
+    # Every fix waiting counts, not converted ones too: each needs a decision.
+    assert "11 need your decision:" in page
+    assert f'<a href="{base}#group-equations">4 equations</a>,' in page
+    assert f'<a href="{base}#group-figures">3 figures</a>,' in page
+    assert f'<a href="{base}#group-headings">4 headings</a>.' in page
     for slug in ("equations", "figures", "headings"):
         assert f'id="group-{slug}"' in page_of(rich)
 

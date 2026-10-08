@@ -166,6 +166,8 @@ def test_reviews_before_aggregation_do_not_change_the_pipeline_counts(factory):
     expected = dict(EXPECTED_DONE_COUNTS)
     del expected[("equation", "check:latex.allowed_commands:other")]  # p2-e3's, replaced
     expected[("equation", "aggregate:checks_edited")] = 1
+    del expected[("equation", "tier:required:other")]  # its reason was that check
+    expected[("equation", "tier:required:checks_edited")] = 1
     with db.session_scope(factory) as s:
         rows = aggregate_rows(s)
     assert rows == expected

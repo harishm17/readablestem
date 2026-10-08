@@ -1,9 +1,11 @@
 """The weekly error-analysis report, from `error_aggregates` only (no document content).
 
 `a11y-stem ops report --days 7` prints, for the last N UTC days: jobs and their
-outcomes, pages, cost per page and conversion times; per step (equation, figure,
-heading) the status mix, the most frequent failed checks and reasons, and model call
-outcomes; failed static checks of the output HTML. Each table is plain text, so it can be
+outcomes, pages, cost per page and conversion times; the review load (decisions a
+person had to make per page, optional notes per page, by step); per step (equation,
+figure, heading) the status and review-tier mix, the most frequent reasons for each tier,
+failed checks and reasons, and model call outcomes; failed static checks of the output
+HTML. Each table is plain text, so it can be
 pasted into a weekly note as is.
 """
 
@@ -51,6 +53,28 @@ def _top(counts: dict[tuple[str, str], int], step: str, prefix: str) -> list[tup
     return [(label, str(n)) for label, n in found[:TOP]]
 
 
+TIERS = ("required", "optional", "none")
+
+
+def _per_page(n: int, pages: int) -> str:
+    return f"{n} ({n / pages:.2f} per page)" if pages else str(n)
+
+
+def _review_load(counts: dict[tuple[str, str], int], pages: int) -> list[tuple[str, str]]:
+    """Required decisions (a heading group counts once) and optional notes, per page."""
+    decisions = {s: counts.get((s, "decisions:required"), 0) for s in STEPS}
+    optional = {s: counts.get((s, "tier:optional"), 0) for s in STEPS}
+    if not any(decisions.values()) and not any(optional.values()):
+        return []
+    rows = [
+        ("required decisions", _per_page(sum(decisions.values()), pages)),
+        ("optional notes", _per_page(sum(optional.values()), pages)),
+    ]
+    rows += [(f"  {s}: required", str(decisions[s])) for s in STEPS if decisions[s]]
+    rows += [(f"  {s}: optional", str(optional[s])) for s in STEPS if optional[s]]
+    return rows
+
+
 def render_report(counts: dict[tuple[str, str], int], *, since: date, until: date) -> str:
     """The report text for already-loaded counts (see `load_counts`)."""
     job = {c: n for (s, c), n in counts.items() if s == "job"}
@@ -76,6 +100,7 @@ def render_report(counts: dict[tuple[str, str], int], *, since: date, until: dat
         if c.startswith("latency:")
     ]
     lines += _table("Conversion time (done jobs)", latency)
+    lines += _table("Review load (as the pipeline left it)", _review_load(counts, pages))
     for step in STEPS:
         statuses = {
             c.removeprefix("status:"): n
@@ -90,6 +115,14 @@ def render_report(counts: dict[tuple[str, str], int], *, since: date, until: dat
             for status, n in sorted(statuses.items(), key=lambda i: -i[1])
         ]
         lines += _table(f"{step}: {total} fixes by status", mix)
+        tiers = [
+            (tier, _share(counts.get((step, f"tier:{tier}"), 0), total))
+            for tier in TIERS
+            if counts.get((step, f"tier:{tier}"))
+        ]
+        lines += _table(f"{step}: review tiers", tiers)
+        for tier in ("required", "optional"):
+            lines += _table(f"{step}: why {tier}", _top(counts, step, f"tier:{tier}:"))
         lines += _table(f"{step}: top failed checks", _top(counts, step, "check:"))
         lines += _table(f"{step}: top reasons", _top(counts, step, "reason:"))
         lines += _table(f"{step}: model calls", _top(counts, step, "call:"))
