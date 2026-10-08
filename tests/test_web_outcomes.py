@@ -22,7 +22,7 @@ import pytest
 from sqlalchemy import select
 
 from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, JobBudget
+from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from a11y_stem.core.types import DocumentResult, DocumentStats, Element, Kind, PageStats
 from a11y_stem.models import OFFLINE_DEFAULTS, make_vision_client
 from a11y_stem.models.fake import FakeVisionClient
@@ -501,7 +501,7 @@ def test_jobs_of_users_no_longer_allowed_are_not_claimed(env):
 
 def test_fake_models_answer_offline_and_are_refused_in_production(tmp_path):
     settings = Settings(_env_file=None, fake_models=True)
-    budget = JobBudget(guard=FakeVisionClient().budget or _guard(), max_usd=1, max_calls=10)
+    budget = JobBudget(guard=InMemorySpendGuard(1.0), max_usd=1, max_calls=10)
     assert isinstance(default_client_factory(settings, budget), FakeVisionClient)
     prod = Settings(
         _env_file=None,
@@ -520,12 +520,6 @@ def test_fake_models_answer_offline_and_are_refused_in_production(tmp_path):
     )
     with pytest.raises(ConfigError, match="FAKE_MODELS"):
         prod.check_production()
-
-
-def _guard():
-    from a11y_stem.core.budget import InMemorySpendGuard
-
-    return InMemorySpendGuard(1.0)
 
 
 def test_a_missing_model_key_fails_with_its_own_code_and_message(env, monkeypatch):

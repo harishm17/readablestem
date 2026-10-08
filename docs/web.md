@@ -219,12 +219,15 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   `create_app`.
 - **Storing.** `result_json` (the `DocumentResult` without `html`), `html`, crops as
   `Blob(kind="crop")`, status `done` and an outcome code when the result is incomplete
-  (below). Only
-  if this worker still owns the job (same attempt, still running), so a job deleted or
-  requeued meanwhile is not brought back. NUL characters (they occur in text extracted
-  from PDFs, and Postgres refuses them) are removed first. If the write fails, a
-  transient error (`OperationalError`) is retried once; after that the job is failed
-  with `store_failed` instead of being left running, which would convert it again.
+  (below). Only if this worker still owns the job (same attempt, still running), so a
+  job deleted or requeued meanwhile is not brought back. NUL characters (they occur in
+  text extracted from PDFs, and Postgres refuses them) are removed first. If the write
+  fails, a transient error (`OperationalError`) is retried once; after that the job is
+  failed with `store_failed` instead of being left running, which would convert it
+  again. The static HTML checks of the output travel in `result_json` as
+  `html_checks` and are counted by `ops.aggregate` (`document check:<name>:<code>`).
+  axe-core does not run in the hosted app (there is no browser in the image); it runs in
+  CI and in the eval harness only.
 - **Failure codes** (`Job.error_code`, shown on the job page with a plain explanation):
 
   | Code | Cause |
