@@ -104,6 +104,7 @@ DOCUMENT_CACHE_SIZE = 4
 DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
 PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render the pages
 PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
+CROP_PAD = 2.0  # crop's default padding around an element box (pt)
 
 TEXT_FLAGS = (
     pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP | pymupdf.TEXT_ACCURATE_BBOXES
@@ -296,7 +297,7 @@ def crop(
     element: Element,
     *,
     dpi: int = 200,
-    pad: float = 2.0,
+    pad: float = CROP_PAD,
     max_side_px: int = 2048,
 ) -> bytes:
     """PNG of the element's region (padded), long side capped at `max_side_px`.
@@ -3017,12 +3018,28 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             ink = [c for c in chars if not c.blank]
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
-            box = _union((c.x0, c.y0, c.x1, c.y1) for c in ink)
+            box = _clear_of_punctuation(_union((c.x0, c.y0, c.x1, c.y1) for c in ink), row, end)
             row_pieces.append(_Inline(box, text, score, reasons, _dominant_size([row])))
             cursor = end
         row_pieces.append("".join(c.c for c in row.chars[cursor:]))
         _append_row(pieces, row_pieces)
     return _tidy(pieces)
+
+
+def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
+    """Pull an inline equation's right edge in so its padded crop stops short of the
+    punctuation that follows it ("d_0," in "positions d_0, d_f and ...").
+
+    The comma stays in the paragraph text after the equation's marker; if the crop shows
+    it too, the model transcribes it and the output reads "d0, ,". The edge moves left by
+    at most CROP_PAD, so a crop with the default padding still holds every glyph of the
+    equation.
+    """
+    after = next((c for c in row.chars[end:] if not c.blank), None)
+    if after is None or after.c not in ",.;:":
+        return box
+    x1 = max(min(box[2], after.x0 - CROP_PAD), box[2] - CROP_PAD, box[0] + 0.5)
+    return (box[0], box[1], x1, box[3])
 
 
 def _append_row(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) -> None:

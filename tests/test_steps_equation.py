@@ -546,3 +546,38 @@ def test_fix_codes_and_reasons_are_content_free():
     assert "private" not in (fix.reason or "")
     for call in fix.calls:
         assert "private" not in call.model_dump_json()
+
+
+# ---------------------------------------------------------------------- inline punctuation
+
+
+@pytest.mark.parametrize(
+    ("raw", "clean"),
+    [
+        ("d_0,", "d_0"),
+        ("d_0 ,", "d_0"),
+        (r"x = 5\,.", "x = 5"),
+        (r"v_0 \; ;", "v_0"),
+        ("t = 0~s:", "t = 0~s"),
+        ("a,.", "a"),
+        (r"x\,", r"x\,"),  # a thin space, not a comma
+        (r"a \\,", r"a \\"),  # a comma after a line break is a comma
+        (",", ","),  # nothing would be left
+        (r"\{1, 2, 3\}", r"\{1, 2, 3\}"),
+    ],
+)
+def test_strip_trailing_punctuation(raw, clean):
+    assert equation_step.strip_trailing_punctuation(raw) == clean
+
+
+def test_inline_transcription_drops_the_sentence_comma_the_paragraph_already_has():
+    """The smoke test rendered "d0 , ,": the comma after the marker plus the model's."""
+    client = by_model(cheap=out("d_0,", 0.97))
+    fix = run(client, equation_element(display="inline", text="d0"))
+    assert fix.equation is not None and fix.equation.latex == "d_0"
+    assert "," not in fix.equation.mathml
+
+
+def test_display_equations_keep_their_punctuation():
+    fix = run(by_model(main=out(r"\Delta t = t_\text{f} - t_0 .")), equation_element())
+    assert fix.equation is not None and fix.equation.latex.endswith(".")

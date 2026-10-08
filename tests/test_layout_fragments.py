@@ -13,6 +13,7 @@ import pymupdf
 import pytest
 
 from a11y_stem.core.types import Element, Kind
+from a11y_stem.pipeline import layout
 from a11y_stem.pipeline.layout import analyze
 
 BODY = 11.0
@@ -85,3 +86,31 @@ def test_a_run_never_starts_with_an_infix_operator_or_ends_with_one():
 
     for text in inline(analyze(one_page(fill)).elements):
         assert text[0] not in "/=+-*\u2212" and text[-1] not in "/=+-*\u2212"
+
+
+def test_an_inline_crop_stops_short_of_the_comma_that_follows_it():
+    """The comma stays in the paragraph after the marker; the crop must not show it, or
+    the model transcribes it as well ("d0 , ,")."""
+
+    def fill(page):
+        line(page, 72, 100, ("The positions ", "helv"), ("d", "heit"))
+        page.insert_text((150.2, 102), "0", fontsize=7)  # the subscript
+        line(page, 154.1, 100, (", ", "helv"), ("d", "heit"), (" and the rest.", "helv"))
+
+    pdf = one_page(fill)
+    elements = analyze(pdf).elements
+    first = next(e for e in elements if e.kind == Kind.EQUATION)
+    assert (first.text or "").replace(" ", "") == "d0"
+    with pymupdf.open(stream=pdf) as doc:
+        chars = [
+            c
+            for b in doc[0].get_text("rawdict")["blocks"]
+            for ln in b["lines"]
+            for s in ln["spans"]
+            for c in s["chars"]
+        ]
+    comma = next(c for c in chars if c["c"] == ",")
+    subscript = next(c for c in chars if c["c"] == "0")
+    right = first.bbox[2] + layout.CROP_PAD  # where the default crop ends
+    assert right <= comma["bbox"][0] + 0.01
+    assert right >= subscript["bbox"][2] - 0.01  # the subscript is still in it
