@@ -491,8 +491,11 @@ def test_figure_eval_describes_then_judges_blind(monkeypatch, tmp_path):
 
     judge_requests = [r for r in client.requests if r.step == "judge"]
     assert len(judge_requests) == 2
+    figure_images = [r.images for r in client.requests if r.step == "figure"]
     for request in judge_requests:
-        assert request.model == "gpt-6.1-sol" and request.images == []
+        # The judge sees the same figure image the figure step saw (blind to who wrote
+        # the alt text, not to the picture).
+        assert request.model == "gpt-6.1-sol" and request.images in figure_images
         text = (request.instructions + (request.context_text or "")).lower()
         for leak in ("gpt", "luna", "sol", "a11y-stem", "pipeline", "model output"):
             assert leak not in text

@@ -98,15 +98,23 @@ def judge_context(candidate: str | None, reference: str, caption: str | None) ->
 
 
 def judge_request(
-    candidate: str | None, reference: str, caption: str | None, *, settings: Settings
+    candidate: str | None,
+    reference: str,
+    caption: str | None,
+    *,
+    settings: Settings,
+    image: bytes | None = None,
 ) -> VisionRequest:
+    """The judge sees the figure when `image` is given (PNG): the first real eval run
+    showed a text-only judge marking correct details absent from the reference, and a
+    case where the reference itself was wrong, as factual errors."""
     prompt = load_prompt(JUDGE_PROMPT)
     return VisionRequest(
         step="judge",
         model=settings.main_model,
         prompt_version=prompt.version,
         instructions=prompt.text,
-        images=[],
+        images=[image] if image else [],
         context_text=judge_context(candidate, reference, caption),
         max_output_tokens=MAX_OUTPUT_TOKENS,
     )
@@ -119,9 +127,10 @@ def judge_alt(
     *,
     client: VisionClient,
     settings: Settings,
+    image: bytes | None = None,
 ) -> Judgement:
     """Grade one candidate. Raises BudgetExceeded (from the client) when spend is refused."""
-    request = judge_request(candidate, reference, caption, settings=settings)
+    request = judge_request(candidate, reference, caption, settings=settings, image=image)
     verdict, call = client.run(request, JudgeVerdict)
     return Judgement(verdict=verdict, call=call)
 

@@ -864,7 +864,12 @@ def _eval_figures(
             reference = (image.get("alt") or "").strip()
             if fix.figure is not None and reference:
                 judgement = judge_mod.judge_alt(
-                    fix.figure.alt, reference, caption, client=cfg.client, settings=cfg.settings
+                    fix.figure.alt,
+                    reference,
+                    caption,
+                    client=cfg.client,
+                    settings=cfg.settings,
+                    image=png,
                 )
         except BudgetExceeded as exc:
             return items, f"budget_{exc.scope}"
