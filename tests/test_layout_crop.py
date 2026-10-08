@@ -85,6 +85,20 @@ def test_crop_follows_page_rotation():
     assert pixmap.width > pixmap.height and dark_share(pixmap) > 0.05
 
 
+def test_drawings_on_a_rotated_page_are_found_in_display_space():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    # Unrotated drawing (100, 100)-(200, 190); /Rotate 90 shows it at x 602-692, y 100-200.
+    page.draw_rect(pymupdf.Rect(100, 100, 200, 150), color=(0, 0, 0), fill=(0, 0, 0))
+    page.draw_line((100, 152), (200, 190), color=(0, 0, 0))
+    page.set_rotation(90)
+    data = doc.tobytes()
+    (figure,) = analyze(data).elements
+    assert figure.kind == Kind.FIGURE
+    assert figure.bbox == pytest.approx((602.0, 100.0, 692.0, 200.0), abs=1.0)
+    assert dark_share(decode(crop(data, figure, dpi=72, pad=0))) > 0.4
+
+
 def test_repeated_crops_open_the_document_once(monkeypatch):
     opened = []
     real_open = layout._open

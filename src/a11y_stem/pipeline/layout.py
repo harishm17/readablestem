@@ -575,28 +575,59 @@ class _Row:
         return self.bbox[3] - self.bbox[1]
 
 
+@dataclass(frozen=True)
+class _Display:
+    """Unrotated page coordinates (what PyMuPDF extracts) -> display coordinates.
+
+    Plain arithmetic instead of pymupdf.Rect/Point: a dense plot has thousands of paths,
+    and building PyMuPDF objects for each point costs seconds per page.
+    """
+
+    a: float
+    b: float
+    c: float
+    d: float
+    e: float
+    f: float
+    rotated: bool
+
+    @classmethod
+    def of(cls, page: pymupdf.Page) -> _Display:
+        m = page.rotation_matrix
+        return cls(m.a, m.b, m.c, m.d, m.e, m.f, page.rotation % 360 != 0)
+
+    def point(self, x: float, y: float) -> tuple[float, float]:
+        if not self.rotated:
+            return x, y
+        return x * self.a + y * self.c + self.e, x * self.b + y * self.d + self.f
+
+    def vector(self, dx: float, dy: float) -> tuple[float, float]:
+        if not self.rotated:
+            return dx, dy
+        return dx * self.a + dy * self.c, dx * self.b + dy * self.d
+
+    def box(self, rect: Sequence[float]) -> BBox:
+        if not self.rotated:
+            return rect[0], rect[1], rect[2], rect[3]
+        (x0, y0), (x1, y1) = self.point(rect[0], rect[1]), self.point(rect[2], rect[3])
+        return min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)  # /Rotate is 90k degrees
+
+
 def _page_rows(page: pymupdf.Page) -> list[_Row]:
     """One row per PyMuPDF line (not yet merged), in display coordinates."""
-    matrix = page.rotation_matrix
-    rotated = page.rotation % 360 != 0
+    display = _Display.of(page)
     rows: list[_Row] = []
     for block in page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]:
         if block.get("type") != 0:
             continue
         for line in block["lines"]:
-            dx, dy = line["dir"]
-            if rotated:
-                dx, dy = dx * matrix.a + dy * matrix.c, dx * matrix.b + dy * matrix.d
+            dx, dy = display.vector(*line["dir"])
             chars: list[_Char] = []
             for span in line["spans"]:
                 size, font, flags = float(span["size"]), span["font"], int(span["flags"])
                 for ch in span["chars"]:
-                    box, origin = ch["bbox"], ch["origin"]
-                    if rotated:
-                        rect = pymupdf.Rect(box) * matrix
-                        box = (rect.x0, rect.y0, rect.x1, rect.y1)
-                        point = pymupdf.Point(origin) * matrix
-                        origin = (point.x, point.y)
+                    box = display.box(ch["bbox"])
+                    origin = display.point(*ch["origin"])
                     chars.append(
                         _Char(ch["c"], *box, baseline=origin[1], size=size, font=font, flags=flags)
                     )
@@ -1131,23 +1162,24 @@ def _visible(colour: object, opacity: object) -> bool:
 
 
 def _page_paths(page: pymupdf.Page) -> list[_Path]:
-    matrix = page.rotation_matrix
+    """Visible vector paths, classified. `get_cdrawings` (plain tuples) is several times
+    faster than `get_drawings` on plots with thousands of markers."""
+    display = _Display.of(page)
     paths: list[_Path] = []
-    for drawing in page.get_drawings():
+    for drawing in page.get_cdrawings():
         stroked = _visible(drawing.get("color"), drawing.get("stroke_opacity"))
         filled = _visible(drawing.get("fill"), drawing.get("fill_opacity"))
         if not (stroked or filled):
             continue  # white boxes and invisible paths
-        rect = pymupdf.Rect(drawing["rect"]) * matrix
-        box = (rect.x0, rect.y0, rect.x1, rect.y1)
+        box = display.box(drawing["rect"])
         items = drawing.get("items") or []
         segments = []
         curved = False
         for item in items:
             if item[0] == "l":
-                p, q = pymupdf.Point(item[1]) * matrix, pymupdf.Point(item[2]) * matrix
-                segments.append((p.x, p.y, q.x, q.y))
-                if abs(p.x - q.x) > 0.5 and abs(p.y - q.y) > 0.5:
+                (px, py), (qx, qy) = display.point(*item[1]), display.point(*item[2])
+                segments.append((px, py, qx, qy))
+                if abs(px - qx) > 0.5 and abs(py - qy) > 0.5:
                     curved = True
             elif item[0] == "c":
                 curved = True
@@ -1255,17 +1287,27 @@ def _math_neighbours(row: _Row, other: _Row) -> bool:
 @dataclass(eq=False)
 class _Figure:
     bbox: BBox
-    reasons: list[str]
+    images: int = 0  # raster images in it
+    paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
 
+    @property
+    def reasons(self) -> list[str]:
+        reasons = ["raster image"] if self.images == 1 else []
+        if self.images > 1:
+            reasons.append(f"{self.images} raster images")
+        if self.paths:
+            reasons.append(f"vector drawing ({self.paths} paths)")
+        return reasons
+
 
 def _raster_figures(page: pymupdf.Page, page_rect: pymupdf.Rect) -> list[_Figure]:
-    matrix = page.rotation_matrix
+    display = _Display.of(page)
     figures = []
     page_area = page_rect.width * page_rect.height
     for info in page.get_image_info():
-        rect = (pymupdf.Rect(info["bbox"]) * matrix) & page_rect
+        rect = pymupdf.Rect(display.box(info["bbox"])) & page_rect
         if rect.is_empty:
             continue
         w_px, h_px = int(info.get("width") or 0), int(info.get("height") or 0)
@@ -1273,7 +1315,7 @@ def _raster_figures(page: pymupdf.Page, page_rect: pymupdf.Rect) -> list[_Figure
             continue  # bullets, spacers, rules drawn as images
         if rect.width * rect.height >= FULL_PAGE_FRACTION * page_area:
             continue  # page background or a scanned page (OCR is out of scope)
-        figures.append(_Figure((rect.x0, rect.y0, rect.x1, rect.y1), ["raster image"]))
+        figures.append(_Figure((rect.x0, rect.y0, rect.x1, rect.y1), images=1))
     return figures
 
 
@@ -1305,7 +1347,7 @@ def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
 def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rect) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables."""
     figures = []
-    for group in _cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP):
+    for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
         members = [paths[i] for i in group]
         if all(p.kind in ("hrule", "vrule") for p in members):
             continue  # separators, underlines, table grids
@@ -1316,7 +1358,9 @@ def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rec
         if width >= 0.85 * page_rect.width and height >= 0.85 * page_rect.height:
             continue  # page border
         inside = [r for r in rows if _centre_inside(r.bbox, box)]
-        curved = any(p.curved for p in members)
+        # Curves that matter: a plotted line, or many markers; not one tick icon in a table.
+        curves = [p for p in members if p.curved]
+        curved = len(curves) >= 3 or any(_area(p.bbox) >= 0.05 * width * height for p in curves)
         bars = [
             p
             for p in members
@@ -1324,8 +1368,27 @@ def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rec
         ]
         if not curved and len(bars) < 2 and len(inside) >= 2:
             continue  # a box, shaded panel or table drawn around text
-        figures.append(_Figure(box, [f"vector drawing ({len(members)} paths)"]))
+        figures.append(_Figure(box, paths=len(members)))
     return figures
+
+
+def _overlapping(groups: list[list[int]], paths: list[_Path]) -> list[list[int]]:
+    """Join clusters whose boxes overlap, until none do.
+
+    Markers of a sparse scatter plot sit further apart than DRAWING_CLUSTER_GAP; without
+    this they form many small clusters, and the lonely ones are dropped as too small
+    instead of belonging to the plot they are drawn in.
+    """
+    while True:
+        boxes = [_union(paths[i].bbox for i in group) for group in groups]
+        joined = _cluster(boxes, 0.0)
+        if len(joined) == len(groups):
+            return groups
+        groups = [[i for g in group for i in groups[g]] for group in joined]
+
+
+def _area(box: BBox) -> float:
+    return max(0.0, box[2] - box[0]) * max(0.0, box[3] - box[1])
 
 
 def _centre_inside(box: BBox, outer: BBox) -> bool:
@@ -1338,8 +1401,9 @@ def _merge_figures(figures: list[_Figure]) -> list[_Figure]:
     merged = []
     for group in _cluster([f.bbox for f in figures], 2.0):
         members = [figures[i] for i in group]
-        reasons = sorted({r for f in members for r in f.reasons})
-        merged.append(_Figure(_union(f.bbox for f in members), reasons))
+        box = _union(f.bbox for f in members)
+        images, paths = sum(f.images for f in members), sum(f.paths for f in members)
+        merged.append(_Figure(box, images=images, paths=paths))
     return merged
 
 

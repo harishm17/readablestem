@@ -143,11 +143,15 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
 - **Raster images** from `page.get_image_info()`, skipped when either side is under 24 px
   or drawn under 12 pt (bullets, spacers), or when the image covers 85 % of the page or more
   (backgrounds and scanned pages).
-- **Vector figures**: drawings closer than 6 pt to each other are clustered. A cluster is a
-  figure when it is at least 24 x 24 pt, is not only horizontal/vertical rules (separators,
-  underlines, table grids), is not a page border, and is not a box or table around text
-  (axis-aligned shapes only with two or more text rows inside, unless it has bar-chart
-  bars). Equation rules are taken out first.
+- **Vector figures**: drawings closer than 6 pt to each other are clustered, then clusters
+  whose boxes overlap are joined (the markers of a sparse scatter plot are further apart
+  than 6 pt but sit inside one plot). A cluster is a figure when it is at least 24 x 24 pt,
+  is not only horizontal/vertical rules (separators, underlines, table grids), is not a
+  page border, and is not a box or table around text: a cluster without meaningful curves
+  (a plotted line covering 5 % of its area, or at least three curved paths such as
+  markers) and without bar-chart bars, with two or more text rows inside, is a box or
+  table. One tick icon in a table cell does not make the table a figure. Equation rules
+  are taken out first.
 - Overlapping figures merge (a photo with arrows drawn on it). Text inside a figure, and
   short labels (at most 25 characters) within 0.6 x font size of its edge, belong to it and
   grow its box.
@@ -188,6 +192,11 @@ and `analyze` warms the cache for the crops that follow. The cache holds user co
 
 Crops render at `dpi` on a white background; when the long side would exceed `max_side_px`,
 the zoom drops so it fits (one pixel of headroom absorbs MuPDF's rounding).
+
+Speed (this machine, 2026-10-07): a 19-page DocBook spec analyses in 0.3 s; a page with a
+4,000-marker scatter plot takes about 1 s, almost all of it in MuPDF's path extraction
+(`get_cdrawings`, which returns plain tuples; `get_drawings` and per-point PyMuPDF
+objects were three times slower). A crop takes about 0.1 s.
 
 ## Known failure modes
 

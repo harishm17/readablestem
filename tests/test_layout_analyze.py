@@ -434,6 +434,40 @@ def test_vector_drawing_is_a_figure_with_its_labels_but_rules_and_boxes_are_not(
     ]
 
 
+def test_a_dense_scatter_plot_is_one_figure():
+    def fill(page):
+        shape = page.new_shape()
+        for i in range(600):
+            shape.draw_circle((100 + (i * 37) % 300, 150 + (i * 53) % 200), 1.0)
+            shape.finish(color=(0, 0, 1), fill=(0, 0, 1))
+        shape.commit()
+        page.insert_text((100, 380), "Figure 4: Measured speeds of 600 carts.", fontsize=10)
+
+    elements = analyze(one_page(fill)).elements
+    (figure,) = elements
+    assert figure.reasons == ["vector drawing (600 paths)"]
+    assert figure.caption == "Figure 4: Measured speeds of 600 carts."
+
+
+def test_a_ruled_table_with_a_tick_icon_is_not_a_figure():
+    def fill(page):
+        for y in (100, 120, 140, 160):
+            page.draw_line((72, y), (400, y), width=0.5)
+        for x in (72, 236, 400):
+            page.draw_line((x, 100), (x, 160), width=0.5)
+        for y, (name, value) in zip(
+            (114, 134, 154), (("Mass", "2 kg"), ("Speed", "3 m/s"), ("Checked", "")), strict=True
+        ):
+            write(page, 78, y, [name])
+            if value:
+                write(page, 242, y, [value])
+        page.draw_polyline([(244, 150), (248, 155), (256, 144)], color=(0, 0.5, 0))  # tick
+
+    elements = analyze(one_page(fill)).elements
+    assert not [e for e in elements if e.kind == Kind.FIGURE]
+    assert "Checked" in " ".join(texts(elements))
+
+
 def test_caption_without_a_figure_stays_a_paragraph():
     def fill(page):
         write(page, 72, 100, ["Figure 9: Not drawn on this page."])
