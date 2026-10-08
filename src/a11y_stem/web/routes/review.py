@@ -295,7 +295,8 @@ def _place_flashes(
             top.append(Notice(message))
             continue
         changed.changed.append(message)
-        notice = Notice(message, f"{changed.label} on page {changed.page}", f"#item-{target}")
+        where = f" on page {changed.page}" if changed.page else ""  # 0: element missing
+        notice = Notice(message, changed.label + where, f"#item-{target}")
         landing = next_to_review(result, changed.element_id)
         if landing in items:
             items[landing].notices.append(notice)
