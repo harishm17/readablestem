@@ -29,7 +29,7 @@ import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
@@ -42,6 +42,7 @@ from a11y_stem.gold.openstax import USER_AGENT
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 OPENSTAX_ORIGIN = "https://openstax.org/"
+DEFAULT_CACHE = Path(".cache")  # relative to the working directory; the CLI passes paths
 # Bump when the printable layout or the equation page changes, so caches miss.
 RENDER_VERSION = "r1"
 Paper = Literal["Letter", "A4"]
@@ -654,20 +655,32 @@ def footer_template(page: PageSource) -> str:
 
 
 def render_page_pdf(
-    page: PageSource,
+    page: PageSource | Sequence[dict],
     out_path: Path | None = None,
     *,
-    images: ImageCache,
+    images: ImageCache | None = None,
     renderer: ChromiumRenderer | None = None,
     paper: Paper = "Letter",
     cache_dir: Path | None = None,
+    fetcher: Any = None,
+    authors: list[str] | None = None,
 ) -> bytes:
-    """Print `page` to PDF (headings, paragraphs, MathML, figures, captions, attribution).
+    """Print a page to PDF (headings, paragraphs, MathML, figures, captions, attribution).
 
-    Images are downloaded into `images` (once) and inlined. With `cache_dir`, the PDF is
-    cached under the SHA-256 of the printable HTML + paper size, so re-running an eval
-    does not re-print unchanged pages. Writes `out_path` when given; returns the bytes.
+    `page` is a `PageSource`, or one page's gold records, whose archive XHTML is then
+    read through `fetcher` (default: the `gold fetch` cache in .cache/openstax); pass
+    `authors` for the attribution in that case. Images are downloaded into `images`
+    (default .cache/eval/images) once and inlined. With `cache_dir`, the PDF is cached
+    under the SHA-256 of the printable HTML + paper size, so re-running an eval does not
+    re-print unchanged pages. Writes `out_path` when given; returns the bytes.
     """
+    if not isinstance(page, PageSource):
+        if fetcher is None:
+            from a11y_stem.gold.openstax import HttpFetcher
+
+            fetcher = HttpFetcher(cache_dir=DEFAULT_CACHE / "openstax")
+        page = page_source_from_records(list(page), fetcher, authors=authors)
+    images = images or ImageCache(DEFAULT_CACHE / "eval" / "images")
     page_html = printable_html(page, images.data_uri)
     footer = footer_template(page)
     cached: Path | None = None

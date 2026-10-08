@@ -230,6 +230,40 @@ def test_page_source_from_records_explains_a_missing_page():
         render.page_source_from_records([record], CacheFetcher({}))
 
 
+def test_render_page_pdf_accepts_gold_records(tmp_path):
+    record = {
+        "book_slug": "physics",
+        "book_title": "Physics",
+        "page_slug": "9-1-rolling-balls",
+        "page_title": "9.1 Rolling Balls",
+        "content_url": CONTENT_URL,
+        "source_url": "https://openstax.org/books/physics/pages/9-1-rolling-balls",
+        "license_name": "CC BY",
+        "license_url": "http://creativecommons.org/licenses/by/4.0/",
+    }
+    printed = []
+
+    class StubPrinter(render.ChromiumRenderer):
+        def pdf(self, page_html, *, paper="Letter", footer_html=""):
+            printed.append((page_html, paper, footer_html))
+            return b"%PDF-stub"
+
+    out = tmp_path / "out.pdf"
+    pdf = render.render_page_pdf(
+        [record],
+        out,
+        images=fake_images(tmp_path),
+        renderer=StubPrinter(),
+        fetcher=CacheFetcher({CONTENT_URL: {"content": PAGE_XHTML}}),
+        authors=["Ada Author"],
+        paper="A4",
+    )
+    assert pdf == out.read_bytes() == b"%PDF-stub"
+    (page_html, paper, footer) = printed[0]
+    assert paper == "A4" and "Rolling Balls" in page_html and "by Ada Author" in page_html
+    assert "Access for free at openstax.org" in footer
+
+
 def test_book_authors_read_from_gold(tmp_path):
     book = tmp_path / "openstax" / "physics"
     book.mkdir(parents=True)
