@@ -46,6 +46,7 @@ from a11y_stem.web.security import (
     SecurityHeadersMiddleware,
 )
 from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
+from a11y_stem.web.uploads import UploadGate
 from a11y_stem.web.worker import (
     ClientFactory,
     Converter,
@@ -234,6 +235,7 @@ def create_app(
         oauth=make_oauth(settings),
         min_headroom_usd=largest_reservation_usd(settings),
         tracer=_job_tracer(settings),
+        uploads=UploadGate(limit=settings.max_concurrent_uploads),
     )
 
     @asynccontextmanager

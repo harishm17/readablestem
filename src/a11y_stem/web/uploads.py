@@ -11,6 +11,13 @@ Uploads are untrusted bytes from the internet, so:
   `web.pdf_probe`): a malformed file that crashes or hangs MuPDF takes down a child, not
   the web server.
 
+- At most `MAX_CONCURRENT_UPLOADS` uploads are taken in at once, and one per user
+  (`UploadGate`). An upload is held in memory while it is read, copied once, and read
+  again by the probe child, so each costs about three times its size: with the defaults
+  (20 MB, 3 at once) that stays near 200 MB, well inside the instance's 1 GiB, however
+  many requests Cloud Run sends (concurrency 20). Over the limit the user gets a short
+  "try again in a moment" page before any of the body is read.
+
 Every rejection is an `UploadRejected` with a category `code`, safe to log.
 """
 
@@ -19,9 +26,10 @@ from __future__ import annotations
 import json
 import subprocess
 import sys
+import threading
 import unicodedata
 from collections.abc import AsyncGenerator
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
@@ -71,6 +79,38 @@ class UploadForm:
 
 def max_upload_bytes(max_upload_mb: int) -> int:
     return max_upload_mb * 1024 * 1024
+
+
+@dataclass
+class UploadGate:
+    """Bounds uploads in progress: `limit` in total and one per user (module docstring).
+
+    `enter(user_id)` returns None when admitted (call `leave(user_id)` afterwards, in a
+    `finally`), else the reason: "busy" (too many in total) or "own_upload" (this user
+    already has one in progress). Per process; each instance has its own memory.
+    """
+
+    limit: int
+    _users: set[str] = field(default_factory=set)
+    _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def enter(self, user_id: str) -> str | None:
+        with self._lock:
+            if user_id in self._users:
+                return "own_upload"
+            if len(self._users) >= self.limit:
+                return "busy"
+            self._users.add(user_id)
+            return None
+
+    def leave(self, user_id: str) -> None:
+        with self._lock:
+            self._users.discard(user_id)
+
+    @property
+    def in_progress(self) -> int:
+        with self._lock:
+            return len(self._users)
 
 
 class _InMemoryParser(MultiPartParser):

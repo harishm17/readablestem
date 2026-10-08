@@ -63,6 +63,8 @@ class Settings(BaseSettings):
     max_model_calls_per_page: int = Field(default=80, gt=0)
     max_pages_per_job: int = Field(default=30, gt=0)
     max_upload_mb: int = Field(default=20, gt=0)
+    # Uploads taken in at once per instance (one per user); see web/uploads.py.
+    max_concurrent_uploads: int = Field(default=3, gt=0)
 
     # --- storage and retention
     database_url: str = "sqlite:///.local/a11y-stem.db"

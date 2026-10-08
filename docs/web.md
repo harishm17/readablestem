@@ -54,7 +54,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per user per UTC day (`quota_days`) |
-| `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB` | Upload limits |
+| `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together) |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
@@ -122,11 +122,17 @@ else, admins included, so job ids cannot be probed and admins never see document
    fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031:
    a display equation on the main model), a friendly 503 page ("Conversions are paused
    for today"). A smaller threshold admitted uploads that could convert nothing;
-2. size: a declared `Content-Length` over the limit is refused before reading, and the
+2. uploads in progress: at most `MAX_CONCURRENT_UPLOADS` (3) per instance and one per
+   user (`uploads.UploadGate`). Each upload costs about three times its size in memory
+   while it is read, copied and probed, so this keeps uploads near 200 MB however many
+   requests Cloud Run sends at once (`--concurrency=20`, 1 GiB). Over the limit: a 503
+   (busy) or 429 (your own upload is still in progress) page with `Retry-After`, before
+   the body is read;
+3. size: a declared `Content-Length` over the limit is refused before reading, and the
    body is counted while it streams in, so an endless upload is cut off just past
    `MAX_UPLOAD_MB` (413). The file stays in memory; it never touches the server's disk;
-3. the CSRF token;
-4. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
+4. the CSRF token;
+5. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
    child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
    hang in MuPDF *while opening the file and counting pages* kills the child, not the
    server. Password-protected, unreadable or empty files and more than
@@ -137,7 +143,7 @@ else, admins included, so job ids cannot be probed and admins never see document
    (`scanned`, with advice to run OCR first) and one whose every page is blank
    (`no_content`). The child caps its own address space at 768 MB. The conversion
    itself is not isolated this way; see "Limits of the worker" below;
-5. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
+6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (429 if over).
 
 Validation errors re-show the upload page with an error summary linked to the file input.

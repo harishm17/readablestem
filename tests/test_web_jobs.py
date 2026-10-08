@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from starlette.requests import Request
 
 from a11y_stem.web.database import as_utc, utc_today
-from a11y_stem.web.db import Blob, Job, QuotaDay, SpendDay, session_scope
+from a11y_stem.web.db import Blob, Job, QuotaDay, SpendDay, User, session_scope
 from a11y_stem.web.routes.jobs import content_disposition, download_filename
 from a11y_stem.web.security import VIEW_CSP
 from a11y_stem.web.uploads import (
@@ -241,6 +241,40 @@ def test_safe_filename(raw, expected):
 
 
 # --------------------------------------------------------------------------- limits
+
+
+def test_uploads_in_progress_are_bounded_in_total_and_per_user(web):
+    """Each upload costs about three times its size in memory and nothing limited how
+    many ran at once: ten 19 MB uploads took the web process from 225 MB to 802 MB."""
+    gate = web.ctx.uploads
+    assert gate.limit == web.settings.max_concurrent_uploads
+    with session_scope(web.ctx.factory) as session:
+        alice_id = session.scalar(select(User.id).where(User.email == ALICE))
+    assert alice_id is not None
+
+    assert gate.enter(alice_id) is None  # an upload of Alice's is still in progress
+    try:
+        response = upload(web.browser, make_pdf(1))
+        assert response.status_code == 429 and response.headers["retry-after"] == "10"
+        assert "Your other upload is still in progress" in response.text
+    finally:
+        gate.leave(alice_id)
+
+    others = [f"someone-{i}" for i in range(gate.limit)]
+    for other in others:
+        assert gate.enter(other) is None
+    try:
+        response = upload(web.browser, make_pdf(1))
+        assert response.status_code == 503 and "Too many uploads right now" in response.text
+    finally:
+        for other in others:
+            gate.leave(other)
+    assert count(web, Job) == 0
+
+    assert upload(web.browser, make_pdf(1)).status_code == 303
+    assert gate.in_progress == 0  # released after a success ...
+    assert upload(web.browser, b"not a pdf").status_code == 415
+    assert gate.in_progress == 0  # ... and after a rejection
 
 
 def test_daily_page_quota_returns_429_and_changes_nothing(web):

@@ -170,6 +170,34 @@ async def create_job(request: Request, user: UserDep) -> Response:
             "after midnight UTC. Nothing was uploaded.",
             headers={"Retry-After": "3600"},
         )
+    if (refused := ctx.uploads.enter(user.id)) is not None:
+        log_event(logger, "upload_rejected", code=f"upload_{refused}")
+        raise PageError(*UPLOAD_BUSY[refused], headers={"Retry-After": "10"})
+    try:
+        return await _take_upload(request, ctx, user)
+    finally:
+        ctx.uploads.leave(user.id)
+
+
+# Status, title and message when the upload gate (web/uploads.py) turns someone away.
+UPLOAD_BUSY = {
+    "busy": (
+        503,
+        "Too many uploads right now",
+        "Several documents are being uploaded at this moment. Wait a few seconds, then "
+        "go back and upload again. Nothing was uploaded.",
+    ),
+    "own_upload": (
+        429,
+        "Your other upload is still in progress",
+        "You are already uploading a document. Wait until it has finished, then upload "
+        "the next one. Nothing was uploaded.",
+    ),
+}
+
+
+async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> Response:
+    """Read, check and store one upload (inside the upload gate)."""
     try:
         form = await read_upload_form(
             request, max_bytes=max_upload_bytes(ctx.settings.max_upload_mb)
