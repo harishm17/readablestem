@@ -169,8 +169,8 @@ MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close
 DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
 # Relations that make a maths row an equation of its own (arrows also appear in limits).
 _ROW_RELATIONS = frozenset("=<>\u2264\u2265\u2260\u2248\u2261\u221d")
-# Tall glyphs of an inline formula that TeX sets on their own baseline ($\int_0^1$).
-_TALL_GLYPHS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a()[]{}|\u2016")
+# Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$).
+_BIG_OPERATORS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a")
 _LANG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$")
 _JUNK_TITLE = re.compile(
     r"^(?:untitled|document\s*\d*$|microsoft\s+(?:word|powerpoint)|powerpoint presentation"
@@ -213,7 +213,8 @@ _MATH_WORDS = frozenset(
         *("sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh"),
         *("arcsin", "arccos", "arctan", "log", "ln", "lg", "exp", "lim", "max", "min"),
         *("sup", "inf", "det", "dim", "ker", "arg", "deg", "gcd", "lcm", "mod", "var"),
-        *("cov", "const", "sgn", "tr", "mol", "rad"),
+        *("cov", "const", "sgn", "tr", "mol", "rad", "proj", "rank", "diag", "grad", "curl"),
+        *("erf", "coth", "sech", "csch", "arsinh", "arcosh", "artanh"),
     )
 )
 _PROSE_TWO_LETTER = frozenset(
@@ -752,7 +753,7 @@ def _char_class(ch: _Char) -> str:
         return "O"
     if c in _BRACKETS:
         return "B"
-    if c.isalpha():
+    if c.isalpha() and c not in _ACCENTS:  # a TeX hat (U+02C6) is a "modifier letter"
         return "L"
     return "P"
 
@@ -1002,7 +1003,7 @@ def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> l
     rows.extend(f for f in frags if f.vertical)
     for row in rows:
         row.column = _column_of(row.bbox, gutter)
-    return _attach_scripts(rows)
+    return _attach_big_operators(_attach_scripts(rows))
 
 
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
@@ -1042,6 +1043,52 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
         if best is not None:
             host = merged.get(best, rows[best])
             merged[best] = _Row(_insert_script(host.chars, small.chars), column=host.column)
+            dropped.add(i)
+    return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
+
+
+def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
+    """Fold a short fragment led by a big operator into the line it sits in.
+
+    TeX sets the integral sign of an inline $\\int_0^1 x^2\\,dx$ (and a text-style sum or
+    root) on a baseline of its own, so it arrives as a separate row of an integral sign
+    and its upper limit in the middle of a line of text. Left there, it becomes a display
+    equation of its own and the inline equation's crop misses the sign. A fragment of at
+    most four glyphs with a big operator in it joins the row whose vertical extent holds
+    its centre and whose horizontal extent it lies within, before the first glyph to its
+    right.
+    """
+    pieces = [
+        i
+        for i, r in enumerate(rows)
+        if not r.vertical and len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)
+    ]
+    if not pieces:
+        return rows
+    piece_ids = set(pieces)
+    hosts = sorted((r.y0, i) for i, r in enumerate(rows) if i not in piece_ids and not r.vertical)
+    tops = [y for y, _ in hosts]
+    tallest = max((rows[i].height for _, i in hosts), default=0.0)
+    merged: dict[int, _Row] = {}
+    dropped: set[int] = set()
+    for i in pieces:
+        piece = rows[i]
+        centre = (piece.y0 + piece.y1) / 2
+        lo = bisect.bisect_left(tops, centre - tallest)
+        best, overlap = None, 0.0
+        for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
+            host = merged.get(j, rows[j])
+            reach = 0.5 * host.size
+            inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
+            shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
+            on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
+            if on_line and inside and shared > overlap:
+                best, overlap = j, shared
+        if best is not None:
+            host = merged.get(best, rows[best])
+            at = next((k for k, c in enumerate(host.chars) if c.x0 >= piece.x0), len(host.chars))
+            chars = [*host.chars[:at], *piece.chars, *host.chars[at:]]
+            merged[best] = _Row(chars, column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 
@@ -1279,12 +1326,21 @@ def _sparse_intervals(events: list[tuple[float, int]], allowed: int) -> list[tup
 
 
 def _line_widths(boxes: list[BBox]) -> list[float]:
-    """Widths of visual lines (boxes sharing a bottom edge are one line)."""
-    lines: dict[int, list[float]] = {}
-    for x0, _, x1, y1 in boxes:
-        span = lines.setdefault(round(y1), [x0, x1])
-        span[0], span[1] = min(span[0], x0), max(span[1], x1)
-    return [x1 - x0 for x0, x1 in lines.values()]
+    """Widths of visual lines: boxes that overlap vertically by half the smaller height
+    are one line. TeX splits a line with inline maths into pieces whose bottom edges
+    differ (subscripts, fractions); counted apart, they made a column of full lines look
+    like a column of short ones."""
+    lines: list[list[float]] = []  # [x0, y0, x1, y1] per line, top to bottom
+    for x0, y0, x1, y1 in sorted(boxes, key=lambda b: (b[1] + b[3]) / 2):
+        if lines:
+            line = lines[-1]
+            overlap = min(y1, line[3]) - max(y0, line[1])
+            if overlap >= 0.5 * min(y1 - y0, line[3] - line[1]):
+                line[0], line[2] = min(line[0], x0), max(line[2], x1)
+                line[1], line[3] = min(line[1], y0), max(line[3], y1)
+                continue
+        lines.append([x0, y0, x1, y1])
+    return [x1 - x0 for x0, _, x1, _ in lines]
 
 
 def _column_of(box: BBox, gutter: tuple[float, float] | None) -> str:
@@ -1429,13 +1485,18 @@ def _word_lengths(
     """For letters (class L), the length of the plain-letter word they belong to, and
     whether that word is a maths word (`sin`, `det`, `lim`, units such as `mol`).
 
-    Italic letters run together in a row that also has upright letters are maths
-    variables set in a text font (beamer's sans-serif maths: "at" in v = v0 + at), not a
-    word, as long as the run is short (three letters at most): each counts on its own.
+    Italic letters run together are maths variables set in a text font (beamer's
+    sans-serif maths: "at" in v = v0 + at), not a word, when the run is short (three
+    letters at most) and the row reads as maths around them: it also has upright letters
+    (prose with a formula in it), or it has a relation sign and no longer italic run (a
+    formula on its own; an italic sentence has longer words). Each letter then counts
+    on its own.
     """
     lengths = [0] * len(chars)
     maths_word = [False] * len(chars)
     upright = any(k == "L" and not c.italic for k, c in zip(classes, chars, strict=True))
+    if not upright and any(c.c in _ROW_RELATIONS for c in chars):
+        upright = _longest_italic_run(chars, classes, script) <= 3
     i = 0
     while i < len(chars):
         if classes[i] != "L":
@@ -1451,6 +1512,14 @@ def _word_lengths(
             maths_word[k] = word in _MATH_WORDS
         i = j
     return lengths, maths_word
+
+
+def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[bool]) -> int:
+    longest = run = 0
+    for c, k, small in zip(chars, classes, script, strict=True):
+        run = run + 1 if k == "L" and c.italic and not small else 0
+        longest = max(longest, run)
+    return longest
 
 
 @dataclass
@@ -1580,7 +1649,9 @@ def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
                 and chars[i - 1].c.isdigit()
                 and chars[i + 1].c.isdigit()
             )
-            if info.mathy(i) or chars[i].blank or between_digits or (c == "," and depth > 0):
+            inside = between_digits or (c == "," and depth > 0)
+            accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
+            if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
                 continue
             break
@@ -1609,7 +1680,7 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
         elif _article(chars, info, start, end, end - 2):
             end -= 1
             changed = True
-        if end > start and chars[end - 1].c in "+-*/=<>^_|~" and not info.script[end - 1]:
+        if end > start and chars[end - 1].c in _TRAILING_OPERATORS and not info.script[end - 1]:
             end -= 1
             changed = True
         if end > start and chars[start].c in _INFIX_ONLY:  # "/h)] = 40": a broken piece
@@ -1640,6 +1711,12 @@ def _unbalanced(text: str, *, closing: bool) -> bool:
     return closed > opened if closing else opened > closed
 
 
+# Spacing accents TeX sets as separate glyphs above a letter (hat, tilde, bar, dot,
+# check, breve): inside an inline formula they do not end it.
+_ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
+# Operators that cannot end an expression: a run ending in one was cut by prose
+# ("b - proj b" broken at a word the run does not take in).
+_TRAILING_OPERATORS = frozenset("+-*/=<>^_|~\u2212\u00b1\u2213\u00d7\u00f7\u22c5")
 # Operators that cannot start an expression: a run starting with one is the tail of an
 # expression cut by a line break or by prose ("(50 km)/(60 km/h)] = 40" -> "/h)] = 40").
 _INFIX_ONLY = frozenset("/*^_=<>|~\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5")
@@ -2355,6 +2432,8 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
         return False  # two numbered equations
     if line.continues or not (above.complete and line.complete):
         return True
+    if min(above.size, line.size) <= SCRIPT_RATIO * size:
+        return True  # limits under a big operator ("i = 1" under a sum) or over it
     x0, x1 = above.relation_x, line.relation_x
     return x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size
 
@@ -2566,12 +2645,14 @@ def _absorb_labels(figure: _Figure, rows: list[_Row], ctx: _Context) -> bool:
         rx0, ry0, rx1, ry1 = row.bbox
         area = max(1e-6, (rx1 - rx0) * (ry1 - ry0))
         inter = max(0.0, min(rx1, x1) - max(rx0, x0)) * max(0.0, min(ry1, y1) - max(ry0, y0))
-        short = len(row.clean) <= 25 and row.kind != "math"
+        # Display maths is not a label, but a lone variable is ("x" at the end of an axis).
+        short = len(row.clean) <= 25 and (row.kind != "math" or len(row.ink) <= 3)
         reach = 0.6 * row.size
         beside_y = min(ry1, y1) - max(ry0, y0) >= 0.5 * (ry1 - ry0)
         beside_x = min(rx1, x1) - max(rx0, x0) >= 0.5 * (rx1 - rx0)
-        near_x = beside_y and (x0 - reach <= rx1 <= x0 + 1 or x1 - 1 <= rx0 <= x1 + reach)
-        near_y = beside_x and (y0 - reach <= ry1 <= y0 + 1 or y1 - 1 <= ry0 <= y1 + reach)
+        # Within reach of an edge, or across it (a tick label half inside the box).
+        near_x = beside_y and max(rx0 - x1, x0 - rx1) <= reach
+        near_y = beside_x and max(ry0 - y1, y0 - ry1) <= reach
         if inter >= 0.6 * area:
             inside.append(row)
         elif short and (near_x or near_y):
@@ -2717,6 +2798,10 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             if run.kind == "math" and row.kind == "math" and row.region is prev.region:
                 run.add(row)  # rows of one display equation (`_contiguous_regions`)
                 continue
+            if run.kind == "text" and row.kind == "math" and _wrapped_maths(prev, row, run, ctx):
+                row.kind, row.region = "text", None  # its maths becomes inline equations
+                run.add(row)
+                continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx)
             if geometric and _same_style(prev, row, ctx):
                 run.add(row)
@@ -2729,6 +2814,19 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
         else:
             runs.append(_Run([row], row.kind, block_start=True))
     return runs
+
+
+def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
+    """Is maths row `row` the last line of the sentence above, not a display equation?
+
+    "... the system has exactly one solution," / "x = A^-1 b." A display equation is
+    centred or indented and set off by extra space; a line of the paragraph starts at its
+    left margin at the usual line pitch. A numbered or multi-line equation is never one.
+    """
+    region = row.region
+    if region is None or region.labels or len(region.rows) != 1:
+        return False
+    return abs(row.x0 - run.box[0]) <= 0.5 and _continues(prev, row, run, ctx)
 
 
 def _title_like(text: str) -> bool:

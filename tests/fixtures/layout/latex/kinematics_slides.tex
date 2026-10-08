@@ -1,0 +1,46 @@
+% Layout fixture: lecture slides (beamer class, default theme). Written for a11y-stem's
+% tests; no third-party text.
+\documentclass{beamer}
+\usepackage{amsmath}
+\usepackage{tikz}
+\setbeamertemplate{navigation symbols}{}
+
+\begin{document}
+
+\begin{frame}{Motion in One Dimension}
+  \begin{itemize}
+    \item Position $x$ is measured from a chosen origin.
+    \item Velocity is the rate of change of position:
+    \begin{itemize}
+      \item average velocity uses two times,
+      \item instantaneous velocity uses a limit.
+    \end{itemize}
+    \item Acceleration is the rate of change of velocity.
+  \end{itemize}
+\end{frame}
+
+\begin{frame}{Constant Acceleration}
+  When the acceleration $a$ is constant,
+  \begin{align*}
+    v &= v_0 + a t, \\
+    x &= x_0 + v_0 t + \tfrac{1}{2} a t^2 .
+  \end{align*}
+  Eliminating the time gives
+  \begin{equation*}
+    v^2 = v_0^2 + 2 a \left(x - x_0\right).
+  \end{equation*}
+\end{frame}
+
+\begin{frame}{Velocity Graph}
+  \begin{figure}
+    \centering
+    \begin{tikzpicture}[scale=0.9]
+      \draw[->] (0,0) -- (5,0) node[right] {$t$};
+      \draw[->] (0,0) -- (0,3) node[above] {$v$};
+      \draw[thick] (0,0.5) -- (4.5,2.6);
+    \end{tikzpicture}
+    \caption{Velocity rises linearly when the acceleration is constant.}
+  \end{figure}
+\end{frame}
+
+\end{document}

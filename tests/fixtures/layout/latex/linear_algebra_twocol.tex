@@ -1,0 +1,93 @@
+% Layout fixture: a two-column handout (article class, twocolumn, equations numbered
+% per section). Written for a11y-stem's tests; no third-party text.
+\documentclass[10pt,twocolumn]{article}
+% Computer Modern text fonts (CMR, CMBX), as pdfLaTeX writes them; XeTeX defaults to Latin Modern.
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage{amsmath,amssymb,bm}
+\usepackage[margin=0.8in]{geometry}
+\numberwithin{equation}{section}
+\pagestyle{empty}
+
+\begin{document}
+
+\section{Vectors}
+
+A vector $\mathbf{v} \in \mathbb{R}^n$ is a list of $n$ real numbers. Vectors of the
+same length are added component by component, and a vector is scaled by multiplying
+every component by the same number. The dot product of two vectors combines them into
+a single number:
+\begin{equation}
+  \mathbf{u} \cdot \mathbf{v} = \sum_{i=1}^{n} u_i v_i .
+  \label{eq:dot}
+\end{equation}
+The length of a vector is the square root of its dot product with itself, so
+$\|\mathbf{v}\| = \sqrt{\mathbf{v} \cdot \mathbf{v}}$. Two vectors are orthogonal when
+their dot product is zero. In mechanics, a rigid body turning with angular velocity
+$\bm{\omega}$ moves a point at position $\mathbf{r}$ with velocity
+\begin{equation}
+  \mathbf{v} = \bm{\omega} \times \mathbf{r}.
+  \label{eq:cross}
+\end{equation}
+
+\section{Matrices}
+
+A matrix with $m$ rows and $n$ columns maps vectors of $\mathbb{R}^n$ to vectors of
+$\mathbb{R}^m$. For a two by two matrix the determinant is easy to compute:
+\begin{equation}
+  A = \begin{pmatrix} 1 & 2 \\ 3 & 4 \end{pmatrix},
+  \qquad \det A = -2 .
+  \label{eq:matrix}
+\end{equation}
+A linear system collects several equations into one matrix equation $A\mathbf{x} =
+\mathbf{b}$. For example,
+\begin{equation}
+  \begin{bmatrix} 2 & 1 \\ 1 & 3 \end{bmatrix}
+  \begin{bmatrix} x_1 \\ x_2 \end{bmatrix}
+  =
+  \begin{bmatrix} 3 \\ 5 \end{bmatrix}.
+  \label{eq:system}
+\end{equation}
+When $\det A \neq 0$ the system has exactly one solution, $\mathbf{x} = A^{-1}\mathbf{b}$.
+
+\section{Eigenvalues}
+
+A number $\lambda$ is an eigenvalue of $A$ when $A\mathbf{x} = \lambda \mathbf{x}$ for
+some nonzero vector $\mathbf{x}$. To find the eigenvalues:
+\begin{enumerate}
+  \item[(i)] form the matrix $A - \lambda I$;
+  \item[(ii)] solve $\det(A - \lambda I) = 0$ for $\lambda$;
+  \item[(iii)] for each root, solve $(A - \lambda I)\mathbf{x} = \mathbf{0}$.
+\end{enumerate}
+For the matrix in Equation~\eqref{eq:matrix} the characteristic polynomial is
+\begin{equation}
+  \lambda^2 - 5\lambda - 2 = 0 ,
+  \label{eq:charpoly}
+\end{equation}
+whose roots are $\lambda = \frac{5 \pm \sqrt{33}}{2}$. The sum of the eigenvalues is the
+trace of the matrix and their product is its determinant, which gives a quick check of
+the arithmetic. Symmetric matrices have real eigenvalues and orthogonal eigenvectors,
+a fact used again and again in the rest of the course. They also make the next topic,
+projecting a vector onto a line, much easier to compute by hand.
+
+\section{Projections}
+
+The projection of a vector $\mathbf{b}$ onto the line through a nonzero vector
+$\mathbf{a}$ is the multiple of $\mathbf{a}$ closest to $\mathbf{b}$:
+\begin{equation}
+  \operatorname{proj}_{\mathbf{a}} \mathbf{b}
+    = \frac{\mathbf{a} \cdot \mathbf{b}}{\mathbf{a} \cdot \mathbf{a}} \, \mathbf{a} .
+  \label{eq:projection}
+\end{equation}
+The error $\mathbf{b} - \operatorname{proj}_{\mathbf{a}} \mathbf{b}$ is orthogonal to
+$\mathbf{a}$. Three facts follow:
+\begin{itemize}
+  \item projecting twice gives the same vector as projecting once;
+  \item the length of a projection is never more than the length of $\mathbf{b}$;
+  \item the projection of $\mathbf{a}$ itself is $\mathbf{a}$.
+\end{itemize}
+Least squares fits use the same idea with a whole subspace in place of the line, and
+the normal equations $A^{\mathsf{T}} A \hat{\mathbf{x}} = A^{\mathsf{T}} \mathbf{b}$
+give the best approximate solution of a system with no exact one.
+
+\end{document}
