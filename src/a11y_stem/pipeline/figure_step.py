@@ -34,6 +34,18 @@ A decorative answer that contradicts itself (a chart, diagram or table image; a 
 with a caption; or a non-empty alt) fails the warning check
 `figure.decorative_consistency` (code `decorative_conflict`), so it is never ACCEPTED on
 confidence alone.
+
+Second automated check (`second_check`, ADR 0005): once a figure is ACCEPTED with alt
+text, the job's verifier (the Decisions API, `models.verifier`) is asked whether the alt
+text matches the image. When min(P(ok), 1 - P(factual error)) is below
+settings.decisions_figure_flag_below, the warning check `figure.second_check` fails with
+code `second_check_mismatch`, a note: the figure stays ACCEPTED and becomes review
+"optional" ("A second automated check found a possible mismatch between the alt text and
+the image"). It never makes a figure required and never changes its status or
+confidence. If the check is off, has no answer (an error, a timeout, a refusal, no
+budget left) or the figure is not an accepted description, the fix is exactly what it
+would be without it; the answer, or why there is none, is recorded on
+`Fix.verifications` either way.
 """
 
 from __future__ import annotations
@@ -48,6 +60,7 @@ from a11y_stem.core.types import Check, Element, FigureFix, FigureType, Fix, Kin
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
+from a11y_stem.models.verifier import figure_score, verifier_of
 from a11y_stem.pipeline.validate import check_alt, clean_alt, has_errors
 
 PROMPT_NAME = "figure"
@@ -60,8 +73,10 @@ MAX_OUTPUT_TOKENS = 1024
 # Figure types that carry information by definition; "decorative" contradicts them.
 INFORMATIVE_FIGURE_TYPES = frozenset({"chart", "diagram", "table_image"})
 # Failed warning checks that do not change what the description says: the fix is still
-# ACCEPTED (review "optional"). A caption copy is not one: it describes nothing.
-NOTE_CODES = frozenset({"too_long", "redundant_prefix"})
+# ACCEPTED (review "optional"). A caption copy is not one: it describes nothing. The
+# second automated check's flag is one by policy: an optional tier only, never required
+# in this version (its thresholds are not calibrated on human labels yet).
+NOTE_CODES = frozenset({"too_long", "redundant_prefix", "second_check_mismatch"})
 
 
 class FigureOutput(BaseModel):
@@ -223,6 +238,49 @@ def _fix(
     return make(Status.NEEDS_REVIEW, proposal=True)
 
 
+def second_check(
+    fix: Fix, element: Element, png: bytes, *, client: VisionClient, settings: Settings
+) -> Fix:
+    """Ask the job's verifier about an accepted alt text (see the module docstring).
+
+    Only an ACCEPTED, non-decorative figure with alt text is checked: anything else
+    already needs a decision or has nothing to compare. Returns the fix with the answer
+    recorded and, when it flags, a failed `figure.second_check` note and review
+    "optional". Never raises (the verifier fails open).
+    """
+    verifier = verifier_of(client)
+    figure = fix.figure
+    if (
+        verifier is None
+        or not settings.decisions_figure_verify
+        or fix.status is not Status.ACCEPTED
+        or figure is None
+        or figure.decorative
+        or not figure.alt
+    ):
+        return fix
+    verdict = verifier.figure_alt(png, alt=figure.alt, caption=element.caption)
+    score = figure_score(verdict.probabilities) if verdict.answered else None
+    flagged = None if score is None else score < settings.decisions_figure_flag_below
+    update: dict[str, Any] = {
+        "verifications": [
+            *fix.verifications,
+            verdict.record(stage="final", mode="note", flagged=flagged),
+        ]
+    }
+    if flagged is not None:
+        check = Check(
+            name="figure.second_check",
+            passed=not flagged,
+            severity="warning",
+            code="second_check_mismatch" if flagged else None,
+        )
+        update["checks"] = [*fix.checks, check]
+        if flagged:
+            update["review"] = "optional"
+    return fix.model_copy(update=update)
+
+
 def describe(
     element: Element,
     png: bytes,
@@ -261,4 +319,5 @@ def describe(
         escalated = attempt(settings.main_model, escalation=True)
         calls += escalated.calls
         candidate = _prefer(escalated, candidate)
-    return _fix(element, candidate, calls, settings)
+    fix = _fix(element, candidate, calls, settings)
+    return second_check(fix, element, png, client=client, settings=settings)
