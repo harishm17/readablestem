@@ -63,6 +63,7 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
 | `pipeline/validate.py` | `check_latex`, `safe_latex_to_mathml`, `check_mathml`, `check_alt` | WP3 |
 | `pipeline/speech.py` | `mathml_to_speech(mathml) -> str` | WP3 |
 | `pipeline/equation_step.py` | `transcribe(element, png, *, client, settings, context_text) -> Fix` | WP3 |
+| `pipeline/signs.py` | `compare_signs(text_layer, mathml) -> SignComparison \| None` | sign check |
 | `pipeline/figure_step.py` | `describe(element, png, *, client, settings, context_text) -> Fix` | WP3 |
 | `pipeline/assemble.py` | `render_html(*, title, lang, elements, fixes, crops, source_note) -> str` | WP4 |
 | `pipeline/html_checks.py` | `static_checks(html)`, `axe_checks(html)` | WP4 |
@@ -84,9 +85,9 @@ decision.
 
 | Tier (`Fix.review`) | Status | What it means | Examples |
 |---|---|---|---|
-| `required` ("Needs your decision") | NEEDS_REVIEW, FAILED or ABSTAINED | blocks "done", counted on the job page and in ops | failed or abstained conversions (kept as images); equations below the auto-accept confidence after escalation; a text-layer symbol mismatch (any letter, digit or Greek letter that differs); a vector read as a scalar (a letter that is bold in the PDF and a plain variable in the proposal, at base level or in the script of a plain base such as `e^{i𝐤·𝐫}`, or a letter known to be plain made a bold variable); a double-struck, script or fraktur letter the text layer encodes (`ℝ`) read as a plain one; figures without a usable description (abstained, failed, an error-level alt check, a caption copy, a doubtful or self-contradicting decorative answer, low confidence); one decision per group of repeated headings |
-| `optional` ("Optional checks") | ACCEPTED | accepted automatically, listed folded on the review screen with each note in plain English; never blocks "done"; still editable | cosmetic style differences (the bold label of a bold symbol such as `𝐝𝐟`, a bold digit, a style the text layer cannot show such as double-struck R from MSBM, a letter of unknown weight made bold; on a cheap-model answer these still escalate to the main model); a single heading with weak evidence or a repaired level; alt text a little long or starting "image of"; no speech text |
-| `none` | ACCEPTED | nothing to note | |
+| `required` ("Needs your decision") | NEEDS_REVIEW, FAILED or ABSTAINED | blocks "done", counted on the job page and in ops | failed or abstained conversions (kept as images); equations below the auto-accept confidence after escalation; a text-layer symbol mismatch (any letter, digit or Greek letter that differs); a sign or relation that differs from the text layer (a minus dropped or added as in `e^{-λt}` read as `e^{λt}`, `±` read as `+`, `≤` read as `<`, `=` read as `≈`, a dot product read as a cross product; since pipeline 0.3.0); a vector read as a scalar (a letter that is bold in the PDF and a plain variable in the proposal, at base level or in the script of a plain base such as `e^{i𝐤·𝐫}`, or a letter known to be plain made a bold variable); a double-struck, script or fraktur letter the text layer encodes (`ℝ`) read as a plain one; figures without a usable description (abstained, failed, an error-level alt check, a caption copy, a doubtful or self-contradicting decorative answer, low confidence); one decision per group of repeated headings |
+| `optional` ("Optional checks") | ACCEPTED | accepted automatically, listed folded on the review screen with each note in plain English; never blocks "done"; still editable | cosmetic style differences (the bold label of a bold symbol such as `𝐝𝐟`, a bold digit, the lone zero vector `𝟎` too, a style the text layer cannot show such as double-struck R from MSBM, a letter of unknown weight made bold; on a cheap-model answer these still escalate to the main model); a single heading with weak evidence or a repaired level, the bold run-in labels ("Solution", "Discussion") included; alt text a little long or starting "image of"; no speech text |
+| `none` | ACCEPTED | nothing to note | multiplication style (`×`, `·` or juxtaposition for scalars) and division style (`/`, `÷`, a fraction bar) are not compared at all |
 
 - **Data model.** `Fix.review: Literal["required", "optional", "none"]`. Results stored
   before tiers existed load with the tier their status implies (`default_review`:
@@ -111,9 +112,19 @@ decision.
   example) are not headings in OpenStax's outline, but no structural rule separated them
   from real box headings on independent evidence (docs/layout.md "Run-in labels"), so
   they are not guessed at: alone they are optional notes, repeated they are a group.
+- **Signs and relations** (decided by Harish 2026-10-08, pipeline 0.3.0): a sign or
+  operator difference is meaning-level, so required (`equation.text_layer_signs`, code
+  `sign_mismatch`; confidence scaled like a meaning-level style difference, so a cheap
+  answer escalates first). Multiplication style is cosmetic and not even a note, except
+  a dot product read as a cross product (bold vectors on both sides of the sign). The
+  check only asks when the text layer's letters and digits mostly agree with the
+  transcription, and ambiguous glyphs (hyphens in words, ranges, accents, unnamed
+  glyphs) can never raise it on their own (docs/steps.md "Sign and relation check").
+  Results and eval reports from pipeline 0.2.0 were made under the old policy.
 
 Where it lives: `pipeline/equation_step.py` (`text_layer_symbols_differ`,
-`text_layer_style`, `NOTE_CODES`), `pipeline/heading_step.py` (`group_repeated`),
+`text_layer_style`, `NOTE_CODES`), `pipeline/signs.py` (`compare_signs`),
+`pipeline/heading_step.py` (`group_repeated`),
 `pipeline/figure_step.py` (`NOTE_CODES`), `pipeline/layout.py`
 (`Element.regular_letters`), `core/triage.py`, `web/review.py`, `web/routes/review.py`,
 `web/views.py`, `ops/aggregate.py`, `ops/report.py`, `eval/pipeline_eval.py`.

@@ -2,7 +2,7 @@
 
 How the two model-backed steps turn a crop into a fix, and the deterministic checks that
 decide whether a fix is trusted. Code: `src/a11y_stem/pipeline/{equation_step,
-figure_step, validate, speech}.py`; prompts: `src/a11y_stem/models/prompts/{equation,
+figure_step, validate, speech, signs}.py`; prompts: `src/a11y_stem/models/prompts/{equation,
 figure}.md`; tests: `tests/test_steps_*.py`.
 
 The steps assist a reviewer. They never treat model output as correct on its own: every
@@ -62,7 +62,7 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
 No escalation happens when the cheap call produced no output at all (the router already
@@ -158,8 +158,9 @@ accepted with nothing to review. Measured on 181 real model answers with a text 
 sample equations, the document eval's 3 sections, and two runs each of OpenStax 2.1
 and the LaTeX handout), the strict rule finds no difference once accents are dropped
 (the only one was the handout's `\hat{\mathbf{x}}`, a U+02C6 accent), so it adds about
-no decisions. Not covered: signs and operators (a dropped minus), and case (`N` read as
-`n`), because the bags are case-folded.
+no decisions. Signs and relations are not symbols here; they have their own check ("Sign
+and relation check" below). Not covered: case (`N` read as `n`), because the bags are
+case-folded.
 
 ## Letter-style check (equations)
 
@@ -171,7 +172,8 @@ returns `None` (the text layer says nothing about style), `"match"`, `"meaning"`
 `"cosmetic"`:
 
 - **Meaning-level** (check `equation.text_layer_style`, code `style_mismatch`; confidence
-  scaled by 0.6, so a cheap answer escalates, and the fix needs a decision):
+  scaled by 0.6, `MEANING_MISMATCH_FACTOR`, once even when a sign differs as well, so a
+  cheap answer escalates, and the fix needs a decision):
   - a variable whose weight changed. A variable is a one-letter token that is not the
     label of a bold symbol: anywhere at base level, and in the sub/superscripts and
     limits of a base that is not bold (the `𝐤` and `𝐫` of `e^{i𝐤·𝐫}`, the `𝐱` of
@@ -204,6 +206,101 @@ meaning-level. A review of the triage added the vectors in the scripts of a plai
 and the encoded double-struck, script and fraktur letters (both were cosmetic for a day;
 neither changes a verdict on the 181 recorded real answers). `tests/test_style_check.py`
 pins each.
+
+## Sign and relation check (equations)
+
+The symbol check compares letters, digits and Greek letters, so before pipeline 0.3.0 a
+dropped or flipped sign was accepted with nothing to review (`e^{-λt}` read as
+`e^{λt}`, `a = -9.8` read as `a = 9.8`, `x ≤ 1` read as `x < 1`). Harish's decision
+(2026-10-08): sign and operator differences are meaning-level and need a decision.
+`signs.compare_signs(text_layer, mathml)` compares the sign and relation tokens of the
+text layer with those of the MathML, as multisets per class (order is not compared):
+
+| Class | Glyphs folded into it |
+|---|---|
+| minus | U+2212, ⁻ ₋ ➖; ASCII `-`, the hyphens U+2010 and U+2011, the en dash, the small and fullwidth hyphen-minus when they act as a minus (below) |
+| plus, plus-minus, minus-plus | `+` (and its super/subscript, small, fullwidth and heavy forms); `±`; `∓` |
+| relations | `=` (and its forms, plus ≐ ≔ ≜ ≝ ... which TeX may print as a mark over `=`), `≠` (TeX's negation slash over `=` composes to it), `<`, `>`, `≤ ⩽ ≦`, `≥ ⩾ ≧`, `≪`, `≫`, `≮ ≯ ≰ ≱`, `≈`, `≉`, `∼` and ASCII `~`, `≁`, `≃`, `≅`, `≡`, `≢`, `∝` |
+| arrows | `→ ⟶ ↦ ⟼`, `← ⟵ ↤`, `↔ ⟷`, `⇒ ⟹`, `⇐ ⟸`, `⇔ ⟺`; TeX's long arrows printed as a minus or `=` joined to a short arrow (`−→`, `=⇒`, `⇐⇒`) and ASCII digraphs in typed text (`->`, `=>`, `<=>`; `>=` and `<=` are `≥`, `≤`) count as one arrow or relation. The gold set uses `→` only, as a vector accent |
+| products | `×` `⨯` and `·` `⋅` `∙`: compared only for a dot product read as a cross product (below) |
+
+**Certain or uncertain.** Each side counts each class as an interval [certain, certain +
+uncertain], and a class differs only when the two intervals do not meet. A sign the PDF
+certainly has and the transcription lacks is always caught; an ambiguous glyph only
+widens an interval, so it can never make a flag on its own.
+
+- Text layer: a hyphen or en dash directly between two letters or digits
+  (`time-dependent`, `1–3`, TeX's `1--3`) may be a word hyphen or a range, so it is
+  uncertain; anywhere else it is a minus (`a = -9.8` typed as plain text, Word's
+  ` – ` with spaces). Figure dash, em dash and horizontal bar are uncertain (Chromium
+  prints `\overline` as U+2015). A glyph the PDF cannot name (private use, U+FFFD: old
+  Symbol and MT Extra fonts put operators there, CMEX brace pieces come out there too)
+  may be any sign: it raises every upper bound by one.
+- MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain, including a
+  minus inside `<mn>` and an ASCII hyphen in `<mo>` (latex2mathml writes `±`, `⩽`,
+  `⟹` and, for `\sim`, an ASCII `~` as `<mi>`). An accent (the `<mo>` script of `<mover>`/`<munder>`:
+  `\vec`'s arrow, `\tilde`'s `~`) is uncertain: Chromium prints it as a standalone `→`,
+  TeX as a combining accent or not at all. In `<mtext>` a hyphen between letters or
+  digits is skipped (`\text{time-dependent}`); any other sign there is uncertain.
+
+**Left out, and why.**
+
+- Multiplication style is ignored, not even an optional note: `×`, `·` and
+  juxtaposition are the same multiplication for numbers and scalars, the text layer
+  cannot show juxtaposition at all, and units in text mode (`\text{N·m}`) put a dot on
+  one side only, so notes would be noise and would buy main-model calls for nothing.
+  The exception is a vector product: when the text layer shows a `×` or `·` with a bold
+  letter on both sides (skipping spaces and brackets), a `×` that became a `·` (or the
+  reverse) is meaning-level (`𝐯 = 𝛚 × 𝐫` read as `\mathbf{v} = \boldsymbol{\omega}
+  \cdot \mathbf{r}`). A dropped sign between vectors is not flagged: it may be a scalar
+  times a vector. An ASCII letter `x` is never a times sign (it is a letter, so the
+  symbol check sees it).
+- Division: `/`, `÷` and a fraction bar are the same operation, and fraction bars are
+  drawn lines that never appear as text, so `a/b` and `\frac{a}{b}` cannot be compared.
+- Brackets, bars and fences (out of scope), primes, accents other than arrows,
+  invisible operators (U+2061-U+2064, never printed), set relations (`∈`, `⊂`) and
+  every other operator.
+
+**When it runs.** Only when the symbol check ran (the text layer has at least one
+letter or digit) and found no strong mismatch: a text layer whose letters disagree with
+the transcription (garbled, or another equation) is no evidence for its signs either.
+And only when the text layer shows at least one compared token (a lone variable, or a
+font whose operators all came out unnamed, says nothing). Then the check
+`equation.text_layer_signs` (severity warning) passes or fails with code
+`sign_mismatch`.
+
+**Verdict.** A failure is meaning-level: the fix needs a decision (review `required`),
+the confidence is scaled by 0.6 (`MEANING_MISMATCH_FACTOR`, applied once when a style
+mismatch is there too, so a 0.95 answer stays a 0.57 proposal instead of falling below
+the abstain bar), and a cheap-model answer escalates to the main model first. If the
+main model reads the signs right, its answer is accepted.
+
+**Measured (2026-10-08).** Replayed on every recorded real answer with a text layer: 636
+answers, 134 distinct (text layer, MathML) pairs, from the equations task (runs 1-3,
+the final run and the three triage runs), the document task (three triage runs and a
+partial one, with layout re-run on the page PDFs to confirm today's `Element.text`),
+both converts (OpenStax 2.1, the LaTeX handout) and the committed demo. The check ran on
+88 pairs (the other 46 have no sign in the text layer) and fired on none: no new
+required decision on real outputs. On the same 88 real text layers, every synthetic sign
+error was caught: a dropped minus 45/45, minus to plus 45/45, `=` to `<`, `≤` or `≈`
+146/146 each, `+` to `±` and a dropped `+` 9/9 each; `×` to `·` was flagged 2/13, the
+two vector products (the handout's `𝛚 × 𝐫`), not scientific notation. Tests:
+`tests/test_sign_check.py` (synthetic flips and non-flips, the LaTeX fixtures' CMSY
+minus signs, the Chromium fixtures, and a course page printed by Chromium, `browser`).
+
+**Vector arrows.** Chromium prints a `\vec` arrow as a standalone `→`, which counts as
+an arrow in the text layer, while the transcription's accent arrow is uncertain. So an
+arrow the transcription drops (a vector read as a scalar, like a lost bold) fails the
+check, and so does an arrow vector written in bold instead (`\mathbf{s}` for `→𝑠`):
+the prompt asks for `\vec` for arrows, so a person confirms the notation. The one arrow
+vector in the recorded answers (gold 2.2 eq-008) was written `\vec{s}`. TeX prints the
+accent as a combining arrow, which is not a token.
+
+**Limits.** Counts, not positions: a minus moved to another term (`x_f - x_0` read as
+`x_0 - x_f`, or `e^{-x}y` read as `e^{x}(-y)`) keeps every count. An ASCII hyphen
+between two letters is ambiguous, so in a text layer that writes a minus that way
+(plain typed maths, `x-y`) a dropped minus is missed. Signs inside `\text{}` only
+widen ranges.
 
 ## Validators and codes
 
@@ -348,6 +445,8 @@ never reaches the instructions, and that the equation's text layer is never sent
 | `tests/test_steps_validate.py` | every code of every validator; the allowlist-vs-converter tests (no allowed command converts with leftovers, every command whose argument is copied verbatim is treated as text mode); alignment rewriting; `\text{}` injection and a fuzz test showing `safe_latex_to_mathml` output is always allowlisted; defusedxml refusing DTDs and entity bombs; deep and oversize input; gold MathML and OpenStax alt text as real-data sanity checks |
 | `tests/test_steps_speech.py` | all 30 gold equations produce speech; targeted rules |
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
+| `tests/test_style_check.py` | the letter-style check: meaning-level and cosmetic cases, layout's bold and regular letters |
+| `tests/test_sign_check.py` | the sign and relation check: flips and drops that must flag, hyphens, ranges, product style, accents and long arrows that must not; tiers, escalation and the single confidence factor; the LaTeX fixtures' CMSY signs and the Chromium fixtures; a course page printed by Chromium (`browser`); a result stored by pipeline 0.2.0 still loads |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
 | `tests/test_steps_live.py` | `live_model`: a gold equation rendered from MathML in Chromium and a generated bar chart, through the real API |
 | `tests/test_steps_support.py` | helpers, including `fallback_router`, a stand-in for WP1's router used until it merges |
@@ -365,6 +464,9 @@ decorative rules were added; the prompt versions have changed since.
 ## Known limits
 
 - The cross-check needs a text layer; scanned PDFs get no cross-check.
+- The sign check compares counts, not positions: a minus moved to another term keeps
+  every count, and a minus typed as an ASCII hyphen between two letters is ambiguous
+  ("Sign and relation check").
 - Speech is a reviewer aid, not a screen reader: it does not do function application
   ("f open parenthesis x close parenthesis"), and it reads `\cdot` as "times".
 - The command allowlist is curated; a legitimate command outside it (for example
