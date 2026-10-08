@@ -123,13 +123,16 @@ Conventions for every task:
   run one after another). It excludes rendering and local processing. The document task
   is different: its item is one OpenStax *section* printed to a PDF of 13-16 pages, and
   its latency is `DocumentStats.latency_ms`, the wall-clock time of converting that whole
-  PDF. (The report's `latency_ms.basis` string still says "sum of model-call latencies"
-  for every task; that string lives in `eval/pipeline_eval.py`.)
-- **Cost per page.** For the document task `per_item_usd` is per *section*, not per PDF
-  page: the first real run cost $0.161 for 3 sections of 16, 14 and 13 PDF pages, which
-  is $0.054 per section but **$0.0037 per PDF page**. Quote the per-PDF-page figure for
-  anything about running cost. In production, `ops report` gives cost per converted page
-  from the aggregates.
+  PDF. The report's `latency_ms.basis` says which one applies.
+- **Cost per page.** For the document task `per_item_usd` is per *section*
+  (`per_item_unit` is `section`), not per PDF page, so the report also gives
+  `cost.pdf_pages` (the PDF pages converted, from `DocumentStats.pages`; a section the
+  layout could not read adds none) and `cost.per_pdf_page_usd`. The first real run cost
+  $0.161 for 3 sections of 16, 14 and 13 PDF pages: $0.054 per section but **$0.0037
+  per PDF page**. Quote the per-PDF-page figure for anything about running cost; it is
+  the one `ops report` gives in production (cost per converted page from the
+  aggregates). The gate's `document_cost` still compares `per_item_usd`, which is fine
+  for runs over the same sections.
 
 ### equations
 

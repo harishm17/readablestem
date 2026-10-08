@@ -729,3 +729,58 @@ def test_a_page_the_layout_cannot_read_scores_as_found_nothing(monkeypatch, tmp_
     m = report["metrics"]
     assert report["n"] == 2 and m["page_errors"] == {"too_many_pages": 2}
     assert (m["detection_recall"], m["predicted_equations"]) == (0.0, 0)
+
+
+def test_document_cost_is_reported_per_pdf_page_as_well_as_per_section(monkeypatch, tmp_path):
+    """A document item is one OpenStax section printed to a PDF of many pages. The first
+    real run cost $0.161 for sections of 16, 14 and 13 PDF pages: $0.054 per section but
+    $0.0037 per PDF page, and only the second compares with production cost per page."""
+    from a11y_stem.core.types import ModelCall
+
+    gold = write_gold(
+        tmp_path,
+        [equation("p-1", 0, EQ_V, "block"), equation("p-2", 0, EQ_V, "block"),
+         equation("p-3", 0, EQ_V, "block")],
+    )  # fmt: skip
+    pages = {b"p-1": 16, b"p-2": 14}
+
+    def convert_pdf(pdf_bytes, *, settings, client, concurrency=4, **_):
+        name = pdf_bytes.rsplit(b" ", 1)[-1]
+        if name not in pages:
+            raise layout.LayoutError("unreadable", "cannot open")  # scores, costs nothing
+        fix = eq_fix("p1-e0", "v")
+        fix.calls = [ModelCall(step="equation", model="m", prompt_version="v", cost_usd=0.03)]
+        result = DocumentResult(
+            pipeline_version=run.PIPELINE_VERSION,
+            elements=[Element(id="p1-e0", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1),
+                              order=0, display="block")],
+            fixes=[fix],
+            stats=DocumentStats(pages=pages[name], cost_usd=0.03, latency_ms=2000,
+                                model_calls=1),
+            html="<html></html>",
+        )  # fmt: skip
+        return ConversionOutput(result=result)
+
+    monkeypatch.setattr(run, "convert_pdf", convert_pdf)
+    monkeypatch.setattr(html_checks, "static_checks", lambda html: [])
+    monkeypatch.setattr(html_checks, "axe_checks", lambda html: [])
+    run_ = pe.run_pipeline_eval(config(gold, "document", FakeVisionClient()))
+    cost = run_.report["cost"]
+    assert [i["pdf_pages"] for i in run_.items] == [16, 14, 0]
+    assert cost["per_item_unit"] == "section"
+    assert cost["per_item_usd"] == pytest.approx(0.06 / 3)
+    assert (cost["pdf_pages"], cost["per_pdf_page_usd"]) == (30, pytest.approx(0.06 / 30))
+    assert run_.report["latency_ms"]["basis"].startswith("wall-clock conversion")
+    text = pe.format_markdown(run_.report)
+    assert "$0.02000 per section (pipeline), $0.00200 per PDF page (30 pages)" in text
+    assert "(wall-clock conversion of each section's PDF" in text
+
+
+def test_other_tasks_keep_their_cost_unit_and_latency_basis(monkeypatch, equation_gold):
+    monkeypatch.setattr(equation_step, "transcribe", fake_transcribe)
+    report = pe.run_pipeline_eval(config(equation_gold, "equations", equation_client())).report
+    assert report["cost"]["per_item_unit"] == "equation"
+    assert "per_pdf_page_usd" not in report["cost"]
+    assert (
+        report["latency_ms"]["basis"] == "sum of model-call latencies per item (excludes rendering)"
+    )
