@@ -1,7 +1,7 @@
 [project]
 name = "a11y-stem"
 version = "0.1.0"
-description = "Assists with making STEM course materials accessible (MathML equations, figure alt text, table headers). Skeleton."
+description = "Assists with making STEM course materials accessible: PDF in, HTML with MathML equations, figure alt text and headings out."
 license = "MIT"
 license-files = ["LICENSE"]
 authors = [
@@ -9,9 +9,28 @@ authors = [
 ]
 requires-python = ">=3.12"
 dependencies = [
+    "alembic>=1.20.0",
+    "authlib>=1.8.0",
+    "defusedxml>=0.7.1",
+    "fastapi>=0.142.4",
+    "httpx>=0.28.1",
+    "itsdangerous>=2.2.0",
+    "jinja2>=3.1.6",
     "latex2mathml>=3.81.1",
+    "openai>=3.26.0",
+    "psycopg[binary]>=3.3.6",
+    "pydantic>=2.13.5",
+    "pydantic-settings>=2.15.0",
     "pymupdf>=1.28.2",
+    "python-multipart>=0.0.32",
+    "sqlalchemy>=2.1.4",
+    "structlog>=26.1.0",
+    "uvicorn[standard]>=0.54.0",
 ]
+
+[project.optional-dependencies]
+# Langfuse tracing (off by default; inputs are masked when on).
+tracing = ["langfuse>=4.17.0"]
 
 [project.scripts]
 a11y-stem = "a11y_stem.cli.main:main"
@@ -24,6 +43,14 @@ build-backend = "uv_build"
 dev = [
     "pytest>=9.1.1",
     "ruff>=0.16.10",
+    "ty>=0.0.85",
+    # Embedded Postgres for local tests (no wheels for 3.13+; CI uses a service container).
+    "pgserver>=0.1.4; python_version < '3.13'",
+]
+# Headless Chromium: axe-core checks on generated HTML, and rendering gold equations to
+# images for the end-to-end eval. Install browsers with: uv run playwright install chromium
+browser = [
+    "playwright>=1.63.0",
 ]
 
 [tool.ruff]
@@ -47,7 +74,10 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -m 'not network'"
+addopts = "-ra -m 'not network and not live_model and not browser'"
 markers = [
     "network: hits the live OpenStax API (run with: uv run pytest -m network)",
+    "live_model: calls the real OpenAI API and costs money (run with: uv run pytest -m live_model)",
+    "browser: needs Playwright Chromium (run with: uv run pytest -m browser)",
+    "postgres: needs a Postgres server (DATABASE_URL or embedded pgserver)",
 ]

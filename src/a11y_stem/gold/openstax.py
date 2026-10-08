@@ -205,7 +205,7 @@ def resolve_book(slug: str, fetcher: Fetcher) -> Book:
     uuid = item.get("cnx_id")
     release = fetcher.get_json(RELEASE_URL)
     entry = release.get("books", {}).get(uuid) if uuid else None
-    if not entry:
+    if not entry or not uuid:
         raise BookNotFoundError(f"{slug!r} (uuid {uuid}) is not in the current archive release.")
     archive_path = release["archiveUrl"]
     version = entry["defaultVersion"]

@@ -27,3 +27,6 @@ private-inputs/
 .idea/
 .vscode/
 .DS_Store
+
+# Local databases and scratch output
+.local/

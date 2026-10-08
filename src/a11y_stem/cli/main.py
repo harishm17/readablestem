@@ -15,6 +15,7 @@ import sys
 from pathlib import Path
 
 from a11y_stem import __version__
+from a11y_stem.cli import convert, eval_cli, ops, serve
 
 GOLD_DIR = Path("data/gold")
 CACHE_DIR = Path(".cache/openstax")
@@ -264,12 +265,17 @@ def build_parser() -> argparse.ArgumentParser:
     eq.add_argument("--display", choices=["all", "block", "inline"], default="all")
     eq.add_argument("--report", type=Path, help="write per-item scores as JSON")
     eq.set_defaults(func=_cmd_eval_equations)
+    eval_cli.register(evaluate, top=sub)
 
     parse = sub.add_parser("parse", help="PDF -> elements (stub, no model calls)")
     parse.add_argument("pdf", type=Path)
     parse.add_argument("--pages", help="1-based page numbers, comma separated")
     parse.add_argument("--json", action="store_true")
     parse.set_defaults(func=_cmd_parse)
+
+    convert.register(sub)
+    serve.register(sub)
+    ops.register(sub)
     return parser
 
 
