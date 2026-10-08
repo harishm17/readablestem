@@ -95,7 +95,8 @@ def allow(
         }
         return render(request, "admin.html", context, status_code=422)
     with session_scope(get_ctx(request).factory) as session:
-        set_allowed(session, normalised, allowed=True, admin=admin == "on")
+        # Unticked keeps the person's current role: re-adding an admin must not demote them.
+        set_allowed(session, normalised, allowed=True, admin=True if admin == "on" else None)
     log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
     flash(request, "The allowlist was updated.")
     return RedirectResponse("/admin", status_code=303)

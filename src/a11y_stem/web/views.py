@@ -98,7 +98,7 @@ class JobView:
     @property
     def version(self) -> str:
         """Changes whenever the status partial would look different (htmx polling)."""
-        return f"{self.status}-{self.pages_done}"
+        return f"{self.status}-{self.pages_done}-{self.queue_ahead}"
 
     @property
     def status_label(self) -> str:

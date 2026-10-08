@@ -285,6 +285,16 @@ def test_unknown_action_or_element(web):
     assert post(web, "bad id!", action="accept").status_code == 404
 
 
+def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+    response = post(web, "p1-e3", action="accept\nSECRET-DOC-TEXT fake log line")
+    assert response.status_code == 422
+    assert "review_invalid" in caplog.text and "action=unknown" in caplog.text
+    assert "SECRET" not in caplog.text
+
+
 def test_a_failed_rerender_changes_nothing(web):
     before = result(web)
     web.pipeline.render_raises = RuntimeError("SECRET-DOC-TEXT assembler bug")

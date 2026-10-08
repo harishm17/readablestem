@@ -106,12 +106,22 @@ def _error_page(request: Request, status: int, title: str, message: str) -> Resp
 
 def _on_page_error(request: Request, exc: Exception) -> Response:
     assert isinstance(exc, PageError)
+    if _is_htmx(request):  # e.g. the job was deleted in another tab: reload to show why
+        return Response(status_code=exc.status_code, headers={"HX-Refresh": "true"})
     context: dict[str, Any] = {"title": exc.title, "message": exc.message, "job_id": None}
     context |= {"status": exc.status_code} | exc.context
     return render(request, exc.template, context, status_code=exc.status_code, headers=exc.headers)
 
 
+def _is_htmx(request: Request) -> bool:
+    return request.headers.get("HX-Request") == "true"
+
+
 def _on_login_required(request: Request, exc: Exception) -> Response:
+    if _is_htmx(request):
+        # A background poll after the session ended: the browser's XHR would follow a 303
+        # and swap the sign-in page into the status box. Send the whole page there.
+        return Response(status_code=401, headers={"HX-Redirect": "/login"})
     if request.method in {"GET", "HEAD"}:
         return RedirectResponse("/login", status_code=303)
     return _error_page(request, 401, *ERROR_TEXT[401])

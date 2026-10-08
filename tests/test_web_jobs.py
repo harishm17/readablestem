@@ -286,7 +286,7 @@ def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
 def test_job_page_polls_with_htmx_and_falls_back_to_meta_refresh_while_running(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
     page = web.browser.get(f"/jobs/{job_id}").text
-    assert f'hx-get="/jobs/{job_id}/status?v=queued-0"' in page
+    assert f'hx-get="/jobs/{job_id}/status?v=queued-0-0"' in page
     assert '<noscript><meta http-equiv="refresh" content="5"></noscript>' in page
     assert f'<a href="/jobs/{job_id}">refresh the status</a>' in page
     assert "next in line" in page
@@ -299,13 +299,15 @@ def test_job_page_polls_with_htmx_and_falls_back_to_meta_refresh_while_running(w
 
 def test_status_fragment_is_204_until_something_changes(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    assert web.browser.get(f"/jobs/{job_id}/status?v=queued-0").status_code == 204
+    assert web.browser.get(f"/jobs/{job_id}/status?v=queued-0-0").status_code == 204
     fragment = web.browser.get(f"/jobs/{job_id}/status?v=stale")
     assert fragment.status_code == 200 and 'id="job-status"' in fragment.text
     assert "<html" not in fragment.text  # a fragment, not a page
 
     web.run_worker()
-    finished = web.browser.get(f"/jobs/{job_id}/status?v=queued-0", headers={"HX-Request": "true"})
+    finished = web.browser.get(
+        f"/jobs/{job_id}/status?v=queued-0-0", headers={"HX-Request": "true"}
+    )
     assert finished.status_code == 200
     assert finished.headers["hx-refresh"] == "true"  # reload to show the results
 
@@ -315,6 +317,26 @@ def test_queue_position_is_shown(web):
     second = job_id_from(upload(web.browser, make_pdf(1)))
     assert "next in line" in web.browser.get(f"/jobs/{first}").text
     assert "1 document ahead of yours" in web.browser.get(f"/jobs/{second}").text
+    # The polled fragment notices when the queue moves, not only when the status changes.
+    assert web.browser.get(f"/jobs/{second}/status?v=queued-0-1").status_code == 204
+    assert web.worker().claim() is not None  # the first job starts
+    moved = web.browser.get(f"/jobs/{second}/status?v=queued-0-1")
+    assert moved.status_code == 200 and "next in line" in moved.text
+
+
+def test_status_poll_after_the_session_ends_sends_the_page_to_sign_in(web):
+    job_id = job_id_from(upload(web.browser, make_pdf(1)))
+    web.browser.cookies.clear()
+    response = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
+    assert response.status_code == 401
+    assert response.headers["hx-redirect"] == "/login"  # not a sign-in page swapped in
+
+
+def test_status_poll_for_a_deleted_job_reloads_the_page(web):
+    job_id = job_id_from(upload(web.browser, make_pdf(1)))
+    web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    response = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
+    assert response.status_code == 404 and response.headers["hx-refresh"] == "true"
 
 
 def test_failed_job_explains_why(web):

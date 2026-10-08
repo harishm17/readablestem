@@ -223,7 +223,9 @@ def review_action(
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewInvalid as exc:
-        log_event(logger, "review_invalid", job_id=job_id, action=action)
+        # `action` is free text from the form: only known values reach the log.
+        logged_action = action if action in STATUS_FOR_ACTION else "unknown"
+        log_event(logger, "review_invalid", job_id=job_id, action=logged_action)
         return _page(request, job_id, user, invalid=(element_id, exc), status_code=422)
     log_event(
         logger,

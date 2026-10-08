@@ -163,6 +163,19 @@ def test_admin_can_allow_and_remove_people_but_not_themselves(web):
     assert "You cannot remove yourself" in web.browser.get("/admin").text
 
 
+def test_re_adding_someone_without_the_admin_box_keeps_their_role(web):
+    login(web.browser, ADMIN)
+    csrf = token(web.browser, "/admin")
+    web.browser.post("/admin/allowlist", data={"csrf_token": csrf, "email": ADMIN})
+    web.browser.post("/admin/allowlist", data={"csrf_token": csrf, "email": ALICE})
+    with session_scope(web.ctx.factory) as session:
+        me = session.scalar(select(User).where(User.email == ADMIN))
+        alice = session.scalar(select(User).where(User.email == ALICE))
+        assert me is not None and me.is_admin  # not demoted
+        assert alice is not None and alice.is_allowed and not alice.is_admin
+    assert web.browser.get("/admin").status_code == 200
+
+
 def test_admin_allow_validates_the_email(web):
     login(web.browser, ADMIN)
     response = web.browser.post(
