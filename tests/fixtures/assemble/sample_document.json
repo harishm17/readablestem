@@ -1,0 +1,316 @@
+{
+  "_note": "Sample input for tests/test_assemble_*.py. Text written for the tests; MathML generated with latex2mathml.",
+  "title": "Speed and Velocity",
+  "lang": "en",
+  "elements": [
+    {
+      "id": "p1-e0",
+      "kind": "heading",
+      "page": 0,
+      "bbox": [
+        72.0,
+        60.0,
+        400.0,
+        82.0
+      ],
+      "order": 0,
+      "text": "2.2 Speed and Velocity",
+      "font_size": 18.0,
+      "bold": true
+    },
+    {
+      "id": "p1-e1",
+      "kind": "paragraph",
+      "page": 0,
+      "bbox": [
+        72.0,
+        90.0,
+        540.0,
+        140.0
+      ],
+      "order": 1,
+      "text": "Average speed is distance over time, ⟦p1-e2⟧, where ⟦p1-e3⟧ is the distance travelled.",
+      "font_size": 11.0
+    },
+    {
+      "id": "p1-e2",
+      "kind": "equation",
+      "page": 0,
+      "bbox": [
+        300.0,
+        92.0,
+        340.0,
+        104.0
+      ],
+      "order": 2,
+      "score": 0.8,
+      "reasons": [
+        "relation symbol"
+      ],
+      "display": "inline",
+      "parent_id": "p1-e1"
+    },
+    {
+      "id": "p1-e3",
+      "kind": "equation",
+      "page": 0,
+      "bbox": [
+        100.0,
+        106.0,
+        112.0,
+        118.0
+      ],
+      "order": 3,
+      "score": 0.6,
+      "reasons": [
+        "math font"
+      ],
+      "display": "inline",
+      "parent_id": "p1-e1"
+    },
+    {
+      "id": "p1-e4",
+      "kind": "equation",
+      "page": 0,
+      "bbox": [
+        220.0,
+        150.0,
+        380.0,
+        190.0
+      ],
+      "order": 4,
+      "score": 0.9,
+      "display": "block"
+    },
+    {
+      "id": "p1-e5",
+      "kind": "equation",
+      "page": 0,
+      "bbox": [
+        220.0,
+        200.0,
+        380.0,
+        240.0
+      ],
+      "order": 5,
+      "score": 0.9,
+      "display": "block"
+    },
+    {
+      "id": "p1-e6",
+      "kind": "figure",
+      "page": 0,
+      "bbox": [
+        72.0,
+        250.0,
+        400.0,
+        450.0
+      ],
+      "order": 6,
+      "caption": "Figure 2.5 Position against time for a cart moving at constant velocity."
+    },
+    {
+      "id": "p1-e7",
+      "kind": "figure",
+      "page": 0,
+      "bbox": [
+        72.0,
+        470.0,
+        400.0,
+        650.0
+      ],
+      "order": 7,
+      "caption": "Figure 2.6 A cart on a ramp with two marked positions."
+    },
+    {
+      "id": "p2-e0",
+      "kind": "heading",
+      "page": 1,
+      "bbox": [
+        72.0,
+        60.0,
+        400.0,
+        80.0
+      ],
+      "order": 8,
+      "text": "Instantaneous velocity",
+      "font_size": 14.0,
+      "bold": true
+    },
+    {
+      "id": "p2-e1",
+      "kind": "paragraph",
+      "page": 1,
+      "bbox": [
+        72.0,
+        90.0,
+        540.0,
+        130.0
+      ],
+      "order": 9,
+      "text": "Shown in the lab handout as <script>alert('x')</script> & \"quoted\" text.",
+      "font_size": 11.0
+    },
+    {
+      "id": "p2-e2",
+      "kind": "equation",
+      "page": 1,
+      "bbox": [
+        220.0,
+        140.0,
+        380.0,
+        180.0
+      ],
+      "order": 10,
+      "score": 0.7,
+      "display": "block"
+    },
+    {
+      "id": "p2-e3",
+      "kind": "heading",
+      "page": 1,
+      "bbox": [
+        72.0,
+        190.0,
+        400.0,
+        205.0
+      ],
+      "order": 11,
+      "text": "NOTE TO STUDENTS",
+      "font_size": 11.0,
+      "bold": true
+    },
+    {
+      "id": "p2-e4",
+      "kind": "figure",
+      "page": 1,
+      "bbox": [
+        500.0,
+        20.0,
+        540.0,
+        40.0
+      ],
+      "order": 12
+    },
+    {
+      "id": "p2-e5",
+      "kind": "paragraph",
+      "page": 1,
+      "bbox": [
+        72.0,
+        210.0,
+        540.0,
+        250.0
+      ],
+      "order": 13,
+      "text": "The slope of a position-time graph is the velocity."
+    }
+  ],
+  "fixes": [
+    {
+      "element_id": "p1-e0",
+      "kind": "heading",
+      "status": "accepted",
+      "confidence": 0.95,
+      "heading": {
+        "level": 1,
+        "text": "2.2 Speed and Velocity"
+      }
+    },
+    {
+      "element_id": "p1-e2",
+      "kind": "equation",
+      "status": "accepted",
+      "confidence": 0.97,
+      "equation": {
+        "latex": "v = \\frac{d}{t}",
+        "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>v</mi><mo>&#x0003D;</mo><mfrac><mrow><mi>d</mi></mrow><mrow><mi>t</mi></mrow></mfrac></mrow></math>",
+        "speech": "v equals d over t",
+        "display": "inline"
+      }
+    },
+    {
+      "element_id": "p1-e3",
+      "kind": "equation",
+      "status": "abstained",
+      "confidence": 0.2,
+      "reason": "low_confidence"
+    },
+    {
+      "element_id": "p1-e4",
+      "kind": "equation",
+      "status": "accepted",
+      "confidence": 0.93,
+      "equation": {
+        "latex": "\\bar{v} = \\frac{\\Delta x}{\\Delta t}",
+        "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mover><mrow><mi>v</mi></mrow><mo stretchy=\"true\">&#x000AF;</mo></mover><mo>&#x0003D;</mo><mfrac><mrow><mi>&#x00394;</mi><mi>x</mi></mrow><mrow><mi>&#x00394;</mi><mi>t</mi></mrow></mfrac></mrow></math>",
+        "speech": "v bar equals delta x over delta t"
+      }
+    },
+    {
+      "element_id": "p1-e5",
+      "kind": "equation",
+      "status": "failed",
+      "reason": "budget_job_usd"
+    },
+    {
+      "element_id": "p1-e6",
+      "kind": "figure",
+      "status": "accepted",
+      "confidence": 0.9,
+      "figure": {
+        "figure_type": "chart",
+        "alt": "Line graph of position against time: a straight line rising from the origin."
+      }
+    },
+    {
+      "element_id": "p1-e7",
+      "kind": "figure",
+      "status": "abstained",
+      "confidence": 0.3,
+      "reason": "low_confidence"
+    },
+    {
+      "element_id": "p2-e0",
+      "kind": "heading",
+      "status": "needs_review",
+      "confidence": 0.6,
+      "heading": {
+        "level": 2,
+        "text": "Instantaneous velocity"
+      }
+    },
+    {
+      "element_id": "p2-e2",
+      "kind": "equation",
+      "status": "rejected",
+      "confidence": 0.88,
+      "equation": {
+        "latex": "v = x",
+        "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>v</mi><mo>&#x0003D;</mo><mi>x</mi></mrow></math>",
+        "speech": "v equals x"
+      }
+    },
+    {
+      "element_id": "p2-e3",
+      "kind": "heading",
+      "status": "rejected",
+      "confidence": 0.5,
+      "heading": {
+        "level": 3,
+        "text": "NOTE TO STUDENTS"
+      }
+    },
+    {
+      "element_id": "p2-e4",
+      "kind": "figure",
+      "status": "accepted",
+      "confidence": 0.9,
+      "figure": {
+        "figure_type": "other",
+        "alt": "",
+        "decorative": true
+      }
+    }
+  ]
+}
