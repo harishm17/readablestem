@@ -13,7 +13,8 @@ your alt text, and then reads the caption separately.
   image), `other`.
 - `decorative`: true only when the image adds no information to the lesson: a border,
   ornament, background texture, or a logo or stock image unrelated to the content. Most
-  figures in course material are not decorative.
+  figures in course material are not decorative, and charts, diagrams, tables and
+  captioned figures never are.
 - `alt`: the alt text, following the rules below. An empty string when `decorative` is
   true.
 - `confidence`: your probability, from 0 to 1, that the alt text is accurate and gives a

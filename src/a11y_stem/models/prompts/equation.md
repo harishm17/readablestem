@@ -26,21 +26,25 @@ image says.
 3. Bold symbols (vectors) use `\mathbf{...}`, for example `\mathbf{v}`. A symbol with an
    arrow over it uses `\vec{...}`.
 4. Words, labels and units use `\text{...}`: `v_\text{avg}`, `5.2\ \text{m/s}`. Put
-   `\ ` (backslash space) between a number and its unit.
-5. Several lines aligned on a relation sign: use `\begin{array}{rcl} ... \end{array}`,
+   `\ ` (backslash space) between a number and its unit. Inside `\text{...}` write only
+   words, numbers and units; keep `<`, `>` and `&` outside it, as math:
+   `\text{if } x < 5`.
+5. Write a percent sign as `\%`, for example `25\%` or `\text{25\% yield}`. A bare `%`
+   starts a comment and hides the rest of the line.
+6. Several lines aligned on a relation sign: use `\begin{array}{rcl} ... \end{array}`,
    one row per line, rows separated by `\\`. Left-hand side in the first column, the
    relation (`=`, `<`, `\approx`) in the second, right-hand side in the third; leave the
    first cell empty on continuation lines: `& = & 47\ \text{km/h}`. Do not use
    `aligned`, `align`, `split` or `gathered`.
-6. Use braces for any subscript or superscript longer than one character: `x_{10}`,
+7. Use braces for any subscript or superscript longer than one character: `x_{10}`,
    `e^{-kt}`. Fractions are `\frac{...}{...}`, roots `\sqrt{...}` or `\sqrt[3]{...}`.
-7. Use standard commands only: Greek letters (`\alpha`, `\Delta`), operators and
+8. Use standard commands only: Greek letters (`\alpha`, `\Delta`), operators and
    relations (`\times`, `\cdot`, `\pm`, `\leq`, `\neq`, `\approx`, `\propto`,
    `\rightarrow`), functions (`\sin`, `\log`, `\ln`), `\sum`, `\int`, `\lim`, accents
    (`\hat`, `\bar`, `\dot`), `\left( ... \right)`, and the `array`, `pmatrix`,
    `bmatrix` and `cases` environments. Never use `\def`, `\newcommand`, `\href`,
    `\url`, `\color`, `\label`, `\tag` or package-specific commands.
-8. Keep punctuation that is part of the image, such as a final period or comma.
+9. Keep punctuation that is part of the image, such as a final period or comma.
 
 ## Confidence
 

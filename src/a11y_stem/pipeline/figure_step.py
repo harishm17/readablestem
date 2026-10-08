@@ -6,9 +6,11 @@ visible "needs a description" flag in the output.
 
 Routing: figures go to the main model. Tiny figures (no side longer than one inch on the
 page: icons, bullets, small logos) start on the cheap model with a low-detail image and
-escalate to the main model when the result would not be accepted (confidence below
-settings.auto_accept_confidence or an error-level alt-text check). Every call goes
-through `models.router.call_with_fallback`.
+escalate to the main model when the result would not be accepted (confidence below the
+accept bar, an error-level alt-text check, or a self-contradicting decorative answer).
+The first attempt goes through `models.router.call_with_fallback`; the escalation is one
+main-model call with no fallback (the fallback would resend the cheap request that has
+already been answered), and if it fails the cheap answer stands.
 
 The model sees the caption and nearby text only as `context_text`, which the client
 fences as untrusted data; the instructions are the constant prompt.
@@ -24,6 +26,10 @@ Status rules, in order:
    users entirely;
 5. otherwise NEEDS_REVIEW.
 Decorative figures get `FigureFix(alt="", decorative=True)` whatever alt the model wrote.
+A decorative answer that contradicts itself (a chart, diagram or table image; a figure
+with a caption; or a non-empty alt) fails the warning check
+`figure.decorative_consistency` (code `decorative_conflict`), so it is never ACCEPTED on
+confidence alone.
 """
 
 from __future__ import annotations
@@ -46,6 +52,8 @@ PROMPT_VERSION = load_prompt(PROMPT_NAME).version
 TINY_FIGURE_MAX_SIDE_PT = 72.0  # one inch on the page
 DECORATIVE_ACCEPT_CONFIDENCE = 0.95
 MAX_OUTPUT_TOKENS = 1024
+# Figure types that carry information by definition; "decorative" contradicts them.
+INFORMATIVE_FIGURE_TYPES = frozenset({"chart", "diagram", "table_image"})
 
 
 class FigureOutput(BaseModel):
@@ -69,6 +77,15 @@ def _call(
     """One routed call (model, then its fallback). Looked up on the module at call time
     so tests can substitute the router."""
     return router.call_with_fallback(client, request, schema, settings=settings)
+
+
+def _call_once(
+    client: VisionClient, request: VisionRequest, schema: type[T]
+) -> tuple[T | None, list[ModelCall]]:
+    """One call to request.model with no fallback (the escalation). The client still
+    reserves spend first and raises BudgetExceeded when refused."""
+    parsed, call = client.run(request, schema)
+    return parsed, [call]
 
 
 def is_tiny(element: Element) -> bool:
@@ -104,13 +121,33 @@ class _Candidate:
         return self.output is not None and not has_errors(self.checks)
 
 
+def _decorative_conflict(output: FigureOutput, element: Element) -> bool:
+    """A decorative answer that its own fields (or the page) contradict."""
+    return (
+        output.figure_type in INFORMATIVE_FIGURE_TYPES
+        or bool((element.caption or "").strip())
+        or bool(output.alt.strip())
+    )
+
+
 def _evaluate(output: FigureOutput | None, calls: list[ModelCall], element: Element) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
     if output.decorative:
-        return _Candidate(output, calls, "", check_alt("", decorative=True))
+        conflict = _decorative_conflict(output, element)
+        consistency = Check(
+            name="figure.decorative_consistency",
+            passed=not conflict,
+            severity="warning",
+            code="decorative_conflict" if conflict else None,
+        )
+        return _Candidate(output, calls, "", [*check_alt("", decorative=True), consistency])
     alt = " ".join(output.alt.split())
     return _Candidate(output, calls, alt, check_alt(alt, decorative=False, caption=element.caption))
+
+
+def _conflicted(candidate: _Candidate) -> bool:
+    return any(c.code == "decorative_conflict" for c in candidate.checks)
 
 
 def _accept_bar(output: FigureOutput, settings: Settings) -> float:
@@ -125,7 +162,11 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
         return False  # the router already tried the other model as the fallback
     if candidate.calls and candidate.calls[-1].model == settings.main_model:
         return False
-    return output.confidence < _accept_bar(output, settings) or not candidate.usable
+    return (
+        output.confidence < _accept_bar(output, settings)
+        or not candidate.usable
+        or _conflicted(candidate)
+    )
 
 
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
@@ -184,7 +225,7 @@ def describe(
     tiny = is_tiny(element)
     context = figure_context(element, context_text)
 
-    def attempt(model: str) -> _Candidate:
+    def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
             step="figure",
             model=model,
@@ -195,14 +236,17 @@ def describe(
             max_output_tokens=MAX_OUTPUT_TOKENS,
             image_detail="low" if tiny else "high",
         )
-        output, calls = _call(client, request, FigureOutput, settings)
+        if escalation:
+            output, calls = _call_once(client, request, FigureOutput)
+        else:
+            output, calls = _call(client, request, FigureOutput, settings)
         return _evaluate(output, calls, element)
 
     first_model = settings.cheap_model if tiny else settings.main_model
     candidate = attempt(first_model)
     calls = list(candidate.calls)
     if first_model != settings.main_model and _needs_escalation(candidate, settings):
-        escalated = attempt(settings.main_model)
+        escalated = attempt(settings.main_model, escalation=True)
         calls += escalated.calls
         candidate = _prefer(escalated, candidate)
     return _fix(element, candidate, calls, settings)

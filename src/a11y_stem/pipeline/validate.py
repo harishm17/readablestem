@@ -11,27 +11,36 @@ LaTeX (`check_latex`)
     allowlist before conversion. latex2mathml never runs TeX, but it does turn some
     commands into attributes (`\href` -> `href`, `\style` -> `style`, `\class` ->
     `class`), silently drops unknown environments, and copies unknown commands into the
-    output as literal text. Codes: `empty`, `too_long`, `unbalanced_braces`,
-    `unbalanced_env`, `math_delimiter`, `forbidden_command`, `unknown_command`,
-    `unknown_environment`.
+    output as literal text. It also drops everything after a bare `%` (a TeX comment),
+    takes the next token as the width of `\hspace` when there are no braces, and copies
+    the argument of `\text`-like commands into its XML output unescaped, so `<`, `>` or
+    `&` there become markup. Codes: `empty`, `too_long`, `unbalanced_braces`,
+    `unbalanced_env`, `math_delimiter`, `comment`, `forbidden_command`,
+    `unknown_command`, `unknown_environment`, `bad_argument`, `markup_in_text`.
 
 Conversion (`safe_latex_to_mathml`)
     latex2mathml 3.81.1 renders `aligned` and `gathered` as one flat row with literal
     `&` tokens, and `align`/`split` with the relation glued into the second cell. These
     environments are rewritten to `\begin{array}{rl...}` (right/left alternating
-    columns, as many as the widest row needs) before conversion. The result is parsed
-    and re-serialised, so the string handed on is always well-formed and namespaced.
+    columns, as many as the widest row needs) before conversion. The result is parsed,
+    escaped specials in text (`\%`, `\_`, `\#`, `\$`) are unescaped, and the tree is
+    re-serialised only if every element and attribute is on the MathML allowlist, so
+    the string handed on is always well-formed, namespaced and safe to insert, even for
+    a caller that skips `check_latex` and `check_mathml`.
 
 MathML (`check_mathml`)
     Parsed with defusedxml (no DTDs, no entity expansion). Only presentation elements
-    and layout attributes are allowed: no `href`, event handlers, `style`, `class` or
-    colours. Size and depth are capped, fixed-arity elements must have the right number
-    of children, and LaTeX leftovers (`\foo` copied into a token) are flagged.
+    and layout attributes are allowed: no `href`, event handlers, `style`, `class`,
+    colours or speech overrides (`intent`, `arg`). Token elements hold text only, and
+    `math` appears only at the root. Size and depth are capped, fixed-arity elements
+    must have the right number of children, and LaTeX leftovers (`\foo` or `\%` copied
+    into a token) are flagged.
 
 Alt text (`check_alt`)
     Rules from common alt-text guidance: short, not "image of ...", not a file name,
-    URL or markup, not a placeholder word, and not a copy of the caption (which is read
-    separately).
+    URL or markup, not a placeholder ("N/A", "An image", "Unreadable image" or only
+    symbols), and not a copy of the caption (which is read separately). Invisible
+    format characters are ignored when judging the text.
 """
 
 from __future__ import annotations
@@ -45,6 +54,7 @@ from typing import Literal
 import defusedxml
 import defusedxml.ElementTree as DET
 from latex2mathml.converter import convert as _latex2mathml_convert
+from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 
 from a11y_stem.core.types import Check
 
@@ -53,6 +63,10 @@ MATHML_NS = "http://www.w3.org/1998/Math/MathML"
 
 class LatexConversionError(ValueError):
     """latex2mathml could not convert the input. The message never contains the LaTeX."""
+
+
+class UnsafeMathMLError(ValueError):
+    """A MathML tree has content outside the allowlist. The message is a category code."""
 
 
 def _check(name: str, code: str | None, severity: Literal["error", "warning"] = "error") -> Check:
@@ -166,6 +180,20 @@ ALLOWED_ENVIRONMENTS = _words(
 # Environments latex2mathml renders badly; rewritten to `array` before conversion.
 ALIGNMENT_ENVIRONMENTS = frozenset({"aligned", "align", "align*", "split", "gathered"})
 
+# Commands whose argument latex2mathml copies verbatim into an <mtext> (its tokenizer
+# takes `\text{...}` up to the first `}` as raw text, and its serialiser then unescapes
+# `&lt;`, `&gt;` and `&amp;` across the whole output). `<`, `>` or `&` in that argument
+# would become markup, so check_latex refuses them (`markup_in_text`).
+TEXT_MODE_COMMANDS = _words("text textrm textbf textit textsf texttt textnormal textup mbox")
+_TEXT_ARGUMENT = re.compile(r"\s*\{([^}]*)\}")
+_TEXT_MARKUP = frozenset("<>&")
+
+# latex2mathml takes the next token as `\hspace`'s width, so `x \hspace y` silently
+# swallows the `y`. Only a braced, non-negative dimension is allowed.
+_HSPACE_ARGUMENT = re.compile(
+    r"\s*\{\s*\d+(?:\.\d+)?\s*(?:em|ex|pt|mm|cm|in|pc|bp|dd|cc|sp|mu)\s*\}"
+)
+
 _ENV_NAME = re.compile(r"\s*\{\s*([A-Za-z]+\*?)\s*\}")
 
 
@@ -173,7 +201,8 @@ def _tokens(latex: str) -> Iterator[tuple[str, str, int]]:
     """Yield (kind, value, end) for the characters that matter to the checks.
 
     kind is "word" (\\name), "symbol" (\\ + one character), "open"/"close" (unescaped
-    braces), "amp" (&) or "dollar" ($). Everything else is skipped.
+    braces), "amp" (&), "dollar" ($) or "percent" (an unescaped %, which starts a TeX
+    comment). Everything else is skipped.
     """
     i, n = 0, len(latex)
     while i < n:
@@ -194,10 +223,29 @@ def _tokens(latex: str) -> Iterator[tuple[str, str, int]]:
                 yield "symbol", "", n  # a lone trailing backslash
                 i = n
             continue
-        kind = {"{": "open", "}": "close", "&": "amp", "$": "dollar"}.get(ch)
+        kind = {"{": "open", "}": "close", "&": "amp", "$": "dollar", "%": "percent"}.get(ch)
         if kind:
             yield kind, ch, i + 1
         i += 1
+
+
+def escape_percent_signs(latex: str) -> str:
+    r"""Turn every unescaped `%` into `\%`.
+
+    In a one-equation transcription a bare `%` is always a percent sign, never a
+    comment, but latex2mathml (like TeX) drops everything after it on the line. Used by
+    the equation step on model output; `check_latex` still rejects a bare `%` from any
+    other caller (code `comment`).
+    """
+    cuts = [end - 1 for kind, _, end in _tokens(latex) if kind == "percent"]
+    if not cuts:
+        return latex
+    parts, pos = [], 0
+    for cut in cuts:
+        parts += [latex[pos:cut], "\\%"]
+        pos = cut + 1
+    parts.append(latex[pos:])
+    return "".join(parts)
 
 
 def _environment_name(latex: str, end: int) -> str | None:
@@ -206,8 +254,19 @@ def _environment_name(latex: str, end: int) -> str | None:
     return match.group(1) if match else None
 
 
+def _text_argument(latex: str, end: int) -> str:
+    """What latex2mathml copies verbatim for a text command ending at `end`: the braced
+    argument up to the first `}`, or else the next non-space character."""
+    match = _TEXT_ARGUMENT.match(latex, end)
+    if match:
+        return match.group(1)
+    rest = latex[end:].lstrip()
+    return rest[:1]
+
+
 def check_latex(latex: str) -> list[Check]:
-    """Allowed commands only, balanced braces/environments, no file or shell commands."""
+    """Allowed commands only, balanced braces/environments, no file or shell commands,
+    no comments, and nothing in a text argument that would become markup."""
     if not latex.strip():
         return [_check("latex.not_empty", "empty")]
     checks = [
@@ -218,7 +277,7 @@ def check_latex(latex: str) -> list[Check]:
     braces_ok = True
     env_stack: list[str] = []
     env_code: str | None = None
-    forbidden = unknown = unknown_env = dollar = False
+    forbidden = unknown = unknown_env = dollar = comment = bad_argument = markup = False
     for kind, value, end in _tokens(latex):
         if kind == "open":
             depth += 1
@@ -227,6 +286,8 @@ def check_latex(latex: str) -> list[Check]:
             braces_ok = braces_ok and depth >= 0
         elif kind == "dollar":
             dollar = True
+        elif kind == "percent":
+            comment = True
         elif kind == "symbol":
             unknown = unknown or value not in ALLOWED_CONTROL_SYMBOLS
         elif kind == "word":
@@ -234,6 +295,10 @@ def check_latex(latex: str) -> list[Check]:
                 forbidden = True
             elif value not in ALLOWED_COMMANDS:
                 unknown = True
+            elif value in TEXT_MODE_COMMANDS:
+                markup = markup or bool(_TEXT_MARKUP.intersection(_text_argument(latex, end)))
+            elif value == "hspace":
+                bad_argument = bad_argument or not _HSPACE_ARGUMENT.match(latex, end)
             elif value in ENVIRONMENT_COMMANDS:
                 name = _environment_name(latex, end)
                 if name is None:
@@ -251,9 +316,12 @@ def check_latex(latex: str) -> list[Check]:
         _check("latex.balanced_braces", None if braces_ok and depth == 0 else "unbalanced_braces"),
         _check("latex.balanced_environments", env_code),
         _check("latex.no_math_delimiters", "math_delimiter" if dollar else None),
+        _check("latex.no_comments", "comment" if comment else None),
         _check("latex.no_forbidden_commands", "forbidden_command" if forbidden else None),
         _check("latex.allowed_commands", "unknown_command" if unknown else None),
         _check("latex.allowed_environments", "unknown_environment" if unknown_env else None),
+        _check("latex.command_arguments", "bad_argument" if bad_argument else None),
+        _check("latex.plain_text_arguments", "markup_in_text" if markup else None),
     ]
     return checks
 
@@ -341,7 +409,18 @@ def _local_name(tag: object) -> str:
 
 def serialize_mathml(root: ET.Element) -> str:
     """Serialise a parsed MathML tree: local tag names, one xmlns on the root, escaped
-    text and attributes. Used so downstream code only ever sees re-serialised output."""
+    text and attributes. Used so downstream code only ever sees re-serialised output.
+
+    Refuses (UnsafeMathMLError, message = category code) any tree that is not safe to
+    insert into HTML: an element or attribute outside the allowlist, markup inside a
+    token element (an <mtext> child is parsed as HTML by browsers), a nested <math>, or
+    nesting too deep for this recursive walk.
+    """
+    if tree_depth(root) > _SERIALIZE_MAX_DEPTH:
+        raise UnsafeMathMLError("too_deep")
+    code = _allowlist_code(root)
+    if code is not None:
+        raise UnsafeMathMLError(code)
 
     def walk(elem: ET.Element, is_root: bool) -> str:
         tag = _local_name(elem.tag)
@@ -363,32 +442,76 @@ def _parse_xml(text: str) -> ET.Element:
     return DET.fromstring(text, forbid_dtd=True, forbid_entities=True, forbid_external=True)
 
 
+# Spans latex2mathml copies into its output verbatim (named groups of its own tokenizer,
+# so they match what this converter version does): text-command arguments and \verb.
+_RAW_TEXT_GROUPS = ("text_content", "verb_content")
+
+
+def _escape_raw_text(latex: str) -> str:
+    """XML-escape `&`, `<` and `>` in the spans latex2mathml copies verbatim.
+
+    Its serialiser unescapes `&lt;`, `&gt;` and `&amp;` across the whole output, so
+    `\\text{</mtext><mphantom>...}` would otherwise become real elements. Escaped once
+    here, they survive that step as entities and parse back to literal text.
+    """
+    parts: list[str] = []
+    pos = 0
+    for match in _LATEX2MATHML_TOKEN.finditer(latex):
+        for group in _RAW_TEXT_GROUPS:
+            start, end = match.span(group)
+            if start < 0 or start == end:
+                continue
+            raw = latex[start:end]
+            parts += [latex[pos:start], _escape_xml(raw)]
+            pos = end
+    parts.append(latex[pos:])
+    return "".join(parts)
+
+
+# latex2mathml copies text-mode arguments verbatim, so `\text{25\% yield}` would keep
+# its backslash. These escapes mean the bare character in text mode, as in TeX.
+_TEXT_ESCAPE = re.compile(r"\\([%#_$&])")
+
+
+def _unescape_text_specials(root: ET.Element) -> None:
+    for elem in root.iter():
+        if _local_name(elem.tag) == "mtext" and elem.text:
+            elem.text = _TEXT_ESCAPE.sub(r"\1", elem.text)
+
+
 def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
     """LaTeX -> MathML via latex2mathml, with the array/aligned workaround.
 
-    Returns MathML with a `<math>` root in the MathML namespace and `display` set.
-    Raises `LatexConversionError` (content-free message) when conversion fails.
+    Returns MathML with a `<math>` root in the MathML namespace and `display` set,
+    re-serialised from an allowlisted tree (see `serialize_mathml`), so the output is
+    safe to insert into HTML even when the input skipped `check_latex`: markup inside
+    `\\text{...}` stays literal text. Raises `LatexConversionError` (content-free
+    message) when conversion fails or the converter's output falls outside the
+    allowlist (for example an `href` from `\\href`).
     """
     if display not in ("block", "inline"):
         raise ValueError("display must be 'block' or 'inline'")
     if len(latex) > MAX_LATEX_CHARS:  # same limit as check_latex; bounds the work below
         raise LatexConversionError("input too long")
     try:
-        raw = _latex2mathml_convert(rewrite_alignment_environments(latex), display=display)
+        source = _escape_raw_text(rewrite_alignment_environments(latex))
+        raw = _latex2mathml_convert(source, display=display)
     except Exception as exc:  # latex2mathml raises many exception types
         raise LatexConversionError(f"latex2mathml failed ({type(exc).__name__})") from None
     try:
         root = _parse_xml(raw)
     except (ET.ParseError, defusedxml.DefusedXmlException) as exc:
         raise LatexConversionError(f"converter output unparsable ({type(exc).__name__})") from None
-    if tree_depth(root) > _SERIALIZE_MAX_DEPTH:  # keeps the recursive serialiser safe
-        raise LatexConversionError("converter output too deeply nested")
     if _local_name(root.tag) != "math":
         wrapper = ET.Element(f"{{{MATHML_NS}}}math")
         wrapper.append(root)
         root = wrapper
     root.set("display", display)
-    return serialize_mathml(root)
+    _unescape_text_specials(root)
+    try:
+        return serialize_mathml(root)
+    except UnsafeMathMLError as exc:
+        raise LatexConversionError(f"converter output refused ({exc})") from None
 
 
 # ========================================================================== MathML
@@ -408,8 +531,10 @@ ALLOWED_ELEMENTS = _words(
     maligngroup malignmark
     """
 )
-# Layout and meaning attributes only. Deliberately absent: href, src, style, class, id,
-# event handlers, mathcolor/mathbackground (could hide content), xlink:*.
+# Layout attributes only. Deliberately absent: href, src, style, class, id, event
+# handlers, mathcolor/mathbackground (could hide content), xlink:*, and intent/arg
+# (MathML 4 speech overrides: a screen reader would say something other than what
+# sighted readers and the reviewer see; latex2mathml never emits them).
 ALLOWED_ATTRIBUTES = _words(
     """
     display displaystyle scriptlevel mathvariant mathsize dir fence form stretchy
@@ -417,9 +542,12 @@ ALLOWED_ATTRIBUTES = _words(
     minsize maxsize linethickness numalign denomalign bevelled width height depth voffset
     linebreak notation columnalign rowalign columnspacing rowspacing columnlines rowlines
     columnwidth frame framespacing equalrows equalcolumns rowspan columnspan open close
-    encoding fontstyle fontweight intent arg alttext
+    encoding fontstyle fontweight
     """
 )
+# Allowed on the root <math> only (OpenStax sets alttext there; it is the fallback text
+# when MathML is not rendered).
+ROOT_ONLY_ATTRIBUTES = frozenset({"alttext"})
 _UNSAFE_ATTRIBUTE_NAMES = re.compile(r"^(on.*|href|src|style|class|id|xlink:.*|xmlns:.*)$", re.I)
 _UNSAFE_VALUE = re.compile(r"javascript:|vbscript:|data:|url\s*\(|expression\s*\(|[<>]", re.I)
 
@@ -436,7 +564,12 @@ FIXED_ARITY = {
     "munderover": 3,
 }
 _TOKEN_ELEMENTS = frozenset({"mi", "mn", "mo", "mtext", "ms"})
-_LATEX_LEFTOVER = re.compile(r"\\[A-Za-z]+|\\[{}]")
+# The only element MathML allows inside a token (mglyph is not on the allowlist).
+_TOKEN_CHILDREN = frozenset({"malignmark"})
+# A backslash followed by a command name or by any other non-alphanumeric character
+# (`\%`, `\_`, `\{`, `\,`, `\\`): LaTeX the converter copied through as text. A token
+# that is only a backslash (`\backslash`) is not a leftover.
+_LATEX_LEFTOVER = re.compile(r"\\(?:[A-Za-z]+|[^A-Za-z0-9])")
 
 
 def tree_depth(root: ET.Element) -> int:
@@ -450,7 +583,7 @@ def tree_depth(root: ET.Element) -> int:
     return deepest
 
 
-def _attribute_code(elem: ET.Element) -> str | None:
+def _attribute_code(elem: ET.Element, *, is_root: bool) -> str | None:
     code = None
     for key, value in elem.attrib.items():
         name = _local_name(key)
@@ -460,9 +593,45 @@ def _attribute_code(elem: ET.Element) -> str | None:
             or _UNSAFE_VALUE.search(value)
         ):
             return "unsafe_attribute"
-        if name not in ALLOWED_ATTRIBUTES:
+        if name not in ALLOWED_ATTRIBUTES and not (is_root and name in ROOT_ONLY_ATTRIBUTES):
             code = "unknown_attribute"
     return code
+
+
+def _tree_codes(root: ET.Element) -> dict[str, str | None]:
+    """Allowlist failures by check name (None = passed). Shared by `check_mathml` and
+    `serialize_mathml`, so what is checked is exactly what is safe to serialise."""
+    element_code = attribute_code = token_code = None
+    if _local_name(root.tag) != "math":
+        root_code = "wrong_root"
+    elif root.tag != f"{{{MATHML_NS}}}math":
+        root_code = "missing_namespace"
+    else:
+        root_code = None
+    for elem in root.iter():
+        name = _local_name(elem.tag)
+        if not str(elem.tag).startswith(f"{{{MATHML_NS}}}") or name not in ALLOWED_ELEMENTS:
+            element_code = "unknown_element"
+        if name == "math" and elem is not root and root_code is None:
+            root_code = "nested_math"
+        if name in _TOKEN_ELEMENTS and any(
+            _local_name(child.tag) not in _TOKEN_CHILDREN for child in elem
+        ):
+            token_code = "markup_in_token"
+        code = _attribute_code(elem, is_root=elem is root)
+        if code == "unsafe_attribute" or (code and attribute_code is None):
+            attribute_code = code
+    return {
+        "mathml.root": root_code,
+        "mathml.known_elements": element_code,
+        "mathml.safe_attributes": attribute_code,
+        "mathml.token_content": token_code,
+    }
+
+
+def _allowlist_code(root: ET.Element) -> str | None:
+    """The first allowlist failure code for a tree, or None when it is safe to serialise."""
+    return next((code for code in _tree_codes(root).values() if code), None)
 
 
 def _is_leftover(elem: ET.Element, name: str) -> bool:
@@ -476,7 +645,8 @@ def _is_leftover(elem: ET.Element, name: str) -> bool:
 
 
 def check_mathml(mathml: str) -> list[Check]:
-    """Well-formed (defusedxml), <math> root in the MathML namespace, known elements only."""
+    """Well-formed (defusedxml), <math> root in the MathML namespace, known elements and
+    attributes only, text-only tokens, sane structure, no LaTeX leftovers."""
     if len(mathml) > MAX_MATHML_CHARS:
         return [_check("mathml.size", "too_large")]
     try:
@@ -487,19 +657,10 @@ def check_mathml(mathml: str) -> list[Check]:
         return [_check("mathml.size", None), _check("mathml.well_formed", "not_well_formed")]
 
     elements = list(root.iter())
-    root_code = None
-    if _local_name(root.tag) != "math":
-        root_code = "wrong_root"
-    elif root.tag != f"{{{MATHML_NS}}}math":
-        root_code = "missing_namespace"
-    element_code = attribute_code = arity_code = leftover_code = None
+    tree = _tree_codes(root)
+    arity_code = leftover_code = None
     for elem in elements:
         name = _local_name(elem.tag)
-        if not elem.tag.startswith(f"{{{MATHML_NS}}}") or name not in ALLOWED_ELEMENTS:
-            element_code = "unknown_element"
-        code = _attribute_code(elem)
-        if code == "unsafe_attribute" or (code and attribute_code is None):
-            attribute_code = code
         if name in FIXED_ARITY and len(elem) != FIXED_ARITY[name]:
             arity_code = "bad_arity"
         if _is_leftover(elem, name):
@@ -508,9 +669,7 @@ def check_mathml(mathml: str) -> list[Check]:
     return [
         _check("mathml.size", "too_large" if too_large else None),
         _check("mathml.well_formed", None),
-        _check("mathml.root", root_code),
-        _check("mathml.known_elements", element_code),
-        _check("mathml.safe_attributes", attribute_code),
+        *(_check(name, code) for name, code in tree.items()),
         _check("mathml.depth", "too_deep" if tree_depth(root) > MAX_MATHML_DEPTH else None),
         _check("mathml.structure", arity_code),
         _check("mathml.converted", leftover_code),
@@ -534,23 +693,43 @@ _FILE_STEM = re.compile(
     r"|^\w+_\w+$",
     re.I,
 )
-# URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands.
+# URLs, script URLs, data URIs, HTML tags or entities, Markdown links, LaTeX commands.
 _URL_OR_MARKUP = re.compile(
-    r"https?://|\bwww\.|\bdata:[a-z]+/[a-z]|</?[A-Za-z!][^>]*>|&#?\w+;|\]\(|\\[A-Za-z]+",
+    r"https?://|\bwww\.|\b(?:javascript|vbscript):|\bdata:[a-z]+/[a-z]|</?[A-Za-z!][^>]*>"
+    r"|&#?\w+;|\]\(|\\[A-Za-z]+",
     re.I,
 )
-_PLACEHOLDERS = _words(
+# Words that name the medium or say nothing about the content. Alt text made only of
+# these ("Image", "An image", "Unreadable image", "No alt text", "N/A", "Not available")
+# tells a student nothing about the figure.
+PLACEHOLDER_WORDS = _words(
     """
-    image img picture photo photograph figure fig graph chart diagram graphic illustration
-    drawing icon logo alt alttext placeholder untitled description todo tbd none null
-    undefined spacer blank
+    a an the this that here of for is no not none n na nil
+    image images img picture pic photo photograph figure fig graph chart diagram graphic
+    illustration drawing icon logo screenshot alt alttext text description caption
+    placeholder untitled undefined null unknown unreadable illegible unavailable available
+    missing todo tbd blank empty spacer insert
     """
-) | {"alt text", "image description", "no description", "figure description"}
+)
+# Alt text needs at least this many letters or digits to say anything ("." and "📈" do not).
+ALT_MIN_ALNUM = 2
 # A bare label such as "Figure 2.3" (compared after punctuation is removed: "figure 2 3").
 _PLACEHOLDER_LABEL = re.compile(
     r"^(figure|fig|image|chart|graph|diagram|table|photo|picture)[\d\s]*[a-z]?$"
 )
 _FIGURE_LABEL = re.compile(r"^\s*(figure|fig\.?)\s*[\w]+([.\-]\w+)*\s*[:.]?\s+", re.I)
+# Characters a screen reader does not voice that are not Unicode category Cf: Hangul
+# fillers and the blank braille pattern.
+_INVISIBLE_FILLERS = frozenset("ᅟᅠㅤﾠ⠀")
+
+
+def _visible(text: str) -> str:
+    """Text without invisible format characters (zero-width space, invisible separators,
+    BOM, bidi marks: category Cf) or filler characters, whitespace collapsed."""
+    text = "".join(
+        ch for ch in text if unicodedata.category(ch) != "Cf" and ch not in _INVISIBLE_FILLERS
+    )
+    return " ".join(text.split())
 
 
 def _plain(text: str) -> str:
@@ -564,9 +743,18 @@ def _without_figure_label(text: str) -> str:
     return _FIGURE_LABEL.sub("", text, count=1)
 
 
+def _is_placeholder(text: str, plain: str) -> bool:
+    if sum(ch.isalnum() for ch in text) < ALT_MIN_ALNUM:
+        return True  # only punctuation, symbols or emoji
+    return all(word in PLACEHOLDER_WORDS for word in plain.split()) or bool(
+        _PLACEHOLDER_LABEL.match(plain)
+    )
+
+
 def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list[Check]:
-    """Length, no 'image of', no file names, no URLs/markup, not a caption copy."""
-    text = alt.strip()
+    """Length, no 'image of', no file names, no URLs/markup, not a placeholder, not a
+    caption copy. Judged on the visible text (invisible format characters removed)."""
+    text = _visible(alt)
     if decorative:
         return [_check("alt.decorative", "decorative_with_text" if text else None)]
     if not text:
@@ -581,7 +769,7 @@ def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list
     is_filename = bool(_FILE_EXTENSION.search(text)) or (
         " " not in text and bool(_FILE_STEM.match(text))
     )
-    is_placeholder = plain in _PLACEHOLDERS or bool(_PLACEHOLDER_LABEL.match(plain))
+    is_placeholder = _is_placeholder(text, plain)
     is_caption_copy = bool(caption and caption.strip()) and _plain(
         _without_figure_label(text)
     ) == _plain(_without_figure_label(caption or ""))

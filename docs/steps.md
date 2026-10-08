@@ -23,8 +23,10 @@ flowchart LR
   SP --> ST[status rules] --> F[Fix]
 ```
 
-Each box marked with a model goes through `models.router.call_with_fallback`: if the
+The first call for an element goes through `models.router.call_with_fallback`: if the
 model fails (timeout, API error, refusal, invalid output), the other model is tried once.
+The escalation (cheap -> main) is a single main-model call with no fallback, because the
+main model's fallback is the cheap model, which has already answered this exact request.
 Every attempt becomes a `ModelCall` on the fix. `BudgetExceeded` is never caught here;
 the orchestrator (`pipeline.run`) decides what happens to the rest of the document.
 
@@ -42,8 +44,8 @@ tell the model that text between `<document_text>` tags is data, not instruction
 
 | Prompt | Output schema (strict pydantic, `extra=forbid`) | What it asks for |
 |---|---|---|
-| `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units; multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
-| `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information; alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
+| `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
+| `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
 
 Why `array{rcl}`: latex2mathml 3.81.1 renders `aligned` as one flat row with literal `&`
 tokens, and OpenStax writes multi-line equations as a three-column `mtable`
@@ -59,11 +61,13 @@ hallucinations.
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
 | Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, or it fails an error-level check |
-| Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), or the alt text fails an error-level check |
+| Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
 No escalation happens when the cheap call produced no output at all (the router already
 tried the main model as its fallback), or when the answer already came from the main
-model as a fallback. After escalation the main model's answer is used, unless it is
+model as a fallback. The escalation itself is one call to the main model and never falls
+back: during a main-model outage that saves a duplicate cheap call (and a slot in
+`max_model_calls_per_job`) per escalated element, and the cheap answer stands. After escalation the main model's answer is used, unless it is
 unusable and the cheap answer is usable (for example the main model returned invalid
 LaTeX); then the cheap answer is kept. The fix's `checks` belong to the answer that was
 kept; its `calls` include every attempt.
@@ -108,6 +112,12 @@ for decorative figures: marking a figure decorative hides it from screen-reader 
 entirely, so it needs more certainty. Decorative figures always get
 `FigureFix(alt="", decorative=True)`, whatever alt text the model wrote.
 
+A decorative answer is also cross-checked against itself and the page. If the model's
+`figure_type` is `chart`, `diagram` or `table_image`, the figure has a caption, or the
+model wrote alt text anyway, the warning check `figure.decorative_consistency` fails
+with code `decorative_conflict`. The fix then goes to review whatever the confidence,
+and a tiny figure escalates to the main model first.
+
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
 
@@ -141,9 +151,12 @@ send the fix to review.
 | `latex.balanced_braces` | `unbalanced_braces` | error | unescaped `{`/`}` do not balance |
 | `latex.balanced_environments` | `unbalanced_env` | error | `\begin`/`\end` missing, mismatched or nameless |
 | `latex.no_math_delimiters` | `math_delimiter` | error | an unescaped `$` remains after cleanup |
+| `latex.no_comments` | `comment` | error | an unescaped `%`: latex2mathml (like TeX) drops the rest of the line, so `x = 50% + y` would become `x = 50` |
 | `latex.no_forbidden_commands` | `forbidden_command` | error | file, shell, macro or link commands: `\input \include \write \immediate \openout \read \def \gdef \edef \xdef \let \newcommand \renewcommand \providecommand \newenvironment \DeclareMathOperator \catcode \csname \expandafter \href \url \usepackage \documentclass \special \includegraphics \verb \class \style \htmlClass ...` |
 | `latex.allowed_commands` | `unknown_command` | error | any control word or symbol not in the allowlist |
 | `latex.allowed_environments` | `unknown_environment` | error | an environment other than `array matrix pmatrix bmatrix Bmatrix vmatrix Vmatrix cases aligned align align* gathered split` |
+| `latex.command_arguments` | `bad_argument` | error | `\hspace` without a braced, non-negative dimension (`x \hspace y` would become `<mspace width="y">` and lose the `y`) |
+| `latex.plain_text_arguments` | `markup_in_text` | error | `<`, `>` or `&` in the argument of `\text \textrm \textbf \textit \textsf \texttt \textnormal \textup \mbox` (latex2mathml copies that argument into its XML unescaped, so it would become markup) |
 
 The allowlist (`validate.ALLOWED_COMMANDS`) covers Greek letters, binary operators,
 relations, arrows, common symbols, large operators, function names, spacing, sizing and
@@ -156,7 +169,10 @@ supports. `\not` and `\arg` are left out for that reason.
 
 Before checking, the equation step removes wrappers the prompt forbids but models still
 add: `$...$`, `$$...$$`, `\[...\]`, `\(...\)`, `equation` environments, `\displaystyle`,
-and a trailing `\\` (`equation_step.clean_latex`). This never changes the mathematics.
+and a trailing `\\` (`equation_step.clean_latex`). It also escapes every bare `%` as
+`\%` (`validate.escape_percent_signs`): in one transcribed equation a `%` is a percent
+sign, never a comment. None of this changes the mathematics. Other callers of
+`check_latex` (for example a reviewer's LaTeX edit) get `comment` for a bare `%`.
 
 ### `safe_latex_to_mathml(latex, display)`
 
@@ -165,14 +181,22 @@ and a trailing `\\` (`equation_step.clean_latex`). This never changes the mathem
    `\begin{array}{...}`: right/left alternating columns (`rl`, `rlrl`, ...) sized to the
    widest row's top-level `&` count (ampersands inside nested matrices or braces are not
    counted); `gathered` becomes centred columns. Optional `[t]` positions are dropped.
-3. Converts with latex2mathml.
-4. Parses the result with defusedxml, sets `display`, and re-serialises it with one
-   MathML `xmlns` on the root, so downstream code never handles the converter's raw
-   string.
+3. XML-escapes `<`, `>` and `&` in the spans latex2mathml copies verbatim (text-command
+   arguments and `\verb`, located with latex2mathml's own tokenizer pattern). Its
+   serialiser unescapes `&lt;`, `&gt;` and `&amp;` across the whole output, so without
+   this `\text{</mtext><mphantom>...}` would become real elements.
+4. Converts with latex2mathml.
+5. Parses the result with defusedxml, sets `display`, and unescapes `\%`, `\_`, `\#`,
+   `\$` in `<mtext>` (latex2mathml leaves the backslash in text mode).
+6. Re-serialises with `serialize_mathml`, which writes one MathML `xmlns` on the root and
+   refuses (`UnsafeMathMLError`, message = the code) any tree that fails the allowlist
+   rules of `check_mathml`: an unknown element or attribute, markup inside a token, a
+   nested `<math>`, or nesting deeper than 200.
 
-Any failure raises `LatexConversionError` with a content-free message (the converter's
-own message, which quotes the input, is dropped). Inputs so deeply nested that the
-converter recurses too far fail the same way.
+The output is therefore safe to insert into HTML even for a caller that skips
+`check_latex` and `check_mathml`. Any failure raises `LatexConversionError` with a
+content-free message (the converter's own message, which quotes the input, is dropped).
+Inputs so deeply nested that the converter recurses too far fail the same way.
 
 ### `check_mathml(mathml)`
 
@@ -180,12 +204,13 @@ converter recurses too far fail the same way.
 |---|---|---|
 | `mathml.size` | `too_large` | more than 100,000 characters or 5,000 elements |
 | `mathml.well_formed` | `not_well_formed` / `forbidden_xml` | not XML; or a DTD, entity declaration or external reference (defusedxml refuses them, so entity expansion attacks never run) |
-| `mathml.root` | `wrong_root` / `missing_namespace` | the root is not `<math>` in the MathML namespace |
+| `mathml.root` | `wrong_root` / `missing_namespace` / `nested_math` | the root is not `<math>` in the MathML namespace, or a `<math>` appears below the root |
 | `mathml.known_elements` | `unknown_element` | an element outside MathML Core plus common presentation elements (no `maction`, no `mglyph`, nothing from another namespace) |
-| `mathml.safe_attributes` | `unsafe_attribute` / `unknown_attribute` | `href`, `src`, `style`, `class`, `id`, `on*`, any namespaced attribute, or a value containing `javascript:`, `data:`, `url(` or `<`/`>` (unsafe); any other attribute outside the layout allowlist, such as `mathcolor` (unknown) |
+| `mathml.safe_attributes` | `unsafe_attribute` / `unknown_attribute` | `href`, `src`, `style`, `class`, `id`, `on*`, any namespaced attribute, or a value containing `javascript:`, `data:`, `url(` or `<`/`>` (unsafe); any other attribute outside the layout allowlist, such as `mathcolor`, or the MathML 4 speech overrides `intent` and `arg` (unknown); `alttext` is allowed on the root only |
+| `mathml.token_content` | `markup_in_token` | an element inside `mi`, `mn`, `mo`, `mtext` or `ms` (other than `malignmark`); browsers parse children of `<mtext>` as HTML |
 | `mathml.depth` | `too_deep` | nesting deeper than 64 (measured without recursion) |
 | `mathml.structure` | `bad_arity` | `mfrac`, `mroot`, `msub`, `msup`, `munder`, `mover` without 2 children, or `msubsup`, `munderover` without 3 (latex2mathml turns `\frac{a}` into a one-child `mfrac`) |
-| `mathml.converted` | `unconverted_command` | LaTeX left in a token (`<mi>\foo</mi>`, `<mtext>\textbf{x</mtext>`), any `merror`, or a stray alignment `&` in an `mi` |
+| `mathml.converted` | `unconverted_command` | LaTeX left in a token (`<mi>\foo</mi>`, `<mtext>\textbf{x</mtext>`, `<mtext>a\,b</mtext>`: a backslash followed by a command name or any non-alphanumeric character), any `merror`, or a stray alignment `&` in an `mi` |
 
 All are error-level. All 30 gold MathML equations pass.
 
@@ -194,13 +219,17 @@ All are error-level. All 30 gold MathML equations pass.
 | Check name | Code | Severity | Fails when |
 |---|---|---|---|
 | `alt.decorative` | `decorative_with_text` | error | decorative but the alt is not empty (returned alone) |
-| `alt.not_empty` | `empty` | error | informative figure with blank alt (returned alone) |
+| `alt.not_empty` | `empty` | error | informative figure with blank alt, or alt made only of invisible characters such as U+200B (returned alone) |
 | `alt.length` | `too_long` | warning over 150 characters, error over 300 | |
 | `alt.no_redundant_prefix` | `redundant_prefix` | warning | starts with "image of", "picture of", "graphic of", "photo of" or "photograph of" (optionally after "a", "an" or "the") |
 | `alt.not_filename` | `filename` | error | contains a file name with an image or document extension, or is a single camera or export name (`IMG_2041`, `DSC0042`, `figure_3_2`) |
-| `alt.no_url_or_markup` | `url_or_markup` | error | a URL, `www.`, a data URI, HTML tags or entities, a Markdown link, or a LaTeX command |
-| `alt.not_placeholder` | `placeholder` | error | only a placeholder word ("image", "figure", "graph", "alt text", ...) or a bare label ("Figure 2.3") |
+| `alt.no_url_or_markup` | `url_or_markup` | error | a URL, `www.`, a `javascript:` or `vbscript:` URL, a data URI, HTML tags or entities, a Markdown link, or a LaTeX command |
+| `alt.not_placeholder` | `placeholder` | error | fewer than two letters or digits ("." or an emoji), only words that say nothing about the content ("Image", "An image", "Unreadable image", "No alt text", "N/A", "Not available", "Screenshot"; `validate.PLACEHOLDER_WORDS`), or a bare label ("Figure 2.3") |
 | `alt.not_caption_copy` | `caption_copy` | warning | equal to the caption ignoring case, punctuation and a leading "Figure N.N" label |
+
+All alt rules judge the visible text: format characters (Unicode category Cf, such as
+U+200B and U+2063) and filler characters are removed first, so they cannot hide a file
+name, URL or placeholder.
 
 OpenStax's own alt text in the gold set triggers only `too_long` and `redundant_prefix`
 (it is written for a different, longer format), never an error-level content rule.
@@ -245,7 +274,7 @@ never reaches the instructions, and that the equation's text layer is never sent
 
 | File | What it covers |
 |---|---|
-| `tests/test_steps_validate.py` | every code of every validator; the allowlist-vs-converter test; alignment rewriting; defusedxml refusing DTDs and entity bombs; deep and oversize input; gold MathML and OpenStax alt text as real-data sanity checks |
+| `tests/test_steps_validate.py` | every code of every validator; the allowlist-vs-converter tests (no allowed command converts with leftovers, every command whose argument is copied verbatim is treated as text mode); alignment rewriting; `\text{}` injection and a fuzz test showing `safe_latex_to_mathml` output is always allowlisted; defusedxml refusing DTDs and entity bombs; deep and oversize input; gold MathML and OpenStax alt text as real-data sanity checks |
 | `tests/test_steps_speech.py` | all 30 gold equations produce speech; targeted rules |
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
@@ -259,7 +288,8 @@ Live run on 2026-10-07: the three-row OpenStax equation (`2-2-speed-and-velocity
 came back as `\begin{array}{rcl}` LaTeX, ACCEPTED at 0.99 confidence on `gpt-6.1-sol`
 ($0.0037); the bar chart got "Bar chart with trips on the horizontal axis and speed in
 km/h vertically: Trip A averages 40, Trip B 90, and Trip C 150 km/h." (ACCEPTED, 0.99,
-$0.0033).
+$0.0033). That run used the prompts as they were before the `\%`, `\text{}` and
+decorative rules were added; the prompt versions have changed since.
 
 ## Known limits
 
@@ -270,5 +300,9 @@ $0.0033).
   `\hslash` or `\varGamma`) fails as `unknown_command` and the fix goes to FAILED
   `invalid_latex` after escalation. Extend the lists in `validate.py`; the conversion
   test then checks the new entries.
+- `<`, `>` and `&` inside `\text{}` are refused (`markup_in_text`) even where they are
+  valid LaTeX, such as `\text{R\&D}` or `\text{if x < 5}`; the prompt asks for
+  `\text{if } x < 5`. The converter would render them safely as text, but in model
+  output they are far more likely to be an injection or a confused transcription.
 - Confidence is the model's own estimate (scaled by the cross-check). Calibration against
   the gold set is WP7's job.

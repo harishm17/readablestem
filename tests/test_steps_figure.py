@@ -143,17 +143,57 @@ def test_decorative_needs_review_unless_very_confident():
     assert fix.status == Status.ACCEPTED and fix.figure is not None and fix.figure.decorative
 
 
-def test_decorative_alt_is_forced_empty():
+def test_decorative_alt_is_forced_empty_and_the_contradiction_reviewed():
     fix = run(by_model(main=out("A blue border", 0.99, decorative=True, figure_type="other")))
     assert fix.figure is not None and fix.figure.alt == "" and fix.figure.decorative
-    assert all(c.passed for c in fix.checks)
+    # Writing alt text for a figure it calls decorative contradicts the prompt.
+    assert codes(fix) == {"decorative_conflict"} and fix.status == Status.NEEDS_REVIEW
+
+
+def test_consistent_decorative_answer_passes_the_consistency_check():
+    fix = run(by_model(main=out("", 0.97, decorative=True, figure_type="other")))
+    check = next(c for c in fix.checks if c.name == "figure.decorative_consistency")
+    assert check.passed and check.severity == "warning"
+    assert fix.status == Status.ACCEPTED
+
+
+@pytest.mark.parametrize("figure_type", ["chart", "diagram", "table_image"])
+@pytest.mark.parametrize("bbox", [None, TINY], ids=["normal", "tiny"])
+def test_decorative_informative_figure_type_is_never_accepted(figure_type, bbox):
+    """Decorative hides the figure from screen-reader users; a chart, diagram or table
+    marked decorative was ACCEPTED on confidence alone."""
+    answer = out("Line graph of v vs t", 0.96, decorative=True, figure_type=figure_type)
+    client = by_model(main=answer, cheap=answer)
+    fix = run(client, figure_element(bbox=bbox) if bbox else None)
+    assert fix.status == Status.NEEDS_REVIEW and "decorative_conflict" in codes(fix)
+    check = next(c for c in fix.checks if c.name == "figure.decorative_consistency")
+    assert check.severity == "warning" and not check.passed
+    if bbox:  # the cheap model's contradiction is worth a second opinion
+        assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+
+
+def test_decorative_figure_with_a_caption_is_never_accepted():
+    element = figure_element(caption="Figure 2.3 The drive to school.")
+    fix = run(by_model(main=out("", 0.99, decorative=True, figure_type="photo")), element)
+    assert fix.status == Status.NEEDS_REVIEW and codes(fix) == {"decorative_conflict"}
+
+
+def test_tiny_decorative_conflict_resolved_by_main_model():
+    client = by_model(
+        cheap=out("", 0.97, decorative=True, figure_type="chart"),
+        main=out("Bar chart: trip C is fastest at 150 km/h.", 0.95),
+    )
+    fix = run(client, figure_element(bbox=TINY))
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+    assert fix.status == Status.ACCEPTED and fix.figure is not None
+    assert not fix.figure.decorative
 
 
 def test_decorative_bar_respects_a_higher_auto_accept_setting():
     settings = make_settings(auto_accept_confidence=0.98)
-    client = by_model(main=out("", 0.97, decorative=True))
+    client = by_model(main=out("", 0.97, decorative=True, figure_type="other"))
     fix = describe(figure_element(), PNG, client=client, settings=settings)
-    assert fix.status == Status.NEEDS_REVIEW
+    assert fix.status == Status.NEEDS_REVIEW and codes(fix) == set()
 
 
 # --------------------------------------------------------------------------- routing
@@ -189,7 +229,10 @@ def test_tiny_figure_escalates_on_invalid_alt():
 
 
 def test_tiny_decorative_below_the_decorative_bar_escalates():
-    client = by_model(cheap=out("", 0.9, decorative=True), main=out("", 0.97, decorative=True))
+    client = by_model(
+        cheap=out("", 0.9, decorative=True, figure_type="other"),
+        main=out("", 0.97, decorative=True, figure_type="other"),
+    )
     fix = run(client, figure_element(bbox=TINY))
     assert models(client) == [CHEAP_MODEL, MAIN_MODEL] and fix.status == Status.ACCEPTED
 
@@ -207,6 +250,28 @@ def test_main_outage_falls_back_to_cheap():
     assert models(client) == [MAIN_MODEL, CHEAP_MODEL]
     assert [c.outcome for c in fix.calls] == ["timeout", "ok"]
     assert fix.calls[1].is_fallback and fix.status == Status.ACCEPTED
+
+
+@pytest.mark.parametrize("outcome", ["timeout", "api_error"])
+def test_escalation_during_a_main_outage_does_not_repeat_the_cheap_call(outcome):
+    client = FakeVisionClient(
+        fail_models={MAIN_MODEL: outcome}, defaults={"figure": out("Bar chart of speed.", 0.6)}
+    )
+    fix = run(client, figure_element(bbox=TINY))
+    assert models(client) == [CHEAP_MODEL, MAIN_MODEL]
+    assert [(c.model, c.outcome, c.is_fallback) for c in fix.calls] == [
+        (CHEAP_MODEL, "ok", False),
+        (MAIN_MODEL, outcome, False),
+    ]
+    assert fix.status == Status.NEEDS_REVIEW and fix.figure is not None
+    assert fix.figure.alt == "Bar chart of speed." and fix.confidence == pytest.approx(0.6)
+
+
+@pytest.mark.parametrize("alt", [".", "​", "\U0001f4c8", "⁣⁣", "N/A", "An image"])
+def test_alt_that_says_nothing_is_never_accepted(alt):
+    fix = run(by_model(main=out(alt, 0.95)))
+    assert fix.status == Status.FAILED and fix.reason == "invalid_alt"
+    assert codes(fix) & {"empty", "placeholder"} and fix.figure is None
 
 
 # --------------------------------------------------------------- context and prompts
