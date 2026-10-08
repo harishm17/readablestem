@@ -207,6 +207,11 @@ Cache-Control: no-store            (everything except /static/)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
+Request bodies are capped at 1 MiB while they stream in (`RequestSizeLimitMiddleware`),
+before any form is parsed: Starlette's multipart parser has no limit on file parts, and
+CSRF can only be checked after parsing. The upload route is exempt because it enforces
+its own `MAX_UPLOAD_MB` limit the same way.
+
 The converted document (`/view`, `/download`, `/demo`) gets its own policy instead:
 `sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'`. It may carry
 inline styles and data: images, and the sandbox stops it running scripts, submitting

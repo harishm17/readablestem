@@ -18,11 +18,11 @@ from a11y_stem.core.types import DocumentResult, Kind, Status
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Job, JobStatus
 
-STATUS_LABELS = {
-    JobStatus.QUEUED: "Waiting",
-    JobStatus.RUNNING: "Converting",
-    JobStatus.DONE: "Finished",
-    JobStatus.FAILED: "Stopped",
+STATUS_LABELS: dict[str, str] = {
+    JobStatus.QUEUED.value: "Waiting",
+    JobStatus.RUNNING.value: "Converting",
+    JobStatus.DONE.value: "Finished",
+    JobStatus.FAILED.value: "Stopped",
 }
 
 FIX_STATUS_LABELS = {
@@ -102,7 +102,7 @@ class JobView:
 
     @property
     def status_label(self) -> str:
-        return STATUS_LABELS.get(self.status, self.status)  # type: ignore[call-overload]
+        return STATUS_LABELS.get(self.status, self.status)
 
     @property
     def status_detail(self) -> str:

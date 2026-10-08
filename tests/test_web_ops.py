@@ -284,3 +284,38 @@ def test_validation_errors_do_not_echo_input(web):
         "/jobs/" + "0" * 32 + "/status", params={"v": ["a", "SECRET-DOC-TEXT"]}
     )
     assert "SECRET" not in response.text
+
+
+# --------------------------------------------------------------------------- body size
+
+
+def test_request_bodies_are_capped_before_any_form_is_parsed(web):
+    declared = web.browser.post(
+        "/logout",
+        content=b"x" * 10,
+        headers={
+            "content-type": "application/x-www-form-urlencoded",
+            "content-length": "2000000",
+        },
+    )
+    assert declared.status_code == 413
+
+    def endless():  # chunked, no Content-Length: counted while it streams in
+        for _ in range(64):
+            yield b"a" * 65536
+
+    streamed = web.browser.post(
+        "/logout", content=endless(), headers={"content-type": "application/x-www-form-urlencoded"}
+    )
+    assert streamed.status_code == 413
+    assert "Request too large" in streamed.text
+
+
+def test_the_upload_route_has_its_own_larger_limit(web):
+    web.allow(ALICE)
+    login(web.browser, ALICE)
+    pdf = make_pdf(1)
+    padded = pdf + b"\n%" + b"x" * (1024 * 1024 - len(pdf) - 600) + b"\n"
+    assert len(padded) <= 1024 * 1024 < len(padded) + 600  # the file fits; the body does not
+    response = upload(web.browser, padded)
+    assert response.status_code == 303, response.text[:300]

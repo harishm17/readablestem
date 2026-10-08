@@ -301,7 +301,7 @@ class Worker:
         result = output.result
         try:
             with session_scope(self.factory) as session:
-                job = session.get(Job, claim.job_id)
+                job = session.get(Job, claim.job_id, with_for_update=True)
                 if job is None or job.status != JobStatus.RUNNING or job.attempts != claim.attempt:
                     log_event(logger, "job_result_discarded", job_id=claim.job_id)
                     return "discarded"

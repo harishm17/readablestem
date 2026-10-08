@@ -6,6 +6,9 @@ anywhere, so injected markup cannot run), nosniff, same-origin referrers, no fra
 content), and HSTS in production. A route that sets its own CSP keeps it: the converted
 document is served under a `sandbox` policy instead (`VIEW_CSP`).
 
+Size: every request body except the upload is capped at 1 MiB while it streams in
+(`RequestSizeLimitMiddleware`), before any form is parsed.
+
 Errors: Starlette's own error middleware re-raises after responding, so the server would
 log the exception message, which can contain document text. `SafeErrorMiddleware` sits
 inside it, logs only the exception type and code location, and answers with a plain 500
@@ -17,7 +20,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 
-from starlette.datastructures import MutableHeaders
+from starlette.datastructures import Headers, MutableHeaders
+from starlette.exceptions import HTTPException
 from starlette.responses import HTMLResponse, Response
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
@@ -77,6 +81,67 @@ class SecurityHeadersMiddleware:
             await send(message)
 
         await self.app(scope, receive, send_with_headers)
+
+
+# Every form in the app except the upload is a few kilobytes.
+DEFAULT_MAX_BODY_BYTES = 1024 * 1024
+
+
+class BodyTooLarge(HTTPException):
+    """Raised while reading a request body that passes the size limit (answered as 413)."""
+
+    def __init__(self) -> None:
+        super().__init__(status_code=413)
+
+
+class RequestSizeLimitMiddleware:
+    """Cap request bodies before any form parsing happens.
+
+    Starlette's multipart parser puts no limit on file parts, and every POST route parses
+    its form before it can check the CSRF token, so without this cap anyone could stream
+    an unbounded body into, say, /logout. The upload route is exempt: it enforces its own,
+    larger limit while streaming and answers with a helpful page.
+    """
+
+    def __init__(
+        self,
+        app: ASGIApp,
+        *,
+        max_bytes: int = DEFAULT_MAX_BODY_BYTES,
+        exempt: frozenset[tuple[str, str]] = frozenset({("POST", "/jobs")}),
+    ) -> None:
+        self.app = app
+        self.max_bytes = max_bytes
+        self.exempt = exempt
+
+    async def __call__(self, scope: Scope, receive: Receive, send: Send) -> None:
+        if scope["type"] != "http" or (scope.get("method"), scope.get("path")) in self.exempt:
+            await self.app(scope, receive, send)
+            return
+        declared = Headers(scope=scope).get("content-length", "")
+        if declared.isdigit() and int(declared) > self.max_bytes:
+            await HTMLResponse(_TOO_LARGE, status_code=413)(scope, receive, send)
+            return
+        received = 0
+
+        async def limited_receive() -> Message:
+            nonlocal received
+            message = await receive()
+            if message["type"] == "http.request":
+                received += len(message.get("body", b""))
+                if received > self.max_bytes:
+                    raise BodyTooLarge()
+            return message
+
+        await self.app(scope, limited_receive, send)
+
+
+_TOO_LARGE = (
+    "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+    "<title>Request too large | a11y-stem</title></head><body><main>"
+    "<h1>Request too large</h1><p>That request was larger than this page accepts. "
+    "Go back to <a href='/'>the home page</a>.</p></main></body></html>"
+)
 
 
 class SafeErrorMiddleware:

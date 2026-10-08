@@ -38,7 +38,11 @@ from a11y_stem.web.db import make_engine, make_sessionmaker
 from a11y_stem.web.deps import AppContext, CsrfFailed, LoginRequired, PageError, render
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.routes import admin, cron, jobs, pages, review
-from a11y_stem.web.security import SafeErrorMiddleware, SecurityHeadersMiddleware
+from a11y_stem.web.security import (
+    RequestSizeLimitMiddleware,
+    SafeErrorMiddleware,
+    SecurityHeadersMiddleware,
+)
 from a11y_stem.web.spend import DbSpendGuard
 from a11y_stem.web.worker import (
     ClientFactory,
@@ -63,7 +67,7 @@ ERROR_TEXT = {
     403: ("Not allowed", "You do not have access to this page."),
     404: ("Page not found", "There is nothing at this address, or it is not yours to see."),
     405: ("Not allowed", "That action is not available at this address."),
-    413: ("Too large", "That upload was too large."),
+    413: ("Request too large", "That request was larger than this page accepts."),
 }
 
 
@@ -213,7 +217,7 @@ def create_app(
     )
     app.state.ctx = ctx
 
-    # Added inner-first: SecurityHeaders wraps SafeError wraps Session wraps the routes.
+    # Added inner-first: SecurityHeaders > SafeError > RequestSizeLimit > Session > routes.
     app.add_middleware(
         SessionMiddleware,
         secret_key=_session_secret(settings),
@@ -222,6 +226,7 @@ def create_app(
         same_site="lax",
         https_only=settings.env == "prod",
     )
+    app.add_middleware(RequestSizeLimitMiddleware)
     app.add_middleware(SafeErrorMiddleware, error_page=_plain_500_page)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.env == "prod")
 
