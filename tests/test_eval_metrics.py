@@ -374,6 +374,14 @@ def test_document_page_item_aligns_equations_and_counts_violations():
     assert metrics["axe_skipped_pages"] == 1
 
 
+def test_axe_skip_link_failure_is_a_violation_not_a_skipped_run():
+    skip_link = [Check(name="axe.skip-link", passed=False, code="skip-link")]
+    assert pe.axe_skipped(skip_link) is False
+    assert pe.axe_skipped([Check(name="axe", passed=False, severity="warning", code="skipped")])
+    row = pe.document_page_item("p", [], [], {}, [], skip_link)
+    assert (row["axe_violations"], row["axe_skipped"]) == (["skip-link"], False)
+
+
 # -------------------------------------------------------------------- selection
 
 

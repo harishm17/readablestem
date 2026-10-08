@@ -146,7 +146,7 @@ def test_spend_stop_reports_a_partial_run(monkeypatch, equation_gold):
     monkeypatch.setattr(equation_step, "transcribe", fake_transcribe)
     spend = budget(max_calls=2)
     report = pe.run_pipeline_eval(
-        config(equation_gold, "equations", equation_client(budget=spend))
+        config(equation_gold, "equations", equation_client(budget=spend), budget=spend)
     ).report
     # Call 1 = eq0; calls 2-3 = eq1 (cheap, then escalation refused): eq1 is dropped.
     assert (report["n"], report["n_planned"]) == (1, 4)
@@ -154,6 +154,25 @@ def test_spend_stop_reports_a_partial_run(monkeypatch, equation_gold):
     assert report["stopped_reason"] == "budget_job_calls"
     assert report["metrics"]["exact_lenient"] == 1.0  # over the finished item only
     assert spend.calls == 2
+    # The cheap call for the dropped eq1 was paid for: the report still shows it.
+    cost = report["cost"]
+    assert cost["budget_spent_usd"] == pytest.approx(spend.spent_usd)
+    assert cost["dropped_usd"] == pytest.approx(spend.spent_usd - cost["total_usd"])
+    assert cost["dropped_usd"] > 0
+    assert "went to items dropped at the budget stop" in pe.format_markdown(report)
+
+
+def test_judge_refused_after_describe_keeps_the_describe_cost(monkeypatch, tmp_path):
+    gold = write_gold(tmp_path, [figure("p-1", 0, "A ball on a ramp.", "Figure 1.1")])
+    spend = budget(max_calls=1)  # describe fits, the judge call does not
+    client = FakeVisionClient(defaults={"figure": {"alt": "A ramp.", "confidence": 0.9}})
+    client.budget = spend
+    monkeypatch.setattr(figure_step, "describe", fake_describe)
+    report = pe.run_pipeline_eval(config(gold, "figures", client, budget=spend)).report
+    assert (report["n"], report["stopped_reason"]) == (0, "budget_job_calls")
+    assert report["cost"]["total_usd"] == 0
+    assert spend.spent_usd > 0
+    assert report["cost"]["dropped_usd"] == pytest.approx(spend.spent_usd)
 
 
 def test_dollar_cap_stops_before_overspending(monkeypatch, equation_gold):

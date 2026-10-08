@@ -92,7 +92,9 @@ Conventions for every task:
   for sorted values x[0..n-1], position (n - 1) * q / 100.
 - **Cost** is the sum of `ModelCall.cost_usd` (usage-based, `models/pricing.py`, prices
   checked 2026-10-07). `per_item_usd` is pipeline cost divided by `n`; judge cost is
-  reported separately and never included in it.
+  reported separately and never included in it. `budget_spent_usd` is what the run's
+  spend guard recorded; after a budget stop it can exceed `total_usd`, because the item
+  in flight was paid for in part and then dropped (`dropped_usd` is the difference).
 - **Latency** per item is the sum of its model calls' `latency_ms` (calls within an item
   run one after another). It excludes rendering and local processing. The document task
   uses `DocumentStats.latency_ms` per page instead.
@@ -192,7 +194,7 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
 | `axe_violations` | same for `html_checks.axe_checks` |
-| `axe_skipped_pages` | pages where axe could not run (its single "skipped" warning) |
+| `axe_skipped_pages` | pages where axe could not run: `axe_checks` returned a single warning with code `skipped` (matched exactly, so a failure of the real axe rule `skip-link` still counts as a violation) |
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
 
 ### Judge calibration (`eval calibrate`)

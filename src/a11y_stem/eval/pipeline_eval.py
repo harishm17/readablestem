@@ -41,7 +41,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from a11y_stem.config import Settings
-from a11y_stem.core.budget import BudgetExceeded
+from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import Check, Element, Fix, Kind, ModelCall, Status
 from a11y_stem.eval import judge as judge_mod
 from a11y_stem.eval.equations import EquationScore, MathMLError, normalize, score_mathml
@@ -322,6 +322,9 @@ class EvalConfig:
     client_label: str = "openai"  # "fake" for FakeVisionClient runs
     gold_label: str | None = None  # how to show gold_dir in the report (no home paths)
     concurrency: int = 4  # document task: convert_pdf's thread pool
+    # The client's budget, when there is one: its record of spend is the source of truth
+    # (it includes calls made for an item that was then dropped at a budget stop).
+    budget: JobBudget | None = None
 
 
 @dataclass
@@ -849,8 +852,14 @@ def document_page_item(
 
 
 def axe_skipped(axe: Sequence[Check]) -> bool:
-    """axe_checks returns one "skipped" warning when Chromium is unavailable (contract)."""
-    return any("skip" in f"{c.name} {c.code or ''}".lower() for c in axe)
+    """True for axe_checks' "could not run" result: a single warning coded "skipped".
+
+    Matched exactly, because axe-core has a real rule called "skip-link" whose failure
+    must count as a violation, not as a run that never happened.
+    """
+    return (
+        len(axe) == 1 and axe[0].severity == "warning" and axe[0].code in {"skipped", "axe_skipped"}
+    )
 
 
 def document_metrics(items: Sequence[dict]) -> dict:
@@ -959,20 +968,34 @@ def _prompt_versions(task: str, items: Sequence[dict]) -> dict[str, str]:
     return dict(sorted(versions.items()))
 
 
-def _cost(task: str, items: Sequence[dict]) -> dict:
+def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
+    """Cost of the finished items, plus what the budget recorded for the whole run.
+
+    The two differ after a budget stop: an item dropped mid-way (a cheap call made
+    before its escalation was refused, a describe call before its judge call was
+    refused) was paid for but is not in `items`. `budget_spent_usd` includes it;
+    `dropped_usd` is the difference.
+    """
     step_cost = sum(i.get("cost_usd", 0.0) for i in items)
     judge_cost = sum(i.get("judge_cost_usd", 0.0) for i in items)
     n = len(items)
     unit = {"equations": "equation", "figures": "figure"}.get(task, "page")
+    calls = sum(i.get("model_calls", 0) for i in items)
+    if task == "figures":
+        calls += sum(1 for i in items if i.get("judge_prompt_version"))
     out = {
         "total_usd": step_cost + judge_cost,
         "pipeline_usd": step_cost,
         "per_item_usd": step_cost / n if n else None,
         "per_item_unit": unit,
-        "model_calls": sum(i.get("model_calls", 0) for i in items),
+        "model_calls": calls,
     }
     if task == "figures":
         out["judge_usd"] = judge_cost
+    if budget is not None:
+        out["budget_spent_usd"] = budget.spent_usd
+        out["budget_calls"] = budget.calls
+        out["dropped_usd"] = max(0.0, budget.spent_usd - out["total_usd"])
     return out
 
 
@@ -1006,7 +1029,7 @@ def build_report(
         "complete": stopped is None and len(items) == len(planned_ids),
         "stopped_reason": stopped,
         "metrics": METRICS[task](items),
-        "cost": _cost(task, items),
+        "cost": _cost(task, items, cfg.budget),
         "latency_ms": latency_summary(latencies)
         | {"basis": "sum of model-call latencies per item (excludes rendering)"},
     }
@@ -1094,6 +1117,11 @@ def format_markdown(report: dict) -> str:
         f"{cost['model_calls']} model calls. "
         f"Latency p50 {_fmt(latency['p50'], 0)} ms, p95 {_fmt(latency['p95'], 0)} ms.",
     ]
+    if cost.get("dropped_usd"):
+        lines.append(
+            f"Budget recorded ${cost['budget_spent_usd']:.4f}: ${cost['dropped_usd']:.4f} "
+            "went to items dropped at the budget stop."
+        )
     if report["task"] == "equations":
         lines += ["", "### Selective prediction (keep proposals with confidence >= t)", ""]
         lines += _table(

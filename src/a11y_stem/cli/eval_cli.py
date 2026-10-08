@@ -142,7 +142,7 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
     made = _make_client(args, settings)
     if isinstance(made, str):
         return _error(made)
-    client, _budget, label = made
+    client, budget, label = made
     out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
     fetcher = HttpFetcher(cache_dir=_default(OPENSTAX_CACHE))
     with pe.CachedMedia(
@@ -159,6 +159,7 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
             client_label=label,
             gold_label=_shown(gold_dir),
             concurrency=args.concurrency,
+            budget=budget,
         )
         try:
             run = pe.run_pipeline_eval(config)

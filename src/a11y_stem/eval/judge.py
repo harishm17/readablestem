@@ -71,10 +71,14 @@ class Judgement:
 
 def _field(name: str, text: str | None) -> str:
     """One tagged field. Our tag names are removed from the text so a candidate cannot
-    close its own field and pose as the reference."""
+    close its own field and pose as the reference. Removal repeats until nothing
+    changes: one pass would turn "</cand</candidate>idate>" back into a closing tag."""
     cleaned = text or ""
-    for tag in MAX_CHARS:
-        cleaned = cleaned.replace(f"<{tag}>", "").replace(f"</{tag}>", "")
+    previous = None
+    while cleaned != previous:
+        previous = cleaned
+        for tag in MAX_CHARS:
+            cleaned = cleaned.replace(f"<{tag}>", "").replace(f"</{tag}>", "")
     cleaned = cleaned.strip()
     limit = MAX_CHARS[name]
     if len(cleaned) > limit:
