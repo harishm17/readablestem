@@ -427,10 +427,11 @@ def _bulk_action(
     request: Request, job_id: str, slug: str, user: CurrentUser, action: str, min_confidence: str
 ) -> Response:
     try:
-        bulk = parse_bulk(slug, action, min_confidence)
         with session_scope(get_ctx(request).factory) as session:
+            # Ownership first: someone else's job is a 404 whatever the form says.
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            bulk = parse_bulk(slug, action, min_confidence)
             result = DocumentResult.model_validate(job.result_json or {})
             changes = apply_bulk_accept(result, bulk)
             if changes:  # nothing left to accept: no write, no re-render (idempotent)

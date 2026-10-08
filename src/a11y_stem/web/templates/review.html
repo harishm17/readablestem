@@ -63,7 +63,10 @@
     {% if item.kind == "equation" %}
     <p class="part-label">Proposed equation</p>
     {% if item.mathml %}
-    <div class="mathml-preview">{{ item.mathml }}</div>
+    {# A long equation scrolls sideways inside this box; tabindex lets keyboard users
+       scroll it too (axe scrollable-region-focusable). Without JavaScript the page cannot
+       tell which boxes scroll, so every preview is a tab stop with its own name. #}
+    <div class="mathml-preview" tabindex="0" role="group" aria-label="Proposed {{ name }}">{{ item.mathml }}</div>
     {% else %}
     <p>No proposal: type the LaTeX below, or reject to keep the image.</p>
     {% endif %}

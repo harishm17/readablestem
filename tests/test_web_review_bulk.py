@@ -363,16 +363,23 @@ def test_bulk_accept_needs_the_csrf_token(rich):
     assert statuses(rich) == before and edits(rich) == []
 
 
-def test_bulk_accept_on_someone_elses_job_is_not_found(rich):
+def test_bulk_accept_on_someone_elses_job_is_not_found(rich, caplog):
+    caplog.set_level(logging.DEBUG)
+    before = statuses(rich)
     rich.allow(BOB)
     bob = rich.client()
     login(bob, BOB)
-    response = bob.post(
-        f"/jobs/{rich.job_id}/review/headings",
-        data={"csrf_token": token(bob), "action": "accept_all"},
-    )
-    assert response.status_code == 404
+    for slug, action in [("headings", "accept_all"), ("equations", "accept_all")]:
+        # The second form is one the page never offers: still a 404, not a 422 that
+        # would confirm the job exists.
+        response = bob.post(
+            f"/jobs/{rich.job_id}/review/{slug}",
+            data={"csrf_token": token(bob), "action": action},
+        )
+        assert response.status_code == 404
+    assert statuses(rich) == before
     assert edits(rich) == [] and rich.pipeline.rendered == []
+    assert "review_invalid" not in caplog.text and "review_bulk" not in caplog.text
 
 
 def test_bulk_accepts_are_counted_when_the_job_is_deleted(rich):
