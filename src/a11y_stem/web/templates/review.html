@@ -165,12 +165,12 @@
       {% if hg.keep %}
       <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
         <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-        <button type="submit" name="action" value="accept" class="button">Apply to all {{ hg.keep }}<span class="visually-hidden">: keep “{{ hg.text }}” as {{ "a heading" if hg.keep == 1 else "headings" }}{% if hg.level %} at level {{ hg.level }}{% endif %}</span></button>
+        <button type="submit" name="action" value="accept" class="button">Apply to all {{ hg.keep }}<span class="visually-hidden"> {{ "heading" if hg.keep == 1 else "headings" }} “{{ hg.text }}”{% if hg.level %} at level {{ hg.level }}{% endif %}</span></button>
       </form>
       {% endif %}
       <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
         <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-        <button type="submit" name="action" value="reject" class="button-secondary">Make all {{ n }} bold text<span class="visually-hidden">: “{{ hg.text }}” is not a heading</span></button>
+        <button type="submit" name="action" value="reject" class="button-secondary">Make all {{ n }} bold text<span class="visually-hidden"> instead of {{ "a heading" if n == 1 else "headings" }} “{{ hg.text }}”</span></button>
       </form>
     </div>
     {% if hg.keep < n %}<p class="hint">Apply to all leaves out {{ counted(n - hg.keep, "heading", "headings") }} the document would show at another level: choose a level below, or decide {{ "it" if n - hg.keep == 1 else "them" }} one by one.</p>{% endif %}
@@ -261,8 +261,8 @@
 <div id="review-progress" class="review-progress" tabindex="-1">
   {% for notice in notices %}{{ notice_box(notice) }}{% endfor %}
   <p>{% if remaining %}<strong>{{ remaining }} {{ "decision is" if remaining == 1 else "decisions are" }} still needed:</strong>
-    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}
-    {% if optional %}{{ counted(optional|length, "optional check", "optional checks") }} can be looked at if you want; {{ "it does" if optional|length == 1 else "they do" }} not hold anything up.{% endif %}</p>
+    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}{% if optional %}
+    {{ counted(optional|length, "optional check", "optional checks") }} can be looked at if you want; {{ "it does" if optional|length == 1 else "they do" }} not hold anything up.{% endif %}</p>
 </div>
 
 <p>Only what could change what a student reads needs your decision: an equation or

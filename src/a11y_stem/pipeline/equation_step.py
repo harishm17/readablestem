@@ -301,10 +301,15 @@ def _letter_verdict(pdf: _LetterStyles, got: _MathLetters, letter: str) -> Style
             if spare_variables > 0:
                 return "meaning"
             differs = True
-        if got.var_bold and not pdf.bold:  # bold variables the PDF never shows bold
+        gained = got.var_bold > pdf.bold  # more bold variables than bold PDF letters
+        unmatched_plain = pdf.plain > got.var_plain + got.other_plain  # a plain one went
+        if got.var_bold and (not pdf.bold or (gained and unmatched_plain)):
+            # A letter the PDF shows plain became a bold variable (a scalar, or a vector's
+            # component u_i, read as a vector). Only meaning-level when the PDF is known
+            # to show bold where there is bold; a text layer may also just miss glyphs.
             if pdf.known_plain:
                 return "meaning"
-            differs = True  # unknown: the font may not mark bold at all
+            differs = True
         if got.other_bold > max(0, pdf.bold - got.var_bold):
             differs = True  # a bold script the PDF does not show bold
     elif bool(pdf.bold) != bool(got.var_bold + got.other_bold):

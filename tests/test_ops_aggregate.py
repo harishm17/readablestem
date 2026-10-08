@@ -260,3 +260,34 @@ def test_a_failed_batch_leaves_jobs_unaggregated(factory, monkeypatch):
     with db.session_scope(factory) as s:
         assert s.query(db.Job).one().aggregated is False  # rolled back with the counts
         assert s.query(db.ErrorAggregate).count() == 0
+
+
+def test_review_tiers_are_counted_and_a_heading_group_is_one_decision():
+    from test_web_review_triage import triage_output
+
+    counts = job_counts("done", None, 3, triage_output().result.model_dump(mode="json"))
+    assert counts[("heading", "decisions:required")] == 1  # three headings, one decision
+    assert counts[("equation", "decisions:required")] == 1
+    assert counts[("heading", "tier:required")] == 3
+    assert counts[("heading", "tier:required:heading.repeated_label")] == 3
+    assert counts[("heading", "tier:optional")] == 1
+    assert counts[("heading", "tier:optional:heading.weak_evidence")] == 1
+    assert counts[("heading", "tier:none")] == 1
+    assert counts[("equation", "tier:optional:style_cosmetic")] == 1
+    assert counts[("equation", "tier:required:style_mismatch")] == 1
+    assert counts[("equation", "tier:none")] == 1
+
+
+def test_tiers_of_results_stored_before_tiers_come_from_the_pipeline_status():
+    """A stored fix without `review`: its tier is what its pipeline status implied, even
+    after a reviewer accepted it (the `before` snapshot of its first ReviewEdit)."""
+    stored = sentinel_result().model_dump(mode="json")
+    for fix in stored["fixes"]:
+        del fix["review"], fix["group_key"], fix["group_size"]
+        if fix["element_id"] == "p1-e1":
+            fix["status"] = "accepted"  # a reviewer accepted it
+    reviewed = Reviewed(status={"p1-e1": "needs_review"})
+    counts = job_counts("done", None, 2, stored, reviewed)
+    assert counts[("equation", "tier:required")] == 3
+    assert counts[("equation", "decisions:required")] == 3
+    assert counts[("figure", "tier:none")] == 1

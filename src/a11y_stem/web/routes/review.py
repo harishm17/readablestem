@@ -627,7 +627,7 @@ def _landing(job_id: str, result: DocumentResult, element_id: str) -> str:
 
 
 GROUP_DONE = {
-    "accept": "Kept {n} as headings.",
+    "accept": "Kept {n} as they are.",
     "edit": "Set {n} to level {level}.",
     "reject": "Made {n} bold text instead of headings.",
 }

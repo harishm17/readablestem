@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
@@ -455,3 +457,99 @@ def test_manifest_hash_tracks_content(tmp_path):
     path = next(gold.rglob("*.jsonl"))
     path.write_text(path.read_text().replace("block", "inline"))
     assert pe.manifest_sha256(gold) != no_manifest
+
+
+# ---------------------------------------------------------------------- review load
+
+
+def test_flag_metrics_count_a_group_as_one_decision():
+    # Units: (required, wrong members). A required group of 11 with 0 wrong, a required
+    # group of 2 with 2 wrong, a single wrong one that is only optional, a clean single.
+    m = pe.flag_metrics([(True, 0), (True, 2), (False, 1), (False, 0)])
+    assert (m["required_units"], m["required_units_wrong"]) == (2, 1)
+    assert (m["wrong"], m["wrong_required"]) == (3, 2)
+    assert m["flag_precision"] == 0.5
+    assert m["flag_recall"] == pytest.approx(2 / 3)
+    empty = pe.flag_metrics([])
+    assert (empty["flag_precision"], empty["flag_recall"]) == (None, None)
+
+
+def review_item(item_id, exact, review, gap=False, reasons=()):
+    return {"id": item_id, "exact_lenient": exact, "review": review, "scorer_gap": gap,
+            "tier_reasons": list(reasons)}  # fmt: skip
+
+
+def test_equation_review_load_reports_flags_with_and_without_scorer_gaps():
+    items = [
+        review_item("o/b/s1/eq-0", False, "required", reasons=["style_mismatch"]),  # caught
+        review_item("o/b/s1/eq-1", True, "required", reasons=["below_accept"]),  # false alarm
+        review_item("o/b/s1/eq-2", False, "optional", reasons=["style_cosmetic"]),  # hidden
+        review_item("o/b/s2/eq-0", False, "none", gap=True),  # scorer gap
+        review_item("o/b/s2/eq-1", True, "none"),
+    ]
+    load = pe.equation_review_load(items)
+    assert (load["required"], load["optional"], load["sections"]) == (2, 1, 2)
+    assert load["required_per_section"] == 1.0 and load["required_per_item"] == 0.4
+    assert load["flags"]["flag_precision"] == 0.5
+    assert load["flags"]["flag_recall"] == pytest.approx(1 / 3)
+    assert load["flags_excluding_scorer_gaps"]["flag_recall"] == 0.5
+    assert load["scorer_gaps"] == ["o/b/s2/eq-0"]
+    assert [w["id"] for w in load["wrong_not_required"]] == ["o/b/s1/eq-2", "o/b/s2/eq-0"]
+    assert load["required_by_reason"] == {"below_accept": 1, "style_mismatch": 1}
+    assert load["optional_by_reason"] == {"style_cosmetic": 1}
+
+
+def test_scorer_gaps_are_equations_whose_known_correct_latex_still_fails(tmp_path):
+    records = [
+        {"id": "a", "kind": "equation", "mathml": latex_to_mathml(V_LATEX)},
+        {"id": "b", "kind": "equation", "mathml": latex_to_mathml("x = 1")},
+    ]
+    predictions = tmp_path / "known.jsonl"
+    rows = [{"id": "a", "latex": V_LATEX}, {"id": "b", "latex": "y = 2"}]
+    predictions.write_text("".join(json.dumps(row) + "\n" for row in rows))
+    assert pe.scorer_gap_ids(records, predictions) == frozenset({"b"})
+    assert pe.scorer_gap_ids(records, tmp_path / "missing.jsonl") == frozenset()
+
+
+def hp(level, text, review, group=None, status="accepted"):
+    return p(level, text, status) | {"review": review, "group_key": group, "tier_reasons": []}
+
+
+def test_heading_flags_judge_each_heading_and_count_groups_once():
+    gold = [h(2, "Motion"), h(3, "Teacher Support"), h(3, "Teacher Support"), h(5, "Deep")]
+    predicted = [
+        hp(1, "Motion", "none"),
+        hp(2, "Teacher Support", "required", "hg-1", "needs_review"),
+        hp(2, "Solution", "optional"),  # not a gold heading: wrong, not required
+        hp(2, "Teacher Support", "required", "hg-1", "needs_review"),
+        hp(2, "Deep", "optional"),  # gold level 5 (3 below the top), predicted 1 below
+    ]
+    row = pe.heading_page_item("p", gold, predicted)
+    flags = pe.heading_flags(row, predicted)
+    assert sorted(map(tuple, flags["units"])) == [(False, 0), (False, 1), (False, 1), (True, 0)]
+    why = {w["text"]: w["why_wrong"] for w in flags["wrong_not_required"]}
+    assert why == {"Solution": "not_a_gold_heading", "Deep": "wrong_level"}
+    m = pe.flag_metrics(flags["units"])
+    assert (m["flag_precision"], m["flag_recall"]) == (0.0, 0.0)
+
+
+def test_document_review_load_combines_equations_and_headings():
+    item = {
+        "id": "p",
+        "pdf_pages": 4,
+        "review": pe.load_counts([]) | {"required_decisions": 2, "optional": 3},
+        "pairs": [
+            {"gold_id": "g1", "exact_lenient": False, "review": "required", "scorer_gap": False},
+            {"gold_id": "g2", "exact_lenient": False, "review": "none", "scorer_gap": True},
+            {"gold_id": "g3", "exact_lenient": True, "review": "none", "scorer_gap": False},
+        ],
+        "heading_flags": {"units": [[True, 2], [False, 1]], "wrong_not_required": [
+            {"text": "Solution", "why_wrong": "not_a_gold_heading"}]},
+    }  # fmt: skip
+    load = pe.document_review_load([item])
+    assert (load["required_per_pdf_page"], load["optional_per_pdf_page"]) == (0.5, 0.75)
+    assert load["equation_flags"]["flag_recall"] == 0.5
+    assert load["equation_flags_excluding_scorer_gaps"]["flag_recall"] == 1.0
+    assert load["heading_flags"]["flag_recall"] == pytest.approx(2 / 3)
+    assert load["flags"]["flag_precision"] == 1.0
+    assert [w["kind"] for w in load["wrong_not_required"]] == ["equation", "heading"]

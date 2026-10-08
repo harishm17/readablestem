@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -171,6 +172,9 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
     ):
         assert line in captured.out
     assert "accepted" in captured.out  # fix table header
+    assert re.search(
+        r"^Review:      \d+ decisions? needed.*, \d+ optional checks?$", captured.out, re.M
+    )
     assert TITLE not in captured.out + captured.err  # never prints document text
     assert PARAGRAPH not in captured.out + captured.err
     assert "page 1/1 done" in captured.err

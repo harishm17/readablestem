@@ -314,3 +314,14 @@ def test_two_column_handout_inline_maths():
         ("\u2022", 1),
         ("\u2022", 1),
     ]
+
+
+def test_two_column_handout_records_which_letters_are_known_plain():
+    """Element.regular_letters: letters in a regular font with a bold face (CMMI), so
+    the equation step can tell a scalar made bold; MSBM's double-struck R and the bold
+    CMMIB/CMBX vectors are not in it."""
+    layout = load("linear_algebra_twocol")
+    by_text = {plain(e.text): e for e in layout.elements if e.kind == Kind.EQUATION}
+    assert by_text["v∈Rn"].regular_letters == "n"  # bold v in R^n: R is MSBM
+    assert by_text["\u03c9"].regular_letters is None  # bold omega alone
+    assert by_text["Ax=b"].regular_letters == "A"  # bold x and b
