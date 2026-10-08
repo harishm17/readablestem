@@ -19,6 +19,14 @@ from pydantic import BaseModel, Field
 
 BBox = tuple[float, float, float, float]  # x0, y0, x1, y1 in PDF points
 
+# Inline equations sit inside a paragraph. The paragraph's `text` holds this marker where
+# the equation goes, and the equation element's `parent_id` is the paragraph id.
+INLINE_MARKER = "\u27e6{id}\u27e7"  # rendered e.g. "⟦p1-e7⟧"
+
+
+def inline_marker(element_id: str) -> str:
+    return INLINE_MARKER.format(id=element_id)
+
 
 class Kind(StrEnum):
     HEADING = "heading"
@@ -107,6 +115,7 @@ class Element(BaseModel):
     score: float | None = None
     reasons: list[str] = Field(default_factory=list)
     display: Literal["block", "inline"] | None = None  # equations only
+    parent_id: str | None = None  # inline equations: id of the containing paragraph
     caption: str | None = None  # figures: nearby "Figure N ..." text, if found
 
 
