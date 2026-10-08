@@ -225,6 +225,82 @@ def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = N
     return f'<math display="{display}"{id_attr}>{inner}</math>'
 
 
+# --------------------------------------------------------------------------- width
+
+# Rough advance widths in em, for deciding which display equations may be wider than a
+# phone screen (see `WIDE_EQUATION_EM`). Erring wide is cheap: one more tab stop.
+_RELATIONS = frozenset(
+    "=<>\u2264\u2265\u2260\u2248\u2261\u2245\u223c\u221d"
+    "\u2192\u2190\u2194\u21d2\u21d0\u21d4\u2208\u2209\u2282\u2286\u2283\u2287"
+)
+_BINARY = frozenset("+-\u2212\u00d7\u00b7\u00f7\u00b1\u2213\u2218\u2217\u222a\u2229\u2227\u2228")
+_SCRIPT_SCALE = 0.71  # scriptlevel 1 is about 71% of the base size
+
+
+def _token_em(name: str, text: str) -> float:
+    chars = len(text.strip())
+    if name == "mo":
+        stripped = text.strip()
+        if stripped in _RELATIONS:
+            return 0.6 + 0.56  # a thick space either side
+        if stripped in _BINARY:
+            return 0.6 + 0.44  # a medium space either side
+        return 0.45 * chars + (0.17 if stripped in {",", ";"} else 0.0)
+    if name == "ms":
+        chars += 2  # the quotes
+    return 0.6 * chars + 0.25 * text.strip().count(" ")
+
+
+def _width_em(node: XmlElement) -> float:
+    _, name = _split_tag(node.tag) if isinstance(node.tag, str) else ("", "")
+    children = list(node)
+    if name in {"mi", "mn", "mo", "mtext", "ms"}:
+        return _token_em(name, "".join(node.itertext()))
+    if name == "mspace":
+        width = node.attrib.get("width", "")
+        return float(width[:-2]) if re.fullmatch(r"\d+(\.\d+)?em", width) else 0.0
+    widths = [_width_em(child) for child in children]
+    if not widths:
+        return 0.0
+    if name == "mfrac":
+        return max(widths) + 0.2
+    if name in {"msub", "msup"}:
+        return widths[0] + _SCRIPT_SCALE * sum(widths[1:])
+    if name == "msubsup":
+        return widths[0] + _SCRIPT_SCALE * max(widths[1:], default=0.0)
+    if name in {"munder", "mover", "munderover"}:
+        return max([widths[0], *(_SCRIPT_SCALE * w for w in widths[1:])])
+    if name == "msqrt":
+        return sum(widths) + 1.0
+    if name == "mroot":
+        return widths[0] + _SCRIPT_SCALE * sum(widths[1:]) + 1.0
+    if name == "menclose":
+        return sum(widths) + 0.5
+    if name == "mmultiscripts":
+        return widths[0] + _SCRIPT_SCALE * sum(widths[1:]) / 2
+    if name == "mtable":
+        columns: list[float] = []  # widest cell per column
+        for row in children:
+            for i, cell in enumerate(row):
+                if i == len(columns):
+                    columns.append(0.0)
+                columns[i] = max(columns[i], _width_em(cell))
+        return sum(columns) + 0.8 * max(0, len(columns) - 1)
+    return sum(widths)  # rows, styles and anything else laid out in a line
+
+
+def estimate_width_em(mathml: str) -> float:
+    """Approximate rendered width of (sanitised) MathML in em of its own font size."""
+    try:
+        root = SafeET.fromstring(mathml, forbid_dtd=True)
+    except (ParseError, DefusedXmlException, ValueError):
+        return 0.0
+    try:
+        return _width_em(root)
+    except RecursionError:  # the sanitiser caps depth at 64; this is belt and braces
+        return float("inf")
+
+
 # --------------------------------------------------------------------------- helpers
 
 
@@ -273,6 +349,29 @@ def _equation_label(label: str | None) -> str:
         f'<span class="visually-hidden {AUTHORED_CLASS}">Equation </span>'
         f"{_escape(' '.join(label.split()))}</span>"
     )
+
+
+# A display equation estimated at least this wide (em of its own font) may not fit a
+# 320 CSS px screen: the column is then 288 px and the maths 19.8 px, so 14.5 em fit.
+# The estimate came within -18% / +44% of Chromium's widths for the gold equations, and
+# maths fonts differ between systems, hence the margin.
+WIDE_EQUATION_EM = 11.0
+
+
+def _scroller_attrs(mathml: str, label: str | None) -> str:
+    """Attributes that make a wide equation's box a named tab stop ("" if not wide).
+
+    `.equation` (display) and `.equation-scroll` (inline) scroll sideways when the
+    maths is wider than the screen (WCAG 1.4.10: the equation scrolls, not the page).
+    Keyboard users can only scroll a box that can take focus (axe
+    `scrollable-region-focusable`), but a tab stop on every equation would make a long
+    document tedious to tab through, so only equations that may be too wide for a
+    phone get one, named "Equation" (plus its number) for the focus.
+    """
+    if estimate_width_em(mathml) < WIDE_EQUATION_EM:
+        return ""
+    name = f"Equation {' '.join(label.split())}" if label and label.strip() else "Equation"
+    return f' tabindex="0" role="group" aria-label="{_escape(name)}"'
 
 
 def _fix_attrs(fix: Fix | None, reason: str | None) -> str:
@@ -637,13 +736,19 @@ class _Renderer:
         label = _equation_label(element.equation_label)
         if mathml is not None:
             css = "equation equation-labelled" if label else "equation"
-            return f'<div class="{css}"{self.id_attr(element.id)}>{mathml}{label}</div>'
+            attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
+            return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
         original = self.original(element, EQUATION_NOT_CONVERTED_ALT) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
     def inline_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "inline", with_id=True)
         if mathml is not None:
+            # A long one would widen the page: it scrolls in a box of its own instead
+            # (only those, since a scroll box sits on the text's baseline differently).
+            scroller = _scroller_attrs(mathml, None)
+            if scroller:
+                return f'<span class="equation-scroll"{scroller}>{mathml}</span>'
             return mathml
         self.flagged.add(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
@@ -788,7 +893,10 @@ main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wra
 h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
-.equation { margin: 1em 0; text-align: center; }
+.equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
+  overflow-x: auto; overflow-y: hidden; }
+.equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
+  overflow-x: auto; overflow-y: hidden; }
 .equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
 .equation-labelled > math { flex: 1 0 auto; }
 .equation-label { flex: none; margin-left: auto; }

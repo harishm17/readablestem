@@ -47,7 +47,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 | Heading | `<h1>`-`<h6>` from the heading fix | `<p>` with the original text |
 | Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
-| Inline equation | `<math display="inline">` inside the paragraph or list item | the crop inline, outlined, with "(equation not converted)" |
+| Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
 | Figure | `<figure><img alt="..."><figcaption>` | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
@@ -125,6 +125,32 @@ centred, the number sits at the right. The maths never shrinks below its own wid
 when both do not fit (a long equation on a 320 px screen) the number moves to the next
 line, right-aligned, instead of being painted over (WCAG 1.4.10). An equation that was
 not converted keeps its number too, after the original image in the flagged box.
+
+## Wide equations
+
+An equation cannot wrap, so one wider than the screen scrolls sideways in its own box
+and the page does not (WCAG 1.4.10, reflow at 320 CSS px). Every display equation's
+`<div class="equation">` scrolls when it has to (`overflow-x: auto`). A box can only be
+scrolled from the keyboard if it can take focus, but a tab stop on every equation makes
+a long document tedious to tab through, so only equations that may be too wide for a
+phone become named tab stops:
+
+```html
+<div class="equation" id="p3-e5" tabindex="0" role="group" aria-label="Equation (2.4)">
+  <math display="block">...</math>...</div>
+<p>The sum <span class="equation-scroll" tabindex="0" role="group" aria-label="Equation">
+  <math display="inline" id="p3-e7">...</math></span> is long.</p>
+```
+
+Which ones is an estimate from the MathML (`assemble.estimate_width_em`: token widths,
+fractions as wide as their wider part, scripts at 71%, table columns): at least
+`WIDE_EQUATION_EM` (11 em of the maths font), against the 14.5 em that fit in the 288 px
+column of a 320 px screen. On the gold equations the estimate was within -18% and +44%
+of Chromium's widths; the margin covers other maths fonts. A wide inline equation gets
+its own scroll box (`.equation-scroll`, an inline block); short ones stay plain, since
+a scroll box sits on the line differently. `tests/test_assemble_wide.py` checks in
+Chromium at 320 px that the page does not scroll sideways, that every gold equation
+that overflows is a tab stop, that arrow keys scroll it, and axe.
 
 ## Flagged items
 
@@ -228,6 +254,8 @@ About 35 lines of inline CSS:
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
   (about 17:1 contrast);
 - images at their printed size (PDF points x 96/72) and never wider than the column;
+- display equations scroll sideways inside their `.equation` box when wider than the
+  screen (see "Wide equations");
 - block maths keep the browser's own `display: block math` and centring (overriding
   `display` on `<math>` breaks MathML layout);
 - lists with a hanging indent for printed markers (reset for anything nested in such an
@@ -363,8 +391,8 @@ which reports the scope `daily` because it stands in for the web app's daily cap
 
 TODO(Harish): turn these into the public known-limits copy.
 
-- A very wide display equation widens the page instead of scrolling inside its own box (a
-  scroll box would need `tabindex` to be keyboard-reachable on every equation).
+- An equation wider than the screen does not wrap: it scrolls sideways inside its own
+  box (a tab stop when it may not fit a phone screen).
 - NEEDS_REVIEW items look like converted ones in an export made before review.
 - Tables are not rebuilt; a table that layout reports as a figure becomes an image with
   alt text.
