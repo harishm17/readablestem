@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "task": "document",
+  "date": "2026-10-08",
+  "pipeline_version": "0.2.0",
+  "prompt_versions": {
+    "equation": "equation-df0e12f1",
+    "figure": "figure-ac51f42d"
+  },
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
+  },
+  "models_used": [
+    "gpt-6-luna",
+    "gpt-6.1-sol"
+  ],
+  "client": "openai",
+  "dataset": {
+    "gold_dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "limit": null,
+    "unit": "page",
+    "selection_sha256": "92c3697eae341a202a89da0a855e4826cd40525ef1780d67ba648bf53de4dc95"
+  },
+  "n_planned": 3,
+  "n": 3,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "gold_equations": 30,
+    "predicted_equations": 55,
+    "matched": 30,
+    "detection_precision": 0.5454545454545454,
+    "detection_recall": 1.0,
+    "detection_recall_by_display": {
+      "block": {
+        "n_gold": 17,
+        "recall": 1.0
+      },
+      "inline": {
+        "n_gold": 13,
+        "recall": 1.0
+      }
+    },
+    "matched_exact_lenient": 0.7333333333333333,
+    "matched_mean_teds": 0.8605285549711928,
+    "end_to_end_exact_lenient": 0.7333333333333333,
+    "unmatched_predicted": 25,
+    "unmatched_by_reason": {
+      "prose_math": 24,
+      "fragment": 0,
+      "other": 1
+    },
+    "detection_precision_excluding_prose_math": 0.967741935483871,
+    "split_gold_equations": 0,
+    "static_violations": 0,
+    "static_violation_codes": {},
+    "axe_violations": 0,
+    "axe_violation_codes": {},
+    "axe_checked_pages": 3,
+    "axe_skipped_pages": 0,
+    "axe_error_pages": 0,
+    "page_errors": {}
+  },
+  "cost": {
+    "total_usd": 0.13721556000000001,
+    "pipeline_usd": 0.13721556000000001,
+    "per_item_usd": 0.045738520000000005,
+    "per_item_unit": "section",
+    "model_calls": 86,
+    "pdf_pages": 43,
+    "per_pdf_page_usd": 0.003191059534883721,
+    "budget_spent_usd": 0.13721556000000004,
+    "budget_calls": 86,
+    "dropped_usd": 2.7755575615628914e-17
+  },
+  "latency_ms": {
+    "p50": 40746.0,
+    "p95": 56467.2,
+    "n": 3,
+    "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)"
+  }
+}

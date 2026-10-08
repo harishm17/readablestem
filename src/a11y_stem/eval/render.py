@@ -959,15 +959,18 @@ def demo_note_html(
         else ""
     )
     source = (
-        f' a11y-stem is free, open-source software; its complete source code is at <a href="'
-        f'{esc(source_url, quote=True)}">{esc(source_url)}</a> (it uses PyMuPDF under the '
+        f' a11y-stem is free, open-source software; its complete <a href="'
+        f'{esc(source_url, quote=True)}">source code is on GitHub</a> (it uses PyMuPDF under the '
         "GNU Affero General Public License v3)."
         if source_url
         else ""
     )
+    # Descriptive link text (WCAG 2.4.4) instead of raw URLs, and overflow-wrap so nothing
+    # in the note can widen the page at 320 CSS px (WCAG 1.4.10).
     return (
         '<aside aria-label="About this demo" style="border:2px solid #1a4f8b;'
-        'padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;">\n'
+        "padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;"
+        'overflow-wrap:anywhere;">\n'
         + fake
         + "<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print "
         f"of “{esc(page.page_title)}” from <cite>{esc(page.book_title)}</cite> by "
@@ -975,8 +978,8 @@ def demo_note_html(
         "image descriptions below are the tool's proposals with confidence scores; the "
         "ones marked for review have not been checked by a person. a11y-stem assists "
         "with accessibility work; it does not replace review.</p>\n"
-        f'<p>Original page: <a href="{esc(page.page_url, quote=True)}">'
-        f"{esc(page.page_url)}</a>. Licensed under "
+        f'<p>Read <a href="{esc(page.page_url, quote=True)}">the original page on '
+        "openstax.org</a>. Licensed under "
         f'<a href="{esc(page.license_url, quote=True)}">{esc(page.license_name)}</a> '
         f"({esc(page.license_short)}). Access for free at openstax.org. a11y-stem is not "
         "affiliated with or endorsed by OpenStax.</p>\n"

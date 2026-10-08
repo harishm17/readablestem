@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "task": "equations",
+  "date": "2026-10-08",
+  "pipeline_version": "0.2.0",
+  "prompt_versions": {
+    "equation": "equation-df0e12f1"
+  },
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
+  },
+  "models_used": [
+    "gpt-6-luna",
+    "gpt-6.1-sol"
+  ],
+  "client": "openai",
+  "dataset": {
+    "gold_dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "limit": null,
+    "unit": "equation",
+    "selection_sha256": "8d5112eb7a62daaac34b8943cc7557b65d59ec1a3d3c739b5e4932a6daf5c008"
+  },
+  "n_planned": 30,
+  "n": 30,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "exact_strict": 0.4,
+    "exact_lenient": 0.7666666666666667,
+    "exact_lenient_ci95": [
+      0.5907167369328042,
+      0.8820761191944214
+    ],
+    "mean_teds": 0.864787814230452,
+    "proposal_rate": 1.0,
+    "by_status": {
+      "accepted": {
+        "n": 29,
+        "share": 0.9666666666666667,
+        "exact_lenient": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      "needs_review": {
+        "n": 1,
+        "share": 0.03333333333333333,
+        "exact_lenient": 0.0,
+        "mean_teds": 0.9705882352941176
+      }
+    },
+    "by_route": {
+      "cheap": {
+        "n": 8,
+        "share": 0.26666666666666666,
+        "exact_lenient": 1.0,
+        "mean_teds": 0.9125
+      },
+      "main": {
+        "n": 17,
+        "share": 0.5666666666666667,
+        "exact_lenient": 0.5882352941176471,
+        "mean_teds": 0.8633510447204057
+      },
+      "escalated": {
+        "n": 5,
+        "share": 0.16666666666666666,
+        "exact_lenient": 1.0,
+        "mean_teds": 0.7933333333333333
+      }
+    },
+    "by_display": {
+      "block": {
+        "n": 17,
+        "share": 0.5666666666666667,
+        "exact_lenient": 0.5882352941176471,
+        "mean_teds": 0.8633510447204057
+      },
+      "inline": {
+        "n": 13,
+        "share": 0.43333333333333335,
+        "exact_lenient": 1.0,
+        "mean_teds": 0.8666666666666667
+      }
+    },
+    "selective": [
+      {
+        "threshold": 0.5,
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.864787814230452
+      },
+      {
+        "threshold": 0.55,
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.864787814230452
+      },
+      {
+        "threshold": 0.6,
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      {
+        "threshold": 0.65,
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      {
+        "threshold": 0.7,
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      {
+        "threshold": 0.75,
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      {
+        "threshold": 0.8,
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      {
+        "threshold": 0.85,
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7931034482758621,
+        "mean_teds": 0.8611395238489464
+      },
+      {
+        "threshold": 0.9,
+        "kept": 28,
+        "coverage": 0.9333333333333333,
+        "accuracy": 0.7857142857142857,
+        "mean_teds": 0.8633230782721231
+      },
+      {
+        "threshold": 0.95,
+        "kept": 22,
+        "coverage": 0.7333333333333333,
+        "accuracy": 0.8181818181818182,
+        "mean_teds": 0.8723918066293432
+      }
+    ]
+  },
+  "cost": {
+    "total_usd": 0.04933064,
+    "pipeline_usd": 0.04933064,
+    "per_item_usd": 0.0016443546666666667,
+    "per_item_unit": "equation",
+    "model_calls": 35,
+    "budget_spent_usd": 0.049330639999999995,
+    "budget_calls": 35,
+    "dropped_usd": 0.0
+  },
+  "latency_ms": {
+    "p50": 6085.5,
+    "p95": 15574.15,
+    "n": 30,
+    "basis": "sum of model-call latencies per item (excludes rendering)"
+  }
+}

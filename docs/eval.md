@@ -388,11 +388,11 @@ uv run a11y-stem eval gate --require-current --current data/eval/latest-equation
 After a prompt or model change, re-run the task, promote the new report `--as latest`
 and commit it with the change; CI's gate fails (exit 2) until you do.
 
-TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The real runs
-are in the main checkout's `.local/eval/` (equations-run3, headings-run1, figures-run2,
-document-run1); review them and promote each as both baseline and latest. Note that
-figures-run1 was graded by the older text-only judge and cannot be a baseline for runs
-graded with the image.
+TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The final real
+runs on the finished beta code (2026-10-08) are committed as `data/eval/latest-<task>.json`
+(see "Results" below); review them and promote each as the baseline. Earlier runs are in
+the main checkout's `.local/eval/`. figures-run1 was graded by the older text-only judge
+and cannot be a baseline for runs graded with the image.
 
 Weekly sample (drift check between full runs): a 5% share of the gold units, seeded by
 the ISO week, scored like any other run (`eval/sample.py`). Reports go to
@@ -407,13 +407,14 @@ TODO(Harish): decide whether to schedule it (it spends money; `eval-live.yml` is
 manual-only on purpose), and whether opted-in production pages should join the sample
 once their review labels exist as gold.
 
-Public demo (do not commit the output until the page is chosen):
+Public demo:
 
-TODO(Harish): choose the demo page and approve the spend for a real-model build
-(about $0.05 for one section at the first document run's cost), then commit the
-output. Until then `/demo` shows the "being prepared" page and `ops launch-check`
-lists the demo as unfinished; a `--fake` build is marked as a placeholder and is
-flagged too.
+A provisional demo is committed: OpenStax *Physics* 2.3 "Position vs. Time Graphs" (13 PDF
+pages, 28 model calls, $0.027, built 2026-10-08 with the real models; axe-core clean at
+1100 and 320 CSS px). It shows the pipeline's proposals as they come, including ones a
+reviewer would fix (equation 2.5 has a plain v where the book has a bold vector).
+TODO(Harish): keep this page or choose another, then rebuild with the command below. A
+`--fake` build is marked as a placeholder and `ops launch-check` flags it.
 
 ```
 uv run a11y-stem demo build --page 2-2-speed-and-velocity --max-usd 1.00
@@ -424,6 +425,32 @@ short note saying it is a precomputed demo of an OpenStax CC BY page, with attri
 and a link to the original), `report.json` (the `DocumentResult` without the HTML) and
 `source.pdf` (the exact input) to `src/a11y_stem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
+
+## Results (2026-10-08, beta code, gpt-6.1-sol and gpt-6-luna)
+
+Reports: `data/eval/latest-<task>.json`. Sample: 3 sections of OpenStax *Physics* ch. 2 (CC
+BY 4.0). Small: read the confidence intervals before reading the point estimates.
+
+| Task | n | Headline | Cost |
+|---|---|---|---|
+| equations | 30 | exact_lenient 0.767 (95% CI 0.591-0.882; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.865 | $0.0016 per equation |
+| headings | 121 | recall 1.000 (CI 0.969-1.000), level accuracy 0.992, precision 0.877 (every extra is NEEDS_REVIEW) | no model calls |
+| figures | 13 | image-aware judge pass 0.923 (CI 0.667-0.986), factual errors 0 (judge not yet calibrated) | $0.0035 per figure |
+| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations | $0.0032 per PDF page |
+
+How the equations number got there (error analysis on real runs, same 30 equations):
+
+| Run | Change | exact_lenient | Real misses auto-accepted |
+|---|---|---|---|
+| 1 | first run | 0.367 | (inputs wrong, see run 2) |
+| 2 | eval harness fix: Chromium ignores `mathvariant`, so bold vectors were rendered plain; now drawn as Unicode math bold | 0.600 | 7 |
+| 3 | text-layer style check: a bold letter in the PDF read as plain (or the reverse) lowers confidence, escalating cheap-model answers and keeping the fix in review | 0.767 | 1 |
+
+The model's self-reported confidence was uninformative (every proposal >= 0.88); the
+deterministic check against the PDF's own text layer is what separates right from wrong.
+The figures judge went from pass 0.46 to 0.92 when it was given the image: the text-only
+judge counted correct details missing from the reference as errors, and in one case the
+reference itself was wrong (it says five miles; the caption says 10 km round trip).
 
 ## What the numbers do not show
 

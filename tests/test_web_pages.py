@@ -62,9 +62,15 @@ class Page(HTMLParser):
 @pytest.fixture(scope="module")
 def pages(tmp_path_factory) -> dict[str, str]:
     """Every kind of page, rendered once, as the user who can see it."""
-    env = WebEnv(tmp_path_factory.mktemp("pages"))
+    from a11y_stem.web.routes import pages as pages_module
+
+    root = tmp_path_factory.mktemp("pages")
+    env = WebEnv(root)
     out: dict[str, str] = {}
-    with env.running() as anon:
+    # The committed demo is a converted document, not an app page: render /demo here as it
+    # looks before a demo is built (the real file is checked in test_committed_demo_*).
+    with pytest.MonkeyPatch.context() as mp, env.running() as anon:
+        mp.setattr(pages_module, "DEMO_PAGE", root / "no-demo" / "index.html")
         for path in (
             "/",
             "/demo",
@@ -217,6 +223,22 @@ def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
     with env.running() as client:
         response = client.get("/demo")
     assert response.status_code == 200 and "maths" in response.text
+    assert response.headers["content-security-policy"] == VIEW_CSP
+
+
+def test_committed_demo_is_real_output_and_served_sandboxed(tmp_path):
+    from a11y_stem.web.routes import pages as pages_module
+
+    demo = pages_module.DEMO_PAGE
+    if not demo.is_file():
+        pytest.skip("no demo built (a11y-stem demo build)")
+    text = demo.read_text(encoding="utf-8")
+    assert 'data-a11y-stem-demo="placeholder"' not in text  # built with the real models
+    assert "openstax.org" in text and "CC BY" in text  # attribution travels with it
+    env = WebEnv(tmp_path)
+    with env.running() as client:
+        response = client.get("/demo")
+    assert response.status_code == 200 and "<math" in response.text
     assert response.headers["content-security-policy"] == VIEW_CSP
 
 

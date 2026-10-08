@@ -1,0 +1,144 @@
+{
+  "schema_version": 1,
+  "task": "headings",
+  "date": "2026-10-08",
+  "pipeline_version": "0.2.0",
+  "prompt_versions": {},
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
+  },
+  "models_used": [],
+  "client": "fake",
+  "dataset": {
+    "gold_dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "limit": null,
+    "unit": "page",
+    "selection_sha256": "92c3697eae341a202a89da0a855e4826cd40525ef1780d67ba648bf53de4dc95"
+  },
+  "n_planned": 3,
+  "n": 3,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "gold_headings": 121,
+    "predicted_headings": 138,
+    "matched": 121,
+    "precision": 0.8768115942028986,
+    "recall": 1.0,
+    "recall_ci95": [
+      0.9692293015820281,
+      1.0
+    ],
+    "f1": 0.9343629343629344,
+    "level_accuracy": 0.9917355371900827,
+    "precision_by_status": {
+      "accepted": {
+        "n": 77,
+        "precision": 1.0
+      },
+      "needs_review": {
+        "n": 61,
+        "precision": 0.7213114754098361
+      }
+    },
+    "recall_by_context": {
+      "body": {
+        "n": 20,
+        "recall": 1.0
+      },
+      "learning-objectives": {
+        "n": 3,
+        "recall": 1.0
+      },
+      "links-to-physics": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "note": {
+        "n": 7,
+        "recall": 1.0
+      },
+      "os-exercise": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "os-teacher": {
+        "n": 50,
+        "recall": 1.0
+      },
+      "snap-lab": {
+        "n": 6,
+        "recall": 1.0
+      },
+      "teacher-demonstration": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "tips-for-success": {
+        "n": 7,
+        "recall": 1.0
+      },
+      "virtual-physics": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "watch-physics": {
+        "n": 4,
+        "recall": 1.0
+      },
+      "work-in-physics": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "worked-example": {
+        "n": 14,
+        "recall": 1.0
+      }
+    },
+    "per_page": [
+      {
+        "id": "physics/2-1-relative-motion-distance-and-displacement",
+        "precision": 0.9230769230769231,
+        "recall": 1.0,
+        "n_gold": 48,
+        "n_pred": 52,
+        "error": null
+      },
+      {
+        "id": "physics/2-2-speed-and-velocity",
+        "precision": 0.84,
+        "recall": 1.0,
+        "n_gold": 42,
+        "n_pred": 50,
+        "error": null
+      },
+      {
+        "id": "physics/2-3-position-vs-time-graphs",
+        "precision": 0.8611111111111112,
+        "recall": 1.0,
+        "n_gold": 31,
+        "n_pred": 36,
+        "error": null
+      }
+    ],
+    "page_errors": {}
+  },
+  "cost": {
+    "total_usd": 0.0,
+    "pipeline_usd": 0.0,
+    "per_item_usd": 0.0,
+    "per_item_unit": "page",
+    "model_calls": 0,
+    "budget_spent_usd": 0.0,
+    "budget_calls": 0,
+    "dropped_usd": 0.0
+  },
+  "latency_ms": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "n": 3,
+    "basis": "sum of model-call latencies per item (excludes rendering)"
+  }
+}

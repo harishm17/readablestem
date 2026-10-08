@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "task": "figures",
+  "date": "2026-10-08",
+  "pipeline_version": "0.2.0",
+  "prompt_versions": {
+    "figure": "figure-ac51f42d",
+    "judge": "judge_figure-137e2607"
+  },
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna",
+    "judge": "gpt-6.1-sol"
+  },
+  "models_used": [
+    "gpt-6.1-sol"
+  ],
+  "client": "openai",
+  "dataset": {
+    "gold_dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "limit": null,
+    "unit": "figure",
+    "selection_sha256": "ff55fd8f6e2e932fd674df868a755e7871e91ca5d1143afb81cb92af979977d9"
+  },
+  "n_planned": 13,
+  "n": 13,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "proposal_rate": 1.0,
+    "check_pass_rate": 1.0,
+    "failed_check_codes": {},
+    "by_status": {
+      "accepted": 13
+    },
+    "figure_types": {
+      "chart": 4,
+      "diagram": 5,
+      "illustration": 2,
+      "photo": 2
+    },
+    "with_reference": 13,
+    "judge_measured": 13,
+    "judge_errors": 0,
+    "judge_pass_rate": 0.9230769230769231,
+    "judge_pass_rate_ci95": [
+      0.666860488286395,
+      0.986289578909774
+    ],
+    "judge_pass_rate_answered": 0.9230769230769231,
+    "judge_mean_score": 4.615384615384615,
+    "judge_factual_error_rate": 0.0,
+    "decorative_rate": 0.0
+  },
+  "cost": {
+    "total_usd": 0.085894,
+    "pipeline_usd": 0.045098,
+    "per_item_usd": 0.003469076923076923,
+    "per_item_unit": "figure",
+    "model_calls": 26,
+    "judge_usd": 0.040796,
+    "budget_spent_usd": 0.08589400000000001,
+    "budget_calls": 26,
+    "dropped_usd": 1.3877787807814457e-17
+  },
+  "latency_ms": {
+    "p50": 5808.0,
+    "p95": 9971.000000000002,
+    "n": 13,
+    "basis": "sum of model-call latencies per item (excludes rendering)"
+  }
+}

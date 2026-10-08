@@ -303,6 +303,44 @@ def test_demo_links_back_to_the_app_and_to_the_source_and_marks_placeholders():
     assert 'data-a11y-stem-demo="placeholder"' in fake and "Placeholder output." in fake
 
 
+def test_demo_note_links_say_where_they_go_not_raw_urls():
+    """A raw URL as link text is poor link purpose (WCAG 2.4.4) and, unbroken, it widened
+    the real demo to 401 px at a 320 px viewport (WCAG 1.4.10)."""
+    page = page_source()
+    wrapped = wrap_demo_html(
+        "<main></main>", page, date="2026-10-08", source_url="https://example.org/src"
+    )
+    note = wrapped[wrapped.index("<aside") : wrapped.index("</aside>")]
+    link_texts = re.findall(r"<a [^>]*>(.*?)</a>", note)
+    assert link_texts and not any("://" in text for text in link_texts)
+    assert "the original page on openstax.org" in link_texts
+    assert "overflow-wrap:anywhere" in note
+
+
+@pytest.mark.browser
+def test_demo_note_does_not_widen_the_page_at_320_px(tmp_path):
+    from playwright.sync_api import sync_playwright
+
+    page = page_source()
+    wrapped = wrap_demo_html(
+        "<main><p>x</p></main>",
+        page,
+        date="2026-10-08",
+        source_url="https://example.org/" + "s" * 80,
+    )
+    path = tmp_path / "demo.html"
+    path.write_text(wrapped, encoding="utf-8")
+    with sync_playwright() as p:
+        browser = p.chromium.launch()
+        tab = browser.new_page(viewport={"width": 320, "height": 640})
+        tab.goto(path.as_uri())
+        widths = tab.evaluate(
+            "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+        )
+        browser.close()
+    assert widths[0] <= widths[1]
+
+
 def test_demo_wraps_a_fragment_in_a_document():
     wrapped = wrap_demo_html("<main><p>x</p></main>", page_source(), date="2026-10-07")
     assert wrapped.startswith("<!doctype html>")
