@@ -2,12 +2,14 @@
 
 The two models cover each other (`Settings.fallback_for`), so an outage, a refusal or a
 malformed answer on one model does not cost the user a fix. Exactly one fallback attempt:
-retrying transient network errors is the SDK's job (`settings.model_max_retries`), and a
-chain of fallbacks would multiply spend on inputs that no model can handle.
+resending after transient errors is the client's job (`settings.model_max_retries`, each
+resend reserved and charged on its own), and a chain of fallbacks would multiply spend on
+inputs that no model can handle.
 
 Every attempt is returned as a `ModelCall`, numbered in order (`attempt` 1, then 2 for the
 fallback, which also has `is_fallback=True`), so cost and outcome reporting sees the full
-picture.
+picture. One `ModelCall` can cover several sends to the same model (the client's retries);
+its cost is what all of them were charged.
 
 Budget: `BudgetExceeded` from the first reservation propagates unchanged (nothing was
 sent). If the first call went out and the fallback's reservation is refused, the router
