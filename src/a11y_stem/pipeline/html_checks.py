@@ -14,11 +14,12 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.unique_ids | duplicate_id | an id used twice |
 | html.math_display | math_missing_display | `<math>` with no block/inline display (warning) |
 | html.self_contained | external_resource | scripts, links, frames, or any non-data: URL |
-| html.wording | banned_wording | "compliant"/"compliance" in text the tool wrote |
+| html.wording | banned_wording | a compliance claim (`_BANNED`) in text the tool wrote |
 
-The wording rule only reads text inside elements carrying `assemble.AUTHORED_CLASS` (the
-notes and the about section): a mechanics text about "compliant mechanisms" is the
-instructor's content, not a claim by this tool.
+The wording rule (docs/design/beta-architecture.md rule 7) only reads text inside
+elements carrying `assemble.AUTHORED_CLASS` (the notes and the about section). Course
+text is the instructor's, not a claim by this tool: mechanics uses "compliance" for the
+flexibility of a beam.
 
 `axe_checks` runs the vendored axe-core (vendor/README.md) in headless Chromium when the
 `browser` dependency group and its browser are installed, and returns one skipped

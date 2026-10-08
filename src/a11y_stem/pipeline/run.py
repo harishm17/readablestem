@@ -402,7 +402,8 @@ class _Run:
             stop=self.stop,
             tracer=self.tracer,
         )
-        # Each task runs in a copy of this context so tracer spans nest under the document.
+        # Each task runs in a copy of this context, so a contextvars-based tracer nests the
+        # step span under this page's span even though it runs on a pool thread.
         context = contextvars.copy_context()
         future: Future[_Done] = self.pool.submit(lambda: context.run(work))
         self.futures[future] = element

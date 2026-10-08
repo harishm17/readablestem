@@ -118,7 +118,7 @@ def test_document_skeleton(sample_html):
     assert sample_html.count("<main>") == 1
     assert "<script" not in sample_html.lower()
     assert not re.search(r"(src|href)=\"(?!data:)", sample_html)  # nothing external
-    assert "compliant" not in sample_html.lower()
+    assert "compli" + "ant" not in sample_html.lower()  # rule 7, anywhere in the output
 
 
 def test_tags_balance_and_no_event_handlers(sample_html):
@@ -207,8 +207,14 @@ def test_flagged_figure_keeps_its_caption(sample_html):
     assert "<figcaption>Figure 2.6 A cart on a ramp" in block(sample_html, "p1-e7")
 
 
-def test_decorative_figure_has_empty_alt(sample_html):
-    assert 'alt=""' in block(sample_html, "p2-e4")
+def test_decorative_image_without_caption_is_not_an_empty_figure(sample_html):
+    item = block(sample_html, "p2-e4")
+    assert item.startswith('<div class="decorative" id="p2-e4"><img src="data:image/png')
+    assert 'alt=""' in item and "<figure" not in item
+
+
+def test_flag_reason_is_omitted_when_the_fix_has_none(sample_html):
+    assert 'data-status="rejected">' in block(sample_html, "p2-e2")  # no data-reason
 
 
 def test_headings_follow_fixes_and_rejected_ones_become_paragraphs(sample_html):

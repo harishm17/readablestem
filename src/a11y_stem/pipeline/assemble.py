@@ -337,7 +337,7 @@ class _Renderer:
         if fix is None:
             return None, "no_fix"
         if fix.status in NOT_CONVERTED:
-            return None, fix.reason or fix.status.value
+            return None, fix.reason or ""  # data-status already says why
         if fix.equation is None or not fix.equation.mathml.strip():
             return None, "no_output"
         claimed = self.claim_id(element.id) if with_id else None
@@ -383,7 +383,7 @@ class _Renderer:
         if fix is None:
             reason = "no_fix"
         elif fix.status in NOT_CONVERTED:
-            reason = fix.reason or fix.status.value
+            reason = fix.reason or ""
         elif fix.figure is None or not (fix.figure.decorative or fix.figure.alt.strip()):
             reason = "no_output"
         else:
@@ -392,6 +392,8 @@ class _Renderer:
                 image = self.original(element, alt)
             else:  # no crop to show: the description itself is the content
                 image = f"<p>{_escape(alt)}</p>" if alt else ""
+            if not alt and not caption:  # decorative: no empty "figure" for screen readers
+                return f'<div class="decorative"{self.id_attr(element.id)}>{image}</div>'
             return f"<figure{self.id_attr(element.id)}>{image}{caption}</figure>"
         figure = f"<figure>{self.original(element, FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
         return self.flag_block(element, reason, figure, "Needs a description.", FIGURE_NOTE)
