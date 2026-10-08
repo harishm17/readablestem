@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  Fixture for tests/test_layout_fixtures.py: a two-column page with a full-width heading
+  and intro, a figure in the right column and a full-width summary. Original text written
+  for this project. Paragraphs are labelled A-E in reading order; Chromium balances the
+  columns, so paragraph D starts at the bottom of the left column and continues at the top
+  of the right one (the layout code must join it back together).
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Two-column handout</title>
+<style>
+  body { font-family: "DejaVu Serif", serif; font-size: 10pt; margin: 0; }
+  h2 { font-size: 15pt; margin: 0 0 10pt 0; }
+  p { margin: 0 0 7pt 0; line-height: 1.3; text-align: justify; }
+  .columns { column-count: 2; column-gap: 26pt; }
+  figure { margin: 8pt 0; break-inside: avoid; }
+  figcaption { font-size: 9pt; margin-top: 4pt; }
+</style>
+</head>
+<body>
+<h2>2.4 Free Fall</h2>
+<p>Introduction. This handout is printed in two columns. Read the left column from top to
+bottom before moving to the right column, and finish with the summary at the end of the page.</p>
+<div class="columns">
+<p>Paragraph A. An object in free fall moves only under the pull of gravity. Near the ground
+every object speeds up at the same rate, whatever its mass, once air resistance is small enough
+to ignore.</p>
+<p>Paragraph B. The velocity after a time <math><mi>t</mi></math> is
+<math><mi>v</mi><mo>=</mo><mi>g</mi><mi>t</mi></math> for an object dropped from rest, so the
+velocity grows steadily while the object falls.</p>
+<p>Paragraph C. The distance fallen grows faster than the time, because the object is moving
+faster during every later second than it was during the second before.</p>
+<p>Paragraph D. A simple experiment drops a ball past two light gates and records the time
+between them. Repeating the drop several times reduces random error.</p>
+<figure>
+<svg width="210" height="110" viewBox="0 0 210 110" xmlns="http://www.w3.org/2000/svg">
+  <line x1="20" y1="100" x2="200" y2="100" stroke="black" stroke-width="1.2"/>
+  <line x1="20" y1="100" x2="20" y2="5" stroke="black" stroke-width="1.2"/>
+  <path d="M20,100 Q110,95 190,10" fill="none" stroke="#1f4e9c" stroke-width="2"/>
+</svg>
+<figcaption>Figure 2.4 Distance fallen against time for a dropped ball.</figcaption>
+</figure>
+<p>Paragraph E. The curve in the figure bends upwards, which is what a steadily increasing
+speed looks like on a graph of distance against time.</p>
+</div>
+<p>Summary. Free fall is motion with constant acceleration, so the same equations describe a
+dropped ball, a falling stone and a cart rolling down a smooth ramp.</p>
+</body>
+</html>

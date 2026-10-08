@@ -1,0 +1,47 @@
+<!doctype html>
+<!--
+  Fixture for tests/test_layout_fixtures.py: an outline that jumps from h1 to h3 (an h2
+  appears later, so the jump is visible in font sizes), a bold body-size heading, a raster
+  figure with its caption ABOVE it, a two-line derivation, maths typed as plain HTML
+  italics, and an italic word that is not maths. Original text written for this project.
+  make_fixtures.py replaces src="cart.png" with a data: URI before printing.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Untitled document</title>
+<style>
+  body { font-family: "Liberation Serif", serif; font-size: 11pt; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 10pt 0; }
+  h2 { font-size: 16pt; margin: 14pt 0 8pt 0; }
+  h3 { font-size: 13pt; margin: 12pt 0 6pt 0; }
+  h4 { font-size: 11pt; margin: 12pt 0 4pt 0; }
+  p { margin: 0 0 8pt 0; line-height: 1.35; }
+  math[display="block"] { margin: 4pt 0; }
+  figure { margin: 12pt 0; }
+  figcaption { font-size: 9.5pt; margin-bottom: 6pt; }
+  img { width: 216pt; height: 126pt; }
+</style>
+</head>
+<body>
+<h1>Kinematics Review</h1>
+<h3>Constant Acceleration</h3>
+<p>With a constant acceleration the velocity changes by the same amount in every second.
+This is the <i>simplest</i> kind of changing motion, and it is a good model for a cart rolling
+down a smooth ramp.</p>
+<h4>Worked example</h4>
+<p>A cart starts from rest and accelerates at two metres per second squared for three
+seconds. Its final velocity follows from the definition of acceleration:</p>
+<math display="block"><msub><mi>v</mi><mi>f</mi></msub><mo>=</mo><msub><mi>v</mi><mn>0</mn></msub><mo>+</mo><mi>a</mi><mi>t</mi></math>
+<math display="block"><mo>=</mo><mn>0</mn><mo>+</mo><mn>2</mn><mo>×</mo><mn>3</mn><mo>=</mo><mn>6</mn></math>
+<p>The answer has units of metres per second, which is a useful check on the working.</p>
+<figure>
+<figcaption>Figure 3 A cart on a ramp, drawn as a simple block on a slope.</figcaption>
+<img src="cart.png" alt="">
+</figure>
+<p>The ramp in the figure is smooth, so friction can be ignored. Here <i>a</i> = 2 m/s<sup>2</sup>
+and <i>t</i> = 3 s, typed as ordinary text rather than as an equation.</p>
+<h2>Summary</h2>
+<p>Constant acceleration links velocity, time and distance with a few short equations.</p>
+</body>
+</html>
