@@ -64,7 +64,7 @@ import time
 import unicodedata
 from collections import Counter, OrderedDict, deque
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import count, pairwise
 
@@ -1697,6 +1697,13 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
         elif end > start and text[0] in "([{" and _unbalanced(text, closing=False):
             start += 1
             changed = True
+        elif end > start and text.count("|") % 2 and (text[0] == "|" or text[-1] == "|"):
+            # An unpaired bar at an edge ("|x" before a line break); "|x| < 1" keeps both.
+            if text[0] == "|":
+                start += 1
+            else:
+                end -= 1
+            changed = True
     return start, end
 
 
@@ -1719,11 +1726,12 @@ def _unbalanced(text: str, *, closing: bool) -> bool:
 # check, breve): inside an inline formula they do not end it.
 _ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
 # Operators that cannot end an expression: a run ending in one was cut by prose
-# ("b - proj b" broken at a word the run does not take in).
-_TRAILING_OPERATORS = frozenset("+-*/=<>^_|~\u2212\u00b1\u2213\u00d7\u00f7\u22c5")
+# ("b - proj b" broken at a word the run does not take in). Not "|": it closes |x|.
+_TRAILING_OPERATORS = frozenset("+-*/=<>^_~\u2212\u00b1\u2213\u00d7\u00f7\u22c5")
 # Operators that cannot start an expression: a run starting with one is the tail of an
 # expression cut by a line break or by prose ("(50 km)/(60 km/h)] = 40" -> "/h)] = 40").
-_INFIX_ONLY = frozenset("/*^_=<>|~\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5")
+# Not "|" (it opens |x|, see `_trim_run`) and not "~" ("~5 m" is about five metres).
+_INFIX_ONLY = frozenset("/*^_=<>\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5")
 
 
 def _broken_brackets(text: str) -> bool:
@@ -1898,6 +1906,8 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     chars = row.chars
     (m0, m1), rest = tokens[0], tokens[1:]
     first = chars[m0].c
+    if m1 - m0 == 1 and first in _DASHES and _signed_value(chars[m0], chars[rest[0][0] :]):
+        return None  # "- 40 m/s", "\u2013 5 \u00b0C": a negative value, not a dash bullet
     if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS):
         glyph = _clean(first)
         family: tuple[str, str] = ("bullet", glyph)
@@ -1929,6 +1939,69 @@ def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | N
     return _MarkerCandidate(row, marker, family, readings, chars[m0].x0, sure)
 
 
+class _ColumnRows:
+    """One page's rows per column, top to bottom: the lines above and below a row."""
+
+    def __init__(self, rows: Sequence[_Row]) -> None:
+        self.columns: dict[str, list[_Row]] = {}
+        for row in rows:
+            if not row.vertical:
+                self.columns.setdefault(row.column, []).append(row)
+        for column in self.columns.values():
+            column.sort(key=lambda r: r.baseline)
+        self.baselines = {k: [r.baseline for r in v] for k, v in self.columns.items()}
+
+    def neighbour(self, row: _Row, step: int) -> _Row | None:
+        """The nearest row above (step -1) or below (+1) in `row`'s column that overlaps
+        it in x."""
+        rows, baselines = self.columns.get(row.column, []), self.baselines.get(row.column, [])
+        if step < 0:
+            k = bisect.bisect_left(baselines, row.baseline - 0.3 * row.size) - 1
+            span = range(k, -1, -1)
+        else:
+            k = bisect.bisect_right(baselines, row.baseline + 0.3 * row.size)
+            span = range(k, len(rows))
+        return next((rows[i] for i in span if rows[i].x0 < row.x1 and rows[i].x1 > row.x0), None)
+
+    def wraps_into(self, candidate: _MarkerCandidate, ctx: _Context) -> bool:
+        """Is the candidate's row the next line of the paragraph above, which happens to
+        start "2. The"? The line above is at the usual pitch and size, starts as far left
+        as the marker or further right, and does not end a sentence or clause; and the
+        line below does not hang at the item text's indent."""
+        row = candidate.row
+        above = self.neighbour(row, -1)
+        if above is None:
+            return False
+        size = row.size
+        pitch = row.baseline - above.baseline
+        limit = max(1.3 * ctx.pitch * size / ctx.body, 1.25 * size)
+        if abs(above.size - size) > max(1.0, 0.12 * size) or not 0.5 * size <= pitch <= limit:
+            return False
+        if candidate.x0 > above.x0 + 0.5 * size:
+            return False  # the marker is indented past the text above
+        if above.clean[-1:] in tuple(".:;!?"):
+            return False
+        below = self.neighbour(row, 1)
+        hanging = (
+            below is not None
+            and below.baseline - row.baseline <= limit
+            and abs(below.x0 - candidate.marker.x) <= 1.5
+            and candidate.marker.x - candidate.x0 > 1.5
+        )
+        return not hanging
+
+
+_DASHES = frozenset("-\u2013\u2014")  # line-start bullets that are also how minus is typed
+
+
+def _signed_value(dash: _Char, after: list[_Char]) -> bool:
+    """Is a line-start dash the sign of the value after it? It is when the value starts
+    with a digit or a decimal point ("- 40 m/s"; Word turns a spaced hyphen into "\u2013"),
+    or when the dash is set in a maths font (a minus sign)."""
+    text = "".join(c.c for c in after).lstrip()
+    return dash.math or text[:1].isdigit() or (text[:1] in ".," and text[1:2].isdigit())
+
+
 class _DrawnBullets:
     """Small drawn shapes that can be list bullets (Chromium draws CSS disc markers as
     paths), indexed by vertical centre."""
@@ -1956,22 +2029,33 @@ class _DrawnBullets:
 
 
 def _list_markers(
-    rows_by_page: dict[int, list[_Row]], paths: dict[int, list[_Path]], body: float
+    rows_by_page: dict[int, list[_Row]], paths: dict[int, list[_Path]], ctx: _Context
 ) -> None:
     """Set `row.marker` on every row that starts a list item, in all analysed pages.
 
     A bullet glyph or a drawn bullet is enough, and so is a number before a capital
-    letter ("3. Measure"). Letters, roman numerals, bare numbers and line-start dashes
-    need a sibling: another row with the same kind of marker, the next or previous value
-    ("b." for "a."; the same glyph for a dash) and the marker or the item text starting
-    within MARKER_ALIGN in x, anywhere in the document (lists cross pages). "A ball
-    rolls", "2.3 Speed", "2.5 metres", a lone "B. Smith" or a sentence wrapped onto a new
-    line after a dash do not start lists.
+    letter ("3. Measure"), unless that row is the next line of a wrapped paragraph
+    (`_ColumnRows.wraps_into`). Letters, roman numerals, bare numbers and line-start
+    dashes need a sibling: another row with the same kind of marker, the next or
+    previous value ("b." for "a."; the same glyph for a dash) and the marker or the item
+    text starting within MARKER_ALIGN in x, anywhere in the document (lists cross
+    pages). "A ball rolls", "2.3 Speed", "2.5 metres", a lone "B. Smith", "... is
+    exactly" / "2. The heavier ball ...", a spaced minus ("- 40 m/s") or a sentence
+    wrapped onto a new line after a dash do not start lists.
     """
     candidates: list[_MarkerCandidate] = []
     for number, rows in rows_by_page.items():
-        bullets = _DrawnBullets(paths.get(number, []), body)
-        candidates.extend(c for row in rows if (c := _marker_candidate(row, bullets)) is not None)
+        bullets = _DrawnBullets(paths.get(number, []), ctx.body)
+        found = [c for row in rows if (c := _marker_candidate(row, bullets)) is not None]
+        if any(c.sure and c.readings for c in found):
+            columns = _ColumnRows(rows)
+            found = [
+                replace(c, sure=False)
+                if c.sure and c.readings and columns.wraps_into(c, ctx)
+                else c
+                for c in found
+            ]
+        candidates.extend(found)
     index: dict[tuple, tuple[list[float], list[float]]] = {}
     for candidate in candidates:
         for reading in candidate.readings or (("bullet", 0),):
@@ -2010,7 +2094,9 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
 
     Consecutive items in reading order form one list (display equations inside an item
     do not end it; anything else does). A deeper indent opens a level, a shallower one
-    closes levels until one matches.
+    closes levels until one matches. Indents are measured from the left edge of the
+    item's column (`_Block.origin`), so a list that goes on in the next column or on a
+    page with another margin keeps its levels.
     """
     levels: dict[int, int] = {}
     stack: list[float] = []
@@ -2019,7 +2105,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
             if block.kind != Kind.EQUATION:
                 stack = []
             continue
-        x = block.marker.x
+        x = block.marker.x - block.origin
         while stack and x < stack[-1] - tolerance:
             stack.pop()
         if not stack or x > stack[-1] + tolerance:
@@ -2226,11 +2312,11 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
 
     `_merge_baselines` joins pieces of a line up to 4 x font size apart, so an equation
     number set close to its equation ("= 2000 m - 525 m ,   2.8") arrives as part of the
-    row. It is cut off when the last token reads as an equation number, stands at least
-    one font size clear of the rest, and the rest has maths in it (or is only the comma
-    that ends the maths) and does not end in a relation or operator ("x =   2.4" keeps its
-    right-hand side). Whether it is an equation number is decided later, by where it
-    sits (`_equation_regions`).
+    row. It is cut off when the last token reads as an equation number (or the last two
+    do: "Eq. 2.4", "Equation (2.4)"), stands at least one font size clear of the rest,
+    and the rest has maths in it (or is only the comma that ends the maths) and does not
+    end in a relation or operator ("x =   2.4" keeps its right-hand side). Whether it is
+    an equation number is decided later, by where it sits (`_equation_regions`).
     """
     out: list[_Row] = []
     for row in rows:
@@ -2239,8 +2325,12 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
             out.append(row)
             continue
         start = tokens[-1][0]
-        before = [c for c in row.chars[:start] if not c.blank]
         label = _clean("".join(c.c for c in row.chars[start:]))
+        if len(tokens) >= 3:
+            prefixed = _clean("".join(c.c for c in row.chars[tokens[-2][0] :]))
+            if EQUATION_NUMBER.match(prefixed):  # "Eq. 2.4": the prefix goes with it
+                start, label = tokens[-2][0], prefixed
+        before = [c for c in row.chars[:start] if not c.blank]
         if (
             _is_equation_number(label)
             and before
@@ -2424,7 +2514,9 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
     """Does `line` continue the display equation whose last line is `above` (box `box`)?
 
     A line that starts with "=" or an operator may sit a little further down (half as
-    far again): nothing else starts a line that way.
+    far again): nothing else starts a line that way. A line whose middle is above the
+    bottom of the equation sits beside it, not under it: "f(t) =" level with the middle
+    row of a cases brace, whose rows are whole equations ("1 if t > 0") of their own.
     """
     size = max(above.size, line.size)
     reach = MAX_LINE_GAP * size * (1.5 if line.continues else 1.0)
@@ -2436,6 +2528,8 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
         return False  # two numbered equations
     if line.continues or not (above.complete and line.complete):
         return True
+    if (line.box[1] + line.box[3]) / 2 < box[3]:
+        return True  # beside the equation: rows of a brace, a matrix or an array
     if min(above.size, line.size) <= SCRIPT_RATIO * size:
         return True  # limits under a big operator ("i = 1" under a sum) or over it
     x0, x1 = above.relation_x, line.relation_x
@@ -2751,6 +2845,7 @@ class _Block:
     reasons: list[str] = field(default_factory=list)
     caption: str | None = None
     marker: _Marker | None = None  # list items: the marker of the first row
+    origin: float = 0.0  # list items: left edge of their column's text (`_column_origins`)
     label: str | None = None  # display equations: the equation number beside them
 
 
@@ -3189,10 +3284,31 @@ def _page_blocks(
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
+    origins = _column_origins(text_rows)
+    for block in final:
+        if block.marker is not None:
+            block.origin = origins.get(block.rows[0].column, 0.0)
     return _PageBlocks(number, (round(page_rect.width, 2), round(page_rect.height, 2)), final)
 
 
 _TEXT_BLOCKS = (Kind.PARAGRAPH, Kind.LIST_ITEM)  # blocks whose text may hold inline maths
+
+
+def _column_origins(rows: Sequence[_Row]) -> dict[str, float]:
+    """Left edge of the text of each column of a page: the leftmost x where at least
+    three rows start (within 2.5 pt), so one outdented line does not move it; the
+    leftmost row when no three rows line up."""
+    starts: dict[str, list[float]] = {}
+    for row in rows:
+        if not row.vertical:
+            starts.setdefault(row.column, []).append(row.x0)
+    origins: dict[str, float] = {}
+    for column, xs in starts.items():
+        xs.sort()
+        origins[column] = next(
+            (x for i, x in enumerate(xs) if bisect.bisect_right(xs, x + 2.5) - i >= 3), xs[0]
+        )
+    return origins
 
 
 def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
@@ -3289,7 +3405,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             paths[number] = _page_paths(doc[number])
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
     ctx = _body_and_pitch({n: rows for n, (rows, _) in prepared.items()})
-    _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx.body)
+    _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx)
     pages = [
         _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins)
         for n in selected

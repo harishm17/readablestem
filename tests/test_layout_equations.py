@@ -239,3 +239,22 @@ def test_cutting_a_number_off_a_list_item_row_keeps_the_item():
     ]
     first, number = layout._split_labels([layout._Row(chars, marker=marker)])
     assert first.marker is marker and number.text == "(3)"
+
+
+@pytest.mark.parametrize("label", ["Eq. 2.4", "Eqn. 2.4", "Equation 2.4", "Eq. (2.4)"])
+@pytest.mark.parametrize("gap", [20, 40])  # close enough to be merged into the maths row
+def test_a_prefixed_equation_number_close_to_the_maths_becomes_its_label(label, gap):
+    """ "v = d / t   Eq. 2.4": only the last token ("2.4") was tested, and its gap to
+    "Eq." is a normal space, so the number stayed in the equation's text and crop."""
+    width = pymupdf.get_text_length("v = d / t", fontname="Times-Italic", fontsize=12)
+
+    def fill(page):
+        prose(page, 100, "The average velocity over the interval is defined as")
+        page.insert_text((250, 140), "v = d / t", fontsize=12, fontname="Times-Italic")
+        page.insert_text((250 + width + gap, 140), label, fontsize=12)
+        prose(page, 180, "and it is measured in metres per second in this course.")
+
+    [equation] = equations(analyze(one_page(fill)).elements)
+    assert equation.equation_label == label
+    assert nospace(equation.text) == "v=d/t"
+    assert equation.bbox[2] < 250 + width + gap  # the number is not in the crop

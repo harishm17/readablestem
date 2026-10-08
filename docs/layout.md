@@ -165,12 +165,18 @@ within 3 x font size:
   height: Chromium draws CSS disc markers as paths. Filled curves are "•", outlines "◦",
   filled squares "▪";
 - a line-start dash or star (`-` `–` `—` `*` `∗`, LaTeX's second and third levels) or a
-  middle dot (`·`, Word's Symbol bullet as extracted);
+  middle dot (`·`, Word's Symbol bullet as extracted). A dash followed by a digit or a
+  decimal point (`- 40 m/s`, Word's `– 5 °C`), or set in a maths font, is the sign of a
+  value, not a bullet: the sign stays in the text;
 - an ordered marker: `1.` `2)` `(3)`, `a.` `b)` `(c)`, `A.`, `iv.` `(ii)` `IV)`. OpenStax's
   "3 ." (number and full stop in separate spans) is read as "3.".
 
 A bullet glyph, a drawn bullet, or a number before a capital letter ("3. Measure") is
-enough. Letters, roman numerals, other numbers and line-start dashes need a sibling: a row
+enough, except that the number needs a sibling too when its row reads as the next line of
+a wrapped paragraph: the line above is at the usual pitch and size, starts as far left as
+the marker, and does not end with `.` `:` `;` `!` `?`, and the line below does not hang at
+the item text ("... is exactly" / "2. The heavier ball ..."). Letters, roman numerals,
+other numbers and line-start dashes need a sibling: a row
 anywhere in the document (lists cross pages) with the same kind of marker printed the same
 way, the next or previous value ("b." for "a."; the same glyph for a dash) and the marker
 or the item text starting within 3 pt in x. "i" is both a letter and a roman numeral; its
@@ -183,7 +189,10 @@ indent is fine). **Levels** come from the left edge of the item text, which is t
 for every item of one level even when the markers are right-aligned (LaTeX's "(i)",
 "(ii)", "(iii)"): consecutive items in reading order form one list, a deeper indent
 (more than 0.6 x body size) opens a level, a shallower one closes levels until one
-matches. A display equation inside an item does not end the list; any other block does.
+matches. The indent is measured from the left edge of the item's column on its page (the
+leftmost x where at least three rows start), so a list that goes on in the next column or
+on a page with another margin keeps its levels. A display equation inside an item does
+not end the list; any other block does.
 A list item's row is never a display equation ("b. - 40 m/s" had become one): maths in
 it becomes inline equations with the item as their parent.
 
@@ -225,8 +234,11 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
      and either the line starts with `=`, `+`, `−`, `×` ... (the next row of a
      derivation), or one of the two lines is not a whole equation (no relation with
      something on both sides: a numerator, `f(x) =`), or one is at script size (the
-     limits under a sum), or both are whole equations whose first relations are aligned
-     within 0.3 x font size (an `align` system). Two whole equations stacked close but
+     limits under a sum), or the line's vertical middle is above the bottom of the
+     equation (it sits beside it: `sgn(x) =` level with the middle row of a cases brace,
+     whose rows `1  x > 0` are whole equations of their own), or both are whole equations
+     whose first relations are aligned within 0.3 x font size (an `align` system). Two
+     whole equations stacked close but
      centred on their own (`time = d / v` over `d = v × time`), two numbered equations
      (each row of a numbered `align`) and equations at paragraph spacing stay apart.
 
@@ -239,14 +251,17 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   side). It becomes `equation_label` and stays out of the text and box. A number merged
   into a maths row (`_merge_baselines` joins pieces up to 4 font sizes apart: `= 2000 m −
   525 m ,   2.8`) is first cut off when it stands at least one font size clear of maths
-  (or of the comma that ends it) that does not end in a relation. A number inside the
-  maths that is not beside any line stays part of it.
+  (or of the comma that ends it) that does not end in a relation; a prefixed number
+  (`Eq. 2.4`, `Equation (2.4)`) is cut off whole, measured from before the prefix. A
+  number inside the maths that is not beside any line stays part of it.
 - **Inline equations** inside paragraph rows: a stretch of maths-capable characters
   (maths characters, digits, operators, brackets, single letters, sub/superscripts, a decimal
   point or a comma inside brackets), trimmed of spaces, trailing operators and punctuation,
   unbalanced brackets and a leading or trailing English `a`/`A`/`I`. It never starts with
   an operator that cannot start an expression (`/ * ^ = <` ...: `/h)] = 40` is the tail
   of a plain-text formula cut by a line break) or ends with one (including `−` and `×`).
+  A bar `|` is kept at either end when the run has a pair of them (`|x| < 1`, `|r|ⁿ`);
+  an unpaired bar at an edge is dropped.
   It is kept only with evidence: a maths character; an italic single letter with an
   operator (a leading sign does not count: `-49 m` with an italic unit is a quantity) or
   script or Greek letter; a single letter with a sub/superscript (`x²`); a signed number
@@ -412,7 +427,9 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - **Maths written as text** (OpenStax writes `d₀`, `t = 0 s`, `y = mx + b` in HTML, not
   MathML) is found and converted like any inline maths; the gold set has no MathML for
   it, so it counts against detection precision in the document eval (reported as
-  `prose_math`).
+  `prose_math` when the prediction shows a formula: a relation with operands, a variable
+  with an index or script, an italic variable with an operator; a bare quantity such as
+  `-49 m` or a lone symbol is `other`).
 - **Lists:** a marker on a line of its own above its text (OpenStax prints exercise
   numbers that way) is not an item: the number stays at the start of a paragraph. Bullets
   that are raster images are not recognised. A list that the PDF numbers with a gap, or

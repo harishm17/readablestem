@@ -114,3 +114,38 @@ def test_an_inline_crop_stops_short_of_the_comma_that_follows_it():
     right = first.bbox[2] + layout.CROP_PAD  # where the default crop ends
     assert right <= comma["bbox"][0] + 0.01
     assert right >= subscript["bbox"][2] - 0.01  # the subscript is still in it
+
+
+def test_absolute_value_bars_stay_on_both_sides():
+    """ "|" was an infix-only operator, so the opening bar of |x| was trimmed: the
+    equation read "x| < 1" and the bar stayed behind in the paragraph text."""
+
+    def fill(page):
+        line(
+            page,
+            72,
+            100,
+            ("The series converges when ", "helv"),
+            ("|", "helv"),
+            ("x", "heit"),
+            ("| < 1 and the error is at most ", "helv"),
+            ("|", "helv"),
+            ("r", "heit"),
+            ("|", "helv"),
+        )
+        page.insert_text((385.5, 95), "n", fontsize=7, fontname="heit")  # superscript
+        line(page, 72, 115, ("after the first few terms of the series.", "helv"))
+
+    elements = analyze(one_page(fill)).elements
+    assert [t.replace(" ", "") for t in inline(elements)] == ["|x|<1", "|r|n"]
+    assert "|" not in (elements[0].text or "")
+
+
+def test_an_unpaired_bar_at_the_edge_of_a_run_is_still_dropped():
+    chars = [
+        layout._Char(c, 6 * i, 0, 6 * i + 5, 10, 9, 10.0, "Helv-Oblique" if c == "x" else "Helv", 0)
+        for i, c in enumerate("|x + 1")
+    ]
+    row = layout._Row(chars)
+    start, end = layout._trim_run(row.chars, layout._CharInfo.of(row), 0, len(chars))
+    assert "".join(c.c for c in chars[start:end]) == "x + 1"

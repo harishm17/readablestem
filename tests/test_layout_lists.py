@@ -294,3 +294,114 @@ def test_list_levels_follow_the_text_indent_and_reset_after_a_paragraph():
     ]
     levels = layout._list_levels(blocks, tolerance=6.0)
     assert [levels.get(id(b)) for b in blocks] == [1, 2, None, 2, 3, 1, None, 1]
+
+
+def test_list_levels_are_measured_from_the_left_edge_of_the_column():
+    def block(x: float, origin: float) -> layout._Block:
+        marker = layout._Marker("1.", True, 1, x)
+        return layout._Block(Kind.LIST_ITEM, (0, 0, 1, 1), marker=marker, origin=origin)
+
+    left = [block(76, 58), block(98, 58)]  # level 1 and 2 in the left column
+    right = [block(362, 322), block(340, 322)]  # the same indents in the right column
+    levels = layout._list_levels([*left, *right], tolerance=6.0)
+    assert [levels[id(b)] for b in [*left, *right]] == [1, 2, 2, 1]
+
+
+def test_a_list_that_goes_on_in_the_next_column_keeps_its_levels():
+    """Levels came from the absolute x of the item text, so every item after a column
+    break went one level deeper and nested inside the last item of the first column."""
+
+    def item(page, x: float, y: float, marker: str, lines: list[str]) -> float:
+        page.insert_text((x, y), marker, fontsize=BODY)
+        return write(page, x + (14 if marker[0].isdigit() else 18), y, lines) + 4
+
+    def fill(page):
+        y = write(
+            page,
+            58,
+            80,
+            [
+                "The checklist below continues into the",
+                "right-hand column of this handout, as a",
+                "long numbered list with nested parts.",
+            ],
+        )
+        y = item(page, 62, y + 6, "1.", ["Measure the length of the ramp with", "the tape."])
+        y = item(page, 62, y, "2.", ["Time the cart over the full ramp:"])
+        y = item(page, 80, y, "(a)", ["once with the stopwatch held in hand,"])
+        item(page, 80, y, "(b)", ["once with the light gate at the end."])
+        y = item(page, 344, 80, "(c)", ["once more with the ramp raised,"])
+        y = item(page, 344, y, "(d)", ["and once with the ramp lowered."])
+        y = item(page, 326, y, "3.", ["Average the times for each setting of", "the ramp."])
+        y = item(page, 326, y, "4.", ["Compare the plot with the prediction."])
+        write(
+            page,
+            322,
+            y + 6,
+            [
+                "The plot should show the time falling as",
+                "the ramp gets steeper, and the slope of",
+                "the line gives the acceleration.",
+            ],
+        )
+
+    found = items(analyze(one_page(fill)).elements)
+    assert [(m, lv) for m, _, lv, _ in found] == [
+        ("1.", 1), ("2.", 1), ("(a)", 2), ("(b)", 2), ("(c)", 2), ("(d)", 2), ("3.", 1), ("4.", 1),
+    ]  # fmt: skip
+
+
+# ---------------------------------------------------------------- not lists (review round 2)
+
+
+@pytest.mark.parametrize(
+    "lines",
+    [
+        [
+            "The ratio of the heavier mass to the lighter one is exactly",
+            "2. The heavier ball therefore falls with the same acceleration as the",
+            "lighter one, because the force on it is also twice as large as before.",
+        ],
+        [
+            "The answer to the first question is given in section",
+            "3. A full derivation is left to the reader as an exercise for this week.",
+            "Next we turn to the energy of the system and how it changes over time.",
+        ],
+    ],
+)
+def test_a_wrapped_line_that_starts_with_a_number_and_a_capital_is_not_an_item(lines):
+    """A number before a capital needs no sibling, but not on the next line of a
+    paragraph: it cut the sentence and moved "2." into a marker (rendered <ol start=2>)."""
+    elements = analyze(one_page(lambda page: write(page, 72, 100, lines))).elements
+    assert kinds(elements) == [Kind.PARAGRAPH]
+    assert lines[1] in (elements[0].text or "")
+
+
+def test_a_lone_numbered_item_after_a_colon_is_still_an_item():
+    def fill(page):
+        write(page, 72, 100, ["Follow these steps to calibrate the light gate:"])
+        write(page, 72, 115, ["1. Measure the distance between the two gates."])
+        write(page, 72, 145, ["Then repeat the whole procedure for the other cart."])
+
+    elements = analyze(one_page(fill)).elements
+    assert kinds(elements) == [Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.PARAGRAPH]
+    assert items(elements) == [("1.", True, 1, "Measure the distance between the two gates.")]
+
+
+@pytest.mark.parametrize("dash", ["-", "\u2013", "\u2014"])
+def test_a_spaced_minus_before_a_number_is_not_a_dash_bullet(dash):
+    """Two lines starting "- 40 m/s" and "- 20 m/s" matched the sibling rule: the sign
+    went into the marker and the values were read out as positive."""
+    html = (
+        "<p>The velocities of the two carts after the collision are:<br>"
+        f"{dash} 40 m/s<br>{dash} 20 m/s<br>so both carts move to the left after they collide.</p>"
+    )
+    elements = analyze(html_page(html)).elements
+    assert not any(e.kind == Kind.LIST_ITEM for e in elements)
+    text = " ".join(e.text or "" for e in elements)
+    assert f"{dash} 40 m/s" in text and f"{dash} 20 m/s" in text
+
+
+def test_a_dash_bullet_before_words_is_still_a_bullet():
+    html = "<p>\u2013 forty metres per second<br>\u2013 twenty metres per second</p>"
+    assert [m for m, *_ in items(analyze(html_page(html)).elements)] == ["\u2013", "\u2013"]

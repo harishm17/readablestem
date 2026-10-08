@@ -6,8 +6,9 @@ slides and a two-column handout, in Computer Modern (CMR, CMMI, CMSY, CMEX, CMBX
 beamer's Latin Modern Sans. They cover what TeX does differently from the Chromium
 fixtures: equation numbers at the right margin, align environments, inline integrals
 set on a baseline of their own, limits under a sum, matrices, bold vectors, the
-negation slash of \\neq, nested itemize/enumerate with TeX's bullets and dashes,
-beamer's triangle bullets and sans-serif maths, a two-column page and a TikZ figure.
+negation slash of \\neq, a cases brace, absolute-value bars, nested itemize/enumerate
+with TeX's bullets and dashes, beamer's triangle bullets and sans-serif maths, a
+two-column page and a TikZ figure.
 """
 
 from __future__ import annotations
@@ -57,6 +58,14 @@ def children(layout: Layout, parent: Element) -> list[Element]:
     return [e for e in layout.elements if e.parent_id == parent.id]
 
 
+def number_rect_of(name: str, page: int, text: str) -> pymupdf.Rect:
+    """Where `text` is printed on `page` (its first occurrence)."""
+    with pymupdf.open(LATEX / f"{name}.pdf") as doc:
+        found = doc[page].search_for(text)
+    assert found, text
+    return found[0]
+
+
 def number_rect(name: str, equation: Element) -> pymupdf.Rect:
     """Where the equation's number is printed: the occurrence of its text level with the
     equation (not a reference to it in the running text)."""
@@ -94,19 +103,20 @@ def test_calculus_notes_outline():
         (1, "2 Integrals"),
         (2, "2.1 The fundamental theorem"),
         (2, "2.2 Exercises"),
+        (1, "3 Continuity"),
     ]
 
 
 def test_calculus_notes_numbered_equations_keep_their_numbers_out_of_the_crop():
     layout = load("calculus_notes")
     equations = blocks(layout)
-    assert [e.equation_label for e in equations] == ["(1)", "(2)", "(3)", None, "(4)"]
+    assert [e.equation_label for e in equations] == ["(1)", "(2)", "(3)", None, "(4)", None]
     for equation in equations:
         if equation.equation_label:
             number = number_rect("calculus_notes", equation)
             assert equation.bbox[2] < number.x0  # crop = bbox + 2 pt padding
             assert equation.equation_label not in (equation.text or "")
-    definition, product, chain, theorem, riemann = equations
+    definition, product, chain, theorem, riemann, _ = equations
     assert "fraction bar" in definition.reasons and "lim" in (definition.text or "")
     # Each row of the numbered align is its own equation; both rows are whole equations.
     assert "uv" in plain(product.text) and "g(x)" in plain(chain.text)
@@ -148,10 +158,36 @@ def test_calculus_notes_inline_integrals_include_their_integral_sign():
 def test_calculus_notes_figure_keeps_its_axis_labels_and_caption():
     layout = load("calculus_notes")
     page_two = [e for e in layout.elements if e.page == 1]
-    assert [e.kind for e in page_two] == [Kind.FIGURE]
+    assert [e.kind for e in page_two if e.kind == Kind.FIGURE] == [Kind.FIGURE]
     figure = page_two[0]
     assert (figure.caption or "").startswith("Figure 1: The area under")
     assert sorted((figure.text or "").split()) == ["1", "x", "y"]
+
+
+def test_calculus_notes_cases_brace_is_one_equation():
+    """The middle row of a cases brace sits on the baseline of "sgn(x) =", and the rows
+    above and below it are whole equations of their own ("1  x > 0"): the brace used to
+    come out as two overlapping display equations, each cropped and sent on its own."""
+    layout = load("calculus_notes")
+    on_page_two = [e for e in blocks(layout) if e.page == 1]
+    assert len(on_page_two) == 1
+    sign = on_page_two[0]
+    assert sign.equation_label is None
+    for part in ("sgn(x)=", "1x>0", "0x=0", "\u22121x<0"):
+        assert part in plain(sign.text)
+    top_row = number_rect_of("calculus_notes", sign.page, "x > 0")
+    bottom_row = number_rect_of("calculus_notes", sign.page, "x < 0")
+    assert sign.bbox[1] <= top_row.y0 + 1 and sign.bbox[3] >= bottom_row.y1 - 1
+
+
+def test_calculus_notes_absolute_values_keep_both_bars():
+    """A leading "|" was trimmed as an infix-only operator: "|r| < 1" became "r| < 1"
+    with the opening bar left in the paragraph text and outside the crop."""
+    layout = load("calculus_notes")
+    paragraph = next(e for e in layout.elements if (e.text or "").startswith("The geometric"))
+    values = [plain(e.text) for e in children(layout, paragraph)]
+    assert values[1:] == ["|r|<1", "|x|"]
+    assert "|" not in (paragraph.text or "")
 
 
 # ---------------------------------------------------------------- problem set (article)
