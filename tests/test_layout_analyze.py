@@ -137,9 +137,10 @@ def test_bold_body_line_and_standalone_numbered_line_are_headings_list_items_are
         ("Worked example", REASON_BOLD_BODY),
         ("2.3 Units of Speed", REASON_NUMBERED_LINE),
     ]
-    assert texts(elements, Kind.PARAGRAPH)[-2:] == [
-        "1. Measure the length of the ramp.",
-        "2. Time the cart from top to bottom.",
+    items = [e for e in elements if e.kind == Kind.LIST_ITEM]
+    assert [(e.list_marker, e.list_ordered, e.list_level, e.text) for e in items] == [
+        ("1.", True, 1, "Measure the length of the ramp."),
+        ("2.", True, 1, "Time the cart from top to bottom."),
     ]
     levels = heading_levels(elements)
     assert [levels[h.id] for h in headings] == [1, 1]  # no size-based headings at all
@@ -177,11 +178,12 @@ def test_long_runs_of_large_text_and_bold_sentences_inside_paragraphs_are_not_he
     )
 
 
-def test_bullets_start_new_paragraphs():
+def test_bullets_start_new_list_items():
     html = "<p>\u2022 Measure the ramp length.<br>\u2022 Time the cart over that length.</p>"
-    assert texts(analyze(html_page(html)).elements) == [
-        "\u2022 Measure the ramp length.",
-        "\u2022 Time the cart over that length.",
+    elements = analyze(html_page(html)).elements
+    assert [(e.kind, e.list_marker, e.list_ordered, e.text) for e in elements] == [
+        (Kind.LIST_ITEM, "\u2022", False, "Measure the ramp length."),
+        (Kind.LIST_ITEM, "\u2022", False, "Time the cart over that length."),
     ]
 
 
@@ -267,7 +269,7 @@ def test_a_lone_short_line_without_maths_neighbours_stays_text():
     assert paragraph.text == "The final speed of the cart after the ramp is 12 m/s."
 
 
-def test_adjacent_maths_lines_and_an_equation_number_merge_into_one_region():
+def test_adjacent_maths_lines_merge_and_the_equation_number_is_kept_apart():
     def fill(page):
         write(page, 72, 100, ["The position after the cart has rolled for two seconds:"])
         page.insert_text((250, 140), "x = v t + 2", fontsize=12)
@@ -278,8 +280,10 @@ def test_adjacent_maths_lines_and_an_equation_number_merge_into_one_region():
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
     equation = elements[1]
-    assert equation.text == "x = v t + 2 (2.1) = 14 m"
-    assert equation.bbox[2] > 520  # the equation number is part of the region
+    assert equation.text == "x = v t + 2 = 14 m"
+    assert equation.equation_label == "(2.1)"
+    assert "equation number" in equation.reasons
+    assert equation.bbox[2] < 400  # the number is outside the box, so outside the crop
 
 
 # ---------------------------------------------------------------- inline maths

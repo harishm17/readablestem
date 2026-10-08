@@ -6,8 +6,9 @@ What the output looks like and why is in docs/output.md. In short:
   inline stylesheet and one `<main>`. No scripts and no external resources, so the file
   works offline, inside an LMS page, and saved to disk.
 - Content in reading order (`Element.order`): headings from heading fixes, paragraphs as
-  `<p>` with inline equations placed at their markers, block equations as
-  `<math display="block">`, figures as `<figure><img alt>` + `<figcaption>`.
+  `<p>` with inline equations placed at their markers, consecutive list items as nested
+  `<ul>`/`<ol>`, block equations as `<math display="block">` (with their equation number
+  after them), figures as `<figure><img alt>` + `<figcaption>`.
 - Anything not converted (ABSTAINED, FAILED, REJECTED, or MathML the sanitiser refused)
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
@@ -28,6 +29,7 @@ import html
 import re
 from collections import Counter
 from dataclasses import dataclass, field
+from itertools import pairwise
 from typing import Literal
 from xml.etree.ElementTree import Element as XmlElement
 from xml.etree.ElementTree import ParseError
@@ -96,6 +98,11 @@ _LANG = re.compile(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*")
 _CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _REASON = re.compile(r"[a-z0-9_]{1,64}")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# An ordered list marker as layout reports it: "3.", "b)", "(iv)".
+_ORDERED_MARKER = re.compile(
+    r"(?:\((?P<inner>[0-9A-Za-z]{1,6})\)|(?P<plain>[0-9A-Za-z]{1,6})(?P<sep>[.)]))"
+)
+_ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
 _PT_TO_CSS_PX = 96 / 72  # a PDF point is 1/72 in; a CSS pixel is 1/96 in
 
 
@@ -252,12 +259,128 @@ def _size_attrs(element: Element) -> str:
     return ""
 
 
+def _equation_label(label: str | None) -> str:
+    """The equation's number ("(2.4)", "2.4"), written after its maths. Screen readers
+    hear "Equation 2.4" (the word is visually hidden); sighted readers see the number
+    as printed, at the right of the equation."""
+    if not label or not label.strip():
+        return ""
+    return (
+        '<span class="equation-label">'
+        f'<span class="visually-hidden {AUTHORED_CLASS}">Equation </span>'
+        f"{_escape(' '.join(label.split()))}</span>"
+    )
+
+
 def _fix_attrs(fix: Fix | None, reason: str | None) -> str:
     """Content-free status/reason codes, for tooling that reads the output."""
     attrs = f' data-status="{fix.status.value}"' if fix is not None else ""
     if reason and _REASON.fullmatch(reason):
         attrs += f' data-reason="{reason}"'
     return attrs
+
+
+# --------------------------------------------------------------------------- lists
+
+
+def _roman(text: str) -> int | None:
+    """Value of a canonical roman numeral below 400 ("iv" -> 4), else None. (Layout has the
+    same reading; it is repeated here so assembly does not import the PDF code.)"""
+    lower = text.lower()
+    if not lower or any(c not in _ROMAN for c in lower) or not (text.islower() or text.isupper()):
+        return None
+    values = [_ROMAN[c] for c in lower]
+    total = sum(
+        -v if i + 1 < len(values) and values[i + 1] > v else v for i, v in enumerate(values)
+    )
+    canonical, rest = "", total
+    for number, letters in ((100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"),
+                            (5, "v"), (4, "iv"), (1, "i")):  # fmt: skip
+        while rest >= number:
+            canonical, rest = canonical + letters, rest - number
+    return total if 0 < total < 400 and canonical == lower else None
+
+
+@dataclass(frozen=True)
+class _ListStyle:
+    """How one run of sibling list items is written."""
+
+    tag: Literal["ul", "ol"]
+    family: tuple[str, ...]  # siblings of one family share a list
+    type: str | None = None  # <ol type>: "a", "A", "i" or "I" ("1" is the default)
+    start: int | None = None  # <ol start> when the first value is not 1
+    printed: bool = False  # irregular markers: list-style none, the marker printed
+
+
+def _marker_parts(marker: str) -> tuple[str, str] | None:
+    """("{}." | "{})" | "({})", body) of an ordered marker, or None."""
+    match = _ORDERED_MARKER.fullmatch(marker.strip())
+    if not match:
+        return None
+    if match["inner"] is not None:
+        return "({})", match["inner"]
+    return "{}" + match["sep"], match["plain"]
+
+
+def _family(item: Element) -> tuple[str, ...]:
+    """Items that can share one list: bullets with bullets; ordered items with the same
+    kind of marker (numbers or letters) printed the same way ("a." and "b." but not "(c)")."""
+    parts = _marker_parts(item.list_marker or "") if item.list_ordered else None
+    if parts is None:
+        return ("bullet",) if not item.list_ordered else ("other",)
+    form, body = parts
+    return ("decimal" if body.isdigit() else "letter", form)
+
+
+def _sequence(bodies: list[str]) -> tuple[str | None, int] | None:
+    """(<ol type>, first value) when the bodies count up by one, else None.
+
+    Single letters that count up are letters ("a", "b", "c"; "h", "i", "j"; a lone "c"),
+    otherwise roman numerals that count up ("i", "ii", "iii"; "iv", "v").
+    """
+    if all(b.isdigit() for b in bodies):
+        values = [int(b) for b in bodies]
+        return (None, values[0]) if _counts_up(values) else None
+    if not (all(b.islower() for b in bodies) or all(b.isupper() for b in bodies)):
+        return None
+    lower = bodies[0].islower()
+    if all(len(b) == 1 and b.isascii() and b.isalpha() for b in bodies):
+        letters = [ord(b.lower()) - ord("a") + 1 for b in bodies]
+        if _counts_up(letters):
+            return ("a" if lower else "A"), letters[0]
+    romans = [_roman(b) for b in bodies]
+    numbers = [r for r in romans if r is not None]
+    if len(numbers) == len(bodies) and _counts_up(numbers):
+        return ("i" if lower else "I"), numbers[0]
+    return None
+
+
+def _counts_up(values: list[int]) -> bool:
+    return all(b == a + 1 for a, b in pairwise(values))
+
+
+def _list_style(items: list[Element]) -> _ListStyle:
+    family = _family(items[0])
+    if family == ("bullet",):
+        return _ListStyle("ul", family)
+    parts = [_marker_parts(item.list_marker or "") for item in items]
+    bodies = [p[1] for p in parts if p is not None]
+    sequence = _sequence(bodies) if len(bodies) == len(items) else None
+    if sequence is None or family[1] != "{}.":
+        return _ListStyle("ol", family, printed=True)  # "(a)", "3)", or a broken sequence
+    kind, first = sequence
+    return _ListStyle("ol", family, type=kind, start=first if first != 1 else None)
+
+
+def _list_levels(items: list[Element]) -> list[int]:
+    """Levels relative to the first item, never more than one deeper than the item before
+    (a deeper item needs a parent item to nest in)."""
+    base = items[0].list_level or 1
+    levels: list[int] = []
+    for item in items:
+        level = max(1, (item.list_level or 1) - base + 1)
+        levels.append(min(level, levels[-1] + 1) if levels else 1)
+    return levels
 
 
 # --------------------------------------------------------------------------- renderer
@@ -312,11 +435,52 @@ class _Renderer:
 
     # ----- elements
 
+    def render_all(self, ordered: list[Element]) -> list[str]:
+        """Every element in reading order; consecutive list items become one list.
+
+        A display equation between two list items belongs to the item before it (layout
+        does not end a list there either) and is written inside that item, so the list
+        and its nesting go on after it. One after the last item stays outside the list.
+        """
+        chunks: list[str] = []
+        i = 0
+        while i < len(ordered):
+            if ordered[i].kind is Kind.LIST_ITEM:
+                items: list[Element] = []
+                inside: dict[str, list[Element]] = {}
+                while i < len(ordered):
+                    element = ordered[i]
+                    if element.kind is Kind.LIST_ITEM:
+                        items.append(element)
+                    elif element.id in self.placed:
+                        pass  # an item's inline equations are written inside it
+                    elif element.kind is Kind.EQUATION and self.list_goes_on(ordered, i):
+                        inside.setdefault(items[-1].id, []).append(element)
+                    else:
+                        break
+                    i += 1
+                chunks.append(self.lists(items, inside))
+                continue
+            chunk = self.render(ordered[i])
+            if chunk:
+                chunks.append(chunk)
+            i += 1
+        return chunks
+
+    def list_goes_on(self, ordered: list[Element], start: int) -> bool:
+        """Is the next element after the equations from `start` on a list item?"""
+        for element in ordered[start:]:
+            if element.kind is not Kind.EQUATION:
+                return element.kind is Kind.LIST_ITEM
+        return False
+
     def render(self, element: Element) -> str:
         if element.kind is Kind.HEADING:
             return self.heading(element)
         if element.kind is Kind.PARAGRAPH:
             return self.paragraph(element, element.text or "")
+        if element.kind is Kind.LIST_ITEM:
+            return self.lists([element])
         if element.kind is Kind.EQUATION:
             return "" if element.id in self.placed else self.block_equation(element)
         if element.kind is Kind.FIGURE:
@@ -327,6 +491,61 @@ class _Renderer:
         if not text.strip():
             return ""
         return f"<p{self.id_attr(element.id)}>{self.rich(text)}</p>"
+
+    def lists(self, items: list[Element], inside: dict[str, list[Element]] | None = None) -> str:
+        """Consecutive list items as nested lists.
+
+        A deeper item nests inside the item before it (`_list_levels`), after the
+        display equations `inside` puts in that item. At one level, siblings of one
+        family (`_family`) share a list. A regular ordered list ("a.", "b.", ... or "3.",
+        "4.", ...) is an `<ol>` with `type` and `start`, and the browser prints the
+        markers; any other ordered list ("(a)", "3)", a gap in the numbering) keeps its
+        printed markers as text in a list with `list-style: none` and `role="list"`
+        (Safari drops list semantics without a list style otherwise).
+        """
+        levels = _list_levels(items)
+        inside = inside or {}
+
+        def build(start: int, level: int) -> tuple[str, int]:
+            out, i = [], start
+            while i < len(items) and levels[i] == level:
+                family = _family(items[i])
+                members: list[tuple[Element, str]] = []
+                while i < len(items) and levels[i] == level and _family(items[i]) == family:
+                    item, i = items[i], i + 1
+                    nested = "".join(self.block_equation(e) for e in inside.get(item.id, []))
+                    if i < len(items) and levels[i] > level:
+                        deeper, i = build(i, level + 1)
+                        nested += deeper
+                    members.append((item, nested))
+                out.append(self.one_list([m for m, _ in members], [n for _, n in members]))
+            return "".join(out), i
+
+        html, i = "", 0
+        while i < len(items):
+            chunk, i = build(i, levels[i])
+            html += chunk
+        return html
+
+    def one_list(self, items: list[Element], nested: list[str]) -> str:
+        style = _list_style(items)
+        attrs = ""
+        if style.type:
+            attrs += f' type="{style.type}"'
+        if style.start is not None:
+            attrs += f' start="{style.start}"'
+        if style.printed:
+            attrs += ' class="printed-markers" role="list"'
+        lis = []
+        for item, inner in zip(items, nested, strict=True):
+            marker = (
+                f'<span class="list-marker">{_escape(item.list_marker or "")}</span> '
+                if style.printed
+                else ""
+            )
+            text = self.rich(item.text or "")
+            lis.append(f"<li{self.id_attr(item.id)}>{marker}{text}{inner}</li>")
+        return f"<{style.tag}{attrs}>{''.join(lis)}</{style.tag}>"
 
     def heading(self, element: Element) -> str:
         level, text = self.heading_parts(element)
@@ -372,9 +591,11 @@ class _Renderer:
 
     def block_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "block", with_id=False)
+        label = _equation_label(element.equation_label)
         if mathml is not None:
-            return f'<div class="equation"{self.id_attr(element.id)}>{mathml}</div>'
-        original = self.original(element, EQUATION_NOT_CONVERTED_ALT)
+            css = "equation equation-labelled" if label else "equation"
+            return f'<div class="{css}"{self.id_attr(element.id)}>{mathml}{label}</div>'
+        original = self.original(element, EQUATION_NOT_CONVERTED_ALT) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
     def inline_equation(self, element: Element) -> str:
@@ -451,7 +672,7 @@ def _placed_equations(
     """Equations whose marker appears in text that will be rendered (rendered inline)."""
     texts: list[str] = []
     for element in elements:
-        if element.kind is Kind.PARAGRAPH:
+        if element.kind in (Kind.PARAGRAPH, Kind.LIST_ITEM):
             texts.append(element.text or "")
         elif element.kind is Kind.HEADING:
             texts.append(renderer.heading_parts(element)[1])
@@ -515,8 +736,19 @@ h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
 p { margin: 0 0 1em; }
 img { max-width: 100%; height: auto; }
 .equation { margin: 1em 0; text-align: center; }
+.equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
+.equation-labelled > math { flex: 1 0 auto; }
+.equation-label { flex: none; margin-left: auto; }
 math { font-size: 1.1em; }
 math[display="block"] { margin: 0 auto; }
+ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
+li > ul, li > ol { margin: 0.25em 0 0; }
+.printed-markers { list-style: none; }
+.printed-markers > li { text-indent: -1.75em; padding-left: 1.75em; }
+.printed-markers > li > * { text-indent: 0; }
+.list-marker { display: inline-block; min-width: 1.5em; text-indent: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; }
 figure { margin: 1.5em 0; }
 figure img { display: block; }
 figcaption { margin-top: 0.5em; }
@@ -562,7 +794,7 @@ def render_html(
         first_fix.setdefault(fix.element_id, fix)
     renderer = _Renderer(fixes=first_fix, crops=crops, equations=equations)
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
-    body = [chunk for chunk in (renderer.render(e) for e in ordered) if chunk]
+    body = renderer.render_all(ordered)
     about = _about_section(list(first_fix.values()), len(renderer.flagged), source_note)
     return "\n".join(
         [

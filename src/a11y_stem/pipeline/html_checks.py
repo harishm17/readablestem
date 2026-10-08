@@ -12,6 +12,7 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.heading_text | empty_heading | a heading with no text (or img alt) in it |
 | html.img_alt | img_missing_alt | `<img>` without an `alt` attribute (`alt=""` is allowed) |
 | html.unique_ids | duplicate_id | an id used twice |
+| html.list_structure | list_structure | an `<li>` outside a list, or anything but `<li>` in one |
 | html.math_display | math_missing_display | `<math>` with no block/inline display (warning) |
 | html.self_contained | external_resource | scripts, links, frames, or any non-data: URL |
 | html.wording | banned_wording | a compliance claim (`_BANNED`) in text the tool wrote |
@@ -53,6 +54,8 @@ VOID_ELEMENTS = frozenset(
 EXTERNAL_ELEMENTS = frozenset({"script", "link", "iframe", "frame", "object", "embed", "base"})
 URL_ATTRIBUTES = frozenset({"src", "href", "srcset", "poster", "data", "action", "formaction"})
 _HEADING = re.compile(r"h([1-6])")
+LISTS = frozenset({"ul", "ol", "menu"})
+LIST_CHILDREN = frozenset({"li", "script", "template"})
 _BANNED = re.compile(r"\bcomplian(?:t|ce)\b", re.IGNORECASE)
 _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
 
@@ -89,6 +92,7 @@ class _Collector(HTMLParser):
         self.maths_without_display = 0
         self.external = 0
         self.authored_text: list[str] = []
+        self.list_errors = 0  # <li> outside a list, or other content directly in one
         self._stack: list[tuple[str, bool]] = []  # (tag, inside authored text)
         self._heading: tuple[int, list[str]] | None = None
         self._in_title = False
@@ -125,10 +129,15 @@ class _Collector(HTMLParser):
             self._heading[1].append(data)
         if self._stack and self._stack[-1][1]:
             self.authored_text.append(data)
+        if self._stack and self._stack[-1][0] in LISTS and data.strip():
+            self.list_errors += 1  # text directly inside <ul>/<ol>
 
     # ----- helpers
 
     def _start(self, tag: str, attrs: dict[str, str | None], *, void: bool) -> None:
+        parent = self._stack[-1][0] if self._stack else None
+        if (tag == "li" and parent not in LISTS) or (parent in LISTS and tag not in LIST_CHILDREN):
+            self.list_errors += 1
         if tag == "html":
             self.lang = attrs.get("lang")
         elif tag == "title":
@@ -197,6 +206,7 @@ def static_checks(html: str) -> list[Check]:
         _check("html.heading_text", all(text.strip() for _, text in doc.headings), "empty_heading"),
         _check("html.img_alt", doc.imgs_without_alt == 0, "img_missing_alt"),
         _check("html.unique_ids", all(n == 1 for n in doc.ids.values()), "duplicate_id"),
+        _check("html.list_structure", doc.list_errors == 0, "list_structure"),
         _check(
             "html.math_display",
             doc.maths_without_display == 0,

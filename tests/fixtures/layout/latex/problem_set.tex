@@ -1,0 +1,70 @@
+% Layout fixture: a physics problem set (article class) with lettered and roman list
+% items, multiple-choice options, a multi-line derivation and decimal equation numbers.
+% Written for a11y-stem's tests; no third-party text.
+\documentclass[11pt]{article}
+% Computer Modern text fonts (CMR, CMBX), as pdfLaTeX writes them; XeTeX defaults to Latin Modern.
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage{amsmath}
+\usepackage[margin=1in]{geometry}
+\renewcommand{\theequation}{2.\arabic{equation}}
+\pagestyle{empty}
+
+\begin{document}
+
+\section*{Problem Set 2: Kinematics}
+
+\subsection*{Problem 1}
+
+A cart starts from rest and speeds up at a steady rate. Its average velocity over a
+time interval is
+\begin{equation}
+  \bar{v} = \frac{\Delta x}{\Delta t} = \frac{x_f - x_0}{t_f - t_0}.
+  \label{eq:average}
+\end{equation}
+\begin{enumerate}
+  \renewcommand{\labelenumi}{(\alph{enumi})}
+  \item Find the average velocity between $t = 0$ and $t = 4.0\ \mathrm{s}$.
+  \item Explain why the instantaneous velocity at $t = 2.0\ \mathrm{s}$ equals it.
+  \item Sketch the position of the cart against time.
+\end{enumerate}
+
+\subsection*{Problem 2}
+
+Starting from the definition of acceleration, the speed after a distance $d$ follows
+from three steps:
+\begin{align*}
+  v^2 &= v_0^2 + 2 a d \\
+      &= 0 + 2 \left(3.0\ \mathrm{m/s^2}\right)\left(12\ \mathrm{m}\right) \\
+      &= 72\ \mathrm{m^2/s^2}.
+\end{align*}
+Which value is closest to the final speed?
+\begin{enumerate}
+  \renewcommand{\labelenumi}{\Alph{enumi}.}
+  \item $6.0\ \mathrm{m/s}$
+  \item $8.5\ \mathrm{m/s}$
+  \item $36\ \mathrm{m/s}$
+  \item $72\ \mathrm{m/s}$
+\end{enumerate}
+
+\subsection*{Problem 3}
+
+A stone falls from rest. Ignoring air resistance, the distance it falls in time $t$ is
+\begin{equation}
+  d = \frac{1}{2} g t^2 ,
+  \label{eq:fall}
+\end{equation}
+and the time to fall a height $h$ is
+\begin{equation}
+  t = \sqrt{\frac{2 h}{g}} .
+  \label{eq:time}
+\end{equation}
+Use $g = 9.8\ \mathrm{m/s^2}$ in both parts:
+\begin{enumerate}
+  \renewcommand{\labelenumi}{(\roman{enumi})}
+  \item how far does it fall in $1.5\ \mathrm{s}$?
+  \item how long does it take to fall $20\ \mathrm{m}$?
+\end{enumerate}
+2.5 metres is the height of the classroom ceiling, for comparison.
+
+\end{document}

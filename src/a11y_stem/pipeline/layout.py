@@ -16,16 +16,19 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
    columns resuming below them at the same height).
 4. PyMuPDF lines on one baseline are merged into rows (it splits justified text and
    inline maths into several "lines"). Rows are put in reading order and grouped into
-   runs: paragraphs, headings, display equations, captions. PyMuPDF's own blocks are not
-   trusted: they glue captions onto the next paragraph and a fraction's denominator onto
-   the text below it.
+   runs: paragraphs, list items, headings, display equations, captions. PyMuPDF's own
+   blocks are not trusted: they glue captions onto the next paragraph and a fraction's
+   denominator onto the text below it. A row starting with a bullet, a drawn bullet or
+   an ordered marker confirmed by a sibling starts a list item (`_list_markers`).
 5. Equations: rows that score as maths (`parse.equation_score`) and contain no prose word
-   are display equations; vertically adjacent maths rows and short rows tied together by
-   a vector fraction bar or radical become one region, with an equation number beside it
-   ("(2.4)", "Eq. 2.4", or a bare "2.4" to its right). Inside paragraphs, runs of maths
-   characters (maths fonts, math-italic letters, Greek, maths symbols) or an italic single
-   letter next to an operator become inline equations, and the paragraph text gets
-   `core.types.inline_marker(id)` in their place.
+   are display-equation rows. Rows on one fraction bar or radical, or side by side on one
+   baseline, form lines; stacked lines form one display equation when one continues the
+   other (starts with "="), is not a whole equation, or has its relation aligned with it
+   (`_equation_regions`). An equation number beside it ("(2.4)", "Eq. 2.4", or a bare
+   "2.4" to its right) becomes `Element.equation_label`, outside the box and the text.
+   Inside paragraphs and list items, runs of maths characters (maths fonts, math-italic
+   letters, Greek, maths symbols) or an italic single letter next to an operator become
+   inline equations, and the text gets `core.types.inline_marker(id)` in their place.
 6. Figures: raster images and clusters of vector drawings, minus equation rules, text
    underlines, page borders and boxes or tables drawn around text (rounded or not).
    Short labels inside or right next to a figure belong to it; running text never does,
@@ -61,7 +64,7 @@ import time
 import unicodedata
 from collections import Counter, OrderedDict, deque
 from collections.abc import Iterable, Sequence
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import count, pairwise
 
@@ -104,6 +107,7 @@ DOCUMENT_CACHE_SIZE = 4
 DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
 PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render the pages
 PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
+CROP_PAD = 2.0  # crop's default padding around an element box (pt)
 
 TEXT_FLAGS = (
     pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP | pymupdf.TEXT_ACCURATE_BBOXES
@@ -124,10 +128,12 @@ SECTION_NUMBER = re.compile(
     r"|Module|MODULE|Appendix|APPENDIX)\s+)?"
     r"(?P<num>\d{1,3}(?:\.\d{1,3}){0,4}|[IVX]{1,5}|[A-Z])(?P<sep>[.:)]?)(?:\s+|$)"
 )
-# "Figure 2.3 Velocity...", "Fig. 4: ...", but not "Figure 2 shows that ...".
+# "Figure 2.3 Velocity...", "Fig. 4: ...", but not "Figure 2 shows that ...". Beamer
+# captions have no number: "Figure: Velocity ...".
 CAPTION = re.compile(
     r"^(?:Figure|FIGURE|Fig\.|FIG\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
     r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
+    r"|^(?:Figure|Fig\.):\s+(?=\S)"
 )
 PAGE_NUMBER = re.compile(
     r"^(?:page\s+)?(?:\d{1,4}|[ivxlcdm]{1,7})(?:\s*(?:/|of)\s*\d{1,4})?$", re.IGNORECASE
@@ -145,15 +151,30 @@ BARE_EQUATION_NUMBER = re.compile(r"^\d{1,3}(?:\.\d{1,3}){1,2}[a-z]?$")
 # private-use U+F0B7), and Symbol is a maths font, so without this every bullet would be
 # an inline equation. Other private-use Symbol code points are Greek letters (U+F061 is
 # alpha) and stay maths; Wingdings bullets are not in a maths font in the first place.
+# Beamer draws its triangles with the AMS symbol font (U+25B6), also a maths font.
 _BULLET_GLYPHS = frozenset(
     "\u2022\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u27a2\u2713\u2714\u25ba\u25b8"
-    "\uf0b7"
+    "\u25b6\u25b9\u25bb\u27a4\u25c6\u25c7\u2666\u2756\uf0b7"
 )
+# Bullets only at the start of a line and followed by a space (LaTeX's second-level "\u2013",
+# third-level "\u2217", Markdown's "-" and "*"); maths or punctuation anywhere else. They
+# need a sibling (the same glyph starting another line at the same indent), because a
+# wrapped sentence can start a line with a dash.
+_LINE_START_BULLETS = frozenset("-\u2013\u2014*\u2217\u00b7\u2219\u22c5")
 _DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
-_BULLET = re.compile(
-    r"^(?:[\u2022\u00b7\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u2219\u22c5\u27a2"
-    r"\u2713\u2714\u25ba\u25b8*]\s|\(?\d{1,2}[.)]\s|\([a-z]\)\s|[a-z]\)\s|\([ivx]{1,4}\)\s)"
+# Ordered list markers: "1.", "2)", "(3)", "a.", "b)", "(c)", "iv.", "(ii)", "A.", "IV)".
+_ORDERED_MARKER = re.compile(
+    r"^(?:\((?P<inner>\d{1,3}|[A-Za-z]|[ivxlc]{2,6}|[IVXLC]{2,6})\)"
+    r"|(?P<plain>\d{1,3}|[A-Za-z]|[ivxlc]{2,6}|[IVXLC]{2,6})(?P<sep>[.)]))$"
 )
+_ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
+MAX_MARKER_GAP = 3.0  # x font size: widest gap between a list marker and its text
+MARKER_ALIGN = 3.0  # pt: sibling markers (or their item texts) start this close in x
+DRAWN_BULLET_RATIO = 0.6  # a drawn bullet is at most this x the row's font size
+# Relations that make a maths row an equation of its own (arrows also appear in limits).
+_ROW_RELATIONS = frozenset("=<>\u2264\u2265\u2260\u2248\u2261\u221d")
+# Big operators of an inline formula that TeX sets on a baseline of their own ($\int_0^1$).
+_BIG_OPERATORS = frozenset("\u222b\u222c\u222d\u222e\u2211\u220f\u2210\u221a")
 _LANG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$")
 _JUNK_TITLE = re.compile(
     r"^(?:untitled|document\s*\d*$|microsoft\s+(?:word|powerpoint)|powerpoint presentation"
@@ -175,6 +196,7 @@ _TEXT_MAP: dict[int, str | None] = {
 # the minus are in _SIGNS: in a text font they also print dashes and option flags):
 _STRONG_MATH = frozenset(
     "\u2211\u220f\u222b\u222e\u221a\u2202\u2207\u221e"  # sum prod int oint sqrt partial nabla inf
+    "\u2206"  # increment: TeX's text-font capital Delta (OT1 cmr) extracts as this
     "\u2264\u2265\u2260\u2248\u2261\u221d"  # <= >= != approx equiv proportional
     "\u2192\u2190\u2194\u21d2\u21d4"  # arrows
     "\u22c5\u00d7\u00f7"  # cdot times div
@@ -195,7 +217,8 @@ _MATH_WORDS = frozenset(
         *("sin", "cos", "tan", "cot", "sec", "csc", "sinh", "cosh", "tanh"),
         *("arcsin", "arccos", "arctan", "log", "ln", "lg", "exp", "lim", "max", "min"),
         *("sup", "inf", "det", "dim", "ker", "arg", "deg", "gcd", "lcm", "mod", "var"),
-        *("cov", "const", "sgn", "tr", "mol", "rad"),
+        *("cov", "const", "sgn", "tr", "mol", "rad", "proj", "rank", "diag", "grad", "curl"),
+        *("erf", "coth", "sech", "csch", "arsinh", "arcosh", "artanh"),
     )
 )
 _PROSE_TWO_LETTER = frozenset(
@@ -204,8 +227,11 @@ _PROSE_TWO_LETTER = frozenset(
         *("we", "it", "no", "do", "up", "us"),
     )
 )
+# TeX's bold fonts: CMBX (bold extended), CMB, CMMIB (bold maths italic, \boldsymbol and
+# \bm) and CMBSY (bold symbols); EC/cm-super's SFBX.
 _BOLD_FONT = re.compile(
-    r"bold|black|heavy|semibold|demi|cmbx|cmb\d|sfbx|-medi$|\bbd\b|,bd|-bd", re.IGNORECASE
+    r"bold|black|heavy|semibold|demi|cmbx|cmb\d|cmmib|cmbsy|sfbx|-medi$|\bbd\b|,bd|-bd",
+    re.IGNORECASE,
 )
 _ITALIC_FONT = re.compile(r"italic|oblique|cmti|cmsl|sfti|-it$|,it|ital", re.IGNORECASE)
 _MONO_FONT = re.compile(r"mono|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
@@ -274,7 +300,7 @@ def crop(
     element: Element,
     *,
     dpi: int = 200,
-    pad: float = 2.0,
+    pad: float = CROP_PAD,
     max_side_px: int = 2048,
 ) -> bytes:
     """PNG of the element's region (padded), long side capped at `max_side_px`.
@@ -731,7 +757,7 @@ def _char_class(ch: _Char) -> str:
         return "O"
     if c in _BRACKETS:
         return "B"
-    if c.isalpha():
+    if c.isalpha() and c not in _ACCENTS:  # a TeX hat (U+02C6) is a "modifier letter"
         return "L"
     return "P"
 
@@ -752,10 +778,36 @@ def _rounded(box: BBox) -> BBox:
 
 def _clean(text: str) -> str:
     """Whitespace collapsed, soft hyphens/zero-width/control characters removed, marker
-    brackets neutralised (`_TEXT_MAP`)."""
+    brackets neutralised (`_TEXT_MAP`), TeX's negation slash joined to its relation."""
     text = text.translate(_TEXT_MAP)
     text = "".join(c for c in text if c.isspace() or unicodedata.category(c) != "Cc")
+    if "\u0338" in text:
+        text = _negate_relations(text)
     return " ".join(text.split())
+
+
+# TeX writes \neq as a zero-width slash (U+0338, CMSY's "negationslash") drawn over "=".
+_NEGATED = {
+    "=": "\u2260",
+    "<": "\u226e",
+    ">": "\u226f",
+    "\u2264": "\u2270",
+    "\u2265": "\u2271",
+    "\u2208": "\u2209",
+    "\u2261": "\u2262",
+    "\u223c": "\u2241",
+    "\u2282": "\u2284",
+    "\u2286": "\u2288",
+}
+_NEGATION = re.compile(
+    "\\s*\u0338\\s*([" + "".join(_NEGATED) + "])|([" + "".join(_NEGATED) + "])\\s*\u0338"
+)
+
+
+def _negate_relations(text: str) -> str:
+    """ "A\u0338 = 0" -> "A \u2260 0"; a slash with no relation next to it is dropped."""
+    text = _NEGATION.sub(lambda m: " " + _NEGATED[m.group(1) or m.group(2)], text)
+    return text.replace("\u0338", "")
 
 
 # ============================================================================ rows
@@ -773,6 +825,8 @@ class _Row:
     score: float = 0.0
     reasons: list[str] = field(default_factory=list)
     absorbed: bool = False  # belongs to a figure (labels, text inside a diagram)
+    marker: _Marker | None = None  # the row starts a list item (see _list_markers)
+    region: _Region | None = None  # the display equation it belongs to (_equation_regions)
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -835,6 +889,19 @@ class _Row:
     @property
     def height(self) -> float:
         return self.bbox[3] - self.bbox[1]
+
+    def is_script(self, c: _Char) -> bool:
+        """Is `c` a sub- or superscript in this row?
+
+        Smaller than the row's text, or raised with MuPDF's superscript flag. The flag
+        alone is not trusted: MuPDF sets it on any span that starts above the previous
+        one, which in TeX output is most of a line after an inline fraction.
+        """
+        if c.blank:
+            return False
+        if c.size < SCRIPT_RATIO * self.size:
+            return True
+        return bool(c.flags & _SUPERSCRIPT_FLAG) and c.baseline < self.baseline - 0.2 * self.size
 
 
 @dataclass(frozen=True)
@@ -940,12 +1007,15 @@ def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> l
     rows.extend(f for f in frags if f.vertical)
     for row in rows:
         row.column = _column_of(row.bbox, gutter)
-    return _attach_scripts(rows)
+    return _attach_big_operators(_attach_scripts(rows))
 
 
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     """Fold small sub/superscript fragments into the row they belong to.
 
+    A fragment is a script only if every glyph in it is small: a subscripted variable
+    such as a fraction's denominator "v_avg" is mostly script-size letters, but its "v"
+    is not, and folding it into the line above would interleave the two by x.
     Hosts are looked up in a vertical window around each fragment (rows are sorted by
     top edge), in the same order a full scan would visit them.
     """
@@ -958,6 +1028,7 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     for i, small in enumerate(rows):
         if small.vertical or len(small.clean) > 12 or i in merged:
             continue
+        glyph = max(c.size for c in small.ink)  # the largest glyph, see the docstring
         best = None
         centre = (small.y0 + small.y1) / 2
         # A host's box grows when a script joins it, by at most about one font size.
@@ -965,7 +1036,7 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
         hi = bisect.bisect_right(tops, centre + 2 * largest)
         for j in range(lo, hi):
             host = rows[j]
-            if j == i or j in dropped or host.vertical or small.size > SCRIPT_RATIO * host.size:
+            if j == i or j in dropped or host.vertical or glyph > SCRIPT_RATIO * host.size:
                 continue
             host = merged.get(j, host)
             near_y = host.y0 - 0.5 * host.size <= centre <= host.y1 + 0.5 * host.size
@@ -975,10 +1046,67 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
                 break
         if best is not None:
             host = merged.get(best, rows[best])
-            chars = sorted(host.chars + small.chars, key=lambda c: c.x0)
+            merged[best] = _Row(_insert_script(host.chars, small.chars), column=host.column)
+            dropped.add(i)
+    return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
+
+
+def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
+    """Fold a short fragment led by a big operator into the line it sits in.
+
+    TeX sets the integral sign of an inline $\\int_0^1 x^2\\,dx$ (and a text-style sum or
+    root) on a baseline of its own, so it arrives as a separate row of an integral sign
+    and its upper limit in the middle of a line of text. Left there, it becomes a display
+    equation of its own and the inline equation's crop misses the sign. A fragment of at
+    most four glyphs with a big operator in it joins the row whose vertical extent holds
+    its centre and whose horizontal extent it lies within, before the first glyph to its
+    right.
+    """
+    pieces = [
+        i
+        for i, r in enumerate(rows)
+        if not r.vertical and len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)
+    ]
+    if not pieces:
+        return rows
+    piece_ids = set(pieces)
+    hosts = sorted((r.y0, i) for i, r in enumerate(rows) if i not in piece_ids and not r.vertical)
+    tops = [y for y, _ in hosts]
+    tallest = max((rows[i].height for _, i in hosts), default=0.0)
+    merged: dict[int, _Row] = {}
+    dropped: set[int] = set()
+    for i in pieces:
+        piece = rows[i]
+        centre = (piece.y0 + piece.y1) / 2
+        lo = bisect.bisect_left(tops, centre - tallest)
+        best, overlap = None, 0.0
+        for _, j in hosts[lo : bisect.bisect_right(tops, centre)]:
+            host = merged.get(j, rows[j])
+            reach = 0.5 * host.size
+            inside = host.x0 - reach <= piece.x0 and piece.x1 <= host.x1 + reach
+            shared = min(piece.y1, host.y1) - max(piece.y0, host.y0)
+            on_line = host.y0 <= centre <= host.y1 and host.column == piece.column
+            if on_line and inside and shared > overlap:
+                best, overlap = j, shared
+        if best is not None:
+            host = merged.get(best, rows[best])
+            at = next((k for k, c in enumerate(host.chars) if c.x0 >= piece.x0), len(host.chars))
+            chars = [*host.chars[:at], *piece.chars, *host.chars[at:]]
             merged[best] = _Row(chars, column=host.column)
             dropped.add(i)
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
+
+
+def _insert_script(host: list[_Char], script: list[_Char]) -> list[_Char]:
+    """`script`'s characters as one block, after the host glyphs that start before its
+    right edge. A sub/superscript lands right after its base; the denominator of a small
+    fraction lands after its numerator instead of being interleaved with it by x."""
+    end = max(c.x1 for c in script)
+    at = 0
+    for i, c in enumerate(host):
+        if not c.blank and c.x0 < end - 0.01:
+            at = i + 1
+    return [*host[:at], *script, *host[at:]]
 
 
 # ============================================================================ margins
@@ -1202,12 +1330,21 @@ def _sparse_intervals(events: list[tuple[float, int]], allowed: int) -> list[tup
 
 
 def _line_widths(boxes: list[BBox]) -> list[float]:
-    """Widths of visual lines (boxes sharing a bottom edge are one line)."""
-    lines: dict[int, list[float]] = {}
-    for x0, _, x1, y1 in boxes:
-        span = lines.setdefault(round(y1), [x0, x1])
-        span[0], span[1] = min(span[0], x0), max(span[1], x1)
-    return [x1 - x0 for x0, x1 in lines.values()]
+    """Widths of visual lines: boxes that overlap vertically by half the smaller height
+    are one line. TeX splits a line with inline maths into pieces whose bottom edges
+    differ (subscripts, fractions); counted apart, they made a column of full lines look
+    like a column of short ones."""
+    lines: list[list[float]] = []  # [x0, y0, x1, y1] per line, top to bottom
+    for x0, y0, x1, y1 in sorted(boxes, key=lambda b: (b[1] + b[3]) / 2):
+        if lines:
+            line = lines[-1]
+            overlap = min(y1, line[3]) - max(y0, line[1])
+            if overlap >= 0.5 * min(y1 - y0, line[3] - line[1]):
+                line[0], line[2] = min(line[0], x0), max(line[2], x1)
+                line[1], line[3] = min(line[1], y0), max(line[3], y1)
+                continue
+        lines.append([x0, y0, x1, y1])
+    return [x1 - x0 for x0, _, x1, _ in lines]
 
 
 def _column_of(box: BBox, gutter: tuple[float, float] | None) -> str:
@@ -1346,9 +1483,24 @@ def _top_down(boxes: Sequence[BBox], members: Iterable[int]) -> list[int]:
 # ============================================================================ maths
 
 
-def _word_lengths(chars: list[_Char], classes: list[str], script: list[bool]) -> list[int]:
-    """For letters (class L), the length of the plain-letter word they belong to."""
+def _word_lengths(
+    chars: list[_Char], classes: list[str], script: list[bool]
+) -> tuple[list[int], list[bool]]:
+    """For letters (class L), the length of the plain-letter word they belong to, and
+    whether that word is a maths word (`sin`, `det`, `lim`, units such as `mol`).
+
+    Italic letters run together are maths variables set in a text font (beamer's
+    sans-serif maths: "at" in v = v0 + at), not a word, when the run is short (three
+    letters at most) and the row reads as maths around them: it also has upright letters
+    (prose with a formula in it), or it has a relation sign and no longer italic run (a
+    formula on its own; an italic sentence has longer words). Each letter then counts
+    on its own.
+    """
     lengths = [0] * len(chars)
+    maths_word = [False] * len(chars)
+    upright = any(k == "L" and not c.italic for k, c in zip(classes, chars, strict=True))
+    if not upright and any(c.c in _ROW_RELATIONS for c in chars):
+        upright = _longest_italic_run(chars, classes, script) <= 3
     i = 0
     while i < len(chars):
         if classes[i] != "L":
@@ -1357,10 +1509,21 @@ def _word_lengths(chars: list[_Char], classes: list[str], script: list[bool]) ->
         j = i
         while j < len(chars) and classes[j] == "L" and script[j] == script[i]:
             j += 1
+        italic_variables = upright and j - i <= 3 and all(c.italic for c in chars[i:j])
+        word = "".join(c.c for c in chars[i:j]).lower()
         for k in range(i, j):
-            lengths[k] = j - i
+            lengths[k] = 1 if italic_variables else j - i
+            maths_word[k] = word in _MATH_WORDS
         i = j
-    return lengths
+    return lengths, maths_word
+
+
+def _longest_italic_run(chars: list[_Char], classes: list[str], script: list[bool]) -> int:
+    longest = run = 0
+    for c, k, small in zip(chars, classes, script, strict=True):
+        run = run + 1 if k == "L" and c.italic and not small else 0
+        longest = max(longest, run)
+    return longest
 
 
 @dataclass
@@ -1370,6 +1533,7 @@ class _CharInfo:
     classes: list[str]
     script: list[bool]
     words: list[int]
+    maths_words: list[bool]
 
     @classmethod
     def of(cls, row: _Row) -> _CharInfo:
@@ -1381,15 +1545,15 @@ class _CharInfo:
             and (first + 1 == len(row.chars) or row.chars[first + 1].blank)
         ):
             classes[first] = "P"  # "\u00b7 Measure the ramp": a bullet, not a product
-        script = [
-            not c.blank and (c.size < SCRIPT_RATIO * row.size or bool(c.flags & _SUPERSCRIPT_FLAG))
-            for c in row.chars
-        ]
-        return cls(classes, script, _word_lengths(row.chars, classes, script))
+        script = [row.is_script(c) for c in row.chars]
+        words, maths_words = _word_lengths(row.chars, classes, script)
+        return cls(classes, script, words, maths_words)
 
     def mathy(self, i: int) -> bool:
         kind = self.classes[i]
-        return kind in "MDOB" or (kind == "L" and (self.words[i] == 1 or self.script[i]))
+        if kind in "MDOB":
+            return True
+        return kind == "L" and (self.words[i] == 1 or self.script[i] or self.maths_words[i])
 
 
 def _prose_words(row: _Row, info: _CharInfo) -> int:
@@ -1405,10 +1569,18 @@ def _prose_words(row: _Row, info: _CharInfo) -> int:
         while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
             j += 1
         word = "".join(c.c for c in chars[i:j]).lower()
-        if (len(word) >= 3 and word not in _MATH_WORDS) or word in _PROSE_TWO_LETTER:
+        variables = j - i > 1 and info.words[i] == 1  # italic maths letters, see _word_lengths
+        if not variables and (
+            (len(word) >= 3 and word not in _MATH_WORDS) or word in _PROSE_TWO_LETTER
+        ):
             count += 1
         i = j
     return count
+
+
+def _is_equation_number(text: str) -> bool:
+    """ "(2.4)", "[3]", "Eq. 2.4" or a bare "2.4": what an equation number looks like."""
+    return bool(EQUATION_NUMBER.match(text) or BARE_EQUATION_NUMBER.match(text))
 
 
 def _classify_row(row: _Row) -> None:
@@ -1420,11 +1592,17 @@ def _classify_row(row: _Row) -> None:
     superscript = any(info.script)
     row.score, row.reasons = equation_score(text, fonts, superscript)
     ink = [i for i, c in enumerate(row.chars) if not c.blank]
-    ratio = sum(info.mathy(i) for i in ink) / max(1, len(ink))
+    # Punctuation after maths ("v ." at the end of a displayed fraction) counts neither way.
+    counted = [i for i in ink if row.chars[i].c not in ",.;:"]
+    ratio = sum(info.mathy(i) for i in counted) / max(1, len(counted))
     prose = _prose_words(row, info)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
-    elif EQUATION_NUMBER.match(text) or BARE_EQUATION_NUMBER.match(text):
+    elif row.marker is not None:
+        row.kind = "text"  # a list item ("b. - 40 m/s"): maths in it is inline
+    elif not counted:
+        row.kind = "frag"  # a lone "," or "." belongs to the maths it ends, if any
+    elif _is_equation_number(text):
         row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
@@ -1475,7 +1653,9 @@ def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
                 and chars[i - 1].c.isdigit()
                 and chars[i + 1].c.isdigit()
             )
-            if info.mathy(i) or chars[i].blank or between_digits or (c == "," and depth > 0):
+            inside = between_digits or (c == "," and depth > 0)
+            accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
+            if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
                 continue
             break
@@ -1504,8 +1684,11 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
         elif _article(chars, info, start, end, end - 2):
             end -= 1
             changed = True
-        if end > start and chars[end - 1].c in "+-*/=<>^_|~" and not info.script[end - 1]:
+        if end > start and chars[end - 1].c in _TRAILING_OPERATORS and not info.script[end - 1]:
             end -= 1
+            changed = True
+        if end > start and chars[start].c in _INFIX_ONLY:  # "/h)] = 40": a broken piece
+            start += 1
             changed = True
         text = "".join(c.c for c in chars[start:end])
         if end > start and text[-1] in ")]}" and _unbalanced(text, closing=True):
@@ -1513,6 +1696,13 @@ def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tupl
             changed = True
         elif end > start and text[0] in "([{" and _unbalanced(text, closing=False):
             start += 1
+            changed = True
+        elif end > start and text.count("|") % 2 and (text[0] == "|" or text[-1] == "|"):
+            # An unpaired bar at an edge ("|x" before a line break); "|x| < 1" keeps both.
+            if text[0] == "|":
+                start += 1
+            else:
+                end -= 1
             changed = True
     return start, end
 
@@ -1532,11 +1722,50 @@ def _unbalanced(text: str, *, closing: bool) -> bool:
     return closed > opened if closing else opened > closed
 
 
+# Spacing accents TeX sets as separate glyphs above a letter (hat, tilde, bar, dot,
+# check, breve): inside an inline formula they do not end it.
+_ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
+# Operators that cannot end an expression: a run ending in one was cut by prose
+# ("b - proj b" broken at a word the run does not take in). Not "|": it closes |x|.
+_TRAILING_OPERATORS = frozenset("+-*/=<>^_~\u2212\u00b1\u2213\u00d7\u00f7\u22c5")
+# Operators that cannot start an expression: a run starting with one is the tail of an
+# expression cut by a line break or by prose ("(50 km)/(60 km/h)] = 40" -> "/h)] = 40").
+# Not "|" (it opens |x|, see `_trim_run`) and not "~" ("~5 m" is about five metres).
+_INFIX_ONLY = frozenset("/*^_=<>\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5")
+
+
+def _broken_brackets(text: str) -> bool:
+    """A closing bracket before any opening one, or an opening one never closed."""
+    depth = 0
+    for c in text:
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth < 0:
+                return True
+    return depth != 0
+
+
 def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) -> list[str]:
+    """Why a run inside a paragraph row is maths, or [] when it is not.
+
+    Without a maths character, a run must also be a whole expression: brackets that open
+    and close in order (not "h)] = 40", a piece of a plain-text formula cut by a line
+    break), and an operator that is not just a leading sign ("-49 m" is a quantity with
+    an italic unit, not a formula).
+    """
     idx = range(start, end)
     if any(info.classes[i] == "M" for i in idx):
         return ["math font or symbol"]
-    operator = any(info.classes[i] == "O" or info.script[i] for i in idx)
+    if _broken_brackets("".join(chars[i].c for i in idx)):
+        return []
+    first = next(i for i in idx if not chars[i].blank)
+    operator = any(
+        (info.classes[i] == "O" and not (i == first and chars[i].c in "+-\u2212\u00b1"))
+        or info.script[i]
+        for i in idx
+    )
     italic_letter = any(
         info.classes[i] == "L" and info.words[i] == 1 and chars[i].italic and not info.script[i]
         for i in idx
@@ -1559,6 +1788,330 @@ def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) 
             if any(c.isalnum() for c in left) and any(c.isalnum() for c in right):
                 return ["relation between operands"]
     return []
+
+
+# ============================================================================ lists
+
+
+@dataclass(frozen=True)
+class _Marker:
+    """The list marker that starts a row: what is printed and where the item text starts."""
+
+    text: str  # as printed: "a.", "(iii)", "3)", "\u2022"
+    ordered: bool
+    end: int  # index in row.chars where the item text starts (after the marker)
+    x: float  # left edge of the item text: the same for every item of one list level
+
+
+@dataclass(frozen=True, eq=False)
+class _MarkerCandidate:
+    """A row that starts like a list item, before siblings confirm it."""
+
+    row: _Row
+    marker: _Marker
+    family: tuple[str, str]  # ("decimal" | "letter", "{}." | "{})" | "({})") or ("bullet", glyph)
+    readings: tuple[tuple[str, int], ...]  # (style, ordinal) readings of an ordered marker
+    x0: float  # left edge of the marker itself
+    sure: bool  # needs no sibling: a bullet glyph, a drawn bullet, or "3." before a capital
+
+
+_ROMAN_STEPS = (
+    (100, "c"), (90, "xc"), (50, "l"), (40, "xl"), (10, "x"), (9, "ix"), (5, "v"), (4, "iv"),
+    (1, "i"),
+)  # fmt: skip
+
+
+def roman_value(text: str) -> int | None:
+    """ "iv" -> 4, "XII" -> 12; None unless `text` is a canonical roman numeral below 400."""
+    lower = text.lower()
+    if not lower or any(c not in _ROMAN for c in lower):
+        return None
+    total = 0
+    for i, c in enumerate(lower):
+        value = _ROMAN[c]
+        total += -value if i + 1 < len(lower) and _ROMAN[lower[i + 1]] > value else value
+    canonical, rest = "", total
+    for number, letters in _ROMAN_STEPS:
+        while rest >= number:
+            canonical, rest = canonical + letters, rest - number
+    return total if 0 < total < 400 and canonical == lower else None
+
+
+def marker_readings(body: str) -> tuple[tuple[str, int], ...]:
+    """Possible (style, ordinal) readings of an ordered marker's body.
+
+    "3" -> decimal 3; "b" -> lower-alpha 2; "iv" -> lower-roman 4; "i" is both lower-alpha
+    9 and lower-roman 1 (its siblings decide); "C" is upper-alpha 3 and upper-roman 100.
+    """
+    if body.isdigit():
+        return (("decimal", int(body)),)
+    readings: list[tuple[str, int]] = []
+    case = "lower" if body.islower() else "upper"
+    if len(body) == 1 and body.isascii() and body.isalpha():
+        readings.append((f"{case}-alpha", ord(body.lower()) - ord("a") + 1))
+    roman = roman_value(body)
+    if roman is not None and (body.islower() or body.isupper()):
+        readings.append((f"{case}-roman", roman))
+    return tuple(readings)
+
+
+def _ordered_marker(text: str) -> tuple[str, str] | None:
+    """(form, body) of an ordered marker token: "(iv)" -> ("({})", "iv"), "3." -> ("{}.", "3")."""
+    match = _ORDERED_MARKER.match(text)
+    if not match:
+        return None
+    if match["inner"] is not None:
+        return "({})", match["inner"]
+    return "{}" + match["sep"], match["plain"]
+
+
+def _tokens(row: _Row) -> list[tuple[int, int]]:
+    """(start, end) character ranges of the ink tokens of a row: split at blanks and at
+    gaps of at least 0.3 x font size (a marker and its text in separate spans)."""
+    tokens: list[tuple[int, int]] = []
+    start = None
+    chars = row.chars
+    for i, c in enumerate(chars):
+        if c.blank:
+            if start is not None:
+                tokens.append((start, i))
+                start = None
+            continue
+        if start is not None and c.x0 - chars[i - 1].x1 >= 0.3 * row.size:
+            tokens.append((start, i))
+            start = None
+        if start is None:
+            start = i
+    if start is not None:
+        tokens.append((start, len(chars)))
+    return tokens
+
+
+def _marker_candidate(row: _Row, bullets: _DrawnBullets) -> _MarkerCandidate | None:
+    """Does `row` start like a list item? A bullet glyph, an ordered marker ("a.", "(3)",
+    "iv)", "3 ." as OpenStax prints it) or a drawn bullet just left of it, followed by
+    the item's text within MAX_MARKER_GAP x font size."""
+    if row.vertical:
+        return None
+    drawn = bullets.left_of(row)
+    tokens = _tokens(row)
+    if drawn is not None:
+        if not tokens:
+            return None
+        start = tokens[0][0]
+        marker = _Marker(drawn[1], False, start, row.chars[start].x0)
+        return _MarkerCandidate(row, marker, ("bullet", drawn[1]), (), drawn[0], True)
+    if len(tokens) < 2:
+        return None
+    chars = row.chars
+    (m0, m1), rest = tokens[0], tokens[1:]
+    first = chars[m0].c
+    if m1 - m0 == 1 and first in _DASHES and _signed_value(chars[m0], chars[rest[0][0] :]):
+        return None  # "- 40 m/s", "\u2013 5 \u00b0C": a negative value, not a dash bullet
+    if m1 - m0 == 1 and (first in _BULLET_GLYPHS or first in _LINE_START_BULLETS):
+        glyph = _clean(first)
+        family: tuple[str, str] = ("bullet", glyph)
+        readings: tuple[tuple[str, int], ...] = ()
+        sure = first in _BULLET_GLYPHS
+        text = glyph
+    else:
+        text = "".join(c.c for c in chars[m0:m1])
+        if text.isdigit() and "".join(c.c for c in chars[slice(*rest[0])]) in (".", ")"):
+            m1 = rest[0][1]  # "3 ." (OpenStax prints the number and its full stop apart)
+            rest = rest[1:]
+            text += chars[m1 - 1].c
+        parsed = _ordered_marker(text)
+        if parsed is None or not rest:
+            return None
+        form, body = parsed
+        readings = marker_readings(body)
+        if not readings:
+            return None
+        family = ("decimal" if body.isdigit() else "letter", form)
+        following = chars[rest[0][0]].c
+        sure = body.isdigit() and (following.isupper() or following in "(\"'\u201c")
+    start = rest[0][0]
+    if chars[start].x0 - chars[m1 - 1].x1 > MAX_MARKER_GAP * row.size:
+        return None
+    if not any(c.c.isalnum() or c.math for c in chars[start:]):
+        return None
+    marker = _Marker(text, family[0] != "bullet", start, chars[start].x0)
+    return _MarkerCandidate(row, marker, family, readings, chars[m0].x0, sure)
+
+
+class _ColumnRows:
+    """One page's rows per column, top to bottom: the lines above and below a row."""
+
+    def __init__(self, rows: Sequence[_Row]) -> None:
+        self.columns: dict[str, list[_Row]] = {}
+        for row in rows:
+            if not row.vertical:
+                self.columns.setdefault(row.column, []).append(row)
+        for column in self.columns.values():
+            column.sort(key=lambda r: r.baseline)
+        self.baselines = {k: [r.baseline for r in v] for k, v in self.columns.items()}
+
+    def neighbour(self, row: _Row, step: int) -> _Row | None:
+        """The nearest row above (step -1) or below (+1) in `row`'s column that overlaps
+        it in x."""
+        rows, baselines = self.columns.get(row.column, []), self.baselines.get(row.column, [])
+        if step < 0:
+            k = bisect.bisect_left(baselines, row.baseline - 0.3 * row.size) - 1
+            span = range(k, -1, -1)
+        else:
+            k = bisect.bisect_right(baselines, row.baseline + 0.3 * row.size)
+            span = range(k, len(rows))
+        return next((rows[i] for i in span if rows[i].x0 < row.x1 and rows[i].x1 > row.x0), None)
+
+    def wraps_into(self, candidate: _MarkerCandidate, ctx: _Context) -> bool:
+        """Is the candidate's row the next line of the paragraph above, which happens to
+        start "2. The"? The line above is at the usual pitch and size, starts as far left
+        as the marker or further right, and does not end a sentence or clause; and the
+        line below does not hang at the item text's indent."""
+        row = candidate.row
+        above = self.neighbour(row, -1)
+        if above is None:
+            return False
+        size = row.size
+        pitch = row.baseline - above.baseline
+        limit = max(1.3 * ctx.pitch * size / ctx.body, 1.25 * size)
+        if abs(above.size - size) > max(1.0, 0.12 * size) or not 0.5 * size <= pitch <= limit:
+            return False
+        if candidate.x0 > above.x0 + 0.5 * size:
+            return False  # the marker is indented past the text above
+        if above.clean[-1:] in tuple(".:;!?"):
+            return False
+        below = self.neighbour(row, 1)
+        hanging = (
+            below is not None
+            and below.baseline - row.baseline <= limit
+            and abs(below.x0 - candidate.marker.x) <= 1.5
+            and candidate.marker.x - candidate.x0 > 1.5
+        )
+        return not hanging
+
+
+_DASHES = frozenset("-\u2013\u2014")  # line-start bullets that are also how minus is typed
+
+
+def _signed_value(dash: _Char, after: list[_Char]) -> bool:
+    """Is a line-start dash the sign of the value after it? It is when the value starts
+    with a digit or a decimal point ("- 40 m/s"; Word turns a spaced hyphen into "\u2013"),
+    or when the dash is set in a maths font (a minus sign)."""
+    text = "".join(c.c for c in after).lstrip()
+    return dash.math or text[:1].isdigit() or (text[:1] in ".," and text[1:2].isdigit())
+
+
+class _DrawnBullets:
+    """Small drawn shapes that can be list bullets (Chromium draws CSS disc markers as
+    paths), indexed by vertical centre."""
+
+    def __init__(self, paths: Sequence[_Path], body: float) -> None:
+        marks = []
+        for path in paths:
+            x0, y0, x1, y1 = path.bbox
+            if path.kind == "shape" and 0.5 <= max(x1 - x0, y1 - y0) <= 1.2 * body:
+                glyph = ("\u2022" if path.curved else "\u25aa") if path.filled else "\u25e6"
+                marks.append(((y0 + y1) / 2, path.bbox, glyph))
+        marks.sort(key=lambda m: m[0])
+        self.marks = marks
+        self.centres = [m[0] for m in marks]
+
+    def left_of(self, row: _Row) -> tuple[float, str] | None:
+        """(left edge, glyph) of a bullet drawn just left of `row` at its height."""
+        lo = bisect.bisect_left(self.centres, row.y0)
+        hi = bisect.bisect_right(self.centres, row.y1)
+        for _, (x0, y0, x1, y1), glyph in self.marks[lo:hi]:
+            side = max(x1 - x0, y1 - y0)
+            if side <= DRAWN_BULLET_RATIO * row.size and 0 <= row.x0 - x1 <= 2.5 * row.size:
+                return x0, glyph
+        return None
+
+
+def _list_markers(
+    rows_by_page: dict[int, list[_Row]], paths: dict[int, list[_Path]], ctx: _Context
+) -> None:
+    """Set `row.marker` on every row that starts a list item, in all analysed pages.
+
+    A bullet glyph or a drawn bullet is enough, and so is a number before a capital
+    letter ("3. Measure"), unless that row is the next line of a wrapped paragraph
+    (`_ColumnRows.wraps_into`). Letters, roman numerals, bare numbers and line-start
+    dashes need a sibling: another row with the same kind of marker, the next or
+    previous value ("b." for "a."; the same glyph for a dash) and the marker or the item
+    text starting within MARKER_ALIGN in x, anywhere in the document (lists cross
+    pages). "A ball rolls", "2.3 Speed", "2.5 metres", a lone "B. Smith", "... is
+    exactly" / "2. The heavier ball ...", a spaced minus ("- 40 m/s") or a sentence
+    wrapped onto a new line after a dash do not start lists.
+    """
+    candidates: list[_MarkerCandidate] = []
+    for number, rows in rows_by_page.items():
+        bullets = _DrawnBullets(paths.get(number, []), ctx.body)
+        found = [c for row in rows if (c := _marker_candidate(row, bullets)) is not None]
+        if any(c.sure and c.readings for c in found):
+            columns = _ColumnRows(rows)
+            found = [
+                replace(c, sure=False)
+                if c.sure and c.readings and columns.wraps_into(c, ctx)
+                else c
+                for c in found
+            ]
+        candidates.extend(found)
+    index: dict[tuple, tuple[list[float], list[float]]] = {}
+    for candidate in candidates:
+        for reading in candidate.readings or (("bullet", 0),):
+            lists = index.setdefault((candidate.family, reading), ([], []))
+            lists[0].append(candidate.x0)
+            lists[1].append(candidate.marker.x)
+    for lists in index.values():
+        lists[0].sort()
+        lists[1].sort()
+
+    def aligned(key: tuple, candidate: _MarkerCandidate, needed: int) -> bool:
+        lists = index.get(key)
+        if lists is None:
+            return False
+        for values, x in ((lists[0], candidate.x0), (lists[1], candidate.marker.x)):
+            near = bisect.bisect_right(values, x + MARKER_ALIGN)
+            if near - bisect.bisect_left(values, x - MARKER_ALIGN) >= needed:
+                return True
+        return False
+
+    for candidate in candidates:
+        if candidate.readings:
+            confirmed = any(
+                aligned((candidate.family, (style, value + step)), candidate, 1)
+                for style, value in candidate.readings
+                for step in (-1, 1)
+            )
+        else:  # the same bullet glyph on another row (this one counts itself)
+            confirmed = aligned((candidate.family, ("bullet", 0)), candidate, 2)
+        if candidate.sure or confirmed:
+            candidate.row.marker = candidate.marker
+
+
+def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
+    """Nesting level (1 = top) per list-item block id, from the indent of the item text.
+
+    Consecutive items in reading order form one list (display equations inside an item
+    do not end it; anything else does). A deeper indent opens a level, a shallower one
+    closes levels until one matches. Indents are measured from the left edge of the
+    item's column (`_Block.origin`), so a list that goes on in the next column or on a
+    page with another margin keeps its levels.
+    """
+    levels: dict[int, int] = {}
+    stack: list[float] = []
+    for block in blocks:
+        if block.marker is None:
+            if block.kind != Kind.EQUATION:
+                stack = []
+            continue
+        x = block.marker.x - block.origin
+        while stack and x < stack[-1] - tolerance:
+            stack.pop()
+        if not stack or x > stack[-1] + tolerance:
+            stack.append(x)
+        levels[id(block)] = len(stack)
+    return levels
 
 
 # ============================================================================ drawings
@@ -1745,6 +2298,290 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
     return not bare or row.x0 - box[2] >= 1.0 * size
 
 
+# ============================================================================ display equations
+
+# Signs that continue the line above when a maths line starts with them ("= 250 m/s" under
+# "v = ...", "+ c" under a long sum).
+_CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
+MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
+MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
+
+
+def _split_labels(rows: list[_Row]) -> list[_Row]:
+    """Cut an equation number off the end of a maths row into a row of its own.
+
+    `_merge_baselines` joins pieces of a line up to 4 x font size apart, so an equation
+    number set close to its equation ("= 2000 m - 525 m ,   2.8") arrives as part of the
+    row. It is cut off when the last token reads as an equation number (or the last two
+    do: "Eq. 2.4", "Equation (2.4)"), stands at least one font size clear of the rest,
+    and the rest has maths in it (or is only the comma that ends the maths) and does not
+    end in a relation or operator ("x =   2.4" keeps its right-hand side). Whether it is
+    an equation number is decided later, by where it sits (`_equation_regions`).
+    """
+    out: list[_Row] = []
+    for row in rows:
+        tokens = _tokens(row)
+        if row.vertical or len(tokens) < 2:
+            out.append(row)
+            continue
+        start = tokens[-1][0]
+        label = _clean("".join(c.c for c in row.chars[start:]))
+        if len(tokens) >= 3:
+            prefixed = _clean("".join(c.c for c in row.chars[tokens[-2][0] :]))
+            if EQUATION_NUMBER.match(prefixed):  # "Eq. 2.4": the prefix goes with it
+                start, label = tokens[-2][0], prefixed
+        before = [c for c in row.chars[:start] if not c.blank]
+        if (
+            _is_equation_number(label)
+            and before
+            and row.chars[start].x0 - before[-1].x1 >= 1.0 * row.size
+            and before[-1].c not in _CONTINUATION_SIGNS
+            and (
+                any(c.math or c.c in _ROW_RELATIONS or c.c in _SIGNS for c in before)
+                or all(c.c in ",.;:" for c in before)  # the comma that ends the maths
+            )
+        ):
+            out.append(_Row(row.chars[:start], column=row.column, marker=row.marker))
+            out.append(_Row(row.chars[start:], column=row.column))
+        else:
+            out.append(row)
+    return out
+
+
+@dataclass(eq=False)
+class _Region:
+    """One display equation: the maths rows that belong together, the rules it uses
+    (fraction bars, radicals) and the rows of its equation number, kept apart."""
+
+    rows: list[_Row] = field(default_factory=list)
+    rules: list[_Path] = field(default_factory=list)
+    labels: list[_Row] = field(default_factory=list)
+    box: BBox = (0.0, 0.0, 0.0, 0.0)  # rows and rules, while lines are being stacked
+
+
+@dataclass(eq=False)
+class _Line:
+    """Maths rows of one line of a display equation: a main row, the numerators and
+    denominators of its fractions, and the columns of an aligned row."""
+
+    rows: list[_Row]
+    rules: list[_Path]
+    labels: list[_Row] = field(default_factory=list)
+
+    @cached_property
+    def box(self) -> BBox:
+        return _union([*(r.bbox for r in self.rows), *(p.bbox for p in self.rules)])
+
+    @cached_property
+    def size(self) -> float:
+        return max(r.size for r in self.rows)
+
+    @cached_property
+    def ink(self) -> list[_Char]:
+        return sorted((c for r in self.rows for c in r.ink), key=lambda c: c.x0)
+
+    @cached_property
+    def relations(self) -> list[_Char]:
+        """Relation signs at full size (not in a sub/superscript), left to right."""
+        return [
+            c
+            for r in self.rows
+            for c in r.ink
+            if c.c in _ROW_RELATIONS and not r.is_script(c) and c.size >= 0.75 * self.size
+        ]
+
+    @cached_property
+    def complete(self) -> bool:
+        """An equation on its own: a relation with something on both sides."""
+        ink = self.ink
+        return any(
+            ink[0].x1 <= rel.x0 + 0.5 and ink[-1].x0 >= rel.x1 - 0.5 for rel in self.relations
+        )
+
+    @cached_property
+    def continues(self) -> bool:
+        """Starts with a relation or operator: the next line of the equation above."""
+        return self.ink[0].c in _CONTINUATION_SIGNS
+
+    @cached_property
+    def relation_x(self) -> float | None:
+        return min((c.x0 for c in self.relations), default=None)
+
+
+def _same_line(a: _Row, b: _Row) -> bool:
+    """Two maths rows side by side on one line, in the same column: on one baseline at
+    most MAX_COLUMN_GAP font sizes apart (aligned columns, an operator in its own span),
+    or a lone punctuation mark next to a row it overlaps vertically (Chromium sets the
+    full stop after a fraction on a baseline of its own)."""
+    if a.column != b.column:
+        return False
+    size = max(a.size, b.size)
+    gap = max(a.x0 - b.x1, b.x0 - a.x1)
+    if abs(a.baseline - b.baseline) <= 0.4 * size and gap <= MAX_COLUMN_GAP * size:
+        return True
+    lone = a if _punctuation_only(a) else b if _punctuation_only(b) else None
+    if lone is None or gap > 1.5 * size:
+        return False
+    other = b if lone is a else a
+    return min(lone.y1, other.y1) - max(lone.y0, other.y0) >= 0.5 * lone.height
+
+
+def _punctuation_only(row: _Row) -> bool:
+    return all(c.c in ",.;:" for c in row.ink)
+
+
+def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
+    """Group the page's maths rows into display equations; sets `row.region`.
+
+    1. Lines: rows touching one fraction bar or radical (numerator, denominator,
+       radicand) and the main row at the bar's height, plus rows side by side on one
+       baseline, are one line. Equation numbers ("2.4", "(3)") are not in any line:
+       each goes to the line it sits beside (`_number_beside`), nearest centre first.
+    2. Equations: a line joins the equation above it when the gap is at most
+       MAX_LINE_GAP x font size, they overlap horizontally, at most one of them has an
+       equation number, and the line either continues the one above (starts with "="
+       or an operator), or one of the two is not a whole equation (no relation with
+       something on both sides), or both are whole equations with their first relations
+       aligned (the rows of an aligned derivation). Two whole equations stacked close
+       together but centred on their own ("time = d / v" over "d = v t") stay apart.
+    """
+    maths = [r for r in rows if r.kind == "math" and not r.absorbed and not r.vertical]
+    if not maths:
+        return []
+    parent = list(range(len(maths)))
+    position = {id(r): i for i, r in enumerate(maths)}
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    index = _RowIndex(maths)
+    on_rule: dict[int, list[_Path]] = {}
+    for rule in rules:
+        near = _rule_rows(rule, index)
+        if not near:
+            continue
+        middle = (rule.bbox[1] + rule.bbox[3]) / 2
+        level = [
+            r
+            for r in index.near(middle, middle)
+            if r.y0 <= middle <= r.y1
+            and r.column == near[0].column
+            and max(r.x0 - rule.bbox[2], rule.bbox[0] - r.x1) <= 4 * r.size
+            and not (_is_equation_number(r.clean) and r.x0 - rule.bbox[2] >= r.size)
+        ]
+        members = [*near, *(r for r in level if r not in near)]
+        for row in members:
+            on_rule.setdefault(id(row), []).append(rule)
+            parent[find(position[id(row)])] = find(position[id(members[0])])
+    labels = [r for r in maths if id(r) not in on_rule and _is_equation_number(r.clean)]
+    label_ids = {id(r) for r in labels}
+    body = sorted((r for r in maths if id(r) not in label_ids), key=lambda r: r.baseline)
+    window = index.largest  # rows of one line: a shared baseline, or a lone full stop
+    for i, row in enumerate(body):
+        for other in body[i + 1 :]:
+            if other.baseline - row.baseline > window:
+                break
+            if _same_line(row, other):
+                parent[find(position[id(other)])] = find(position[id(row)])
+    groups: dict[int, list[_Row]] = {}
+    for row in body:
+        groups.setdefault(find(position[id(row)]), []).append(row)
+    lines = [
+        _Line(members, list({id(p): p for r in members for p in on_rule.get(id(r), [])}.values()))
+        for members in groups.values()
+    ]
+    for label in labels:
+        centre = (label.y0 + label.y1) / 2
+        beside = [
+            line
+            for line in lines
+            if line.rows[0].column == label.column
+            and _number_beside(label, line.box, line.size)
+            and line.ink[-1].c not in _CONTINUATION_SIGNS  # "x =   2.4": its right-hand side
+        ]
+        if beside:
+            nearest = min(beside, key=lambda ln: abs((ln.box[1] + ln.box[3]) / 2 - centre))
+            nearest.labels.append(label)
+        else:
+            lines.append(_Line([label], []))  # a number inside the maths, not beside it
+    return _stack_lines(lines)
+
+
+def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
+    """Does `line` continue the display equation whose last line is `above` (box `box`)?
+
+    A line that starts with "=" or an operator may sit a little further down (half as
+    far again): nothing else starts a line that way. A line whose middle is above the
+    bottom of the equation sits beside it, not under it: "f(t) =" level with the middle
+    row of a cases brace, whose rows are whole equations ("1 if t > 0") of their own.
+    """
+    size = max(above.size, line.size)
+    reach = MAX_LINE_GAP * size * (1.5 if line.continues else 1.0)
+    if line.box[1] - box[3] > reach or line.rows[0].column != above.rows[0].column:
+        return False
+    if line.box[0] > box[2] + size or line.box[2] < box[0] - size:
+        return False
+    if above.labels and line.labels:
+        return False  # two numbered equations
+    if line.continues or not (above.complete and line.complete):
+        return True
+    if (line.box[1] + line.box[3]) / 2 < box[3]:
+        return True  # beside the equation: rows of a brace, a matrix or an array
+    if min(above.size, line.size) <= SCRIPT_RATIO * size:
+        return True  # limits under a big operator ("i = 1" under a sum) or over it
+    x0, x1 = above.relation_x, line.relation_x
+    return x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size
+
+
+def _stack_lines(lines: list[_Line]) -> list[_Region]:
+    """Join lines into display equations top to bottom (see `_equation_regions`)."""
+    regions: list[_Region] = []
+    last: list[_Line] = []  # the lowest line of each region so far
+    active: list[int] = []  # regions whose bottom is still within reach
+    for line in sorted(lines, key=lambda ln: (ln.box[1], ln.box[0])):
+        reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
+        active = [k for k in active if regions[k].box[3] >= reach]
+        host = next(
+            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line)), None
+        )
+        if host is None:
+            regions.append(_Region(box=line.box))
+            last.append(line)
+            active.append(len(regions) - 1)
+            host = len(regions) - 1
+        region = regions[host]
+        region.rows.extend(line.rows)
+        region.rules.extend(p for p in line.rules if p not in region.rules)
+        region.labels.extend(line.labels)
+        region.box = _union([region.box, line.box])
+        if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
+            last[host] = line  # a stray mark does not stand for the line above
+    for region in regions:
+        for row in [*region.rows, *region.labels]:
+            row.region = region
+    return regions
+
+
+def _contiguous_regions(ordered: list[_Row]) -> list[_Row]:
+    """Reading order with each display equation's rows together, at the place of its
+    first row, and equation numbers taken out of the flow."""
+    members: dict[int, list[_Row]] = {}
+    for row in ordered:
+        if row.region is not None and row not in row.region.labels:
+            members.setdefault(id(row.region), []).append(row)
+    out: list[_Row] = []
+    for row in ordered:
+        region = row.region
+        if region is None:
+            out.append(row)
+        elif id(region) in members:
+            out.extend(members.pop(id(region)))
+    return out
+
+
 # ============================================================================ figures
 
 
@@ -1906,12 +2743,14 @@ def _absorb_labels(figure: _Figure, rows: list[_Row], ctx: _Context) -> bool:
         rx0, ry0, rx1, ry1 = row.bbox
         area = max(1e-6, (rx1 - rx0) * (ry1 - ry0))
         inter = max(0.0, min(rx1, x1) - max(rx0, x0)) * max(0.0, min(ry1, y1) - max(ry0, y0))
-        short = len(row.clean) <= 25 and row.kind != "math"
+        # Display maths is not a label, but a lone variable is ("x" at the end of an axis).
+        short = len(row.clean) <= 25 and (row.kind != "math" or len(row.ink) <= 3)
         reach = 0.6 * row.size
         beside_y = min(ry1, y1) - max(ry0, y0) >= 0.5 * (ry1 - ry0)
         beside_x = min(rx1, x1) - max(rx0, x0) >= 0.5 * (rx1 - rx0)
-        near_x = beside_y and (x0 - reach <= rx1 <= x0 + 1 or x1 - 1 <= rx0 <= x1 + reach)
-        near_y = beside_x and (y0 - reach <= ry1 <= y0 + 1 or y1 - 1 <= ry0 <= y1 + reach)
+        # Within reach of an edge, or across it (a tick label half inside the box).
+        near_x = beside_y and max(rx0 - x1, x0 - rx1) <= reach
+        near_y = beside_x and max(ry0 - y1, y0 - ry1) <= reach
         if inter >= 0.6 * area:
             inside.append(row)
         elif short and (near_x or near_y):
@@ -2005,6 +2844,9 @@ class _Block:
     score: float | None = None
     reasons: list[str] = field(default_factory=list)
     caption: str | None = None
+    marker: _Marker | None = None  # list items: the marker of the first row
+    origin: float = 0.0  # list items: left edge of their column's text (`_column_origins`)
+    label: str | None = None  # display equations: the equation number beside them
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -2031,9 +2873,11 @@ def _continues(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
     left, right = run.box[0], run.box[2]
     if row.x0 > right or row.x1 < left or row.x0 < left - 2 * size:
         return False
+    if run.rows[0].marker is not None and row.x0 < left - 0.5 * size:
+        return False  # a list item goes on at its marker or its text, never further left
     if row.x0 - run.margin >= 0.8 * size and prev.x1 < right - 1.5 * size:
         return False  # first-line indent after a short line: a new paragraph
-    return not (_BULLET.match(row.clean) or CAPTION.match(row.clean))
+    return row.marker is None and not CAPTION.match(row.clean)
 
 
 def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
@@ -2050,7 +2894,11 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
-            if run.kind == "math" and row.kind == "math" and _joins_equation(run, row):
+            if run.kind == "math" and row.kind == "math" and row.region is prev.region:
+                run.add(row)  # rows of one display equation (`_contiguous_regions`)
+                continue
+            if run.kind == "text" and row.kind == "math" and _wrapped_maths(prev, row, run, ctx):
+                row.kind, row.region = "text", None  # its maths becomes inline equations
                 run.add(row)
                 continue
             geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx)
@@ -2067,13 +2915,17 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
     return runs
 
 
-def _joins_equation(run: _Run, row: _Row) -> bool:
-    box = run.box
-    size = max(row.size, run.rows[-1].size)
-    gap_y = row.y0 - box[3]
-    horizontal = row.x0 <= box[2] + 3 * size and row.x1 >= box[0] - 3 * size
-    same_line = min(row.y1, box[3]) - max(row.y0, box[1]) >= 0.5 * row.height
-    return (gap_y <= 0.8 * size and horizontal) or same_line or _number_beside(row, box, size)
+def _wrapped_maths(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
+    """Is maths row `row` the last line of the sentence above, not a display equation?
+
+    "... the system has exactly one solution," / "x = A^-1 b." A display equation is
+    centred or indented and set off by extra space; a line of the paragraph starts at its
+    left margin at the usual line pitch. A numbered or multi-line equation is never one.
+    """
+    region = row.region
+    if region is None or region.labels or len(region.rows) != 1:
+        return False
+    return abs(row.x0 - run.box[0]) <= 0.5 and _continues(prev, row, run, ctx)
 
 
 def _title_like(text: str) -> bool:
@@ -2099,6 +2951,10 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
         score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
         if len(rows) > 1:
             reasons.append(f"{len(rows)} lines merged")
+        region = rows[0].region
+        labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
+        if labels:
+            reasons.append("equation number")
         return _Block(
             Kind.EQUATION,
             box,
@@ -2107,6 +2963,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
             font_size=size,
             score=max([score, *(r.score for r in rows)]),
             reasons=reasons,
+            label=" ".join(r.clean for r in labels) or None,
         )
     text = _join_text(rows)
     letters = sum(c.isalpha() for c in text)
@@ -2163,6 +3020,8 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
         return _Block(
             Kind.HEADING, box, rows, text=text, font_size=size, bold=bold, reasons=heading
         )
+    if rows[0].marker is not None:
+        return _Block(Kind.LIST_ITEM, box, rows, font_size=size, bold=bold, marker=rows[0].marker)
     return _Block(Kind.PARAGRAPH, box, rows, font_size=size, bold=bold)
 
 
@@ -2240,9 +3099,14 @@ def _merge_chapter_numbers(blocks: list[_Block]) -> list[_Block]:
 
 
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
-    """Paragraph text with inline equations cut out (hyphenation repaired between rows)."""
+    """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
+    between rows. A list item's text starts after its marker."""
     pieces: list[str | _Inline] = []
-    for row in block.rows:
+    rows = list(block.rows)
+    if block.marker is not None and block.marker.end:
+        first = rows[0]
+        rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
+    for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
         for start, end, reasons in _inline_runs(row):
@@ -2252,12 +3116,28 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             ink = [c for c in chars if not c.blank]
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
-            box = _union((c.x0, c.y0, c.x1, c.y1) for c in ink)
+            box = _clear_of_punctuation(_union((c.x0, c.y0, c.x1, c.y1) for c in ink), row, end)
             row_pieces.append(_Inline(box, text, score, reasons, _dominant_size([row])))
             cursor = end
         row_pieces.append("".join(c.c for c in row.chars[cursor:]))
         _append_row(pieces, row_pieces)
     return _tidy(pieces)
+
+
+def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
+    """Pull an inline equation's right edge in so its padded crop stops short of the
+    punctuation that follows it ("d_0," in "positions d_0, d_f and ...", "in 1.5 s?").
+
+    The comma stays in the paragraph text after the equation's marker; if the crop shows
+    it too, the model transcribes it and the output reads "d0, ,". The edge moves left by
+    at most CROP_PAD, so a crop with the default padding still holds every glyph of the
+    equation.
+    """
+    after = next((c for c in row.chars[end:] if not c.blank), None)
+    if after is None or after.c not in ",.;:?":
+        return box
+    x1 = max(min(box[2], after.x0 - CROP_PAD), box[2] - CROP_PAD, box[0] + 0.5)
+    return (box[0], box[1], x1, box[3])
 
 
 def _append_row(pieces: list[str | _Inline], row_pieces: list[str | _Inline]) -> None:
@@ -2361,6 +3241,7 @@ def _page_blocks(
     margins: _MarginFilter,
 ) -> _PageBlocks:
     page_rect = page.rect
+    rows = _split_labels(rows)
     for row in rows:
         _classify_row(row)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
@@ -2374,14 +3255,16 @@ def _page_blocks(
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     figures = [f for f in figures if _absorb_labels(f, rows, ctx)]
     text_rows = [r for r in rows if not r.absorbed]
+    _equation_regions(text_rows, used_rules)
     order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, [f.bbox for f in figures])
-    ordered = [text_rows[i] for i in order]
+    ordered = _contiguous_regions([text_rows[i] for i in order])
     runs = _runs(ordered, ctx)
     blocks = [_classify_run(run, ctx) for run in runs]
     blocks = _merge_chapter_numbers(_merge_style_splits(blocks, runs))
     for block in blocks:
-        if block.kind == Kind.EQUATION:
-            _add_rules(block, used_rules)
+        region = block.rows[0].region if block.rows else None
+        if block.kind == Kind.EQUATION and region is not None:
+            _add_rules(block, region.rules)
     _attach_captions(blocks, figures)
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:
@@ -2398,14 +3281,38 @@ def _page_blocks(
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
-        if block.kind == Kind.PARAGRAPH:
+        if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
-    final = [b for b in final if b.kind != Kind.PARAGRAPH or _has_content(b.pieces)]
+    final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
+    origins = _column_origins(text_rows)
+    for block in final:
+        if block.marker is not None:
+            block.origin = origins.get(block.rows[0].column, 0.0)
     return _PageBlocks(number, (round(page_rect.width, 2), round(page_rect.height, 2)), final)
 
 
+_TEXT_BLOCKS = (Kind.PARAGRAPH, Kind.LIST_ITEM)  # blocks whose text may hold inline maths
+
+
+def _column_origins(rows: Sequence[_Row]) -> dict[str, float]:
+    """Left edge of the text of each column of a page: the leftmost x where at least
+    three rows start (within 2.5 pt), so one outdented line does not move it; the
+    leftmost row when no three rows line up."""
+    starts: dict[str, list[float]] = {}
+    for row in rows:
+        if not row.vertical:
+            starts.setdefault(row.column, []).append(row.x0)
+    origins: dict[str, float] = {}
+    for column, xs in starts.items():
+        xs.sort()
+        origins[column] = next(
+            (x for i, x in enumerate(xs) if bisect.bisect_right(xs, x + 2.5) - i >= 3), xs[0]
+        )
+    return origins
+
+
 def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
-    """A paragraph cut by a column break is one paragraph again.
+    """A paragraph (or list item) cut by a column break is one block again.
 
     The next block in reading order must be a paragraph that starts higher on the page
     (the top of the next column) with a lowercase letter, and the first part must not end
@@ -2416,7 +3323,8 @@ def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
         prev = out[-1] if out else None
         if (
             prev is not None
-            and prev.kind == Kind.PARAGRAPH == block.kind
+            and prev.kind in _TEXT_BLOCKS
+            and block.kind == Kind.PARAGRAPH
             and block.bbox[1] < prev.bbox[1]
             and prev.rows[-1].clean[-1:] not in tuple(".?!:")
             and block.rows[0].clean[:1].islower()
@@ -2497,11 +3405,12 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             paths[number] = _page_paths(doc[number])
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
     ctx = _body_and_pitch({n: rows for n, (rows, _) in prepared.items()})
+    _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx)
     pages = [
         _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins)
         for n in selected
     ]
-    elements = _to_elements(pages)
+    elements = _to_elements(pages, ctx)
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
         levels = heading_levels(elements)
@@ -2516,14 +3425,15 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     )
 
 
-def _to_elements(pages: list[_PageBlocks]) -> list[Element]:
+def _to_elements(pages: list[_PageBlocks], ctx: _Context) -> list[Element]:
     """Blocks -> Elements with ids "p{page+1}-e{index}" and a global reading order."""
     elements: list[Element] = []
+    levels = _list_levels((b for page in pages for b in page.blocks), 0.6 * ctx.body)
     for page in pages:
         ids = (f"p{page.number + 1}-e{index}" for index in count())
         for block in page.blocks:
             element_id = next(ids)
-            if block.kind == Kind.PARAGRAPH:
+            if block.kind in _TEXT_BLOCKS:
                 children = []
                 parts = []
                 for piece in block.pieces:
@@ -2533,16 +3443,20 @@ def _to_elements(pages: list[_PageBlocks]) -> list[Element]:
                         parts.append(inline_marker(child_id))
                     else:
                         parts.append(piece)
+                marker = block.marker
                 elements.append(
                     Element(
                         id=element_id,
-                        kind=Kind.PARAGRAPH,
+                        kind=Kind(block.kind),
                         page=page.number,
                         bbox=_rounded(block.bbox),
                         order=len(elements),
                         text="".join(parts).strip(),
                         font_size=block.font_size,
                         bold=block.bold,
+                        list_marker=marker.text if marker else None,
+                        list_ordered=marker.ordered if marker else None,
+                        list_level=levels.get(id(block)) if marker else None,
                     )
                 )
                 for child_id, inline in children:
@@ -2576,6 +3490,7 @@ def _to_elements(pages: list[_PageBlocks]) -> list[Element]:
                     score=block.score,
                     reasons=block.reasons,
                     display="block" if kind == Kind.EQUATION else None,
+                    equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
                 )
             )

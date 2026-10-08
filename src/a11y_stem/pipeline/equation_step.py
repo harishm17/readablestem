@@ -143,6 +143,32 @@ def clean_latex(latex: str) -> str:
     return escape_percent_signs(text)
 
 
+# Spacing a model may leave before a sentence mark: blanks, ~, \, \; \: \! \  and quads.
+_TRAILING_SPACING = re.compile(r"(?:\s|~|\\[,;:! ]|\\q?quad(?![A-Za-z]))+$")
+
+
+def strip_trailing_punctuation(latex: str) -> str:
+    r"""Drop sentence punctuation (, . ; : ?) from the end of an inline transcription.
+
+    The paragraph text keeps the mark that follows an inline equation's marker, so if
+    the model also transcribes it (the crop showed part of it) the output reads
+    "d0, ,". Spacing left in front of the mark goes with it. A mark after a backslash is
+    a command (\, \; \: are spaces) and stays; so does LaTeX that would be left empty.
+    "!" stays: after maths it is a factorial. Display equations keep their punctuation:
+    it is part of the line the reader sees.
+    """
+    text = latex.rstrip()
+    while text and text[-1] in ",.;:?":
+        backslashes = len(text[:-1]) - len(text[:-1].rstrip("\\"))
+        if backslashes % 2:
+            break  # "\," is a thin space, not a comma
+        stripped = _TRAILING_SPACING.sub("", text[:-1])
+        if not stripped.strip():
+            break
+        text = stripped
+    return text
+
+
 def _symbol_bag(text: str) -> Counter[str]:
     """Letters, digits and Greek letters, case-folded; math italic glyphs map to ASCII."""
     folded = unicodedata.normalize("NFKC", text).casefold()
@@ -290,6 +316,8 @@ def _evaluate(
     if not output.is_equation:
         return candidate
     candidate.latex = clean_latex(output.latex)
+    if display == "inline":
+        candidate.latex = strip_trailing_punctuation(candidate.latex)
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)
     if candidate.mathml is None:
         return candidate
