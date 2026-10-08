@@ -7,7 +7,7 @@ does not exist *or* belongs to someone else, so job ids cannot be probed.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta
 from typing import Any
 from urllib.parse import quote
 
@@ -17,7 +17,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from a11y_stem.web.database import utc_today
+from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import (
     CSRF_FIELD,
@@ -81,12 +81,20 @@ def upload_error_message(code: str, ctx: AppContext) -> str:
 
 
 def owned_job(session: Session, job_id: str, user: CurrentUser, *, lock: bool = False) -> Job:
+    """The user's job, or a 404 page. A job past its `retain_until` counts as deleted even
+    before the hourly purge removes it, so the retention promise does not depend on the
+    scheduler running on time."""
     if not JOB_ID.match(job_id):
         raise PageError(404, *NOT_FOUND)
     job = session.get(Job, job_id, with_for_update=lock or None)
-    if job is None or job.user_id != user.id:
+    if job is None or job.user_id != user.id or expired(job):
         raise PageError(404, *NOT_FOUND)
     return job
+
+
+def expired(job: Job, now: datetime | None = None) -> bool:
+    retain_until = as_utc(job.retain_until)
+    return retain_until is not None and retain_until <= (now or utcnow())
 
 
 def require_done(job: Job) -> None:
@@ -106,7 +114,9 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     spend_closed = ctx.guard.cap_reached(ctx.min_headroom_usd)
     with session_scope(ctx.factory) as session:
         jobs = session.scalars(
-            select(Job).where(Job.user_id == user.id).order_by(Job.created_at.desc())
+            select(Job)
+            .where(Job.user_id == user.id, Job.retain_until > utcnow())  # see `owned_job`
+            .order_by(Job.created_at.desc())
         ).all()
         views = [job_view(session, job) for job in jobs]
         # Labels only (no counts), so the stored results are not loaded for the list.

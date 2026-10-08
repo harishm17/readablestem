@@ -336,9 +336,12 @@ with JavaScript off.
 Schema: `web/db.py`. Migrations: `migrations/` with `alembic.ini` at the repo root. The
 URL comes from `DATABASE_URL` (or the settings, which read `.env`).
 
-- Dev and test create tables directly on start-up. Production refuses to start unless the
-  schema is at the latest migration: run `uv run a11y-stem db upgrade` (same as
-  `uv run alembic upgrade head`) before deploying.
+- Dev and test create tables directly on start-up. Production refuses to start when the
+  schema is missing or behind this release's migrations: run `uv run a11y-stem db
+  upgrade` (same as `uv run alembic upgrade head`) before deploying. A schema at a
+  revision this release does not know (a newer release migrated it) is accepted and
+  logged as `schema_ahead`, so traffic can roll back to an older revision; see
+  deploy.md, "Roll back".
 - A local SQLite database made by start-up cannot then be upgraded with Alembic (its
   tables already exist). Delete `.local/a11y-stem.db` if you need to test migrations.
 - New migration: change `web/db.py`, then

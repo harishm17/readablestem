@@ -4,7 +4,9 @@ Every call is appended to $FAKE_GCLOUD_DIR/calls.jsonl. A resource "exists" once
 create (or `secrets versions add`) for its kind has been seen, so a second run of the
 script takes the "already exists" branches. Kinds are the command groups ("sql
 instances", "scheduler jobs", ...); secrets are tracked per name. Secret values sent on
-stdin are recorded as SHA-256 only.
+stdin are recorded as SHA-256 only. Alert policies are tracked by display name, like
+`gcloud monitoring policies list --filter=displayName="..."` finds them, and their JSON
+body is recorded.
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from pathlib import Path
 
 STATE = Path(os.environ["FAKE_GCLOUD_DIR"])
 CRON_TOKEN = "fake-cron-token-0123456789abcdef"  # what `secrets versions access` returns
-PER_NAME = {"secrets", "secrets versions"}
+PER_NAME = {"secrets", "secrets versions", "logging metrics"}
 
 
 def created() -> set[str]:
@@ -52,6 +54,8 @@ def main() -> int:
         record["env_file"] = Path(env_file).read_text()
     if words[:3] == ["secrets", "versions", "add"]:
         record["stdin_sha256"] = hashlib.sha256(sys.stdin.read().encode()).hexdigest()
+    if policy_file := flag(args, "policy-from-file"):  # alert policies: keep the body
+        record["policy"] = json.loads(Path(policy_file).read_text())
     with (STATE / "calls.jsonl").open("a") as fh:
         fh.write(json.dumps(record) + "\n")
 
@@ -72,10 +76,15 @@ def main() -> int:
             print("https://a11y-stem-abc123-uc.a.run.app")
         elif resource_key(words, "describe") not in have:
             return 1
+    elif words[:3] == ["monitoring", "policies", "list"]:  # alert policies, by display name
+        if f"monitoring policies {flag(args, 'filter')}" in have:
+            print("projects/p/alertPolicies/existing")
     elif "list" in words or "list-configs" in words:
         verb = "list" if "list" in words else "list-configs"
         if resource_key(words, verb) in have:
             print(f"projects/p/{words[0]}/existing")
+    elif words[:3] == ["monitoring", "policies", "create"]:
+        mark(f'monitoring policies displayName="{record["policy"]["displayName"]}"')
     elif "create" in words:
         mark(resource_key(words, "create"))
         if "name" in fmt:

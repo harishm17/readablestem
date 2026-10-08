@@ -204,3 +204,63 @@ def test_tracing_is_opt_in_and_its_key_is_a_secret(env):
 
     del env["LANGFUSE_PUBLIC_KEY"]
     assert "LANGFUSE_PUBLIC_KEY is not set" in run(env).stderr
+
+
+def policies(env: dict[str, str]) -> dict[str, dict]:
+    return {c["policy"]["displayName"]: c["policy"] for c in calls(env) if "policy" in c}
+
+
+def test_the_hourly_purge_has_alerts_of_its_own(env):
+    """/healthz stays 200 when the scheduler stops reaching the app (a 403 after a
+    cron-token rotation, a paused job), so the retention promise needs its own alerts."""
+    assert run(env, "monitoring").returncode == 0
+    metrics = {
+        c["argv"][5]: next(a for a in c["argv"] if a.startswith("--log-filter="))
+        for c in calls(env)
+        if c["argv"][2:5] == ["logging", "metrics", "create"]
+    }
+    assert set(metrics) == {
+        "a11y-stem-cron-done",
+        "a11y-stem-cron-problems",
+        "a11y-stem-scheduler-errors",
+    }
+    assert 'jsonPayload.message="cron_done"' in metrics["a11y-stem-cron-done"]
+    for event in ("cron_refused", "aggregate_failed", "purge_backstop_deleted"):
+        assert event in metrics["a11y-stem-cron-problems"]
+    assert 'resource.labels.job_id="a11y-stem-cron"' in metrics["a11y-stem-scheduler-errors"]
+
+    found = policies(env)
+    assert set(found) == {
+        "a11y-stem healthz failing",
+        "a11y-stem cron not running",
+        "a11y-stem cron or purge problem",
+    }
+    (absent,) = found["a11y-stem cron not running"]["conditions"]
+    assert absent["conditionAbsent"]["duration"] == "7200s"
+    # One series across revisions, so a deploy does not look like the cron stopping.
+    assert absent["conditionAbsent"]["aggregations"][0]["crossSeriesReducer"] == "REDUCE_SUM"
+    channels = {tuple(policy["notificationChannels"]) for policy in found.values()}
+    assert len(channels) == 1 and all(channels)
+
+    rerun = len(calls(env))
+    assert run(env, "monitoring").returncode == 0
+    again = commands(env)[rerun:]
+    assert not [c for c in again if " create " in f" {c} "]
+    assert len([c for c in again if "logging metrics update" in c]) == 3
+
+
+def test_the_budget_alert_is_not_skipped_silently(env):
+    del env["BILLING_ACCOUNT_ID"]
+    result = run(env, "budget")
+    assert result.returncode != 0 and "SKIP_BUDGET=true" in result.stderr
+    env["SKIP_BUDGET"] = "true"
+    result = run(env, "budget")
+    assert result.returncode == 0 and "SKIP_BUDGET=true: no budget alert" in result.stdout
+    assert not (Path(env["FAKE_GCLOUD_DIR"]) / "calls.jsonl").exists()  # nothing created
+
+
+def test_the_default_budget_is_above_the_fixed_monthly_cost(env):
+    assert run(env, "budget").returncode == 0
+    (create,) = [c for c in calls(env) if "budgets" in c["argv"] and "create" in c["argv"]]
+    amount = next(a for a in create["argv"] if a.startswith("--budget-amount="))
+    assert float(amount.removeprefix("--budget-amount=").removesuffix("USD")) >= 60

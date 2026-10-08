@@ -53,12 +53,16 @@ class PurgeStats:
     unaggregated_deleted: int  # finished jobs deleted without their counts
 
 
-def purge_expired(factory: sessionmaker[Session], now: datetime | None = None) -> PurgeStats:
+def purge_expired(
+    factory: sessionmaker[Session], now: datetime | None = None, *, source: str = "cron"
+) -> PurgeStats:
     """Delete every job whose `retain_until` is before `now` (default: current UTC time).
 
     Batches of `BATCH_SIZE` jobs, one transaction each. On Postgres the job rows are
     locked with SKIP LOCKED, so a job the worker is updating at that instant is left for
-    the next run instead of blocking it.
+    the next run instead of blocking it. `source` (a code: "cron", "worker", "cli") is
+    logged with `purge_done`, so the hourly scheduler run and the worker's backstop can
+    be told apart.
     """
     now = _as_utc(now or datetime.now(UTC))
     stats = PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
@@ -72,6 +76,7 @@ def purge_expired(factory: sessionmaker[Session], now: datetime | None = None) -
             break
     get_logger(__name__).info(
         "purge_done",
+        source=source,
         jobs_deleted=stats.jobs_deleted,
         blobs_deleted=stats.blobs_deleted,
         unaggregated_deleted=stats.unaggregated_deleted,

@@ -76,16 +76,18 @@ assembled with the originals kept, and the fixes that could not run are flagged.
    **External** and leave it in **Testing**, then add each beta instructor as a test
    user. Only allowlisted accounts can use the app anyway (`a11y-stem users allow`).
 2. **Clients > Create client**, application type **Web application**.
-3. **Authorized redirect URIs**: add `https://YOUR_DOMAIN/auth/callback`. Before the
-   domain works, also add the service URL the script prints, for example
-   `https://a11y-stem-abc123-uc.a.run.app/auth/callback`. Google requires https (only
-   localhost may use http), an exact match, and no wildcards. For local development add
-   `http://localhost:8000/auth/callback`.
+3. **Authorized redirect URIs**: add the service's own URL,
+   `https://a11y-stem-PROJECT_NUMBER.REGION.run.app/auth/callback` (Cloud Run's
+   predictable URL; `gcloud projects describe PROJECT_ID --format='value(projectNumber)'`
+   gives the number), and `https://YOUR_DOMAIN/auth/callback` if you will map a domain.
+   Google requires https (only localhost may use http), an exact match, and no
+   wildcards. For local development add `http://localhost:8000/auth/callback`.
 4. Copy the **client ID** (goes in `GOOGLE_CLIENT_ID`) and the **client secret** (you
    type it at the script's hidden prompt; it is stored in Secret Manager only).
 
-The app builds the redirect URI from `BASE_URL`, so `BASE_URL` must match one of the
-URIs above exactly.
+The app always sends `redirect_uri = BASE_URL + /auth/callback`, and keeps the sign-in
+state in a cookie on the host it was started from. So sign-in only works on the host
+`BASE_URL` names: registering a second URI does not let you sign in at another host.
 
 ## 4. Fill in the settings
 
@@ -96,9 +98,15 @@ $EDITOR deploy/.env.deploy
 
 Required: `PROJECT_ID`, `REGION`, `BASE_URL`, `DAILY_SPEND_CAP_USD`,
 `PER_USER_DAILY_PAGE_QUOTA`, `GOOGLE_CLIENT_ID`, `CONTACT_EMAIL`, `ADMIN_EMAILS`,
-`ALERT_EMAIL`. Leave `OPENAI_API_KEY` and `GOOGLE_CLIENT_SECRET` empty and type them when
-asked. `BASE_URL` is the URL people will use; if the domain is not ready yet, set it to
-the domain anyway and add the `run.app` redirect URI from step 3 meanwhile.
+`ALERT_EMAIL`, and `BILLING_ACCOUNT_ID` (or `SKIP_BUDGET=true`). Leave `OPENAI_API_KEY`
+and `GOOGLE_CLIENT_SECRET` empty and type them when asked.
+
+`BASE_URL` for the first deploy: the service's own URL,
+`https://a11y-stem-PROJECT_NUMBER.REGION.run.app`. A custom domain is not serving until
+step 7 (DNS and the managed certificate can take up to a day), and sign-in only works on
+the `BASE_URL` host (step 3), so start with the run.app URL, check everything there
+(step 6), and switch `BASE_URL` to the domain in step 8. Without a custom domain, keep
+the run.app URL.
 
 Region: if you want Cloud Run's own domain mapping (step 7), choose one of the regions
 that support it: asia-east1, asia-northeast1, asia-southeast1, europe-north1,
@@ -125,8 +133,8 @@ in order (run any subset with `./deploy/deploy.sh STEP ...`):
 | `migrate` | Cloud Run job `a11y-stem-migrate` runs `a11y-stem db upgrade`, and waits for it |
 | `service` | `gcloud run deploy` with `--min-instances=1 --max-instances=2 --no-cpu-throttling --concurrency=20 --memory=1Gi --timeout=900`, a `/healthz` startup probe, the env vars and the five secrets |
 | `cron` | Cloud Scheduler job `a11y-stem-cron`: hourly POST to `/internal/cron/aggregate-and-purge` with the `X-Cron-Token` header |
-| `monitoring` | Email notification channel, uptime check on `/healthz` every 5 minutes, alert policy |
-| `budget` | Monthly billing budget with alerts at 50%, 90%, 100% and forecast 100% (needs `BILLING_ACCOUNT_ID`) |
+| `monitoring` | Email notification channel; uptime check on `/healthz` every 5 minutes with an alert; three log-based metrics and two alert policies for the hourly cron: no `cron_done` for 2 hours, and any `cron_refused`, `aggregate_failed`, purge-backstop line or failed Cloud Scheduler attempt |
+| `budget` | Monthly billing budget (`BUDGET_USD`, default 90) with alerts at 50%, 90%, 100% and forecast 100%. Needs `BILLING_ACCOUNT_ID`; the script stops unless it is set or `SKIP_BUDGET=true` |
 
 Why these Cloud Run settings: the worker thread that converts PDFs lives in the web
 process, so one instance is always up and its CPU stays allocated between requests;
@@ -169,7 +177,8 @@ curl -fsS "$URL/healthz"
 gcloud scheduler jobs run a11y-stem-cron --project="$PROJECT_ID" --location="$REGION"
 ```
 
-Then sign in at `$URL` with an admin email and convert a small PDF.
+Then sign in at `$URL` (the same host as `BASE_URL`) with an admin email and convert a
+small PDF.
 
 ## 7. Map the custom domain
 
@@ -199,15 +208,36 @@ old one in **Monitoring > Uptime checks** first, or keep both).
 
 ## 8. Point sign-in at the domain
 
-Make sure `BASE_URL` is the domain, then confirm `https://a11y.example.org/auth/callback`
-is in the client's authorized redirect URIs (step 3). If you changed `BASE_URL`, re-run
-`./deploy/deploy.sh service`. You can remove the `run.app` redirect URI afterwards.
+Once `https://a11y.example.org/healthz` answers: confirm
+`https://a11y.example.org/auth/callback` is in the client's authorized redirect URIs
+(step 3), set `BASE_URL=https://a11y.example.org` in `deploy/.env.deploy` and re-run
+`./deploy/deploy.sh service`. Sign in again at the domain (sessions are per host). You
+can remove the `run.app` redirect URI afterwards.
 
 ## 9. Budget alert
 
 Set `BILLING_ACCOUNT_ID` and re-run `./deploy/deploy.sh budget`. A Cloud Billing budget
 only sends alerts; it never stops spending. The hard stops are the OpenAI project limit
-(step 2) and the app's own caps.
+(step 2) and the app's own caps. The budget covers Google Cloud only: OpenAI bills
+separately (its own alerts, step 2).
+
+### What it costs
+
+Estimates from list prices for us-central1 (October 2026), for the setup above. Check
+them in the Google Cloud pricing calculator before relying on them. TODO(Harish): confirm
+the numbers for your region and set `BUDGET_USD` (default 90, about 1.5x the fixed cost,
+so the alert fires only when something unusual happens).
+
+| Item | How it is billed | About per month |
+|---|---|---|
+| Cloud Run, 1 vCPU always allocated (`--min-instances=1 --no-cpu-throttling`) | 2,592,000 vCPU-s x $0.000018, minus 240,000 free | $42 |
+| Cloud Run, 1 GiB memory | 2,592,000 GiB-s x $0.000002, minus 450,000 free | $4 |
+| Cloud SQL `db-f1-micro`, 10 GB SSD, one backup | instance hours plus storage | $9-10 |
+| Artifact Registry, Secret Manager, Scheduler, Monitoring, Logging | mostly inside free tiers | under $2 |
+| **Fixed total** | before any conversions | **about $57** |
+| OpenAI | per conversion; capped by `DAILY_SPEND_CAP_USD` (at most 30x it a month) | measured $0.0037 per PDF page (document eval: 43 pages, $0.161) |
+
+A second instance (`--max-instances=2`) only runs, and costs, under load.
 
 ## 10. GitHub settings
 
@@ -219,6 +249,23 @@ only sends alerts; it never stops spending. The hard stops are the OpenAI projec
 - **Live eval**: repository secret `OPENAI_API_KEY`, from a separate OpenAI project with
   its own small hard limit. `eval-live.yml` runs only when started by hand and refuses a
   `max_usd` above 10.
+
+## Before the first real users
+
+TODO(Harish): none of this has run yet; the code and CI are ready for it. In order:
+
+1. Push `feat/beta-app` as a pull request so every CI job (lint-test on 3.12 and 3.14,
+   postgres, browser, docker, eval-gate, gitleaks) runs on the beta code once. Run
+   `make ci-local` first.
+2. Set the OpenAI project's hard monthly limit (step 2) before the first deploy.
+3. Deploy once to a throwaway staging project (`./deploy/deploy.sh`, all steps), sign in
+   at the run.app URL, convert one PDF, run the cron by hand and check the three alert
+   policies exist (Monitoring > Alerting). Then delete that project.
+4. Choose and verify the domain early: domain mapping (step 7) waits on DNS and the
+   managed certificate.
+5. Decide the backup window and the privacy wording (see "Backups and deleted
+   documents"), write the known-limits page, and remove the "Draft" notes:
+   `a11y-stem ops launch-check` lists what is still unfinished.
 
 ## Ship a new version
 
@@ -246,10 +293,15 @@ Traffic stays pinned to that revision until you run `update-traffic --to-latest`
 deploy again and then run it). To redeploy an older image instead, run
 `IMAGE_TAG=<commit> ./deploy/deploy.sh service`.
 
-Database: migrations only go forward. A release whose migration removes or renames
-something cannot be rolled back by traffic alone, so write migrations in two releases
-(add the new thing, ship code that uses it, remove the old thing later). If data has to
-come back, restore a backup (this overwrites the instance's current data):
+Database: migrations only go forward. An older revision starts against a schema that a
+newer release migrated (it does not know that revision, logs `schema_ahead` and carries
+on), so traffic rollback works as long as migrations are additive; it refuses only a
+schema that is behind its own code. A release whose migration removes or renames
+something cannot be rolled back by traffic alone: the old code would fail on the missing
+column. So write migrations in two releases (add the new thing, ship code that uses it,
+remove the old thing later), and treat rolling back past a destructive migration as a
+backup restore (or a forward fix). If data has to come back, restore a backup (this
+overwrites the instance's current data):
 
 ```sh
 gcloud sql backups list --filter=instance:a11y-stem-db --project="$PROJECT_ID"

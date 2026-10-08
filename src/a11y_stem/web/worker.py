@@ -40,6 +40,11 @@ queue is safe with several workers or instances:
   cost. An attempt that dies mid-call leaves its holds counted (erring on the side of
   spending less, like the daily cap), so a retry never gets more than what is left and
   the job's totals are always current.
+- Retention backstop: once an hour the worker loop runs the purge itself
+  (`ops.retention.purge_expired`, logged as `purge_done source=worker`). The hourly
+  Cloud Scheduler call stays the primary path; this keeps the 24-hour deletion promise
+  if the scheduler stops (a rotated token, a paused job). A backstop run that deletes
+  anything logs `purge_backstop_deleted`, which means the scheduler is late.
 - Results are stored only if this worker still owns the job (same attempt, still
   running), so a job deleted or requeued meanwhile is never resurrected. If storing
   fails (a database error, after one retry of a transient one) the job is failed with
@@ -97,6 +102,9 @@ TIMEOUT_GRACE_S = 30.0
 # One retry of the result write after a transient database error (connection lost,
 # database locked) before the job is failed with "store_failed".
 STORE_RETRY_DELAY_S = 1.0
+# The retention backstop: first run this long after the loop starts, then this often.
+PURGE_FIRST_S = 600.0
+PURGE_EVERY_S = 3600.0
 DISCARDED = "discarded"
 _CODE = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 # Float sums of many small costs drift by ~1e-16; this keeps an exact fit under a cap.
@@ -323,6 +331,7 @@ class Worker:
         self._thread: threading.Thread | None = None
         self._current: _Attempt | None = None
         self._paused = False
+        self._next_purge = time.monotonic() + PURGE_FIRST_S
 
     # ------------------------------------------------------------------ queue
 
@@ -774,8 +783,31 @@ class Worker:
         self.process(claim)
         return claim.job_id
 
+    def purge_backstop(self) -> int | None:
+        """Run the retention purge if it is due (see the module docstring). Returns the
+        jobs deleted, or None when it was not due or failed. Never raises."""
+        if time.monotonic() < self._next_purge:
+            return None
+        self._next_purge = time.monotonic() + PURGE_EVERY_S
+        from a11y_stem.ops.retention import purge_expired
+
+        try:
+            stats = purge_expired(self.factory, self.clock(), source="worker")
+        except Exception as exc:
+            log_exception(logger, "purge_backstop_failed", exc)
+            return None
+        if stats.jobs_deleted:
+            log_event(
+                logger,
+                "purge_backstop_deleted",
+                logging.WARNING,
+                jobs_deleted=stats.jobs_deleted,
+            )
+        return stats.jobs_deleted
+
     def _loop(self) -> None:
         while not self._stop.is_set():
+            self.purge_backstop()
             try:
                 ran = self.run_once()
             except Exception as exc:  # e.g. database briefly unreachable

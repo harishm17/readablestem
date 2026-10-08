@@ -68,7 +68,9 @@ load_config() {
   # purged document survives in backups until they roll over (docs/operations.md,
   # "Retention"). One keeps that to about a day and still allows a restore.
   SQL_RETAINED_BACKUPS=${SQL_RETAINED_BACKUPS:-1}
-  BUDGET_USD=${BUDGET_USD:-25}
+  # About 1.5x the fixed monthly cost of this setup (docs/deploy.md, "What it costs"),
+  # so the alert means something; a Cloud Billing budget does not include OpenAI.
+  BUDGET_USD=${BUDGET_USD:-90}
   CRON_SCHEDULE=${CRON_SCHEDULE:-0 * * * *}
   case "$DB_MODE" in
     cloudsql | external) ;;
@@ -107,7 +109,7 @@ step_apis() {
   gc services enable run.googleapis.com artifactregistry.googleapis.com \
     cloudbuild.googleapis.com compute.googleapis.com secretmanager.googleapis.com \
     sqladmin.googleapis.com cloudscheduler.googleapis.com monitoring.googleapis.com \
-    billingbudgets.googleapis.com iam.googleapis.com
+    logging.googleapis.com billingbudgets.googleapis.com iam.googleapis.com
 }
 
 step_iam() {
@@ -365,10 +367,137 @@ alert_channel() {
   printf '%s' "$channel"
 }
 
+# ensure_log_metric NAME DESCRIPTION FILTER: a counter of matching log entries.
+ensure_log_metric() {
+  local name=$1 description=$2 filter=$3
+  if exists logging metrics describe "$name"; then
+    gc logging metrics update "$name" --description="$description" --log-filter="$filter" \
+      >/dev/null
+    note "log metric $name updated"
+  else
+    gc logging metrics create "$name" --description="$description" --log-filter="$filter" \
+      >/dev/null
+    note "log metric $name created"
+  fi
+}
+
+# ensure_policy DISPLAY_NAME FILE: create the alert policy unless one has that name.
+ensure_policy() {
+  local display=$1 file=$2
+  if [ -n "$(gc monitoring policies list --filter="displayName=\"$display\"" \
+    --format='value(name)')" ]; then
+    note "alert policy \"$display\" exists"
+    return
+  fi
+  gc monitoring policies create --policy-from-file="$file" >/dev/null
+  note "alert policy \"$display\" created"
+}
+
 step_monitoring() {
-  step "Uptime check on /healthz with an email alert to $ALERT_EMAIL"
-  local channel check host name="$SERVICE healthz" policy_file
+  local channel
   channel=$(alert_channel)
+  uptime_alert "$channel"
+  retention_alerts "$channel"
+}
+
+# The hourly cron carries the privacy promise (aggregate, then purge), and /healthz stays
+# 200 when it breaks, so it gets alerts of its own (docs/operations.md, "When something
+# goes wrong"):
+# - no `cron_done` for 2 hours: the scheduler is not reaching the app (paused or deleted
+#   job, 403 after a cron-token rotation, 500s). The worker's hourly purge backstop
+#   keeps deleting meanwhile, and logs as `purge_done source=worker`, which is why this
+#   watches `cron_done` and not `purge_done`;
+# - any `cron_refused`, `aggregate_failed`, `purge_backstop_deleted` (the backstop found
+#   overdue jobs) or `purge_backstop_failed` line;
+# - any failed attempt of the Cloud Scheduler job itself.
+retention_alerts() {
+  local channel=$1 run_filter cron_job="$SERVICE-cron" file
+  step "Alerts on the hourly aggregate-and-purge (email to $ALERT_EMAIL)"
+  run_filter="resource.type=\"cloud_run_revision\" AND resource.labels.service_name=\"$SERVICE\""
+  ensure_log_metric "$SERVICE-cron-done" "Hourly aggregate-and-purge finished" \
+    "$run_filter AND jsonPayload.message=\"cron_done\""
+  ensure_log_metric "$SERVICE-cron-problems" "Cron refused or failed; purge backstop acted" \
+    "$run_filter AND jsonPayload.message=(\"cron_refused\" OR \"aggregate_failed\" OR \"purge_backstop_deleted\" OR \"purge_backstop_failed\")"
+  ensure_log_metric "$SERVICE-scheduler-errors" "Cloud Scheduler job $cron_job failed" \
+    "resource.type=\"cloud_scheduler_job\" AND resource.labels.job_id=\"$cron_job\" AND severity>=ERROR"
+
+  file="$TMP_DIR/cron-absent.json"
+  cat >"$file" <<EOF
+{
+  "displayName": "$SERVICE cron not running",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "No cron_done log line for 2 hours",
+      "conditionAbsent": {
+        "filter": "metric.type=\"logging.googleapis.com/user/$SERVICE-cron-done\" AND resource.type=\"cloud_run_revision\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "duration": "7200s",
+        "trigger": {"count": 1}
+      }
+    }
+  ],
+  "notificationChannels": ["$channel"]
+}
+EOF
+  ensure_policy "$SERVICE cron not running" "$file"
+
+  file="$TMP_DIR/cron-problems.json"
+  cat >"$file" <<EOF
+{
+  "displayName": "$SERVICE cron or purge problem",
+  "combiner": "OR",
+  "conditions": [
+    {
+      "displayName": "Cron refused or failed, or the purge backstop acted",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/$SERVICE-cron-problems\" AND resource.type=\"cloud_run_revision\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "trigger": {"count": 1}
+      }
+    },
+    {
+      "displayName": "Cloud Scheduler job failed",
+      "conditionThreshold": {
+        "filter": "metric.type=\"logging.googleapis.com/user/$SERVICE-scheduler-errors\" AND resource.type=\"cloud_scheduler_job\"",
+        "aggregations": [
+          {
+            "alignmentPeriod": "300s",
+            "perSeriesAligner": "ALIGN_SUM",
+            "crossSeriesReducer": "REDUCE_SUM"
+          }
+        ],
+        "comparison": "COMPARISON_GT",
+        "thresholdValue": 0,
+        "duration": "0s",
+        "trigger": {"count": 1}
+      }
+    }
+  ],
+  "notificationChannels": ["$channel"]
+}
+EOF
+  ensure_policy "$SERVICE cron or purge problem" "$file"
+}
+
+uptime_alert() {
+  local channel=$1 check host name="$SERVICE healthz" policy_file
+  step "Uptime check on /healthz with an email alert to $ALERT_EMAIL"
   host=${UPTIME_HOST:-$(service_url)}
   host=${host#https://}
   host=${host%%/*}
@@ -381,11 +510,6 @@ step_monitoring() {
     note "uptime check created for https://$host/healthz"
   else
     note "uptime check exists ($check)"
-  fi
-  if [ -n "$(gc monitoring policies list --filter="displayName=\"$name failing\"" \
-    --format='value(name)')" ]; then
-    note "alert policy exists"
-    return
   fi
   policy_file="$TMP_DIR/policy.json"
   # Condition from the Cloud Monitoring uptime-check policy example (policies-in-json).
@@ -416,14 +540,13 @@ step_monitoring() {
   "notificationChannels": ["$channel"]
 }
 EOF
-  gc monitoring policies create --policy-from-file="$policy_file" >/dev/null
-  note "alert policy created"
+  ensure_policy "$name failing" "$policy_file"
 }
 
 step_budget() {
   step "Billing budget alert (${BUDGET_USD} USD per month)"
-  if [ -z "${BILLING_ACCOUNT_ID:-}" ]; then
-    note "BILLING_ACCOUNT_ID not set: skipped (docs/deploy.md, step 9)"
+  if [ -z "${BILLING_ACCOUNT_ID:-}" ]; then # main() refused this unless SKIP_BUDGET=true
+    note "SKIP_BUDGET=true: no budget alert (docs/deploy.md, step 9)"
     return
   fi
   local display="$SERVICE monthly budget"
@@ -454,6 +577,13 @@ main() {
   steps=${*:-apis iam registry build database secrets migrate service cron monitoring budget}
   cd "$(dirname "$0")/.." # Cloud Build uploads the repository root
   load_config
+  case " $steps " in
+    *" budget "*)
+      if [ -z "${BILLING_ACCOUNT_ID:-}" ] && [ "${SKIP_BUDGET:-false}" != true ]; then
+        die "BILLING_ACCOUNT_ID is not set (needed for the budget alert; set SKIP_BUDGET=true to deploy without one)"
+      fi
+      ;;
+  esac
   printf 'Project %s, region %s, image %s\n' "$PROJECT_ID" "$REGION" "$IMAGE"
   for step_name in $steps; do
     case "$step_name" in

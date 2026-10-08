@@ -74,7 +74,7 @@ def _cmd_purge(args: argparse.Namespace) -> int:
     from a11y_stem.ops.retention import purge_expired
 
     try:
-        stats = purge_expired(_factory())
+        stats = purge_expired(_factory(), source="cli")
     except SQLAlchemyError as exc:
         return _db_error(exc)
     print(_purge_line(stats))

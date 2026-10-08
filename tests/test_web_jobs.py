@@ -473,3 +473,36 @@ def test_retention_date_is_shown(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
     expected = (datetime.now(UTC) + timedelta(hours=24)).strftime("%b %Y")
     assert expected in web.browser.get(f"/jobs/{job_id}").text
+
+
+def test_a_job_past_its_retention_time_is_gone_before_the_purge_runs(web):
+    """retain_until was only checked by the hourly purge: if the scheduler stopped, an
+    expired document stayed viewable and downloadable."""
+    job_id = finished_job(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.retain_until = datetime.now(UTC) - timedelta(minutes=1)
+    for path in ("", "/status", "/view", "/download", "/review", "/crops/p1-e3.png"):
+        assert web.browser.get(f"/jobs/{job_id}{path}").status_code == 404, path
+    assert job_id not in web.browser.get("/app").text
+    assert count(web, Job) == 1  # still in the database until the purge
+
+
+def test_the_worker_purges_expired_jobs_if_the_scheduler_does_not(web, caplog, monkeypatch):
+    import logging
+
+    from a11y_stem.web import worker as worker_module
+
+    caplog.set_level(logging.INFO)
+    job_id = finished_job(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.retain_until = datetime.now(UTC) - timedelta(hours=2)
+    monkeypatch.setattr(worker_module, "PURGE_FIRST_S", 0.0)
+    worker = web.worker()
+    assert worker.purge_backstop() == 1
+    assert count(web, Job) == 0 and count(web, Blob) == 0
+    assert "purge_backstop_deleted" in caplog.messages
+    assert worker.purge_backstop() is None  # not due again for an hour
