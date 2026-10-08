@@ -10,11 +10,19 @@ The web route owns the transaction; this module owns the rules:
   `validate.clean_alt`, `pipeline.validate`) before it is stored; error-level failures
   are shown back to the reviewer, nothing is saved. A heading level the output's
   outline repair would change (one that skips a level after the heading before it) is
-  refused, with the levels that fit,
+  refused, with the levels that fit; so is accepting a proposed level the repair would
+  change (after a heading before it was rejected or changed),
 - reject: the original stays in the document, flagged,
 - bulk accept: many fixes of one kind at once, but only the ones a single "Accept" could
-  take (NEEDS_REVIEW, a proposal, no failed error-level check). FAILED and ABSTAINED
-  fixes have nothing safe to accept and are never included.
+  take (NEEDS_REVIEW, a proposal, no failed error-level check, and for a heading a
+  level the output keeps). FAILED and ABSTAINED fixes have nothing safe to accept and
+  are never included.
+
+A heading decision can change the level the output writes for later headings (the
+children of a rejected heading move up together). Stored levels are not rewritten, so
+restoring the heading puts them back; instead `heading_places` tells the review screen
+the level each heading is written at, and `ReviewChange.moved` names the other headings
+a decision moved.
 
 It also decides the order of the review screen. A reviewer's time should go where the
 risk is, so fixes are grouped by kind (equations, then figures, then headings); within a
@@ -96,6 +104,8 @@ class ReviewChange:
     before: dict[str, Any]
     after: dict[str, Any]
     warnings: list[Check] = field(default_factory=list)
+    # Other headings the output now writes at a different level (reading order).
+    moved: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -231,14 +241,39 @@ def apply_review(
         message = "This proposal failed a required check, so it cannot be accepted as it is. "
         message += "Edit it, or reject it to keep the original."
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    if action == "accept" and fix.heading is not None:
+        _refuse_moved_level(result, element_id, fix.heading.level, then="then Save edit")
+    # Only a heading decision can move other headings: the outline before it, to compare.
+    places = heading_places(result) if fix.kind is Kind.HEADING else {}
     if action == "edit":
         warnings = _edit(result, fix, element, form)
     fix.status = STATUS_FOR_ACTION[action]
     fix.reviewed = True  # a reviewer's Accept is not the pipeline's automatic one
     _recount(result)
     return ReviewChange(
-        fix=fix, action=action, before=before, after=snapshot(fix), warnings=warnings
+        fix=fix,
+        action=action,
+        before=before,
+        after=snapshot(fix),
+        warnings=warnings,
+        moved=_moved_by(places, heading_places(result), element_id) if places else [],
     )
+
+
+def _moved_by(
+    before: Mapping[str, HeadingPlace], after: Mapping[str, HeadingPlace], element_id: str
+) -> list[str]:
+    """Headings other than `element_id` written as headings before and after a decision,
+    at a different level."""
+    return [
+        eid
+        for eid, place in after.items()
+        if eid != element_id
+        and eid in before
+        and before[eid].in_document
+        and place.in_document
+        and before[eid].written != place.written
+    ]
 
 
 def _recount(result: DocumentResult) -> None:
@@ -362,26 +397,62 @@ def heading_level_written(result: DocumentResult, element_id: str, level: int) -
     return outline.would_write(level)
 
 
-def highest_heading_levels(result: DocumentResult) -> dict[str, int]:
-    """element_id -> the highest level number each heading can take without the outline
-    repair changing it (the review page's hint). One pass in reading order, the way
-    `assemble.render_html` writes the headings."""
+@dataclass(frozen=True)
+class HeadingPlace:
+    """One heading's place in the output's outline (`assemble.Outline`)."""
+
+    highest: int  # levels 1 to this are written as they are after the heading before it
+    level: int | None  # the fix's level; None without a proposal
+    written: int | None  # what the output makes of `level` here (or would, if accepted)
+    in_document: bool  # written as a heading now, not as a paragraph (rejected, failed)
+
+    @property
+    def moved(self) -> bool:
+        """The output writes (or would write) another level than the fix's."""
+        return self.level is not None and self.written != self.level
+
+    @property
+    def suggested(self) -> int | None:
+        """The level to offer for this heading: the fix's, or when the output moves it,
+        the level it is written at if that level keeps its place (else the deepest that
+        does)."""
+        if self.level is None or self.written is None:
+            return self.level
+        return min(self.written, self.highest) if self.moved else self.level
+
+
+def heading_places(result: DocumentResult) -> dict[str, HeadingPlace]:
+    """element_id -> its place, for every heading element. One pass in reading order,
+    the way `assemble.render_html` writes the headings (the first fix for an id wins)."""
     from a11y_stem.pipeline import assemble
 
     first: dict[str, Fix] = {}
     for fix in result.fixes:
         first.setdefault(fix.element_id, fix)
     outline = assemble.Outline()
-    highest: dict[str, int] = {}
+    places: dict[str, HeadingPlace] = {}
     for element in sorted(result.elements, key=lambda e: e.order):
         if element.kind is not Kind.HEADING:
             continue
-        fits = [n for n in range(1, 7) if outline.would_write(n) == n]
-        highest.setdefault(element.id, max(fits))
-        level, _ = assemble.heading_parts(element, first.get(element.id))
+        fix = first.get(element.id)
+        level, _ = assemble.heading_parts(element, fix)
+        stored = fix.heading.level if fix is not None and fix.heading is not None else None
+        if element.id not in places:  # a repeated id (a layout bug): the first one
+            places[element.id] = HeadingPlace(
+                highest=max(n for n in range(1, 7) if outline.would_write(n) == n),
+                level=stored,
+                written=None if stored is None else outline.would_write(stored),
+                in_document=level is not None,
+            )
         if level is not None:
             outline.write(level)
-    return highest
+    return places
+
+
+def heading_moved(fix: Fix, places: Mapping[str, HeadingPlace]) -> bool:
+    """The output writes this heading fix at another level than the one stored."""
+    place = places.get(fix.element_id)
+    return fix.kind is Kind.HEADING and place is not None and place.moved
 
 
 def heading_levels_that_fit(result: DocumentResult, element_id: str) -> list[int]:
@@ -390,6 +461,28 @@ def heading_levels_that_fit(result: DocumentResult, element_id: str) -> list[int
     return [
         level for level in range(1, 7) if heading_level_written(result, element_id, level) == level
     ]
+
+
+def _refuse_moved_level(
+    result: DocumentResult,
+    element_id: str,
+    level: int,
+    *,
+    then: str = "",
+    values: dict[str, str] | None = None,
+) -> None:
+    """Raise ReviewInvalid, on the level select, when the output would write `level` as
+    another level for this heading; `then` is what to do after choosing one that fits."""
+    written = heading_level_written(result, element_id, level)
+    if written == level:
+        return
+    highest = max(heading_levels_that_fit(result, element_id))
+    message = (
+        f"Level {level} would skip a level after the heading before it, so the "
+        f"document would show it as level {written}. Choose a level from 1 to "
+        f"{highest}{', ' + then if then else ''}, or change the heading before it first."
+    )
+    raise ReviewInvalid([FieldError(field_id("level", element_id), message)], values)
 
 
 def _edit_heading(
@@ -402,15 +495,7 @@ def _edit_heading(
             [FieldError(fid, "Choose a heading level from 1 to 6.")], {"level": raw}
         )
     level = int(raw)
-    written = heading_level_written(result, fix.element_id, level)
-    if written != level:
-        highest = max(heading_levels_that_fit(result, fix.element_id))
-        message = (
-            f"Level {level} would skip a level after the heading before it, so the "
-            f"document would show it as level {written}. Choose a level from 1 to "
-            f"{highest}, or change the heading before it first."
-        )
-        raise ReviewInvalid([FieldError(fid, message)], {"level": raw})
+    _refuse_moved_level(result, fix.element_id, level, values={"level": raw})
     if fix.heading is not None:
         text = fix.heading.text
     else:
@@ -422,10 +507,11 @@ def _edit_heading(
 # --------------------------------------------------------------------------- bulk
 
 
-def bulk_eligible(fix: Fix) -> bool:
-    """What a bulk accept may take: exactly what a single "Accept" could, and only while
-    it is still waiting for review (a reviewer's own decision is never overwritten)."""
-    return fix.status is Status.NEEDS_REVIEW and can_accept(fix)
+def bulk_eligible(fix: Fix, places: Mapping[str, HeadingPlace]) -> bool:
+    """What a bulk accept may take: exactly what a single "Accept" could (for a heading,
+    only a level the output keeps; `places` from `heading_places`), and only while it is
+    still waiting for review (a reviewer's own decision is never overwritten)."""
+    return fix.status is Status.NEEDS_REVIEW and can_accept(fix) and not heading_moved(fix, places)
 
 
 def at_or_above(fix: Fix, min_percent: int) -> bool:
@@ -433,11 +519,14 @@ def at_or_above(fix: Fix, min_percent: int) -> bool:
 
 
 def bulk_candidates(result: DocumentResult, request: BulkRequest) -> list[Fix]:
+    # Accepting a fix waiting for review changes no level and keeps it in the document,
+    # so the outline is the same after each one: one pass is enough.
+    places = heading_places(result) if request.kind is Kind.HEADING else {}
     return [
         f
         for f in result.fixes
         if f.kind is request.kind
-        and bulk_eligible(f)
+        and bulk_eligible(f, places)
         and (request.min_percent is None or at_or_above(f, request.min_percent))
     ]
 

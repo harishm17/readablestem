@@ -85,6 +85,11 @@
     <p class="part-label">Heading text</p>
     <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
     {% if item.heading_level %}<p>Proposed level: {{ item.heading_level }}</p>{% endif %}
+    {% if item.heading_shown %}
+    {# The outline repair (web.review.heading_places) writes another level: say which. #}
+    <p><strong>{% if item.heading_in_document %}In the document: level {{ item.heading_shown }}.{% else %}If accepted, it would be level {{ item.heading_shown }}.{% endif %}</strong>
+      Level {{ item.heading_level }} would skip a level after the heading before it, which the document never does.</p>
+    {% endif %}
     {% endif %}
   </div>
 </div>
@@ -153,6 +158,7 @@
     <input type="hidden" name="action" value="accept_all">
     <button type="submit" class="button-secondary">Accept all {{ counted(g.accept_all, "remaining " ~ g.one, "remaining " ~ g.many) }}</button>
     {% if g.not_converted %}<p class="hint">Not included: {{ counted(g.not_converted, g.one, g.many) }} that could not be converted.</p>{% endif %}
+    {% if g.moved %}<p class="hint">Not included: {{ counted(g.moved, g.one, g.many) }} the document shows at another level than the one proposed. Choose a level on {{ "its card" if g.moved == 1 else "their cards" }}.</p>{% endif %}
   </form>
   {% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ g.slug }}" class="bulk-form">

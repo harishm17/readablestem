@@ -225,8 +225,9 @@ heading move up together:
 
 (Clamping to "previous heading + 1" alone would make Sub 1.2 a child of Sub 1.1.) The
 first heading keeps its level; an outline with no gaps is written unchanged. The repair
-is `assemble.Outline`; the review screen asks it (`would_write`) before saving a new
-heading level, and refuses a level the output would show differently.
+is `assemble.Outline`; the review screen asks it (`would_write`) before saving or
+accepting a heading level, refuses a level the output would show differently, and shows
+the level the output writes when a change to an earlier heading moved it.
 
 ## About this conversion
 

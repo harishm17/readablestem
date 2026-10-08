@@ -766,6 +766,190 @@ def test_levels_that_fit_are_always_1_to_n():
                 assert (written == level) == (level in fits), spec
 
 
+# Every decision path must agree with the output: a level the reviewer accepts is the
+# level the document shows, and the review screen shows the level the document writes.
+# These run the real assembler (no fixture here patches it).
+
+
+def heading_doc(*spec: int | None) -> DocumentResult:
+    """Headings p1-e0, p1-e1, ... waiting for review at the levels in `spec`; None is a
+    heading the reviewer rejected (written as a paragraph)."""
+    elements = [
+        Element(id=f"p1-e{i}", kind=Kind.HEADING, page=0, bbox=(0, i, 1, i + 1), order=i,
+                text=f"Heading {i}")
+        for i in range(len(spec))
+    ]  # fmt: skip
+    fixes = [
+        Fix(element_id=f"p1-e{i}", kind=Kind.HEADING, confidence=0.9,
+            status=Status.REJECTED if level is None else Status.NEEDS_REVIEW,
+            heading=HeadingFix(level=level or 2, text=f"Heading {i}"))
+        for i, level in enumerate(spec)
+    ]  # fmt: skip
+    return DocumentResult(
+        pipeline_version="t",
+        elements=elements,
+        fixes=fixes,
+        stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
+    )
+
+
+def written_levels(data: DocumentResult) -> dict[str, int]:
+    """element_id -> N of the <hN> the real assembler writes for it."""
+    from a11y_stem.pipeline.assemble import render_html
+
+    html = render_html(title="t", lang="en", elements=data.elements, fixes=data.fixes, crops={})
+    return {eid: int(n) for n, eid in re.findall(r'<h([1-6]) id="(p1-e\d+)"', html)}
+
+
+def stored_levels(data: DocumentResult) -> dict[str, tuple[int, str]]:
+    return {f.element_id: (f.heading.level, f.status.value) for f in data.fixes if f.heading}
+
+
+def test_heading_places_say_the_level_the_output_writes():
+    """What the review screen shows for each heading (`heading_places`) is what the
+    assembler writes, for every outline of up to four headings, some rejected."""
+    import itertools
+
+    from a11y_stem.web.review import heading_places
+
+    for n in range(1, 5):
+        for spec in itertools.product((None, 1, 2, 3, 4, 5, 6), repeat=n):
+            data = heading_doc(*spec)
+            written = written_levels(data)
+            places = heading_places(data)
+            shown = {eid: p.written for eid, p in places.items() if p.in_document}
+            assert shown == written, spec
+            for place in places.values():
+                assert place.moved == (place.written != place.level), spec
+                assert place.suggested is not None and place.suggested <= place.highest, spec
+
+
+def test_accepting_a_level_the_output_would_move_is_refused():
+    """h1, h2, h3; the reviewer rejects the h2. Accepting the h3 as proposed used to
+    store 3 while the document wrote <h2>; "Save edit" with 3 was already refused."""
+    from a11y_stem.web.review import ReviewInvalid, apply_review
+
+    data = heading_doc(1, 2, 3)
+    apply_review(data, "p1-e1", "reject", {})
+    with pytest.raises(ReviewInvalid) as refused:
+        apply_review(data, "p1-e2", "accept", {})
+    [error] = refused.value.errors
+    assert error.field_id == "level-p1-e2"
+    assert error.message == (
+        "Level 3 would skip a level after the heading before it, so the document would "
+        "show it as level 2. Choose a level from 1 to 2, then Save edit, or change the "
+        "heading before it first."
+    )
+    assert stored_levels(data)["p1-e2"] == (3, "needs_review")  # nothing saved
+    apply_review(data, "p1-e2", "edit", {"level": "2"})
+    assert stored_levels(data)["p1-e2"] == (2, "edited")
+    assert written_levels(data)["p1-e2"] == 2
+
+
+def test_a_change_to_an_earlier_heading_names_the_headings_it_moves():
+    """h1, h2, h3 with the h3 accepted; the h2 is then edited to level 1. The document
+    writes the h3 as <h2>: the decision says so, and the review screen shows level 2
+    (`heading_places`). The stored level is kept, so undoing the change puts it back."""
+    from a11y_stem.web.review import apply_review, heading_places
+
+    data = heading_doc(1, 2, 3)
+    assert apply_review(data, "p1-e2", "accept", {}).moved == []
+    change = apply_review(data, "p1-e1", "edit", {"level": "1"})
+    assert change.moved == ["p1-e2"]
+    assert written_levels(data)["p1-e2"] == 2
+    place = heading_places(data)["p1-e2"]
+    assert (place.level, place.written, place.moved, place.suggested) == (3, 2, True, 2)
+    assert apply_review(data, "p1-e1", "edit", {"level": "2"}).moved == ["p1-e2"]
+    assert written_levels(data)["p1-e2"] == 3 and not heading_places(data)["p1-e2"].moved
+
+
+def test_rejecting_and_restoring_a_heading_moves_its_children_and_back():
+    from a11y_stem.web.review import apply_review
+
+    data = heading_doc(1, 2, 3, 3, 2)
+    assert apply_review(data, "p1-e1", "reject", {}).moved == ["p1-e2", "p1-e3"]
+    assert written_levels(data) == {"p1-e0": 1, "p1-e2": 2, "p1-e3": 2, "p1-e4": 2}
+    assert apply_review(data, "p1-e1", "accept", {}).moved == ["p1-e2", "p1-e3"]
+    assert written_levels(data) == {"p1-e0": 1, "p1-e1": 2, "p1-e2": 3, "p1-e3": 3, "p1-e4": 2}
+    assert apply_review(data, "p1-e4", "reject", {}).moved == []  # nothing after it
+
+
+def test_bulk_accept_leaves_out_levels_the_output_would_move():
+    """Accept all on h1, h4, h2 used to store 4 for the second heading, written <h2>."""
+    from a11y_stem.web.review import BulkRequest, apply_bulk_accept, bulk_candidates
+
+    data = heading_doc(1, 4, 2)
+    request = BulkRequest(Kind.HEADING, None)
+    assert [f.element_id for f in bulk_candidates(data, request)] == ["p1-e0", "p1-e2"]
+    accepted = apply_bulk_accept(data, request)
+    assert [c.fix.element_id for c in accepted] == ["p1-e0", "p1-e2"]
+    written = written_levels(data)
+    assert all(written[c.fix.element_id] == c.fix.heading.level for c in accepted)  # type: ignore[union-attr]
+    assert stored_levels(data)["p1-e1"] == (4, "needs_review")
+    assert bulk_candidates(data, BulkRequest(Kind.HEADING, 80)) == []
+
+
+def test_the_page_shows_and_offers_the_level_the_document_writes(outline):
+    """Reject the h2: the h3 is written as <h2>. Its card says so, offers level 2, has no
+    Accept button, and "Accept all" leaves it out."""
+    assert post(outline, "p1-e1", action="reject").status_code == 303
+    page = review_page(outline)
+    third = card(page, "p1-e2")
+    assert "Proposed level: 3" in third
+    assert "In the document: level 2." in third
+    assert '<option value="2" selected>Level 2</option>' in third
+    assert 'value="accept"' not in third
+    assert "Accept all 1 remaining heading</button>" in page
+    assert "Not included: 1 heading the document shows at another level" in page
+    response = post(outline, "p1-e2", action="accept")  # from a page loaded earlier
+    assert response.status_code == 422
+    assert '<a href="#level-p1-e2">Level 3 would skip a level' in response.text
+    assert 'id="level-error-p1-e2"' in response.text
+    assert post(outline, "headings", action="accept_all").status_code == 303
+    assert {f.element_id: f.status.value for f in result(outline).fixes} == {
+        "p1-e0": "accepted",
+        "p1-e1": "rejected",
+        "p1-e2": "needs_review",
+    }
+    assert "In the document" not in card(review_page(outline), "p1-e1")  # level 2 fits
+
+
+def test_a_rejected_heading_says_where_it_would_go_if_accepted(outline):
+    assert post(outline, "p1-e2", action="reject").status_code == 303
+    assert post(outline, "p1-e1", action="edit", level="1").status_code == 303
+    rejected = card(review_page(outline), "p1-e2")
+    assert "If accepted, it would be level 2." in rejected
+    assert '<option value="2" selected>Level 2</option>' in rejected
+    assert 'value="accept"' not in rejected
+    assert post(outline, "p1-e2", action="accept").status_code == 422
+    assert result(outline).fix_for("p1-e2").status is Status.REJECTED  # type: ignore[union-attr]
+
+
+def test_a_decision_that_moves_later_headings_says_so(outline):
+    assert post(outline, "p1-e2", action="accept").status_code == 303
+    assert post(outline, "p1-e1", action="edit", level="1").status_code == 303
+    assert levels(outline) == {"p1-e0": 1, "p1-e1": 1, "p1-e2": 3}
+    page = review_page(outline)
+    assert "Heading 3 is now shown at a different level." in page
+    decided = card(page, "p1-e2")
+    assert "Accepted by you" in decided
+    assert "In the document: level 2." in decided
+    assert '<option value="2" selected>Level 2</option>' in decided
+
+
+def test_moved_headings_are_named_then_counted():
+    from a11y_stem.web.routes.review import _moved_message
+
+    numbers = {f"p1-e{i}": i + 1 for i in range(9)}
+    assert _moved_message([], numbers) == ""
+    assert _moved_message(["p1-e2"], numbers) == " Heading 3 is now shown at a different level."
+    assert _moved_message(["p1-e2", "p1-e3", "p1-e5"], numbers) == (
+        " Headings 3, 4 and 6 are now shown at a different level."
+    )
+    many = [f"p1-e{i}" for i in range(1, 8)]
+    assert _moved_message(many, numbers) == " 7 later headings are now shown at a different level."
+
+
 # --------------------------------------------------------------------------- after a decision
 
 

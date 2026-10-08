@@ -335,7 +335,17 @@ nothing is saved.
   more than one below the heading before it would be stored as one level and shown as
   another. It is refused with the level it would be shown at and the levels that fit
   ("Choose a level from 1 to 3, or change the heading before it first"); the form's
-  hint says the same before saving. The first heading may take any level.
+  hint says the same before saving. The first heading may take any level. Rejecting or
+  changing a heading can move later ones (the children of a rejected heading move up
+  together), so Accept, as well as Save edit, refuses a proposed level the output would
+  move, and the card has no Accept button for it. The card shows the level the document
+  writes ("In the document: level 2."; for a rejected heading, "If accepted, it would be
+  level 2.") and its select offers that level. A decision that moves other headings says
+  which ("Heading 3 is now shown at a different level."). Stored levels are not
+  rewritten: restoring a rejected heading puts its children back where they were.
+  `web.review.heading_places` is the one pass that gives every heading's written level;
+  a test checks it against the assembler's output for every outline of up to four
+  headings.
 
 After a decision the browser is redirected (303) to `#item-<id>` of the next fix still
 waiting, after this one in review order and wrapping round to the first, or to
@@ -351,8 +361,10 @@ The landing item has `tabindex="-1"`, so the next Tab reaches that link.
   to spot and fix later, a wrong equation or alt text is not.
 
 Only fixes a single "Accept" could take are included: status `needs_review`, a proposal,
-and no failed error-level check. Failed and not-converted fixes, and fixes the reviewer
-already decided, are never touched. The threshold compares the whole percentage the page
+no failed error-level check and, for a heading, a level the output writes as it is
+("Not included: 1 heading the document shows at another level than the one proposed").
+Failed and not-converted fixes, and fixes the reviewer already decided, are never
+touched. The threshold compares the whole percentage the page
 shows (0.795 is shown as 80%, so it is "at or above 80%"). Bulk accept posts to the same
 route as a single decision, with the group (`equations`, `figures`, `headings`) in
 place of the element id (element ids look like `p3-e12`, so the two cannot collide).
