@@ -531,9 +531,54 @@ Targets: required decisions per page 0.21-0.23 on the gold sections, 0.19 on Ope
 2 on the one-page handout (both real errors), 0.29 over the two documents (target about 1).
 Flag precision 0.56-0.60 on the gold sections, 0.60 on the two documents (3 useful of 5:
 the Procedure group and the two omegas), up from 0.30-0.32 and 0.19 (target 0.5). Flag
-recall of meaning-level errors: no real error newly hidden; recall over all wrong items
-drops (document 0.95 -> 0.75 excluding scorer gaps) because single run-in labels, a
-heading level and a bold subscript are now optional notes, as the policy decides.
+recall of meaning-level errors: no real error *in these eval items* newly hidden; recall
+over all wrong items drops (document 0.95 -> 0.75 excluding scorer gaps) because single
+run-in labels, a heading level and a bold subscript are now optional notes, as the
+policy decides.
+
+### After the review of the triage (same day)
+
+A review found meaning-level errors outside the eval items that the first version let
+through, reproduced with real layout on a Chromium-printed PDF and FakeVisionClient
+answers at confidence 0.95: one wrong digit (9.80 read as 9.30), `ω` read as `w`, the
+`t` dropped from `e^{-λt}` and `ℝ` read as `ℕ` were accepted with nothing to review (the
+symbol check only fired below a Dice similarity of 0.5); a bold `𝐤·𝐫` in an exponent
+read plain, and an encoded `ℝ` read as a plain `R`, were optional notes. Fixed
+(docs/steps.md "Text-layer cross-check" and "Letter-style check"): any difference in
+letters, digits and Greek letters is required (`symbol_mismatch`); a bold letter in the
+script of a plain base is a variable; an encoded double-struck, script or fraktur letter
+read plain is meaning-level; and every failed text-layer check on a cheap-model answer,
+a cosmetic one too, escalates to the main model. Still cosmetic, as the policy says: a
+bold digit, also the lone zero vector `𝟎` read as `0` (it escalates, but if the main
+model also reads `0` it is an optional note).
+
+Applied to the 181 recorded real answers above (equations task, document task, both
+converts), the new rules change no tier. Re-run with real models (commit 6508901, same
+prompts and models; reports in `/tmp/triage-review/`, not committed; $0.30 spent,
+including a document run stopped by its own `--max-usd` reservation cap and re-run at
+`--concurrency 1`):
+
+| Measure | First triage | After the review |
+|---|---|---|
+| equations: required / optional | 1 / 1 | 0 / 1 |
+| equations: exact_lenient | 0.733 | 0.767 |
+| equations: escalated route / cost | 5 / $0.048 | 6 / $0.053 |
+| document: required decisions (43 PDF pages) / optional | 10 (0.23 per page) / 23 | 9 (0.21 per page) / 23 |
+| document: flag precision / recall, excluding scorer gaps | 0.60 (6/10) / 0.75 (15/20) | 0.56 (5/9) / 0.70 (14/20) |
+| convert, OpenStax 2.1 (16 pages) | 3 decisions, 10 optional, 43 calls, $0.028 | 3 decisions, 10 optional, 42 calls, $0.028 |
+| convert, LaTeX handout (1 page) | 2 decisions, 3 optional, 32 calls, $0.019 | 1 decision, 3 optional, 34 calls, $0.020 |
+
+The differences are model variance, not the rules: the first runs' extra required
+equations were a bold `Δ𝐝` the main model read plain (2.1 eq-000, equations task), a 2.3
+eq-005 answer at confidence 0.84 (document task) and the second bold omega of the
+handout; this time the models read them right or surer. Every escalation in the
+equations task was a cheap answer that dropped a bold `𝐝` (meaning-level, escalated
+before as well); the sixth is one more of those. The headings are unchanged (no model
+calls). The cosmetic notes (OpenStax `𝐝𝟎` and `𝐝𝐟`, the handout's three MSBM
+`\mathbb{R}`) now go to the main model as well, which wrote the same thing, so they stay
+optional notes (5 more main-model calls over the two documents, a few tenths of a cent;
+the call totals also move with the other escalations). The bold omega that remains is
+still required. No `symbol_mismatch` fired in any run.
 
 ## What the numbers do not show
 

@@ -149,9 +149,9 @@ The check `equation.text_layer` (severity warning) fails when the bags differ at
   `e^{-λt}`), `ℝ` read as `ℕ`. Confidence is kept, but the fix needs a decision (review
   policy: a text-layer symbol mismatch is required).
 
-Either one escalates a cheap-model answer. Before this was strict (2026-10-08) only the
-strong mismatch counted, so a confident answer with one wrong digit was accepted with
-nothing to review. Measured on 181 real model answers with a text layer (the 30 gold
+Either one escalates a cheap-model answer. Until the review of the triage (2026-10-08)
+only the strong mismatch counted, so a confident answer with one wrong digit was
+accepted with nothing to review. Measured on 181 real model answers with a text layer (the 30 gold
 sample equations, the document eval's 3 sections, and two runs each of OpenStax 2.1
 and the LaTeX handout), the strict rule finds no difference once accents are dropped
 (the only one was the handout's `\hat{\mathbf{x}}`, a U+02C6 accent), so it adds about
