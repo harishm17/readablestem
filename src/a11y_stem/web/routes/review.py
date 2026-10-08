@@ -38,6 +38,7 @@ from a11y_stem.web.review import (
     ReviewInvalid,
     apply_review,
     has_proposal,
+    needs_attention,
     rerender_html,
     review_order,
 )
@@ -148,8 +149,10 @@ def _page(
         if fix.kind is not Kind.PARAGRAPH
     ]
     flashes = pop_flash(request)
+    progress: list[str] = []
     for item in items:
         item.notices = [f["message"] for f in flashes if f.get("element_id") == item.element_id]
+        progress += [f"{item.kind_label} on page {item.page}: {n}" for n in item.notices]
     general = [f for f in flashes if not f.get("element_id")]
     errors: list[FieldError] = []
     if invalid is not None:
@@ -165,6 +168,8 @@ def _page(
         "items": items,
         "errors": [{"field_id": e.field_id, "message": e.message} for e in errors],
         "flash": general,
+        "progress": progress,
+        "remaining": sum(1 for item in items if needs_attention(item.status)),
         "active": "app",
     }
     return render(request, "review.html", context, status_code=status_code)
@@ -234,4 +239,7 @@ def review_action(
             c.code or c.name for c in change.warnings
         )
     flash(request, message, element_id=element_id)
-    return RedirectResponse(f"/jobs/{job_id}/review#fix-{element_id}", status_code=303)
+    # A fix that needed attention has now moved down the list, so go back to the progress
+    # note above the list, where the next fix to review now sits. Otherwise stay on it.
+    anchor = "review-progress" if needs_attention(change.before["status"]) else f"fix-{element_id}"
+    return RedirectResponse(f"/jobs/{job_id}/review#{anchor}", status_code=303)

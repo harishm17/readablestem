@@ -69,6 +69,10 @@ class ReviewChange:
     warnings: list[Check] = field(default_factory=list)
 
 
+def needs_attention(status: Status | str) -> bool:
+    return Status(status) in _ATTENTION
+
+
 def review_order(result: DocumentResult) -> list[Fix]:
     order = {e.id: e.order for e in result.elements}
     return sorted(

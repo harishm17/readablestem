@@ -47,9 +47,8 @@ def admin_context(request: Request) -> dict[str, Any]:
                 select(User).where(User.is_allowed.is_(True)).order_by(User.email)
             )
         ]
-        counts = dict(
-            session.execute(select(Job.status, func.count()).group_by(Job.status)).tuples().all()
-        )
+        rows = session.execute(select(Job.status, func.count()).group_by(Job.status)).all()
+        counts = {str(status): int(count) for status, count in rows}
         aggregates = session.execute(
             select(
                 ErrorAggregate.day,
@@ -64,7 +63,7 @@ def admin_context(request: Request) -> dict[str, Any]:
     return {
         "users": users,
         "spend": ctx.guard.snapshot(),
-        "queue": {status.value: int(counts.get(status, 0)) for status in JobStatus},
+        "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},
         "aggregates": aggregates,
         "aggregate_days": AGGREGATE_DAYS,
         "active": "admin",

@@ -16,6 +16,14 @@
 <p><a href="/jobs/{{ job.id }}">Back to the results</a> ·
   <a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></p>
 
+<div id="review-progress" class="review-progress" tabindex="-1">
+  {% for note in progress %}
+  <p class="notice" role="status">{{ note }}</p>
+  {% endfor %}
+  <p>{% if remaining %}{{ remaining }} {{ "fix still needs" if remaining == 1 else "fixes still need" }} your
+    attention.{% else %}Nothing left that needs your attention.{% endif %}</p>
+</div>
+
 {% if not items %}
 <p>There is nothing to review in this document.</p>
 {% else %}
