@@ -5,11 +5,15 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
 1. Characters come from PyMuPDF's raw text dictionary with accurate glyph boxes, so the
    numerator and denominator rows of a fraction do not overlap. All geometry is turned
    into display coordinates (the page's /Rotate applied), the space `crop` clips in.
-2. Running headers/footers (text in the top/bottom 7 % of the page that repeats on at
-   least half of the pages, digits normalised) and bare page numbers are dropped.
+2. Decoration is dropped: running headers/footers (text in the top/bottom 7 % of the
+   page that repeats on at least half of the pages, digits normalised, unless it is
+   larger or bolder than body text and changes from page to page), bare page numbers,
+   images and drawings repeated in those bands (logos), and watermarks (diagonal text in
+   a large font, or rotated text repeated at the same place).
 3. Columns: a vertical white gap in the x-coverage of narrow lines splits a page into
-   two columns. Lines that cross it, and narrow lines with nothing beside them in the
-   other column, are full-width and split the reading flow.
+   two columns. Lines that cross it are full-width and split the reading flow, and so are
+   narrow lines at a section break across both columns (nothing beside them, both
+   columns resuming below them at the same height).
 4. PyMuPDF lines on one baseline are merged into rows (it splits justified text and
    inline maths into several "lines"). Rows are put in reading order and grouped into
    runs: paragraphs, headings, display equations, captions. PyMuPDF's own blocks are not
@@ -17,27 +21,45 @@ How a page is read (thresholds and known failure modes: docs/layout.md):
    the text below it.
 5. Equations: rows that score as maths (`parse.equation_score`) and contain no prose word
    are display equations; vertically adjacent maths rows and short rows tied together by
-   a vector fraction bar or radical become one region. Inside paragraphs, runs of maths
+   a vector fraction bar or radical become one region, with an equation number beside it
+   ("(2.4)", "Eq. 2.4", or a bare "2.4" to its right). Inside paragraphs, runs of maths
    characters (maths fonts, math-italic letters, Greek, maths symbols) or an italic single
    letter next to an operator become inline equations, and the paragraph text gets
    `core.types.inline_marker(id)` in their place.
 6. Figures: raster images and clusters of vector drawings, minus equation rules, text
-   underlines, page borders and boxes or tables drawn around text. Short labels inside or
-   right next to a figure belong to it; a "Figure N" caption within reach is attached.
+   underlines, page borders and boxes or tables drawn around text (rounded or not).
+   Short labels inside or right next to a figure belong to it; running text never does,
+   and an image with running text on it is a background, not a figure. A "Figure N"
+   caption within reach is attached.
+7. Text is document content: the inline-marker brackets are replaced by look-alikes
+   wherever they occur in it, so only real inline equations have markers.
+
+Untrusted input: MuPDF is C code parsing bytes from the internet, and some damaged files
+make it abort the whole process (a glibc double free while rendering). Before a page is
+extracted or rendered in this process, `analyze` and `crop` have a child process do the
+same once (`_probe_pages`); a child that dies or hangs makes the file
+`LayoutError("unreadable")`.
+MuPDF's own error and warning printing is switched off: it quotes content-stream tokens
+and resource names from the PDF, which must not reach the logs.
 
 Thread safety: PyMuPDF is not thread-safe, so every PyMuPDF call here runs under one
-module lock. `crop` keeps a small cache of opened documents keyed by the PDF bytes; call
-`release(pdf_bytes)` when a document is finished so its content does not stay in memory.
+module lock. `crop` keeps a small cache of opened documents keyed by the PDF bytes, which
+expires after `DOCUMENT_CACHE_TTL_S` of disuse; call `release(pdf_bytes)` when a document
+is finished so its content does not stay in memory even that long.
 """
 
 from __future__ import annotations
 
+import bisect
 import hashlib
 import re
 import statistics
+import subprocess
+import sys
 import threading
+import time
 import unicodedata
-from collections import Counter, OrderedDict
+from collections import Counter, OrderedDict, deque
 from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from functools import cached_property, lru_cache
@@ -67,6 +89,7 @@ MAX_BOLD_HEADING_ROWS = 2
 MARGIN_BAND = 0.07  # top/bottom share of the page searched for running headers/footers
 MARGIN_REFERENCE_PAGES = 24  # pages sampled to decide what repeats
 MIN_GUTTER = 8.0  # narrowest white gap between two text columns
+MAX_GUTTER_CROSSINGS = 24  # lines that may cross a gutter (centred titles, captions)
 MIN_IMAGE_PX = 24  # raster images with a side smaller than this (pixels) are decoration
 MIN_IMAGE_PT = 12.0  # ... and so are images drawn smaller than this on the page
 FULL_PAGE_FRACTION = 0.85  # images covering this share of the page: background or scan
@@ -75,7 +98,11 @@ DRAWING_CLUSTER_GAP = 6.0  # drawings closer than this belong to the same figure
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
+WATERMARK_RATIO = 2.0  # diagonal text this many times the body size is a watermark
 DOCUMENT_CACHE_SIZE = 4
+DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
+PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render the pages
+PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
 
 TEXT_FLAGS = (
     pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP | pymupdf.TEXT_ACCURATE_BBOXES
@@ -104,10 +131,27 @@ CAPTION = re.compile(
 PAGE_NUMBER = re.compile(
     r"^(?:page\s+)?(?:\d{1,4}|[ivxlcdm]{1,7})(?:\s*(?:/|of)\s*\d{1,4})?$", re.IGNORECASE
 )
-EQUATION_NUMBER = re.compile(r"^\(\s*[\dA-Za-z]{1,3}(?:[.\-]\d{1,3})*[a-z]?\s*\)$")
+# "(2.4)", "[3]", "(A.1)", "Eq. 2.4", "Eqn (5)": an equation number wherever it sits.
+EQUATION_NUMBER = re.compile(
+    r"^(?:(?:Eq|Eqn|Equation)\.?\s*)?"
+    r"(?:\(\s*[\dA-Za-z]{1,3}(?:[.\-]\d{1,3})*[a-z]?\s*\)|\[\s*\d{1,3}(?:[.\-]\d{1,3})*[a-z]?\s*\])$"
+    r"|^(?:Eq|Eqn|Equation)\.?\s*\d{1,3}(?:[.\-]\d{1,3})*[a-z]?$"
+)
+# "2.4" or "2.4a" without brackets (OpenStax, many Word templates): an equation number only
+# when it sits on the same line as maths, well to its right.
+BARE_EQUATION_NUMBER = re.compile(r"^\d{1,3}(?:\.\d{1,3}){1,2}[a-z]?$")
+# Glyphs that start list items. Word draws bullets in the Symbol font (as U+2022 or the
+# private-use U+F0B7), and Symbol is a maths font, so without this every bullet would be
+# an inline equation. Other private-use Symbol code points are Greek letters (U+F061 is
+# alpha) and stay maths; Wingdings bullets are not in a maths font in the first place.
+_BULLET_GLYPHS = frozenset(
+    "\u2022\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u27a2\u2713\u2714\u25ba\u25b8"
+    "\uf0b7"
+)
+_DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")  # bullets at the start of a line, maths elsewhere
 _BULLET = re.compile(
-    r"^(?:[\u2022\u00b7\u25e6\u25aa\u25cf\u2023\u2043\u2219*]\s|\(?\d{1,2}[.)]\s|\([a-z]\)\s"
-    r"|[a-z]\)\s|\([ivx]{1,4}\)\s)"
+    r"^(?:[\u2022\u00b7\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u2219\u22c5\u27a2"
+    r"\u2713\u2714\u25ba\u25b8*]\s|\(?\d{1,2}[.)]\s|\([a-z]\)\s|[a-z]\)\s|\([ivx]{1,4}\)\s)"
 )
 _LANG = re.compile(r"^[A-Za-z]{2,3}(?:-[A-Za-z0-9]{1,8})*$")
 _JUNK_TITLE = re.compile(
@@ -115,7 +159,16 @@ _JUNK_TITLE = re.compile(
     r"|slide\s*\d+$|title$|no title$)|\.(?:pdf|docx?|pptx?|tex|odt|rtf|txt|html?|key)$",
     re.IGNORECASE,
 )
-_INVISIBLE = dict.fromkeys(map(ord, "\u00ad\u200b\u200c\u200d\u2060\ufeff"))
+# Applied to every piece of text taken from the document: invisible characters go; the
+# inline-marker brackets (core.types.INLINE_MARKER) become look-alike white square
+# brackets, so text in the PDF cannot fake a marker (layout is the only producer of
+# markers); Word's private-use Symbol bullet becomes U+2022.
+_TEXT_MAP: dict[int, str | None] = {
+    **dict.fromkeys(map(ord, "\u00ad\u200b\u200c\u200d\u2060\ufeff")),
+    ord("\u27e6"): "\u301a",
+    ord("\u27e7"): "\u301b",
+    ord("\uf0b7"): "\u2022",
+}
 
 # Character classes for maths detection. Symbols that only occur in maths (signs such as
 # the minus are in _SIGNS: in a text font they also print dashes and option flags):
@@ -194,14 +247,25 @@ def analyze(
     `index` counts from 0 per page in reading order; an inline equation comes right after
     the paragraph that contains it. `Element.order` is the position in the whole document.
     Pages are analysed in ascending order (duplicates ignored). Raises `LayoutError`.
+
+    The selected pages are first rendered once in a child process (see `_probe_pages`);
+    the document is opened for this call only and closed again, so analysis leaves no
+    user content in this module (only `crop` caches documents).
     """
     with _LOCK:
-        doc = _document(pdf_bytes)
-        selected = _select_pages(doc.page_count, pages, max_pages)
+        _quiet_mupdf()
         try:
-            return _analyze_document(doc, selected)
-        except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content streams
-            raise LayoutError("unreadable", "the PDF could not be parsed") from exc
+            doc = _open(pdf_bytes)
+            try:
+                selected = _select_pages(doc.page_count, pages, max_pages)
+                _ensure_probed(pdf_bytes, _digest(pdf_bytes), selected)
+                return _analyze_document(doc, selected)
+            except (RuntimeError, pymupdf.mupdf.FzErrorBase) as exc:  # damaged content
+                raise LayoutError("unreadable", "the PDF could not be parsed") from exc
+            finally:
+                doc.close()
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store quotes PDF content
 
 
 def crop(
@@ -217,43 +281,46 @@ def crop(
     The region is `element.bbox` grown by `pad` points on every side and clipped to the
     page, rendered at `dpi` on a white background, then scaled down if its long side would
     exceed `max_side_px`. Opened documents are cached (see `release`), so cropping every
-    element of one PDF parses it once. Safe to call from several threads, but calls are
-    serialised by the module lock, so there is nothing to gain from a thread pool here.
+    element of one PDF parses it once. A page is only rendered here after it rendered in a
+    child process (`analyze` already did that for the pages it analysed). Safe to call from
+    several threads, but calls are serialised by the module lock, so there is nothing to
+    gain from a thread pool here.
     """
     if dpi <= 0 or pad < 0 or max_side_px < 16:
         raise ValueError("crop needs dpi > 0, pad >= 0 and max_side_px >= 16")
     with _LOCK:
-        doc = _document(pdf_bytes)
-        if not 0 <= element.page < doc.page_count:
-            raise ValueError(f"element page {element.page} is not in the PDF")
-        page = doc[element.page]
-        x0, y0, x1, y1 = element.bbox
-        clip = pymupdf.Rect(x0 - pad, y0 - pad, x1 + pad, y1 + pad) & page.rect
-        if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
-            raise ValueError("element region is empty or outside the page")
-        # MuPDF rounds the clip outwards to whole pixels, so leave one pixel of headroom.
-        zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
-        pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
-        if max(pixmap.width, pixmap.height) > max_side_px:  # defensive; rounding only
-            zoom *= (max_side_px - 1) / max(pixmap.width, pixmap.height)
+        _quiet_mupdf()
+        try:
+            key, doc = _CACHE.document(pdf_bytes)
+            if not 0 <= element.page < doc.page_count:
+                raise ValueError(f"element page {element.page} is not in the PDF")
+            _ensure_probed(pdf_bytes, key, [element.page])
+            page = doc[element.page]
+            x0, y0, x1, y1 = element.bbox
+            clip = pymupdf.Rect(x0 - pad, y0 - pad, x1 + pad, y1 + pad) & page.rect
+            if clip.is_empty or clip.width < 0.5 or clip.height < 0.5:
+                raise ValueError("element region is empty or outside the page")
+            # MuPDF rounds the clip outwards to whole pixels, so leave one pixel of headroom.
+            zoom = min(dpi / 72.0, (max_side_px - 1) / max(clip.width, clip.height))
             pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
-        return pixmap.tobytes("png")
+            if max(pixmap.width, pixmap.height) > max_side_px:  # defensive; rounding only
+                zoom *= (max_side_px - 1) / max(pixmap.width, pixmap.height)
+                pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+            return pixmap.tobytes("png")
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()
 
 
 def release(pdf_bytes: bytes | None = None) -> None:
     """Drop a cached document (or all of them with no argument).
 
-    The cache holds the PDF bytes and the parsed document. The pipeline should release a
-    document when its job finishes so user content does not linger in process memory.
+    The cache holds the PDF bytes and the parsed document of recent `crop` calls. Entries
+    also expire on their own after `DOCUMENT_CACHE_TTL_S` without use, but the pipeline
+    should release a document as soon as its job finishes (in a `finally`), so user
+    content does not linger in process memory.
     """
     with _LOCK:
-        if pdf_bytes is None:
-            keys = list(_CACHE)
-        else:
-            keys = [k for k, v in _CACHE.items() if v.data is pdf_bytes]
-            keys = keys or [k for k in [_digest(pdf_bytes)] if k in _CACHE]
-        for key in keys:
-            _CACHE.pop(key).doc.close()
+        _CACHE.release(pdf_bytes)
 
 
 def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
@@ -312,41 +379,220 @@ def section_number(text: str) -> tuple[int, bool] | None:
     return 1, len(num) == 1 and num not in "IVX" and not prefix
 
 
+# Words that make "12 Metres", "2.5 Kilograms" or "10 October 2026" a quantity or a date,
+# not a numbered section title.
+_QUANTITY_WORDS = frozenset(
+    (
+        *("metre", "meter", "kilometre", "kilometer", "centimetre", "centimeter"),
+        *("millimetre", "millimeter", "gram", "kilogram", "second", "minute", "hour"),
+        *("day", "week", "month", "year", "newton", "joule", "watt", "volt", "ampere", "amp"),
+        *("kelvin", "degree", "litre", "liter", "percent", "mile", "foot", "feet", "inch"),
+        *("inches", "pound", "ounce"),
+        *("january", "february", "march", "april", "may", "june", "july", "august"),
+        *("september", "october", "november", "december"),
+        *("jan", "feb", "mar", "apr", "jun", "jul", "aug", "sep", "sept", "oct", "nov", "dec"),
+    )
+)
+
+
+def section_heading_number(text: str) -> bool:
+    """Does `text` start like a numbered section title, not a quantity, date or list item?
+
+    Body-size headings need this before a number counts as strong evidence: "2.3 Units of
+    Speed", "Chapter 2 Motion", "IV. Results" pass; "2 kg", "12 Metres", "0.5 s",
+    "10 October 2026", "9.8 metres per second" and "1. Measure the ramp" do not. A bare
+    integer needs a prefix word ("Chapter 3"); a decimal must not start with "0." and
+    must be followed by a capitalised word that is not a unit or a month.
+    """
+    match = SECTION_NUMBER.match(text.strip())
+    if not match:
+        return False
+    num, sep, prefix = match["num"], match["sep"], match["prefix"]
+    if not prefix:
+        if num[0].isdigit() and ("." not in num or num.startswith("0")):
+            return False  # "2 kg", "12 Metres", "0.5 s"; "1." is a list item
+        if not num[0].isdigit() and (not sep or sep == ")" or (len(num) == 1 and num not in "IVX")):
+            return False  # "A) Units", "B. Smith"
+    words = text.strip()[match.end() :].split()
+    if not words:
+        return bool(prefix)  # "Chapter 2" on its own line
+    first = words[0].strip("\"'(“")
+    letters = sum(c.isalpha() for c in " ".join(words))
+    if not first[:1].isupper() or letters < 3:
+        return False
+    stem = "".join(c for c in first.lower() if c.isalpha())
+    unit = stem in _QUANTITY_WORDS or stem.rstrip("s") in _QUANTITY_WORDS
+    after = words[1] if len(words) > 1 else ""
+    return not (unit and not after[:1].isupper())  # "Second Law" is a title, "Seconds for" not
+
+
 # ============================================================================ documents
+
+
+def _quiet_mupdf() -> None:
+    """Stop MuPDF printing parser errors and warnings to stdout. Hold `_LOCK`.
+
+    They quote content-stream tokens and resource names from the PDF ("unknown keyword:
+    'Jane...'"), and stdout goes to the service logs (privacy rule 1). The switch is
+    process-wide, so it is set again on every call in case other code turned it back on.
+    """
+    pymupdf.TOOLS.mupdf_display_errors(False)
+    pymupdf.TOOLS.mupdf_display_warnings(False)
 
 
 @dataclass
 class _Cached:
     data: bytes
     doc: pymupdf.Document
+    used: float  # time.monotonic() of the last use
 
 
-_CACHE: OrderedDict[str, _Cached] = OrderedDict()
+class _DocumentCache:
+    """Opened documents for `crop`, at most `DOCUMENT_CACHE_SIZE`, each closed after
+    `DOCUMENT_CACHE_TTL_S` without use. Every method expects the caller to hold `_LOCK`.
+
+    The expiry runs on a daemon timer, so a long-lived worker that goes idle after a job
+    does not keep that job's PDF in memory until the next request comes along.
+    """
+
+    def __init__(self) -> None:
+        self.entries: OrderedDict[str, _Cached] = OrderedDict()
+        self.timer: threading.Timer | None = None
+        self.due = 0.0  # time.monotonic() at which the pending timer fires
+
+    def __len__(self) -> int:
+        return len(self.entries)
+
+    def document(self, pdf_bytes: bytes) -> tuple[str, pymupdf.Document]:
+        """(SHA-256 key, opened document) for these bytes, opening them if needed.
+
+        Identity is checked first (the pipeline passes the same bytes object to every
+        crop, so no hashing is needed); equal bytes from another object are found by hash.
+        """
+        now = time.monotonic()
+        self.expire(now)
+        key = next((k for k, e in self.entries.items() if e.data is pdf_bytes), None)
+        if key is None:
+            key = _digest(pdf_bytes)
+        entry = self.entries.get(key)
+        if entry is None:
+            entry = _Cached(pdf_bytes, _open(pdf_bytes), now)
+            self.entries[key] = entry
+            while len(self.entries) > DOCUMENT_CACHE_SIZE:
+                self.entries.popitem(last=False)[1].doc.close()
+        entry.used = now
+        self.entries.move_to_end(key)
+        self.schedule()
+        return key, entry.doc
+
+    def release(self, pdf_bytes: bytes | None) -> None:
+        if pdf_bytes is None:
+            keys = list(self.entries)
+        else:
+            keys = [k for k, e in self.entries.items() if e.data is pdf_bytes]
+            keys = keys or [k for k in [_digest(pdf_bytes)] if k in self.entries]
+        for key in keys:
+            self.entries.pop(key).doc.close()
+
+    def expire(self, now: float) -> None:
+        for key in [k for k, e in self.entries.items() if now - e.used >= DOCUMENT_CACHE_TTL_S]:
+            self.entries.pop(key).doc.close()
+
+    def schedule(self) -> None:
+        """Make sure a timer fires when the least recently used entry expires."""
+        if not self.entries:
+            return
+        due = min(e.used for e in self.entries.values()) + DOCUMENT_CACHE_TTL_S + 0.05
+        if self.timer is not None:
+            if self.due <= due:
+                return  # it fires in time; anything not yet expired is rescheduled then
+            self.timer.cancel()
+        self.due = due
+        self.timer = threading.Timer(max(0.0, due - time.monotonic()), self._on_timer)
+        self.timer.daemon = True
+        self.timer.start()
+
+    def _on_timer(self) -> None:
+        with _LOCK:
+            if self.timer is threading.current_thread():  # not a timer cancelled too late
+                self.timer = None
+            self.expire(time.monotonic())
+            self.schedule()
+
+
+_CACHE = _DocumentCache()
 
 
 def _digest(pdf_bytes: bytes) -> str:
     return hashlib.sha256(pdf_bytes).hexdigest()
 
 
-def _document(pdf_bytes: bytes) -> pymupdf.Document:
-    """Opened document for these bytes, from the cache when possible. Hold `_LOCK`.
+# Pages that rendered in a child process, by document hash (hashes only, no content).
+_PROBED: OrderedDict[str, set[int]] = OrderedDict()
+PROBED_MEMORY = 64  # documents remembered
 
-    Identity is checked first (the pipeline passes the same bytes object to every crop,
-    so no hashing is needed); equal bytes from another object are found by SHA-256.
+# Runs in a fresh interpreter: open the PDF from stdin, then extract and render each page
+# the way analyze and crop will. Python errors are fine (the parent handles them); only a
+# crash (MuPDF aborting the process) or a hang matters, so they are swallowed per page.
+_PROBE_SCRIPT = """
+import sys
+import pymupdf
+pymupdf.TOOLS.mupdf_display_errors(False)
+pymupdf.TOOLS.mupdf_display_warnings(False)
+doc = pymupdf.open(stream=sys.stdin.buffer.read(), filetype="pdf")
+zoom = float(sys.argv[2])
+for number in map(int, sys.argv[1].split(",")):
+    try:
+        page = doc[number]
+        page.get_text("rawdict", flags=int(sys.argv[3]))
+        page.get_cdrawings()
+        page.get_image_info()
+        page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), alpha=False)
+    except Exception:
+        pass
+sys.stdout.write("ok")
+"""
+
+
+def _ensure_probed(pdf_bytes: bytes, key: str, pages: list[int]) -> None:
+    """Probe the pages of this document that have not passed a probe yet. Hold `_LOCK`."""
+    done = _PROBED.get(key, set())
+    todo = [page for page in pages if page not in done]
+    if todo:
+        _probe_pages(pdf_bytes, todo)
+        _PROBED[key] = done | set(todo)
+    if key in _PROBED:
+        _PROBED.move_to_end(key)
+    while len(_PROBED) > PROBED_MEMORY:
+        _PROBED.popitem(last=False)
+
+
+def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
+    """Extract and render `pages` in a child process; LayoutError("unreadable") if it dies.
+
+    Some damaged PDFs make MuPDF abort the whole process (a glibc double free while
+    building a page's display list) although they open and parse without an error. In the
+    worker, that would take the web server down with it, and again on every retry of the
+    job. A page that rendered in a child renders here too: MuPDF is deterministic. The
+    child's output is discarded (its error messages may quote the PDF).
     """
-    for key, entry in _CACHE.items():
-        if entry.data is pdf_bytes:
-            _CACHE.move_to_end(key)
-            return entry.doc
-    key = _digest(pdf_bytes)
-    if key in _CACHE:
-        _CACHE.move_to_end(key)
-        return _CACHE[key].doc
-    doc = _open(pdf_bytes)
-    _CACHE[key] = _Cached(pdf_bytes, doc)
-    while len(_CACHE) > DOCUMENT_CACHE_SIZE:
-        _CACHE.popitem(last=False)[1].doc.close()
-    return doc
+    command = [
+        sys.executable,
+        "-I",  # isolated: no PYTHON* variables, user site or current directory on the path
+        "-c",
+        _PROBE_SCRIPT,
+        ",".join(map(str, pages)),
+        str(PROBE_ZOOM),
+        str(TEXT_FLAGS),
+    ]
+    try:
+        result = subprocess.run(
+            command, input=pdf_bytes, capture_output=True, timeout=PROBE_TIMEOUT_S, check=False
+        )
+    except subprocess.TimeoutExpired:
+        raise LayoutError("unreadable", "the PDF took too long to render") from None
+    if result.returncode != 0 or result.stdout != b"ok":
+        raise LayoutError("unreadable", "the PDF could not be rendered")
 
 
 def _open(pdf_bytes: bytes) -> pymupdf.Document:
@@ -434,10 +680,11 @@ class _Char:
         """Maths whatever the context: maths font, math-italic letter, Greek, symbol.
 
         A minus or plus-minus sign in a text font is not enough on its own: groff prints
-        command-line options as "\u2212d", and dashes come out as minus signs too.
+        command-line options as "\u2212d", and dashes come out as minus signs too. List
+        bullets are never maths, even in the Symbol font Word draws them in.
         """
         c = self.c
-        if self.blank:
+        if self.blank or c in _BULLET_GLYPHS:
             return False
         if _font_traits(self.font)[2]:
             return True
@@ -496,8 +743,9 @@ def _rounded(box: BBox) -> BBox:
 
 
 def _clean(text: str) -> str:
-    """Whitespace collapsed, soft hyphens/zero-width/control characters removed."""
-    text = text.translate(_INVISIBLE)
+    """Whitespace collapsed, soft hyphens/zero-width/control characters removed, marker
+    brackets neutralised (`_TEXT_MAP`)."""
+    text = text.translate(_TEXT_MAP)
     text = "".join(c for c in text if c.isspace() or unicodedata.category(c) != "Cc")
     return " ".join(text.split())
 
@@ -511,6 +759,7 @@ class _Row:
 
     chars: list[_Char]
     vertical: bool = False  # rotated text: never merged with other rows
+    diagonal: bool = False  # ... at an angle that is not a multiple of 90 degrees
     column: str = "L"  # "L", "R" or "S" (spans both columns / single-column page)
     kind: str = "text"  # "math" | "frag" | "text", see _classify_row
     score: float = 0.0
@@ -632,7 +881,8 @@ def _page_rows(page: pymupdf.Page) -> list[_Row]:
                         _Char(ch["c"], *box, baseline=origin[1], size=size, font=font, flags=flags)
                     )
             if any(not c.blank for c in chars):
-                rows.append(_Row(chars, vertical=abs(dy) > 0.2 or dx < 0))
+                vertical = abs(dy) > 0.2 or dx < 0
+                rows.append(_Row(chars, vertical, diagonal=abs(dx) > 0.2 and abs(dy) > 0.2))
     return rows
 
 
@@ -681,19 +931,30 @@ def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> l
 
 
 def _attach_scripts(rows: list[_Row]) -> list[_Row]:
-    """Fold small sub/superscript fragments into the row they belong to."""
+    """Fold small sub/superscript fragments into the row they belong to.
+
+    Hosts are looked up in a vertical window around each fragment (rows are sorted by
+    top edge), in the same order a full scan would visit them.
+    """
     rows = sorted(rows, key=lambda r: (r.y0, r.x0))
+    tops = [r.y0 for r in rows]
+    tallest = max((r.height for r in rows if not r.vertical), default=0.0)  # hosts only
+    largest = max((r.size for r in rows), default=0.0)
     merged: dict[int, _Row] = {}
     dropped: set[int] = set()
     for i, small in enumerate(rows):
         if small.vertical or len(small.clean) > 12 or i in merged:
             continue
         best = None
-        for j, host in enumerate(rows):
+        centre = (small.y0 + small.y1) / 2
+        # A host's box grows when a script joins it, by at most about one font size.
+        lo = bisect.bisect_left(tops, centre - 2 * tallest - 2 * largest)
+        hi = bisect.bisect_right(tops, centre + 2 * largest)
+        for j in range(lo, hi):
+            host = rows[j]
             if j == i or j in dropped or host.vertical or small.size > SCRIPT_RATIO * host.size:
                 continue
             host = merged.get(j, host)
-            centre = (small.y0 + small.y1) / 2
             near_y = host.y0 - 0.5 * host.size <= centre <= host.y1 + 0.5 * host.size
             near_x = host.x0 - host.size <= small.x0 and small.x1 <= host.x1 + 2 * host.size
             if near_y and near_x and host.column == small.column:
@@ -714,8 +975,8 @@ def _norm_margin(text: str) -> str:
     return re.sub(r"\d+", "#", " ".join(text.lower().split()))
 
 
-def _margin_zone(row: _Row, height: float) -> str | None:
-    centre = (row.y0 + row.y1) / 2
+def _box_zone(box: BBox, height: float) -> str | None:
+    centre = (box[1] + box[3]) / 2
     if centre <= height * MARGIN_BAND:
         return "top"
     if centre >= height * (1 - MARGIN_BAND):
@@ -723,22 +984,61 @@ def _margin_zone(row: _Row, height: float) -> str | None:
     return None
 
 
+def _margin_zone(row: _Row, height: float) -> str | None:
+    return _box_zone(row.bbox, height)
+
+
 def _is_page_number(text: str) -> bool:
     return bool(PAGE_NUMBER.match(text.strip(" -\u2013\u2014|")))
 
 
+def _box_key(box: BBox) -> tuple[int, int, int, int]:
+    return round(box[0]), round(box[1]), round(box[2]), round(box[3])
+
+
+def _rotated_key(row: _Row) -> tuple[str, int, int]:
+    """Same text near the same place: a watermark or a stamp repeated on every page."""
+    return _norm_margin(row.clean), round((row.x0 + row.x1) / 40), round((row.y0 + row.y1) / 40)
+
+
 @dataclass
 class _MarginFilter:
-    """Running headers/footers: margin text that repeats across pages, plus page numbers."""
+    """What repeats on the pages and is not content: running headers and footers, page
+    numbers, logos in the header/footer band, watermarks.
 
-    repeated: set[tuple[str, str]]
+    Margin text is dropped when its digit-normalised text repeats in the same band, unless
+    it stands out (larger than body text, or bold) and its digits change from page to page:
+    "Problem 3 (15 points)" in 14 pt at the top of each page is a heading, "Notes - page 3"
+    in 9 pt is a running header.
+    """
+
+    repeated: set[tuple[str, str]]  # (zone, normalised text)
+    fixed: set[tuple[str, str]]  # ... of those, the ones whose text never changes
+    rotated: set[tuple[str, int, int]]  # rotated text repeated at the same place
+    figures: set[tuple[str, tuple[int, int, int, int]]]  # (zone, box) of band figures
+    body: float
 
     def drops(self, row: _Row, height: float) -> bool:
+        if row.vertical:
+            if row.diagonal and row.size >= WATERMARK_RATIO * self.body:
+                return True  # a large diagonal "DRAFT" across the page
+            if _rotated_key(row) in self.rotated:
+                return True
         zone = _margin_zone(row, height)
         if zone is None:
             return False
         text = row.clean
-        return _is_page_number(text) or (zone, _norm_margin(text)) in self.repeated
+        if _is_page_number(text):
+            return True
+        key = (zone, _norm_margin(text))
+        if key not in self.repeated:
+            return False
+        prominent = row.size >= HEADING_SIZE_RATIO * self.body or row.bold
+        return key in self.fixed or not prominent
+
+    def drops_figure(self, box: BBox, height: float) -> bool:
+        zone = _box_zone(box, height)
+        return zone is not None and (zone, _box_key(box)) in self.figures
 
 
 def _reference_pages(page_count: int, selected: list[int]) -> list[int]:
@@ -754,23 +1054,64 @@ def _reference_pages(page_count: int, selected: list[int]) -> list[int]:
     return sorted(chosen)
 
 
+def _band_figures(page: pymupdf.Page, paths: list[_Path]) -> set[tuple[str, tuple]]:
+    """(zone, rounded box) of the figures a page has in its header/footer band."""
+    rect, height = page.rect, page.rect.height
+    band_paths = [p for p in paths if _box_zone(p.bbox, height) is not None]
+    figures = _merge_figures(_raster_figures(page, rect) + _vector_figures(band_paths, [], rect))
+    keys = set()
+    for figure in figures:
+        zone = _box_zone(figure.bbox, height)
+        if zone is not None:
+            keys.add((zone, _box_key(figure.bbox)))
+    return keys
+
+
 def _margin_filter(
-    doc: pymupdf.Document, selected: list[int], frags: dict[int, list[_Row]]
+    doc: pymupdf.Document,
+    selected: list[int],
+    frags: dict[int, list[_Row]],
+    paths: dict[int, list[_Path]],
 ) -> _MarginFilter:
     reference = _reference_pages(doc.page_count, selected)
-    counts: Counter[tuple[str, str]] = Counter()
+    counts: Counter[tuple] = Counter()
+    texts: dict[tuple[str, str], set[str]] = {}
+    sizes: Counter[float] = Counter()
     for number in reference:
+        page = doc[number]
         if number not in frags:
-            frags[number] = _page_rows(doc[number])
-        height = doc[number].rect.height
-        seen = set()
+            frags[number] = _page_rows(page)
+        if number not in paths:
+            paths[number] = _page_paths(page)
+        height = page.rect.height
+        seen: set[tuple] = set()
         for row in frags[number]:
+            if row.vertical:
+                seen.add(("rotated", _rotated_key(row)))
+                continue
             zone = _margin_zone(row, height)
-            if zone is not None:
-                seen.add((zone, _norm_margin(row.clean)))
+            if zone is None:
+                for c in row.ink:
+                    sizes[round(c.size * 2) / 2] += 1
+                continue
+            key = (zone, _norm_margin(row.clean))
+            seen.add(("text", key))
+            texts.setdefault(key, set()).add(row.clean)
+        seen.update(("figure", key) for key in _band_figures(page, paths[number]))
         counts.update(seen)
     needed = max(2, -(-len(reference) // 2))  # at least half of the pages, and two
-    return _MarginFilter({key for key, n in counts.items() if n >= needed})
+    repeated: dict[str, set] = {"text": set(), "rotated": set(), "figure": set()}
+    for (kind, key), n in counts.items():
+        if n >= needed:
+            repeated[kind].add(key)
+    body = max(sizes.items(), key=lambda kv: (kv[1], -kv[0]))[0] if sizes else 10.0
+    return _MarginFilter(
+        repeated=repeated["text"],
+        fixed={key for key in repeated["text"] if len(texts[key]) == 1},
+        rotated=repeated["rotated"],
+        figures=repeated["figure"],
+        body=max(body, 1.0),
+    )
 
 
 # ============================================================================ columns
@@ -791,20 +1132,26 @@ def _find_gutter(boxes: list[BBox]) -> tuple[float, float] | None:
     if width < 150:
         return None
     narrow = [b for b in boxes if b[2] - b[0] <= 0.55 * width]
+    events = sorted([(b[0], 1) for b in narrow] + [(b[2], -1) for b in narrow])
     # Strictest first: with crossings allowed, the gap would also take in the ragged ends
-    # of the longest left-column lines.
-    for allowed in range(max(2, len(narrow) // 10) + 1):
-        gutter = _gutter_with(narrow, allowed, left, width)
+    # of the longest left-column lines. A gutter crossed by more than MAX_GUTTER_CROSSINGS
+    # lines is no gutter (and the cap keeps a page of thousands of rows linear).
+    for allowed in range(min(max(2, len(narrow) // 10), MAX_GUTTER_CROSSINGS) + 1):
+        gutter = _gutter_with(narrow, events, allowed, left, width)
         if gutter is not None:
             return gutter
     return None
 
 
 def _gutter_with(
-    narrow: list[BBox], allowed: int, left: float, width: float
+    narrow: list[BBox],
+    events: list[tuple[float, int]],
+    allowed: int,
+    left: float,
+    width: float,
 ) -> tuple[float, float] | None:
     best: tuple[float, float] | None = None
-    for gap0, gap1 in _sparse_intervals(narrow, allowed):
+    for gap0, gap1 in _sparse_intervals(events, allowed):
         middle = (gap0 + gap1) / 2
         if gap1 - gap0 < MIN_GUTTER or not left + 0.25 * width <= middle <= left + 0.75 * width:
             continue
@@ -825,9 +1172,9 @@ def _gutter_with(
     return best
 
 
-def _sparse_intervals(boxes: list[BBox], allowed: int) -> list[tuple[float, float]]:
-    """Maximal x-intervals covered by at most `allowed` of the boxes."""
-    events = sorted([(b[0], 1) for b in boxes] + [(b[2], -1) for b in boxes])
+def _sparse_intervals(events: list[tuple[float, int]], allowed: int) -> list[tuple[float, float]]:
+    """Maximal x-intervals covered by at most `allowed` boxes, from sorted box edges
+    ((x0, +1) and (x1, -1) per box)."""
     intervals: list[tuple[float, float]] = []
     depth, start = 0, None
     for x, step in events:
@@ -862,49 +1209,91 @@ def _column_of(box: BBox, gutter: tuple[float, float] | None) -> str:
 def _reading_order(
     boxes: Sequence[BBox],
     gutter: tuple[float, float] | None,
-    bridge: float,
+    body: float,
     context: Sequence[BBox] = (),
 ) -> list[int]:
     """Indices of `boxes` in reading order.
 
     Two columns: left column, then right column, segment by segment, where full-width
-    items (crossing the gutter, or with nothing beside them in the other column but more
-    of that column below) close a segment. `context` boxes (e.g. figures while ordering
-    text) shape the column extents but are not returned.
+    items close a segment: items crossing the gutter, and narrow items at a section break
+    across both columns (see `_section_break`). `context` boxes (e.g. figures while
+    ordering text) shape the column extents but are not returned.
     """
     if gutter is None:
         return _top_down(boxes, range(len(boxes)))
     everything = list(boxes) + list(context)
     columns = [_column_of(b, gutter) for b in everything]
-    bands = {
-        side: _bands([b for b, c in zip(everything, columns, strict=True) if c == side], bridge)
+    sides = {
+        side: _ColumnExtent(
+            [b for b, c in zip(everything, columns, strict=True) if c == side], body
+        )
         for side in ("L", "R")
     }
     for i, (box, column) in enumerate(zip(everything, columns, strict=True)):
-        if column == "S":
-            continue
-        other = bands["R" if column == "L" else "L"]
-        beside = any(box[1] < y1 and box[3] > y0 for y0, y1 in other)
-        below = any(y0 >= box[3] for y0, _ in other)
-        if not beside and below:
+        if column != "S" and _section_break(
+            box, sides[column], sides["R" if column == "L" else "L"], body
+        ):
             columns[i] = "S"
     spanning = sorted(
         (i for i in range(len(boxes)) if columns[i] == "S"),
         key=lambda i: (boxes[i][1], boxes[i][0]),
     )
     starts = [boxes[i][1] for i in spanning]
+    segments: dict[tuple[int, str], list[int]] = {}
+    for i in range(len(boxes)):
+        if columns[i] != "S":
+            segment = bisect.bisect_right(starts, boxes[i][1])
+            segments.setdefault((segment, columns[i]), []).append(i)
     order: list[int] = []
     for segment in range(len(spanning) + 1):
         for side in ("L", "R"):
-            members = [
-                i
-                for i in range(len(boxes))
-                if columns[i] == side and sum(s <= boxes[i][1] for s in starts) == segment
-            ]
-            order.extend(_top_down(boxes, members))
+            order.extend(_top_down(boxes, segments.get((segment, side), [])))
         if segment < len(spanning):
             order.append(spanning[segment])
     return order
+
+
+class _ColumnExtent:
+    """Where one column has content: bridged bands, plus item tops and bottoms."""
+
+    def __init__(self, boxes: list[BBox], body: float) -> None:
+        self.bands = _bands(boxes, 2.0 * body)
+        self.band_tops = [y0 for y0, _ in self.bands]
+        self.tops = sorted(b[1] for b in boxes)
+        self.bottoms = sorted(b[3] for b in boxes)
+
+    def overlaps(self, y0: float, y1: float) -> bool:
+        k = bisect.bisect_left(self.band_tops, y1) - 1  # last band starting above y1
+        return k >= 0 and self.bands[k][1] > y0
+
+    def first_top_from(self, y: float) -> float | None:
+        k = bisect.bisect_left(self.tops, y)
+        return self.tops[k] if k < len(self.tops) else None
+
+    def last_bottom_to(self, y: float) -> float | None:
+        k = bisect.bisect_right(self.bottoms, y)
+        return self.bottoms[k - 1] if k else None
+
+
+def _section_break(box: BBox, own: _ColumnExtent, other: _ColumnExtent, body: float) -> bool:
+    """Is this narrow item really full-width: a heading at a break across both columns?
+
+    The other column must have nothing beside it but more content below, the item must
+    stand apart from its own column's content above (a block gap, not the next line of a
+    paragraph), and both columns must resume below it at about the same height. A
+    heading inside one column, beside a large gap in the other (space around an equation
+    or before a Word "Heading 1"), fails the last test and stays in its column.
+    """
+    if other.overlaps(box[1], box[3]):
+        return False
+    other_below = other.first_top_from(box[3])
+    if other_below is None:
+        return False
+    above = own.last_bottom_to(box[1] + 0.25 * body)
+    if above is not None and box[1] - above < 0.8 * body:
+        return False  # the next line of a paragraph, not a block on its own
+    own_below = own.first_top_from(box[3] - 0.25 * body)
+    return own_below is not None and other_below >= own_below - 0.5 * body
 
 
 def _bands(boxes: list[BBox], bridge: float) -> list[tuple[float, float]]:
@@ -919,7 +1308,12 @@ def _bands(boxes: list[BBox], bridge: float) -> list[tuple[float, float]]:
 
 
 def _top_down(boxes: Sequence[BBox], members: Iterable[int]) -> list[int]:
-    """Top to bottom; items overlapping vertically by half their height go left to right."""
+    """Top to bottom; items overlapping vertically by half their height go left to right.
+
+    Only items of comparable height share a line: a tall box (a panel or figure with text
+    inside or beside it) would otherwise pull everything it spans into one "line" and
+    order it by x instead of top to bottom.
+    """
     ordered = sorted(members, key=lambda i: (boxes[i][1], boxes[i][0]))
     lines: list[list[int]] = []
     for i in ordered:
@@ -928,7 +1322,8 @@ def _top_down(boxes: Sequence[BBox], members: Iterable[int]) -> list[int]:
             box = boxes[i]
             overlap = min(anchor[3], box[3]) - max(anchor[1], box[1])
             smaller = min(anchor[3] - anchor[1], box[3] - box[1])
-            if smaller > 0 and overlap >= 0.5 * smaller:
+            larger = max(anchor[3] - anchor[1], box[3] - box[1])
+            if smaller > 0 and overlap >= 0.5 * smaller and larger <= 3 * smaller:
                 lines[-1].append(i)
                 continue
         lines.append([i])
@@ -966,6 +1361,13 @@ class _CharInfo:
     @classmethod
     def of(cls, row: _Row) -> _CharInfo:
         classes = [_char_class(c) for c in row.chars]
+        first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
+        if (
+            first is not None
+            and row.chars[first].c in _DOT_BULLETS
+            and (first + 1 == len(row.chars) or row.chars[first + 1].blank)
+        ):
+            classes[first] = "P"  # "\u00b7 Measure the ramp": a bullet, not a product
         script = [
             not c.blank and (c.size < SCRIPT_RATIO * row.size or bool(c.flags & _SUPERSCRIPT_FLAG))
             for c in row.chars
@@ -1009,6 +1411,8 @@ def _classify_row(row: _Row) -> None:
     prose = _prose_words(row, info)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
+    elif EQUATION_NUMBER.match(text) or BARE_EQUATION_NUMBER.match(text):
+        row.kind = "frag"  # "(2.4)", "Eq. 2.4", "2.4": maths only beside an equation
     elif prose == 0 and row.score >= EQUATION_THRESHOLD and ratio >= 0.5:
         row.kind = "math"
     elif prose == 0 and ratio >= 0.6 and len(ink) <= 40:
@@ -1178,15 +1582,20 @@ def _page_paths(page: pymupdf.Page) -> list[_Path]:
         items = drawing.get("items") or []
         segments = []
         curved = False
+        straight = 0.0  # length of horizontal and vertical lines
         for item in items:
             if item[0] == "l":
                 (px, py), (qx, qy) = display.point(*item[1]), display.point(*item[2])
                 segments.append((px, py, qx, qy))
                 if abs(px - qx) > 0.5 and abs(py - qy) > 0.5:
                     curved = True
+                else:
+                    straight += abs(px - qx) + abs(py - qy)
             elif item[0] == "c":
                 curved = True
         width, height = box[2] - box[0], box[3] - box[1]
+        if curved and straight >= 0.6 * 2 * (width + height):
+            curved = False  # a rounded rectangle (a callout box): its corners are not a plot
         if height <= RULE_THICKNESS and width >= 3:
             kind = "hrule"
         elif width <= RULE_THICKNESS and height >= 3:
@@ -1216,11 +1625,28 @@ def _radical_like(
     return bar and steep
 
 
-def _rule_rows(rule: _Path, rows: list[_Row]) -> list[_Row]:
+class _RowIndex:
+    """Rows sorted by top edge, for finding rows within a vertical window quickly."""
+
+    def __init__(self, rows: list[_Row]) -> None:
+        self.rows = sorted(rows, key=lambda r: r.y0)
+        self.tops = [r.y0 for r in self.rows]
+        self.tallest = max((r.height for r in self.rows), default=0.0)
+        self.largest = max((r.size for r in self.rows), default=0.0)  # font size
+
+    def near(self, y0: float, y1: float) -> list[_Row]:
+        """Rows whose vertical extent meets [y0, y1]."""
+        lo = bisect.bisect_left(self.tops, y0 - self.tallest)
+        hi = bisect.bisect_right(self.tops, y1)
+        return [r for r in self.rows[lo:hi] if r.y1 >= y0]
+
+
+def _rule_rows(rule: _Path, index: _RowIndex) -> list[_Row]:
     """Maths rows touching a rule: above/below a fraction bar or under a radical."""
     x0, y0, x1, y1 = rule.bbox
     near = []
-    for row in rows:
+    reach = 0.8 * index.largest  # the furthest a touching row can be (see below)
+    for row in index.near(y0 - reach, y1 + reach):
         if row.kind not in ("math", "frag") or row.absorbed:
             continue
         # Half of the shorter one: a numerator sits on its bar, a bar sits over a radicand.
@@ -1242,12 +1668,16 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
     maths row (or fragments on both sides of a bar), or when it is vertically adjacent to
     a maths row (exponent rows, limits, an equation number on the same line). Others
     become text again (a lone "12 m/s." line is prose).
+
+    Attachment spreads breadth-first from the maths rows through a vertical index, so a
+    page full of short numeric rows costs about n log n, not a pass per row.
     """
     mathish = [r for r in rows if r.kind in ("math", "frag") and not r.absorbed]
+    index = _RowIndex(mathish)
     attached = {id(r) for r in mathish if r.kind == "math"}
     used: list[_Path] = []
     for rule in rules:
-        near = _rule_rows(rule, mathish)
+        near = _rule_rows(rule, index)
         if not near:
             continue
         widest = max(r.x1 - r.x0 for r in near)
@@ -1259,15 +1689,14 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
         if any(r.kind == "math" for r in near) or (above and below) or rule.kind == "radical":
             used.append(rule)
             attached.update(id(r) for r in near)
-    changed = True
-    while changed:
-        changed = False
-        for row in mathish:
-            if id(row) in attached:
-                continue
-            if any(_math_neighbours(row, other) for other in mathish if id(other) in attached):
+    queue = deque(r for r in mathish if id(r) in attached)
+    reach = 0.6 * index.largest  # _math_neighbours' widest vertical gap
+    while queue:
+        source = queue.popleft()
+        for row in index.near(source.y0 - reach, source.y1 + reach):
+            if id(row) not in attached and _math_neighbours(row, source):
                 attached.add(id(row))
-                changed = True
+                queue.append(row)
     for row in mathish:
         if row.kind == "frag":
             row.kind = "math" if id(row) in attached else "text"
@@ -1275,13 +1704,32 @@ def _resolve_fragments(rows: list[_Row], rules: list[_Path]) -> list[_Path]:
 
 
 def _math_neighbours(row: _Row, other: _Row) -> bool:
+    """Does fragment `row` belong with maths row `other`? Vertically adjacent and
+    overlapping in x, or an equation number beside it (`_number_beside`)."""
     size = max(row.size, other.size)
     gap_y = max(row.y0 - other.y1, other.y0 - row.y1)
     gap_x = max(row.x0 - other.x1, other.x0 - row.x1)
     if gap_y <= 0.6 * size and gap_x <= 1.0 * size and gap_y > -0.5 * min(row.height, other.height):
         return True
-    same_line = min(row.y1, other.y1) - max(row.y0, other.y0) >= 0.5 * min(row.height, other.height)
-    return same_line and bool(EQUATION_NUMBER.match(row.clean)) and row.column == other.column
+    return row.column == other.column and _number_beside(row, other.bbox, size)
+
+
+def _number_beside(row: _Row, box: BBox, size: float) -> bool:
+    """Is `row` an equation number for the maths in `box`?
+
+    Its vertical centre must be within half a font size of the maths: numbers sit on the
+    baseline of a one-line equation, or halfway down a fraction (between numerator and
+    denominator, on neither line). "(2.4)" or "Eq. 2.4" may sit on either side; a bare
+    "2.4" counts only to the right of the maths, with a gap.
+    """
+    text = row.clean
+    bare = bool(BARE_EQUATION_NUMBER.match(text))
+    if not bare and not EQUATION_NUMBER.match(text):
+        return False
+    centre = (row.y0 + row.y1) / 2
+    if not box[1] - 0.5 * size <= centre <= box[3] + 0.5 * size:
+        return False
+    return not bare or row.x0 - box[2] >= 1.0 * size
 
 
 # ============================================================================ figures
@@ -1350,6 +1798,7 @@ def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
 def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rect) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables."""
     figures = []
+    index = _RowIndex([r for r in rows if not r.vertical])
     for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
         members = [paths[i] for i in group]
         if all(p.kind in ("hrule", "vrule") for p in members):
@@ -1362,8 +1811,9 @@ def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rec
         if width >= 0.85 * page_rect.width and height >= 0.85 * page_rect.height:
             continue  # page border
         inside = [r for r in rows if _centre_inside(r.bbox, box)]
-        # Curves that matter: a plotted line, or many markers; not one tick icon in a table.
-        curves = [p for p in members if p.curved]
+        # Curves that matter: a plotted line, or many markers; not one tick icon in a table,
+        # nor the round bullets of a list in a panel.
+        curves = [p for p in members if p.curved and not _bullet_mark(p, index)]
         curved = len(curves) >= 3 or any(_area(p.bbox) >= 0.05 * width * height for p in curves)
         bars = [
             p
@@ -1374,6 +1824,20 @@ def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rec
             continue  # a box, shaded panel or table drawn around text
         figures.append(_Figure(box, paths=len(members)))
     return figures
+
+
+def _bullet_mark(path: _Path, index: _RowIndex) -> bool:
+    """A small mark just left of a text row, at its height: a drawn list bullet."""
+    x0, y0, x1, y1 = path.bbox
+    centre = (y0 + y1) / 2
+    for row in index.near(centre, centre):
+        if (
+            max(x1 - x0, y1 - y0) <= 0.8 * row.size
+            and row.y0 <= centre <= row.y1
+            and 0 <= row.x0 - x1 <= 2.5 * row.size
+        ):
+            return True
+    return False
 
 
 def _overlapping(groups: list[list[int]], paths: list[_Path]) -> list[list[int]]:
@@ -1411,27 +1875,69 @@ def _merge_figures(figures: list[_Figure]) -> list[_Figure]:
     return merged
 
 
-def _absorb_labels(figure: _Figure, rows: list[_Row]) -> None:
-    """Text inside a figure, and short labels just outside it, belong to the figure."""
+def _absorb_labels(figure: _Figure, rows: list[_Row], ctx: _Context) -> bool:
+    """Give a figure its labels; False when the "figure" is really a background.
+
+    Short text inside a figure, and short labels just outside it, belong to it. Running
+    text never does: lines of a paragraph inside a figure's box (text set on a backdrop,
+    in a panel, over a watermark logo) stay in the reading flow, and so does a title-sized
+    line. A raster image with such text on top of it is a background or a watermark, not
+    a figure: it is dropped (nothing absorbed) so its text keeps its place in the outline.
+    """
     x0, y0, x1, y1 = figure.bbox
+    inside: list[_Row] = []
+    near: list[_Row] = []
     for row in rows:
         if row.absorbed or CAPTION.match(row.clean):
             continue
         rx0, ry0, rx1, ry1 = row.bbox
         area = max(1e-6, (rx1 - rx0) * (ry1 - ry0))
         inter = max(0.0, min(rx1, x1) - max(rx0, x0)) * max(0.0, min(ry1, y1) - max(ry0, y0))
-        inside = inter >= 0.6 * area
         short = len(row.clean) <= 25 and row.kind != "math"
         reach = 0.6 * row.size
         beside_y = min(ry1, y1) - max(ry0, y0) >= 0.5 * (ry1 - ry0)
         beside_x = min(rx1, x1) - max(rx0, x0) >= 0.5 * (rx1 - rx0)
         near_x = beside_y and (x0 - reach <= rx1 <= x0 + 1 or x1 - 1 <= rx0 <= x1 + reach)
         near_y = beside_x and (y0 - reach <= ry1 <= y0 + 1 or y1 - 1 <= ry0 <= y1 + reach)
-        if inside or (short and (near_x or near_y)):
+        if inter >= 0.6 * area:
+            inside.append(row)
+        elif short and (near_x or near_y):
+            near.append(row)
+    running = _running_text(inside, ctx)
+    if figure.images and not figure.paths and running:
+        return False
+    for row in [*inside, *near]:
+        if id(row) not in running:
             row.absorbed = True
             figure.labels.append(row)
     if figure.labels:
         figure.bbox = _union([figure.bbox, *(r.bbox for r in figure.labels)])
+    return True
+
+
+def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
+    """Ids of rows that are not labels: lines of a paragraph (a prose line that the next
+    or previous prose line continues) and title-sized lines of several words."""
+    found: set[int] = set()
+    prose = []
+    for row in rows:
+        if row.kind != "text" or row.vertical:
+            continue
+        words = _prose_words(row, _CharInfo.of(row))
+        if words >= 2 and row.size >= HEADING_SIZE_RATIO * ctx.body:
+            found.add(id(row))
+        if words >= 3:
+            prose.append(row)
+    prose.sort(key=lambda r: r.baseline)
+    for i, above in enumerate(prose):
+        for below in prose[i + 1 :]:
+            if below.baseline - above.baseline > 2.0 * max(above.size, below.size):
+                break
+            if below.column == above.column and _continues(
+                above, below, _Run([above], "text", True), ctx
+            ):
+                found.update((id(above), id(below)))
+    return found
 
 
 # ============================================================================ blocks
@@ -1445,10 +1951,31 @@ class _Context:
 
 @dataclass(eq=False)
 class _Run:
+    """Consecutive rows (in reading order) of one paragraph, heading or display equation.
+
+    The extents are kept up to date as rows are added, so growing a run is O(1) per row
+    (a crafted page with thousands of rows in one run must not be quadratic).
+    """
+
     rows: list[_Row]
     kind: str  # "math" | "text"
     block_start: bool  # the run starts after a geometric break, not just a style change
     block_end: bool = True
+    box: BBox = (0.0, 0.0, 0.0, 0.0)  # union of the rows' boxes
+    margin: float = 0.0  # left edge of the rows after the first (the first's when alone)
+
+    def __post_init__(self) -> None:
+        rows, self.rows = self.rows, []
+        for row in rows:
+            self.add(row)
+
+    def add(self, row: _Row) -> None:
+        if not self.rows:
+            self.box, self.margin = row.bbox, row.x0
+        else:
+            self.box = _union([self.box, row.bbox])
+            self.margin = row.x0 if len(self.rows) == 1 else min(self.margin, row.x0)
+        self.rows.append(row)
 
 
 @dataclass(eq=False)
@@ -1479,8 +2006,8 @@ def _heading_sized(row: _Row, ctx: _Context) -> bool:
     return row.size >= HEADING_SIZE_RATIO * ctx.body
 
 
-def _continues(prev: _Row, row: _Row, rows: list[_Row], ctx: _Context) -> bool:
-    """Is `row` the next line of the paragraph whose rows so far are `rows`?"""
+def _continues(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
+    """Is `row` the next line of the paragraph `run`, whose last row is `prev`?"""
     size = prev.size
     if abs(row.size - size) > max(1.0, 0.12 * size):
         return False
@@ -1488,12 +2015,10 @@ def _continues(prev: _Row, row: _Row, rows: list[_Row], ctx: _Context) -> bool:
     limit = max(1.3 * ctx.pitch * size / ctx.body, 1.25 * size)
     if not 0.5 * size <= pitch <= limit:
         return False
-    left = min(r.x0 for r in rows)
-    right = max(r.x1 for r in rows)
+    left, right = run.box[0], run.box[2]
     if row.x0 > right or row.x1 < left or row.x0 < left - 2 * size:
         return False
-    margin = min(r.x0 for r in rows[1:]) if len(rows) > 1 else rows[0].x0
-    if row.x0 - margin >= 0.8 * size and prev.x1 < right - 1.5 * size:
+    if row.x0 - run.margin >= 0.8 * size and prev.x1 < right - 1.5 * size:
         return False  # first-line indent after a short line: a new paragraph
     return not (_BULLET.match(row.clean) or CAPTION.match(row.clean))
 
@@ -1513,15 +2038,15 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             run = runs[-1]
             prev = run.rows[-1]
             if run.kind == "math" and row.kind == "math" and _joins_equation(run, row):
-                run.rows.append(row)
+                run.add(row)
                 continue
-            geometric = run.kind == "text" == row.kind and _continues(prev, row, run.rows, ctx)
+            geometric = run.kind == "text" == row.kind and _continues(prev, row, run, ctx)
             if geometric and _same_style(prev, row, ctx):
-                run.rows.append(row)
+                run.add(row)
                 continue
             run.block_end = not geometric
             ends_sentence = prev.clean[-1:] in ".:?!"
-            short = row.x1 < max(r.x1 for r in run.rows) - 3 * row.size
+            short = row.x1 < run.box[2] - 3 * row.size
             starts = not geometric or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
@@ -1530,17 +2055,22 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
 
 
 def _joins_equation(run: _Run, row: _Row) -> bool:
-    box = _union(r.bbox for r in run.rows)
+    box = run.box
     size = max(row.size, run.rows[-1].size)
     gap_y = row.y0 - box[3]
     horizontal = row.x0 <= box[2] + 3 * size and row.x1 >= box[0] - 3 * size
     same_line = min(row.y1, box[3]) - max(row.y0, box[1]) >= 0.5 * row.height
-    return (gap_y <= 0.8 * size and horizontal) or same_line
+    return (gap_y <= 0.8 * size and horizontal) or same_line or _number_beside(row, box, size)
 
 
 def _title_like(text: str) -> bool:
-    first = next((c for c in text if c.isalnum()), "")
-    return bool(first) and not first.islower() and text[-1:] not in ",;"
+    """Starts like a title: the first word that starts with a letter, after any number
+    ("2 kg", "2.3 Units", "2nd Law"), is not lowercase, and it does not end like a clause."""
+    for word in text.split():
+        first = next((c for c in word if c.isalnum()), "")
+        if first.isalpha():
+            return not first.islower() and text[-1:] not in ",;"
+    return False
 
 
 def _classify_run(run: _Run, ctx: _Context) -> _Block:
@@ -1568,14 +2098,23 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     text = _join_text(rows)
     letters = sum(c.isalpha() for c in text)
     bold = all(r.bold for r in rows)
-    number = section_number(text)
-    evidence: list[str] = []
-    if number:
-        evidence.append(REASON_LIST_NUMBER if number[1] else REASON_NUMBERED)
     ratio = size / ctx.body
+    larger = ratio >= HEADING_SIZE_RATIO
+    # A section number is strong evidence in a large font ("3 Forces" is a chapter title);
+    # at body size only a real section shape counts, not "2 kg", "12 Metres" or a date.
+    number = section_number(text)
+    titled = section_heading_number(text)
+    evidence: list[str] = []
+    if number and number[1]:
+        evidence.append(REASON_LIST_NUMBER)
+    elif number and (larger or titled):
+        evidence.append(REASON_NUMBERED)
+    # Rotated and diagonal text (a watermark, a stamp in the margin) is never a heading.
+    upright = not any(r.vertical for r in rows)
     heading = None
     if (
-        ratio >= HEADING_SIZE_RATIO
+        upright
+        and larger
         and len(rows) <= MAX_HEADING_ROWS
         and len(text) <= MAX_HEADING_CHARS
         and (letters >= 2 or number)
@@ -1584,7 +2123,8 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     elif CAPTION.match(text):
         return _Block("caption", box, rows, text=text, font_size=size)
     elif (
-        bold
+        upright
+        and bold
         and ratio >= 0.95
         and run.block_start
         and len(rows) <= MAX_BOLD_HEADING_ROWS
@@ -1594,14 +2134,13 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     ):
         heading = [REASON_BOLD_BODY, *evidence]
     elif (
-        number
-        and not number[1]
+        upright
+        and titled
         and len(rows) == 1
         and run.block_start
         and run.block_end
         and len(text) <= 80
         and len(text.split()) <= 12
-        and _title_like(text)
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
@@ -1737,7 +2276,7 @@ def _tidy(pieces: list[str | _Inline]) -> list[str | _Inline]:
         if isinstance(piece, _Inline):
             out.append(piece)
             continue
-        text = piece.translate(_INVISIBLE)
+        text = piece.translate(_TEXT_MAP)
         text = "".join(c for c in text if c.isspace() or unicodedata.category(c) != "Cc")
         if i > 0 and text.lstrip()[:1] in tuple(".,;:!?)"):
             text = text.lstrip()  # no space between a marker and "." or ","
@@ -1805,22 +2344,24 @@ def _page_blocks(
     rows: list[_Row],
     gutter: tuple[float, float] | None,
     ctx: _Context,
+    paths: list[_Path],
+    margins: _MarginFilter,
 ) -> _PageBlocks:
     page_rect = page.rect
     for row in rows:
         _classify_row(row)
-    paths = _page_paths(page)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
-    loose = [p for p in paths if not any(p is u for u in used_rules)]
+    used = {id(rule) for rule in used_rules}
+    loose = [p for p in paths if id(p) not in used]
     figures = _merge_figures(
         _raster_figures(page, page_rect) + _vector_figures(loose, rows, page_rect)
     )
-    for figure in figures:
-        _absorb_labels(figure, rows)
+    # A logo repeated in the header or footer band is decoration, like a running header.
+    figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
+    figures = [f for f in figures if _absorb_labels(f, rows, ctx)]
     text_rows = [r for r in rows if not r.absorbed]
-    bridge = 2.0 * ctx.body
-    order = _reading_order([r.bbox for r in text_rows], gutter, bridge, [f.bbox for f in figures])
+    order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, [f.bbox for f in figures])
     ordered = [text_rows[i] for i in order]
     runs = _runs(ordered, ctx)
     blocks = [_classify_run(run, ctx) for run in runs]
@@ -1841,7 +2382,7 @@ def _page_blocks(
                 reasons=figure.reasons,
             )
         )
-    order = _reading_order([b.bbox for b in blocks], gutter, bridge)
+    order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
         if block.kind == Kind.PARAGRAPH:
@@ -1933,14 +2474,20 @@ def _body_and_pitch(rows_by_page: dict[int, list[_Row]]) -> _Context:
 
 def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     frags: dict[int, list[_Row]] = {}
-    margins = _margin_filter(doc, selected, frags)
+    paths: dict[int, list[_Path]] = {}
+    margins = _margin_filter(doc, selected, frags, paths)
     prepared = {}
     for number in selected:
         if number not in frags:
             frags[number] = _page_rows(doc[number])
+        if number not in paths:
+            paths[number] = _page_paths(doc[number])
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
     ctx = _body_and_pitch({n: rows for n, (rows, _) in prepared.items()})
-    pages = [_page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx) for n in selected]
+    pages = [
+        _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins)
+        for n in selected
+    ]
     elements = _to_elements(pages)
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:

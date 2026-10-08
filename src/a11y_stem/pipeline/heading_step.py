@@ -14,6 +14,11 @@ Evidence and confidence (also in docs/layout.md):
 | bold body-size line, or a standalone numbered line | 0.60 | no      |
 | ... plus a section number                         | 0.88 | yes     |
 
+At body size, layout only gives the "numbered section" reason for a real section shape
+(`layout.section_heading_number`: "2.3 Units of Speed", "Chapter 2"; not "2 kg",
+"12 Metres", "0.5 s" or "10 October 2026"), so quantities and dates are never accepted as
+numbered headings.
+
 Penalties: all caps -0.15, fewer than 4 letters -0.20, list-style number ("1.", "A)")
 without a larger font -0.15, outline repaired -0.03. A fix is ACCEPTED only with strong
 evidence and none of the first three penalties, which keeps every accepted heading at

@@ -1,8 +1,12 @@
-"""layout.crop: region rendering, size limits, rotation, the document cache, threads."""
+"""layout.crop: region rendering, size limits, rotation, the document cache, threads, and
+the child-process probe that keeps a crashing PDF from taking the process down."""
 
 from __future__ import annotations
 
+import time
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -114,11 +118,13 @@ def test_repeated_crops_open_the_document_once(monkeypatch):
     assert len(opened) == 1
     crop(bytes(bytearray(data)), element((100, 100, 200, 150)))  # equal bytes, new object
     assert len(opened) == 1
-    analyze(data)  # analysis shares the cache
-    assert len(opened) == 1
-    release(data)
+    analyze(data)  # analysis opens and closes its own copy; it does not fill the cache
+    assert len(opened) == 2 and len(layout._CACHE) == 1
     crop(data, element((100, 100, 200, 150)))
     assert len(opened) == 2
+    release(data)
+    crop(data, element((100, 100, 200, 150)))
+    assert len(opened) == 3
 
 
 def test_the_cache_is_bounded_and_can_be_emptied():
@@ -170,3 +176,97 @@ def test_crop_reports_unreadable_and_encrypted_pdfs_like_analyze():
     with pytest.raises(LayoutError) as exc:
         crop(locked, element((0, 0, 10, 10)))
     assert exc.value.code == "encrypted"
+
+
+def test_analysis_leaves_no_document_in_the_cache():
+    analyze(block_pdf())
+    assert len(layout._CACHE) == 0
+
+
+def test_cached_documents_expire_after_a_while_without_use(monkeypatch):
+    monkeypatch.setattr(layout, "DOCUMENT_CACHE_TTL_S", 0.2)
+    crop(block_pdf(), element((100, 100, 200, 150)))
+    assert len(layout._CACHE) == 1
+    deadline = time.monotonic() + 10
+    while len(layout._CACHE) and time.monotonic() < deadline:  # a daemon timer expires it
+        time.sleep(0.05)
+    assert len(layout._CACHE) == 0
+
+
+# ---------------------------------------------------------------- crash isolation
+
+FIXTURES = Path(__file__).parent / "fixtures" / "layout"
+
+
+@pytest.fixture
+def unprobed(monkeypatch):
+    """Forget which documents passed the probe, so every test probes afresh."""
+    monkeypatch.setattr(layout, "_PROBED", OrderedDict())
+
+
+def test_a_pdf_that_kills_the_renderer_is_unreadable_not_fatal(monkeypatch, unprobed):
+    # MuPDF dies of SIGABRT; SIGKILL is the same for the parent and skips the core dump.
+    monkeypatch.setattr(
+        layout, "_PROBE_SCRIPT", "import os, signal; os.kill(os.getpid(), signal.SIGKILL)"
+    )
+    data = block_pdf()
+    with pytest.raises(LayoutError) as exc:
+        analyze(data)
+    assert exc.value.code == "unreadable"
+    with pytest.raises(LayoutError) as exc:
+        crop(data, element((100, 100, 200, 150)))
+    assert exc.value.code == "unreadable"
+
+
+def test_a_pdf_that_hangs_the_renderer_is_unreadable(monkeypatch, unprobed):
+    monkeypatch.setattr(layout, "_PROBE_SCRIPT", "import time; time.sleep(60)")
+    monkeypatch.setattr(layout, "PROBE_TIMEOUT_S", 0.5)
+    started = time.monotonic()
+    with pytest.raises(LayoutError) as exc:
+        analyze(block_pdf())
+    assert exc.value.code == "unreadable" and time.monotonic() - started < 10
+
+
+def test_a_damaged_pdf_that_aborts_mupdf_does_not_kill_this_process(unprobed):
+    """tests/fixtures/layout/damaged_render_abort.pdf is two_column.pdf with 19 bytes
+    flipped. It parses, but rendering it makes MuPDF (PyMuPDF 1.28.2) abort the process
+    with a glibc double free. Before the probe, this test killed pytest."""
+    data = (FIXTURES / "damaged_render_abort.pdf").read_bytes()
+    try:
+        layout_ = analyze(data)
+    except LayoutError as exc:
+        assert exc.code == "unreadable"
+    else:  # a MuPDF release that fixes the bug: then every crop must work too
+        for item in layout_.elements:
+            crop(data, item)
+
+
+def test_pages_are_probed_once_and_crop_probes_pages_analysis_skipped(monkeypatch, unprobed):
+    probed: list[list[int]] = []
+    real = layout._probe_pages
+
+    def recording(pdf_bytes: bytes, pages: list[int]) -> None:
+        probed.append(list(pages))
+        real(pdf_bytes, pages)
+
+    monkeypatch.setattr(layout, "_probe_pages", recording)
+    doc = pymupdf.open()
+    for _ in range(3):
+        doc.new_page().insert_text((72, 100), "Some text", fontsize=11)
+    data = doc.tobytes()
+    analyze(data, pages=[0, 2])
+    analyze(data, pages=[0])
+    crop(data, element((50, 80, 200, 110), page=0))
+    crop(data, element((50, 80, 200, 110), page=1))
+    crop(data, element((50, 80, 200, 110), page=1))
+    assert probed == [[0, 2], [1]]
+
+
+def test_the_probe_output_is_discarded(monkeypatch, unprobed, capfd):
+    monkeypatch.setattr(
+        layout, "_PROBE_SCRIPT", "import sys; print('SecretStudentName'); sys.exit(3)"
+    )
+    with pytest.raises(LayoutError):
+        analyze(block_pdf())
+    out, err = capfd.readouterr()
+    assert "Secret" not in out + err
