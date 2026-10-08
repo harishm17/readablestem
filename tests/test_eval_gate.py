@@ -99,7 +99,10 @@ def test_a_metric_missing_from_the_current_report_fails():
 
 def test_only_the_reports_task_is_checked():
     result = compare(report("headings", recall=0.86), report("headings"), list(DEFAULT_TOLERANCES))
-    assert statuses(result) == {"heading_recall": "regressed"}  # -0.04 > 0.03
+    assert statuses(result) == {
+        "heading_recall": "regressed",  # -0.04 > 0.03
+        "heading_precision": "no_baseline",  # these fixtures carry no precision
+    }
     result = compare(
         report("figures", judge_pass_rate=0.66), report("figures"), list(DEFAULT_TOLERANCES)
     )
@@ -212,6 +215,76 @@ def test_cli_uses_a_tolerance_file(tmp_path, capsys):
     args = ["eval", "gate", "--current", str(bad), "--baseline", str(baseline)]
     assert main([*args, "--tolerance-file", str(tol)]) == 0
     assert main(args) == 1  # data/eval/tolerances.json (= defaults) applies otherwise
+
+
+def judged(judge: str, rate: float) -> dict:
+    data = report("figures", judge_pass_rate=rate)
+    data["prompt_versions"] = {"figure": "figure-ac51f42d", "judge": judge}
+    data["models"] = {**data["models"], "judge": "gpt-6.1-sol"}
+    return data
+
+
+def test_a_changed_judge_is_refused_not_compared():
+    """figures-run2 vs figures-run1 passed with the judge prompt changed: the pass rate
+    went from 0.46 to 0.92 because the instrument changed."""
+    with pytest.raises(GateRefused) as refused:
+        compare(
+            judged("judge_figure-137e2607", 0.92),
+            judged("judge_figure-d52d54f1", 0.46),
+            list(DEFAULT_TOLERANCES),
+        )
+    assert refused.value.code == "judge_changed"
+    other_model = judged("judge_figure-137e2607", 0.92)
+    other_model["models"]["judge"] = "gpt-6-luna"
+    with pytest.raises(GateRefused, match="different judges"):
+        compare(other_model, judged("judge_figure-137e2607", 0.9), list(DEFAULT_TOLERANCES))
+    assert compare(
+        judged("judge_figure-137e2607", 0.92),
+        judged("judge_figure-137e2607", 0.90),
+        list(DEFAULT_TOLERANCES),
+    ).passed
+
+
+def test_require_current_refuses_a_report_made_with_other_prompts(tmp_path, capsys):
+    """A committed latest-<task>.json that predates a prompt change would let the change
+    through without anyone re-running the eval."""
+    versions = gate.code_versions()
+    fresh = report()
+    fresh["prompt_versions"] = {"equation": versions["equation"]}
+    stale = report()  # equation-aaaa1111, not the code's prompt
+    baseline = write(tmp_path, "base.json", fresh)
+    args = ["eval", "gate", "--require-current", "--baseline", str(baseline), "--current"]
+    assert main([*args, str(write(tmp_path, "fresh.json", fresh))]) == 0
+    capsys.readouterr()
+    assert main([*args, str(write(tmp_path, "stale.json", stale))]) == 2
+    err = capsys.readouterr().err
+    assert "stale_report" in err and "equation prompt equation-aaaa1111" in err
+    # Without the flag (comparing two historical runs) it is only a note.
+    plain = ["eval", "gate", "--baseline", str(baseline), "--current"]
+    assert main([*plain, str(tmp_path / "stale.json")]) == 0
+
+
+def test_document_metrics_and_heading_precision_are_tracked():
+    base = report("document", detection_recall=1.0, detection_precision=0.47)
+    base["metrics"] |= {"matched_exact_lenient": 0.567, "axe_violations": 0}
+    worse = copy.deepcopy(base)
+    worse["metrics"] |= {"axe_violations": 1, "detection_precision": 0.40}
+    result = compare(worse, base, list(DEFAULT_TOLERANCES))
+    rows = statuses(result)
+    assert rows["document_axe_violations"] == "regressed"  # any new violation fails
+    assert rows["document_detection_precision"] == "regressed"
+    assert rows["document_matched_exact_lenient"] == "ok"
+    headings = compare(
+        report("headings", precision=0.80),
+        report("headings", precision=0.877),
+        list(DEFAULT_TOLERANCES),
+    )
+    assert statuses(headings)["heading_precision"] == "regressed"
+
+
+def test_committed_tolerances_track_the_same_metrics_as_the_defaults():
+    names = {t.name for t in load_tolerances(Path("data/eval/tolerances.json"))}
+    assert names == {t.name for t in DEFAULT_TOLERANCES}
 
 
 def test_cli_reports_missing_and_malformed_files(tmp_path, capsys):

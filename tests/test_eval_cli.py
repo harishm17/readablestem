@@ -219,6 +219,74 @@ def test_calibrate_needs_inputs(tmp_path, capsys):
     assert "file not found" in capsys.readouterr().err
 
 
+def sample_args(gold, tmp_path, *extra) -> list[str]:
+    return [
+        "eval",
+        "sample",
+        "--task",
+        "equations",
+        "--gold",
+        str(gold),
+        "--cache",
+        str(tmp_path / "cache"),
+        "--fake",
+        *extra,
+    ]
+
+
+def test_weekly_sample_scores_a_seeded_share_of_the_gold_set(gold, tmp_path, fake_inputs, capsys):
+    out = tmp_path / "w41.json"
+    args = sample_args(gold, tmp_path, "--fraction", "0.5", "--week", "2026-W41", "--out", str(out))
+    assert main(args) == 0
+    assert "weekly sample 2026-W41: 2 of 4 equations units" in capsys.readouterr().out
+    report = json.loads(out.read_text())
+    sample = report["sample"]
+    assert (sample["units_sampled"], sample["units_total"], sample["seed"]) == (2, 4, "2026-W41")
+    assert report["n"] == 2 and report["complete"]
+    assert "sample 2026-W41" in report["dataset"]["gold_dir"]
+    assert main(args) == 0  # the same week draws the same items
+    assert json.loads(out.read_text())["sample"]["ids"] == sample["ids"]
+
+
+def test_the_sample_always_has_at_least_one_unit(gold):
+    from datetime import date
+
+    from a11y_stem.eval.pipeline_eval import load_gold
+    from a11y_stem.eval.sample import iso_week, sample_units
+
+    assert len(sample_units("equations", load_gold(gold), fraction=0.05, seed="w")) == 1
+    assert iso_week(date(2026, 10, 8)) == "2026-W41"
+    with pytest.raises(ValueError):
+        sample_units("equations", load_gold(gold), fraction=0, seed="w")
+
+
+def test_promote_copies_only_complete_real_and_current_reports(tmp_path, capsys):
+    from a11y_stem.eval.gate import code_versions
+
+    def write(name: str, **changes) -> str:
+        data = {
+            "task": "equations",
+            "complete": True,
+            "client": "openai",
+            "prompt_versions": {"equation": code_versions()["equation"]},
+            "models": {"main": "gpt-6.1-sol", "cheap": "gpt-6-luna"},
+        } | changes
+        path = tmp_path / name
+        path.write_text(json.dumps(data))
+        return str(path)
+
+    target = ["--out-dir", str(tmp_path / "data")]
+    assert main(["eval", "promote", write("ok.json"), "--as", "latest", *target]) == 0
+    assert (tmp_path / "data" / "latest-equations.json").is_file()
+    assert main(["eval", "promote", write("fake.json", client="fake"), "--as", "baseline"]) == 2
+    assert main(["eval", "promote", write("part.json", complete=False), "--as", "baseline"]) == 2
+    stale = write("stale.json", prompt_versions={"equation": "equation-00000000"})
+    capsys.readouterr()
+    assert main(["eval", "promote", stale, "--as", "latest", *target]) == 2
+    assert "equation prompt equation-00000000" in capsys.readouterr().err
+    assert main(["eval", "promote", stale, "--as", "baseline", *target]) == 0  # history is fine
+
+
 def test_calibrate_probes_with_the_fake_client(tmp_path, capsys):
     gold = write_gold(tmp_path, [figure("p", 0, "A ball.", "Fig 1"), figure("p", 1, "A car.", "F")])
     out = tmp_path / "probes.json"

@@ -5,15 +5,23 @@
 - 0 when every tracked metric is within its tolerance,
 - 1 when at least one tracked metric regressed (or vanished from the current report),
 - 2 when the two reports cannot be compared fairly: different task, different gold
-  manifest, different item selection, or a partial run on either side.
+  manifest, different item selection, a partial run on either side, a different judge
+  (prompt or model: the measuring instrument changed), or, with `--require-current`, a
+  current report produced with other prompts or models than the code under test has.
 
 Why refuse instead of comparing anyway: a score on a different gold set, or on the 12 of
-30 equations a run reached before its budget ran out, is a different measurement. A gate
-that compared them would pass or fail for reasons unrelated to the change under test.
+30 equations a run reached before its budget ran out, is a different measurement. So is
+a figure pass rate graded by a different judge: when the judge started seeing the image
+the rate went from 0.46 to 0.92 with the same alt texts. A gate that compared them would
+pass or fail for reasons unrelated to the change under test. And a committed
+`latest-<task>.json` that no longer matches the prompts in the code would let a prompt
+change through without anyone re-running the eval; `--require-current` (used in CI)
+refuses it.
 
-Tolerances are absolute drops for rates (0.02 = two percentage points) and a relative
-increase for cost. `data/eval/tolerances.json` overrides the defaults by name. With 30
-equations one item is 0.033, so the default 0.02 tolerance fails on any single lost item:
+Tolerances are absolute drops for rates (0.02 = two percentage points), a relative
+increase for cost, and an absolute increase for counts (axe violations).
+`data/eval/tolerances.json` overrides the defaults by name. With 30 equations one item
+is 0.033, so the default 0.02 tolerance fails on any single lost item:
 on purpose, while the gold set is this small.
 """
 
@@ -25,7 +33,10 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any, Literal
 
-Rule = Literal["max_drop", "max_rel_increase"]
+Rule = Literal["max_drop", "max_rel_increase", "max_increase"]
+RULES = ("max_drop", "max_rel_increase", "max_increase")
+# Report prompt_versions keys -> prompt file names (models/prompts/<name>.md).
+PROMPT_FILES = {"equation": "equation", "figure": "figure", "judge": "judge_figure"}
 
 
 class GateRefused(ValueError):
@@ -42,7 +53,9 @@ class Tolerance:
     task: str  # report["task"] this applies to
     path: str  # dotted path into the report, e.g. "metrics.exact_lenient"
     rule: Rule
-    limit: float  # max_drop: absolute; max_rel_increase: fraction (0.25 = +25%)
+    # max_drop: absolute drop; max_rel_increase: fraction (0.25 = +25%); max_increase:
+    # absolute rise of a count (0 = any increase fails)
+    limit: float
 
 
 DEFAULT_TOLERANCES: tuple[Tolerance, ...] = (
@@ -50,7 +63,27 @@ DEFAULT_TOLERANCES: tuple[Tolerance, ...] = (
     Tolerance("mean_teds", "equations", "metrics.mean_teds", "max_drop", 0.02),
     Tolerance("cost_per_equation", "equations", "cost.per_item_usd", "max_rel_increase", 0.25),
     Tolerance("heading_recall", "headings", "metrics.recall", "max_drop", 0.03),
+    Tolerance("heading_precision", "headings", "metrics.precision", "max_drop", 0.03),
     Tolerance("figure_judge_pass_rate", "figures", "metrics.judge_pass_rate", "max_drop", 0.05),
+    Tolerance(
+        "document_detection_recall", "document", "metrics.detection_recall", "max_drop", 0.02
+    ),
+    Tolerance(
+        "document_detection_precision",
+        "document",
+        "metrics.detection_precision",
+        "max_drop",
+        0.03,
+    ),
+    Tolerance(
+        "document_matched_exact_lenient",
+        "document",
+        "metrics.matched_exact_lenient",
+        "max_drop",
+        0.03,
+    ),
+    Tolerance("document_axe_violations", "document", "metrics.axe_violations", "max_increase", 0),
+    Tolerance("document_cost", "document", "cost.per_item_usd", "max_rel_increase", 0.25),
 )
 
 
@@ -71,7 +104,7 @@ def load_tolerances(path: Path | None) -> list[Tolerance]:
         missing = {"task", "path", "rule", "limit"} - merged.keys()
         if missing:
             raise ValueError(f"tolerance {name!r} is missing {', '.join(sorted(missing))}")
-        if merged["rule"] not in ("max_drop", "max_rel_increase"):
+        if merged["rule"] not in RULES:
             raise ValueError(f"tolerance {name!r}: unknown rule {merged['rule']!r}")
         by_name[name] = Tolerance(
             name=name,
@@ -148,6 +181,47 @@ def check_comparable(current: dict, baseline: dict) -> None:
                 f"{report.get('n_planned')}, stopped: {report.get('stopped_reason')}); "
                 "raise --max-usd and re-run",
             )
+    judges = [_judge(report) for report in (current, baseline)]
+    if judges[0] != judges[1]:
+        raise GateRefused(
+            "judge_changed",
+            f"the reports were graded by different judges (baseline {judges[1]}, current "
+            f"{judges[0]}); the instrument changed, so re-run the baseline with the current "
+            "judge before comparing",
+        )
+
+
+def _judge(report: dict) -> tuple[str | None, str | None]:
+    """(judge prompt version, judge model) of a report; (None, None) when unjudged."""
+    prompts = report.get("prompt_versions") or {}
+    models = report.get("models") or {}
+    return prompts.get("judge"), models.get("judge")
+
+
+def code_versions() -> dict[str, str]:
+    """Prompt versions of the code under test, keyed like a report's `prompt_versions`."""
+    from a11y_stem.models.prompts import load_prompt
+
+    return {key: load_prompt(name).version for key, name in PROMPT_FILES.items()}
+
+
+def check_current(report: dict, versions: dict[str, str], models: dict[str, str]) -> None:
+    """Raise GateRefused("stale_report") when `report` was produced with other prompts
+    or models than `versions` / `models` (the code under test)."""
+    stale = []
+    for key, version in sorted((report.get("prompt_versions") or {}).items()):
+        if key in versions and version != versions[key]:
+            stale.append(f"{key} prompt {version} (code: {versions[key]})")
+    for key, model in sorted((report.get("models") or {}).items()):
+        if key in models and model != models[key]:
+            stale.append(f"{key} model {model} (code: {models[key]})")
+    if stale:
+        raise GateRefused(
+            "stale_report",
+            "the current report was not produced by this code: "
+            + "; ".join(stale)
+            + ". Re-run `a11y-stem eval pipeline` for this task and commit the new report",
+        )
 
 
 def _row(t: Tolerance, baseline: float | None, current: float | None) -> GateRow:
@@ -158,6 +232,9 @@ def _row(t: Tolerance, baseline: float | None, current: float | None) -> GateRow
     if t.rule == "max_drop":
         delta = current - baseline
         regressed = -delta > t.limit + 1e-9
+    elif t.rule == "max_increase":
+        delta = current - baseline
+        regressed = delta > t.limit + 1e-9
     else:  # relative increase (cost): a zero baseline only tolerates zero
         if baseline == 0:
             delta = 0.0 if current == 0 else float("inf")
@@ -207,7 +284,12 @@ def format_table(result: GateResult) -> str:
     ]
     for r in result.rows:
         relative = r.rule == "max_rel_increase"
-        allowed = f"+{r.limit * 100:.0f}%" if relative else f"-{r.limit:.3f}"
+        if relative:
+            allowed = f"+{r.limit * 100:.0f}%"
+        elif r.rule == "max_increase":
+            allowed = f"+{r.limit:g}"
+        else:
+            allowed = f"-{r.limit:.3f}"
         change = (
             _num(r.delta, pct=True)
             if relative
@@ -225,11 +307,26 @@ def format_table(result: GateResult) -> str:
     return "\n".join(lines) + "\n"
 
 
-def run_gate(current_path: Path, baseline_path: Path, tolerance_path: Path | None) -> int:
-    """Print the diff table; return the exit code (0 pass, 1 regression, 2 refused)."""
+def run_gate(
+    current_path: Path,
+    baseline_path: Path,
+    tolerance_path: Path | None,
+    *,
+    require_current: bool = False,
+) -> int:
+    """Print the diff table; return the exit code (0 pass, 1 regression, 2 refused).
+
+    `require_current`: also refuse a current report whose prompts or models differ from
+    the code under test (CI sets it; see the module docstring).
+    """
     current = json.loads(current_path.read_text(encoding="utf-8"))
     baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
     try:
+        if require_current:
+            from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
+
+            models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
+            check_current(current, code_versions(), models)
         result = compare(current, baseline, load_tolerances(tolerance_path))
     except GateRefused as exc:
         print(f"error: cannot compare ({exc.code}): {exc}", file=sys.stderr)

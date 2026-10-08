@@ -25,6 +25,7 @@ EVAL_DIR = Path("data/eval")
 EVAL_CACHE = Path(".cache/eval")
 OPENSTAX_CACHE = Path(".cache/openstax")
 DEMO_DIR = Path("src/a11y_stem/web/static/demo")
+WEEKLY_DIR = Path(".local") / "eval" / "weekly"  # git-ignored; commit a report on purpose
 DEFAULT_MAX_CALLS = 5000
 # Same as eval.pipeline_eval.TASKS (a test checks); kept here so building the parser
 # does not import the pipeline.
@@ -130,19 +131,58 @@ def _settings() -> Any:
 
 
 def _cmd_pipeline(args: argparse.Namespace) -> int:
-    from a11y_stem.eval import pipeline_eval as pe
-    from a11y_stem.eval.render import RenderError
-    from a11y_stem.gold.openstax import HttpFetcher
+    gold_dir = args.gold or _default(GOLD_DIR)
+    if not gold_dir.is_dir():
+        return _error(f"gold dir not found: {gold_dir}")
+    out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
+    return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir))
+
+
+def _cmd_sample(args: argparse.Namespace) -> int:
+    """The weekly sample (eval.sample): a seeded share of the gold set, scored as usual."""
+    import tempfile
+
+    from a11y_stem.eval.sample import iso_week, sample_gold
 
     gold_dir = args.gold or _default(GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
+    week = args.week or iso_week(args.date_value)
+    out = args.out or _default(WEEKLY_DIR / f"{week}-{args.task}.json")
+    with tempfile.TemporaryDirectory(prefix="a11y-stem-sample-") as tmp:
+        try:
+            sample = sample_gold(
+                gold_dir, Path(tmp), task=args.task, fraction=args.fraction, seed=week
+            )
+        except ValueError as exc:
+            return _error(str(exc))
+        if not sample["units_sampled"]:
+            return _error(f"the gold set has nothing for task {args.task}")
+        print(
+            f"weekly sample {week}: {sample['units_sampled']} of {sample['units_total']} "
+            f"{args.task} units ({args.fraction:.0%})"
+        )
+        label = f"{_shown(gold_dir)} (sample {week}, {args.fraction:.0%})"
+        return _run_pipeline(args, Path(tmp), out, gold_label=label, extra={"sample": sample})
+
+
+def _run_pipeline(
+    args: argparse.Namespace,
+    gold_dir: Path,
+    out: Path,
+    *,
+    gold_label: str,
+    extra: dict | None = None,
+) -> int:
+    from a11y_stem.eval import pipeline_eval as pe
+    from a11y_stem.eval.render import RenderError
+    from a11y_stem.gold.openstax import HttpFetcher
+
     settings = _settings()
     made = _make_client(args, settings)
     if isinstance(made, str):
         return _error(made)
     client, budget, label = made
-    out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
     fetcher = HttpFetcher(cache_dir=_default(OPENSTAX_CACHE))
     with pe.CachedMedia(
         gold_dir, args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
@@ -154,9 +194,9 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
             media=media,
             date=args.date,
             gold_dir=gold_dir,
-            limit=args.limit,
+            limit=getattr(args, "limit", None),
             client_label=label,
-            gold_label=_shown(gold_dir),
+            gold_label=gold_label,
             concurrency=args.concurrency,
             budget=budget,
         )
@@ -166,6 +206,7 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
             return _error(f"could not build the eval input (no model calls made): {exc}")
         except NotImplementedError as exc:
             return _error(f"a pipeline module is still a stub ({exc}); integrate it first")
+    run.report.update(extra or {})
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
@@ -187,9 +228,46 @@ def _cmd_gate(args: argparse.Namespace) -> int:
     if tolerances is None and _default(EVAL_DIR / "tolerances.json").is_file():
         tolerances = _default(EVAL_DIR / "tolerances.json")
     try:
-        return run_gate(args.current, args.baseline, tolerances)
+        return run_gate(
+            args.current, args.baseline, tolerances, require_current=args.require_current
+        )
     except (ValueError, KeyError) as exc:  # malformed JSON or tolerance file
         return _error(f"cannot read reports or tolerances: {exc}")
+
+
+def _cmd_promote(args: argparse.Namespace) -> int:
+    """Copy a reviewed report to data/eval/<baseline|latest>-<task>.json for the CI gate.
+
+    Refuses a partial run, and (for `latest`) a report produced with other prompts or
+    models than this code, which the gate would refuse anyway.
+    """
+    from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
+    from a11y_stem.eval.gate import GateRefused, check_current, code_versions
+
+    if not args.report.is_file():
+        return _error(f"report not found: {args.report}")
+    try:
+        report = json.loads(args.report.read_text(encoding="utf-8"))
+    except ValueError as exc:
+        return _error(f"cannot read {args.report}: {exc}")
+    task = report.get("task")
+    if task not in TASKS:
+        return _error(f"not an eval report (task {task!r})")
+    if not report.get("complete", False):
+        return _error("the report is partial; re-run with a higher --max-usd")
+    if report.get("client") != "openai":
+        return _error("only real-model reports can be baselines (this one is a fake run)")
+    if args.kind == "latest":
+        models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
+        try:
+            check_current(report, code_versions(), models)
+        except GateRefused as exc:
+            return _error(str(exc))
+    target = args.out_dir or _default(EVAL_DIR)
+    path = target / f"{args.kind}-{task}.json"
+    _write_json(report, path)
+    print(f"wrote {_shown(path)}; review and commit it")
+    return 0
 
 
 # ======================================================================= calibrate
@@ -237,8 +315,19 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
     client, _budget, _label = made
     paraphrases = cal.load_paraphrases(args.paraphrases) if args.paraphrases else None
     figures = cal.probe_figures(load_gold(gold_dir), args.limit)
+    images = None
+    # The figures eval judges with the image attached; probe the same instrument. A fake
+    # client never looks at images, so a plumbing run does not download them.
+    if not args.text_only and not args.fake:
+        from a11y_stem.eval import render
+
+        cache = render.ImageCache(_default(EVAL_CACHE) / "images")
+        try:
+            images = {f["id"]: cache.png(cal.probe_image_url(f)) for f in figures}
+        except render.RenderError as exc:
+            return _error(f"could not get a figure image (no model calls made): {exc}")
     report, items = cal.run_probes(
-        figures, client=client, settings=settings, paraphrases=paraphrases
+        figures, client=client, settings=settings, paraphrases=paraphrases, images=images
     )
     if args.out:
         _write_json(report, args.out)
@@ -454,7 +543,38 @@ def register(
         type=Path,
         help="tolerances JSON (default: data/eval/tolerances.json if present)",
     )
+    gate.add_argument(
+        "--require-current",
+        action="store_true",
+        help="refuse (exit 2) a current report made with other prompts or models than this code",
+    )
     gate.set_defaults(func=_cmd_gate)
+
+    promote = group.add_parser(
+        "promote", help="copy a reviewed report to data/eval as the baseline or latest"
+    )
+    promote.add_argument("report", type=Path, help="a complete report from eval pipeline")
+    promote.add_argument("--as", dest="kind", choices=["baseline", "latest"], required=True)
+    promote.add_argument("--out-dir", type=Path, help="default: data/eval")
+    promote.set_defaults(func=_cmd_promote)
+
+    sample = group.add_parser(
+        "sample", help="weekly drift check: score a seeded random share of the gold set"
+    )
+    sample.add_argument("--task", required=True, choices=TASKS)
+    _add_spend_args(sample)
+    sample.add_argument("--fraction", type=float, default=0.05, help="share of units (0.05)")
+    sample.add_argument("--week", help="ISO week used as the seed, e.g. 2026-W41 (default: now)")
+    sample.add_argument("--gold", type=Path, help="gold dir (default: data/gold)")
+    sample.add_argument(
+        "--out", type=Path, help="report JSON (default: .local/eval/weekly/<week>-<task>.json)"
+    )
+    sample.add_argument("--items", type=Path, help="also write per-item rows as JSONL")
+    sample.add_argument("--date", type=_iso_date, default=today, help="run date to record")
+    sample.add_argument("--cache", type=Path, help="render cache (default: .cache/eval)")
+    sample.add_argument("--paper", choices=["Letter", "A4"], default="Letter")
+    sample.add_argument("--concurrency", type=_positive_int, default=4)
+    sample.set_defaults(func=_cmd_sample, date_value=dt.date.today())
 
     calibrate = group.add_parser(
         "calibrate", help="judge vs human labels (kappa), label template, bias probes"
@@ -469,6 +589,11 @@ def register(
     )
     _add_spend_args(calibrate)
     calibrate.add_argument("--gold", type=Path, help="gold dir for --probes")
+    calibrate.add_argument(
+        "--text-only",
+        action="store_true",
+        help="--probes: judge without the figure image (the older text-only instrument)",
+    )
     calibrate.add_argument("--limit", type=_positive_int, help="--probes: first N figures")
     calibrate.add_argument(
         "--paraphrases", type=Path, help="--probes: hand-written verbose texts (id, text)"

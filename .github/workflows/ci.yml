@@ -175,7 +175,7 @@ jobs:
             if [ ! -f "$current" ]; then
               echo "::error::$baseline has no matching $current"; exit 1
             fi
-            uv run a11y-stem eval gate --current "$current" --baseline "$baseline"
+            uv run a11y-stem eval gate --require-current --current "$current" --baseline "$baseline"
           done
 
   secret-scan:

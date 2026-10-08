@@ -204,6 +204,21 @@ def test_probes_expose_length_bias_and_check_expected_outcomes():
     assert "| verbose | pass |" in text and "Length bias" in text
 
 
+def test_probes_can_judge_with_the_image_like_the_figures_eval():
+    """The figures eval attaches the image and the prompt then treats it as the ground
+    truth; probes run text-only measured a different judge."""
+    probe = cal.probe_figures(figures())
+    images = {f["id"]: f"png-{f['id']}".encode() for f in probe}
+    client = FakeVisionClient(responders={"judge": length_biased_judge})
+    report, _ = cal.run_probes(probe, client=client, settings=settings(), images=images)
+    assert report["judge_mode"] == "image"
+    assert all(len(r.images) == 1 for r in client.requests)
+    assert {r.images[0] for r in client.requests} == set(images.values())
+    assert "judge: image" in cal.format_probes(report)
+    text_only, _ = cal.run_probes(probe, client=FakeVisionClient(), settings=settings())
+    assert text_only["judge_mode"] == "text_only"
+
+
 def test_probes_stop_cleanly_when_the_budget_runs_out():
     budget = JobBudget(InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=5)
     client = FakeVisionClient(responders={"judge": length_biased_judge}, budget=budget)

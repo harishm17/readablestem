@@ -268,7 +268,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | `postgres` | `pytest -m postgres` against a Postgres 16 service container |
 | `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
 | `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as Cloud Build's `--tag` build may use), and checks the entry point and non-root user |
-| `eval-gate` | `a11y-stem eval gate` when `data/eval/latest.json` and `baseline.json` are committed |
+| `eval-gate` | `a11y-stem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
 | `secret-scan` | gitleaks over the full history |
 
 Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes
