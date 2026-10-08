@@ -42,8 +42,10 @@
   </header>
 
   <main id="main" class="wrap" tabindex="-1">
+    {# A live region present at page load is not announced, so the first one-time notice
+       (after a POST-redirect, e.g. "deleted") takes focus instead. #}
     {% for item in flash if not item.element_id %}
-    <div class="notice" role="status"><p>{{ item.message }}</p></div>
+    <div class="notice" role="status" tabindex="-1"{% if loop.first %} autofocus{% endif %}><p>{{ item.message }}</p></div>
     {% endfor %}
     {% block content %}{% endblock %}
   </main>

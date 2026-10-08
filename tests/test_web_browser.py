@@ -178,10 +178,12 @@ def describe(violations: list[dict]) -> str:
         "/privacy",
         "/terms",
         "/limits",
+        "/status",
         "/demo",
         "/login",
         "/dev-login",
         "/admin",
+        "/jobs/{id}/delete",
     ],
 )
 def test_pages_have_no_serious_or_critical_axe_violations(
@@ -209,6 +211,8 @@ def queued_job(site, browser):
     yield job_id
     page.goto(f"{site.base}/jobs/{job_id}")
     page.get_by_role("button", name="Delete now").click()
+    page.get_by_role("button", name="Yes, delete it").click()
+    page.wait_for_url(f"{site.base}/app")
     context.close()
 
 
@@ -323,3 +327,150 @@ def test_everything_works_without_javascript(site, browser):
     page.locator("#fix-p1-e4").get_by_role("button", name="Reject").click()
     assert "Rejected" in page.locator("#review-progress").inner_text()
     context.close()
+
+
+# --------------------------------------------------------------------------- focus
+
+
+def active_classes(page) -> str:
+    return page.evaluate("document.activeElement.className || document.activeElement.tagName")
+
+
+def test_the_error_summary_takes_focus_after_every_failed_form(site, browser):
+    """Focus used to stay on <body>: keyboard users had to tab past the header to reach
+    the summary, and role=alert on page load is not reliably announced."""
+    context = browser.new_context(java_script_enabled=False)  # works without scripts too
+    page = context.new_page()
+    page.goto(f"{site.base}/dev-login")
+    page.get_by_role("button", name="Sign in").click()  # empty email
+    assert "error-summary" in active_classes(page)
+
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/app")
+    page.get_by_role("button", name="Upload and convert").click()  # no file chosen
+    assert "error-summary" in active_classes(page)
+
+    sign_in(page, site.base, ADMIN)
+    page.goto(f"{site.base}/admin")
+    page.get_by_label("Email address to allow").fill("not an email")
+    page.get_by_role("button", name="Allow", exact=True).click()
+    assert "error-summary" in active_classes(page)
+    context.close()
+
+
+def test_deleting_asks_first_then_the_notice_takes_focus(site, browser):
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    job_id = upload_pdf(page, site.base)
+    page.get_by_role("button", name="Delete now").click()
+    assert page.get_by_role("heading", level=1).inner_text() == "Delete notes.pdf?"
+    page.get_by_role("link", name="No, keep it").click()
+    assert page.url.endswith(f"/jobs/{job_id}")
+    page.get_by_role("button", name="Delete now").click()
+    page.get_by_role("button", name="Yes, delete it").focus()
+    page.keyboard.press("Enter")
+    page.wait_for_url(f"{site.base}/app")
+    assert "notice" in active_classes(page)
+    assert "have been deleted" in page.evaluate("document.activeElement.textContent")
+    context.close()
+
+
+# --------------------------------------------------------------------------- reflow
+
+LONG_NAME = "Physics_Chapter_02_Kinematics_and_Dynamics_Lecture_Notes_Final_Version_3.pdf"
+# WCAG 1.4.12 text spacing, applied as the bookmarklets do.
+TEXT_SPACING = (
+    "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; "
+    "word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }"
+)
+APP_CSS = (
+    "needs app.css (owned by the review-ux stream): overflow-wrap on long names, "
+    "position: relative on .table-scroll"
+)
+
+
+@pytest.fixture(scope="module")
+def long_named_job(site, browser) -> str:
+    context = browser.new_context()
+    page = context.new_page()
+    sign_in(page, site.base, ALICE)
+    page.goto(f"{site.base}/app")
+    page.get_by_label("PDF file").set_input_files(
+        files=[{"name": LONG_NAME, "mimeType": "application/pdf", "buffer": make_pdf(1)}]
+    )
+    page.get_by_role("button", name="Upload and convert").click()
+    page.wait_for_url(f"{site.base}/jobs/*")
+    job_id = page.url.rsplit("/", 1)[-1]
+    assert site.run_worker() == job_id
+    context.close()
+    return job_id
+
+
+PUBLIC = ("/", "/privacy", "/terms", "/limits", "/status", "/login", "/dev-login")
+
+
+def _reflow_params():
+    pages = [*PUBLIC, "/app", "/admin", "/jobs/{id}"]
+    # Known failures, each fixed only in app.css: the long file name in the job page's
+    # <h1> and the documents table; the visually hidden button text that escapes
+    # .table-scroll on /app and /admin; the source URL on /terms with wider spacing.
+    owned = {"/app", "/admin", "/jobs/{id}", "/terms +text-spacing"}
+    for spacing in (False, True):
+        suffix = " +text-spacing" if spacing else ""
+        for path in pages:
+            if path + suffix in owned or path in owned:
+                mark = pytest.mark.xfail(reason=APP_CSS, strict=False)
+                yield pytest.param(path, spacing, id=path + suffix, marks=mark)
+            else:
+                yield pytest.param(path, spacing, id=path + suffix)
+
+
+@pytest.mark.parametrize(("path", "spacing"), list(_reflow_params()))
+def test_pages_reflow_at_320_css_pixels(site, browser, long_named_job, path, spacing):
+    """WCAG 1.4.10: at 320 CSS px (400% zoom) nothing may need sideways scrolling, also
+    with a long file name and with the 1.4.12 text-spacing override."""
+    context = browser.new_context(viewport={"width": 320, "height": 256}, bypass_csp=True)
+    page = context.new_page()
+    if path not in PUBLIC:
+        sign_in(page, site.base, ADMIN if path == "/admin" else ALICE)
+    page.goto(site.base + path.replace("{id}", long_named_job))
+    if spacing:
+        page.add_style_tag(content=TEXT_SPACING)
+    width = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+    )
+    context.close()
+    assert width[0] <= width[1], f"{path}: content is {width[0]} px wide in a {width[1]} px view"
+
+
+# --------------------------------------------------------------------------- stricter axe
+
+WCAG_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]
+STRICT_IMPACTS = {"moderate", "serious", "critical"}
+
+
+@pytest.mark.parametrize(
+    "path",
+    [*PUBLIC, "/app", "/admin", "/jobs/{id}", "/jobs/{id}/delete"],
+)
+def test_pages_pass_wcag22_aa_and_best_practice_at_moderate_and_above(
+    site, browser, long_named_job, axe_source, path
+):
+    """The suite above fails only on serious and critical results; this one also runs
+    the WCAG 2.2 AA and best-practice rules and fails on moderate ones."""
+    context = browser.new_context(bypass_csp=True)
+    page = context.new_page()
+    if path not in PUBLIC:
+        sign_in(page, site.base, ADMIN if path == "/admin" else ALICE)
+    response = page.goto(site.base + path.replace("{id}", long_named_job))
+    assert response is not None and response.status == 200
+    page.add_script_tag(content=axe_source)
+    results = page.evaluate(
+        "async (tags) => await axe.run(document, "
+        "{runOnly: {type: 'tag', values: tags}, resultTypes: ['violations']})",
+        WCAG_TAGS,
+    )
+    context.close()
+    violations = [v for v in results["violations"] if v["impact"] in STRICT_IMPACTS]
+    assert not violations, describe(violations)

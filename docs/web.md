@@ -86,7 +86,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation or figure |
 | GET `/jobs/{id}/review` | owner | Review screen |
 | POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix |
-| POST `/jobs/{id}/delete` | owner | Delete the job and everything made from it now |
+| GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
 | POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
@@ -315,10 +315,19 @@ rule `meta-refresh`, critical). It has a "refresh the status" link and, inside
 refresh until the job finishes and shows a "Stop reloading this page" link. Every page has a skip link, one
 `<main>`, a labelled navigation, unique titles (prefixed "Error:" when a form has errors),
 labels on every control, error summaries linked to fields, visible focus rings, and
-status written in words, not colour alone. `tests/test_web_browser.py` runs axe-core on
-every page (zero serious or critical violations), including an unfinished job page with
-JavaScript on and as a no-JS browser parses it, and walks the upload-to-review flow
-with JavaScript off.
+status written in words, not colour alone. After a failed form the error summary takes
+focus (`autofocus` on a `tabindex="-1"` box, so it works without JavaScript), and so does
+the first one-time notice after a redirect ("deleted"), because a live region present at
+page load is not announced. While htmx polls, the status fragment carries a `<title>`
+that htmx moves into the document title, so the tab title follows the status.
+
+`tests/test_web_browser.py` runs axe-core on every page (zero serious or critical
+violations), including an unfinished job page with JavaScript on and as a no-JS browser
+parses it; runs the WCAG 2.2 AA and best-practice rules at moderate and above; checks
+every page at 320 CSS px with a long underscored file name, with and without the WCAG
+1.4.12 text-spacing override (pages whose fix is in `app.css` are expected failures
+until that lands); checks where focus goes after errors and after deleting; and walks the
+upload-to-review flow with JavaScript off.
 
 ## Privacy
 

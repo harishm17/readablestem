@@ -323,6 +323,9 @@ def test_status_fragment_is_204_until_something_changes(web):
     )
     assert finished.status_code == 200
     assert finished.headers["hx-refresh"] == "true"  # reload to show the results
+    # htmx takes the document title from the fragment, so the tab title follows it.
+    assert finished.text.startswith("<title>Finished: notes.pdf | a11y-stem</title>")
+    assert "<title>" not in fragment.text  # not without htmx (it would be in <body>)
 
 
 def test_queue_position_is_shown(web):
@@ -347,7 +350,9 @@ def test_status_poll_after_the_session_ends_sends_the_page_to_sign_in(web):
 
 def test_status_poll_for_a_deleted_job_reloads_the_page(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    web.browser.post(
+        f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser), "confirm": "yes"}
+    )
     response = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
     assert response.status_code == 404 and response.headers["hx-refresh"] == "true"
 
@@ -450,14 +455,30 @@ def test_malformed_job_ids_are_404(web, job_id):
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
 
 
+def test_delete_asks_first_and_one_post_without_confirmation_deletes_nothing(web):
+    """WCAG 3.3.4: deleting stored user data must be confirmed, reversible or checked."""
+    job_id = finished_job(web)
+    blobs = count(web, Blob)
+    page = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    assert page.status_code == 200
+    assert "Delete notes.pdf?" in page.text and "cannot be undone" in page.text
+    assert 'name="confirm" value="yes"' in page.text
+    assert f'<a href="/jobs/{job_id}">No, keep it</a>' in page.text
+    assert count(web, Job) == 1 and count(web, Blob) == blobs
+    assert web.browser.get(f"/jobs/{job_id}/delete").status_code == 200  # the same page
+
+
 def test_delete_now_removes_the_job_and_everything_derived(web):
     job_id = finished_job(web)
     assert count(web, Blob) > 1  # upload + crops
-    response = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    response = web.browser.post(
+        f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser), "confirm": "yes"}
+    )
     assert response.status_code == 303 and response.headers["location"] == "/app"
     assert count(web, Job) == 0 and count(web, Blob) == 0
     page = web.browser.get("/app").text
     assert "have been deleted" in page
+    assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
 
 

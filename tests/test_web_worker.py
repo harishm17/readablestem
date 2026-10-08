@@ -356,7 +356,10 @@ def test_deleting_a_running_job_stops_its_model_calls_at_once(env, caplog):
     sent: list[int] = []
 
     def delete_now() -> None:
-        assert browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": csrf}).status_code == 303
+        response = browser.post(
+            f"/jobs/{job_id}/delete", data={"csrf_token": csrf, "confirm": "yes"}
+        )
+        assert response.status_code == 303
 
     worker = env.worker()
     worker.converter = paged_converter(5, after_page={1: delete_now}, sent=sent)

@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ filename }}?{% endblock %}
+{% block content %}
+<h1>Delete {{ filename }}?</h1>
+<p>This deletes the uploaded PDF, the converted HTML, the images cut from it and your review
+  decisions. It cannot be undone.</p>
+<form method="post" action="/jobs/{{ job_id }}/delete" class="inline-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button type="submit" class="button-danger">Yes, delete it</button>
+</form>
+<p><a href="/jobs/{{ job_id }}">No, keep it</a></p>
+{% endblock %}

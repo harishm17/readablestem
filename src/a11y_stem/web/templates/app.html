@@ -67,6 +67,7 @@
         <td>{{ job.page_count }}</td>
         <td>{{ job.retain_until|utc }}</td>
         <td>
+          {# Posts without confirm=yes: the next page asks before anything is deleted. #}
           <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
             <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
             <button type="submit" class="button-secondary">Delete<span class="visually-hidden"> {{ job.filename }}</span></button>

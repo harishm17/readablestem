@@ -291,7 +291,11 @@ def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Res
     context = status_context(job, outcome)
     if v and v == context["status_version"]:
         return Response(status_code=204)
-    headers = {"HX-Refresh": "true"} if job.finished and request.headers.get("HX-Request") else None
+    htmx = request.headers.get("HX-Request") == "true"
+    if htmx:  # htmx sets document.title from a top-level <title> in the fragment
+        label = outcome.label if outcome is not None else job.status_label
+        context["page_title"] = f"{label}: {job.filename}"
+    headers = {"HX-Refresh": "true"} if job.finished and htmx else None
     return render(request, "_job_status.html", context, headers=headers)
 
 
@@ -352,8 +356,31 @@ def crop(request: Request, job_id: str, element_id: str, user: UserDep) -> Respo
     return Response(png, media_type="image/png")
 
 
+def _confirm_delete_page(request: Request, job_id: str, user: CurrentUser) -> Response:
+    with session_scope(get_ctx(request).factory) as session:
+        filename = owned_job(session, job_id, user).filename
+    context = {"job_id": job_id, "filename": filename}
+    return render(request, "delete_confirm.html", context)
+
+
+@router.get("/jobs/{job_id}/delete")
+def confirm_delete(request: Request, job_id: str, user: UserDep) -> Response:
+    """The confirmation step on its own (for a link)."""
+    return _confirm_delete_page(request, job_id, user)
+
+
 @router.post("/jobs/{job_id}/delete", dependencies=[Depends(require_csrf)])
-def delete_job(request: Request, job_id: str, user: UserDep) -> Response:
+async def delete_job(request: Request, job_id: str, user: UserDep) -> Response:
+    """Delete only with `confirm=yes`; any other POST (the "Delete" buttons) gets the
+    confirmation page first. Deleting user data cannot be undone, so it is confirmed
+    (WCAG 3.3.4), and it works without JavaScript."""
+    form = await request.form()
+    if form.get("confirm") != "yes":
+        return await run_in_threadpool(_confirm_delete_page, request, job_id, user)
+    return await run_in_threadpool(_delete_now, request, job_id, user)
+
+
+def _delete_now(request: Request, job_id: str, user: CurrentUser) -> Response:
     from a11y_stem.ops.retention import delete_jobs
 
     with session_scope(get_ctx(request).factory) as session:

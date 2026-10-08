@@ -1,5 +1,7 @@
 {% if errors|default([]) %}
-<div class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1">
+{# autofocus: after a failed form the summary takes focus (with or without JavaScript),
+   so keyboard and screen reader users start at the list of problems. #}
+<div class="error-summary" role="alert" aria-labelledby="error-summary-title" tabindex="-1" autofocus>
   <h2 id="error-summary-title">There is a problem</h2>
   <ul>
     {% for error in errors %}
