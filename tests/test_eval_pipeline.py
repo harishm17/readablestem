@@ -398,3 +398,50 @@ def test_document_eval_drops_a_half_converted_page(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "convert_pdf", convert_pdf)
     report = pe.run_pipeline_eval(config(gold, "document", FakeVisionClient())).report
     assert (report["n"], report["n_planned"], report["stopped_reason"]) == (0, 2, "budget_job_usd")
+
+
+def test_a_page_the_layout_cannot_read_scores_as_found_nothing(monkeypatch, tmp_path):
+    gold = write_gold(
+        tmp_path,
+        [
+            heading("p-1", 0, 2, "One"),
+            heading("p-2", 0, 2, "Two"),
+            equation("p-2", 0, EQ_V, "block"),
+        ],
+    )
+
+    def analyze(pdf_bytes, **_):
+        if pdf_bytes.endswith(b"p-1"):
+            raise layout.LayoutError("unreadable", "cannot open")
+        element = Element(
+            id="p1-e0", kind=Kind.HEADING, page=0, bbox=(0, 0, 1, 1), order=0, text="Two"
+        )
+        return Layout(elements=[element], page_count=1, pages=[0])
+
+    def heading_fixes(elements):
+        return [
+            Fix(
+                element_id=e.id,
+                kind=Kind.HEADING,
+                status=Status.ACCEPTED,
+                heading=HeadingFix(level=1, text=e.text or ""),
+            )
+            for e in elements
+        ]
+
+    monkeypatch.setattr(layout, "analyze", analyze)
+    monkeypatch.setattr(heading_step, "heading_fixes", heading_fixes)
+    report = pe.run_pipeline_eval(config(gold, "headings", FakeVisionClient())).report
+    assert report["complete"] and report["n"] == 2  # a pipeline failure is a result
+    m = report["metrics"]
+    assert (m["recall"], m["precision"], m["page_errors"]) == (0.5, 1.0, {"unreadable": 1})
+    assert "| page_errors | unreadable: 1 |" in pe.format_markdown(report)
+
+    def convert_pdf(pdf_bytes, **_):
+        raise layout.LayoutError("too_many_pages", "too long")
+
+    monkeypatch.setattr(run, "convert_pdf", convert_pdf)
+    report = pe.run_pipeline_eval(config(gold, "document", FakeVisionClient())).report
+    m = report["metrics"]
+    assert report["n"] == 2 and m["page_errors"] == {"too_many_pages": 2}
+    assert (m["detection_recall"], m["predicted_equations"]) == (0.0, 0)

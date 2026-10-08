@@ -140,6 +140,7 @@ maximised. Order matters because one page repeats "Teacher Support" 22 times (an
 | `precision_by_status` | precision of accepted vs needs_review headings |
 | `recall_by_context` | recall per enclosing box (`body` = none); `os-teacher` holds 50 of 121 gold headings |
 | `per_page` | precision, recall and counts per page |
+| `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing" (recall 0 for it), it does not stop the run |
 
 ### figures
 
@@ -192,6 +193,7 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
 | `axe_violations` | same for `html_checks.axe_checks` |
 | `axe_skipped_pages` | pages where axe could not run (its single "skipped" warning) |
+| `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
 
 ### Judge calibration (`eval calibrate`)
 

@@ -640,10 +640,17 @@ def heading_metrics(items: Sequence[dict]) -> dict:
                 "recall": _safe_div(i["matched"], i["n_gold"]),
                 "n_gold": i["n_gold"],
                 "n_pred": i["n_pred"],
+                "error": i.get("error"),
             }
             for i in items
         ],
+        "page_errors": _page_errors(items),
     }
+
+
+def _page_errors(items: Sequence[dict]) -> dict[str, int]:
+    """LayoutError codes per page that could not be analysed (scored as no predictions)."""
+    return dict(sorted(Counter(i["error"] for i in items if i.get("error")).items()))
 
 
 def _page_id(page: Sequence[dict]) -> str:
@@ -655,9 +662,15 @@ def _eval_headings(cfg: EvalConfig, units: list[list[dict]]) -> tuple[list[dict]
     for page in units:
         gold = _of_kind(page, "heading")
         pdf = cfg.media.page_pdf(page)
-        analysed = layout.analyze(pdf)
-        predicted = predicted_headings(heading_step.heading_fixes(analysed.elements))
-        items.append(heading_page_item(_page_id(page), gold, predicted))
+        error = None
+        try:
+            analysed = layout.analyze(pdf)
+            predicted = predicted_headings(heading_step.heading_fixes(analysed.elements))
+        except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
+            predicted, error = [], exc.code
+        item = heading_page_item(_page_id(page), gold, predicted)
+        item["error"] = error
+        items.append(item)
     return items, None
 
 
@@ -867,6 +880,7 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "axe_violations": sum(axe_codes.values()),
         "axe_violation_codes": dict(sorted(axe_codes.items())),
         "axe_skipped_pages": sum(bool(i["axe_skipped"]) for i in items),
+        "page_errors": _page_errors(items),
     }
 
 
@@ -880,6 +894,10 @@ def _eval_document(cfg: EvalConfig, units: list[list[dict]]) -> tuple[list[dict]
             )
         except BudgetExceeded as exc:
             return items, f"budget_{exc.scope}"
+        except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
+            item = document_page_item(_page_id(page), _of_kind(page, "equation"), [], {}, [], [])
+            items.append(item | _calls_summary([]) | {"error": exc.code})
+            continue
         result = output.result
         stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
         if stopped:  # a half-converted page would score as misses; drop it and stop
@@ -1030,6 +1048,8 @@ def _fmt(value: Any, digits: int = 3) -> str:
         return f"{value:.{digits}f}"
     if isinstance(value, (list, tuple)) and len(value) == 2:
         return f"{_fmt(value[0], digits)}-{_fmt(value[1], digits)}"
+    if isinstance(value, dict):  # category counts, e.g. page_errors
+        return ", ".join(f"{k}: {v}" for k, v in value.items()) or "none"
     return str(value)
 
 
@@ -1043,13 +1063,13 @@ HEADLINE = {
     "equations": ["exact_strict", "exact_lenient", "exact_lenient_ci95", "mean_teds",
                   "proposal_rate"],
     "headings": ["precision", "recall", "recall_ci95", "f1", "level_accuracy",
-                 "gold_headings", "predicted_headings"],
+                 "gold_headings", "predicted_headings", "page_errors"],
     "figures": ["proposal_rate", "check_pass_rate", "judge_pass_rate",
                 "judge_pass_rate_ci95", "judge_pass_rate_answered", "judge_mean_score",
                 "judge_factual_error_rate", "judge_errors"],
     "document": ["detection_precision", "detection_recall", "matched_exact_lenient",
                  "end_to_end_exact_lenient", "static_violations", "axe_violations",
-                 "axe_skipped_pages"],
+                 "axe_skipped_pages", "page_errors"],
 }  # fmt: skip
 
 
