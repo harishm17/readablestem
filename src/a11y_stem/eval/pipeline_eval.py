@@ -11,7 +11,9 @@ Each task rebuilds the input the pipeline would see from the gold answer key
 - figures: each gold figure image -> `figure_step.describe` -> graded against the
   OpenStax alt text by the LLM judge (`eval.judge`), plus the step's own checks.
 - document: each gold page printed to PDF -> `run.convert_pdf` -> equations aligned to
-  gold in reading order, and the output HTML's static/axe check results.
+  gold in reading order, and the output HTML's static/axe check results. Predicted
+  equations with no gold match are broken down (prose maths / fragment / other), and
+  gold equations the layout cut into several elements are counted.
 
 Inputs first: every input of the run is built (rendered, printed, downloaded) before
 the first model call. Building them is free, so a failure there (`RenderError`, e.g. an
@@ -63,6 +65,11 @@ TASKS = ("equations", "headings", "figures", "document")
 THRESHOLDS = tuple(round(0.5 + 0.05 * i, 2) for i in range(10))
 HEADING_MATCH_RATIO = 0.85
 EQUATION_ALIGN_MIN = 0.5
+# A predicted equation is a piece of a gold one when this share of its signature appears,
+# in order, in the gold signature (and it is at least two symbols long).
+PIECE_CONTAINMENT = 0.8
+UNMATCHED_REASONS = ("prose_math", "fragment", "other")
+_EDGE_OPERATORS = frozenset("=+-*/^_<>,.;:\u00d7\u00f7\u22c5\u2264\u2265\u2260\u2248")
 ROUTES = ("cheap", "main", "escalated", "fallback", "none", "other")
 MINUS_SIGN = chr(0x2212)
 
@@ -140,6 +147,14 @@ def heading_signature(text: str | None) -> str:
     folded = unicodedata.normalize("NFKC", text or "").casefold()
     kept = "".join(ch if ch.isalnum() else " " for ch in folded)
     return " ".join(kept.split())
+
+
+def containment(part: str, whole: str) -> float:
+    """Share of `part`'s characters found in order in `whole`; 0 when either is empty."""
+    if not part or not whole:
+        return 0.0
+    matcher = difflib.SequenceMatcher(None, part, whole, autojunk=False)
+    return sum(block.size for block in matcher.get_matching_blocks()) / len(part)
 
 
 def similarity(a: str, b: str) -> float:
@@ -893,6 +908,13 @@ def document_page_item(
     A predicted equation's signature is its proposed MathML's token text and, as a
     second chance, the PDF text of its region: detection is credited even when the
     transcription is wrong (that shows up in exact_lenient instead).
+
+    Predictions without a gold match are not all the same kind of mistake, so each one
+    gets a reason (`unmatched_reason`): a "fragment" (a piece of a gold equation the
+    layout cut apart, or text that cannot be a whole formula: it starts or ends with an
+    operator, or its brackets do not balance), "prose_math" (an inline formula that is
+    whole, typically maths the source wrote as text, so the gold has no MathML for it),
+    or "other". A gold equation is "split" when two or more predictions are pieces of it.
     """
     predicted = sorted((e for e in elements if e.kind == Kind.EQUATION), key=lambda e: e.order)
     gold_sigs = [math_signature(g["mathml"]) for g in gold]
@@ -931,6 +953,21 @@ def document_page_item(
             }
         )
     matched_gold = {gi for gi, _, _ in pairs}
+    pieces = _split_pieces(gold, gold_sigs, predicted, pred_sigs, pairs)
+    unmatched = []
+    for pi, element in enumerate(predicted):
+        if any(pi == p for _, p, _ in pairs):
+            continue
+        reason = _unmatched_reason(element, pred_sigs[pi], pi in pieces)
+        unmatched.append(
+            {
+                "element_id": element.id,
+                "pred_display": element.display,
+                "reason": reason,
+                "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
+            }
+        )
+    split = _split_gold(gold, pairs, pieces)
     return {
         "id": page_id,
         "n_gold": len(gold),
@@ -939,10 +976,93 @@ def document_page_item(
         "matched": len(pairs),
         "pairs": matched,
         "missed_gold_ids": [g["id"] for i, g in enumerate(gold) if i not in matched_gold],
+        "unmatched": unmatched,
+        "unmatched_by_reason": {
+            reason: sum(u["reason"] == reason for u in unmatched) for reason in UNMATCHED_REASONS
+        },
+        "split_gold_ids": split,
         "static_violations": _failed_codes(static),
         "axe_violations": _failed_codes(axe) if axe_status(axe) == "ran" else [],
         "axe_status": axe_status(axe),
     }
+
+
+def _split_pieces(
+    gold: Sequence[dict],
+    gold_sigs: Sequence[str],
+    predicted: Sequence[Element],
+    pred_sigs: Sequence[tuple[str, str]],
+    pairs: Sequence[tuple[int, int, float]],
+) -> dict[int, int]:
+    """Unmatched prediction index -> index of the gold equation it is a piece of.
+
+    Candidates are the gold equations near it in reading order (between the gold
+    equations matched just before and just after it, both included) of the same display
+    type; an inline piece must also sit in the same paragraph as the gold equation's
+    matched prediction, if it has one. A piece is at least two symbols long, and
+    PIECE_CONTAINMENT of it appears in order in the gold equation. ("d0" mentioned in
+    the paragraph above "Delta d = d_f - d_0" is not a piece of that display equation.)
+    """
+    by_pred = {pi: gi for gi, pi, _ in pairs}
+    by_gold = {gi: pi for gi, pi, _ in pairs}
+    matched_preds = sorted(by_pred)
+    pieces: dict[int, int] = {}
+    for pi, element in enumerate(predicted):
+        signatures = [sig for sig in pred_sigs[pi] if len(sig) >= 2]
+        if pi in by_pred or not signatures:
+            continue
+        before = [p for p in matched_preds if p < pi]
+        after = [p for p in matched_preds if p > pi]
+        lo = by_pred[before[-1]] if before else 0
+        hi = by_pred[after[0]] if after else len(gold) - 1
+        best, best_share = None, PIECE_CONTAINMENT
+        for gi in range(lo, hi + 1):
+            if (gold[gi].get("display") or "block") != (element.display or "block"):
+                continue
+            host = by_gold.get(gi)
+            elsewhere = host is not None and predicted[host].parent_id != element.parent_id
+            if element.display == "inline" and elsewhere:
+                continue
+            share = max(containment(sig, gold_sigs[gi]) for sig in signatures)
+            if share >= best_share:
+                best, best_share = gi, share
+        if best is not None:
+            pieces[pi] = best
+    return pieces
+
+
+def _split_gold(
+    gold: Sequence[dict], pairs: Sequence[tuple[int, int, float]], pieces: dict[int, int]
+) -> list[str]:
+    """Ids of gold equations that came out as two or more predicted elements."""
+    counts = Counter(gi for gi, _, _ in pairs)
+    counts.update(pieces.values())
+    return [gold[gi]["id"] for gi, n in sorted(counts.items()) if n >= 2]
+
+
+def _unmatched_reason(element: Element, sigs: tuple[str, str], piece: bool) -> str:
+    text = sigs[1] or sigs[0]
+    broken = (
+        not text
+        or text[0] in _EDGE_OPERATORS - {"-"}
+        or text[-1] in _EDGE_OPERATORS - {".", ","}
+        or _brackets_broken(text)
+    )
+    if piece or broken:
+        return "fragment"
+    return "prose_math" if element.display == "inline" else "other"
+
+
+def _brackets_broken(text: str) -> bool:
+    depth = 0
+    for c in text:
+        if c in "([{":
+            depth += 1
+        elif c in ")]}":
+            depth -= 1
+            if depth < 0:
+                return True
+    return depth != 0
 
 
 AXE_SKIP_CODES = {"skipped", "axe_skipped"}
@@ -981,6 +1101,10 @@ def document_metrics(items: Sequence[dict]) -> dict:
         by_display[display] = {"n_gold": n_gold, "recall": _safe_div(found, n_gold)}
     static_codes: Counter[str] = Counter(c for i in items for c in i["static_violations"])
     axe_codes: Counter[str] = Counter(c for i in items for c in i["axe_violations"])
+    unmatched = {
+        reason: sum(i.get("unmatched_by_reason", {}).get(reason, 0) for i in items)
+        for reason in UNMATCHED_REASONS
+    }
     return {
         "gold_equations": gold,
         "predicted_equations": pred,
@@ -991,6 +1115,14 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "matched_exact_lenient": rate(p["exact_lenient"] for p in pairs),
         "matched_mean_teds": mean(p["teds"] for p in pairs),
         "end_to_end_exact_lenient": _safe_div(sum(p["exact_lenient"] for p in pairs), gold),
+        # Why the unmatched predictions did not match, and the precision without the
+        # whole inline formulas the gold has no MathML for (maths written as text).
+        "unmatched_predicted": pred - matched,
+        "unmatched_by_reason": unmatched,
+        "detection_precision_excluding_prose_math": _safe_div(
+            matched, pred - unmatched["prose_math"]
+        ),
+        "split_gold_equations": sum(len(i.get("split_gold_ids", [])) for i in items),
         "static_violations": sum(static_codes.values()),
         "static_violation_codes": dict(sorted(static_codes.items())),
         "axe_violations": sum(axe_codes.values()),
@@ -1214,8 +1346,10 @@ HEADLINE = {
                 "judge_pass_rate_ci95", "judge_pass_rate_answered", "judge_mean_score",
                 "judge_factual_error_rate", "judge_errors"],
     "document": ["detection_precision", "detection_recall", "matched_exact_lenient",
-                 "end_to_end_exact_lenient", "static_violations", "axe_violations",
-                 "axe_checked_pages", "axe_skipped_pages", "axe_error_pages", "page_errors"],
+                 "end_to_end_exact_lenient", "unmatched_predicted",
+                 "detection_precision_excluding_prose_math", "split_gold_equations",
+                 "static_violations", "axe_violations", "axe_checked_pages",
+                 "axe_skipped_pages", "axe_error_pages", "page_errors"],
 }  # fmt: skip
 
 
@@ -1245,6 +1379,9 @@ def format_markdown(report: dict) -> str:
             f"Budget recorded ${cost['budget_spent_usd']:.4f}: ${cost['dropped_usd']:.4f} "
             "went to items dropped at the budget stop."
         )
+    if report["task"] == "document":
+        lines += ["", "### Unmatched predicted equations", ""]
+        lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())
     if report["task"] == "equations":
         lines += ["", "### Selective prediction (keep proposals with confidence >= t)", ""]
         lines += _table(
