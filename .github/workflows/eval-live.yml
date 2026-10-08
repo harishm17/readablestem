@@ -1,0 +1,68 @@
+name: Eval (live model)
+
+# Manual only: this calls the OpenAI API and costs money. The eval itself refuses to
+# spend more than --max-usd; the check below also refuses caps above 10 USD per run.
+
+on:
+  workflow_dispatch:
+    inputs:
+      max_usd:
+        description: "Spend cap for this run, in USD (0 < cap <= 10)"
+        required: true
+        default: "1.00"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: eval-live
+  cancel-in-progress: false
+
+jobs:
+  equations:
+    name: eval pipeline --task equations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Inputs reach the shell as environment variables, never pasted into the script.
+      - name: Check the spend cap and the API key
+        env:
+          MAX_USD: ${{ inputs.max_usd }}
+          HAS_KEY: ${{ secrets.OPENAI_API_KEY != '' }}
+        run: |
+          if ! [[ "$MAX_USD" =~ ^[0-9]+(\.[0-9]+)?$ ]] \
+            || ! awk -v v="$MAX_USD" 'BEGIN { exit !(v > 0 && v <= 10) }'; then
+            echo "::error::max_usd must be a number above 0 and at most 10 (got '$MAX_USD')"
+            exit 1
+          fi
+          if [ "$HAS_KEY" != "true" ]; then
+            echo "::error::repository secret OPENAI_API_KEY is not set"
+            exit 1
+          fi
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked, with the browser group for rendering equations)
+        run: uv sync --locked --all-groups
+      - name: Install Chromium
+        run: uv run playwright install --with-deps chromium
+      - name: Run the equations eval (live model, capped)
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          MAX_USD: ${{ inputs.max_usd }}
+        run: uv run a11y-stem eval pipeline --task equations --max-usd "$MAX_USD"
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: eval-equations-${{ github.run_id }}
+          path: |
+            data/eval/
+            .local/eval/
+          if-no-files-found: warn
+          retention-days: 30
