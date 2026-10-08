@@ -342,6 +342,17 @@ def active_classes(page) -> str:
     return page.evaluate("document.activeElement.className || document.activeElement.tagName")
 
 
+def assert_summary_focused(page, timeout_s: float = 5.0) -> None:
+    """Chromium applies `autofocus` at the next rendering opportunity after load, so on a
+    slow machine (GitHub Actions) focus can still be on <body> right after the response
+    arrives. Poll from Python: this test runs with page JavaScript disabled."""
+    deadline = time.monotonic() + timeout_s
+    while "error-summary" not in (classes := active_classes(page)):
+        if time.monotonic() > deadline:
+            raise AssertionError(f"focus is on {classes!r}, not the error summary")
+        time.sleep(0.05)
+
+
 def test_the_error_summary_takes_focus_after_every_failed_form(site, browser):
     """Focus used to stay on <body>: keyboard users had to tab past the header to reach
     the summary, and role=alert on page load is not reliably announced."""
@@ -349,18 +360,18 @@ def test_the_error_summary_takes_focus_after_every_failed_form(site, browser):
     page = context.new_page()
     page.goto(f"{site.base}/dev-login")
     page.get_by_role("button", name="Sign in").click()  # empty email
-    assert "error-summary" in active_classes(page)
+    assert_summary_focused(page)
 
     sign_in(page, site.base, ALICE)
     page.goto(f"{site.base}/app")
     page.get_by_role("button", name="Upload and convert").click()  # no file chosen
-    assert "error-summary" in active_classes(page)
+    assert_summary_focused(page)
 
     sign_in(page, site.base, ADMIN)
     page.goto(f"{site.base}/admin")
     page.get_by_label("Email address to allow").fill("not an email")
     page.get_by_role("button", name="Allow", exact=True).click()
-    assert "error-summary" in active_classes(page)
+    assert_summary_focused(page)
     context.close()
 
 
