@@ -46,8 +46,9 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 |---|---|---|
 | Heading | `<h1>`-`<h6>` from the heading fix | `<p>` with the original text |
 | Paragraph | `<p>`, inline equations placed at their markers | (no fix) |
-| Inline equation | `<math display="inline">` inside the paragraph | the crop inline, outlined, with "(equation not converted)" |
-| Block equation | `<div class="equation"><math display="block">` | `<div class="flagged">`: the crop plus a note |
+| List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
+| Inline equation | `<math display="inline">` inside the paragraph or list item | the crop inline, outlined, with "(equation not converted)" |
+| Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
 | Figure | `<figure><img alt="..."><figcaption>` | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
 
@@ -71,6 +72,55 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
+
+## Lists
+
+Layout reports each list item as an element of its own (`Kind.LIST_ITEM`) with the marker
+as printed (`list_marker`: "•", "a.", "(iii)"), `list_ordered` and `list_level`
+(docs/layout.md, "Lists"). The assembler turns consecutive items back into lists:
+
+- An item one level deeper nests inside the `<li>` before it. Levels are taken relative
+  to the first item and never go more than one deeper than the item before, so every
+  nested list has a parent item (a list starting at level 2, or a jump from 1 to 3,
+  still nests correctly).
+- At one level, items of one family share a list: bullets; numbers printed the same way
+  ("1." "2."); letters or roman numerals printed the same way ("a." "b.", "(i)" "(ii)").
+  A different family starts a new list. The glyph of a bullet is not kept: browsers
+  choose disc, circle and square by nesting depth.
+- A regular ordered list (markers counting up by one, ending in a full stop) is an `<ol>`
+  with `type="a"`, `"A"`, `"i"` or `"I"` and `start` when it does not start at 1, and the
+  browser prints the markers. Single letters are letters ("h. i. j." is h to j);
+  otherwise roman numerals ("i. ii. iii.").
+- Anything else ("(a)", "3)", a gap in the numbering, mixed case) keeps the printed
+  marker as text in `<span class="list-marker">` inside a list with `list-style: none`
+  and `role="list"` (Safari drops the list semantics of a list without a list style).
+- A paragraph or heading between items ends the list; a numbered list that resumes
+  after it gets `start`, so the numbers stay right. A display equation inside an item
+  also ends the list in the HTML (layout keeps the nesting level across it).
+
+```html
+<ol><li id="p1-e34">Compute <math ...>...</math> with the fundamental theorem.</li>
+<li id="p1-e36">Show that<ol class="printed-markers" role="list">
+  <li id="p1-e37"><span class="list-marker">(a)</span> <math ...>...</math>, and</li>
+  <li id="p1-e39"><span class="list-marker">(b)</span> the area under ...</li></ol></li>
+<li id="p1-e44">Estimate the integral in the first exercise with four strips.</li></ol>
+```
+
+## Equation numbers
+
+A display equation's number (`Element.equation_label`, "(2.4)", "2.4", "Eq. 2.4") is not
+part of its crop or its MathML: layout keeps it out (docs/layout.md). The assembler writes
+it after the maths, as printed, with a visually hidden "Equation " in front so a screen
+reader says "Equation (2.4)" rather than a bare number:
+
+```html
+<div class="equation equation-labelled" id="p3-e5"><math display="block">...</math>
+  <span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.4</span></div>
+```
+
+The wrapper is a flex row: the maths takes the remaining width and stays centred, the
+number sits at the right. An equation that was not converted keeps its number too,
+after the original image in the flagged box.
 
 ## Flagged items
 
@@ -98,7 +148,7 @@ Layout writes a marker such as `⟦p1-e7⟧` (`core.types.inline_marker`) into t
 text where an inline equation sits, and gives the equation `parent_id` = the paragraph.
 The assembler replaces each marker with the equation's MathML, or with the flagged crop.
 
-- Markers are honoured in paragraphs, headings and figure captions.
+- Markers are honoured in paragraphs, list items, headings and figure captions.
 - An equation whose marker is not found is rendered at its own position as a block, so
   nothing is lost.
 - A marker with no matching equation is left as text. That only happens if layout has a
@@ -166,13 +216,16 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 
 ## Styling
 
-About 25 lines of inline CSS:
+About 35 lines of inline CSS:
 
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
   (about 17:1 contrast);
 - images at their printed size (PDF points x 96/72) and never wider than the column;
 - block maths keep the browser's own `display: block math` and centring (overriding
   `display` on `<math>` breaks MathML layout);
+- lists with a hanging indent for printed markers, equation numbers to the right of
+  their equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
+  readers still read it);
 - a visible `:focus-visible` outline and a print rule that keeps flagged boxes together.
 
 There is no dark mode yet.
@@ -190,6 +243,7 @@ There is no dark mode yet.
 | `html.heading_text` | `empty_heading` |
 | `html.img_alt` | `img_missing_alt` (`alt=""` is allowed) |
 | `html.unique_ids` | `duplicate_id` |
+| `html.list_structure` | `list_structure` (an `<li>` outside `<ul>`/`<ol>`, or an element other than `<li>` or text directly in one; axe's `list` and `listitem` rules) |
 | `html.math_display` | `math_missing_display` (warning) |
 | `html.self_contained` | `external_resource` |
 | `html.wording` | `banned_wording` |
@@ -282,7 +336,7 @@ Fixes:
 Model calls: 2
 Cost:        $0.0044 (fake client, nothing billed)
 Time:        0.0 s
-Checks:      static 10/10 passed
+Checks:      static 11/11 passed
              axe-core no violations
 wrote /tmp/wp4-demo/notes.html
 wrote /tmp/wp4-demo/notes.json
