@@ -257,6 +257,24 @@ def test_jobs_of_removed_users_are_skipped_by_the_skip_locked_claim(factory, tmp
     assert claim is not None and claim.job_id == second
 
 
+def test_queue_position_follows_the_claim_order_on_postgres(factory, tmp_path):
+    """views.queue_ahead compares (attempts, created_at, id) as a row value, the order
+    Worker.claim takes jobs in; checked here against the real claims."""
+    from a11y_stem.web.views import queue_ahead
+
+    retried, fresh, last = queue_jobs(factory, 3)
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, retried)
+        assert job is not None
+        job.attempts = 1  # requeued after a lost lease: goes behind fresh jobs
+    with db.session_scope(factory) as session:
+        ahead = {j: queue_ahead(session, session.get(db.Job, j)) for j in (retried, fresh, last)}  # type: ignore[arg-type]
+    assert ahead == {fresh: 0, last: 1, retried: 2}
+    worker = make_worker(factory, tmp_path)
+    claimed = [worker.claim() for _ in range(3)]
+    assert [c.job_id for c in claimed if c] == [fresh, last, retried]
+
+
 def test_worker_stores_results_with_postgres_types(factory, tmp_path):
     [job_id] = queue_jobs(factory, 1)
     worker = make_worker(factory, tmp_path)
