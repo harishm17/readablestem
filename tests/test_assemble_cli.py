@@ -178,8 +178,24 @@ def test_budget_stop_is_reported(pdf, tmp_path, pipeline, monkeypatch, capsys):
     )
     assert run(pdf, "--out", tmp_path / "o.html", "--fake") == 0
     out = capsys.readouterr().out
-    assert "Budget:      stopped early (budget_job_calls); 1 item(s) kept as originals" in out
+    assert (
+        "Budget:      stopped early (budget_job_calls: MAX_MODEL_CALLS_PER_JOB); "
+        "1 item(s) kept as originals"
+    ) in out
     assert "Model calls: 1" in out
+
+
+def test_run_cap_is_named_as_the_max_usd_cap(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    monkeypatch.setattr(
+        models,
+        "make_vision_client",
+        lambda settings, budget, *, fake: FakeVisionClient(budget=budget),
+        raising=False,
+    )
+    assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "0.0001") == 0
+    out = capsys.readouterr().out
+    assert "stopped early (budget_daily: the --max-usd cap for this run); 2 item(s)" in out
+    assert "Model calls: 0" in out
 
 
 def test_axe_flag_runs_axe_and_summarises_rule_ids(pdf, tmp_path, pipeline, monkeypatch, capsys):
@@ -193,6 +209,14 @@ def test_axe_flag_says_when_it_was_skipped(pdf, tmp_path, pipeline, monkeypatch,
     monkeypatch.setattr(html_checks, "axe_checks", lambda html: [html_checks.AXE_SKIPPED])
     assert run(pdf, "--out", tmp_path / "o.html", "--fake", "--axe") == 0
     assert "axe-core skipped (needs the browser group" in capsys.readouterr().out
+
+
+def test_axe_error_is_not_reported_as_a_violation(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    error = Check(name="axe", passed=False, severity="warning", code="axe_error")
+    monkeypatch.setattr(html_checks, "axe_checks", lambda html: [error])
+    assert run(pdf, "--out", tmp_path / "o.html", "--fake", "--axe") == 0
+    out = capsys.readouterr().out
+    assert "axe-core could not run (browser error" in out and "violated" not in out
 
 
 def test_help_lists_convert(capsys):
@@ -246,6 +270,18 @@ def test_missing_and_unreadable_files_exit_2(tmp_path, pipeline, capsys):
 def test_output_path_that_is_a_directory_exits_2(pdf, tmp_path, pipeline, capsys):
     assert run(pdf, "--out", tmp_path, "--fake") == 2
     assert "is a directory" in capsys.readouterr().err
+
+
+def test_never_overwrites_the_input_pdf(pdf, tmp_path, pipeline, monkeypatch, capsys):
+    original = pdf.read_bytes()
+    assert run(pdf, "--out", pdf, "--fake") == 2
+    assert "is the input PDF" in capsys.readouterr().err
+    monkeypatch.chdir(tmp_path)  # the same file through a relative path
+    assert run(pdf, "--out", "notes.pdf", "--fake", "--report", "r.json") == 2
+    assert run(pdf, "--out", "o.html", "--fake", "--report", "notes.pdf") == 2
+    assert run(pdf, "--out", "o.html", "--fake", "--report", "o.html") == 2
+    assert "must be different files" in capsys.readouterr().err
+    assert pdf.read_bytes() == original
 
 
 def test_layout_errors_exit_2_with_their_code(pdf, tmp_path, pipeline, monkeypatch, capsys):

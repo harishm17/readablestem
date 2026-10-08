@@ -34,6 +34,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - `<title>` is the PDF title or the first level-1 heading, else "Converted document".
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
+- If two fixes name the same element, the first one wins, as in `DocumentResult.fix_for`.
 
 ## How each element is written
 
@@ -254,6 +255,11 @@ wrote /tmp/wp4-demo/notes.json
 
 `--report` writes `{"result": DocumentResult without html, "checks": [...], "axe": [...]}`.
 It contains document text, so treat it like the HTML.
+
+When a limit stops the run, the summary names it, e.g. `Budget: stopped early
+(budget_daily: the --max-usd cap for this run)`. The run cap is an `InMemorySpendGuard`,
+which reports the scope `daily` because it stands in for the web app's daily cap.
+`--out` and `--report` may not be the input PDF or each other.
 
 ## Engineering limits (input for the known-limits copy)
 

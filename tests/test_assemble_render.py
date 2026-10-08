@@ -491,6 +491,22 @@ def test_duplicate_element_ids_are_used_once():
     assert "<p>t1</p>" in html
 
 
+def test_first_fix_for_an_element_wins_like_fix_for():
+    failed = Fix(element_id="e1", kind=Kind.EQUATION, status=Status.FAILED, reason="x")
+    html = render([equation("e1", 0)], [failed, accepted("e1", convert("y"))], {"e1": png()})
+    assert 'data-status="failed"' in html and "<math" not in html
+    assert "<li>Equations (1): 1 not converted (error or spending limit)</li>" in html
+
+
+def test_a_repeated_marker_is_flagged_and_counted_once():
+    text = "a ⟦e1⟧ b ⟦e1⟧ c"
+    para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text=text)
+    abstained = Fix(element_id="e1", kind=Kind.EQUATION, status=Status.ABSTAINED)
+    html = render([para, equation("e1", 1, parent="p")], [abstained], {"e1": png()})
+    assert html.count('class="flagged-inline"') == 2 and html.count('id="e1"') == 1
+    assert "<p>1 item could not be converted. They keep the original" in html
+
+
 # --------------------------------------------------------------------------- about
 
 

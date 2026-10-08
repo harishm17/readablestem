@@ -544,13 +544,60 @@ def test_tracer_spans_are_content_free(fake):
     assert "A cart on a ramp." not in everything and "frac" not in everything
 
 
-def test_a_broken_tracer_never_stops_a_conversion(fake):
-    class BrokenTracer:
-        def span(self, name, **attrs):
+class FailingTracer:
+    """A tracer whose spans fail to open, or fail when they close (e.g. a flush error)."""
+
+    def __init__(self, *, on_enter: bool) -> None:
+        self.on_enter = on_enter
+        self.closed_with: list[type[BaseException] | None] = []
+
+    @contextlib.contextmanager
+    def span(self, name, **attrs):
+        if self.on_enter:
             raise RuntimeError("tracing backend down")
+        try:
+            yield None
+        except BaseException as exc:
+            self.closed_with.append(type(exc))
+            raise RuntimeError("flush failed on close") from None
+        self.closed_with.append(None)
+        raise RuntimeError("flush failed on close")
 
-        def flush(self) -> None:
-            return None
+    def flush(self) -> None:
+        return None
 
-    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=BrokenTracer())
+
+@pytest.mark.parametrize("on_enter", [True, False])
+def test_a_broken_tracer_never_stops_a_conversion(fake, on_enter):
+    tracer = FailingTracer(on_enter=on_enter)
+    output = convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
     assert {f.status for f in output.result.fixes} == {Status.ACCEPTED}
+    assert output.result.html
+
+
+def test_a_tracer_cannot_swallow_a_real_error(monkeypatch):
+    def unreadable(pdf_bytes, *, pages=None, max_pages=None):
+        raise LayoutError("unreadable", "bad PDF")
+
+    monkeypatch.setattr(layout, "analyze", unreadable)
+    tracer = FailingTracer(on_enter=False)
+    with pytest.raises(LayoutError):
+        convert_pdf(b"%PDF", settings=settings(), client=fake_client(), tracer=tracer)
+    assert tracer.closed_with == [LayoutError]
+
+
+def test_inline_equation_alone_in_its_paragraph_gets_the_neighbours(fake):
+    fake.layout = Layout(
+        elements=[
+            el("p1-e0", Kind.PARAGRAPH, 0, 0, text="The kinetic energy is"),
+            el("p1-e1", Kind.PARAGRAPH, 0, 1, text=inline_marker("p1-e2")),
+            el("p1-e2", Kind.EQUATION, 0, 2, display="inline", parent_id="p1-e1"),
+            el("p1-e3", Kind.PARAGRAPH, 0, 3, text="where m is the mass ⟦a, b⟧."),
+        ],
+        page_count=1,
+        pages=[0],
+    )
+    convert_pdf(b"%PDF", settings=settings(), client=fake_client())
+    assert fake.contexts["p1-e2"] == (
+        "The kinetic energy is\n[this equation]\nwhere m is the mass ⟦a, b⟧."
+    )  # the parent (only a marker) is skipped; interval brackets are not markers

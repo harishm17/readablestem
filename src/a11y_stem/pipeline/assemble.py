@@ -79,7 +79,10 @@ STATUS_LABELS = {
 }
 
 _MARKER_OPEN, _MARKER_CLOSE = INLINE_MARKER.split("{id}")
-_MARKER = re.compile(
+# One inline-equation marker (`core.types.inline_marker`); group 1 is the element id.
+# Ids never contain spaces, so maths written with these brackets ("⟦a, b⟧") is not one.
+# `run` uses the same pattern for the context text it sends to models.
+INLINE_MARKER_RE = re.compile(
     re.escape(_MARKER_OPEN)
     + r"([^\s"
     + re.escape(_MARKER_OPEN + _MARKER_CLOSE)
@@ -224,13 +227,17 @@ def _clean_lang(lang: str) -> str:
 
 
 def _clean_title(title: str | None) -> str:
-    text = _MARKER.sub("[equation]", title or "")
+    text = INLINE_MARKER_RE.sub("[equation]", title or "")
     text = " ".join(text.split())
     return text or DEFAULT_TITLE
 
 
+def _is_png(data: bytes | None) -> bool:
+    return data is not None and data.startswith(_PNG_SIGNATURE)
+
+
 def _png_data_uri(png: bytes | None) -> str | None:
-    if not png or not png.startswith(_PNG_SIGNATURE):
+    if png is None or not _is_png(png):
         return None
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
 
@@ -262,7 +269,7 @@ class _Renderer:
     equations: dict[str, Element]
     used_ids: set[str] = field(default_factory=lambda: {ABOUT_ID, ABOUT_TITLE_ID})
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
-    flagged: int = 0
+    flagged: set[str] = field(default_factory=set)  # ids shown as originals
     last_heading: int = 0
 
     # ----- ids and text
@@ -283,7 +290,7 @@ class _Renderer:
     def rich(self, text: str) -> str:
         """Escaped text with inline-equation markers replaced by maths (or a flag)."""
         out, pos = [], 0
-        for match in _MARKER.finditer(text):
+        for match in INLINE_MARKER_RE.finditer(text):
             equation = self.equations.get(match.group(1))
             if equation is None:
                 continue  # not one of ours: leave the characters as text
@@ -359,7 +366,7 @@ class _Renderer:
         mathml, reason = self.converted_mathml(element, "inline", with_id=True)
         if mathml is not None:
             return mathml
-        self.flagged += 1
+        self.flagged.add(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
@@ -388,7 +395,7 @@ class _Renderer:
             reason = "no_output"
         else:
             alt = "" if fix.figure.decorative else fix.figure.alt.strip()
-            if _png_data_uri(self.crops.get(element.id)) is not None:
+            if _is_png(self.crops.get(element.id)):
                 image = self.original(element, alt)
             else:  # no crop to show: the description itself is the content
                 image = f"<p>{_escape(alt)}</p>" if alt else ""
@@ -410,7 +417,7 @@ class _Renderer:
         return unavailable
 
     def flag_block(self, element: Element, reason: str, body: str, label: str, note: str) -> str:
-        self.flagged += 1
+        self.flagged.add(element.id)
         fix = self.fixes.get(element.id)
         attrs = self.id_attr(element.id) + _fix_attrs(fix, reason)
         return (
@@ -435,7 +442,7 @@ def _placed_equations(
             texts.append(renderer.heading_parts(element)[1])
         elif element.kind is Kind.FIGURE:
             texts.append(element.caption or "")
-    found = {m.group(1) for text in texts for m in _MARKER.finditer(text)}
+    found = {m.group(1) for text in texts for m in INLINE_MARKER_RE.finditer(text)}
     return found & equation_ids
 
 
@@ -459,8 +466,9 @@ def _about_section(fixes: list[Fix], flagged: int, source_note: str | None) -> s
     )
     flagged_note = (
         f"<p>{flagged} item{'s' if flagged != 1 else ''} could not be converted. "
-        "They are shown as images of the original page, outlined and labelled "
-        "&ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;.</p>"
+        "They keep the original (an image of the page where one is available), "
+        "outlined and labelled &ldquo;Not converted&rdquo; or "
+        "&ldquo;Needs a description&rdquo;.</p>"
         if flagged
         else ""
     )
@@ -512,17 +520,21 @@ def render_html(
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
-    `fixes` are matched to elements by id (the last fix for an id wins). `crops` maps
+    `fixes` are matched to elements by id (the first fix for an id wins, as in
+    `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
     element ids to PNG bytes; they are embedded as data: URIs only where an image is
     shown (figures, and equations that were not converted). `source_note` is plain text
     for the about section, e.g. an OpenStax attribution.
     """
     ordered = sorted(elements, key=lambda e: e.order)
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
-    renderer = _Renderer(fixes={f.element_id: f for f in fixes}, crops=crops, equations=equations)
+    first_fix: dict[str, Fix] = {}
+    for fix in fixes:  # first wins, like DocumentResult.fix_for
+        first_fix.setdefault(fix.element_id, fix)
+    renderer = _Renderer(fixes=first_fix, crops=crops, equations=equations)
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = [chunk for chunk in (renderer.render(e) for e in ordered) if chunk]
-    about = _about_section(fixes, renderer.flagged, source_note)
+    about = _about_section(list(first_fix.values()), len(renderer.flagged), source_note)
     return "\n".join(
         [
             "<!doctype html>",

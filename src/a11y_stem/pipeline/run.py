@@ -35,7 +35,7 @@ from bisect import bisect_left
 from collections import Counter, defaultdict
 from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
-from contextlib import ExitStack, contextmanager
+from contextlib import contextmanager
 from dataclasses import dataclass
 from functools import partial
 from typing import Any
@@ -45,7 +45,6 @@ from pydantic import Field
 from a11y_stem.config import Settings
 from a11y_stem.core.budget import BudgetExceeded
 from a11y_stem.core.types import (
-    INLINE_MARKER,
     Check,
     ConversionOutput,
     DocumentResult,
@@ -77,7 +76,6 @@ ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 
 # Neighbouring text sent with each crop as untrusted context (the client fences it).
 CONTEXT_CHARS = 600
-_MARKER_OPEN, _MARKER_CLOSE = INLINE_MARKER.split("{id}")
 _TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING)
 _MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE)
 
@@ -160,32 +158,39 @@ def _annotate(span: Any, **attrs: Any) -> None:
 
 @contextmanager
 def _span(tracer: Tracer, name: str, **attrs: Any) -> Generator[Any]:
-    """`tracer.span`, except that a tracer failing to open a span never stops the work."""
-    with ExitStack() as stack:
-        try:
-            span = stack.enter_context(tracer.span(name, **attrs))
-        except Exception:
-            log.debug("tracer could not open a %s span", name)
-            span = None
+    """`tracer.span`, except that tracing never changes the outcome of the work.
+
+    A tracer that fails to open or close a span is logged at debug level and ignored;
+    an exception from the work itself always propagates (a tracer cannot swallow it).
+    """
+    try:
+        manager = tracer.span(name, **attrs)
+        span = manager.__enter__()
+    except Exception:
+        log.debug("tracer could not open a %s span", name)
+        yield None
+        return
+    try:
         yield span
+    except BaseException as exc:
+        try:
+            manager.__exit__(type(exc), exc, exc.__traceback__)
+        except Exception:
+            log.debug("tracer could not close a %s span", name)
+        raise
+    else:
+        try:
+            manager.__exit__(None, None, None)
+        except Exception:
+            log.debug("tracer could not close a %s span", name)
 
 
 # --------------------------------------------------------------------------- context
 
 
-def _without_markers(text: str, own_id: str | None = None) -> str:
-    """Document text for the model: our inline markers become readable placeholders."""
-    if own_id is not None:
-        text = text.replace(inline_marker(own_id), "[this equation]")
-    out, pos = [], 0
-    while (start := text.find(_MARKER_OPEN, pos)) != -1:
-        end = text.find(_MARKER_CLOSE, start)
-        if end == -1:
-            break
-        out.append(text[pos:start] + "[equation]")
-        pos = end + len(_MARKER_CLOSE)
-    out.append(text[pos:])
-    return "".join(out)
+def _without_markers(text: str) -> str:
+    """Document text for the model: our inline markers become a readable placeholder."""
+    return assemble.INLINE_MARKER_RE.sub("[equation]", text)
 
 
 def _head(text: str, limit: int) -> str:
@@ -223,12 +228,18 @@ def _neighbour_context(element: Element, before: str | None, after: str | None) 
     return "\n".join(parts) if (before or after) else None
 
 
+def _first_text(elements: list[Element], indexes: Iterable[int], skip: str | None) -> str | None:
+    """Text of the first element at `indexes` that is not `skip` (the parent paragraph)."""
+    return next((elements[i].text for i in indexes if elements[i].id != skip), None)
+
+
 def context_texts(elements: list[Element]) -> dict[str, str | None]:
     """Untrusted neighbouring text for each equation and figure (reading order).
 
     Inline equations get a window of their own paragraph around their marker. Block
-    equations and figures get the end of the previous text element and the start of the
-    next one, ~CONTEXT_CHARS in total. Inline markers become "[equation]".
+    equations and figures (and an inline equation alone in its paragraph) get the end
+    of the previous text element and the start of the next one, ~CONTEXT_CHARS in
+    total. Inline markers become "[equation]".
     """
     by_id = {e.id: e for e in elements}
     text_at = [i for i, e in enumerate(elements) if e.kind in _TEXT_KINDS and e.text]
@@ -238,11 +249,14 @@ def context_texts(elements: list[Element]) -> dict[str, str | None]:
             continue
         parent = by_id.get(element.parent_id or "")
         if parent is not None and parent.text and inline_marker(element.id) in parent.text:
-            result[element.id] = _inline_context(element, parent)
-            continue
+            context = _inline_context(element, parent)
+            if context is not None:
+                result[element.id] = context
+                continue
+        skip = parent.id if parent is not None else None
         pos = bisect_left(text_at, index)  # first text element after this one
-        before = elements[text_at[pos - 1]].text if pos > 0 else None
-        after = elements[text_at[pos]].text if pos < len(text_at) else None
+        before = _first_text(elements, (text_at[i] for i in range(pos - 1, -1, -1)), skip)
+        after = _first_text(elements, (text_at[i] for i in range(pos, len(text_at))), skip)
         result[element.id] = _neighbour_context(element, before, after)
     return result
 

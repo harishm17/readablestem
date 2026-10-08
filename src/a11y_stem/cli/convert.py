@@ -115,6 +115,14 @@ def _make_client(settings: Settings, budget: JobBudget, *, fake: bool) -> Vision
 
 # --------------------------------------------------------------------------- output
 
+# What each budget reason means in a CLI run. The run cap is an InMemorySpendGuard, which
+# reports the scope "daily" (it stands in for the web app's daily cap).
+_BUDGET_LIMITS = {
+    "budget_daily": "the --max-usd cap for this run",
+    "budget_job_usd": "MAX_USD_PER_JOB",
+    "budget_job_calls": "MAX_MODEL_CALLS_PER_JOB",
+}
+
 
 def _progress(done: int, total: int) -> None:
     print(f"page {done}/{total} done", file=sys.stderr, flush=True)
@@ -134,6 +142,8 @@ def _axe_summary(checks: list[Check]) -> str:
             "skipped (needs the browser group: uv sync --group browser && "
             "uv run playwright install chromium)"
         )
+    if any(c.code == "axe_error" for c in checks):
+        return "could not run (browser error; the HTML was still written)"
     violations = [c for c in checks if not c.passed]
     if not violations:
         return "no violations"
@@ -183,9 +193,8 @@ def _print_summary(
     budget = sorted({r for r in reasons if r.startswith("budget_")})
     if budget:
         stopped = sum(1 for r in reasons if r in budget)
-        print(
-            f"Budget:      stopped early ({', '.join(budget)}); {stopped} item(s) kept as originals"
-        )
+        limits = ", ".join(f"{r}: {_BUDGET_LIMITS.get(r, 'spend limit')}" for r in budget)
+        print(f"Budget:      stopped early ({limits}); {stopped} item(s) kept as originals")
     print(f"Checks:      static {_check_summary(checks)}")
     if axe is not None:
         print(f"             axe-core {_axe_summary(axe)}")
@@ -221,8 +230,14 @@ def _convert(args: argparse.Namespace) -> int:
     if not args.pdf.is_file():
         raise _CliError(f"PDF not found: {args.pdf}")
     for target in (args.out, args.report):
-        if target is not None and target.is_dir():
+        if target is None:
+            continue
+        if target.is_dir():
             raise _CliError(f"{target} is a directory; give a file path")
+        if target.resolve() == args.pdf.resolve():
+            raise _CliError(f"{target} is the input PDF; choose another output path")
+    if args.report is not None and args.report.resolve() == args.out.resolve():
+        raise _CliError("--report and --out must be different files")
     pdf_bytes = args.pdf.read_bytes()
     pages = _parse_pages(args.pages, _page_count(pdf_bytes, args.pdf), args.pdf)
 
