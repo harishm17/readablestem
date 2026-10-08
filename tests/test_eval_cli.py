@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 import json
-import sys
-import types
 from typing import ClassVar
 
 import pytest
@@ -151,19 +149,27 @@ def test_max_usd_builds_the_openai_client_with_the_cap(gold, tmp_path, fake_inpu
             super().__init__(budget=budget)
             built.append(budget)
 
-    module = types.ModuleType("a11y_stem.models.openai_client")
-    module.OpenAIVisionClient = StubOpenAIVisionClient  # type: ignore[attr-defined]
-    monkeypatch.setitem(sys.modules, "a11y_stem.models.openai_client", module)
+    from a11y_stem.cli import eval_cli
+    from a11y_stem.config import Settings
+    from a11y_stem.models import openai_client
+
+    monkeypatch.setattr(openai_client, "OpenAIVisionClient", StubOpenAIVisionClient)
+    monkeypatch.setattr(
+        eval_cli, "_settings", lambda: Settings(_env_file=None, openai_api_key="sk-test")
+    )
     assert main(pipeline_args(gold, tmp_path, "--max-usd", "1.5", "--max-calls", "7")) == 0
     (budget,) = built
     assert (budget.max_usd, budget.max_calls, budget.guard.cap_usd) == (1.5, 7, 1.5)
     assert json.loads((tmp_path / "report.json").read_text())["client"] == "openai"
 
 
-def test_missing_openai_client_is_explained(gold, tmp_path, fake_inputs, monkeypatch, capsys):
-    monkeypatch.setitem(sys.modules, "a11y_stem.models.openai_client", None)
+def test_missing_api_key_is_explained(gold, tmp_path, fake_inputs, monkeypatch, capsys):
+    from a11y_stem.cli import eval_cli
+    from a11y_stem.config import Settings
+
+    monkeypatch.setattr(eval_cli, "_settings", lambda: Settings(_env_file=None))
     assert main(pipeline_args(gold, tmp_path, "--max-usd", "1")) == 2
-    assert "WP1" in capsys.readouterr().err
+    assert "OPENAI_API_KEY is not set" in capsys.readouterr().err
 
 
 def test_stub_steps_are_reported_not_crashed(gold, tmp_path, fake_inputs, monkeypatch, capsys):

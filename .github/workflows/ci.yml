@@ -70,6 +70,7 @@ jobs:
           --health-retries 12
     env:
       DATABASE_URL: postgresql+psycopg://postgres@localhost:5432/a11y_test
+      TEST_POSTGRES_URL: postgresql+psycopg://postgres@localhost:5432/a11y_test
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -144,14 +145,14 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Look for data/eval/latest.json and data/eval/baseline.json
+      - name: Look for committed baselines (data/eval/baseline-<task>.json)
         id: files
         run: |
-          if [ -f data/eval/latest.json ] && [ -f data/eval/baseline.json ]; then
+          if ls data/eval/baseline-*.json >/dev/null 2>&1; then
             echo "present=true" >> "$GITHUB_OUTPUT"
           else
             echo "present=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::no eval report and baseline committed yet; gate skipped"
+            echo "::notice::no eval baseline committed yet; gate skipped"
           fi
       - if: steps.files.outputs.present == 'true'
         uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
@@ -162,11 +163,17 @@ jobs:
         name: Install (locked)
         run: uv sync --locked
       - if: steps.files.outputs.present == 'true'
-        name: Fail if the latest eval regressed against the baseline
-        run: >-
-          uv run a11y-stem eval gate
-          --current data/eval/latest.json
-          --baseline data/eval/baseline.json
+        name: Fail if any task's latest eval regressed against its baseline
+        run: |
+          set -euo pipefail
+          for baseline in data/eval/baseline-*.json; do
+            task="${baseline#data/eval/baseline-}"; task="${task%.json}"
+            current="data/eval/latest-${task}.json"
+            if [ ! -f "$current" ]; then
+              echo "::error::$baseline has no matching $current"; exit 1
+            fi
+            uv run a11y-stem eval gate --current "$current" --baseline "$baseline"
+          done
 
   secret-scan:
     name: gitleaks

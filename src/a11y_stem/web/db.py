@@ -200,7 +200,8 @@ def make_engine(database_url: str) -> Engine:
             cur.close()
 
         return engine
-    return create_engine(database_url, pool_pre_ping=True, pool_size=5, max_overflow=5)
+    # 2 instances x (3 + 2) = 10 connections, well under db-f1-micro's 25.
+    return create_engine(database_url, pool_pre_ping=True, pool_size=3, max_overflow=2)
 
 
 def make_sessionmaker(engine: Engine) -> sessionmaker[Session]:

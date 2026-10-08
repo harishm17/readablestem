@@ -111,7 +111,7 @@ def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClien
     """The real model client (WP1), imported only when a job actually runs."""
     from a11y_stem import models
 
-    make_vision_client = models.make_vision_client  # ty: ignore[unresolved-attribute]
+    make_vision_client = models.make_vision_client
     return make_vision_client(settings, budget)
 
 

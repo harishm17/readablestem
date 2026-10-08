@@ -152,13 +152,13 @@ def test_production_refuses_to_start_without_its_limits(tmp_path):
     ],
 )
 def test_production_refuses_empty_or_weak_secrets(tmp_path, overrides, named):
-    """`SecretStr("") == ""` is False, so `check_production` alone let these through."""
+    """Blank secrets (`SecretStr("")`, whitespace) are refused by the spine's
+    `check_production`; a weak session secret passes it and is refused by the web app."""
     from a11y_stem.config import ConfigError
 
     settings = prod_settings(tmp_path, **overrides)
-    settings.check_production()  # the spine check passes...
     with pytest.raises(ConfigError, match=named) as refused:
-        create_app(settings)  # ...the web app does not
+        create_app(settings)
     assert "s" * 40 not in str(refused.value) and "sk-test" not in str(refused.value)
 
 

@@ -57,6 +57,8 @@ def _error(message: str) -> int:
 def _cmd_serve(args: argparse.Namespace) -> int:
     import uvicorn
 
+    from a11y_stem.observability.logging import uvicorn_log_options
+
     uvicorn.run(
         "a11y_stem.web.app:create_app",
         factory=True,
@@ -65,6 +67,7 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         reload=args.reload,
         proxy_headers=True,
         server_header=False,
+        **uvicorn_log_options(),
     )
     return 0
 

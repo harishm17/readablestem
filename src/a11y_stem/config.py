@@ -120,7 +120,7 @@ class Settings(BaseSettings):
                 ("OPENAI_API_KEY", self.openai_api_key),
                 ("CONTACT_EMAIL", self.contact_email),
             ]
-            if value in (None, "")
+            if _blank(value)
         ]
         if missing:
             raise ConfigError("production start refused; missing: " + ", ".join(missing))
@@ -130,6 +130,13 @@ class Settings(BaseSettings):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):
             raise ConfigError("BASE_URL must be https in production")
+
+
+def _blank(value: object) -> bool:
+    """None, "", whitespace, or a SecretStr holding one of those."""
+    if isinstance(value, SecretStr):
+        value = value.get_secret_value()
+    return value is None or (isinstance(value, str) and not value.strip())
 
 
 @lru_cache(maxsize=1)

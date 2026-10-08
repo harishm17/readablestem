@@ -30,3 +30,6 @@ private-inputs/
 
 # Local databases and scratch output
 .local/
+
+# Agent worktrees
+.claude/worktrees/

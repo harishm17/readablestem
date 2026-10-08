@@ -14,7 +14,6 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
-import importlib
 import json
 import math
 import sys
@@ -111,11 +110,11 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
     budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
     if args.fake:
         return FakeVisionClient(budget=budget), budget, "fake"
+    from a11y_stem.models.openai_client import OpenAIVisionClient
+
     try:
-        module = importlib.import_module("a11y_stem.models.openai_client")
-        client = module.OpenAIVisionClient(settings, budget)
-    except ModuleNotFoundError:
-        return "the OpenAI client (models/openai_client.py, WP1) is not available yet"
+        settings.require_openai_key()  # fail before any work, not on the first call
+        client = OpenAIVisionClient(settings, budget)
     except ConfigError as exc:
         return str(exc)
     return client, budget, "openai"

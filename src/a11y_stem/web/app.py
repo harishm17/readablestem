@@ -31,6 +31,7 @@ from starlette.responses import HTMLResponse
 
 from a11y_stem.config import ConfigError, Settings, get_settings
 from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
+from a11y_stem.observability.logging import configure_logging, request_logging_middleware
 from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
 from a11y_stem.web.database import as_utc, prepare_database
@@ -217,6 +218,7 @@ def create_app(
     settings = settings or get_settings()
     settings.check_production()
     check_web_secrets(settings)
+    configure_logging(settings)
     engine = make_engine(settings.database_url)
     factory = make_sessionmaker(engine)
     ctx = AppContext(
@@ -273,6 +275,8 @@ def create_app(
     app.add_middleware(RequestSizeLimitMiddleware)
     app.add_middleware(SafeErrorMiddleware, error_page=_plain_500_page)
     app.add_middleware(SecurityHeadersMiddleware, hsts=settings.env == "prod")
+    # Outermost: logs method, route template, status and latency only (no query, headers).
+    app.middleware("http")(request_logging_middleware)
 
     app.add_exception_handler(PageError, _on_page_error)
     app.add_exception_handler(LoginRequired, _on_login_required)
