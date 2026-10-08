@@ -26,11 +26,12 @@
   "files": [
     {
       "path": "openstax/physics/2-1-relative-motion-distance-and-displacement.jsonl",
-      "sha256": "3602a2313ffef100162d5a780a24abfdc173b38e4cecaac941ac662c451bd360",
-      "records": 15,
+      "sha256": "5fabf75ae582a696c9a0ef486d1e8b4cb157525452229f70d59884186ac1215e",
+      "records": 63,
       "counts": {
         "equation": 8,
         "figure": 6,
+        "heading": 48,
         "table": 1
       },
       "retrieved_at": [
@@ -39,11 +40,12 @@
     },
     {
       "path": "openstax/physics/2-2-speed-and-velocity.jsonl",
-      "sha256": "ba5f6cad769f1ef989221afc8f6ae31d86f59ecad084c7d67ffbe45515069953",
-      "records": 15,
+      "sha256": "19c9793e9d199efb4dc52b5db6a09031e67b73cd0e0e520db25a3481139b44cf",
+      "records": 57,
       "counts": {
         "equation": 12,
         "figure": 2,
+        "heading": 42,
         "table": 1
       },
       "retrieved_at": [
@@ -52,11 +54,12 @@
     },
     {
       "path": "openstax/physics/2-3-position-vs-time-graphs.jsonl",
-      "sha256": "5604575447e59a95aa92fd07b38884ba500ed9d2f024fe8f2e654e77852ffd80",
-      "records": 16,
+      "sha256": "5d199e0aab8bc0dd369e3ff947b1f790accee2763a8969b65098b0c1ee651ec2",
+      "records": 47,
       "counts": {
         "equation": 10,
         "figure": 5,
+        "heading": 31,
         "table": 1
       },
       "retrieved_at": [
@@ -67,6 +70,7 @@
   "totals": {
     "equation": 30,
     "figure": 13,
+    "heading": 121,
     "table": 3
   }
 }
