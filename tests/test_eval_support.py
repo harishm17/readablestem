@@ -11,12 +11,15 @@ from __future__ import annotations
 import hashlib
 import json
 import struct
+import unicodedata
+from collections import Counter
 from pathlib import Path
 
 from pydantic import BaseModel
 
 from a11y_stem.config import Settings
 from a11y_stem.core.types import (
+    Check,
     Element,
     EquationFix,
     FigureFix,
@@ -25,6 +28,7 @@ from a11y_stem.core.types import (
     Status,
 )
 from a11y_stem.eval.equations import latex_to_mathml
+from a11y_stem.eval.render import math_tokens
 from a11y_stem.gold.openstax import write_manifest
 from a11y_stem.models.base import VisionRequest
 
@@ -115,14 +119,32 @@ def write_gold(root: Path, records: list[dict]) -> Path:
 
 
 class FakeMedia:
-    """EvalMedia without a browser: deterministic fake PNGs and PDFs, calls recorded."""
+    """EvalMedia without a browser: deterministic fake PNGs and PDFs, calls recorded.
 
-    def __init__(self) -> None:
+    An equation's text layer defaults to its MathML's token text (a clean PDF text
+    layer, e.g. "v=dt"); `texts` (by MathML) and `contexts` (by record id) override.
+    """
+
+    def __init__(
+        self, texts: dict[str, str | None] | None = None, contexts: dict[str, str] | None = None
+    ) -> None:
         self.calls: list[tuple[str, str]] = []
+        self.texts = texts or {}
+        self.contexts = contexts or {}
 
     def equation_png(self, record: dict) -> bytes:
         self.calls.append(("equation", record["id"]))
         return fake_png(record["mathml"])
+
+    def equation_text(self, record: dict) -> str | None:
+        mathml = record["mathml"]
+        return self.texts[mathml] if mathml in self.texts else math_tokens(mathml)
+
+    def equation_context(self, record: dict) -> str | None:
+        return self.contexts.get(record["id"])
+
+    def close(self) -> None:
+        self.calls.append(("close", ""))
 
     def figure_png(self, url: str) -> bytes:
         self.calls.append(("figure", url))
@@ -147,14 +169,31 @@ class FigureOut(BaseModel):
     confidence: float
 
 
+def _symbols(text: str) -> Counter[str]:
+    return Counter(ch for ch in unicodedata.normalize("NFKC", text).casefold() if ch.isalnum())
+
+
+def text_layer_similarity(text_layer: str | None, mathml: str) -> float | None:
+    """Dice similarity of symbol bags, as WP3's equation_step computes it (None when the
+    text layer has fewer than 3 symbols)."""
+    expected = _symbols(text_layer or "")
+    if sum(expected.values()) < 3:
+        return None
+    got = _symbols(math_tokens(mathml))
+    return 2 * sum((expected & got).values()) / (sum(expected.values()) + sum(got.values()))
+
+
 def fake_transcribe(
     element: Element, png: bytes, *, client, settings: Settings, context_text=None
 ) -> Fix:
-    """Contract-shaped stand-in for equation_step.transcribe.
+    """Contract-shaped stand-in for equation_step.transcribe, using `element.text` the way
+    WP3's step does.
 
-    Inline equations start on the cheap model and escalate to the main model below 0.85
-    confidence; block equations go straight to the main model. Uses the rendered PNG as
-    the request image, so FakeVisionClient answers by image hash.
+    Inline equations with a text layer of 25 characters or fewer start on the cheap model
+    and escalate to the main model below 0.85 confidence; others go straight to the main
+    model. A transcription whose symbols mostly differ from the text layer gets a failed
+    warning check and lower confidence (so it cannot be ACCEPTED). Uses the rendered PNG
+    as the request image, so FakeVisionClient answers by image hash.
     """
     display = element.display or "block"
 
@@ -165,10 +204,12 @@ def fake_transcribe(
             prompt_version="equation-test1",
             instructions="Transcribe.",
             images=[png],
+            context_text=context_text,
         )
         return client.run(request, EquationOut)
 
-    first = settings.main_model if display == "block" else settings.cheap_model
+    short = len((element.text or "").strip()) <= 25
+    first = settings.cheap_model if display == "inline" and short else settings.main_model
     out, call = ask(first)
     calls = [call]
     if first == settings.cheap_model and out is not None and out.confidence < 0.85:
@@ -182,18 +223,32 @@ def fake_transcribe(
             calls=calls,
             reason="model_refused",
         )
-    status = Status.ACCEPTED if out.confidence >= 0.85 else Status.NEEDS_REVIEW
+    mathml = latex_to_mathml(out.latex, display=display)
+    confidence, checks = out.confidence, []
+    similarity = text_layer_similarity(element.text, mathml)
+    if similarity is not None and similarity < 0.5:
+        checks.append(
+            Check(
+                name="equation.text_layer",
+                passed=False,
+                severity="warning",
+                code="text_layer_mismatch",
+            )
+        )
+        confidence *= 0.5 + 0.5 * similarity
+    status = Status.ACCEPTED if confidence >= 0.85 and not checks else Status.NEEDS_REVIEW
     return Fix(
         element_id=element.id,
         kind=Kind.EQUATION,
         status=status,
-        confidence=out.confidence,
+        confidence=confidence,
         equation=EquationFix(
             latex=out.latex,
-            mathml=latex_to_mathml(out.latex, display=display),
+            mathml=mathml,
             speech="",
             display="inline" if display == "inline" else "block",
         ),
+        checks=checks,
         calls=calls,
     )
 

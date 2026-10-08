@@ -3,14 +3,22 @@
 Each task rebuilds the input the pipeline would see from the gold answer key
 (`eval.render`), runs the real pipeline code on it, and scores the output:
 
-- equations: each gold equation rendered to a PNG -> `equation_step.transcribe` ->
-  scored against the gold MathML (`eval.equations.score_mathml`).
+- equations: each gold equation rendered to a PNG -> `equation_step.transcribe`, given
+  what `run.convert_pdf` would give it (the printed equation's text layer and the text
+  around it on the page) -> scored against the gold MathML (`eval.equations.score_mathml`).
 - headings: each gold page printed to PDF -> `layout.analyze` +
   `heading_step.heading_fixes` -> matched to gold h1-h6 (text, relative level).
 - figures: each gold figure image -> `figure_step.describe` -> graded against the
   OpenStax alt text by the LLM judge (`eval.judge`), plus the step's own checks.
 - document: each gold page printed to PDF -> `run.convert_pdf` -> equations aligned to
   gold in reading order, and the output HTML's static/axe check results.
+
+Inputs first: every input of the run is built (rendered, printed, downloaded) before
+the first model call. Building them is free, so a failure there (`RenderError`, e.g. an
+openstax.org download that times out) raises before anything is spent instead of
+throwing away a half-paid run. The media's Chromium is then closed: it holds a sync
+Playwright session in this thread, and axe-core (`html_checks.axe_checks`, document
+task) cannot start its own beside it.
 
 Spend: every model call goes through the client's `JobBudget` (an `InMemorySpendGuard`
 capped by `--max-usd`). When a reservation is refused the run stops cleanly: the item
@@ -252,9 +260,21 @@ class EvalMedia(Protocol):
 
     def equation_png(self, record: dict) -> bytes: ...
 
+    def equation_text(self, record: dict) -> str | None:
+        """The equation's PDF text layer (what `layout` would put on `Element.text`)."""
+        ...
+
+    def equation_context(self, record: dict) -> str | None:
+        """The text around the equation, as `run.convert_pdf` passes `context_text`."""
+        ...
+
     def figure_png(self, url: str) -> bytes: ...
 
     def page_pdf(self, page_records: list[dict]) -> bytes: ...
+
+    def close(self) -> None:
+        """Release the browser. Called once every input is built, before any step runs."""
+        ...
 
 
 class CachedMedia:
@@ -276,6 +296,7 @@ class CachedMedia:
         self.paper = paper
         self.images = render.ImageCache(cache_dir / "images")
         self.browser = render.ChromiumRenderer()
+        self._contexts: dict[str, list[tuple[str, str | None]]] = {}
 
     def __enter__(self) -> CachedMedia:
         return self
@@ -291,6 +312,27 @@ class CachedMedia:
             [record], self.cache_dir / "equations", renderer=self.browser
         )
         return pngs[record["id"]]
+
+    def equation_text(self, record: dict) -> str | None:
+        return self._render.render_equation_text(
+            record["mathml"], self.cache_dir / "equations", renderer=self.browser
+        )
+
+    def equation_context(self, record: dict) -> str | None:
+        """Context from the page's archive XHTML, found by the record's index on the page."""
+        render = self._render
+        url = record["content_url"]
+        if url not in self._contexts:
+            page = render.page_source_from_records([record], self.fetcher)
+            self._contexts[url] = render.equation_contexts(page.xhtml)
+        contexts = self._contexts[url]
+        index = record.get("index_on_page")
+        found = contexts[index] if isinstance(index, int) and 0 <= index < len(contexts) else None
+        if found is None or found[0] != render.math_tokens(record["mathml"]):
+            raise render.RenderError(
+                f"equation {record['id']} is not at its index in the page source"
+            )
+        return found[1]
 
     def figure_png(self, url: str) -> bytes:
         return self.images.png(url)
@@ -499,14 +541,47 @@ def equation_metrics(items: Sequence[dict]) -> dict:
     }
 
 
-def _eval_equations(cfg: EvalConfig, units: list[dict]) -> tuple[list[dict], str | None]:
+@dataclass(frozen=True)
+class EquationInput:
+    """What `equation_step.transcribe` gets for one equation inside `run.convert_pdf`.
+
+    The text layer matters beyond the image: the step routes short inline equations to
+    the cheap model by its length, and cross-checks the transcription against it (a
+    mismatch adds a failed check and lowers the confidence, so ACCEPTED becomes
+    NEEDS_REVIEW). Without it the eval would measure a confidence the app never sees.
+    """
+
+    png: bytes
+    text_layer: str | None
+    context: str | None
+
+
+def _equation_inputs(media: EvalMedia, units: list[dict]) -> list[EquationInput]:
+    return [
+        EquationInput(media.equation_png(r), media.equation_text(r), media.equation_context(r))
+        for r in units
+    ]
+
+
+def _eval_equations(
+    cfg: EvalConfig, units: list[dict], inputs: list[EquationInput]
+) -> tuple[list[dict], str | None]:
     items: list[dict] = []
-    for index, record in enumerate(units):
-        png = cfg.media.equation_png(record)
-        element = _element(Kind.EQUATION, index, png, display=record.get("display") or "block")
+    for index, (record, given) in enumerate(zip(units, inputs, strict=True)):
+        element = _element(
+            Kind.EQUATION,
+            index,
+            given.png,
+            display=record.get("display") or "block",
+            text=given.text_layer,
+        )
         try:
             fix = equation_step.transcribe(
-                element, png, client=cfg.client, settings=cfg.settings, context_text=None
+                element,
+                given.png,
+                client=cfg.client,
+                settings=cfg.settings,
+                context_text=given.context,
             )
         except BudgetExceeded as exc:
             return items, f"budget_{exc.scope}"
@@ -660,11 +735,16 @@ def _page_id(page: Sequence[dict]) -> str:
     return f"{page[0]['book_slug']}/{page[0]['page_slug']}"
 
 
-def _eval_headings(cfg: EvalConfig, units: list[list[dict]]) -> tuple[list[dict], str | None]:
+def _page_inputs(media: EvalMedia, units: list[list[dict]]) -> list[bytes]:
+    return [media.page_pdf(page) for page in units]
+
+
+def _eval_headings(
+    cfg: EvalConfig, units: list[list[dict]], pdfs: list[bytes]
+) -> tuple[list[dict], str | None]:
     items = []
-    for page in units:
+    for page, pdf in zip(units, pdfs, strict=True):
         gold = _of_kind(page, "heading")
-        pdf = cfg.media.page_pdf(page)
         error = None
         try:
             analysed = layout.analyze(pdf)
@@ -681,7 +761,7 @@ def _eval_headings(cfg: EvalConfig, units: list[list[dict]]) -> tuple[list[dict]
 
 
 def figure_item(record: dict, fix: Fix, judgement: judge_mod.Judgement | None) -> dict:
-    image = next(img for img in record["images"] if img.get("url"))
+    image = _figure_image(record)
     reference = (image.get("alt") or "").strip()
     proposal = fix.figure
     verdict = judgement.verdict if judgement is not None else None
@@ -757,11 +837,20 @@ def figure_metrics(items: Sequence[dict]) -> dict:
     }
 
 
-def _eval_figures(cfg: EvalConfig, units: list[dict]) -> tuple[list[dict], str | None]:
+def _figure_image(record: dict) -> dict:
+    return next(img for img in record["images"] if img.get("url"))
+
+
+def _figure_inputs(media: EvalMedia, units: list[dict]) -> list[bytes]:
+    return [media.figure_png(_figure_image(record)["url"]) for record in units]
+
+
+def _eval_figures(
+    cfg: EvalConfig, units: list[dict], pngs: list[bytes]
+) -> tuple[list[dict], str | None]:
     items = []
-    for index, record in enumerate(units):
-        image = next(img for img in record["images"] if img.get("url"))
-        png = cfg.media.figure_png(image["url"])
+    for index, (record, png) in enumerate(zip(units, pngs, strict=True)):
+        image = _figure_image(record)
         caption = record.get("caption")
         element = _element(Kind.FIGURE, index, png, caption=caption)
         try:
@@ -846,20 +935,33 @@ def document_page_item(
         "pairs": matched,
         "missed_gold_ids": [g["id"] for i, g in enumerate(gold) if i not in matched_gold],
         "static_violations": _failed_codes(static),
-        "axe_violations": _failed_codes(axe),
-        "axe_skipped": axe_skipped(axe),
+        "axe_violations": _failed_codes(axe) if axe_status(axe) == "ran" else [],
+        "axe_status": axe_status(axe),
     }
 
 
-def axe_skipped(axe: Sequence[Check]) -> bool:
-    """True for axe_checks' "could not run" result: a single warning coded "skipped".
+AXE_SKIP_CODES = {"skipped", "axe_skipped"}
 
-    Matched exactly, because axe-core has a real rule called "skip-link" whose failure
-    must count as a violation, not as a run that never happened.
+
+def axe_status(axe: Sequence[Check]) -> str | None:
+    """Whether axe-core really ran on a page: "ran", "skipped", "error", or None (no
+    result, e.g. a page the layout could not read).
+
+    `html_checks.axe_checks` reports a run that never happened as one Check named
+    "axe": coded "skipped" when Playwright or Chromium is missing, and failed with code
+    "axe_error" when axe or the browser broke (for one, Playwright refusing to start
+    while another sync session is open in the thread). Neither is a clean page, so
+    neither may count as zero violations. Rule results are named "axe.<rule>", so
+    axe-core's real "skip-link" rule still counts as a violation.
     """
-    return (
-        len(axe) == 1 and axe[0].severity == "warning" and axe[0].code in {"skipped", "axe_skipped"}
-    )
+    if not axe:
+        return None
+    if len(axe) == 1 and axe[0].name == "axe":
+        if axe[0].code in AXE_SKIP_CODES:
+            return "skipped"
+        if not axe[0].passed:
+            return "error"
+    return "ran"
 
 
 def document_metrics(items: Sequence[dict]) -> dict:
@@ -888,15 +990,18 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "static_violation_codes": dict(sorted(static_codes.items())),
         "axe_violations": sum(axe_codes.values()),
         "axe_violation_codes": dict(sorted(axe_codes.items())),
-        "axe_skipped_pages": sum(bool(i["axe_skipped"]) for i in items),
+        "axe_checked_pages": sum(i["axe_status"] == "ran" for i in items),
+        "axe_skipped_pages": sum(i["axe_status"] == "skipped" for i in items),
+        "axe_error_pages": sum(i["axe_status"] == "error" for i in items),
         "page_errors": _page_errors(items),
     }
 
 
-def _eval_document(cfg: EvalConfig, units: list[list[dict]]) -> tuple[list[dict], str | None]:
+def _eval_document(
+    cfg: EvalConfig, units: list[list[dict]], pdfs: list[bytes]
+) -> tuple[list[dict], str | None]:
     items = []
-    for page in units:
-        pdf = cfg.media.page_pdf(page)
+    for page, pdf in zip(units, pdfs, strict=True):
         try:
             output = run.convert_pdf(
                 pdf, settings=cfg.settings, client=cfg.client, concurrency=cfg.concurrency
@@ -930,7 +1035,13 @@ def _eval_document(cfg: EvalConfig, units: list[list[dict]]) -> tuple[list[dict]
 
 # ========================================================================== report
 
-RUNNERS: dict[str, Callable[[EvalConfig, list[Any]], tuple[list[dict], str | None]]] = {
+INPUTS: dict[str, Callable[[EvalMedia, list[Any]], list[Any]]] = {
+    "equations": _equation_inputs,
+    "headings": _page_inputs,
+    "figures": _figure_inputs,
+    "document": _page_inputs,
+}
+RUNNERS: dict[str, Callable[[EvalConfig, list[Any], list[Any]], tuple[list[dict], str | None]]] = {
     "equations": _eval_equations,
     "headings": _eval_headings,
     "figures": _eval_figures,
@@ -1036,12 +1147,19 @@ def build_report(
 
 
 def run_pipeline_eval(cfg: EvalConfig) -> EvalRun:
-    """Run one task end to end and return the report plus per-item rows."""
+    """Run one task end to end and return the report plus per-item rows.
+
+    Raises RenderError, before any model call, when an input cannot be built.
+    """
     if cfg.task not in RUNNERS:
         raise ValueError(f"unknown task {cfg.task!r}; expected one of {', '.join(TASKS)}")
     units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit)
     planned = unit_ids(cfg.task, units)
-    items, stopped = RUNNERS[cfg.task](cfg, units)
+    # All inputs before the first model call (see the module docstring): a RenderError
+    # raises here, with nothing spent. Then the browser goes, before any step runs.
+    inputs = INPUTS[cfg.task](cfg.media, units)
+    cfg.media.close()
+    items, stopped = RUNNERS[cfg.task](cfg, units, inputs)
     return EvalRun(
         report=build_report(cfg, items, planned_ids=planned, stopped=stopped), items=items
     )
@@ -1092,7 +1210,7 @@ HEADLINE = {
                 "judge_factual_error_rate", "judge_errors"],
     "document": ["detection_precision", "detection_recall", "matched_exact_lenient",
                  "end_to_end_exact_lenient", "static_violations", "axe_violations",
-                 "axe_skipped_pages", "page_errors"],
+                 "axe_checked_pages", "axe_skipped_pages", "axe_error_pages", "page_errors"],
 }  # fmt: skip
 
 

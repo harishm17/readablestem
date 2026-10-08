@@ -66,6 +66,22 @@ Plus the shared fields every gold record carries (see `docs/development.md`).
   allowlisted tree) is drawn by headless Chromium at device scale 2 (about 40 px per em,
   close to a 200 dpi crop) on white, cropped to the `<math>` box plus 4 px. Cached by the
   SHA-256 of the MathML under `.cache/eval/equations/`.
+- **Equation text layer.** Inside `run.convert_pdf`, `layout` puts the PDF text of the
+  equation's region on `Element.text`, and `equation_step` uses it twice: inline
+  equations with 25 characters or fewer of it start on the cheap model, and the
+  transcription is cross-checked against it (a mismatch adds a failed check and lowers
+  the confidence, so the fix cannot be accepted). So the equation is also printed to PDF
+  by Chromium, and the text of that PDF (control characters dropped, whitespace
+  collapsed, as `layout` does) becomes `Element.text`. It looks like the text of the
+  printed pages in the document task: math-italic letters, fractions flattened out of
+  order (`distance𝑣avg = time`). Cached next to the PNG.
+- **Equation context.** `run.convert_pdf` also passes the text around each equation as
+  `context_text`. The eval builds the same window from the page's archive XHTML, finding
+  the equation by its `index_on_page` (and refusing to go on if the equation there is not
+  the gold one): an inline equation inside a paragraph, list item, table cell or heading
+  gets up to 300 characters of it either side of `[this equation]`; a display equation
+  (or an inline one alone in its paragraph) gets the end of the previous text block and
+  the start of the next, one per line. Other equations show as `[equation]`.
 - **Page PDF.** The page's archive XHTML (from the `gold fetch` cache, `.cache/openstax/`)
   is turned into plain printable HTML: headings at their published levels, paragraphs,
   lists, tables, MathML, figures with captions, note boxes with a border. Scripts,
@@ -79,6 +95,14 @@ Plus the shared fields every gold record carries (see `docs/development.md`).
 - **Figure images** are downloaded once from `images[].url` (openstax.org only) into
   `.cache/eval/images/`, converted to PNG and capped at 2048 px on the long side, the
   same cap `layout.crop` uses.
+- **Inputs before spend.** A run builds every input first (all PNGs, text layers,
+  contexts, page PDFs, figure downloads), then closes its Chromium, then makes the first
+  model call. A failed download or render stops the run there with exit 2 and nothing
+  spent; rerun it (finished renders and downloads are cached). Closing the browser first
+  matters for the document task: Playwright refuses to start a second sync session in a
+  thread that has one open, so axe-core (`html_checks.axe_checks`) would fail on every
+  page printed in the same run. Inputs are held in memory for the run: a few kB per
+  equation, up to a few MB per figure or page.
 
 ## Metrics
 
@@ -101,8 +125,10 @@ Conventions for every task:
 
 ### equations
 
-For each gold equation: render, call `transcribe(element, png, context_text=None)`,
-score the proposed MathML with `eval.equations.score_mathml`.
+For each gold equation: render, call `transcribe(element, png, context_text=context)`
+with `element.text` = the equation's text layer and `element.display` = the gold
+`display` (see "How inputs are rebuilt"), then score the proposed MathML with
+`eval.equations.score_mathml`.
 
 | Metric | Definition |
 |---|---|
@@ -193,8 +219,10 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `matched_mean_teds` | mean TEDS over matched pairs |
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
-| `axe_violations` | same for `html_checks.axe_checks` |
-| `axe_skipped_pages` | pages where axe could not run: `axe_checks` returned a single warning with code `skipped` (matched exactly, so a failure of the real axe rule `skip-link` still counts as a violation) |
+| `axe_violations` | same for `html_checks.axe_checks`, over the pages where axe ran |
+| `axe_checked_pages` | pages where axe-core really ran (`axe_violations` is over these) |
+| `axe_skipped_pages` | pages where axe could not run: `axe_checks` returned its single "axe" check coded `skipped` (Playwright or Chromium not installed) |
+| `axe_error_pages` | pages where axe broke: a single failed "axe" check (WP4 codes it `axe_error`). Neither case counts as zero violations. Rule results are named `axe.<rule>`, so a failure of axe's real `skip-link` rule still counts as a violation |
 | `page_errors` | `LayoutError` codes for pages the pipeline could not read; such a page counts as "found nothing", it does not stop the run |
 
 ### Judge calibration (`eval calibrate`)
@@ -272,7 +300,8 @@ uv run a11y-stem gold fetch --book physics --pages 3 --chapter 2 --date 2026-10-
 ```
 
 `gold fetch` also fills `.cache/openstax/`, which holds the page XHTML the page PDFs are
-printed from. After that, rendering is offline except for figure images (downloaded once).
+printed from and the equation contexts are read from. After that, rendering is offline
+except for figure images (downloaded once).
 
 Real runs need `OPENAI_API_KEY` in `.env` and a spend cap. Each model call reserves its
 worst case before it is sent (about $0.020 on gpt-6.1-sol, $0.001 on gpt-6-luna, from
@@ -335,9 +364,14 @@ gold set are looked up live and pass the same license gate as `gold fetch`.
   and it means the gate detects changes, not significance.
 - **Clean inputs.** Rendered equations and printed pages are cleaner than real course
   PDFs: one renderer, one set of fonts, single column, no scanning noise, no LaTeX
-  (Computer Modern) typesetting, no handwriting, no slides. Isolated equation PNGs come
-  with no surrounding text, which the real pipeline has. Expect real documents to score
-  lower.
+  (Computer Modern) typesetting, no handwriting, no slides. Expect real documents to
+  score lower.
+- **Equation inputs are rebuilt, not read.** The equations task gives the step a text
+  layer from a Chromium print and a context window built from the page source. Real
+  PDFs (LaTeX, Word) have other text layers, sometimes none, and `layout` may cut a
+  region or a paragraph differently, so routing, the text-layer cross-check and the
+  confidence it scales can differ from a real document. The document task reads both from
+  the printed PDF the way the app does.
 - **One book.** High-school physics, three sections of one chapter, OpenStax's own
   MathML style. Calculus, chemistry notation, matrices and long derivations are not in the
   sample.

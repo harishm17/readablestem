@@ -4,6 +4,7 @@ plus Chromium rendering (browser marker)."""
 from __future__ import annotations
 
 import re
+import unicodedata
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
@@ -25,6 +26,7 @@ PAGE_XHTML = (FIXTURES / "page.xhtml").read_text(encoding="utf-8")
 ARCHIVE = "https://openstax.org/apps/archive/20990101.000000"
 CONTENT_URL = f"{ARCHIVE}/contents/book@v1:page.json"
 BALL_URL = f"{ARCHIVE}/resources/ball123"
+FRACTION = '<math display="block"><mi>v</mi><mo>=</mo><mfrac><mi>d</mi><mi>t</mi></mfrac></math>'
 
 
 def tiny_png(width: int = 8, height: int = 4) -> bytes:
@@ -310,6 +312,92 @@ def test_render_equations_uses_the_cache_without_a_browser(tmp_path):
     assert out == {"eq-1": b"cached"}
 
 
+def test_equation_contexts_mirror_what_convert_pdf_sends():
+    contexts = render.equation_contexts(PAGE_XHTML)
+    assert [tokens for tokens, _ in contexts] == ["vSECRET-ANNOTATION", "v=dt"]
+    # Inline, inside a paragraph: the paragraph around "[this equation]".
+    assert contexts[0][1] == "Speed is [this equation] and we watch a short video."
+    # Display: the previous and next text blocks (the figure caption is not one; the
+    # paragraph's own inline equation shows as "[equation]").
+    assert contexts[1][1] == (
+        "Speed is [equation] and we watch a short video.\n[this equation]\nWorked Example"
+    )
+
+
+def test_equation_contexts_window_long_text_and_handle_lone_equations():
+    long_before = "word " * 100
+    xhtml = (
+        '<html xmlns="http://www.w3.org/1999/xhtml"><body><div data-type="page">'
+        f"<h2>Title</h2><p>{long_before}<math><mi>x</mi></math> after.</p>"
+        "<p><math><mi>y</mi></math></p><ul><li><p>Next item.</p></li></ul>"
+        "</div></body></html>"
+    )
+    (_, first), (_, alone) = render.equation_contexts(xhtml)
+    assert (
+        first is not None
+        and first.startswith("... word")
+        and first.endswith("[this equation] after.")
+    )
+    assert len(first) < 300 + len("... [this equation] after.") + 1
+    # An inline equation alone in its paragraph gets its neighbours instead: the end of
+    # the previous block (its equation shown as "[equation]") and the start of the next.
+    previous = " ".join(long_before.split()) + " [equation] after."
+    assert alone == f"... {previous[-300:].lstrip()}\n[this equation]\nNext item."
+
+
+def test_equation_contexts_refuse_unparseable_pages():
+    with pytest.raises(RenderError):
+        render.equation_contexts("<html><p>unclosed")
+
+
+def test_math_tokens_identify_an_equation():
+    assert render.math_tokens(FRACTION) == "v=dt"
+    with pytest.raises(RenderError):
+        render.math_tokens("<math><mi>x</mi>")
+
+
+def test_pdf_text_collapses_the_text_layer():
+    doc = pymupdf.open()
+    doc.new_page().insert_text((72, 72), "v =\n d / t")
+    assert render.pdf_text(doc.tobytes()) == "v = d / t"
+
+
+def test_render_equation_text_uses_the_cache_without_a_browser(tmp_path):
+    key = render._sha256(FRACTION)
+    (tmp_path / f"{key}-text-{render.RENDER_VERSION}.txt").write_text("", encoding="utf-8")
+
+    class NoBrowser(render.ChromiumRenderer):
+        def _start(self) -> None:
+            raise AssertionError("browser started on a cache hit")
+
+    # A cached empty text layer means "the PDF has none": None, as layout would give.
+    assert render.render_equation_text(FRACTION, tmp_path, renderer=NoBrowser()) is None
+
+
+def test_playwright_failures_become_render_errors():
+    """Regression: a Playwright timeout escaped as a traceback instead of RenderError."""
+    sync_api = pytest.importorskip("playwright.sync_api")
+
+    class TimingOut:
+        def new_context(self, **_):
+            raise sync_api.TimeoutError("Timeout 30000ms exceeded")
+
+    renderer = render.ChromiumRenderer()
+    renderer._browser = TimingOut()
+    try:
+        with pytest.raises(RenderError, match=r"Chromium could not open a page \(TimeoutError\)"):
+            renderer.equation_png(FRACTION)
+    finally:
+        renderer._browser = None
+    other = render.ChromiumRenderer()
+    other._browser = type("Broken", (), {"new_context": lambda self, **_: 1 / 0})()
+    try:
+        with pytest.raises(ZeroDivisionError):  # not a Playwright error: left alone
+            other.pdf("<p>x</p>")
+    finally:
+        other._browser = None
+
+
 # ======================================================================= browser
 
 
@@ -317,9 +405,6 @@ def test_render_equations_uses_the_cache_without_a_browser(tmp_path):
 def chromium():
     with render.ChromiumRenderer() as renderer:
         yield renderer
-
-
-FRACTION = '<math display="block"><mi>v</mi><mo>=</mo><mfrac><mi>d</mi><mi>t</mi></mfrac></math>'
 
 
 @pytest.mark.browser
@@ -352,6 +437,20 @@ def test_render_equations_caches_by_mathml_hash(tmp_path, chromium):
     files = list(tmp_path.iterdir())
     assert len(files) == 1 and files[0].name.startswith(render._sha256(FRACTION))
     assert render.render_equations([record], tmp_path, renderer=chromium) == first
+
+
+@pytest.mark.browser
+def test_render_equation_text_is_the_printed_text_layer(tmp_path, chromium):
+    text = render.render_equation_text(FRACTION, tmp_path, renderer=chromium)
+    # Math italic glyphs, fraction flattened: what layout reads from a printed page.
+    assert text is not None
+    assert sorted(ch for ch in unicodedata.normalize("NFKC", text) if ch.isalnum()) == [
+        "d",
+        "t",
+        "v",
+    ]
+    (cached,) = tmp_path.iterdir()
+    assert cached.read_text(encoding="utf-8") == text
 
 
 @pytest.mark.browser

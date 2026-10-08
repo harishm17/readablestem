@@ -359,7 +359,7 @@ def test_document_page_item_aligns_equations_and_counts_violations():
     assert [m["exact_lenient"] for m in row["pairs"]] == [True, False]
     assert row["missed_gold_ids"] == [gold[1]["id"]]
     assert row["static_violations"] == ["skipped_level"]  # warnings are not violations
-    assert (row["axe_violations"], row["axe_skipped"]) == ([], True)
+    assert (row["axe_violations"], row["axe_status"]) == ([], "skipped")
 
     metrics = pe.document_metrics([row])
     assert metrics["detection_precision"] == pytest.approx(2 / 3)
@@ -371,15 +371,50 @@ def test_document_page_item_aligns_equations_and_counts_violations():
         "inline": {"n_gold": 1, "recall": 0.0},
     }
     assert metrics["static_violation_codes"] == {"skipped_level": 1}
-    assert metrics["axe_skipped_pages"] == 1
+    assert (metrics["axe_skipped_pages"], metrics["axe_checked_pages"]) == (1, 0)
 
 
 def test_axe_skip_link_failure_is_a_violation_not_a_skipped_run():
     skip_link = [Check(name="axe.skip-link", passed=False, code="skip-link")]
-    assert pe.axe_skipped(skip_link) is False
-    assert pe.axe_skipped([Check(name="axe", passed=False, severity="warning", code="skipped")])
+    assert pe.axe_status(skip_link) == "ran"
+    assert pe.axe_status([Check(name="axe", passed=False, severity="warning", code="skipped")]) == (
+        "skipped"
+    )
     row = pe.document_page_item("p", [], [], {}, [], skip_link)
-    assert (row["axe_violations"], row["axe_skipped"]) == (["skip-link"], False)
+    assert (row["axe_violations"], row["axe_status"]) == (["skip-link"], "ran")
+
+
+# WP4's html_checks results, verbatim: what axe_checks returns when it did not run.
+AXE_SKIPPED = Check(name="axe", passed=True, severity="warning", code="skipped")
+AXE_ERROR = Check(name="axe", passed=False, severity="warning", code="axe_error")
+
+
+def test_axe_error_is_a_run_that_did_not_happen_not_a_clean_page():
+    """Regression: a crashed axe (e.g. Playwright refusing a second sync session in the
+    thread) was a warning, so it counted as zero violations and not as skipped."""
+    clean = pe.document_page_item("p/clean", [], [], {}, [], [Check(name="axe", passed=True)])
+    crashed = pe.document_page_item("p/crashed", [], [], {}, [], [AXE_ERROR])
+    missing = pe.document_page_item("p/missing", [], [], {}, [], [AXE_SKIPPED])
+    image_alt = Check(name="axe.image-alt", passed=False, code="image-alt")
+    found = pe.document_page_item("p/found", [], [], {}, [], [image_alt])
+    assert [r["axe_status"] for r in (clean, crashed, missing, found)] == [
+        "ran",
+        "error",
+        "skipped",
+        "ran",
+    ]
+    metrics = pe.document_metrics([clean, crashed, missing, found])
+    assert metrics["axe_violations"] == 1 and metrics["axe_violation_codes"] == {"image-alt": 1}
+    assert (
+        metrics["axe_checked_pages"],
+        metrics["axe_skipped_pages"],
+        metrics["axe_error_pages"],
+    ) == (2, 1, 1)
+    # Any lone failed "axe" check is a broken run, whatever its code.
+    broken = [Check(name="axe", passed=False, code="browser_crash")]
+    assert pe.axe_status(broken) == "error"
+    assert pe.document_page_item("p", [], [], {}, [], broken)["axe_violations"] == []
+    assert pe.axe_status([]) is None  # no HTML to check (the page failed earlier)
 
 
 # -------------------------------------------------------------------- selection

@@ -26,10 +26,12 @@ import html
 import json
 import re
 import time
+import unicodedata
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Generator, Iterable, Iterator, Sequence
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from types import TracebackType
@@ -141,11 +143,39 @@ math {{ font-family: "Noto Sans Math", "STIX Two Math", "Latin Modern Math", mat
 # --------------------------------------------------------------------------- browser
 
 
+def _is_playwright_error(exc: BaseException) -> bool:
+    try:
+        from playwright.sync_api import Error as PlaywrightError
+    except ImportError:  # pragma: no cover - depends on installed groups
+        return False
+    return isinstance(exc, PlaywrightError)
+
+
+@contextmanager
+def _chromium_errors(action: str) -> Generator[None]:
+    """Playwright failures (a timeout, a browser that will not start) as RenderError.
+
+    Callers then handle one error type for "this input could not be built", instead of
+    a Playwright timeout escaping as a traceback.
+    """
+    try:
+        yield
+    except Exception as exc:
+        if _is_playwright_error(exc):
+            raise RenderError(f"Chromium could not {action} ({type(exc).__name__})") from exc
+        raise
+
+
 class ChromiumRenderer:
     """One headless Chromium shared by many renders (a launch costs ~0.5 s).
 
     The browser starts on the first render, not on construction, so a run whose inputs
-    are all cached never launches it. Call `close()` (or use `with`) when done.
+    are all cached never launches it. Call `close()` (or use `with`) when done; a closed
+    renderer starts again on its next render.
+
+    It holds a sync Playwright session open in the calling thread, and Playwright refuses
+    to start a second sync session in a thread that has one. Close it before anything
+    else in the thread starts its own (axe-core in `html_checks.axe_checks` does).
 
     JavaScript is off and the context is offline: every page we render is static and
     self-contained (images are inlined as data: URIs), so nothing can call out.
@@ -178,8 +208,14 @@ class ChromiumRenderer:
                 "Playwright is not installed: uv sync --group browser && "
                 "uv run playwright install chromium"
             ) from exc
-        self._playwright = sync_playwright().start()
-        self._browser = self._playwright.chromium.launch()
+        with _chromium_errors("start"):
+            self._playwright = sync_playwright().start()
+            try:
+                self._browser = self._playwright.chromium.launch()
+            except Exception:
+                self._playwright.stop()
+                self._playwright = None
+                raise
 
     def close(self) -> None:
         if self._browser is not None:
@@ -191,36 +227,43 @@ class ChromiumRenderer:
     def _context(self, scale: float = 1) -> Any:
         if self._browser is None:
             self._start()
-        return self._browser.new_context(
-            java_script_enabled=False, offline=True, device_scale_factor=scale
-        )
+        with _chromium_errors("open a page"):
+            return self._browser.new_context(
+                java_script_enabled=False, offline=True, device_scale_factor=scale
+            )
 
     def equation_png(self, mathml: str, *, scale: int = 2, pad_px: int = 4) -> bytes:
         page_html = EQUATION_PAGE.format(pad=pad_px, math=clean_mathml(mathml))
         context = self._context(scale)
         try:
-            page = context.new_page()
-            page.set_content(page_html, wait_until="load")
-            return page.locator("#eq").screenshot(animations="disabled", caret="hide")
+            with _chromium_errors("render the equation"):
+                page = context.new_page()
+                page.set_content(page_html, wait_until="load")
+                return page.locator("#eq").screenshot(animations="disabled", caret="hide")
         finally:
             context.close()
+
+    def equation_pdf(self, mathml: str, *, pad_px: int = 4) -> bytes:
+        """The equation page printed to PDF: what a PDF's text layer holds for it."""
+        return self.pdf(EQUATION_PAGE.format(pad=pad_px, math=clean_mathml(mathml)))
 
     def pdf(self, page_html: str, *, paper: Paper = "Letter", footer_html: str = "") -> bytes:
         context = self._context()
         try:
-            page = context.new_page()
-            page.set_content(page_html, wait_until="load")
-            page.emulate_media(media="print")
-            return page.pdf(
-                format=paper,
-                print_background=True,
-                margin={"top": "18mm", "bottom": "20mm", "left": "18mm", "right": "18mm"},
-                display_header_footer=bool(footer_html),
-                header_template="<span></span>",
-                footer_template=footer_html or "<span></span>",
-                tagged=False,  # an untagged PDF, like most course PDFs (and no alt leak)
-                outline=False,
-            )
+            with _chromium_errors("print the page"):
+                page = context.new_page()
+                page.set_content(page_html, wait_until="load")
+                page.emulate_media(media="print")
+                return page.pdf(
+                    format=paper,
+                    print_background=True,
+                    margin={"top": "18mm", "bottom": "20mm", "left": "18mm", "right": "18mm"},
+                    display_header_footer=bool(footer_html),
+                    header_template="<span></span>",
+                    footer_template=footer_html or "<span></span>",
+                    tagged=False,  # an untagged PDF, like most course PDFs (and no alt leak)
+                    outline=False,
+                )
         finally:
             context.close()
 
@@ -282,6 +325,44 @@ def render_equations(
         with ChromiumRenderer() as own:
             render_all(own)
     return out
+
+
+def pdf_text(pdf: bytes) -> str:
+    """A PDF's text layer as one line: reading order, control characters dropped and
+    whitespace collapsed, the way `layout` cleans the text it puts on an element."""
+    import pymupdf
+
+    with pymupdf.open(stream=pdf, filetype="pdf") as doc:
+        text = " ".join(page.get_text("text", sort=True) for page in doc)
+    text = "".join(ch for ch in text if ch.isspace() or unicodedata.category(ch) != "Cc")
+    return " ".join(text.split())
+
+
+def render_equation_text(
+    mathml: str, cache_dir: Path, *, renderer: ChromiumRenderer | None = None
+) -> str | None:
+    """The text layer a printed PDF has for this equation (None when it has none).
+
+    In a real document `layout` reads it from the PDF and `equation_step` cross-checks
+    the model's transcription against it, so the equations eval must pass it too.
+    Chromium prints MathML as positioned glyphs, so the text comes out the way the
+    document eval's printed pages hold it: math-italic letters (U+1D400 block), and
+    fractions flattened out of order (numerator, then the left-hand side, then the
+    denominator). Cached as text under the MathML's SHA-256.
+    """
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    path = cache_dir / f"{_sha256(mathml)}-text-{RENDER_VERSION}.txt"
+    if path.exists():
+        text = path.read_text(encoding="utf-8")
+    else:
+        if renderer is not None:
+            pdf = renderer.equation_pdf(mathml)
+        else:
+            with ChromiumRenderer() as own:
+                pdf = own.equation_pdf(mathml)
+        text = pdf_text(pdf)
+        path.write_text(text, encoding="utf-8")
+    return text or None
 
 
 # --------------------------------------------------------------------------- images
@@ -597,6 +678,125 @@ def _content_root(xhtml: str) -> ET.Element:
     if body is None:
         raise RenderError("page XHTML has no body")
     return body
+
+
+# Equation context: what `run.convert_pdf` sends with each equation as context_text.
+CONTEXT_CHARS = 600  # same window as pipeline.run.CONTEXT_CHARS (about half each side)
+TEXT_BLOCK_TAGS = {"p", "li", "dt", "dd", "td", "th", "h1", "h2", "h3", "h4", "h5", "h6"}
+_THIS_EQUATION = ""  # private-use stand-in while whitespace is collapsed
+
+
+def _is_text_block(elem: ET.Element) -> bool:
+    """Elements a PDF layout reads as paragraphs or headings (box titles print as text)."""
+    tag = _local(elem.tag)
+    return tag in TEXT_BLOCK_TAGS or (tag in {"div", "span"} and elem.get("data-type") == "title")
+
+
+def _flat_text(elem: ET.Element, this: ET.Element | None = None) -> str:
+    """Text of `elem`, whitespace collapsed, each <math> as "[equation]" (`this` one as
+    the stand-in marker), like the paragraph text convert_pdf shows a model."""
+    parts: list[str] = []
+
+    def walk(node: ET.Element) -> None:
+        tag = _local(node.tag)
+        if tag == "math":
+            parts.append(_THIS_EQUATION if node is this else "[equation]")
+            return
+        if tag in DROP:
+            return
+        parts.append(node.text or "")
+        for child in node:
+            walk(child)
+            parts.append(child.tail or "")
+
+    walk(elem)
+    return " ".join("".join(parts).split())
+
+
+def _token_text(elem: ET.Element) -> str:
+    return "".join("".join(elem.itertext()).split())
+
+
+def math_tokens(mathml: str) -> str:
+    """All text in a MathML string, whitespace removed: identifies one equation."""
+    try:
+        return _token_text(SafeET.fromstring(mathml))
+    except Exception as exc:
+        raise RenderError("MathML could not be parsed") from exc
+
+
+def _head(text: str, limit: int) -> str:
+    return text if len(text) <= limit else text[:limit].rstrip() + " ..."
+
+
+def _tail(text: str, limit: int) -> str:
+    return text if len(text) <= limit else "... " + text[-limit:].lstrip()
+
+
+def equation_contexts(xhtml: str) -> list[tuple[str, str | None]]:
+    """(token text, context) for each <math> on a page, in document order.
+
+    Document order is the gold set's `index_on_page`; the token text lets a caller check
+    that it has the right equation. The context is what `run.convert_pdf` would send
+    with the equation (`pipeline.run.context_texts`), read from the page source instead
+    of a PDF layout: an inline equation inside a text block gets up to 300 characters of
+    that block either side of "[this equation]"; a display equation, or an inline one
+    alone in its block, gets the end of the previous text block and the start of the
+    next, one per line around "[this equation]". Other equations show as "[equation]".
+    None when there is no text around it.
+    """
+    try:
+        root = SafeET.fromstring(xhtml)
+    except Exception as exc:
+        raise RenderError("page XHTML could not be parsed") from exc
+    parents = {child: parent for parent in root.iter() for child in parent}
+    order = {elem: i for i, elem in enumerate(root.iter())}
+
+    def ancestors(elem: ET.Element) -> Iterator[ET.Element]:
+        node = parents.get(elem)
+        while node is not None:
+            yield node
+            node = parents.get(node)
+
+    # Innermost text blocks only: a <li> holding <p>s reads as those paragraphs.
+    holds_block: set[ET.Element] = set()
+    for elem in root.iter():
+        if _is_text_block(elem):
+            for node in ancestors(elem):
+                if node in holds_block:
+                    break
+                holds_block.add(node)
+    blocks = [
+        (order[elem], elem, text)
+        for elem in root.iter()
+        if _is_text_block(elem) and elem not in holds_block and (text := _flat_text(elem))
+    ]
+    half = CONTEXT_CHARS // 2
+
+    def context(math: ET.Element) -> str | None:
+        above = list(ancestors(math))
+        boxed = any(node.get("data-type") == "equation" for node in above)
+        display = math.get("display") or ("block" if boxed else "inline")
+        block = next((node for node in above if _is_text_block(node)), None)
+        if display == "inline" and block is not None:
+            before, _, after = _flat_text(block, math).partition(_THIS_EQUATION)
+            if before.strip() or after.strip():
+                return f"{_tail(before, half)}[this equation]{_head(after, half)}".strip()
+        enclosing = set(above)
+        at = order[math]
+        previous = next(
+            (text for o, elem, text in reversed(blocks) if o < at and elem not in enclosing),
+            None,
+        )
+        following = next((text for o, _, text in blocks if o > at), None)
+        if previous is None and following is None:
+            return None
+        parts = [_tail(previous, half)] if previous else []
+        parts.append("[this equation]")
+        parts += [_head(following, half)] if following else []
+        return "\n".join(parts)
+
+    return [(_token_text(m), context(m)) for m in root.iter() if _local(m.tag) == "math"]
 
 
 def attribution_lines(page: PageSource) -> list[tuple[str, str | None]]:

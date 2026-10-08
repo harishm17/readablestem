@@ -163,8 +163,8 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
         )
         try:
             run = pe.run_pipeline_eval(config)
-        except RenderError as exc:
-            return _error(f"could not build the eval input: {exc}")
+        except RenderError as exc:  # raised while building inputs, before any model call
+            return _error(f"could not build the eval input (no model calls made): {exc}")
         except NotImplementedError as exc:
             return _error(f"a pipeline module is still a stub ({exc}); integrate it first")
     pe.write_report(run.report, out)

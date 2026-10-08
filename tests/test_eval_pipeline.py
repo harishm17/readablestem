@@ -21,6 +21,8 @@ from a11y_stem.core.types import (
     Status,
 )
 from a11y_stem.eval import pipeline_eval as pe
+from a11y_stem.eval import render
+from a11y_stem.eval.render import RenderError
 from a11y_stem.models.fake import FakeVisionClient, image_key
 from a11y_stem.pipeline import equation_step, figure_step, heading_step, html_checks, layout, run
 from a11y_stem.pipeline.layout import Layout
@@ -29,6 +31,7 @@ from test_eval_support import (
     EQ_F,
     EQ_V,
     EQ_X,
+    FIXTURES,
     FakeMedia,
     eq_fix,
     equation,
@@ -42,6 +45,8 @@ from test_eval_support import (
 )
 
 DATE = "2026-10-07"
+# "v = d t" in math-italic letters, as a printed PDF's text layer holds them.
+ITALIC_V_D_T = "\U0001d463 = \U0001d451 \U0001d461"
 
 
 def budget(cap: float = math.inf, max_calls: int = 1000) -> JobBudget:
@@ -99,7 +104,7 @@ def test_equation_eval_scores_rendered_inputs(monkeypatch, equation_gold):
 
     # Every request carried the PNG the renderer produced for that gold record.
     assert [r.images[0] for r in client.requests[:1]] == [fake_png(EQ_V)]
-    assert [c[0] for c in media.calls] == ["equation"] * 4
+    assert [c[0] for c in media.calls] == ["equation"] * 4 + ["close"]
 
     assert (report["n"], report["n_planned"], report["complete"]) == (4, 4, True)
     m = report["metrics"]
@@ -200,6 +205,56 @@ def test_budget_failed_fix_also_stops_the_run(monkeypatch, equation_gold):
     assert report["metrics"]["exact_lenient"] is None
 
 
+def test_the_step_gets_the_text_layer_and_context_convert_pdf_would_give(
+    monkeypatch, equation_gold
+):
+    """Regression: transcribe got text=None and context_text=None, so the step's
+    text-layer cross-check and routing never ran as they do inside convert_pdf."""
+    seen = []
+
+    def transcribe(element, png, *, client, settings, context_text=None):
+        seen.append((element.text, element.display, context_text))
+        return fake_transcribe(
+            element, png, client=client, settings=settings, context_text=context_text
+        )
+
+    monkeypatch.setattr(equation_step, "transcribe", transcribe)
+    v_id = "openstax/physics/p-1/eq-000"
+    media = FakeMedia(texts={EQ_V: ITALIC_V_D_T}, contexts={v_id: "Speed is\n[this equation]\nso."})
+    client = equation_client()
+    pe.run_pipeline_eval(config(equation_gold, "equations", client, media=media))
+    assert seen[0] == (ITALIC_V_D_T, "block", "Speed is\n[this equation]\nso.")
+    assert seen[1] == ("x=2", "inline", None)
+    assert client.requests[0].context_text == "Speed is\n[this equation]\nso."
+
+
+def test_text_layer_cross_check_keeps_a_confident_wrong_answer_for_review(monkeypatch, tmp_path):
+    gold = write_gold(
+        tmp_path, [equation("p-1", 0, EQ_A, "block"), equation("p-1", 1, EQ_X, "inline")]
+    )
+    monkeypatch.setattr(equation_step, "transcribe", fake_transcribe)
+    by_image = {
+        ("equation", image_key(fake_png(EQ_A))): {"latex": "x = y", "confidence": 0.95},
+        ("equation", image_key(fake_png(EQ_X))): {"latex": "x = 2", "confidence": 0.95},
+    }
+
+    def run_with(media):
+        client = FakeVisionClient(by_image=by_image)
+        return pe.run_pipeline_eval(config(gold, "equations", client, media=media))
+
+    items = run_with(FakeMedia()).items
+    # "a=b+c" in the text layer vs "x=y" transcribed: no symbol in common.
+    assert (items[0]["status"], items[0]["failed_checks"]) == ("needs_review", [])
+    assert items[0]["confidence"] == pytest.approx(0.475)
+    assert items[1]["route"] == "cheap"  # a short inline text layer starts cheap
+    # Without a text layer (the old eval input) the same answer looked accepted.
+    blind = run_with(FakeMedia(texts={EQ_A: None, EQ_X: None})).items
+    assert (blind[0]["status"], blind[0]["confidence"]) == ("accepted", 0.95)
+    # A long inline text layer goes straight to the main model, as in the app.
+    long_text = run_with(FakeMedia(texts={EQ_X: "x = 2 (a long text layer here)"})).items
+    assert long_text[1]["route"] == "main"
+
+
 def test_limit_changes_the_selection_hash(monkeypatch, equation_gold):
     monkeypatch.setattr(equation_step, "transcribe", fake_transcribe)
     full = pe.run_pipeline_eval(config(equation_gold, "equations", equation_client())).report
@@ -226,6 +281,119 @@ def test_markdown_summary_has_the_headline_and_tables(monkeypatch, equation_gold
 def test_unknown_task_is_refused(equation_gold):
     with pytest.raises(ValueError, match="unknown task"):
         pe.run_pipeline_eval(config(equation_gold, "tables", FakeVisionClient()))
+
+
+class FailingMedia(FakeMedia):
+    """Building input number `fail_at` (0-based, any kind) fails, like an openstax.org
+    download that times out."""
+
+    def __init__(self, fail_at: int) -> None:
+        super().__init__()
+        self.fail_at = fail_at
+        self.built = 0
+
+    def _count(self) -> None:
+        if self.built == self.fail_at:
+            raise RenderError("image download failed (URLError)")
+        self.built += 1
+
+    def equation_png(self, record):
+        self._count()
+        return super().equation_png(record)
+
+    def figure_png(self, url):
+        self._count()
+        return super().figure_png(url)
+
+    def page_pdf(self, page_records):
+        self._count()
+        return super().page_pdf(page_records)
+
+
+@pytest.mark.parametrize(
+    ("task", "records"),
+    [
+        ("equations", [equation("p-1", i, m, "block") for i, m in enumerate([EQ_V, EQ_A, EQ_F])]),
+        ("figures", [figure("p-1", i, "A ramp.", f"Figure 1.{i}") for i in range(3)]),
+        ("document", [equation(f"p-{i}", 0, EQ_V, "block") for i in range(3)]),
+    ],
+)
+def test_an_input_that_fails_to_build_fails_the_run_before_any_spend(
+    monkeypatch, tmp_path, task, records
+):
+    """Regression: inputs were built lazily, so a failed download on item k raised after
+    k-1 paid items and the CLI wrote no report: the spend was lost."""
+    monkeypatch.setattr(equation_step, "transcribe", fake_transcribe)
+    monkeypatch.setattr(figure_step, "describe", fake_describe)
+    convert_calls = []
+    monkeypatch.setattr(run, "convert_pdf", lambda *a, **k: convert_calls.append(1) or converted())
+    monkeypatch.setattr(html_checks, "static_checks", lambda html: [])
+    monkeypatch.setattr(html_checks, "axe_checks", lambda html: [])
+    spend = budget()
+    client = FakeVisionClient(
+        defaults={"equation": {"latex": "x", "confidence": 0.9}, "figure": None}, budget=spend
+    )
+    gold = write_gold(tmp_path, records)
+    with pytest.raises(RenderError, match="download failed"):
+        pe.run_pipeline_eval(config(gold, task, client, media=FailingMedia(2), budget=spend))
+    assert client.requests == [] and convert_calls == []
+    assert (spend.calls, spend.spent_usd) == (0, 0)
+
+
+def test_every_input_is_built_and_the_browser_closed_before_the_first_model_call(
+    monkeypatch, equation_gold
+):
+    log: list[str] = []
+
+    class LoggingMedia(FakeMedia):
+        def equation_png(self, record):
+            log.append("input")
+            return super().equation_png(record)
+
+        def close(self):
+            log.append("close")
+
+    def transcribe(element, png, **kwargs):
+        log.append("model")
+        return fake_transcribe(element, png, **kwargs)
+
+    monkeypatch.setattr(equation_step, "transcribe", transcribe)
+    pe.run_pipeline_eval(
+        config(equation_gold, "equations", equation_client(), media=LoggingMedia())
+    )
+    assert log == ["input"] * 4 + ["close"] + ["model"] * 4
+
+
+def test_cached_media_reads_context_from_the_page_source_by_index(tmp_path):
+    xhtml = (FIXTURES / "page.xhtml").read_text(encoding="utf-8")
+
+    class Fetcher:
+        def get_json(self, url):
+            return {"content": xhtml}
+
+    media = pe.CachedMedia(tmp_path / "gold", tmp_path / "cache", Fetcher())
+    block = equation("p-1", 1, EQ_V, "block")  # the fixture's second <math>: v = d/t
+    assert media.equation_context(block) == (
+        "Speed is [equation] and we watch a short video.\n[this equation]\nWorked Example"
+    )
+    with pytest.raises(RenderError, match="not at its index"):  # gold out of step with source
+        media.equation_context(equation("p-1", 0, EQ_V, "block"))
+    with pytest.raises(RenderError, match="not at its index"):
+        media.equation_context(equation("p-1", 7, EQ_V, "block"))
+
+
+def test_cached_media_text_layer_comes_from_the_cache_without_a_browser(tmp_path):
+    media = pe.CachedMedia(tmp_path / "gold", tmp_path / "cache", fetcher=None)
+    cached = tmp_path / "cache" / "equations"
+    cached.mkdir(parents=True)
+    key = render._sha256(EQ_V)
+    (cached / f"{key}-text-{render.RENDER_VERSION}.txt").write_text(ITALIC_V_D_T, encoding="utf-8")
+
+    def no_browser():
+        raise AssertionError("browser started on a cache hit")
+
+    media.browser._start = no_browser  # type: ignore[method-assign]
+    assert media.equation_text(equation("p-1", 0, EQ_V, "block")) == ITALIC_V_D_T
 
 
 # ------------------------------------------------------------------------- headings
@@ -396,6 +564,100 @@ def test_document_eval_aligns_equations_and_runs_html_checks(monkeypatch, tmp_pa
     assert m["axe_violation_codes"] == {"color-contrast": 1}
     assert report["latency_ms"]["p50"] == 1500.0
     assert report["prompt_versions"]["equation"] == "equation-v9"
+
+
+# WP4's html_checks.axe_checks result when axe could not run (its own Playwright session
+# failed to start, for one), verbatim.
+AXE_ERROR = Check(name="axe", passed=False, severity="warning", code="axe_error")
+IMAGE_ALT = Check(name="axe.image-alt", passed=False, code="image-alt")
+
+
+def converted(html: str = "<html></html>") -> ConversionOutput:
+    result = DocumentResult(
+        pipeline_version=run.PIPELINE_VERSION,
+        stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0, model_calls=0),
+        html=html,
+    )
+    return ConversionOutput(result=result)
+
+
+def test_axe_runs_after_the_eval_browser_is_closed(monkeypatch, tmp_path):
+    """Regression: CachedMedia printed each page with a sync Playwright session left
+    open in this thread, so axe_checks' own session failed (axe_error) on every page
+    that was not cached, and those pages scored as axe-clean."""
+    session = {"open": False}
+
+    class BrowserMedia(FakeMedia):  # CachedMedia's shape: a print opens the browser
+        def page_pdf(self, page_records):
+            session["open"] = True
+            return super().page_pdf(page_records)
+
+        def close(self):
+            session["open"] = False
+            super().close()
+
+    def axe_checks(html):  # Playwright refuses a second sync session in one thread
+        return [AXE_ERROR] if session["open"] else [IMAGE_ALT]
+
+    gold = write_gold(
+        tmp_path, [equation("p-1", 0, EQ_V, "block"), equation("p-2", 0, EQ_X, "inline")]
+    )
+    monkeypatch.setattr(run, "convert_pdf", lambda pdf, **_: converted())
+    monkeypatch.setattr(html_checks, "static_checks", lambda html: [])
+    monkeypatch.setattr(html_checks, "axe_checks", axe_checks)
+    report = pe.run_pipeline_eval(
+        config(gold, "document", FakeVisionClient(), media=BrowserMedia())
+    ).report
+    m = report["metrics"]
+    assert (m["axe_violations"], m["axe_checked_pages"], m["axe_error_pages"]) == (2, 2, 0)
+    assert "| axe_error_pages | 0 |" in pe.format_markdown(report)
+
+
+def test_a_crashed_axe_run_is_reported_not_scored_clean(monkeypatch, tmp_path):
+    gold = write_gold(tmp_path, [equation("p-1", 0, EQ_V, "block")])
+    monkeypatch.setattr(run, "convert_pdf", lambda pdf, **_: converted())
+    monkeypatch.setattr(html_checks, "static_checks", lambda html: [])
+    monkeypatch.setattr(html_checks, "axe_checks", lambda html: [AXE_ERROR])
+    m = pe.run_pipeline_eval(config(gold, "document", FakeVisionClient())).report["metrics"]
+    assert (m["axe_violations"], m["axe_checked_pages"], m["axe_error_pages"]) == (0, 0, 1)
+
+
+@pytest.mark.browser
+def test_axe_can_start_its_own_playwright_after_a_real_eval_browser(monkeypatch, tmp_path):
+    from playwright.sync_api import sync_playwright
+
+    def axe_checks(html):  # WP4's pattern: its own sync session, axe_error if it fails
+        try:
+            with sync_playwright() as playwright:
+                playwright.chromium.launch().close()
+        except Exception:
+            return [AXE_ERROR]
+        return [Check(name="axe", passed=True)]
+
+    renderer = render.ChromiumRenderer()
+
+    class RealBrowserMedia(FakeMedia):
+        def page_pdf(self, page_records):
+            return renderer.pdf("<!doctype html><p>Page</p>")
+
+        def close(self):
+            renderer.close()
+
+    try:
+        renderer.equation_png(EQ_X)
+        assert axe_checks("") == [AXE_ERROR]  # the hazard: nested sync sessions fail
+        renderer.close()
+        gold = write_gold(tmp_path, [equation("p-1", 0, EQ_V, "block")])
+        monkeypatch.setattr(run, "convert_pdf", lambda pdf, **_: converted())
+        monkeypatch.setattr(html_checks, "static_checks", lambda html: [])
+        monkeypatch.setattr(html_checks, "axe_checks", axe_checks)
+        report = pe.run_pipeline_eval(
+            config(gold, "document", FakeVisionClient(), media=RealBrowserMedia())
+        ).report
+    finally:
+        renderer.close()
+    m = report["metrics"]
+    assert (m["axe_checked_pages"], m["axe_error_pages"]) == (1, 0)
 
 
 def test_document_eval_drops_a_half_converted_page(monkeypatch, tmp_path):
