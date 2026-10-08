@@ -37,7 +37,7 @@ from a11y_stem.web.review import (
     FieldError,
     ReviewInvalid,
     apply_review,
-    has_proposal,
+    can_accept,
     needs_attention,
     rerender_html,
     review_order,
@@ -113,7 +113,7 @@ def _item(
         decorative=bool(fix.figure and fix.figure.decorative),
         heading_level=fix.heading.level if fix.heading else None,
         heading_text=fix.heading.text if fix.heading else (element.text if element else None),
-        can_accept=has_proposal(fix) and fix.status is not Status.ACCEPTED,
+        can_accept=can_accept(fix) and fix.status is not Status.ACCEPTED,
         values=values,
     )
 

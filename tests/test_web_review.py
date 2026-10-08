@@ -259,6 +259,25 @@ def test_nothing_to_accept_on_an_abstained_fix(web):
     assert '<a href="#actions-p1-e5">' in response.text
 
 
+def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
+    from a11y_stem.web.db import Job
+
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, web.job_id)
+        assert job is not None and job.result_json is not None
+        data = DocumentResult.model_validate(job.result_json)
+        fix = data.fix_for("p1-e4")
+        assert fix is not None
+        fix.checks = [Check(name="alt.length", passed=False, severity="error", code="too_long")]
+        job.result_json = data.model_dump(mode="json", exclude={"html"})
+    card = web.browser.get(f"/jobs/{web.job_id}/review").text.split('id="fix-p1-e4"')[1]
+    assert 'value="accept"' not in card.split("</li>")[0]
+    response = post(web, "p1-e4", action="accept")
+    assert response.status_code == 422
+    assert "failed a required check" in response.text
+    assert post(web, "p1-e4", action="edit", alt="A rising line").status_code == 303
+
+
 def test_unknown_action_or_element(web):
     assert post(web, "p1-e3", action="delete-everything").status_code == 422
     assert post(web, "p9-e9", action="accept").status_code == 404

@@ -2,8 +2,9 @@
 
 The web route owns the transaction; this module owns the rules:
 
-- accept: only a fix that has a proposal (an abstained or failed fix has nothing to accept;
-  the reviewer can edit it or keep the original by rejecting it),
+- accept: only a fix with a proposal that passed every error-level check (an abstained
+  fix has nothing to accept, and an invalid proposal must be edited, which re-validates
+  it; the reviewer can also keep the original by rejecting it),
 - edit: the reviewer's LaTeX / alt text / heading level goes through the same
   deterministic validators as model output (`pipeline.validate`) before it is stored;
   error-level failures are shown back to the reviewer, nothing is saved,
@@ -85,6 +86,12 @@ def has_proposal(fix: Fix) -> bool:
     return any(p is not None for p in (fix.equation, fix.figure, fix.heading))
 
 
+def can_accept(fix: Fix) -> bool:
+    """Only a proposal that passed every error-level check may be accepted as it is;
+    anything else goes through "Save edit", which validates it again."""
+    return has_proposal(fix) and not _blocking(fix.checks)
+
+
 def snapshot(fix: Fix) -> dict[str, Any]:
     """What a ReviewEdit stores as before/after (deleted with the job)."""
     return fix.model_dump(mode="json", include={"status", "equation", "figure", "heading"})
@@ -112,14 +119,12 @@ def apply_review(
     before = snapshot(fix)
     warnings: list[Check] = []
     if action == "accept" and not has_proposal(fix):
-        raise ReviewInvalid(
-            [
-                FieldError(
-                    field_id("actions", element_id),
-                    "There is no proposal to accept. Edit it, or reject it to keep the original.",
-                )
-            ]
-        )
+        message = "There is no proposal to accept. Edit it, or reject it to keep the original."
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
+    if action == "accept" and not can_accept(fix):
+        message = "This proposal failed a required check, so it cannot be accepted as it is. "
+        message += "Edit it, or reject it to keep the original."
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
     if action == "edit":
         warnings = _edit(fix, element, form)
     fix.status = STATUS_FOR_ACTION[action]
