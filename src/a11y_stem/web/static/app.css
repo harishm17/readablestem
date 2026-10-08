@@ -215,3 +215,33 @@ progress { width: 16rem; height: 1.1rem; }
 @media (prefers-reduced-motion: reduce) {
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
+
+/* Review screen: progress, sections, groups, bulk accept, folded decided fixes */
+.review-progress { margin: 1rem 0; }
+.review-toc { background: var(--panel); border-radius: var(--radius); padding: 0.25rem 1.25rem 0.75rem; margin: 1.5rem 0; }
+.review-toc h2 { font-size: 1.15rem; margin: 0.75rem 0 0.25rem; }
+.review-toc ul { margin: 0; padding-left: 1.2rem; }
+.review-group { border-top: 2px solid var(--rule); margin-top: 2.5rem; }
+.review-group:focus { outline: none; }
+.group-count { font-weight: 400; color: var(--muted); font-size: 1rem; }
+.bulk-actions { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.25rem 1.25rem 1rem; margin: 1rem 0 1.5rem; }
+.bulk-form { margin: 0.75rem 0; }
+.bulk-form .field { margin-bottom: 0.5rem; }
+.bulk-form .hint { max-width: 44rem; }
+.part-label { font-weight: 700; margin: 0.75rem 0 0.35rem; }
+.fix-card h3 { font-size: 1.2rem; margin-top: 1rem; }
+.explained { margin: 0.5rem 0; }
+.explained p { margin: 0.25rem 0; }
+.check-list li { margin: 0.25rem 0; }
+.code-line { display: block; color: var(--muted); font-size: 0.85rem; }
+.changed-note { border-left: 5px solid var(--ok); background: var(--panel); padding: 0.4rem 0.9rem; margin: 0.75rem 0; }
+.heading-proposal { background: var(--panel); padding: 0.5rem 0.75rem; border-radius: var(--radius); font-weight: 600; }
+.prose-input { font-family: inherit; }
+.review-item { scroll-margin-top: 0.5rem; }
+.review-item:focus { outline: none; }
+.done-group { margin: 1rem 0 0.5rem; }
+.done-group > summary, .done-item > summary { cursor: pointer; padding: 0.4rem 0; }
+.done-group > summary { font-weight: 600; }
+.done-list { margin: 0.5rem 0 0 1rem; }
+.done-item { border-bottom: 1px solid var(--rule); }
+.done-item > .fix-card { margin-top: 0.5rem; }

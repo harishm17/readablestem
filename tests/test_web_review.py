@@ -1,4 +1,9 @@
-"""Review screen: ordering, display, accept / edit / reject, validation, re-render.
+"""Review screen: one fix at a time (display, accept / edit / reject, validation,
+re-render) and the MathML sanitizer.
+
+Grouping, bulk accept and where the reviewer lands after a decision are in
+test_web_review_bulk.py; the code -> sentence table in test_web_review_messages.py; axe
+in a real browser in test_web_review_browser.py.
 
 `pipeline.validate`, `pipeline.speech` and `pipeline.assemble` belong to other work
 packages and are monkeypatched with small deterministic fakes here.
@@ -12,10 +17,22 @@ from html import escape
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.core.types import Check, DocumentResult
+from a11y_stem.core.types import (
+    Check,
+    ConversionOutput,
+    DocumentResult,
+    DocumentStats,
+    Element,
+    EquationFix,
+    FigureFix,
+    Fix,
+    HeadingFix,
+    Kind,
+    Status,
+)
 from a11y_stem.web.db import ReviewEdit, session_scope
 from a11y_stem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, token, upload
+from fixtures.web.support import ALICE, PNG, WebEnv, job_id_from, login, make_pdf, token, upload
 
 
 class FakePipeline:
@@ -28,8 +45,15 @@ class FakePipeline:
     def check_latex(self, latex: str) -> list[Check]:
         self.latex_checked.append(latex)
         ok = "\\bad" not in latex
+        warn = "\\warn" not in latex
         return [
-            Check(name="latex.allowed_commands", passed=ok, code=None if ok else "unknown_command")
+            Check(name="latex.allowed_commands", passed=ok, code=None if ok else "unknown_command"),
+            Check(
+                name="latex.plain_text_arguments",
+                passed=warn,
+                severity="warning",
+                code=None if warn else "markup_in_text",
+            ),
         ]
 
     def safe_latex_to_mathml(self, latex: str, display: str = "block") -> str:
@@ -45,7 +69,11 @@ class FakePipeline:
     def check_alt(self, alt: str, *, decorative: bool, caption: str | None = None) -> list[Check]:
         self.alt_checked.append((alt, decorative, caption))
         ok = not alt.lower().startswith("image of")
-        return [Check(name="alt.no_image_of", passed=ok, code=None if ok else "image_of")]
+        return [
+            Check(
+                name="alt.no_redundant_prefix", passed=ok, code=None if ok else "redundant_prefix"
+            )
+        ]
 
     def mathml_to_speech(self, mathml: str) -> str:
         return "spoken form"
@@ -58,8 +86,7 @@ class FakePipeline:
         return f"<html><body>rendered {statuses} crops={len(crops)}</body></html>"
 
 
-@pytest.fixture
-def web(tmp_path, monkeypatch):
+def install_fake_pipeline(monkeypatch) -> FakePipeline:
     from a11y_stem.pipeline import assemble, speech, validate
 
     fake = FakePipeline()
@@ -67,6 +94,15 @@ def web(tmp_path, monkeypatch):
         monkeypatch.setattr(validate, name, getattr(fake, name))
     monkeypatch.setattr(speech, "mathml_to_speech", fake.mathml_to_speech)
     monkeypatch.setattr(assemble, "render_html", fake.render_html)
+    return fake
+
+
+@pytest.fixture
+def web(tmp_path, monkeypatch):
+    """The small fake document (fixtures.web.support.fake_result): heading p1-e0 accepted,
+    inline equation p1-e2 accepted, equation p1-e3 and figure p1-e4 need review,
+    equation p1-e5 abstained."""
+    fake = install_fake_pipeline(monkeypatch)
     env = WebEnv(tmp_path)
     with env.running() as client:
         env.allow(ALICE)
@@ -92,37 +128,213 @@ def post(env, element_id: str, **fields):
     return env.browser.post(f"/jobs/{env.job_id}/review/{element_id}", data=data)
 
 
+def review_page(env) -> str:
+    response = env.browser.get(f"/jobs/{env.job_id}/review")
+    assert response.status_code == 200
+    return response.text
+
+
+def cards(page: str) -> list[str]:
+    """Element ids of the fix cards, in page order."""
+    return re.findall(r'<article id="fix-([\w-]+)"', page)
+
+
+def card(page: str, element_id: str) -> str:
+    """The markup of one fix's list item (its notices, card and form): up to the next
+    fix's item or the end of the list."""
+    start = page.index(f'<li id="item-{element_id}"')
+    ends = [page.find(marker, start + 1) for marker in ('<li id="item-', "</ol>")]
+    return page[start : min(e for e in ends if e != -1)]
+
+
+# --------------------------------------------------------------------------- rich document
+
+
+def rich_output() -> ConversionOutput:
+    """Three pages with every status in every group, listed in scrambled order so the
+    review screen's sort is exercised. See test_web_review_bulk.py for the expectations.
+
+    Equations: p1-e1 NR 0.82, p2-e1 FAILED, p2-e2 NR 0.65 (style warning), p2-e3 ACCEPTED,
+    p3-e0 NR 0.90 but an error-level check failed, p3-e4 EDITED.
+    Figures: p1-e2 NR 0.70 (caption warning), p3-e1 ABSTAINED, p3-e2 FAILED, p3-e5 REJECTED.
+    Headings: p1-e0 ACCEPTED, p1-e3 NR 0.60, p2-e0 NR 0.45, p2-e4 ABSTAINED, p3-e3 NR 0.88.
+    """
+    layout = [  # (id, kind, page)
+        ("p1-e0", Kind.HEADING, 0), ("p1-e1", Kind.EQUATION, 0), ("p1-e2", Kind.FIGURE, 0),
+        ("p1-e3", Kind.HEADING, 0), ("p2-e0", Kind.HEADING, 1), ("p2-e1", Kind.EQUATION, 1),
+        ("p2-e2", Kind.EQUATION, 1), ("p2-e3", Kind.EQUATION, 1), ("p2-e4", Kind.HEADING, 1),
+        ("p3-e0", Kind.EQUATION, 2), ("p3-e1", Kind.FIGURE, 2), ("p3-e2", Kind.FIGURE, 2),
+        ("p3-e3", Kind.HEADING, 2), ("p3-e4", Kind.EQUATION, 2), ("p3-e5", Kind.FIGURE, 2),
+    ]  # fmt: skip
+    elements = [
+        Element(
+            id=eid,
+            kind=kind,
+            page=page,
+            bbox=(0, order, 1, order + 1),
+            order=order,
+            text=f"SECRET-DOC-TEXT {eid}" if kind is Kind.HEADING else None,
+            display="block" if kind is Kind.EQUATION else None,
+            caption="Figure SECRET-CAPTION" if kind is Kind.FIGURE else None,
+        )
+        for order, (eid, kind, page) in enumerate(layout)
+    ]
+
+    def eq(latex: str) -> EquationFix:
+        return EquationFix(latex=latex, mathml=f"<math><mi>{latex}</mi></math>", speech=latex)
+
+    def warn(name: str, code: str) -> Check:
+        return Check(name=name, passed=False, severity="warning", code=code)
+
+    def head(eid: str, level: int) -> HeadingFix:
+        return HeadingFix(level=level, text=f"SECRET-HEADING {eid}")
+
+    weak = warn("heading.evidence", "heading.weak_evidence")
+    fixes = [
+        Fix(element_id="p1-e0", kind=Kind.HEADING, status=Status.ACCEPTED, confidence=0.95,
+            heading=head("p1-e0", 1)),
+        Fix(element_id="p1-e1", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, confidence=0.82,
+            equation=eq("a")),
+        Fix(element_id="p1-e2", kind=Kind.FIGURE, status=Status.NEEDS_REVIEW, confidence=0.70,
+            figure=FigureFix(figure_type="chart", alt="SECRET-ALT rising line"),
+            checks=[warn("alt.not_caption_copy", "caption_copy")]),
+        Fix(element_id="p1-e3", kind=Kind.HEADING, status=Status.NEEDS_REVIEW, confidence=0.60,
+            heading=head("p1-e3", 2), checks=[weak]),
+        Fix(element_id="p2-e0", kind=Kind.HEADING, status=Status.NEEDS_REVIEW, confidence=0.45,
+            heading=head("p2-e0", 2),
+            checks=[weak, warn("heading.all_caps", "heading.all_caps")]),
+        Fix(element_id="p2-e1", kind=Kind.EQUATION, status=Status.FAILED, confidence=0.7,
+            reason="invalid_latex",
+            checks=[Check(name="latex.allowed_commands", passed=False, code="unknown_command")]),
+        Fix(element_id="p2-e2", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, confidence=0.65,
+            equation=eq("b"), checks=[warn("equation.text_layer_style", "style_mismatch")]),
+        Fix(element_id="p2-e3", kind=Kind.EQUATION, status=Status.ACCEPTED, confidence=0.97,
+            equation=eq("c")),
+        Fix(element_id="p2-e4", kind=Kind.HEADING, status=Status.ABSTAINED,
+            reason="heading.empty_text",
+            checks=[Check(name="heading.text", passed=False, code="heading.empty_text")]),
+        Fix(element_id="p3-e0", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, confidence=0.90,
+            equation=eq("d"),
+            checks=[Check(name="mathml.structure", passed=False, code="bad_arity")]),
+        Fix(element_id="p3-e1", kind=Kind.FIGURE, status=Status.ABSTAINED, confidence=0.2,
+            reason="low_confidence"),
+        Fix(element_id="p3-e2", kind=Kind.FIGURE, status=Status.FAILED, reason="model_timeout"),
+        Fix(element_id="p3-e3", kind=Kind.HEADING, status=Status.NEEDS_REVIEW, confidence=0.88,
+            heading=head("p3-e3", 3), checks=[warn("heading.outline", "heading.level_repaired")]),
+        Fix(element_id="p3-e4", kind=Kind.EQUATION, status=Status.EDITED, confidence=0.5,
+            equation=eq("e")),
+        Fix(element_id="p3-e5", kind=Kind.FIGURE, status=Status.REJECTED, confidence=0.5,
+            figure=FigureFix(figure_type="photo", alt="SECRET-ALT photo")),
+    ]  # fmt: skip
+    fixes.reverse()  # stored order must not matter
+    by_status: dict[str, int] = {}
+    for fix in fixes:
+        by_status[fix.status.value] = by_status.get(fix.status.value, 0) + 1
+    result = DocumentResult(
+        pipeline_version="test",
+        title="SECRET-HEADING Rich",
+        elements=elements,
+        fixes=fixes,
+        stats=DocumentStats(
+            pages=3, cost_usd=0.02, latency_ms=5, model_calls=4, by_status=by_status
+        ),
+        html="<!doctype html><html lang='en'><head><title>t</title></head><body></body></html>",
+    )
+    crops = {e.id: PNG for e in elements if e.kind in (Kind.EQUATION, Kind.FIGURE)}
+    return ConversionOutput(result=result, crops=crops)
+
+
 # --------------------------------------------------------------------------- page
 
 
-def test_fixes_needing_review_come_first_then_unconverted_then_the_rest(web):
-    page = web.browser.get(f"/jobs/{web.job_id}/review")
-    assert page.status_code == 200
-    order = re.findall(r'<li id="fix-([\w-]+)"', page.text)
-    assert order == ["p1-e3", "p1-e4", "p1-e5", "p1-e0", "p1-e2"]  # paragraphs are not fixes
+def test_groups_by_kind_with_pending_fixes_first(web):
+    page = review_page(web)
+    # Equations (pending p1-e3 needs review, p1-e5 not converted; decided p1-e2), then the
+    # figure, then the accepted heading. Paragraphs are not fixes.
+    assert cards(page) == ["p1-e3", "p1-e5", "p1-e2", "p1-e4", "p1-e0"]
+    assert page.index('id="group-equations"') < page.index('id="group-figures"')
+    assert page.index('id="group-figures"') < page.index('id="group-headings"')
 
 
 def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
-    page = web.browser.get(f"/jobs/{web.job_id}/review").text
-    card = page[page.index('id="fix-p1-e3"') : page.index('id="fix-p1-e4"')]
-    assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in card
-    assert 'alt="The original equation from page 1 of the PDF, as an image."' in card
-    assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' in card
-    assert "x plus 1" in card
-    assert "\\SECRETLATEX{x}</textarea>" in card
-    assert '<label for="latex-p1-e3">' in card
-    assert "55%" in card and "Needs review" in card
-    assert "<code>unknown_command</code>" in card and "(warning)" in card
+    page = review_page(web)
+    equation = card(page, "p1-e3")
+    assert '<h3 id="fix-title-p1-e3">Equation 2 <span class="meta">on page 1</span></h3>' in (
+        equation
+    )  # numbered in reading order: the inline p1-e2 is equation 1
+    assert f'src="/jobs/{web.job_id}/crops/p1-e3.png"' in equation
+    assert 'alt="The original equation 2 from page 1 of the PDF, as an image."' in equation
+    assert '<math xmlns="http://www.w3.org/1998/Math/MathML" display="block">' in equation
+    assert "<strong>Read aloud roughly as:</strong> x plus 1" in equation
+    assert "\\SECRETLATEX{x}</textarea>" in equation
+    assert '<label for="latex-p1-e3">LaTeX for equation 2</label>' in equation
+    assert "<dd>Low (55%)</dd>" in equation and ">Needs review</span>" in equation
+    # The check is explained in words; the raw code stays as a small secondary line.
+    assert "<strong>Worth checking:</strong> The LaTeX uses a command that is not on" in equation
+    assert "Code: <code>latex.allowed_commands: unknown_command</code>" in equation
     for action in ("edit", "accept", "reject"):
-        assert f'name="action" value="{action}"' in card
+        assert f'name="action" value="{action}"' in equation
 
-    figure = page[page.index('id="fix-p1-e4"') : page.index('id="fix-p1-e5"')]
-    assert 'value="SECRET-ALT a rising line"' in figure
-    assert '<label for="alt-p1-e4">' in figure and 'id="decorative-p1-e4"' in figure
+    figure = card(page, "p1-e4")
+    assert "SECRET-ALT a rising line</textarea>" in figure
+    assert '<label for="alt-p1-e4">Alt text for figure 1</label>' in figure
+    assert 'id="decorative-p1-e4"' in figure
+    assert "Aim for 150 characters or fewer (this text has 24)." in figure
+    assert "<strong>Caption in the PDF:</strong> Figure 1 SECRET-CAPTION" in figure
 
-    abstained = page[page.index('id="fix-p1-e5"') : page.index('id="fix-p1-e0"')]
+    abstained = card(page, "p1-e5")
     assert 'value="accept"' not in abstained  # nothing to accept
-    assert "<code>low_confidence</code>" in abstained
+    assert "<strong>Why it was not converted:</strong> The model was not sure enough" in abstained
+    assert "Code: <code>low_confidence</code>" in abstained
+    assert "Type the LaTeX for the equation in the image" in abstained
+
+
+def test_buttons_name_the_fix_they_act_on(web):
+    figure = card(review_page(web), "p1-e4")
+    assert 'Reject<span class="visually-hidden"> figure 1</span>' in figure
+    assert 'Accept<span class="visually-hidden"> figure 1</span>' in figure
+    assert 'Save edit<span class="visually-hidden"> to figure 1</span>' in figure
+
+
+def test_decided_fixes_are_folded_away(web):
+    page = review_page(web)
+    headings = page[page.index('id="group-headings"') :]
+    assert '<details class="done-group">' in headings  # closed: no "open" attribute
+    assert "<summary>1 heading already decided (accepted, edited or rejected)</summary>" in (
+        headings
+    )
+    assert (
+        '<summary id="fix-title-p1-e0">Heading 1, page 1: Accepted, confidence High (100%)'
+        "</summary>" in headings
+    )
+
+
+def test_page_has_a_table_of_contents_with_counts(web):
+    page = review_page(web)
+    toc = page[page.index('<nav class="review-toc"') : page.index("</nav>", page.index("toc"))]
+    assert (
+        '<a href="#group-equations">Equations</a>: 1 needs review, 1 not converted, '
+        "1 already decided" in toc
+    )
+    assert '<a href="#group-figures">Figures</a>: 1 needs review, 0 already decided' in toc
+    assert '<a href="#group-headings">Headings</a>: 1 already decided' in toc
+    assert (
+        '<h2 id="group-equations-title">Equations <span class="group-count">(2 to decide, '
+        "1 already decided)</span></h2>" in page
+    )
+    progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
+    assert "3 fixes still need a decision:</strong>\n    2 equations, 1 figure." in progress
+
+
+def test_job_page_breaks_down_what_needs_review_by_kind(web):
+    page = web.browser.get(f"/jobs/{web.job_id}").text
+    breakdown = page[
+        page.index('id="review-breakdown"') : page.index("</p>", page.index("breakdown"))
+    ]
+    assert "2 need your review:" in breakdown
+    assert f'<a href="/jobs/{web.job_id}/review#group-equations">1 equation</a>,' in breakdown
+    assert f'<a href="/jobs/{web.job_id}/review#group-figures">1 figure</a>.' in breakdown
+    assert "heading" not in breakdown  # none need review
 
 
 # --------------------------------------------------------------------------- actions
@@ -131,9 +343,8 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
 def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 303
-    # It needed review, so it moves down the list: go back to the progress note, which
-    # sits right above the next fix to review.
-    assert response.headers["location"] == f"/jobs/{web.job_id}/review#review-progress"
+    # Next fix still waiting after equation 2 is the abstained equation 3.
+    assert response.headers["location"] == f"/jobs/{web.job_id}/review#item-p1-e5"
     after = result(web)
     fix = after.fix_for("p1-e3")
     assert fix is not None and fix.status.value == "accepted"
@@ -144,20 +355,31 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     job = web.job(web.job_id)
     assert job.html is not None and "p1-e3:accepted" in job.html
     assert "crops=3" in job.html  # the stored crops are passed to the assembler
-    page = web.browser.get(f"/jobs/{web.job_id}/review").text
-    progress = page[page.index('id="review-progress"') : page.index('class="fix-list"')]
-    assert "Equation on page 1: Accepted." in progress
-    assert "2 fixes still need your" in progress
-    order = re.findall(r'<li id="fix-([\w-]+)"', page)
-    assert order == ["p1-e4", "p1-e5", "p1-e0", "p1-e2", "p1-e3"]
-    card = page[page.index('id="fix-p1-e3"') :]
-    assert "Accepted." in card  # also shown inside the card that changed
+    page = review_page(web)
+    assert cards(page) == ["p1-e5", "p1-e2", "p1-e3", "p1-e4", "p1-e0"]
+    # The notice sits where the redirect lands, linked back to the fix that changed.
+    landing = card(page, "p1-e5")
+    assert '<a href="#item-p1-e3">Equation 2 on page 1</a>: Accepted.' in landing
+    assert landing.index("Accepted.") < landing.index('<article id="fix-p1-e5"')
+    # The changed fix is decided now: its group's folded list opens to show it.
+    changed = card(page, "p1-e3")
+    assert '<details class="done-item" open>' in changed
+    assert "<strong>Just changed:</strong> Accepted." in changed
+    assert '<details class="done-group" open>' in page
+    progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
+    assert "Accepted." in progress
+    assert "2 fixes still need a decision" in progress
 
 
-def test_changing_an_already_reviewed_fix_returns_to_that_fix(web):
+def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     post(web, "p1-e3", action="accept")
-    response = post(web, "p1-e3", action="reject")
-    assert response.headers["location"] == f"/jobs/{web.job_id}/review#fix-p1-e3"
+    post(web, "p1-e5", action="reject")
+    response = post(web, "p1-e4", action="reject")
+    assert response.headers["location"] == f"/jobs/{web.job_id}/review#review-progress"
+    page = review_page(web)
+    progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
+    assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Rejected.' in progress
+    assert "Nothing left that needs your attention." in progress
 
 
 def test_saving_an_equation_edit_validates_and_stores_it(web):
@@ -169,8 +391,23 @@ def test_saving_an_equation_edit_validates_and_stores_it(web):
     assert fix.equation.latex == "x^2 + 1"
     assert fix.equation.mathml == '<math display="block"><mi>x^2 + 1</mi></math>'
     assert fix.equation.speech == "spoken form" and fix.equation.display == "block"
-    assert [c.name for c in fix.checks] == ["latex.allowed_commands", "mathml.well_formed"]
+    assert [c.name for c in fix.checks] == [
+        "latex.allowed_commands",
+        "latex.plain_text_arguments",
+        "mathml.well_formed",
+    ]
     assert edits(web)[0].after["equation"]["latex"] == "x^2 + 1"
+
+
+def test_an_edit_with_warnings_is_saved_and_the_warning_explained(web):
+    assert post(web, "p1-e3", action="edit", latex="\\warn{x}").status_code == 303
+    page = review_page(web)
+    assert "Your edit passed the required checks and was saved. 1 check gives a warning" in (
+        card(page, "p1-e5")
+    )
+    changed = card(page, "p1-e3")
+    assert "Text inside \\text{...} contains characters that would turn into markup." in changed
+    assert "markup_in_text" in changed  # the code, in the secondary line
 
 
 def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
@@ -179,11 +416,23 @@ def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     assert response.status_code == 422
     assert "<title>Error: Review fixes" in response.text
     assert '<a href="#latex-p1-e3">' in response.text  # error summary links to the field
-    assert "latex.allowed_commands (unknown_command)" in response.text
+    # Explained in words, with the code in brackets for a bug report.
+    assert "The LaTeX was not saved. The LaTeX uses a command that is not on the list" in (
+        response.text
+    )
+    assert "(latex.allowed_commands: unknown_command)" in response.text
     assert "\\bad{y}</textarea>" in response.text  # the reviewer's input is kept
     assert 'aria-invalid="true"' in response.text
     assert result(web) == before and edits(web) == []
     assert web.pipeline.rendered == []
+
+
+def test_an_invalid_edit_to_a_decided_fix_opens_it_so_the_error_link_works(web):
+    post(web, "p1-e3", action="accept")
+    response = post(web, "p1-e3", action="edit", latex="\\bad{y}")
+    assert response.status_code == 422
+    changed = card(response.text, "p1-e3")
+    assert '<details class="done-item" open>' in changed and 'id="latex-p1-e3"' in changed
 
 
 def test_latex_that_cannot_become_mathml_is_not_saved(web):
@@ -221,7 +470,9 @@ def test_figure_alt_text_failing_a_check_is_not_saved(web):
     response = post(web, "p1-e4", action="edit", alt="Image of a graph")
     assert response.status_code == 422
     assert '<a href="#alt-p1-e4">' in response.text
-    assert 'value="Image of a graph"' in response.text
+    assert "The alt text was not saved. The alt text starts with words like" in response.text
+    assert "Image of a graph</textarea>" in response.text
+    assert "(this text has 16)" in response.text  # counts the reviewer's input
     assert edits(web) == []
 
 
@@ -270,8 +521,9 @@ def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
         assert fix is not None
         fix.checks = [Check(name="alt.length", passed=False, severity="error", code="too_long")]
         job.result_json = data.model_dump(mode="json", exclude={"html"})
-    card = web.browser.get(f"/jobs/{web.job_id}/review").text.split('id="fix-p1-e4"')[1]
-    assert 'value="accept"' not in card.split("</li>")[0]
+    figure = card(review_page(web), "p1-e4")
+    assert 'value="accept"' not in figure
+    assert "<strong>Must be fixed:</strong> The alt text is long." in figure
     response = post(web, "p1-e4", action="accept")
     assert response.status_code == 422
     assert "failed a required check" in response.text

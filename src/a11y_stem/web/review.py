@@ -8,7 +8,15 @@ The web route owns the transaction; this module owns the rules:
 - edit: the reviewer's LaTeX / alt text / heading level goes through the same
   deterministic validators as model output (`pipeline.validate`) before it is stored;
   error-level failures are shown back to the reviewer, nothing is saved,
-- reject: the original stays in the document, flagged.
+- reject: the original stays in the document, flagged,
+- bulk accept: many fixes of one kind at once, but only the ones a single "Accept" could
+  take (NEEDS_REVIEW, a proposal, no failed error-level check). FAILED and ABSTAINED
+  fixes have nothing safe to accept and are never included.
+
+It also decides the order of the review screen. A reviewer's time should go where the
+risk is, so fixes are grouped by kind (equations, then figures, then headings); within a
+group the ones still waiting for a decision come first, in page and reading order, and
+the ones already decided follow (collapsed on the page).
 
 Validators, speech and the HTML assembler are looked up on their modules at call time,
 so tests (and other work packages' stubs) can be swapped in with monkeypatch.
@@ -33,6 +41,7 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
+from a11y_stem.web.messages import confidence_percent, explain_check
 
 logger = logging.getLogger(__name__)
 
@@ -41,9 +50,24 @@ STATUS_FOR_ACTION = {"accept": Status.ACCEPTED, "edit": Status.EDITED, "reject":
 MAX_LATEX_CHARS = 5000
 MAX_ALT_CHARS = 1000
 
-# Review screen order: what needs a decision first, then what was not converted, then the
-# rest. Within a group, document order.
-_ATTENTION = {Status.NEEDS_REVIEW: 0, Status.FAILED: 1, Status.ABSTAINED: 1}
+# Review screen groups, in priority order, and the slug each has in URLs and anchors.
+GROUP_SLUGS = {Kind.EQUATION: "equations", Kind.FIGURE: "figures", Kind.HEADING: "headings"}
+GROUP_KINDS = tuple(GROUP_SLUGS)
+# Waiting for a decision: a proposal to check, or nothing usable (the reviewer can write
+# one, or reject to confirm the original stays).
+PENDING = frozenset({Status.NEEDS_REVIEW, Status.FAILED, Status.ABSTAINED})
+NOT_CONVERTED = frozenset({Status.FAILED, Status.ABSTAINED})
+
+# Bulk accept. "Accept all" is only offered for headings: a wrong heading level is cheap
+# to spot and fix later, a wrong equation or alt text is not. The confidence threshold
+# is offered for every group, from a fixed list so the page can show how many each
+# choice would accept (no JavaScript).
+BULK_ACCEPT_ALL = "accept_all"
+BULK_ACCEPT_CONFIDENT = "accept_confident"
+BULK_ACTIONS = (BULK_ACCEPT_ALL, BULK_ACCEPT_CONFIDENT)
+ACCEPT_ALL_KINDS = frozenset({Kind.HEADING})
+BULK_THRESHOLDS = (90, 80, 70, 60, 50)  # percent
+BULK_DEFAULT_THRESHOLD = 80
 
 
 @dataclass
@@ -70,16 +94,97 @@ class ReviewChange:
     warnings: list[Check] = field(default_factory=list)
 
 
+@dataclass
+class FixGroup:
+    """One kind's fixes as the review screen shows them."""
+
+    kind: Kind
+    pending: list[Fix]  # waiting for a decision, page and reading order
+    done: list[Fix]  # accepted, edited or rejected, page and reading order
+
+    @property
+    def slug(self) -> str:
+        return GROUP_SLUGS[self.kind]
+
+
+@dataclass(frozen=True)
+class BulkRequest:
+    kind: Kind
+    min_percent: int | None  # None: every eligible proposal ("accept all", headings only)
+
+
+# --------------------------------------------------------------------------- order
+
+
 def needs_attention(status: Status | str) -> bool:
-    return Status(status) in _ATTENTION
+    return Status(status) in PENDING
+
+
+def kind_for_slug(slug: str) -> Kind | None:
+    return next((kind for kind, s in GROUP_SLUGS.items() if s == slug), None)
+
+
+def _positions(result: DocumentResult) -> dict[str, tuple[int, int, int]]:
+    """element_id -> (group rank, page, reading order): the review screen's sort key."""
+    elements = {e.id: e for e in result.elements}
+    far = 1 << 30  # a fix whose element is missing goes last in its group
+    out = {}
+    for fix in result.fixes:
+        if fix.kind not in GROUP_SLUGS:
+            continue
+        element = elements.get(fix.element_id)
+        page, order = (element.page, element.order) if element else (far, far)
+        out[fix.element_id] = (GROUP_KINDS.index(fix.kind), page, order)
+    return out
+
+
+def group_fixes(result: DocumentResult) -> list[FixGroup]:
+    """Non-empty groups in priority order (equations, figures, headings). Paragraph and
+    list fixes, if a future step makes any, are not reviewable here."""
+    position = _positions(result)
+    groups = []
+    for kind in GROUP_KINDS:
+        fixes = sorted(
+            (f for f in result.fixes if f.kind is kind), key=lambda f: position[f.element_id]
+        )
+        if fixes:
+            pending = [f for f in fixes if f.status in PENDING]
+            done = [f for f in fixes if f.status not in PENDING]
+            groups.append(FixGroup(kind, pending, done))
+    return groups
 
 
 def review_order(result: DocumentResult) -> list[Fix]:
-    order = {e.id: e.order for e in result.elements}
-    return sorted(
-        result.fixes,
-        key=lambda f: (_ATTENTION.get(f.status, 2), order.get(f.element_id, 1 << 30)),
-    )
+    """Every reviewable fix in the order the review screen lists it."""
+    return [f for g in group_fixes(result) for f in (*g.pending, *g.done)]
+
+
+def item_numbers(result: DocumentResult) -> dict[str, int]:
+    """element_id -> 1-based number within its kind, in reading order. Stable while the
+    reviewer works (unlike a position in the review order, which changes after every
+    decision), so "Equation 3" means the same equation in every message."""
+    position = _positions(result)
+    numbers: dict[str, int] = {}
+    for kind in GROUP_KINDS:
+        ordered = sorted(
+            (f.element_id for f in result.fixes if f.kind is kind), key=position.__getitem__
+        )
+        numbers.update({element_id: i for i, element_id in enumerate(ordered, start=1)})
+    return numbers
+
+
+def next_to_review(result: DocumentResult, element_id: str) -> str | None:
+    """The first fix still waiting for a decision after `element_id` in review order,
+    wrapping round to the first one; None when nothing is left."""
+    position = _positions(result)
+    pending = [f.element_id for g in group_fixes(result) for f in g.pending]
+    here = position.get(element_id)
+    later = [e for e in pending if here is not None and position[e] > here and e != element_id]
+    remaining = later or [e for e in pending if e != element_id]
+    return remaining[0] if remaining else None
+
+
+# --------------------------------------------------------------------------- one fix
 
 
 def has_proposal(fix: Fix) -> bool:
@@ -102,8 +207,10 @@ def field_id(prefix: str, element_id: str) -> str:
 
 
 def describe_failed(checks: list[Check]) -> str:
-    names = ", ".join(f"{c.name} ({c.code})" if c.code else c.name for c in checks)
-    return f"It did not pass these checks: {names}."
+    """The reviewer-facing sentences for failed checks, with their codes in brackets."""
+    explained = [explain_check(c) for c in checks]
+    sentences = " ".join(e.text for e in explained)
+    return f"{sentences} ({'; '.join(e.code for e in explained)})"
 
 
 def apply_review(
@@ -128,10 +235,14 @@ def apply_review(
     if action == "edit":
         warnings = _edit(fix, element, form)
     fix.status = STATUS_FOR_ACTION[action]
-    result.stats.by_status = dict(Counter(f.status.value for f in result.fixes))
+    _recount(result)
     return ReviewChange(
         fix=fix, action=action, before=before, after=snapshot(fix), warnings=warnings
     )
+
+
+def _recount(result: DocumentResult) -> None:
+    result.stats.by_status = dict(Counter(f.status.value for f in result.fixes))
 
 
 def _edit(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
@@ -240,6 +351,71 @@ def _edit_heading(fix: Fix, element: Element | None, form: Mapping[str, str]) ->
         text = (element.text if element else None) or ""
     fix.heading = HeadingFix(level=int(raw), text=text)
     return []
+
+
+# --------------------------------------------------------------------------- bulk
+
+
+def bulk_eligible(fix: Fix) -> bool:
+    """What a bulk accept may take: exactly what a single "Accept" could, and only while
+    it is still waiting for review (a reviewer's own decision is never overwritten)."""
+    return fix.status is Status.NEEDS_REVIEW and can_accept(fix)
+
+
+def at_or_above(fix: Fix, min_percent: int) -> bool:
+    return fix.confidence is not None and confidence_percent(fix.confidence) >= min_percent
+
+
+def bulk_candidates(result: DocumentResult, request: BulkRequest) -> list[Fix]:
+    return [
+        f
+        for f in result.fixes
+        if f.kind is request.kind
+        and bulk_eligible(f)
+        and (request.min_percent is None or at_or_above(f, request.min_percent))
+    ]
+
+
+def bulk_field_id(slug: str) -> str:
+    """The control a bulk error points at: the threshold select of that group."""
+    return f"min-confidence-{slug}"
+
+
+def parse_bulk(slug: str, action: str, min_confidence: str) -> BulkRequest:
+    """The bulk form's fields as a request. Raises LookupError for an unknown group and
+    ReviewInvalid for anything the page never offers."""
+    kind = kind_for_slug(slug)
+    if kind is None:
+        raise LookupError(slug)
+    fid = bulk_field_id(slug)
+    if action == BULK_ACCEPT_ALL:
+        if kind not in ACCEPT_ALL_KINDS:
+            message = "Accepting every proposal at once is only offered for headings."
+            raise ReviewInvalid([FieldError(fid, message)])
+        return BulkRequest(kind, None)
+    if action != BULK_ACCEPT_CONFIDENT:
+        raise ReviewInvalid([FieldError(fid, "Choose an action.")])
+    raw = min_confidence.strip().removesuffix("%")
+    if not raw.isdigit() or int(raw) not in BULK_THRESHOLDS:
+        choices = ", ".join(f"{t}%" for t in BULK_THRESHOLDS)
+        raise ReviewInvalid([FieldError(fid, f"Choose a confidence from the list ({choices}).")])
+    return BulkRequest(kind, int(raw))
+
+
+def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[ReviewChange]:
+    """Accept every candidate in place; one ReviewChange each (empty if none were left,
+    so repeating the same request changes nothing)."""
+    changes = []
+    for fix in bulk_candidates(result, request):
+        before = snapshot(fix)
+        fix.status = Status.ACCEPTED
+        changes.append(ReviewChange(fix=fix, action="accept", before=before, after=snapshot(fix)))
+    if changes:
+        _recount(result)
+    return changes
+
+
+# --------------------------------------------------------------------------- output
 
 
 def rerender_html(result: DocumentResult, crops: dict[str, bytes]) -> str:

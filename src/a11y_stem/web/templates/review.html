@@ -1,12 +1,186 @@
 {% extends "base.html" %}
 {% block title %}{% if errors %}Error: {% endif %}Review fixes: {{ job.filename }}{% endblock %}
+
+{% macro notice_box(notice) %}
+<div class="notice" role="status">
+  <p>{% if notice.href %}<a href="{{ notice.href }}">{{ notice.label }}</a>: {% endif %}{{ notice.message }}</p>
+</div>
+{% endmacro %}
+
+{% macro counted(n, one, many) %}{{ n }} {{ one if n == 1 else many }}{% endmacro %}
+
+{% macro group_counts(g) %}
+{%- if g.needs_review %}{{ g.needs_review }} {{ "needs" if g.needs_review == 1 else "need" }} review, {% endif -%}
+{%- if g.not_converted %}{{ g.not_converted }} not converted, {% endif -%}
+{{ g.done|length }} already decided
+{%- endmacro %}
+
+{# The parts of one fix: what was proposed, why it is here, and the decision form.
+   `item.label` ("Equation 3") is its number within its kind in reading order, so it
+   stays the same while the list reorders. #}
+{% macro card_body(item) %}
+{% set eid = item.element_id %}
+{% set name = item.label|lower %}
+{% for message in item.changed %}
+<p class="changed-note" role="status"><strong>Just changed:</strong> {{ message }}</p>
+{% endfor %}
+<dl class="fix-meta">
+  <div><dt>Status</dt><dd><span class="status-badge fix-{{ item.status }}">{{ item.status_label }}</span></dd></div>
+  <div><dt>Confidence</dt><dd>{{ item.confidence_label }}</dd></div>
+</dl>
+{% if item.reason %}
+<div class="explained">
+  <p><strong>Why it was not converted:</strong> {{ item.reason.text }}</p>
+  <p class="code-line">Code: <code>{{ item.reason.code }}</code></p>
+</div>
+{% endif %}
+{% if item.checks %}
+<div class="explained">
+  <p><strong>What the checks found:</strong></p>
+  <ul class="check-list">
+    {% for check in item.checks %}
+    <li><strong>{{ check.severity }}:</strong> {{ check.text }}
+      <span class="code-line">Code: <code>{{ check.code }}</code></span></li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+
+<div class="fix-body">
+  {% if item.kind in ("equation", "figure") %}
+  <figure class="crop">
+    {% if item.crop_url %}
+    <img src="{{ item.crop_url }}" loading="lazy"
+         alt="The original {{ name }} from page {{ item.page }} of the PDF, as an image.">
+    {% else %}
+    <p>No image of the original is available.</p>
+    {% endif %}
+    <figcaption>Original in the PDF</figcaption>
+  </figure>
+  {% endif %}
+
+  <div class="proposal">
+    {% if item.kind == "equation" %}
+    <p class="part-label">Proposed equation</p>
+    {% if item.mathml %}
+    <div class="mathml-preview">{{ item.mathml }}</div>
+    {% else %}
+    <p>No proposal: type the LaTeX below, or reject to keep the image.</p>
+    {% endif %}
+    {% if item.speech %}<p><strong>Read aloud roughly as:</strong> {{ item.speech }}</p>{% endif %}
+    {% elif item.kind == "figure" %}
+    <p class="part-label">Proposed alt text</p>
+    {% if item.decorative %}
+    <p>Marked as decorative (no alt text).</p>
+    {% elif item.alt %}
+    <p class="alt-proposal">{{ item.alt }}</p>
+    {% else %}
+    <p>No proposal yet: this figure needs a description.</p>
+    {% endif %}
+    {% if item.caption %}<p><strong>Caption in the PDF:</strong> {{ item.caption }}</p>{% endif %}
+    {% elif item.kind == "heading" %}
+    <p class="part-label">Heading text</p>
+    <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
+    {% if item.heading_level %}<p>Proposed level: {{ item.heading_level }}</p>{% endif %}
+    {% endif %}
+  </div>
+</div>
+
+<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="review-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% if item.kind == "equation" %}
+  {% set err = item.errors.get("latex") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="latex-{{ eid }}">LaTeX for {{ name }}</label>
+    <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Change it and choose Save edit to check it again and update the MathML.{% else %}Type the LaTeX for the equation in the image, then choose Save edit.{% endif %}</p>
+    {% if err %}<p class="error-message" id="latex-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+    <textarea id="latex-{{ eid }}" name="latex" rows="3" spellcheck="false" autocapitalize="off"
+              aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
+  </div>
+  {% elif item.kind == "figure" %}
+  {% set err = item.errors.get("alt") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="alt-{{ eid }}">Alt text for {{ name }}</label>
+    <p class="hint" id="alt-hint-{{ eid }}">One or two short sentences: what the figure shows and why it matters here.
+      Aim for {{ alt_guideline }} characters or fewer{% if item.values.get("alt") %} (this text has {{ item.alt_chars }}){% endif %}.</p>
+    {% if err %}<p class="error-message" id="alt-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+    <textarea id="alt-{{ eid }}" name="alt" rows="3" maxlength="1000" class="prose-input"
+              aria-describedby="alt-hint-{{ eid }}{% if err %} alt-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("alt", "") }}</textarea>
+  </div>
+  <div class="field checkbox-field">
+    <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on"{% if item.values.get("decorative") %} checked{% endif %}>
+    <label for="decorative-{{ eid }}">Decorative: it adds nothing a reader needs, so it gets no alt text</label>
+  </div>
+  {% elif item.kind == "heading" %}
+  {% set err = item.errors.get("level") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="level-{{ eid }}">Level for {{ name }}</label>
+    {% if err %}<p class="error-message" id="level-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+    <select id="level-{{ eid }}" name="level"{% if err %} aria-invalid="true" aria-describedby="level-error-{{ eid }}"{% endif %}>
+      {% for n in range(1, 7) %}
+      <option value="{{ n }}"{% if item.values.get("level") == n|string %} selected{% endif %}>Level {{ n }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  {% set err = item.errors.get("actions") %}
+  {% if err %}<p class="error-message" id="actions-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+  <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
+    <button type="submit" name="action" value="edit" class="button">Save edit<span class="visually-hidden"> to {{ name }}</span></button>
+    {% if item.can_accept %}
+    <button type="submit" name="action" value="accept" class="button-secondary">Accept<span class="visually-hidden"> {{ name }}</span></button>
+    {% endif %}
+    <button type="submit" name="action" value="reject" class="button-secondary">Reject<span class="visually-hidden"> {{ name }}</span></button>
+  </div>
+</form>
+{% endmacro %}
+
+{% macro bulk_forms(g) %}
+{% set select_id = "min-confidence-" ~ g.slug %}
+<div class="bulk-actions">
+  <p class="part-label">Accept several {{ g.many }} at once</p>
+  {% if g.accept_all %}
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ g.slug }}" class="bulk-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <input type="hidden" name="action" value="accept_all">
+    <button type="submit" class="button-secondary">Accept all {{ counted(g.accept_all, "remaining " ~ g.one, "remaining " ~ g.many) }}</button>
+    {% if g.not_converted %}<p class="hint">Not included: {{ counted(g.not_converted, g.one, g.many) }} that could not be converted.</p>{% endif %}
+  </form>
+  {% endif %}
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ g.slug }}" class="bulk-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <input type="hidden" name="action" value="accept_confident">
+    <div class="field{% if g.error %} field-error{% endif %}">
+      <label for="{{ select_id }}">Accept every {{ g.one }} proposal at or above</label>
+      <p class="hint" id="{{ select_id }}-hint">Only proposals still waiting that passed every required check are counted; {{ g.many }} that could not be converted never are.
+        {% if g.bulk_warned %}{{ g.bulk_warned }} of them {{ "has" if g.bulk_warned == 1 else "have" }} a warning: read it on the card first.{% endif %}</p>
+      {% if g.error %}<p class="error-message" id="{{ select_id }}-error"><span class="visually-hidden">Error: </span>{{ g.error }}</p>{% endif %}
+      <select id="{{ select_id }}" name="min_confidence"
+              aria-describedby="{{ select_id }}-hint{% if g.error %} {{ select_id }}-error{% endif %}"{% if g.error %} aria-invalid="true"{% endif %}>
+        {% for option in g.bulk_options %}
+        <option value="{{ option.percent }}"{% if option.selected %} selected{% endif %}>{{ option.percent }}% confidence ({{ counted(option.count, g.one, g.many) }})</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="button-secondary">Accept these {{ g.many }}</button>
+  </form>
+</div>
+{% endmacro %}
+
 {% block content %}
 <h1>Review fixes</h1>
 <p class="lede">{{ job.filename }}</p>
 {% include "_error_summary.html" %}
 
-<p>Fixes that need your review come first, then the ones that could not be converted, then
-  the rest. For each one:</p>
+<div id="review-progress" class="review-progress" tabindex="-1">
+  {% for notice in notices %}{{ notice_box(notice) }}{% endfor %}
+  <p>{% if remaining %}<strong>{{ remaining }} {{ "fix still needs" if remaining == 1 else "fixes still need" }} a decision:</strong>
+    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your attention.{% endif %}</p>
+</div>
+
+<p>Equations come first, then figures, then headings, because mistakes there cost a
+  student most. In each group the fixes waiting for you come first, in page order; the
+  ones already decided are folded away below them. For each fix:</p>
 <ul>
   <li><strong>Accept</strong> keeps the proposal as it is.</li>
   <li><strong>Save edit</strong> checks your change again and, if it passes, uses it.</li>
@@ -16,123 +190,60 @@
 <p><a href="/jobs/{{ job.id }}">Back to the results</a> ·
   <a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></p>
 
-<div id="review-progress" class="review-progress" tabindex="-1">
-  {% for note in progress %}
-  <p class="notice" role="status">{{ note }}</p>
-  {% endfor %}
-  <p>{% if remaining %}{{ remaining }} {{ "fix still needs" if remaining == 1 else "fixes still need" }} your
-    attention.{% else %}Nothing left that needs your attention.{% endif %}</p>
-</div>
-
-{% if not items %}
+{% if not groups %}
 <p>There is nothing to review in this document.</p>
 {% else %}
-<ol class="fix-list">
-  {% for item in items %}
-  {% set eid = item.element_id %}
-  <li id="fix-{{ eid }}" class="fix-card status-card-{{ item.status }}">
-    <h2 id="fix-title-{{ eid }}">{{ item.kind_label }} {{ item.number }}
-      {% if item.page %}<span class="meta">on page {{ item.page }}</span>{% endif %}</h2>
-    {% for notice in item.notices %}
-    <p class="notice" role="status">{{ notice }}</p>
+<nav class="review-toc" aria-labelledby="review-toc-title">
+  <h2 id="review-toc-title">Sections</h2>
+  <ul>
+    {% for g in groups %}
+    <li><a href="#group-{{ g.slug }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
     {% endfor %}
-    <dl class="fix-meta">
-      <div><dt>Status</dt><dd><span class="status-badge fix-{{ item.status }}">{{ item.status_label }}</span></dd></div>
-      <div><dt>Confidence</dt><dd>{{ item.confidence_label }}</dd></div>
-      {% if item.reason %}<div><dt>Reason</dt><dd><code>{{ item.reason }}</code></dd></div>{% endif %}
-      {% if item.failed_checks %}
-      <div><dt>Checks not passed</dt>
-        <dd><ul class="check-list">
-          {% for check in item.failed_checks %}
-          <li><code>{{ check.name }}</code>{% if check.code %}: <code>{{ check.code }}</code>{% endif %} ({{ "error" if check.severity == "error" else "warning" }})</li>
-          {% endfor %}
-        </ul></dd>
-      </div>
-      {% endif %}
-    </dl>
+  </ul>
+</nav>
 
-    <div class="fix-body">
-      {% if item.crop_url %}
-      <figure class="crop">
-        <img src="{{ item.crop_url }}" loading="lazy"
-             alt="The original {{ item.kind_label|lower }} from page {{ item.page }} of the PDF, as an image.">
-        <figcaption>Original in the PDF</figcaption>
-      </figure>
-      {% endif %}
-
-      <div class="proposal">
-        {% if item.kind == "equation" %}
-        <h3>Proposed equation</h3>
-        {% if item.mathml %}
-        <div class="mathml-preview">{{ item.mathml }}</div>
-        {% else %}
-        <p>No proposal to preview.</p>
-        {% endif %}
-        {% if item.speech %}<p><strong>Read aloud roughly as:</strong> {{ item.speech }}</p>{% endif %}
-        {% elif item.kind == "figure" %}
-        <h3>Proposed alt text</h3>
-        {% if item.decorative %}
-        <p>Marked as decorative (no alt text).</p>
-        {% elif item.alt %}
-        <p class="alt-proposal">{{ item.alt }}</p>
-        {% else %}
-        <p>No proposal yet: this figure needs a description.</p>
-        {% endif %}
-        {% elif item.kind == "heading" %}
-        <h3>Proposed heading</h3>
-        <p>{% if item.heading_level %}Level {{ item.heading_level }}: {% endif %}{{ item.heading_text or "" }}</p>
-        {% endif %}
-      </div>
-    </div>
-
-    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="review-form">
-      <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-      {% if item.kind == "equation" %}
-      {% set err = item.errors.get("latex") %}
-      <div class="field{% if err %} field-error{% endif %}">
-        <label for="latex-{{ eid }}">LaTeX for {{ item.kind_label|lower }} {{ item.number }}</label>
-        <p class="hint" id="latex-hint-{{ eid }}">Change it and choose Save edit to check it again and update the MathML.</p>
-        {% if err %}<p class="error-message" id="latex-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-        <textarea id="latex-{{ eid }}" name="latex" rows="3" spellcheck="false" autocapitalize="off"
-                  aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
-      </div>
-      {% elif item.kind == "figure" %}
-      {% set err = item.errors.get("alt") %}
-      <div class="field{% if err %} field-error{% endif %}">
-        <label for="alt-{{ eid }}">Alt text for {{ item.kind_label|lower }} {{ item.number }}</label>
-        <p class="hint" id="alt-hint-{{ eid }}">One or two short sentences: what the figure shows and why it matters here.</p>
-        {% if err %}<p class="error-message" id="alt-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-        <input type="text" id="alt-{{ eid }}" name="alt" maxlength="1000" value="{{ item.values.get('alt', '') }}"
-               aria-describedby="alt-hint-{{ eid }}{% if err %} alt-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
-      </div>
-      <div class="field checkbox-field">
-        <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on"{% if item.values.get("decorative") %} checked{% endif %}>
-        <label for="decorative-{{ eid }}">Decorative: it adds nothing a reader needs, so it gets no alt text</label>
-      </div>
-      {% elif item.kind == "heading" %}
-      {% set err = item.errors.get("level") %}
-      <div class="field{% if err %} field-error{% endif %}">
-        <label for="level-{{ eid }}">Level for {{ item.kind_label|lower }} {{ item.number }}</label>
-        {% if err %}<p class="error-message" id="level-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-        <select id="level-{{ eid }}" name="level"{% if err %} aria-invalid="true" aria-describedby="level-error-{{ eid }}"{% endif %}>
-          {% for n in range(1, 7) %}
-          <option value="{{ n }}"{% if item.values.get("level") == n|string %} selected{% endif %}>Level {{ n }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      {% endif %}
-      {% set err = item.errors.get("actions") %}
-      {% if err %}<p class="error-message" id="actions-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-      <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
-        <button type="submit" name="action" value="edit" class="button">Save edit<span class="visually-hidden"> to {{ item.kind_label|lower }} {{ item.number }}</span></button>
-        {% if item.can_accept %}
-        <button type="submit" name="action" value="accept" class="button-secondary">Accept<span class="visually-hidden"> {{ item.kind_label|lower }} {{ item.number }}</span></button>
-        {% endif %}
-        <button type="submit" name="action" value="reject" class="button-secondary">Reject<span class="visually-hidden"> {{ item.kind_label|lower }} {{ item.number }}</span></button>
-      </div>
-    </form>
-  </li>
+{% for g in groups %}
+<section id="group-{{ g.slug }}" class="review-group" aria-labelledby="group-{{ g.slug }}-title" tabindex="-1">
+  <h2 id="group-{{ g.slug }}-title">{{ g.title }} <span class="group-count">({{ g.pending|length }} to decide, {{ g.done|length }} already decided)</span></h2>
+  {% for message in g.notices %}
+  <div class="notice" role="status"><p>{{ message }}</p></div>
   {% endfor %}
-</ol>
+  {% if g.bulk_eligible or g.error %}{{ bulk_forms(g) }}{% endif %}
+
+  {% if g.pending %}
+  <ol class="fix-list">
+    {% for item in g.pending %}
+    <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
+      {% for notice in item.notices %}{{ notice_box(notice) }}{% endfor %}
+      <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
+        <h3 id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %} <span class="meta">on page {{ item.page }}</span>{% endif %}</h3>
+        {{ card_body(item) }}
+      </article>
+    </li>
+    {% endfor %}
+  </ol>
+  {% else %}
+  <p>No {{ g.many }} are waiting for a decision.</p>
+  {% endif %}
+
+  {% if g.done %}
+  <details class="done-group"{% if g.done_open %} open{% endif %}>
+    <summary>{{ counted(g.done|length, g.one, g.many) }} already decided (accepted, edited or rejected)</summary>
+    <ol class="fix-list done-list">
+      {% for item in g.done %}
+      <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
+        <details class="done-item"{% if item.open %} open{% endif %}>
+          <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %}, page {{ item.page }}{% endif %}: {{ item.status_label }}, confidence {{ item.confidence_label }}</summary>
+          <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
+            {{ card_body(item) }}
+          </article>
+        </details>
+      </li>
+      {% endfor %}
+    </ol>
+  </details>
+  {% endif %}
+</section>
+{% endfor %}
 {% endif %}
 {% endblock %}
