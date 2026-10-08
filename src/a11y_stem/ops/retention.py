@@ -1,15 +1,42 @@
-"""Retention (WP6 implements): delete jobs past `retain_until` with everything derived
-from the document (upload, crops, result, HTML, review edits) via the cascade.
+"""Retention: delete jobs past `retain_until` with everything derived from the document
+(upload, crops, result, HTML, review edits).
 
 Deletion is mandatory: it runs even if aggregation failed for a job (privacy beats stats).
+Such jobs are counted in `PurgeStats.unaggregated_deleted` so the loss is visible.
+
+Children are deleted explicitly before their job, so the purge does not depend on the
+database enforcing `ON DELETE CASCADE` (SQLite only does with `PRAGMA foreign_keys=ON`);
+the cascade stays as a second guarantee.
+
+Review actions are counted here, in the same transaction as the delete: a reviewer can act
+any time until the job expires, so counting at deletion counts each action exactly once.
+That count runs in a savepoint and a failure there is logged and skipped, never allowed to
+block the delete.
 """
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, date, datetime
+from typing import Any, cast
 
+from sqlalchemy import delete, select
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.orm import Session, sessionmaker
+
+from a11y_stem.observability.logging import get_logger
+from a11y_stem.ops.aggregate import (
+    FINISHED,
+    Key,
+    aggregate_finished,
+    code,
+    upsert_counts,
+    utc_day,
+)
+from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
+
+BATCH_SIZE = 200
 
 
 @dataclass
@@ -20,4 +47,123 @@ class PurgeStats:
 
 
 def purge_expired(factory: sessionmaker[Session], now: datetime | None = None) -> PurgeStats:
-    raise NotImplementedError("WP6")
+    """Delete every job whose `retain_until` is before `now` (default: current UTC time).
+
+    Batches of `BATCH_SIZE` jobs, one transaction each. On Postgres the job rows are
+    locked with SKIP LOCKED, so a job the worker is updating at that instant is left for
+    the next run instead of blocking it.
+    """
+    now = _as_utc(now or datetime.now(UTC))
+    stats = PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
+    while True:
+        with session_scope(factory) as session:
+            batch = _purge_batch(session, now)
+        stats.jobs_deleted += batch.jobs_deleted
+        stats.blobs_deleted += batch.blobs_deleted
+        stats.unaggregated_deleted += batch.unaggregated_deleted
+        if batch.jobs_deleted < BATCH_SIZE:
+            break
+    get_logger(__name__).info(
+        "purge_done",
+        jobs_deleted=stats.jobs_deleted,
+        blobs_deleted=stats.blobs_deleted,
+        unaggregated_deleted=stats.unaggregated_deleted,
+    )
+    return stats
+
+
+def aggregate_and_purge(
+    factory: sessionmaker[Session], now: datetime | None = None
+) -> tuple[int | None, PurgeStats]:
+    """The cron task: aggregate, then purge even if aggregation raised.
+
+    Returns (jobs aggregated, or None when aggregation failed; purge stats). Purge errors
+    propagate: the caller must report a failed run.
+    """
+    now = _as_utc(now or datetime.now(UTC))
+    aggregated: int | None
+    try:
+        aggregated = aggregate_finished(factory, now)
+    except Exception as exc:
+        get_logger(__name__).error("aggregate_failed", error_type=type(exc).__name__)
+        aggregated = None
+    return aggregated, purge_expired(factory, now)
+
+
+def _as_utc(moment: datetime) -> datetime:
+    if moment.tzinfo is None:
+        return moment.replace(tzinfo=UTC)
+    return moment.astimezone(UTC)
+
+
+def _purge_batch(session: Session, now: datetime) -> PurgeStats:
+    rows = session.execute(
+        select(Job.id, Job.status, Job.aggregated, Job.finished_at, Job.created_at)
+        .where(Job.retain_until < now)
+        .order_by(Job.retain_until, Job.id)
+        .limit(BATCH_SIZE)
+        .with_for_update(skip_locked=True)
+    ).all()
+    if not rows:
+        return PurgeStats(jobs_deleted=0, blobs_deleted=0, unaggregated_deleted=0)
+    ids = [row.id for row in rows]
+    unaggregated = sum(1 for row in rows if row.status in FINISHED and not row.aggregated)
+
+    day_of = {row.id: utc_day(row.finished_at or row.created_at, now) for row in rows}
+    _count_review_actions(session, day_of)
+    blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
+    session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
+    jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
+    return PurgeStats(jobs_deleted=jobs, blobs_deleted=blobs, unaggregated_deleted=unaggregated)
+
+
+def _deleted(result: object) -> int:
+    """Rows a DELETE removed (a DML statement always returns a CursorResult)."""
+    return cast(CursorResult[Any], result).rowcount
+
+
+def _count_review_actions(session: Session, day_of: dict[str, date]) -> None:
+    """Add "review:<action>" counts (step = the reviewed fix's kind) for these jobs.
+
+    `day_of` maps each job id to its completion day, the day its other counts went to.
+    """
+    try:
+        with session.begin_nested():
+            for day, counts in _review_counts(session, day_of).items():
+                upsert_counts(session, day, counts)
+    except Exception as exc:  # stats are best effort; the delete must still happen
+        get_logger(__name__).warning("review_count_failed", error_type=type(exc).__name__)
+
+
+def _review_counts(session: Session, day_of: dict[str, date]) -> dict[date, Counter[Key]]:
+    edits = session.execute(
+        select(ReviewEdit.job_id, ReviewEdit.element_id, ReviewEdit.action).where(
+            ReviewEdit.job_id.in_(list(day_of))
+        )
+    ).all()
+    if not edits:
+        return {}
+    reviewed = sorted({edit.job_id for edit in edits})
+    kinds = {
+        job_id: _fix_kinds(result_json)
+        for job_id, result_json in session.execute(
+            select(Job.id, Job.result_json).where(Job.id.in_(reviewed))
+        ).all()
+    }
+    by_day: dict[date, Counter[Key]] = {}
+    for edit in edits:
+        kind = kinds.get(edit.job_id, {}).get(edit.element_id, "unknown")
+        key: Key = (code(kind), f"review:{code(edit.action)}")
+        by_day.setdefault(day_of[edit.job_id], Counter())[key] += 1
+    return by_day
+
+
+def _fix_kinds(result_json: object) -> dict[str, str]:
+    """element_id -> fix kind, read straight from the stored JSON (no full validation)."""
+    if not isinstance(result_json, dict):
+        return {}
+    kinds: dict[str, str] = {}
+    for fix in result_json.get("fixes") or []:
+        if isinstance(fix, dict) and isinstance(fix.get("element_id"), str):
+            kinds[fix["element_id"]] = str(fix.get("kind", "unknown"))
+    return kinds
