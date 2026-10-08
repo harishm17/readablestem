@@ -723,6 +723,19 @@ _FIGURE_LABEL = re.compile(r"^\s*(figure|fig\.?)\s*[\w]+([.\-]\w+)*\s*[:.]?\s+",
 _INVISIBLE_FILLERS = frozenset("ᅟᅠㅤﾠ⠀")
 
 
+# Bidirectional embeddings, overrides and isolates (U+202A-202E, U+2066-2069). They
+# reorder what is displayed without changing what a screen reader speaks, so a reviewer
+# could approve one text while students hear another ("Trojan Source").
+_BIDI_CONTROLS = re.compile("[\u202a-\u202e\u2066-\u2069]")
+
+
+def clean_alt(alt: str) -> str:
+    """The alt text to store: the visible text `check_alt` judges (format characters such
+    as bidi controls and zero-width spaces removed, whitespace collapsed), so what is
+    stored and rendered is exactly what was validated."""
+    return _visible(alt)
+
+
 def _visible(text: str) -> str:
     """Text without invisible format characters (zero-width space, invisible separators,
     BOM, bidi marks: category Cf) or filler characters, whitespace collapsed."""
@@ -753,7 +766,9 @@ def _is_placeholder(text: str, plain: str) -> bool:
 
 def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list[Check]:
     """Length, no 'image of', no file names, no URLs/markup, not a placeholder, not a
-    caption copy. Judged on the visible text (invisible format characters removed)."""
+    caption copy. Judged on the visible text (invisible format characters removed), so
+    store `clean_alt(alt)`. Bidi controls are an error on their own: text that still has
+    them was not cleaned, and would display differently from how it is spoken."""
     text = _visible(alt)
     if decorative:
         return [_check("alt.decorative", "decorative_with_text" if text else None)]
@@ -785,4 +800,5 @@ def check_alt(alt: str, *, decorative: bool, caption: str | None = None) -> list
         _check("alt.no_url_or_markup", "url_or_markup" if _URL_OR_MARKUP.search(text) else None),
         _check("alt.not_placeholder", "placeholder" if is_placeholder else None),
         _check("alt.not_caption_copy", "caption_copy" if is_caption_copy else None, "warning"),
+        _check("alt.no_bidi_controls", "bidi_control" if _BIDI_CONTROLS.search(alt) else None),
     ]

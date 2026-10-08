@@ -22,6 +22,7 @@ from a11y_stem.pipeline.validate import (
     check_alt,
     check_latex,
     check_mathml,
+    clean_alt,
     has_errors,
     safe_latex_to_mathml,
 )
@@ -714,6 +715,18 @@ def test_invisible_only_alt_is_empty(alt):
 def test_invisible_characters_cannot_hide_a_file_name_or_url():
     assert "filename" in failed_codes(check_alt("IMG_20​41.jpg", decorative=False))
     assert "url_or_markup" in failed_codes(check_alt("h​ttps://x.org", decorative=False))
+
+
+def test_bidi_controls_are_an_error_and_cleaning_removes_them():
+    """check_alt judged the visible text but the stored alt kept U+202E and friends, so a
+    reviewer saw reordered text while a screen reader spoke the logical order."""
+    tricky = "A graph of speed \u202eemit tsniaga\u202c over time"
+    assert "bidi_control" in failed_codes(check_alt(tricky, decorative=False))
+    assert has_errors(check_alt(tricky, decorative=False))
+    cleaned = clean_alt(tricky)
+    assert "\u202e" not in cleaned and "\u202c" not in cleaned
+    assert all(c.passed for c in check_alt(cleaned, decorative=False))
+    assert clean_alt("A  bar\u200b chart\u2067 ") == "A bar chart"
 
 
 def test_script_url_is_markup():

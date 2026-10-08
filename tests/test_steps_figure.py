@@ -76,6 +76,12 @@ def test_alt_whitespace_is_collapsed():
     assert fix.figure is not None and fix.figure.alt == "Bar chart of speeds by trip."
 
 
+def test_stored_alt_is_the_validated_text_without_bidi_controls():
+    fix = run(by_model(main=out("Bar chart of ‮speeds‬ by trip.​")))
+    assert fix.figure is not None and fix.figure.alt == "Bar chart of speeds by trip."
+    assert fix.status == Status.ACCEPTED
+
+
 def test_mid_confidence_needs_review():
     fix = run(by_model(main=out(confidence=0.7)))
     assert fix.status == Status.NEEDS_REVIEW and fix.figure is not None
