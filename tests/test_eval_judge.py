@@ -42,8 +42,16 @@ def test_texts_cannot_close_our_tags_and_are_capped():
     assert context.count("<reference>") == 1
     candidate = context.split("<candidate>\n", 1)[1].split("\n</candidate>", 1)[0]
     assert candidate.endswith(" [cut]") and len(candidate) == judge.MAX_CHARS["candidate"] + 6
-    assert len(context) < 2000  # stays under fence_untrusted's limit
     assert "<caption>\n\n</caption>" in context  # missing caption -> empty field
+
+
+def test_worst_case_context_fits_the_fence_without_being_cut():
+    from a11y_stem.models.base import fence_untrusted
+
+    long = "y" * 5000
+    context = judge.judge_context(long, long, long)
+    assert len(context) <= 2000
+    assert "[truncated]" not in fence_untrusted(context)  # the client never cuts it blindly
 
 
 def test_verdict_schema_and_pass_rule():

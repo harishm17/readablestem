@@ -259,7 +259,7 @@ def test_heading_metrics_are_micro_averaged():
     assert metrics["precision_by_status"]["needs_review"] == {"n": 1, "precision": 0.0}
     assert metrics["recall_by_context"] == {
         "body": {"n": 4, "recall": 0.75},
-        "box": {"n": 1, "recall": 1.0},
+        "note": {"n": 1, "recall": 1.0},
     }
 
 

@@ -34,9 +34,11 @@ from a11y_stem.models.base import VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
 
 JUDGE_PROMPT = "judge_figure"
-# Caps per text keep the fenced block under the 2000-character fence limit, with the
-# candidate first so it is never the part that gets cut.
-MAX_CHARS = {"candidate": 1000, "reference": 600, "caption": 300}
+# Per-field caps keep the whole data block under `fence_untrusted`'s default 2000-character
+# limit, so the client never cuts it blindly. Sized from the sample gold set: OpenStax alt
+# text runs up to ~1000 characters (2 of 13 figures exceed 800), a pipeline candidate is
+# short alt text, and the caption is secondary context. A cut field ends in " [cut]".
+MAX_CHARS = {"candidate": 900, "reference": 800, "caption": 200}
 MAX_OUTPUT_TOKENS = 1024  # reasoning tokens count as output on the main model
 
 

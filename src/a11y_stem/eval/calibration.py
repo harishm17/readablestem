@@ -343,6 +343,9 @@ def run_probes(
                 "expected_pass": row["expected_pass"],
                 "candidate_chars": len(row["candidate"]),
                 "reference_chars": len(row["reference"]),
+                # The judge saw a shortened text: unfit for the length comparison.
+                "cut": len(row["candidate"]) > judge_mod.MAX_CHARS["candidate"]
+                or len(row["reference"]) > judge_mod.MAX_CHARS["reference"],
                 "judge_outcome": judgement.call.outcome,
                 "judge_pass": verdict.passed if verdict is not None else None,
                 "judge_score": verdict.score if verdict is not None else None,
@@ -369,28 +372,43 @@ def probe_report(items: Sequence[dict], *, n_planned: int, stopped: str | None) 
             "mean_score": mean(i["judge_score"] for i in judged),
             "mean_chars": mean(i["candidate_chars"] for i in rows),
         }
-    ref, verbose = probes["reference"], probes["verbose"]
     return {
         "n_planned": n_planned,
         "n": len(items),
         "complete": stopped is None and len(items) == n_planned,
         "stopped_reason": stopped,
         "probes": probes,
-        "length_bias": {
-            "mean_score_delta": _delta(verbose["mean_score"], ref["mean_score"]),
-            "pass_rate_delta": _delta(verbose["pass_rate"], ref["pass_rate"]),
-            "length_ratio": _ratio(verbose["mean_chars"], ref["mean_chars"]),
-        },
+        "length_bias": length_bias(items),
         "cost_usd": sum(i["judge_cost_usd"] for i in items),
     }
 
 
-def _delta(a: float | None, b: float | None) -> float | None:
-    return None if a is None or b is None else a - b
+def length_bias(items: Sequence[dict]) -> dict:
+    """Paired comparison, per figure: verbose score minus reference score.
 
-
-def _ratio(a: float | None, b: float | None) -> float | None:
-    return None if a is None or not b else a / b
+    Pairing removes figure difficulty from the comparison (each figure is its own
+    control). Figures where either text was cut for the judge, or either judgement
+    failed, are left out and counted in `excluded`. A positive mean_score_delta means
+    the judge rewards length for the same content.
+    """
+    by_id: dict[str, dict[str, dict]] = {}
+    for item in items:
+        by_id.setdefault(item["id"], {})[item["probe"]] = item
+    pairs = []
+    for probes in by_id.values():
+        ref, verbose = probes.get("reference"), probes.get("verbose")
+        if ref is None or verbose is None:
+            continue
+        usable = all(p["judge_pass"] is not None and not p["cut"] for p in (ref, verbose))
+        pairs.append((ref, verbose) if usable else None)
+    used = [p for p in pairs if p is not None]
+    return {
+        "pairs": len(used),
+        "excluded": len(pairs) - len(used),
+        "mean_score_delta": mean(v["judge_score"] - r["judge_score"] for r, v in used),
+        "pass_rate_delta": mean(float(v["judge_pass"]) - float(r["judge_pass"]) for r, v in used),
+        "length_ratio": mean(v["candidate_chars"] / max(1, r["candidate_chars"]) for r, v in used),
+    }
 
 
 def load_paraphrases(path: Path) -> dict[str, str]:
@@ -452,8 +470,9 @@ def format_probes(report: dict) -> str:
     bias = report["length_bias"]
     lines += [
         "",
-        f"Length bias: verbose minus reference mean score {_f(bias['mean_score_delta'], 2)}, "
-        f"pass rate {_f(bias['pass_rate_delta'])} (verbose is {_f(bias['length_ratio'], 1)}x "
-        f"longer). Cost ${report['cost_usd']:.4f}.",
+        f"Length bias (paired, {bias['pairs']} figures, {bias['excluded']} excluded): verbose "
+        f"minus reference score {_f(bias['mean_score_delta'], 2)}, pass rate "
+        f"{_f(bias['pass_rate_delta'])}; verbose is {_f(bias['length_ratio'], 1)}x longer. "
+        f"Cost ${report['cost_usd']:.4f}.",
     ]
     return "\n".join(lines) + "\n"

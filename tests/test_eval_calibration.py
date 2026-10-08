@@ -213,6 +213,36 @@ def test_probes_stop_cleanly_when_the_budget_runs_out():
     assert len(items) == 5
 
 
+def probe_item(fid, probe, passed, score, chars, cut=False):
+    return {
+        "id": fid,
+        "probe": probe,
+        "judge_pass": passed,
+        "judge_score": score,
+        "candidate_chars": chars,
+        "cut": cut,
+    }
+
+
+def test_length_bias_is_paired_and_skips_cut_or_failed_judgements():
+    items = [
+        probe_item("a", "reference", True, 4, 100),
+        probe_item("a", "verbose", True, 5, 300),
+        probe_item("b", "reference", False, 2, 50),
+        probe_item("b", "verbose", True, 4, 200),
+        probe_item("c", "reference", True, 5, 900, cut=True),  # judge saw a cut text
+        probe_item("c", "verbose", True, 1, 1900, cut=True),
+        probe_item("d", "reference", None, None, 80),  # judge call failed
+        probe_item("d", "verbose", True, 5, 260),
+        probe_item("e", "empty", False, 1, 0),  # other probes do not count
+    ]
+    bias = cal.length_bias(items)
+    assert (bias["pairs"], bias["excluded"]) == (2, 2)
+    assert bias["mean_score_delta"] == 1.5  # (1 + 2) / 2
+    assert bias["pass_rate_delta"] == 0.5  # (0 + 1) / 2
+    assert bias["length_ratio"] == 3.5  # (3 + 4) / 2
+
+
 def test_load_paraphrases(tmp_path):
     path = tmp_path / "p.jsonl"
     path.write_text('{"id": "a", "text": "Long."}\n{"id": "b", "text": ""}\n')

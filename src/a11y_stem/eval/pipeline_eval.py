@@ -585,7 +585,12 @@ def _safe_div(a: float, b: float) -> float | None:
 
 
 def heading_metrics(items: Sequence[dict]) -> dict:
-    """Micro-averaged over pages: every heading counts once, whatever its page."""
+    """Micro-averaged over pages: every heading counts once, whatever its page.
+
+    recall_by_context splits recall by the enclosing OpenStax box ("body" when none).
+    It matters on this gold set: 50 of its 121 headings are the repeated "Teacher
+    Support" titles of os-teacher boxes, which are easy to find and can flatter the total.
+    """
     gold = sum(i["n_gold"] for i in items)
     pred = sum(i["n_pred"] for i in items)
     matched = sum(i["matched"] for i in items)
@@ -604,13 +609,13 @@ def heading_metrics(items: Sequence[dict]) -> dict:
         for pair in item["pairs"]:
             pred_by_status[pair["pred_status"]] += 1
             matched_by_status[pair["pred_status"]] += 1
-            ctx = "body" if pair["gold_context"] is None else "box"
-            gold_by_context[ctx] += 1
-            found_by_context[ctx] += 1
+            context = pair["gold_context"] or "body"
+            gold_by_context[context] += 1
+            found_by_context[context] += 1
         for extra in item["extra"]:
             pred_by_status[extra["status"]] += 1
         for missed in item["missed"]:
-            gold_by_context["body" if missed["context"] is None else "box"] += 1
+            gold_by_context[missed["context"] or "body"] += 1
     return {
         "gold_headings": gold,
         "predicted_headings": pred,

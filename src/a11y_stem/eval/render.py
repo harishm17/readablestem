@@ -25,6 +25,7 @@ import hashlib
 import html
 import json
 import re
+import time
 import urllib.error
 import urllib.request
 import xml.etree.ElementTree as ET
@@ -311,13 +312,24 @@ def png_bytes(data: bytes, *, max_side_px: int = 2048) -> bytes:
 Getter = Callable[[str], bytes]
 
 
-def _http_get(url: str, timeout: float = 30.0) -> bytes:
+def _http_get(url: str, timeout: float = 30.0, retries: int = 2) -> bytes:
+    """GET with the gold fetcher's user agent; retries timeouts and 5xx/429 with backoff."""
     request = urllib.request.Request(url, headers={"User-Agent": USER_AGENT})
-    try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:
-            return response.read()
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise RenderError(f"image download failed ({type(exc).__name__})") from exc
+    last: Exception | None = None
+    for attempt in range(retries + 1):
+        try:
+            with urllib.request.urlopen(request, timeout=timeout) as response:
+                return response.read()
+        except urllib.error.HTTPError as exc:
+            last = exc
+            if exc.code < 500 and exc.code != 429:
+                break
+        except (urllib.error.URLError, TimeoutError) as exc:
+            last = exc
+        if attempt < retries:
+            time.sleep(2**attempt)
+    name = type(last).__name__ if last else "unknown"
+    raise RenderError(f"image download failed ({name})") from last
 
 
 @dataclass
