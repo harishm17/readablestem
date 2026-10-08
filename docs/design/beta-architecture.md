@@ -11,6 +11,8 @@ back one self-contained HTML file where:
 
 - equations are MathML a screen reader can speak (image -> LaTeX -> MathML),
 - headings are real `<h1>`-`<h6>` in a repaired outline,
+- lists are real `<ul>`/`<ol>` with their nesting and numbering (layout reports each item
+  as a `Kind.LIST_ITEM` element; no model call),
 - figures have short alt text (or an explicit "needs a description" flag),
 - every fix carries a confidence and the checks it passed; uncertain ones go to a review
   screen where the instructor accepts, edits or rejects them.
@@ -22,7 +24,7 @@ flowchart LR
   U[Instructor] -->|Google sign-in + allowlist| W[FastAPI web app]
   W -->|upload PDF, quota check| DB[(Postgres: jobs, blobs, spend, quotas, aggregates)]
   WK[Worker thread] -->|claim job| DB
-  WK --> L[layout.analyze: headings, paragraphs, equations, figures, reading order]
+  WK --> L[layout.analyze: headings, paragraphs, list items, equations, figures, reading order]
   L --> H[heading_step: outline repair]
   L --> E[equation_step: crop -> LaTeX -> validate -> MathML -> speech]
   L --> F[figure_step: classify -> short alt text -> validate]
@@ -53,7 +55,7 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
 | `models/openai_client.py` | `OpenAIVisionClient(settings, budget, *, client=None)` | WP1 |
 | `models/router.py` | `call_with_fallback(client, request, schema, *, settings)` | WP1 |
 | `models/prompts/` | versioned prompt text files + loader `load_prompt(name) -> (version, text)` | WP1 |
-| `pipeline/layout.py` | `analyze(pdf_bytes, *, pages, max_pages) -> Layout`, `crop(...)`, `LayoutError` | WP2 |
+| `pipeline/layout.py` | `analyze(pdf_bytes, *, pages, max_pages) -> Layout` (elements: headings, paragraphs, list items, equations, figures), `crop(...)`, `release(pdf_bytes=None)`, `LayoutError` | WP2 |
 | `pipeline/heading_step.py` | `heading_fixes(elements) -> list[Fix]` | WP2 |
 | `pipeline/validate.py` | `check_latex`, `safe_latex_to_mathml`, `check_mathml`, `check_alt` | WP3 |
 | `pipeline/speech.py` | `mathml_to_speech(mathml) -> str` | WP3 |
@@ -61,7 +63,7 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
 | `pipeline/figure_step.py` | `describe(element, png, *, client, settings, context_text) -> Fix` | WP3 |
 | `pipeline/assemble.py` | `render_html(*, title, lang, elements, fixes, crops, source_note) -> str` | WP4 |
 | `pipeline/html_checks.py` | `static_checks(html)`, `axe_checks(html)` | WP4 |
-| `pipeline/run.py` | `convert_pdf(pdf_bytes, *, settings, client, pages, progress, tracer, concurrency)` | WP4 |
+| `pipeline/run.py` | `convert_pdf(pdf_bytes, *, settings, client, pages, progress, tracer, concurrency, notice)` | WP4 |
 | `web/db.py` | schema, `make_engine`, `session_scope` | spine |
 | `web/*` | `create_app(settings=None, *, converter=None, client_factory=None) -> FastAPI` | WP5 |
 | `ops/retention.py`, `ops/aggregate.py` | `purge_expired(factory, now)`, `aggregate_finished(factory, now)` | WP6 |
@@ -81,7 +83,8 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
    re-serialised from a parsed, allowlisted tree, never pasted as a string.
 3. **Spend.** No model request without a successful reservation (`JobBudget.reserve`).
    CLI commands that call models take `--max-usd` (required) and use
-   `InMemorySpendGuard`.
+   `InMemorySpendGuard`. A reservation is the request's worst case until it settles, so
+   steps running at once fill a small cap before it is spent (`convert --concurrency`).
 4. **Offline tests by default.** Tests use `FakeVisionClient` and generated PDFs. Real
    API tests are marked `live_model`; browser tests `browser`; Postgres tests `postgres`.
 5. **The app itself is accessible.** Semantic HTML, labels on every control, visible

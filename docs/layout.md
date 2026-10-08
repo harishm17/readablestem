@@ -388,9 +388,9 @@ opened documents (4 at most), keyed by the identity of the bytes object and, fai
 by its SHA-256, so cropping every element of a PDF parses it once. The cache holds user
 content, so an entry unused for `DOCUMENT_CACHE_TTL_S` (120 s) is closed by a daemon timer
 even if nobody calls `release`: an idle worker does not keep the last jobs' PDFs past the
-retention purge. **For WP4:** `pipeline.run.convert_pdf` should still call
-`layout.release(pdf_bytes)` in a `finally` when the job ends; `release` is not in the
-contract table of `docs/design/beta-architecture.md` yet (that file is outside WP2).
+retention purge. `pipeline.run.convert_pdf` also calls `layout.release(pdf_bytes)` in a
+`finally` when the job ends (`release` is in the contract table of
+`docs/design/beta-architecture.md`).
 
 Crops render at `dpi` on a white background; when the long side would exceed `max_side_px`,
 the zoom drops so it fits (one pixel of headroom absorbs MuPDF's rounding).

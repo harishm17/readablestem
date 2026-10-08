@@ -793,3 +793,29 @@ def test_inline_equation_alone_in_its_paragraph_gets_the_neighbours(fake):
     assert fake.contexts["p1-e2"] == (
         "The kinetic energy is\n[this equation]\nwhere m is the mass ⟦a, b⟧."
     )  # the parent (only a marker) is skipped; interval brackets are not markers
+
+
+def test_list_items_are_context_for_a_display_equation_between_them():
+    """A worked solution as a numbered list: the equation inside step 1 is introduced by
+    step 1 and followed by step 2, not by whatever paragraph came before the list."""
+    elements = [
+        el("p1-e0", Kind.PARAGRAPH, 0, 0, text="Unrelated paragraph before the list."),
+        el("p1-e1", Kind.LIST_ITEM, 0, 1, text="Solution: the average velocity is",
+           list_marker="1.", list_ordered=True, list_level=1),
+        el("p1-e2", Kind.EQUATION, 0, 2, display="block"),
+        el("p1-e3", Kind.LIST_ITEM, 0, 3, text="Discussion: the answer is positive.",
+           list_marker="2.", list_ordered=True, list_level=1),
+        el("p1-e4", Kind.PARAGRAPH, 0, 4, text="Unrelated paragraph after the list."),
+    ]  # fmt: skip
+    assert run.context_texts(elements)["p1-e2"] == (
+        "Solution: the average velocity is\n[this equation]\nDiscussion: the answer is positive."
+    )
+
+
+def test_an_inline_equation_in_a_list_item_gets_its_item_around_the_marker():
+    elements = [
+        el("p1-e0", Kind.LIST_ITEM, 0, 0, text=f"Speed is {inline_marker('p1-e1')} here.",
+           list_marker="a.", list_ordered=True, list_level=1),
+        el("p1-e1", Kind.EQUATION, 0, 1, display="inline", parent_id="p1-e0"),
+    ]  # fmt: skip
+    assert run.context_texts(elements)["p1-e1"] == "Speed is [this equation] here."

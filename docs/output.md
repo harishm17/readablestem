@@ -311,8 +311,9 @@ and fast, so anyone holding only the HTML can recompute them.
    `ThreadPoolExecutor(concurrency)`. Cropping page N+1 overlaps the model calls for
    page N.
 4. Each step gets ~600 characters of neighbouring text as untrusted `context_text`: for an
-   inline equation, its paragraph around the marker (`[this equation]` marks the spot);
-   otherwise the end of the previous text element and the start of the next. Other
+   inline equation, its paragraph or list item around the marker (`[this equation]`
+   marks the spot); otherwise the end of the previous text element (paragraph, heading or
+   list item) and the start of the next. Other
    markers become `[equation]`.
 5. A step that raises becomes FAILED `internal_error`; a crop that fails, FAILED
    `crop_error`. Only the exception type is logged, never its message (it may quote the
@@ -350,7 +351,8 @@ generation (with tokens and cost), so per-request cost shows in Langfuse's cost 
 ## CLI
 
 ```
-a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--report OUT.json] [--axe]
+a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
+                  [--report OUT.json] [--axe]
 ```
 
 `--max-usd` caps this run with an in-memory spend guard; `MAX_USD_PER_JOB` and
@@ -365,7 +367,7 @@ model, not conversions. Do not publish it." Progress
 
 ```
 Pages:       1
-Elements:    4 (1 headings, 1 paragraphs, 2 equations, 0 figures)
+Elements:    4 (1 headings, 1 paragraphs, 0 list items, 2 equations, 0 figures)
 Fixes:
   kind        accepted
   heading            1
@@ -386,6 +388,15 @@ When a limit stops the run, the summary names it, e.g. `Budget: stopped early
 (budget_daily: the --max-usd cap for this run)`. The run cap is an `InMemorySpendGuard`,
 which reports the scope `daily` because it stands in for the web app's daily cap.
 `--out` and `--report` may not be the input PDF or each other.
+
+`--concurrency` (default 4, at most 16) is how many equation and figure steps run at
+once. Every model request first reserves its worst-case cost and settles to the real
+cost when it returns, so the reservations of the steps in flight count against
+`--max-usd` until they settle. A small cap therefore fills before it is spent: with
+`--max-usd 0.10` and 4 steps of about $0.02 worst case each, a real run refused a call
+after $0.016 of real spend. When the run cap stops a real run with more than one step at
+once, the summary says so and suggests `--concurrency 1`, which reserves one call at a
+time.
 
 ## Engineering limits (input for the known-limits copy)
 

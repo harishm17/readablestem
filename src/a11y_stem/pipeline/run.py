@@ -96,8 +96,10 @@ PIPELINE_VERSION = "0.2.0"
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 
 # Neighbouring text sent with each crop as untrusted context (the client fences it).
+# List items are text too: a display equation inside a numbered solution step is
+# introduced by that step, not by the paragraph before the list.
 CONTEXT_CHARS = 600
-_TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING)
+_TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
 _MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE)
 # Errors that mean the run itself is misconfigured, not that one element is hard: they
 # stop the run and propagate (see the module docstring).
