@@ -189,7 +189,7 @@ def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
     after = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
     assert "Accepted automatically 2" in after
     assert "Reviewed by you (accepted, edited or rejected) 1" in after
-    review = page_text(web.browser.get(f"/jobs/{job_id}/review").text)
+    review = page_text(web.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "Accepted by you" in review and "Accepted automatically" in review
 
 

@@ -267,6 +267,11 @@ class DocumentResult(BaseModel):
     image_only_pages: list[int] = Field(default_factory=list)
     # Static checks of `html` (pipeline.html_checks.static_checks) when it was rendered.
     html_checks: list[Check] = Field(default_factory=list)
+    # 0-based page -> (width, height) in points, the frame of the element boxes (the page
+    # as layout measured it, after rotation): the review screen places its marks on the
+    # page images with them. Empty in results stored before it existed (the review screen
+    # then asks the PDF itself).
+    page_sizes: dict[int, tuple[float, float]] = Field(default_factory=dict)
 
     def fix_for(self, element_id: str) -> Fix | None:
         return next((f for f in self.fixes if f.element_id == element_id), None)

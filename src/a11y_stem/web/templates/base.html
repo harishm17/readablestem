@@ -42,7 +42,7 @@
     </div>
   </header>
 
-  <main id="main" class="wrap" tabindex="-1">
+  <main id="main" class="{% block main_class %}wrap{% endblock %}" tabindex="-1">
     {# A live region present at page load is not announced, so the first one-time notice
        (after a POST-redirect, e.g. "deleted") takes focus instead. #}
     {% for item in flash if not item.element_id %}

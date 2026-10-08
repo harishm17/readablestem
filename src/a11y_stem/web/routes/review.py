@@ -1,5 +1,13 @@
-"""Review screen: what needs a decision first, optional checks folded away, one-click
-decisions.
+"""Review decisions (the POST route both review views share) and the list view of every
+item ("All items as a list", `/jobs/{id}/review/list`). The main review screen, one
+decision at a time beside the page it is on, is `routes/split.py`.
+
+Every decision form carries a hidden `view` field: "list" from the list view, "split"
+from the review screen (the default). After a decision the reviewer goes back to the view
+the form was on: the list's next card (`#item-<id>`), or the review screen's next open
+decision (`?item=<key>`). A refused edit re-shows the same view with the error.
+
+The list view:
 
 Layout (see `web.review` for the rules), in three sections:
 
@@ -562,10 +570,45 @@ def _page(
 
 # --------------------------------------------------------------------------- routes
 
+LIST_VIEW = "list"
 
-@router.get("/jobs/{job_id}/review")
-def review_page(request: Request, job_id: str, user: UserDep) -> Response:
+
+def list_url(job_id: str, anchor: str) -> str:
+    return f"/jobs/{job_id}/review/list#{anchor}"
+
+
+@router.get("/jobs/{job_id}/review/list")
+def review_list(request: Request, job_id: str, user: UserDep) -> Response:
     return _page(request, job_id, user)
+
+
+def _split_redirect(job_id: str, result: DocumentResult, after: str | None) -> Response:
+    """To the review screen's next decision still open after `after` (an element id or a
+    group key; None: the first one still open), or to its done state."""
+    from a11y_stem.web import queue
+    from a11y_stem.web.routes.split import review_url
+
+    decisions = queue.decisions(result)
+    current = queue.find(decisions, after) if after else None
+    landing = queue.next_open(decisions, current)
+    item = landing.key if landing is not None else None
+    return RedirectResponse(review_url(job_id, item=item), status_code=303)
+
+
+def _invalid_page(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    view: str,
+    target: str,
+    exc: ReviewInvalid,
+) -> Response:
+    """The view the form was on again, with the error and the reviewer's input (422)."""
+    if view == LIST_VIEW:
+        return _page(request, job_id, user, invalid=(target, exc), status_code=422)
+    from a11y_stem.web.routes.split import split_page
+
+    return split_page(request, job_id, user, item=target, invalid=(target, exc), status_code=422)
 
 
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
@@ -580,6 +623,7 @@ def review_action(
     decorative: Annotated[str, Form()] = "",
     level: Annotated[str, Form()] = "",
     min_confidence: Annotated[str, Form()] = "",
+    view: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
     "headings"), a bulk accept in that group; when it is a heading group's key
@@ -587,14 +631,15 @@ def review_action(
 
     Element ids look like "p3-e12", so neither a kind nor a group key can be one.
     Sharing the route keeps a single CSRF-checked, ownership-checked way to change a
-    review.
+    review. `view` says which view the form was on (module docstring).
     """
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
+    view = LIST_VIEW if view == LIST_VIEW else "split"
     if kind_for_slug(element_id) is not None:
-        return _bulk_action(request, job_id, element_id, user, action, min_confidence)
+        return _bulk_action(request, job_id, element_id, user, action, min_confidence, view)
     if is_group_key(element_id):
-        return _group_action(request, job_id, element_id, user, action, level)
+        return _group_action(request, job_id, element_id, user, action, level, view)
     form = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
     try:
         with session_scope(get_ctx(request).factory) as session:
@@ -611,7 +656,7 @@ def review_action(
         # `action` is free text from the form: only known values reach the log.
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
         log_event(logger, "review_invalid", job_id=job_id, action=logged_action)
-        return _page(request, job_id, user, invalid=(element_id, exc), status_code=422)
+        return _invalid_page(request, job_id, user, view, element_id, exc)
     log_event(
         logger,
         "review",
@@ -627,13 +672,15 @@ def review_action(
         message += "see the notes on it."
     message += _moved_message(change.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
+    if view != LIST_VIEW:
+        return _split_redirect(job_id, result, element_id)
     return RedirectResponse(_landing(job_id, result, element_id), status_code=303)
 
 
 def _landing(job_id: str, result: DocumentResult, element_id: str) -> str:
     landing = next_to_review(result, element_id)
     anchor = review_anchor(result, landing) if landing else "review-progress"
-    return f"/jobs/{job_id}/review#{anchor}"
+    return list_url(job_id, anchor)
 
 
 GROUP_DONE = {
@@ -644,7 +691,13 @@ GROUP_DONE = {
 
 
 def _group_action(
-    request: Request, job_id: str, group_key: str, user: CurrentUser, action: str, level: str
+    request: Request,
+    job_id: str,
+    group_key: str,
+    user: CurrentUser,
+    action: str,
+    level: str,
+    view: str,
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
@@ -661,7 +714,7 @@ def _group_action(
     except ReviewInvalid as exc:
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
         log_event(logger, "review_invalid", job_id=job_id, action=f"group_{logged_action}")
-        return _page(request, job_id, user, invalid=(group_key, exc), status_code=422)
+        return _invalid_page(request, job_id, user, view, group_key, exc)
     log_event(
         logger,
         "review_group",
@@ -673,6 +726,14 @@ def _group_action(
     )
     message = _group_message(action, level, outcome)
     flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
+    if view != LIST_VIEW:
+        if outcome.left:
+            # Headings left waiting (the output would move their level) keep the group
+            # open: the reviewer stays on it to choose a level for them.
+            from a11y_stem.web.routes.split import review_url
+
+            return RedirectResponse(review_url(job_id, item=group_key), status_code=303)
+        return _split_redirect(job_id, result, group_key)
     landing = None
     if not outcome.left and outcome.changes:
         landing = next_to_review(result, outcome.changes[-1].fix.element_id)
@@ -680,7 +741,7 @@ def _group_action(
         anchor = group_anchor(group_key) if outcome.left else "review-progress"
     else:
         anchor = review_anchor(result, landing) if landing else "review-progress"
-    return RedirectResponse(f"/jobs/{job_id}/review#{anchor}", status_code=303)
+    return RedirectResponse(list_url(job_id, anchor), status_code=303)
 
 
 def _group_message(action: str, level: str, outcome: GroupOutcome) -> str:
@@ -699,7 +760,13 @@ def _group_message(action: str, level: str, outcome: GroupOutcome) -> str:
 
 
 def _bulk_action(
-    request: Request, job_id: str, slug: str, user: CurrentUser, action: str, min_confidence: str
+    request: Request,
+    job_id: str,
+    slug: str,
+    user: CurrentUser,
+    action: str,
+    min_confidence: str,
+    view: str,
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
@@ -725,7 +792,9 @@ def _bulk_action(
         accepted=len(changes),
     )
     flash(request, _bulk_message(bulk, len(changes)), element_id=GROUP_FLASH + slug)
-    return RedirectResponse(f"/jobs/{job_id}/review#group-{slug}", status_code=303)
+    if view != LIST_VIEW:  # bulk accept is only offered on the list view
+        return _split_redirect(job_id, result, None)
+    return RedirectResponse(list_url(job_id, f"group-{slug}"), status_code=303)
 
 
 MOVED_NAMED = 5  # name up to this many moved headings; count any more

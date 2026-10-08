@@ -125,13 +125,13 @@ def tri(tmp_path, monkeypatch):
 
 
 def page_of(env) -> str:
-    response = env.browser.get(f"/jobs/{env.job_id}/review")
+    response = env.browser.get(f"/jobs/{env.job_id}/review/list")
     assert response.status_code == 200
     return response.text
 
 
 def post(env, target: str, **fields):
-    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review")} | fields
+    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"), "view": "list"} | fields
     return env.browser.post(f"/jobs/{env.job_id}/review/{target}", data=data)
 
 
@@ -262,8 +262,8 @@ def test_job_page_counts_decisions_and_optional_checks(tri):
         page.index('id="review-breakdown"') : page.index("</p>", page.index("breakdown"))
     ]
     assert "2 need your decision:" in breakdown
-    assert f'<a href="{base}#group-equations">1 equation</a>,' in breakdown
-    assert f'<a href="{base}#group-headings">1 group of repeated headings</a>.' in breakdown
+    assert f'<a href="{base}?item=p2-e2">1 equation</a>,' in breakdown
+    assert f'<a href="{base}?item={GROUP}">1 group of repeated headings</a>.' in breakdown
     assert "Review fixes (2 need your decision)" in page
 
 
@@ -274,7 +274,7 @@ def test_apply_to_all_keeps_every_heading_of_the_group(tri):
     response = post(tri, GROUP, action="accept")
     assert response.status_code == 303
     # Nothing in this group is left; the next decision is the equation.
-    assert response.headers["location"] == f"/jobs/{tri.job_id}/review#item-p2-e2"
+    assert response.headers["location"] == f"/jobs/{tri.job_id}/review/list#item-p2-e2"
     after = stored(tri)
     for eid in MEMBERS:
         fix = after.fix_for(eid)
@@ -322,7 +322,7 @@ def test_a_level_that_skips_is_refused_for_the_whole_group(tri):
 
 def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
     response = post(tri, "p2-e0", action="reject")
-    assert response.headers["location"] == f"/jobs/{tri.job_id}/review#group-card-{GROUP}"
+    assert response.headers["location"] == f"/jobs/{tri.job_id}/review/list#group-card-{GROUP}"
     page = page_of(tri)
     card = group_card(page)
     # Working through them one by one: their cards stay unfolded, with a link back.
@@ -342,7 +342,7 @@ def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
 
 def test_a_decision_lands_on_the_group_card(tri):
     response = post(tri, "p2-e2", action="accept")
-    assert response.headers["location"] == f"/jobs/{tri.job_id}/review#group-card-{GROUP}"
+    assert response.headers["location"] == f"/jobs/{tri.job_id}/review/list#group-card-{GROUP}"
     card = group_card(page_of(tri))
     assert "Equation 2 on page 2: Accepted." in card
 

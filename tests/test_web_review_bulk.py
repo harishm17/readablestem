@@ -42,13 +42,13 @@ def rich(tmp_path, monkeypatch):
 
 
 def page_of(env) -> str:
-    response = env.browser.get(f"/jobs/{env.job_id}/review")
+    response = env.browser.get(f"/jobs/{env.job_id}/review/list")
     assert response.status_code == 200
     return response.text
 
 
 def post(env, target: str, **fields):
-    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review")} | fields
+    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"), "view": "list"} | fields
     return env.browser.post(f"/jobs/{env.job_id}/review/{target}", data=data)
 
 
@@ -157,14 +157,14 @@ def test_checks_and_reasons_are_explained_not_coded(rich):
     assert 'value="accept"' not in blocked
 
 
-def test_job_page_links_each_kind_to_its_group(rich):
+def test_job_page_links_each_kind_to_its_first_decision(rich):
     page = rich.browser.get(f"/jobs/{rich.job_id}").text
     base = f"/jobs/{rich.job_id}/review"
     # Every fix waiting counts, not converted ones too: each needs a decision.
     assert "11 need your decision:" in page
-    assert f'<a href="{base}#group-equations">4 equations</a>,' in page
-    assert f'<a href="{base}#group-figures">3 figures</a>,' in page
-    assert f'<a href="{base}#group-headings">4 headings</a>.' in page
+    assert f'<a href="{base}?item=p1-e1">4 equations</a>,' in page
+    assert f'<a href="{base}?item=p1-e2">3 figures</a>,' in page
+    assert f'<a href="{base}?item=p1-e3">4 headings</a>.' in page
     for slug in ("equations", "figures", "headings"):
         assert f'id="group-{slug}"' in page_of(rich)
 
@@ -174,7 +174,7 @@ def test_job_page_links_each_kind_to_its_group(rich):
 
 def test_after_a_decision_the_reviewer_lands_on_the_next_fix_waiting(rich):
     location = post(rich, "p1-e1", action="accept").headers["location"]
-    assert location == f"/jobs/{rich.job_id}/review#item-p2-e1"
+    assert location == f"/jobs/{rich.job_id}/review/list#item-p2-e1"
     page = page_of(rich)
     landing = card(page, "p2-e1")
     # The notice is where the redirect lands, before the card, linked to the fix it is
@@ -186,7 +186,7 @@ def test_after_a_decision_the_reviewer_lands_on_the_next_fix_waiting(rich):
     assert "Accepted." not in card(page_of(rich), "p2-e1")  # notices are one-time
 
     location = post(rich, "p3-e3", action="reject").headers["location"]
-    assert location == f"/jobs/{rich.job_id}/review#item-p2-e1"  # last one: wraps round
+    assert location == f"/jobs/{rich.job_id}/review/list#item-p2-e1"  # last one: wraps round
     landing = card(page_of(rich), "p2-e1")
     assert '<a href="#item-p3-e3">Heading 5 on page 3</a>: Rejected.' in landing
 
@@ -272,7 +272,7 @@ def test_accept_all_headings(rich, caplog):
     before = statuses(rich)
     response = post(rich, "headings", action="accept_all")
     assert response.status_code == 303
-    assert response.headers["location"] == f"/jobs/{rich.job_id}/review#group-headings"
+    assert response.headers["location"] == f"/jobs/{rich.job_id}/review/list#group-headings"
     after = statuses(rich)
     for eid in ("p1-e3", "p2-e0", "p3-e3"):
         assert after[eid] == "accepted"

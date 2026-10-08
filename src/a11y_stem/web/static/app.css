@@ -269,3 +269,252 @@ progress { width: 16rem; height: 1.1rem; }
 .done-list { margin: 0.5rem 0 0 1rem; }
 .done-item { border-bottom: 1px solid var(--rule); }
 .done-item > .fix-card { margin-top: 0.5rem; }
+
+/* ===================================================================== review screen
+   One decision at a time beside the page it is on (templates/review_split.html).
+   Marks on the page image: the position of each comes from /jobs/{id}/review/marks.css
+   (the CSP allows no inline styles). Every mark is a link of at least 24 x 24 CSS px
+   (WCAG 2.5.8), and status is in its number, shape and text, never its colour alone:
+   a decision is a numbered disc and a solid frame, an optional check a "Note" label and
+   a dashed frame, an accepted item a tick and a dotted frame (shown on request). The
+   marks keep their own colours in forced-colors mode: they sit on the page image, which
+   stays white whatever the theme, and system colours could make them white on white. */
+
+:root {
+  --desk: #e7e9ee;
+  --mark-required: #7a4b00;   /* 7.4:1 on white; tag text white on it 7.4:1 */
+  --mark-optional: #4b5a75;   /* 6.6:1 on white */
+  --mark-accepted: #1d6b35;   /* 6.5:1 on white */
+  --mark-current: #1a4fa0;    /* 7.9:1 on white */
+  --tint-required: #fdf3e1;
+  --tint-current: #e8eefa;
+}
+
+.wrap-review { max-width: 100rem; }
+.review-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 0.75rem 2rem; padding: 1rem 0 0.75rem; border-bottom: 1px solid var(--rule);
+}
+.review-title { flex: 1 1 26rem; min-width: 0; }
+.review-head h1 { font-size: 1.6rem; margin: 0; }
+.review-file { font-weight: 400; font-size: 1.05rem; color: var(--muted); margin-left: 0.35rem; }
+.review-lede { font-size: 1.1rem; margin: 0.35rem 0 0; max-width: 46rem; }
+.review-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; }
+.review-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+
+/* Decisions as numbered steps: made (filled, ticked), current (ringed), waiting (outlined). */
+.steps { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; }
+.steps ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.step {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2rem; height: 2rem; padding: 0 0.4rem; border-radius: 1rem;
+  border: 2px solid var(--mark-required); color: var(--mark-required); background: var(--bg);
+  font-weight: 700; font-size: 0.95rem; text-decoration: none;
+}
+.step:visited { color: var(--mark-required); }
+.step-done, .step-done:visited { background: var(--ok); border-color: var(--ok); color: #fff; }
+.step-done::after { content: "\2713"; font-size: 0.8rem; margin-left: 0.15rem; }
+.step-current { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--mark-current); }
+.steps-count { margin: 0; color: var(--muted); font-size: 0.95rem; }
+
+/* Layout: decision first in the DOM; on a wide screen the page sits on the left. */
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
+@media (min-width: 64rem) {
+  .split {
+    grid-template-columns: minmax(0, 1.12fr) minmax(24rem, 1fr);
+    grid-template-areas: "page decision" "page optional";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+  .decision-area { grid-area: decision; }
+  .optional-area { grid-area: optional; }
+  .page-area {
+    grid-area: page; position: sticky; top: 0.5rem;
+    max-height: calc(100vh - 1rem); display: flex; flex-direction: column;
+  }
+  .page-scroll { flex: 1 1 auto; min-height: 14rem; }
+}
+/* Short windows (400% zoom on a laptop): nothing sticks, so nothing hides content. */
+@media (min-width: 64rem) and (max-height: 32rem) {
+  .page-area { position: static; max-height: none; }
+}
+
+/* The decision */
+.decision-area {
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 1.1rem 1.4rem 1.25rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  overflow-wrap: anywhere;
+}
+.panel-decision { border-top: 5px solid var(--mark-required); }
+.panel-done { border-top: 5px solid var(--ok); }
+.panel-item { border-top: 5px solid var(--mark-optional); }
+.decision-notice {
+  margin: 0 0 0.9rem; padding: 0.5rem 0.8rem; border-left: 5px solid var(--ok);
+  background: #eef6f0; border-radius: 0 var(--radius) var(--radius) 0;
+}
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.4rem 1rem; }
+.panel-head h2 { margin: 0; font-size: 1.45rem; }
+.panel-head h2:focus { outline: none; }
+.panel-head h2:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.panel-sub { display: block; font-size: 1rem; font-weight: 400; color: var(--muted); margin-top: 0.2rem; }
+.pill {
+  display: inline-block; margin: 0; padding: 0.05rem 0.7rem; border: 2px solid; border-radius: 999px;
+  font-weight: 600; font-size: 0.9rem; white-space: nowrap;
+}
+.pill-required { color: var(--mark-required); border-color: var(--mark-required); background: var(--tint-required); }
+.pill-done { color: var(--ok); border-color: var(--ok); background: #eef6f0; }
+.pill-optional { color: var(--mark-optional); border-color: var(--mark-optional); background: var(--panel); }
+.why { font-size: 1.1rem; margin: 0.9rem 0 0.25rem; }
+.on-page { margin: 0 0 0.9rem; font-size: 0.95rem; }
+
+/* Same-size compare: the PDF crop and the proposal share one scale. The frame is a
+   size container; marks.css gives each equation its natural width and the proposal's
+   font size and left edge in cqw (percent of the crop's width). */
+.compare { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem 0.8rem; margin: 0.5rem 0 0.9rem; }
+.compare .part-label { font-size: 1rem; margin: 0 0 0.5rem; }
+.cmp-frame { container-type: inline-size; width: 100%; }
+.cmp-label { margin: 0.35rem 0 0.15rem; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.cmp-image { display: block; width: 100%; height: auto; background: #fff; border: 1px solid var(--rule); border-radius: 4px; }
+.cmp-row { background: #fff; border: 1px solid var(--rule); border-radius: 4px; overflow-x: auto; padding: 0.15em 0; }
+.cmp-math { white-space: nowrap; font-size: 1.6rem; line-height: 1.3; }
+.cmp-math-plain { padding: 0.25rem 0.5rem; }
+.cmp-math math { font-size: inherit; }
+.cmp-math .flagged { outline: max(2px, 0.07em) solid var(--danger); outline-offset: 0.06em; border-radius: 0.08em; }
+.cmp-none { margin: 0; padding: 0.5rem; background: #fff; border: 1px dashed var(--border); }
+.speech { margin: 0.5rem 0 0; color: var(--muted); }
+.speech-label { font-weight: 600; }
+
+.diff-wrap { position: relative; }
+.diff-table { width: 100%; margin: 0.25rem 0 0.5rem; font-size: 0.95rem; }
+.diff-table caption { text-align: left; font-weight: 700; padding-bottom: 0.25rem; }
+.diff-table th, .diff-table td { padding: 0.35rem 0.5rem; overflow-wrap: anywhere; }
+.diff-symbol { font-size: 1.25rem; font-family: "Cambria Math", "STIX Two Math", "Latin Modern Math", serif; }
+.diff-what { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.diff-meaning td:last-child strong { color: var(--danger); }
+.same-line { color: var(--ok); margin: 0 0 0.75rem; font-size: 0.95rem; }
+
+.region-image { display: block; max-width: 100%; height: auto; margin: 0.5rem 0 0.75rem; border: 1px solid var(--rule); border-radius: 4px; background: #fff; }
+.figure-view { margin: 0.5rem 0 0.75rem; }
+.figure-view img { display: block; max-width: 100%; max-height: 22rem; height: auto; border: 1px solid var(--rule); background: #fff; }
+.figure-view figcaption { margin-top: 0.35rem; color: var(--muted); }
+.cap-label { font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin: 0 0 0.75rem; }
+.facts dt { color: var(--muted); font-size: 0.9rem; }
+.facts dd { margin: 0; font-weight: 600; }
+.heading-text { font-size: 1.1rem; }
+.group-question { font-size: 1.15rem; margin: 0.9rem 0 0.25rem; }
+.group-pages { margin: 0 0 0.9rem; }
+.aside-link { font-size: 0.95rem; }
+
+/* The form: Accept and Reject on one row, the edit box folded until it is needed. */
+.decide-form textarea { width: 100%; }
+.decide-form .field { margin-bottom: 0.75rem; }
+.field-inline .inline-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.decide-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0 0.25rem; }
+.decide-row:focus { outline: none; }
+.decide-row .button, .decide-row .button-secondary { min-width: 7rem; min-height: 2.75rem; font-weight: 600; }
+.decide-note { font-size: 0.9rem; margin: 0.25rem 0 0; }
+.edit-box { margin: 0.5rem 0 0; border: 1px solid var(--rule); border-radius: var(--radius); padding: 0 0.9rem; }
+.edit-box[open] { padding-bottom: 0.9rem; }
+.edit-box > summary { cursor: pointer; padding: 0.55rem 0; font-weight: 600; color: var(--link); }
+/* With JavaScript, a changed field makes Save edit the main button (app.js). */
+.is-edited [data-role="save"] { background: var(--accent); color: #fff; }
+.is-edited [data-role="accept"] { background: var(--bg); color: var(--accent); }
+.tech { margin-top: 1rem; font-size: 0.95rem; }
+.tech > summary { cursor: pointer; color: var(--muted); padding: 0.25rem 0; }
+.decision-nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 1.1rem; padding-top: 0.8rem; border-top: 1px solid var(--rule); }
+.decision-nav a[rel="next"] { margin-left: auto; }
+.done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; }
+.shortcuts { margin-top: 1rem; font-size: 0.9rem; }
+.shortcuts > summary { cursor: pointer; color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; margin: 0.5rem 0; }
+.keys div { display: contents; }
+.keys dd { margin: 0; }
+kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.35rem; background: var(--bg); }
+
+/* Optional checks */
+.optional-area { overflow-wrap: anywhere; }
+.optional-box { background: var(--panel); border-radius: 10px; padding: 0.2rem 1.2rem; }
+.optional-box[open] { padding-bottom: 0.9rem; }
+.optional-box > summary { cursor: pointer; padding: 0.65rem 0; font-weight: 700; font-size: 1.05rem; }
+.optional-list { list-style: none; margin: 0; padding: 0; }
+.optional-list li { padding: 0.4rem 0; border-top: 1px solid var(--rule); }
+.optional-note { display: block; color: var(--muted); font-size: 0.95rem; }
+.optional-none { color: var(--muted); margin: 0; }
+
+/* The page */
+.page-area { background: var(--desk); border-radius: 10px; padding: 0.75rem 0.9rem 0.9rem; min-width: 0; }
+.page-area:focus { outline: none; }
+.page-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+.page-head h2 { margin: 0; font-size: 1.2rem; }
+.page-of { font-weight: 400; color: var(--muted); }
+.page-step { margin: 0; display: flex; gap: 1rem; font-size: 0.95rem; }
+.page-list ol { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.page-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem; min-width: 2.25rem; min-height: 2rem;
+  padding: 0 0.5rem; justify-content: center; border: 1px solid #b9bdc6; border-radius: 6px;
+  background: var(--bg); color: var(--text); text-decoration: none; font-size: 0.9rem;
+}
+.page-chip:visited { color: var(--text); }
+.page-chip:hover { border-color: var(--accent); }
+.page-chip[aria-current="page"] { border: 2px solid var(--mark-current); font-weight: 700; }
+.chip-count { background: var(--mark-required); color: #fff; border-radius: 999px; padding: 0 0.45rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+.page-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 1rem; margin: 0.6rem 0; font-size: 0.9rem; }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; color: var(--text); }
+.legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.key {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.4rem; height: 1.4rem;
+  padding: 0 0.3rem; font-weight: 700; font-size: 0.75rem; line-height: 1;
+}
+.key-required { background: var(--mark-required); color: #fff; border-radius: 0.7rem; }
+.key-optional { background: var(--bg); color: var(--mark-optional); border: 1px dashed var(--mark-optional); border-radius: 3px; }
+.key-accepted { background: var(--bg); color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); border-radius: 0.7rem; }
+.page-scroll {
+  position: relative; overflow: auto; border-radius: 4px; background: var(--desk);
+  max-height: 80vh; overscroll-behavior: contain;
+}
+.page-scroll:focus-visible { outline-offset: -3px; }
+.page-frame { position: relative; margin: 0 auto; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); forced-color-adjust: none; }
+.page-image { display: block; width: 100%; height: auto; }
+.page-note { margin: 0.5rem 0 0; font-size: 0.95rem; }
+.page-failed:not([hidden]) { display: block; }
+
+.box {
+  position: absolute; transform: translate(-50%, -50%); min-width: 24px; min-height: 24px;
+  border-radius: 3px; text-decoration: none; color: inherit;
+}
+.box-required { border: 2.5px solid var(--mark-required); box-shadow: 0 0 0 1.5px #fff, inset 0 0 0 1px #fff; background: rgb(253 243 225 / 0.18); }
+.box-optional { border: 1.5px dashed var(--mark-optional); box-shadow: 0 0 0 1px #fff; }
+.box-accepted { border: 1.5px dotted var(--mark-accepted); box-shadow: 0 0 0 1px #fff; }
+.box.is-current { border: 3px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(26 79 160 / 0.28); background: rgb(232 238 250 / 0.2); }
+.box-tag {
+  position: absolute; left: -14px; top: -14px; display: inline-flex; align-items: center; justify-content: center;
+  min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
+  font: 700 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; white-space: nowrap;
+  box-shadow: 0 0 0 1.5px #fff;
+}
+.box-required .box-tag { background: var(--mark-required); color: #fff; }
+.box-optional .box-tag {
+  left: -4px; top: -21px; min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px;
+  background: #fff; color: var(--mark-optional); border: 1px dashed var(--mark-optional); font-size: 11px;
+}
+.box-accepted .box-tag { left: -10px; top: -10px; min-width: 18px; height: 18px; padding: 0; background: #fff; color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); font-size: 12px; }
+.box.is-current .box-tag { background: var(--mark-current); color: #fff; border: 0; }
+.box:hover { border-style: solid; }
+/* Focus: after the status rules, so a focused mark always shows the focus ring. */
+.page-frame .box:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; box-shadow: 0 0 0 6px var(--focus-halo); z-index: 2; }
+.page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 3px; z-index: 2; }
+
+@media (forced-colors: active) {
+  .step, .page-chip, .pill { border: 2px solid CanvasText; }
+  .step-current, .page-chip[aria-current="page"] { outline: 3px solid Highlight; outline-offset: 2px; }
+  .cmp-math .flagged { outline-color: Highlight; }
+  .decision-notice { border: 2px solid CanvasText; }
+}
+
+@media (max-width: 40rem) {
+  .review-head h1 { font-size: 1.35rem; }
+  .decision-area { padding: 0.9rem 0.9rem 1rem; }
+  .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; }
+  .page-area { padding: 0.6rem; }
+}

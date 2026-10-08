@@ -875,5 +875,6 @@ def convert_pdf(
         stopped_by=run.stop.reason() if run.stop.scope is not None else None,
         image_only_pages=sorted(scans),
         html_checks=checks,
+        page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
     )
     return PipelineOutput(result=result, crops=run.crops, checks=checks)
