@@ -15,15 +15,21 @@ uv run a11y-stem users allow you@example.org --admin
 uv run a11y-stem serve --reload # http://127.0.0.1:8000
 ```
 
-Minimal `.env` for local work (SQLite under `.local/`, no Google, no real model calls
-until WP1's client is in place):
+A verbatim copy of `.env.example` loads (blank values mean "not set"). Minimal `.env`
+for local work (SQLite under `.local/`, no Google, and no OpenAI key: `FAKE_MODELS`
+answers every model request offline with placeholder output, so the whole flow runs
+for free; drop it and set `OPENAI_API_KEY` for real conversions):
 
 ```
 ENV=dev
 DEV_LOGIN_ENABLED=true
+FAKE_MODELS=true
 ADMIN_EMAILS=you@example.org
 CONTACT_EMAIL=you@example.org
 ```
+
+Without `FAKE_MODELS` and without a key, jobs fail with `model_not_configured` ("Conversions
+are not set up on this server yet") rather than a generic error.
 
 `/dev-login` then signs you in with any allowlisted email and no password. In dev and
 test the tables are created on start-up; there is no session secret, so a random one is
@@ -49,7 +55,9 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per user per UTC day (`quota_days`) |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB` | Upload limits |
-| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client |
+| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together) |
+| `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
+| `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted (24 h, or 30 days if the user opts in) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`. Required (non-empty) in production, or the purge would never run |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
@@ -109,8 +117,10 @@ else, admins included, so job ids cannot be probed and admins never see document
 
 `POST /jobs` checks, in order:
 
-1. the daily spend cap: if not even one cheap model call fits under
-   `DAILY_SPEND_CAP_USD` today, a friendly 503 page ("Conversions are paused for today");
+1. the daily spend cap: if not even the largest single model call the pipeline makes
+   fits under `DAILY_SPEND_CAP_USD` today (`spend.largest_reservation_usd`, about $0.031:
+   a display equation on the main model), a friendly 503 page ("Conversions are paused
+   for today"). A smaller threshold admitted uploads that could convert nothing;
 2. size: a declared `Content-Length` over the limit is refused before reading, and the
    body is counted while it streams in, so an endless upload is cut off just past
    `MAX_UPLOAD_MB` (413). The file stays in memory; it never touches the server's disk;
@@ -119,8 +129,13 @@ else, admins included, so job ids cannot be probed and admins never see document
    child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
    hang in MuPDF *while opening the file and counting pages* kills the child, not the
    server. Password-protected, unreadable or empty files and more than
-   `MAX_PAGES_PER_JOB` pages are refused (422). The conversion itself is not isolated
-   this way; see "Limits of the worker" below;
+   `MAX_PAGES_PER_JOB` pages are refused (422), and so are, before any quota is spent:
+   a page larger than 5000 pt on a side (`page_too_large`; MuPDF accepts page boxes far
+   past the PDF maximum, and the conversion's crash probe renders whole pages, about
+   1 GB for an 18000 pt page), a PDF whose every page is a scanned image with no text
+   (`scanned`, with advice to run OCR first) and one whose every page is blank
+   (`no_content`). The child caps its own address space at 768 MB. The conversion
+   itself is not isolated this way; see "Limits of the worker" below;
 5. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (429 if over).
 
@@ -151,11 +166,19 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 - **Claiming.** Fewest attempts first, then oldest, so a retried job goes behind fresh
   ones. Postgres: `SELECT ... FOR UPDATE SKIP LOCKED` then an UPDATE in the same
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
-  says who won.
+  says who won. Jobs of people no longer on the allowlist are not claimed; removing
+  someone also fails their queued and running jobs with `access_removed`.
+- **Daily budget spent.** While less than the largest single model call is left under
+  the daily cap (the same threshold as the upload gate), the worker claims nothing and
+  logs `claims_paused` once (`claims_resumed` when it starts again). Queued jobs wait,
+  and their page says so ("Today's conversion budget has been used up ... starts then"),
+  instead of running into a document with every element "not converted".
 - **Leases.** A claimed job gets `lease_until = now + 120 s`. The conversion runs on its
   own thread; the worker thread waits for it and extends the lease every 40 s, and each
   progress callback extends it too. Before each claim the worker requeues RUNNING jobs
   whose lease ran out; after 3 attempts a job is failed with `lease_expired` instead.
+  On shutdown (`Worker.stop`) the running conversion is cancelled and its lease ended at
+  once, so another instance requeues the job straight away.
 - **Time limit.** `JOB_BASE_S + JOB_PER_PAGE_S * pages` (300 s + 90 s per page, so
   50 minutes for 30 pages; constants in `web/worker.py`, not settings yet). Past it the
   worker stops extending the lease, cancels the conversion, fails the job with `timeout`
@@ -170,14 +193,26 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   exception aborts the run. Model calls already in flight finish. The outcome is
   "discarded", not a failure.
 - **Running.** `converter(pdf_bytes, settings=..., client=client_factory(settings,
-  budget), progress=...)`, where `budget` is a `JobBudget` over the daily `DbSpendGuard`
-  with what is left of `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB` for this job. The
-  caps are per job, not per attempt: spend and calls so far are written to
-  `Job.cost_usd` and `Job.model_calls` on every heartbeat and progress callback, and a
-  retried attempt starts from them. The defaults are `pipeline.run.convert_pdf` and
-  `models.make_vision_client`; tests pass fakes to `create_app`.
+  budget), progress=...)` (plus `tracer=` when tracing is on), where `budget` is a
+  `JobBudget` over the daily `DbSpendGuard` with what is left of the job's caps
+  (`worker.job_caps`: `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB`, lowered to the
+  per-page allowances times the pages). The caps cover the job, not one attempt, and are
+  enforced on the job's row: each reservation is one conditional UPDATE
+
+  ```sql
+  UPDATE jobs SET cost_usd = cost_usd + :a, model_calls = model_calls + 1
+  WHERE id = :id AND status = 'running' AND attempts = :n
+    AND cost_usd + :a <= :max_usd AND model_calls + 1 <= :max_calls
+  ```
+
+  which also checks ownership; settling replaces the hold with the actual cost. So
+  `Job.cost_usd` is always current, and an attempt that dies mid-call leaves its holds
+  counted rather than handing its spend to the retry. The defaults are
+  `pipeline.run.convert_pdf` and `models.make_vision_client`; tests pass fakes to
+  `create_app`.
 - **Storing.** `result_json` (the `DocumentResult` without `html`), `html`, crops as
-  `Blob(kind="crop")`, `cost_usd` and `model_calls` (all attempts), status `done`. Only
+  `Blob(kind="crop")`, status `done` and an outcome code when the result is incomplete
+  (below). Only
   if this worker still owns the job (same attempt, still running), so a job deleted or
   requeued meanwhile is not brought back. NUL characters (they occur in text extracted
   from PDFs, and Postgres refuses them) are removed first. If the write fails, a
@@ -189,11 +224,25 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
+  | `scanned` | Every page was only a scanned image (the upload probe normally refuses these first) |
+  | `no_content` | The result had no elements at all |
+  | `model_not_configured` | The model client is misconfigured (no OpenAI key): every job would fail the same way |
+  | `access_removed` | The owner was removed from the allowlist |
   | `timeout` | The conversion ran past its time limit |
   | `store_failed` | The result could not be written to the database |
   | `lease_expired` | The job was interrupted 3 times |
   | `upload_missing` | The upload blob was gone |
   | `internal_error` | Anything else |
+
+- **Outcome codes on finished jobs** (`worker.result_outcome`; status `done`, results
+  available, but incomplete). The job page and the documents list show them instead of
+  "Finished" (`web/outcome.py`), and `ops.aggregate` counts them as `job error:<code>`:
+
+  | Code | Cause | What the user is told |
+  |---|---|---|
+  | `budget_daily` | The daily cap ran out part way | "Stopped early": N of M equations and figures not converted, originals kept; upload again after 00:00 UTC |
+  | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | "Stopped early": split the PDF |
+  | `scanned_pages` | Some pages were only scanned images (kept as flagged images) | Which pages; run OCR and upload again |
 
 **Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
 web process, not in a child process like the upload probe. A conversion stuck in native

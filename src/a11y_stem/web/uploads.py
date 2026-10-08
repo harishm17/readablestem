@@ -44,6 +44,9 @@ REJECTION_STATUS = {
     "unreadable": 422,
     "no_pages": 422,
     "too_many_pages": 422,
+    "page_too_large": 422,
+    "scanned": 422,
+    "no_content": 422,
 }
 
 

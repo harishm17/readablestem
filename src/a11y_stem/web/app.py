@@ -30,8 +30,8 @@ from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
 
 from a11y_stem.config import ConfigError, Settings, get_settings
-from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
 from a11y_stem.observability.logging import configure_logging, request_logging_middleware
+from a11y_stem.observability.tracing import NoopTracer, Tracer, make_tracer
 from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
 from a11y_stem.web.database import as_utc, prepare_database
@@ -44,7 +44,7 @@ from a11y_stem.web.security import (
     SafeErrorMiddleware,
     SecurityHeadersMiddleware,
 )
-from a11y_stem.web.spend import DbSpendGuard
+from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
 from a11y_stem.web.worker import (
     ClientFactory,
     Converter,
@@ -198,14 +198,15 @@ def _session_secret(settings: Settings) -> str:
     return secrets.token_urlsafe(32)
 
 
-def _min_headroom_usd(settings: Settings) -> float:
-    """Cost of one cheap model call: less than this left under the cap means no uploads."""
-    try:
-        return estimate_max_cost_usd(
-            settings.cheap_model, n_images=1, text_chars=0, max_output_tokens=1024
-        )
-    except UnknownModelError:
-        return 0.0
+def _job_tracer(settings: Settings) -> Tracer | None:
+    """The tracer handed to every conversion, or None when tracing is off.
+
+    Built once per app: a Langfuse client per job would open a connection pool each
+    time. `make_tracer` falls back to no tracing (logging why) when keys or the
+    package are missing.
+    """
+    tracer = make_tracer(settings)
+    return None if isinstance(tracer, NoopTracer) else tracer
 
 
 def create_app(
@@ -230,7 +231,8 @@ def create_app(
         client_factory=client_factory or default_client_factory,
         guard=DbSpendGuard(factory, settings.daily_spend_cap_usd),
         oauth=make_oauth(settings),
-        min_headroom_usd=_min_headroom_usd(settings),
+        min_headroom_usd=largest_reservation_usd(settings),
+        tracer=_job_tracer(settings),
     )
 
     @asynccontextmanager
@@ -244,9 +246,18 @@ def create_app(
                 converter=ctx.converter,
                 client_factory=ctx.client_factory,
                 guard=ctx.guard,
+                headroom_usd=ctx.min_headroom_usd,
+                tracer=ctx.tracer,
             )
             ctx.worker.start()
-        log_event(logger, "app_started", env=settings.env, worker=settings.run_worker)
+        log_event(
+            logger,
+            "app_started",
+            env=settings.env,
+            worker=settings.run_worker,
+            tracing=ctx.tracer is not None,
+            fake_models=settings.fake_models,
+        )
         try:
             yield
         finally:

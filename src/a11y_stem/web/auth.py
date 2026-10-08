@@ -21,11 +21,12 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.config import Settings
-from a11y_stem.web.db import User, session_scope, utcnow
+from a11y_stem.web.database import rowcount
+from a11y_stem.web.db import Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.deps import (
     PageError,
     current_user,
@@ -75,7 +76,13 @@ def normalise_email(raw: object) -> str | None:
 def set_allowed(
     session: Session, email: str, *, allowed: bool, admin: bool | None = None
 ) -> User | None:
-    """Add (allowed=True) or remove someone. Removing an unknown email returns None."""
+    """Add (allowed=True) or remove someone. Removing an unknown email returns None.
+
+    Removing someone also stops their work: their queued and running jobs are failed with
+    "access_removed", so nothing more of theirs is converted or charged to the shared
+    daily budget (a running conversion stops at its next spend reservation, which checks
+    the job is still running). Their documents are still deleted on schedule.
+    """
     user = session.scalar(select(User).where(User.email == email))
     if user is None:
         if not allowed:
@@ -87,9 +94,21 @@ def set_allowed(
     user.is_allowed = allowed
     if not allowed:
         user.is_admin = False
+        stop_jobs_of(session, user.id, "access_removed")
     elif admin is not None:
         user.is_admin = admin
     return user
+
+
+def stop_jobs_of(session: Session, user_id: str, code: str) -> int:
+    """Fail the user's queued and running jobs with `code`. Returns how many."""
+    result = session.execute(
+        update(Job)
+        .where(Job.user_id == user_id, Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]))
+        .values(status=JobStatus.FAILED, error_code=code, finished_at=utcnow(), lease_until=None)
+        .execution_options(synchronize_session=False)
+    )
+    return rowcount(result)
 
 
 def seed_admins(factory: sessionmaker[Session], emails: list[str]) -> None:

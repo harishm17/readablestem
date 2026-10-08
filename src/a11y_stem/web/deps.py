@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from starlette.responses import Response
 
 from a11y_stem.config import Settings
+from a11y_stem.observability.tracing import Tracer
 from a11y_stem.web.db import User, session_scope
 from a11y_stem.web.spend import DbSpendGuard
 from a11y_stem.web.worker import ClientFactory, Converter, Worker
@@ -44,9 +45,12 @@ class AppContext:
     guard: DbSpendGuard
     oauth: Any | None = None  # Authlib registry when Google sign-in is configured
     worker: Worker | None = None
-    # Below this much headroom under the daily cap, new uploads are turned away: not even
-    # one cheap model call would fit.
+    # Below this much headroom under the daily cap, new uploads are turned away and the
+    # worker claims nothing: not even the largest single model call would fit
+    # (`spend.largest_reservation_usd`).
     min_headroom_usd: float = 0.0
+    # Handed to every conversion when tracing is on (`observability.tracing.make_tracer`).
+    tracer: Tracer | None = None
 
     @property
     def dev_login_enabled(self) -> bool:

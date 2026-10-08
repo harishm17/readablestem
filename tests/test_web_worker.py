@@ -29,6 +29,7 @@ from a11y_stem.web.worker import (
     JobCancelled,
     db_safe,
     error_code_for,
+    job_caps,
     job_time_limit_s,
     process_next_job,
 )
@@ -108,8 +109,9 @@ def test_converter_gets_a_client_built_on_a_job_budget_under_the_daily_guard(env
     assert isinstance(client, FakeVisionClient)
     budget = client.budget
     assert isinstance(budget, JobBudget)
-    assert budget.max_usd == env.settings.max_usd_per_job
-    assert budget.max_calls == env.settings.max_model_calls_per_job
+    # A 1-page job gets the per-page allowance, which is below the per-job cap.
+    assert (budget.max_usd, budget.max_calls) == job_caps(env.settings, 1)
+    assert budget.max_usd == env.settings.max_usd_per_page < env.settings.max_usd_per_job
     assert isinstance(budget.guard, DbSpendGuard)
     assert budget.guard.cap_usd == env.settings.daily_spend_cap_usd
 
@@ -613,8 +615,9 @@ def test_job_caps_cover_every_attempt_not_each_one(env):
 
     assert env.run_worker() == job_id
     budget = env.converter.calls[-1]["client"].budget
-    assert budget.max_calls == settings.max_model_calls_per_job - 3
-    assert budget.max_usd == pytest.approx(settings.max_usd_per_job - spent["usd"])
+    max_usd, max_calls = job_caps(settings, 1)
+    assert budget.max_calls == max_calls - 3
+    assert budget.max_usd == pytest.approx(max_usd - spent["usd"])
     job = env.job(job_id)
     assert job.status == "done" and job.attempts == 2
     assert job.model_calls == 3 + 3  # earlier attempt + this one (fake result: 3 calls)

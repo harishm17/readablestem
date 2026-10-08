@@ -214,7 +214,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 |---|---|---|
 | Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
 | `/healthz` answers 503 | The database: Cloud SQL instance state, connections | See "Too many connections" below |
-| Conversions fail with `reason:budget_daily` | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed. Raise the cap only on purpose; it resets at 00:00 UTC |
+| Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`) |
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
 | Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |

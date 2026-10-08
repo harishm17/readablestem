@@ -25,8 +25,14 @@ class ConfigError(RuntimeError):
 
 
 class Settings(BaseSettings):
+    # env_ignore_empty: `NAME=` (as in .env.example) means "not set", so an optional number
+    # left blank falls back to its default instead of failing validation.
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore", case_sensitive=False
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        case_sensitive=False,
+        env_ignore_empty=True,
     )
 
     env: Literal["dev", "test", "prod"] = "dev"
@@ -41,12 +47,20 @@ class Settings(BaseSettings):
     auto_accept_confidence: float = Field(default=0.85, ge=0, le=1)
     # Below this the step abstains instead of proposing a fix.
     abstain_confidence: float = Field(default=0.4, ge=0, le=1)
+    # Answer every model request with the offline FakeVisionClient (placeholder output),
+    # so the web app can be tried end to end without an OpenAI key. Dev and test only.
+    fake_models: bool = False
 
     # --- cost and abuse limits (no defaults for the money ones on purpose)
     daily_spend_cap_usd: float | None = Field(default=None, gt=0)
     per_user_daily_page_quota: int | None = Field(default=None, gt=0)
     max_usd_per_job: float = Field(default=2.0, gt=0)
     max_model_calls_per_job: int = Field(default=400, gt=0)
+    # A job's caps are also at most this much per page of the upload (web.worker.job_caps),
+    # so a short document cannot use a long one's allowance. Measured average: about
+    # $0.004 and a few calls per PDF page; these leave room for equation-dense pages.
+    max_usd_per_page: float = Field(default=0.30, gt=0)
+    max_model_calls_per_page: int = Field(default=80, gt=0)
     max_pages_per_job: int = Field(default=30, gt=0)
     max_upload_mb: int = Field(default=20, gt=0)
 
@@ -126,6 +140,8 @@ class Settings(BaseSettings):
             raise ConfigError("production start refused; missing: " + ", ".join(missing))
         if self.dev_login_enabled:
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
+        if self.fake_models:
+            raise ConfigError("FAKE_MODELS must be false in production")
         if self.database_url.startswith("sqlite"):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):
