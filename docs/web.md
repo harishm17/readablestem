@@ -76,7 +76,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation or figure |
 | GET `/jobs/{id}/review` | owner | Review screen |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group |
 | POST `/jobs/{id}/delete` | owner | Delete the job and everything made from it now |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
@@ -209,12 +209,38 @@ and scripts.
 
 ## Review screen
 
-`/jobs/{id}/review` lists every fix: those needing review first, then those not converted,
-then the rest, each in document order. Each card shows the original crop, the proposed
-equation as MathML (re-serialised from an allowlisted tree by `web/mathml.py`, never
-pasted as a string), the speech text, an editable LaTeX textarea, alt text input (with a
-"decorative" box) or heading level, the confidence and the failed check codes, with
-"Save edit", "Accept" and "Reject" buttons.
+Code: `web/routes/review.py` (page and form handling), `web/review.py` (rules: order,
+eligibility, validation), `web/messages.py` (what each code means). Tests:
+`tests/test_web_review.py` (one fix), `tests/test_web_review_bulk.py` (order, landing,
+bulk accept), `tests/test_web_review_messages.py` (every code has a sentence) and
+`tests/test_web_review_browser.py` (axe, reflow, keyboard, no JavaScript; `browser`
+marker).
+
+**Order.** A reviewer's time should go where a mistake costs a student most, so fixes
+are grouped by kind: equations, then figures, then headings. Within a group, the fixes
+still waiting for a decision come first (needs review, failed and not converted alike),
+in page and reading order; the ones already decided (accepted, edited, rejected) are
+folded into a `<details>` below them. A table of contents at the top links to each group
+and gives its counts. Every fix is numbered within its kind in reading order ("Equation
+3"), so a number stays the same while the list reorders after each decision.
+
+**One fix.** Each card shows:
+
+- the status in words ("Needs review", "Not converted (error)"; the coloured border
+  only repeats it) and the confidence as a word and a number, "Low (45%)" (High from
+  85%, the default auto-accept bar; Medium from 60%);
+- why it is here: each failed check and `Fix.reason` as a sentence from
+  `web/messages.py`, its severity in words ("Must be fixed", "Worth checking"), and the
+  raw code as a small secondary line for bug reports;
+- for equations and figures, the original crop; for equations, the proposed MathML
+  (re-serialised from an allowlisted tree by `web/mathml.py`, never pasted as a string)
+  in a box that scrolls sideways when the equation is wide (a named tab stop, so it can
+  be scrolled from the keyboard), the speech text and an editable LaTeX box; for figures,
+  the proposed alt text, the caption, an alt text box with the 150-character guideline
+  and the current count written out (no JavaScript), and a "decorative" box; for
+  headings, the text and a level select;
+- "Save edit", "Accept" (only when the proposal passed every error-level check) and
+  "Reject" buttons whose accessible names include the fix ("Reject figure 2").
 
 A decision is one transaction: lock the job row, apply the decision (`web/review.py`),
 validate edits with `pipeline.validate` (`check_latex`, `safe_latex_to_mathml`,
@@ -222,6 +248,46 @@ validate edits with `pipeline.validate` (`check_latex`, `safe_latex_to_mathml`,
 `edited`, `rejected`) in `result_json`, and re-render the job's HTML with
 `pipeline.assemble.render_html`. A failed check re-shows the page (422) with the
 reviewer's input and an error summary linked to the field; nothing is saved.
+
+After a decision the browser is redirected (303) to `#item-<id>` of the next fix still
+waiting, after this one in review order and wrapping round to the first, or to
+`#review-progress` when none are left. A one-time notice there links back to the fix
+that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
+The landing item has `tabindex="-1"`, so the next Tab reaches that link.
+
+**Bulk accept.** Each group offers to accept several proposals at once:
+
+- "Accept every equation proposal at or above X%" (X from 90, 80, 70, 60, 50; each
+  option says how many it would take), for every group;
+- "Accept all N remaining headings", for headings only: a wrong heading level is cheap
+  to spot and fix later, a wrong equation or alt text is not.
+
+Only fixes a single "Accept" could take are included: status `needs_review`, a proposal,
+and no failed error-level check. Failed and not-converted fixes, and fixes the reviewer
+already decided, are never touched. The threshold compares the whole percentage the page
+shows (0.795 is shown as 80%, so it is "at or above 80%"). Bulk accept posts to the same
+route as a single decision, with the group (`equations`, `figures`, `headings`) in
+place of the element id (element ids look like `p3-e12`, so the two cannot collide).
+That keeps one CSRF- and ownership-checked way to change a review, and the POST-route
+list in `tests/test_web_auth.py` unchanged. It is one transaction: one `ReviewEdit` per
+fix, `result_json` updated, the HTML re-rendered once, then a redirect to
+`#group-<kind>` with the count ("Accepted 3 headings."). Repeating it changes nothing
+and re-renders nothing. A choice the page never offers (an unknown threshold, "accept
+all" for equations) is refused with a 422 and an error linked to the threshold select.
+
+**Job page.** "Need your review" is broken down by kind, each linking to its group
+("7 need your review: 3 equations, 1 figure, 3 headings.").
+
+**Messages.** `web/messages.py` maps every `(Check.name, Check.code)` pair and every
+`Fix.reason` the pipeline can emit to one plain sentence that says what is wrong and
+what to look at. `tests/test_web_review_messages.py` collects the codes from the
+pipeline's source with `ast` (not from a hand-kept list), so a new code fails the test
+until it has a sentence, and a sentence whose code no longer exists fails it too. An
+unknown code still gets a neutral sentence plus the code.
+
+**Narrow screens.** Long file names, codes and document text wrap
+(`overflow-wrap: anywhere` on headings, ledes, summaries, error text and the review
+cards), so neither the job page nor the review page scrolls sideways at 320 CSS px.
 
 ## Security headers
 
