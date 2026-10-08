@@ -15,16 +15,26 @@ Rows are (day, step, category, count). `step` is the fix kind ("equation", "figu
     equation  call:fallback                             calls made as a fallback
     equation  call:escalated                            fixes re-asked on another model
     job       status:done | status:failed               jobs
-    job       error:encrypted                           Job.error_code
-    job       pages                                     sum of pages (not a count of jobs)
+    job       error:encrypted                           Job.error_code (also outcome codes
+                                                        of done jobs, e.g. budget_daily)
+    job       pages                                     pages of done jobs (a sum)
+    job       cost_microusd                             model spend of done jobs, in
+                                                        millionths of a dollar (a sum)
+    job       latency:lt60s | ... | ge600s              done jobs by conversion wall time
     job       aggregate:invalid_result                  result_json that did not parse
+    document  check:heading.order:skipped_level         failed static HTML checks
     equation  aggregate:checks_edited                   checks lost to an earlier edit
+
+So production cost per page is sum(cost_microusd) / sum(pages) / 1e6 over any days.
 
 Fixes are counted as the pipeline left them, even when a reviewer acted before the cron
 ran. A review rewrites the stored result in place (the status becomes accepted, edited or
 rejected; an edit replaces the checks), so each fix's status is taken from the `before`
-snapshot of its earliest `ReviewEdit`. An edit's replaced checks cannot be recovered;
-that fix's checks are counted as "aggregate:checks_edited" instead of the reviewer's.
+snapshot of its earliest `ReviewEdit`, and its checks too when the snapshot has them.
+Otherwise an edit's replaced checks cannot be recovered and that fix's checks are counted
+as "aggregate:checks_edited" instead of the reviewer's, except for headings: a heading
+edit only changes the level and keeps the pipeline's checks (web/review.py), and those
+corrected headings are the most useful ones for calibration.
 
 Review actions ("review:edit") are counted by `ops.retention` when the job is deleted,
 because reviewers can act until then.
@@ -50,7 +60,7 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, sessionmaker
 
-from a11y_stem.core.types import DocumentResult, Fix
+from a11y_stem.core.types import Check, DocumentResult, Fix, Kind
 from a11y_stem.observability.logging import get_logger
 from a11y_stem.web.db import ErrorAggregate, Job, JobStatus, ReviewEdit, session_scope
 
@@ -90,6 +100,13 @@ class Reviewed:
 
     status: dict[str, str] = field(default_factory=dict)  # element_id -> pipeline status
     edited: set[str] = field(default_factory=set)  # element_ids whose checks were replaced
+    # element_id -> the pipeline's checks, when the earliest snapshot recorded them
+    checks: dict[str, list[Check]] = field(default_factory=dict)
+
+
+# Fix kinds whose review edit keeps the pipeline's checks (web/review.py `_edit_heading`).
+KEEPS_CHECKS_ON_EDIT = frozenset({Kind.HEADING})
+LATENCY_BUCKETS_S = (60, 120, 300, 600)  # upper bounds; the last bucket is "ge600s"
 
 
 def fix_counts(fix: Fix, reviewed: Reviewed | None = None) -> Counter[Key]:
@@ -101,10 +118,19 @@ def fix_counts(fix: Fix, reviewed: Reviewed | None = None) -> Counter[Key]:
     if reviewed is not None:
         status = reviewed.status.get(fix.element_id, status)
     counts[_key(step, "status", code(status))] += 1
-    if reviewed is not None and fix.element_id in reviewed.edited:
+    checks: list[Check] | None = [c for c in fix.checks if not c.passed]
+    if reviewed is not None and fix.element_id in reviewed.checks:
+        checks = [c for c in reviewed.checks[fix.element_id] if not c.passed]
+    elif (
+        reviewed is not None
+        and fix.element_id in reviewed.edited
+        and fix.kind not in KEEPS_CHECKS_ON_EDIT
+    ):
+        checks = None
+    if checks is None:
         counts[_key(step, "aggregate", "checks_edited")] += 1
     else:
-        for check in fix.failed_checks:
+        for check in checks:
             counts[_key(step, "check", code(check.name), code(check.code or "failed"))] += 1
     if fix.reason:
         counts[_key(step, "reason", code(fix.reason))] += 1
@@ -138,7 +164,8 @@ def job_counts(
     counts[_key("job", "status", code(status))] += 1
     if error_code:
         counts[_key("job", "error", code(error_code))] += 1
-    if page_count > 0:
+    done = status == JobStatus.DONE.value
+    if done and page_count > 0:  # pages converted; a failed job converted nothing
         counts[_key("job", "pages")] += page_count
     if result_json is None:
         return counts
@@ -148,9 +175,23 @@ def job_counts(
         # The error text would quote the stored document; count the category only.
         counts[_key("job", "aggregate", "invalid_result")] += 1
         return counts
+    if done:
+        counts[_key("job", "cost_microusd")] += max(0, round(result.stats.cost_usd * 1_000_000))
+        counts[_key("job", "latency", _latency_bucket(result.stats.latency_ms))] += 1
+    for check in result.html_checks:
+        if not check.passed:
+            counts[_key("document", "check", code(check.name), code(check.code or "failed"))] += 1
     for fix in result.fixes:
         counts.update(fix_counts(fix, reviewed))
     return counts
+
+
+def _latency_bucket(latency_ms: int) -> str:
+    seconds = max(0, latency_ms) / 1000
+    for bound in LATENCY_BUCKETS_S:
+        if seconds < bound:
+            return f"lt{bound}s"
+    return f"ge{LATENCY_BUCKETS_S[-1]}s"
 
 
 def reviewed_before_aggregation(session: Session, job_ids: Sequence[str]) -> dict[str, Reviewed]:
@@ -173,9 +214,22 @@ def reviewed_before_aggregation(session: Session, job_ids: Sequence[str]) -> dic
             before = _status_of(edit.before)
             if before is not None:
                 job.status[edit.element_id] = before
+            checks = _checks_of(edit.before)
+            if checks is not None:
+                job.checks[edit.element_id] = checks
         if edit.action == "edit":
             job.edited.add(edit.element_id)
     return reviewed
+
+
+def _checks_of(snapshot: object) -> list[Check] | None:
+    """The checks a `before` snapshot recorded, if it has them (content-free codes)."""
+    if not isinstance(snapshot, Mapping) or not isinstance(snapshot.get("checks"), list):
+        return None
+    try:
+        return [Check.model_validate(item) for item in snapshot["checks"]]
+    except ValidationError:
+        return None
 
 
 def _status_of(snapshot: object) -> str | None:

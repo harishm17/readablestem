@@ -75,8 +75,7 @@ def test_purge_counts_unaggregated_jobs_before_deleting_them(factory):
     assert stats.jobs_deleted == 2 and stats.unaggregated_deleted == 0
     expected = dict(EXPECTED_DONE_COUNTS)
     expected[("job", "status:failed")] = 1
-    expected[("job", "error:encrypted")] = 1
-    expected[("job", "pages")] += 2
+    expected[("job", "error:encrypted")] = 1  # its pages are not "pages converted"
     with db.session_scope(factory) as s:
         assert aggregate_rows(s) == expected
 

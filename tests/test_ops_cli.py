@@ -93,6 +93,49 @@ def test_cron_purges_and_fails_when_aggregation_fails(database, capsys, monkeypa
     )
 
 
+def test_weekly_report_prints_the_error_analysis_tables(database, capsys):
+    with db.session_scope(database) as s:
+        add_job(s, add_user(s), result=sentinel_result(), finished_at=datetime.now(UTC))
+    assert main(["ops", "aggregate"]) == 0
+    capsys.readouterr()
+    assert main(["ops", "report", "--days", "7"]) == 0
+    out = capsys.readouterr().out
+    assert "a11y-stem error analysis" in out
+    assert "pages converted  2" in out and "cost per page    $0.0030" in out
+    assert "equation: 3 fixes by status" in out
+    assert "latex.allowed_commands:unknown_command" in out
+    assert SENTINEL not in out
+
+
+def test_export_writes_opted_in_jobs_only_and_prune_honours_their_deadline(
+    database, capsys, tmp_path
+):
+    from a11y_stem.ops.export import EXPIRES
+
+    soon = datetime.now(UTC) + timedelta(days=3)
+    with db.session_scope(database) as s:
+        user = add_user(s)
+        kept = add_job(s, user, result=sentinel_result(), retain_until=soon, blobs=2)
+        add_job(s, user, result=sentinel_result(), retain_until=soon)  # not opted in
+        job = s.get(db.Job, kept)
+        assert job is not None
+        job.opt_in_retention = True
+    out_dir = tmp_path / "export"
+    assert main(["ops", "export-opted-in", "--out", str(out_dir)]) == 0
+    assert "jobs=1 crops=2 labels=5" in capsys.readouterr().out
+    assert [p.name for p in out_dir.iterdir()] == [kept]
+    files = {p.name for p in (out_dir / kept).iterdir()}
+    assert files == {"result.json", "labels.jsonl", "crops", EXPIRES}
+    exported = " ".join(p.read_text() for p in (out_dir / kept).glob("*.json*"))
+    assert "lecture notes.pdf" not in exported and "@example.org" not in exported
+
+    assert main(["ops", "export-opted-in", "--prune", str(out_dir)]) == 0
+    assert "pruned_jobs=0" in capsys.readouterr().out
+    (out_dir / kept / EXPIRES).write_text((datetime.now(UTC) - timedelta(minutes=1)).isoformat())
+    assert main(["ops", "export-opted-in", "--prune", str(out_dir)]) == 0
+    assert "pruned_jobs=1" in capsys.readouterr().out and not list(out_dir.iterdir())
+
+
 def test_database_errors_are_reported_by_type(tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/empty.db")  # no tables
     assert main(["ops", "purge"]) == 1

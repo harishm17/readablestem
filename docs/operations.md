@@ -71,10 +71,13 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `call:fallback` | calls made on the other model after a failure |
 | same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
-| same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran |
+| same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran (a heading edit keeps them; checks in the earliest `before` snapshot are counted when it has them) |
+| `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
-| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted` |
-| `job` | `pages` | pages converted (a sum, not a count of jobs) |
+| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`; on done jobs the outcome code (`error:budget_daily`, `error:scanned_pages`) |
+| `job` | `pages` | pages of done jobs (a sum, not a count of jobs) |
+| `job` | `cost_microusd` | model spend of done jobs in millionths of a dollar (a sum): `sum(cost_microusd) / sum(pages) / 1e6` is the production cost per page |
+| `job` | `latency:lt60s` ... `latency:ge600s` | done jobs by conversion wall time (buckets 60, 120, 300, 600 s) |
 | `job` | `aggregate:invalid_result` | stored results that no longer parse (schema drift) |
 
 Every part of a category must look like a code (lower case letters, digits, `_ . -`, at
@@ -105,7 +108,15 @@ FROM error_aggregates WHERE step = 'equation' GROUP BY day ORDER BY day;
 -- Model reliability: outcomes per model
 SELECT category, sum(count) FROM error_aggregates
 WHERE category LIKE 'call:%:outcome:%' GROUP BY category ORDER BY 2 DESC;
+
+-- Production cost per converted page, last 30 days
+SELECT sum(count) FILTER (WHERE category = 'cost_microusd') / 1e6
+       / nullif(sum(count) FILTER (WHERE category = 'pages'), 0) AS usd_per_page
+FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 ```
+
+`a11y-stem ops report --days 7` prints the weekly error-analysis tables from these rows
+(through the Cloud SQL Auth Proxy, like the other `ops` commands).
 
 ## Logs
 

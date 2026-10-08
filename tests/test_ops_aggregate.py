@@ -8,9 +8,16 @@ from datetime import UTC, date, datetime, timedelta, timezone
 import pytest
 
 from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import Check, Fix, Kind, ModelCall, Status
+from a11y_stem.core.types import Check, Fix, HeadingFix, Kind, ModelCall, Status
 from a11y_stem.ops import aggregate
-from a11y_stem.ops.aggregate import aggregate_finished, code, fix_counts, job_counts, utc_day
+from a11y_stem.ops.aggregate import (
+    Reviewed,
+    aggregate_finished,
+    code,
+    fix_counts,
+    job_counts,
+    utc_day,
+)
 from a11y_stem.web import db
 from fixtures.ops.seed import (
     EXPECTED_DONE_COUNTS,
@@ -164,6 +171,58 @@ def test_reviews_before_aggregation_do_not_change_the_pipeline_counts(factory):
     assert rows == expected
     assert rows[("equation", "status:needs_review")] == 2
     assert not any(":edited" in c or ":rejected" in c or "too_long" in c for _, c in rows)
+
+
+def test_an_edited_heading_keeps_its_pipeline_checks_in_the_counts():
+    """A heading edit only changes the level (web/review.py), so its failed checks are the
+    pipeline's and are counted, not lost as "aggregate:checks_edited"."""
+    heading = Fix(
+        element_id="p1-e0",
+        kind=Kind.HEADING,
+        status=Status.EDITED,
+        heading=HeadingFix(level=2, text="x"),
+        checks=[
+            Check(name="heading.level_repaired", passed=False, severity="warning", code="skip")
+        ],
+    )
+    reviewed = Reviewed(status={"p1-e0": "needs_review"}, edited={"p1-e0"})
+    counts = fix_counts(heading, reviewed)
+    assert counts[("heading", "check:heading.level_repaired:skip")] == 1
+    assert counts[("heading", "aggregate:checks_edited")] == 0
+    assert counts[("heading", "status:needs_review")] == 1
+
+
+def test_checks_recorded_in_the_before_snapshot_are_counted_instead_of_lost():
+    equation = Fix(
+        element_id="p1-e1",
+        kind=Kind.EQUATION,
+        status=Status.EDITED,
+        checks=[Check(name="latex.length", passed=False, code="too_long")],  # the reviewer's
+    )
+    original = [Check(name="latex.allowed_commands", passed=False, code="unknown_command")]
+    reviewed = Reviewed(
+        status={"p1-e1": "needs_review"}, edited={"p1-e1"}, checks={"p1-e1": original}
+    )
+    counts = fix_counts(equation, reviewed)
+    assert counts[("equation", "check:latex.allowed_commands:unknown_command")] == 1
+    assert counts[("equation", "check:latex.length:too_long")] == 0
+    assert counts[("equation", "aggregate:checks_edited")] == 0
+
+
+def test_failed_html_checks_cost_and_latency_are_counted_for_done_jobs():
+    result = sentinel_result()
+    result.html_checks = [
+        Check(name="heading.order", passed=False, code="skipped_level"),
+        Check(name="img.alt", passed=True),
+    ]
+    result.stats.latency_ms = 130_000
+    counts = job_counts("done", "budget_daily", 2, result.model_dump(mode="json"))
+    assert counts[("document", "check:heading.order:skipped_level")] == 1
+    assert counts[("job", "latency:lt300s")] == 1
+    assert counts[("job", "cost_microusd")] == 6000
+    assert counts[("job", "error:budget_daily")] == 1
+    failed = job_counts("failed", "timeout", 5, None)
+    assert ("job", "pages") not in failed  # pages converted, not pages uploaded
 
 
 def test_review_snapshots_without_a_status_are_ignored(factory):
