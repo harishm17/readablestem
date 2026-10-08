@@ -345,8 +345,10 @@ until it has a sentence, and a sentence whose code no longer exists fails it too
 unknown code still gets a neutral sentence plus the code.
 
 **Narrow screens.** Long file names, codes and document text wrap
-(`overflow-wrap: anywhere` on headings, ledes, summaries, error text and the review
-cards), so neither the job page nor the review page scrolls sideways at 320 CSS px.
+(`overflow-wrap: anywhere` on headings, ledes, summaries, error text, table row headers
+and the review cards; `break-word` everywhere else), so no page scrolls sideways at 320
+CSS px. A table wider than the screen scrolls inside its own `.table-scroll` box, which
+is `position: relative` so the visually hidden button text in it cannot widen the page.
 
 ## Security headers
 
@@ -400,9 +402,10 @@ that htmx moves into the document title, so the tab title follows the status.
 violations), including an unfinished job page with JavaScript on and as a no-JS browser
 parses it; runs the WCAG 2.2 AA and best-practice rules at moderate and above; checks
 every page at 320 CSS px with a long underscored file name, with and without the WCAG
-1.4.12 text-spacing override (pages whose fix is in `app.css` are expected failures
-until that lands); checks where focus goes after errors and after deleting; and walks the
-upload-to-review flow with JavaScript off.
+1.4.12 text-spacing override; checks where focus goes after errors and after deleting,
+and that following an error summary link leaves the field's label and error message in
+view (`scroll-margin-top` on form controls); and walks the upload-to-review flow with
+JavaScript off.
 
 ## Privacy
 

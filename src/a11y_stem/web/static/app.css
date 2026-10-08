@@ -33,15 +33,19 @@ body {
   background: var(--bg);
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   line-height: 1.55;
+  overflow-wrap: break-word;
 }
 
 .wrap { max-width: 64rem; margin: 0 auto; padding: 0 1.25rem; }
 
 h1, h2, h3 { line-height: 1.25; }
-/* File names ("Ch2_Kinematics_lecture_notes_final_v3.pdf") and codes often have no
-   break points. `anywhere` (unlike `break-word`) also lowers the min-content width, so
-   flex and grid items shrink too: no sideways scrolling at 320 CSS px (WCAG 1.4.10). */
-h1, h2, h3, .lede, summary, .error-summary, .error-message { overflow-wrap: anywhere; }
+/* File names ("Ch2_Kinematics_lecture_notes_final_v3.pdf"), emails, URLs and codes often
+   have no break points. `break-word` on the body wraps them in running text; `anywhere`
+   also lowers the min-content width, so flex and grid items and the row headers of
+   tables (file names, emails) shrink too: no sideways scrolling at 320 CSS px (WCAG
+   1.4.10), also with the 1.4.12 text-spacing override. Other table cells keep whole
+   words; a table wider than the screen scrolls inside its .table-scroll box. */
+h1, h2, h3, .lede, summary, .error-summary, .error-message, tbody th { overflow-wrap: anywhere; }
 h1 { font-size: 2rem; margin: 1.5rem 0 1rem; }
 h2 { font-size: 1.4rem; margin: 2rem 0 0.75rem; }
 h3 { font-size: 1.1rem; margin: 1rem 0 0.5rem; }
@@ -138,6 +142,9 @@ input[type="text"], input[type="email"], textarea, select, input[type="file"] {
   color: var(--text);
 }
 input[type="text"], input[type="email"], textarea { width: 40rem; }
+/* An error summary link focuses its field at the top of the window; keep the label,
+   hint and error message above it in view too. */
+input, select, textarea { scroll-margin-top: 8rem; }
 textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
 .checkbox-field { display: grid; grid-template-columns: auto 1fr; gap: 0.25rem 0.6rem; align-items: start; }
 .checkbox-field input { width: 1.4rem; height: 1.4rem; margin: 0.15rem 0 0; }
@@ -162,8 +169,10 @@ textarea { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace
 .notice-warning h2 { margin-top: 0.25rem; font-size: 1.2rem; }
 .draft-note { border: 2px dashed var(--warn); padding: 0.5rem 1rem; color: var(--warn); background: #fffaf0; }
 
-/* Tables */
-.table-scroll { overflow-x: auto; }
+/* Tables. `position: relative` makes the scroller the containing block of the
+   absolutely positioned .visually-hidden button text inside it; otherwise that text
+   escapes the scroller and widens the whole page. */
+.table-scroll { overflow-x: auto; position: relative; }
 table { border-collapse: collapse; width: 100%; margin: 0.5rem 0 1rem; }
 th, td { text-align: left; padding: 0.5rem 0.6rem; border-bottom: 1px solid var(--rule); vertical-align: top; }
 thead th { border-bottom: 2px solid var(--border); }
