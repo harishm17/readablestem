@@ -311,7 +311,9 @@ level), **Make all 11 bold text** (reject each: the output writes `<p><strong>`)
 level select with **Set the level for all 11**. The buttons' accessible names include the
 label ("Apply to all 11 headings “Teacher Support” at level 3"). The group's own cards
 are folded inside it ("Decide them one by one"), for the odd one out; once one is decided
-the card asks about the rest ("2 still waiting"). Apply to all leaves out a heading whose
+the reviewer lands back on the card, which asks about the rest ("2 still waiting") with
+their cards unfolded (also whenever one of them has an error, so the error summary link
+reaches the field). Apply to all leaves out a heading whose
 level the output would move (it says how many); one level for all is refused as a whole,
 with nothing saved, if the output would move it for any of them. Each changed heading gets
 its own `ReviewEdit`, the HTML is re-rendered once, and the reviewer lands on the next
