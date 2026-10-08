@@ -1165,6 +1165,7 @@ def _page_paths(page: pymupdf.Page) -> list[_Path]:
     """Visible vector paths, classified. `get_cdrawings` (plain tuples) is several times
     faster than `get_drawings` on plots with thousands of markers."""
     display = _Display.of(page)
+    width_pt, height_pt = page.rect.width, page.rect.height
     paths: list[_Path] = []
     for drawing in page.get_cdrawings():
         stroked = _visible(drawing.get("color"), drawing.get("stroke_opacity"))
@@ -1172,6 +1173,8 @@ def _page_paths(page: pymupdf.Page) -> list[_Path]:
         if not (stroked or filled):
             continue  # white boxes and invisible paths
         box = display.box(drawing["rect"])
+        if box[2] < 0 or box[3] < 0 or box[0] > width_pt or box[1] > height_pt:
+            continue  # outside the CropBox: not visible on the page
         items = drawing.get("items") or []
         segments = []
         curved = False
@@ -1351,8 +1354,9 @@ def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rec
         members = [paths[i] for i in group]
         if all(p.kind in ("hrule", "vrule") for p in members):
             continue  # separators, underlines, table grids
-        box = _union(p.bbox for p in members)
-        width, height = box[2] - box[0], box[3] - box[1]
+        x0, y0, x1, y1 = _union(p.bbox for p in members)
+        box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
+        width, height = box[2] - box[0], box[3] - box[1]  # the visible part only
         if width < MIN_DRAWING_PT or height < MIN_DRAWING_PT or width * height < 1200:
             continue
         if width >= 0.85 * page_rect.width and height >= 0.85 * page_rect.height:

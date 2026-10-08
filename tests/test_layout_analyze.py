@@ -468,6 +468,21 @@ def test_a_ruled_table_with_a_tick_icon_is_not_a_figure():
     assert "Checked" in " ".join(texts(elements))
 
 
+def test_content_outside_the_crop_box_is_ignored_and_figures_are_clipped_to_the_page():
+    def fill(page):
+        page.insert_text((72, 40), "Hidden above the crop box.", fontsize=11)
+        write(page, 100, 300, ["Visible body text inside the crop box."])
+        page.draw_rect(pymupdf.Rect(20, 600, 120, 680), color=(0, 0, 0), fill=(0, 0, 0))
+        page.draw_rect(pymupdf.Rect(570, 300, 600, 360), color=(0, 0, 0), fill=(0, 0, 0))
+        page.set_cropbox(pymupdf.Rect(50, 100, 562, 692))
+
+    layout = analyze(one_page(fill))
+    assert layout.page_sizes == [(512.0, 592.0)]
+    paragraph, figure = layout.elements
+    assert paragraph.text == "Visible body text inside the crop box."
+    assert figure.bbox == (0.0, 500.0, 70.0, 580.0)  # the part inside the crop box
+
+
 def test_caption_without_a_figure_stays_a_paragraph():
     def fill(page):
         write(page, 72, 100, ["Figure 9: Not drawn on this page."])

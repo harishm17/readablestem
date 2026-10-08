@@ -26,6 +26,8 @@ Element conventions:
   Display equations have `display="block"` and no parent.
 - **Boxes** are PDF points in display space: the page's `/Rotate` is applied, so a
   landscape page reports `(792, 612)` in `page_sizes` and `crop` uses the boxes as they are.
+  The origin is the top-left of the CropBox; content outside it is ignored and figure boxes
+  are clipped to the page.
 - **`reasons`** are short content-free evidence strings (`"math font"`, `"fraction bar"`,
   `"larger font"`, `"raster image"`, ...). They never contain document text.
 - Figures carry the nearby `"Figure N ..."` text in `caption` and any labels drawn inside
