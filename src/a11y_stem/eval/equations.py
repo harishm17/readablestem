@@ -202,7 +202,7 @@ def _fenced_to_mrow(elem: ET.Element) -> ET.Element:
 
 
 def _is_empty_token(elem: ET.Element) -> bool:
-    return elem.tag in TOKEN_TAGS and not (elem.text or "")
+    return elem.tag in TOKEN_TAGS and not elem.text
 
 
 def _normalize_node(elem: ET.Element, inherited_variant: str | None = None) -> ET.Element | None:

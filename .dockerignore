@@ -1,0 +1,38 @@
+# Build context for the Dockerfile. Anything listed here never reaches the image.
+
+# Secrets and private course material: never in an image.
+.env
+.env.*
+private-inputs/
+**/private-inputs/
+
+# Local state: databases, caches, scratch output.
+.local/
+.cache/
+*.db
+*.sqlite
+*.sqlite3
+
+# The build creates its own venv; a host .venv would overwrite it.
+.venv/
+
+# Not needed at runtime.
+.git/
+.github/
+.claude/
+tests/
+deploy/
+Dockerfile
+.dockerignore
+**/__pycache__/
+**/*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+dist/
+build/
+.idea/
+.vscode/
+.DS_Store

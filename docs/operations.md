@@ -1,0 +1,241 @@
+# Operations
+
+How the deployed app looks after itself, what it records, and what to do when something
+goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
+
+## What runs on a schedule
+
+| What | When | Where |
+|---|---|---|
+| Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header) |
+| Uptime check of `/healthz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when it fails for 10 minutes |
+| Outside-in check of `/healthz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set |
+| Dependency updates | Weekly, Dependabot | One grouped PR per ecosystem (uv, actions, Docker) |
+
+The same tasks run by hand:
+
+```sh
+gcloud scheduler jobs run a11y-stem-cron --location="$REGION" --project="$PROJECT_ID"
+
+# or from a machine that can reach the database (prints counts only):
+DATABASE_URL=postgresql+psycopg://... uv run a11y-stem ops cron
+uv run a11y-stem ops aggregate
+uv run a11y-stem ops purge
+```
+
+`ops cron` exits 1 if aggregation failed, but only after the purge has run.
+
+## Retention
+
+Each job gets `retain_until` when it is uploaded: `RETENTION_HOURS` (24) later, or
+`OPT_IN_RETENTION_DAYS` (30) when the instructor opted in. The hourly purge deletes every
+job past that time together with everything derived from the document: the uploaded PDF,
+the crops, the result JSON, the HTML, the filename and the review edits. It deletes the
+child rows itself and does not rely on the database cascade alone.
+
+Every deletion goes through `ops.retention.delete_jobs(session, job_ids)`: the hourly
+purge, and the web app's "delete now" (`POST /jobs/{job_id}/delete` must call
+`delete_jobs(session, [job.id])` in its transaction rather than `session.delete(job)`).
+In the same transaction, before deleting, it aggregates a finished job that was not
+aggregated yet (a user can review, download and delete within the hour, before the cron
+runs) and counts the job's review actions. Deleting a row any other way loses those
+counts without a trace.
+
+Deletion does not wait for statistics. If counting fails at that point (an aggregation
+bug, say), the job is deleted anyway and counted in `unaggregated_deleted`. A non-zero
+value there means some counts are missing; it never means a document was kept.
+
+What survives deletion: users and the allowlist, the daily spend and quota counters, the
+content-free aggregates below, and database backups. A backup holds every document that
+existed when it ran, so a deleted document stays in the backups taken before its
+deletion until they are dropped. The deploy keeps one daily backup and no
+point-in-time-recovery logs, so that is up to about a day after the purge
+([deploy.md](deploy.md), "Backups and deleted documents"); the privacy page has to say so
+(or backups have to be off).
+
+## Error aggregates
+
+`error_aggregates` has one row per (UTC day, step, category) with a count. The day is the
+day the job finished. Fixes are counted as the pipeline left them, even if a reviewer
+acted before the hourly run: a review rewrites the stored result, so each fix's status is
+read from the `before` snapshot of its earliest review. Categories:
+
+| Step | Category | Counts |
+|---|---|---|
+| `equation`, `figure`, `heading` | `status:<status>` | fixes by status (`accepted`, `needs_review`, `abstained`, `failed`) |
+| same | `check:<check name>:<code>` | failed checks, e.g. `check:latex.allowed_commands:unknown_command` |
+| same | `reason:<code>` | `Fix.reason`, e.g. `reason:low_confidence`, `reason:budget_daily` |
+| same | `call:<model>:outcome:<outcome>` | every model call attempt, e.g. `call:gpt-6-luna:outcome:timeout` |
+| same | `call:fallback` | calls made on the other model after a failure |
+| same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
+| same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
+| same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran |
+| `job` | `status:done`, `status:failed` | finished jobs |
+| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted` |
+| `job` | `pages` | pages converted (a sum, not a count of jobs) |
+| `job` | `aggregate:invalid_result` | stored results that no longer parse (schema drift) |
+
+Every part of a category must look like a code (lower case letters, digits, `_ . -`, at
+most 48 characters). Anything else is stored as `other`, so even a bug that puts text in
+a check code cannot write that text into this table. A rising `other` count means some
+code upstream is emitting something that is not a category code.
+
+Aggregation is idempotent: a job's counts and its `aggregated` flag are written in one
+transaction, and on Postgres the job rows are locked with `FOR UPDATE SKIP LOCKED`, so two
+overlapping cron runs never count a job twice.
+
+Reading them (Cloud SQL Studio in the console, or `psql` through the Cloud SQL Auth
+Proxy):
+
+```sql
+-- Most frequent failed checks in the last 7 days
+SELECT step, category, sum(count) AS n
+FROM error_aggregates
+WHERE day >= current_date - 7 AND category LIKE 'check:%'
+GROUP BY step, category ORDER BY n DESC LIMIT 20;
+
+-- Share of equation fixes needing review, per day
+SELECT day,
+       sum(count) FILTER (WHERE category = 'status:needs_review')::float
+         / nullif(sum(count) FILTER (WHERE category LIKE 'status:%'), 0) AS review_rate
+FROM error_aggregates WHERE step = 'equation' GROUP BY day ORDER BY day;
+
+-- Model reliability: outcomes per model
+SELECT category, sum(count) FROM error_aggregates
+WHERE category LIKE 'call:%:outcome:%' GROUP BY category ORDER BY 2 DESC;
+```
+
+## Logs
+
+Every line on stdout is one JSON object. Cloud Logging reads `severity`, `message` and
+`time` (UTC) from it; everything else lands in `jsonPayload`.
+
+```json
+{"method": "POST", "route": "/jobs/{job_id}/review", "status": 303, "latency_ms": 41,
+ "logger": "a11y_stem.http", "time": "2026-10-07T18:02:11.204518Z",
+ "severity": "INFO", "message": "request"}
+```
+
+Useful Logs Explorer queries (add `resource.type="cloud_run_revision" AND
+resource.labels.service_name="a11y-stem"`):
+
+| Question | Query |
+|---|---|
+| Anything wrong? | `severity>=WARNING` |
+| Server errors | `jsonPayload.message="request" AND jsonPayload.status>=500` |
+| Slow pages | `jsonPayload.message="request" AND jsonPayload.latency_ms>5000` |
+| Hourly cleanup | `jsonPayload.message=("aggregate_done" OR "purge_done" OR "aggregate_failed" OR "aggregate_on_delete_failed")` |
+| Tracing problems | `jsonPayload.message=("tracing_disabled" OR "trace_failed")` |
+
+### What can never be in a log line
+
+Logs are about the system, not the documents. The chain in
+`observability/logging.py` enforces it for every logger, ours or a library's:
+
+- Keys that name content or personal data are dropped: `text`, `latex`, `mathml`, `alt`,
+  `html`, `filename`, `email`, `content`, `caption`, `context`, `prompt`, `speech`,
+  `title`, `name`, `body`, `path`, `url`, `query`. Also in the plural (`emails`), as a
+  word inside a longer key (`alt_text`, `admin_emails`, `contextText`), at the end of a
+  key without separators (`alttext`, `doctitle`), and in any spelling (`MathML`, `LaTeX`,
+  `file_name`, `fileName`). Keys starting with `_` get no exemption. `prompt_version` is
+  the one allowed exception.
+- Values must be plain data. Objects become a type marker (`"<Element>"`), so a model or
+  a path cannot leak through its `repr`. Strings are cut at 200 characters.
+- Exceptions are logged as `error_type` plus a `stack` of `file:line:function` entries.
+  The message is dropped: a pydantic error on model output quotes the LaTeX it rejected.
+- Below WARNING, only `a11y_stem.*`, `uvicorn.error` and alembic's migration logger are
+  written. Libraries that log URLs with query strings or request bodies at INFO or DEBUG
+  (the OpenAI SDK's `httpx2`, `httpx`, SQLAlchemy) stay quiet even with `LOG_LEVEL=DEBUG`.
+- Uvicorn's access log is off; `request_logging_middleware` logs the route template
+  (`/jobs/{job_id}`), never the path, query string or headers.
+
+Wiring it into the web app: call `configure_logging(settings)` in `create_app`, and
+start uvicorn with `uvicorn.run(..., **uvicorn_log_options())` (that is,
+`log_config=None, access_log=False`). Nothing else needs to call it in the server
+process. Uvicorn's default `log_config` would install plain-text handlers that print the
+full path and query string (the OAuth callback's `?code=...`) and tracebacks with their
+messages; `configure_logging` routes uvicorn's records through the chain above and drops
+its access lines whether uvicorn configures logging before or after it, but until
+`configure_logging` has run at all, uvicorn's handlers are the only ones there.
+
+Writing a log line:
+
+```python
+from a11y_stem.observability.logging import get_logger
+
+log = get_logger(__name__)
+log.info(
+    "fix_done",
+    job_id=job.id,
+    element_id=fix.element_id,
+    status=fix.status,
+    reason=fix.reason,
+    cost_usd=fix.cost_usd,
+)
+```
+
+Pass ids, counts and category codes as keyword fields. Do not build a message string
+out of values, and never pass document text under a neutral key name: the filter catches
+names, not meaning.
+
+## Tracing (Langfuse)
+
+Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (`deploy.sh` stores the
+secret key in Secret Manager when tracing is enabled). If the `tracing` extra is missing
+or the client cannot start, the app logs `tracing_disabled` with a `reason` and carries
+on without traces. Keep it off for any run on `private-inputs/`.
+
+What a span can carry is an allowlist (`ALLOWED_ATTRIBUTES` in
+`observability/tracing.py`): ids, step, kind, model (or a comma-separated list of the
+models a step used), prompt version, attempt, fallback flag, status, outcome, reason,
+error type, confidence, token counts, `cost_usd`, `latency_ms`, page numbers, plus
+counts (`calls`, `model_calls`, `elements`, `tasks`, `fixes`, `count`; numbers only).
+String values must look like codes. It is enforced three times: when the span is written,
+in the Langfuse `mask` hook (inputs and outputs become `[masked]`), and in the export
+hook, which deletes any other attribute before anything leaves the process. For code
+that calls the Langfuse SDK directly, the client also drops span status descriptions,
+events and link attributes before export, renames spans whose name is not code-like, and
+has Langfuse's media upload (which would send base64 images found in a payload straight
+to Langfuse) switched off.
+
+Span handles take attributes with `.set(...)` or `.update(...)` (the same method), also
+after the span started. A span opened with `model=`, or with `step=` one of `equation`,
+`figure`, `judge`, is a Langfuse generation, so the model, tokens and `cost_usd` set on
+it later show up in Langfuse's cost views. Exceptions are recorded as level ERROR with
+the exception type only.
+
+Spans started in worker threads nest under the job's span only if each task runs in its
+own copy of the caller's context (`pool.submit(contextvars.copy_context().run, work)`);
+otherwise each step shows up as its own trace. `pipeline.run` does this.
+
+## When something goes wrong
+
+| Symptom | Look at | Usual fix |
+|---|---|---|
+| Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
+| `/healthz` answers 503 | The database: Cloud SQL instance state, connections | See "Too many connections" below |
+| Conversions fail with `reason:budget_daily` | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed. Raise the cap only on purpose; it resets at 00:00 UTC |
+| Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`) |
+| Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
+| Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
+| `unaggregated_deleted` above 0 | The cron history | Some statistics are lost for those jobs; nothing else to do |
+| Purge itself failing | `purge_done` missing for over an hour | Treat as a privacy incident: run `a11y-stem ops purge` by hand, then fix the cause |
+| Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections; keep `--max-instances=2` or move to `db-g1-small` (50) |
+| Weekly GitHub uptime run failed | The run's log | Same as the uptime alert; also check the custom domain and certificate |
+
+## CI and dependency updates
+
+`ci.yml` runs on every push to `main` and every pull request:
+
+| Job | What it checks |
+|---|---|
+| `lint-test` (3.12, 3.14) | `ruff check`, `ruff format --check`, `ty check src`, `pytest` (offline; Postgres tests use the embedded server on 3.12) |
+| `postgres` | `pytest -m postgres` against a Postgres 16 service container |
+| `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
+| `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as Cloud Build's `--tag` build may use), and checks the entry point and non-root user |
+| `eval-gate` | `a11y-stem eval gate` when `data/eval/latest.json` and `baseline.json` are committed |
+| `secret-scan` | gitleaks over the full history |
+
+Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes
+updates weekly. `eval-live.yml` (manual, costs money) runs the equations eval against
+the live models with a `max_usd` cap and uploads the report as an artifact.

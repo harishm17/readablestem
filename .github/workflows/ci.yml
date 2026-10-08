@@ -9,43 +9,176 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
 # Actions are pinned to full commit SHAs (tag in the comment). Tags and SHAs checked with
-# `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` on 2026-10-06. setup-uv publishes no
-# floating major tag (no `v10`), so it must be pinned to an exact release.
+# `gh api repos/<owner>/<repo>/git/ref/tags/<tag>` on 2026-10-07. setup-uv publishes no
+# floating major tag (no `v10`), so it must be pinned to an exact release. Dependabot
+# (.github/dependabot.yml) proposes updates weekly.
 
 jobs:
   lint-test:
-    name: ruff + pytest (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: ruff + ty + pytest (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.12", "3.14"]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
       - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
         with:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
+      # The tracing extra (Langfuse) is optional at runtime but its code is type-checked
+      # and its masking is tested, so CI installs it.
       - name: Install (locked)
-        run: uv sync --locked
+        run: uv sync --locked --all-extras
       - name: Ruff lint
         run: uv run ruff check .
       - name: Ruff format check
         run: uv run ruff format --check .
+      - name: Type check
+        run: uv run ty check src
       # Includes tests/test_gold_sample.py: known-correct LaTeX must match the gold sample.
-      - name: Pytest (offline; live OpenStax test is opt-in with -m network)
+      # On 3.12 the Postgres tests also run, against the embedded pgserver.
+      - name: Pytest (offline; live OpenStax and model tests are opt-in)
         run: uv run pytest
+
+  postgres:
+    name: pytest -m postgres (Postgres 16)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: a11y_test
+          # Throwaway container reachable only from this job; no password needed.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d a11y_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql+psycopg://postgres@localhost:5432/a11y_test
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked)
+        run: uv sync --locked --all-extras
+      # Exit code 5 means no test carries the marker yet; anything else is a real result.
+      - name: Pytest (Postgres-marked tests only)
+        run: |
+          set +e
+          uv run pytest -m postgres
+          status=$?
+          if [ "$status" -eq 5 ]; then echo "::warning::no postgres tests collected"; exit 0; fi
+          exit "$status"
+
+  browser:
+    name: pytest -m browser (Playwright Chromium)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - name: Install (locked, with the browser group)
+        run: uv sync --locked --all-groups --all-extras
+      - name: Install Chromium and its system libraries
+        run: uv run playwright install --with-deps chromium
+      - name: Pytest (browser-marked tests only, including axe-core checks)
+        run: |
+          set +e
+          uv run pytest -m browser
+          status=$?
+          if [ "$status" -eq 5 ]; then echo "::warning::no browser tests collected"; exit 0; fi
+          exit "$status"
+
+  docker:
+    name: docker build (no push)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build the image
+        run: docker build --tag a11y-stem:ci .
+      # deploy.sh builds with `gcloud builds submit --tag`: a plain `docker build` in Cloud
+      # Build's docker 20.10 image, which can use the legacy builder. This runner defaults
+      # to BuildKit, so build once more without it to catch BuildKit-only syntax.
+      - name: Build again with the legacy builder (as Cloud Build may)
+        env:
+          DOCKER_BUILDKIT: "0"
+        run: docker build --tag a11y-stem:legacy .
+      - name: Smoke test the entry point and the non-root user
+        run: |
+          docker run --rm a11y-stem:ci a11y-stem --version
+          docker run --rm a11y-stem:ci a11y-stem ops --help
+          test "$(docker run --rm a11y-stem:ci id -u)" = "10001"
+
+  eval-gate:
+    name: eval gate (when a baseline exists)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Look for data/eval/latest.json and data/eval/baseline.json
+        id: files
+        run: |
+          if [ -f data/eval/latest.json ] && [ -f data/eval/baseline.json ]; then
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "present=false" >> "$GITHUB_OUTPUT"
+            echo "::notice::no eval report and baseline committed yet; gate skipped"
+          fi
+      - if: steps.files.outputs.present == 'true'
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - if: steps.files.outputs.present == 'true'
+        name: Install (locked)
+        run: uv sync --locked
+      - if: steps.files.outputs.present == 'true'
+        name: Fail if the latest eval regressed against the baseline
+        run: >-
+          uv run a11y-stem eval gate
+          --current data/eval/latest.json
+          --baseline data/eval/baseline.json
 
   secret-scan:
     name: gitleaks
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
     # Runs the gitleaks CLI directly over the full history. gitleaks-action failed on the
     # repo's first push: it scans "<first commit>^..HEAD", and the root commit has no parent.
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
+          persist-credentials: false
       - name: Install gitleaks 8.24.3 (checksum-verified)
         run: |
           set -euo pipefail
