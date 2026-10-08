@@ -79,9 +79,12 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "equation itself may still be right.",
     ("equation.text_layer", "text_layer_mismatch"): "The symbols in this transcription differ "
     "a lot from the text stored in the PDF, so compare it with the image symbol by symbol.",
-    ("equation.text_layer_style", "style_mismatch"): "A letter that is bold in the PDF (a "
-    "vector) is plain in this transcription, or a plain letter (a scalar) became bold, which "
-    "changes what the equation means, so check which letters are vectors.",
+    ("equation.text_layer", "symbol_mismatch"): "A letter, digit or Greek letter in this "
+    "transcription differs from the text stored in the PDF (a wrong digit, a misread or "
+    "missing symbol), so compare it with the image symbol by symbol.",
+    ("equation.text_layer_style", "style_mismatch"): "A style that carries meaning differs "
+    "from the PDF (a bold letter, a vector, is plain here, a plain one became bold, or a "
+    "double-struck letter such as the R of the reals became plain), so check those letters.",
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",

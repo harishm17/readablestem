@@ -62,7 +62,7 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, or it fails an error-level check |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
 No escalation happens when the cheap call produced no output at all (the router already
@@ -129,17 +129,34 @@ The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (t
 
 ## Text-layer cross-check (equations)
 
-When the PDF has a text layer for the equation (`Element.text`) with at least 3 letters
-or digits, the step compares two bags of symbols: letters, digits and Greek letters from
-the text layer, and the same from the converted MathML's tokens. Both sides are NFKC
-normalised (math-italic glyphs such as U+1D463 become `v`) and case-folded; order and
-spacing are ignored, so a fraction extracted as "distance time" still matches.
+When the PDF has a text layer for the equation (`Element.text`) with at least one letter
+or digit, the step compares two bags (multisets) of symbols: letters, digits and Greek
+letters from the text layer, and the same from the converted MathML's tokens. Both sides
+are NFKC normalised (math-italic glyphs such as U+1D463 become `v`; `ℝ` becomes `R`) and
+case-folded; order and spacing are ignored, so a fraction extracted as "distance time"
+still matches. Accents are not symbols: modifier letters (Unicode category Lm, such as
+the U+02C6 circumflex a LaTeX `\hat` leaves in the text layer) are dropped, and the
+dotless i and j an accent sits on (`\hat{\imath}`) count as i and j.
 
-The score is the Dice similarity of the two bags. Below 0.5 is a strong mismatch: the
-fix gets a failed warning check (`equation.text_layer`, code `text_layer_mismatch`) and
-its confidence is scaled by `0.5 + 0.5 * similarity`. On the cheap model that usually
-triggers escalation. Example: text layer "F = ma", transcription `E = mc^2` gives
-similarity 0.29, so a 0.95 confidence drops to 0.61.
+The check `equation.text_layer` (severity warning) fails when the bags differ at all:
+
+- **Strong mismatch** (code `text_layer_mismatch`): the Dice similarity of the two bags
+  is below 0.5 (judged only with at least 3 symbols in the text layer). Confidence is
+  scaled by `0.5 + 0.5 * similarity`. Example: text layer "F = ma", transcription
+  `E = mc^2` gives similarity 0.29, so a 0.95 confidence drops to 0.61.
+- **Any other difference** (code `symbol_mismatch`): one wrong digit (9.80 read as
+  9.30), a misread Greek letter (`ω` read as `w`), a dropped variable (the `t` of
+  `e^{-λt}`), `ℝ` read as `ℕ`. Confidence is kept, but the fix needs a decision (review
+  policy: a text-layer symbol mismatch is required).
+
+Either one escalates a cheap-model answer. Before this was strict (2026-10-08) only the
+strong mismatch counted, so a confident answer with one wrong digit was accepted with
+nothing to review. Measured on 181 real model answers with a text layer (the 30 gold
+sample equations, the document eval's 3 sections, and two runs each of OpenStax 2.1
+and the LaTeX handout), the strict rule finds no difference once accents are dropped
+(the only one was the handout's `\hat{\mathbf{x}}`, a U+02C6 accent), so it adds about
+no decisions. Not covered: signs and operators (a dropped minus), and case (`N` read as
+`n`), because the bags are case-folded.
 
 ## Letter-style check (equations)
 
@@ -151,25 +168,39 @@ returns `None` (the text layer says nothing about style), `"match"`, `"meaning"`
 `"cosmetic"`:
 
 - **Meaning-level** (check `equation.text_layer_style`, code `style_mismatch`; confidence
-  scaled by 0.6, so a cheap answer escalates, and the fix needs a decision): a variable (a
-  one-letter token outside sub/superscripts and limits) whose weight changed:
-  - a letter that is bold in the PDF read as a plain variable: a vector read as a scalar
-    (`𝛚` -> `\omega`; `𝐝 = 𝐝0` -> `\mathbf{d} = d_0`). Plain occurrences in the PDF
-    are matched to scripts and words first, so when in doubt it asks;
-  - a letter known to be plain made a bold variable: a scalar read as a vector. Known
-    plain = a math italic code point, or a letter layout found, not bold, in a regular
-    font with a bold face (`Element.regular_letters`: Computer Modern CMR/CMMI, Times,
-    DejaVu, STIX, ...; docs/layout.md).
-- **Cosmetic** (code `style_cosmetic`; an optional note, no confidence change, no
-  escalation): every other difference: a bold subscript, superscript or word (`𝐝𝐟` ->
-  `\mathbf{d}_{\text{f}}`, a bold "avg"), a bold digit (`𝐝𝟎` -> `\mathbf{d}_0`), a style
-  the text layer cannot show (MSBM's double-struck R is a plain `R` there, so
-  `\mathbb{R}` differs), and a plain letter of unknown weight made bold (a font that
-  does not mark bold says nothing).
+  scaled by 0.6, so a cheap answer escalates, and the fix needs a decision):
+  - a variable whose weight changed. A variable is a one-letter token that is not the
+    label of a bold symbol: anywhere at base level, and in the sub/superscripts and
+    limits of a base that is not bold (the `𝐤` and `𝐫` of `e^{i𝐤·𝐫}`, the `𝐱` of
+    `lim_{𝐱→0}`, a sum over `𝐤`). The scripts of a bold base (`𝐝𝐟`, `𝐯𝐚𝐯𝐠`) are its
+    label, not variables. Then:
+    - a letter that is bold in the PDF read as a plain variable: a vector read as a
+      scalar (`𝛚` -> `\omega`; `𝐝 = 𝐝0` -> `\mathbf{d} = d_0`; `e^{i𝐤·𝐫}` ->
+      `e^{i k \cdot r}`). Plain occurrences in the PDF are matched to labels and words
+      first, so when in doubt it asks;
+    - a letter known to be plain made a bold variable: a scalar read as a vector. Known
+      plain = a math italic code point, or a letter layout found, not bold, in a regular
+      font with a bold face (`Element.regular_letters`: Computer Modern CMR/CMMI, Times,
+      DejaVu, STIX, ...; docs/layout.md);
+  - a double-struck, script or fraktur letter that the text layer encodes as such (its
+    own code point: `ℝ`, `ℒ`, `𝔤`, as Chromium, Word and unicode-math PDFs write them)
+    read without that style: the reals read as a variable `R` (`𝑥∈ℝ` -> `x \in R`), a
+    Lagrangian read as `L`.
+- **Cosmetic** (code `style_cosmetic`; an optional note, no confidence change; a
+  cheap-model answer still escalates for a second reading): every other difference: the
+  bold label of a bold symbol (`𝐝𝐟` -> `\mathbf{d}_{\text{f}}`, a bold "avg"), a bold
+  digit, alone too (`𝐝𝟎` -> `\mathbf{d}_0`; the zero vector `𝟎` read as `0`: the policy
+  keeps digits cosmetic), a style the text layer cannot show (MSBM's double-struck R is
+  a plain `R` there, so `\mathbb{R}` adds a style rather than losing one), a lost
+  sans-serif or monospace style, and a plain letter of unknown weight made bold (a font
+  that does not mark bold says nothing).
 
 Measured cases (2026-10-08): OpenStax 2.1's `d_0` and `d_f` with bold subscripts and the
 LaTeX handout's `\mathbb{R}^n` are cosmetic; the handout's bold omega read as `\omega` is
-meaning-level. `tests/test_style_check.py` pins each.
+meaning-level. A review of the triage added the vectors in the scripts of a plain base
+and the encoded double-struck, script and fraktur letters (both were cosmetic for a day;
+neither changes a verdict on the 181 recorded real answers). `tests/test_style_check.py`
+pins each.
 
 ## Validators and codes
 

@@ -84,8 +84,8 @@ decision.
 
 | Tier (`Fix.review`) | Status | What it means | Examples |
 |---|---|---|---|
-| `required` ("Needs your decision") | NEEDS_REVIEW, FAILED or ABSTAINED | blocks "done", counted on the job page and in ops | failed or abstained conversions (kept as images); equations below the auto-accept confidence after escalation; a text-layer symbol mismatch; a vector read as a scalar (a letter that is bold in the PDF and a plain variable in the proposal, or a letter known to be plain made a bold variable); figures without a usable description (abstained, failed, an error-level alt check, a caption copy, a doubtful or self-contradicting decorative answer, low confidence); one decision per group of repeated headings |
-| `optional` ("Optional checks") | ACCEPTED | accepted automatically, listed folded on the review screen with each note in plain English; never blocks "done"; still editable | cosmetic style differences (a bold subscript or digit, a style the text layer cannot show such as double-struck R from MSBM, a letter of unknown weight made bold); a single heading with weak evidence or a repaired level; alt text a little long or starting "image of"; no speech text |
+| `required` ("Needs your decision") | NEEDS_REVIEW, FAILED or ABSTAINED | blocks "done", counted on the job page and in ops | failed or abstained conversions (kept as images); equations below the auto-accept confidence after escalation; a text-layer symbol mismatch (any letter, digit or Greek letter that differs); a vector read as a scalar (a letter that is bold in the PDF and a plain variable in the proposal, at base level or in the script of a plain base such as `e^{i𝐤·𝐫}`, or a letter known to be plain made a bold variable); a double-struck, script or fraktur letter the text layer encodes (`ℝ`) read as a plain one; figures without a usable description (abstained, failed, an error-level alt check, a caption copy, a doubtful or self-contradicting decorative answer, low confidence); one decision per group of repeated headings |
+| `optional` ("Optional checks") | ACCEPTED | accepted automatically, listed folded on the review screen with each note in plain English; never blocks "done"; still editable | cosmetic style differences (the bold label of a bold symbol such as `𝐝𝐟`, a bold digit, a style the text layer cannot show such as double-struck R from MSBM, a letter of unknown weight made bold; on a cheap-model answer these still escalate to the main model); a single heading with weak evidence or a repaired level; alt text a little long or starting "image of"; no speech text |
 | `none` | ACCEPTED | nothing to note | |
 
 - **Data model.** `Fix.review: Literal["required", "optional", "none"]`. Results stored
@@ -112,11 +112,11 @@ decision.
   from real box headings on independent evidence (docs/layout.md "Run-in labels"), so
   they are not guessed at: alone they are optional notes, repeated they are a group.
 
-Where it lives: `pipeline/equation_step.py` (`text_layer_style`, `NOTE_CODES`),
-`pipeline/heading_step.py` (`group_repeated`), `pipeline/figure_step.py` (`NOTE_CODES`),
-`pipeline/layout.py` (`Element.regular_letters`), `core/triage.py`, `web/review.py`,
-`web/routes/review.py`, `web/views.py`, `ops/aggregate.py`, `ops/report.py`,
-`eval/pipeline_eval.py`.
+Where it lives: `pipeline/equation_step.py` (`text_layer_symbols_differ`,
+`text_layer_style`, `NOTE_CODES`), `pipeline/heading_step.py` (`group_repeated`),
+`pipeline/figure_step.py` (`NOTE_CODES`), `pipeline/layout.py`
+(`Element.regular_letters`), `core/triage.py`, `web/review.py`, `web/routes/review.py`,
+`web/views.py`, `ops/aggregate.py`, `ops/report.py`, `eval/pipeline_eval.py`.
 
 ## Rules every work package follows
 

@@ -8,7 +8,15 @@ a deterministic comparison catches it before any model judge would.
 Review triage (2026-10-08, "meaning-level only"): of four style flags on two real
 documents only one mattered (a bold omega read as a plain omega). A bold subscript or
 digit, and a double-struck R the text layer cannot show (MSBM), are cosmetic: an
-optional note, no lower confidence, no escalation, no decision.
+optional note, no lower confidence, no decision.
+
+Review of the triage (2026-10-08): a bold vector in the exponent or limit of a plain
+base (e^{i k.r}, lim_{x -> 0} with bold k, r, x) is a vector of its own, not the label of
+a bold symbol, and a double-struck or script letter the text layer does encode (the
+reals, a Lagrangian, from Chromium, Word, unicode-math) read as a plain letter is a
+different symbol: both meaning-level. A
+cosmetic difference on a cheap-model answer still escalates to the main model, as a
+second reading of something the heuristic might have under-rated.
 """
 
 from __future__ import annotations
@@ -173,6 +181,42 @@ def test_scripts_digits_words_and_unencodable_styles_are_cosmetic():
     assert verdict(layer, latex) == "cosmetic"
 
 
+def test_a_bold_vector_in_the_script_of_a_plain_base_is_meaning_level():
+    # Not the label of a bold symbol (d_f) but a vector of its own: the wave vector in a
+    # plane wave's exponent, the point of a limit, the index of a sum.
+    bold_k, bold_r, bold_x = "\U0001d424", "\U0001d42b", "\U0001d431"
+    plane_wave = f"\U0001d452\U0001d456{bold_k}·{bold_r}"  # e^{i k.r}, Chromium-style
+    assert verdict(plane_wave, r"e^{i k \cdot r}") == "meaning"
+    assert verdict(plane_wave, r"e^{i \mathbf{k} \cdot \mathbf{r}}") == "match"
+    assert verdict(f"lim{bold_x}\u21920", r"\lim_{x \to 0}") == "meaning"
+    assert verdict(f"∑{bold_k}{bold_k}", r"\sum_{k} \mathbf{k}") == "meaning"
+    # The labels of a bold symbol stay cosmetic however they are written.
+    assert verdict(f"{BOLD_D}\U0001d41f", r"{\mathbf{d}}_{f}") == "cosmetic"
+    assert verdict(f"{BOLD_D}\U0001d41f", r"\mathbf{d_f}") == "match"
+
+
+def test_a_bold_digit_stays_cosmetic_even_alone():
+    # Policy: digits are cosmetic. A lone bold zero (the zero vector) read as 0 is a note;
+    # on a cheap-model answer it escalates (test_cosmetic_difference_..._escalates).
+    assert verdict("\U0001d405net = \U0001d7ce", r"\mathbf{F}_{\text{net}} = 0") == "cosmetic"
+
+
+def test_an_encoded_double_struck_or_script_letter_read_plain_is_meaning_level():
+    # Chromium, Word and unicode-math write these as their own code points, so the text
+    # layer knows the symbol: the reals read as a variable R, a Lagrangian read as L.
+    italic_x, italic_f, italic_n = "\U0001d465", "\U0001d453", "\U0001d45b"
+    assert verdict(f"{italic_x}\u2208\u211d", r"x \in R") == "meaning"
+    assert verdict(f"{italic_x}\u2208\u211d", r"x \in \mathbb{R}") == "match"
+    assert verdict(f"{italic_f}:\u211d{italic_n}\u2192\u211d", r"f: R^n \to R") == "meaning"
+    assert verdict("\U0001d446=\u222b\u2112\U0001d451\U0001d461", r"S = \int L\,dt") == "meaning"
+    assert verdict("\U0001d446=\u222b\u2112\U0001d451\U0001d461", r"S = \int \mathcal{L}\,dt") == (
+        "match"
+    )
+    assert verdict("\U0001d524", r"g") == "meaning"  # fraktur g (a Lie algebra)
+    # The other direction stays cosmetic: MSBM's R is a plain "R" in the text layer.
+    assert verdict(f"{italic_x}\u2208R", r"x \in \mathbb{R}") == "cosmetic"
+
+
 def test_the_old_any_difference_helper_still_reports_cosmetic_ones():
     assert text_layer_style_mismatch(f"{BOLD_D}\U0001d7ce", mathml(r"\mathbf{d}_0")) is True
     assert text_layer_style_mismatch(BOLD_D, mathml(r"\mathbf{d}")) is False
@@ -205,16 +249,35 @@ def _style_client(latex: str, confidence: float = 0.97):
     )
 
 
-def test_cosmetic_difference_is_accepted_with_a_note_and_never_escalates(monkeypatch):
+def test_cosmetic_difference_is_accepted_with_a_note(monkeypatch):
     use_fallback_router(monkeypatch)
     element = equation_element(display="inline", text=f"{BOLD_D}\U0001d7ce")
     fix = transcribe(
         element, b"png", client=_style_client(r"\mathbf{d}_0"), settings=make_settings()
     )
-    assert [c.model for c in fix.calls] == [CHEAP_MODEL]  # no escalation for a note
+    # The main model is asked too (a second reading), and says the same: still a note.
+    assert [c.model for c in fix.calls] == [CHEAP_MODEL, MAIN_MODEL]
     assert fix.status is Status.ACCEPTED and fix.review == "optional"
     assert fix.confidence == 0.97  # not lowered
     assert [c.code for c in fix.failed_checks] == ["style_cosmetic"]
+
+
+def test_cosmetic_difference_on_the_cheap_model_escalates_and_the_main_answer_wins(
+    monkeypatch,
+):
+    # The cheap model wrote the bold subscript 0 plain (cosmetic): the main model still
+    # gets a second look, and its answer is kept.
+    use_fallback_router(monkeypatch)
+    element = equation_element(display="inline", text=f"{BOLD_D}\U0001d7ce")
+    answers = {
+        CHEAP_MODEL: {"is_equation": True, "latex": r"\mathbf{d}_0", "confidence": 0.99},
+        MAIN_MODEL: {"is_equation": True, "latex": r"\mathbf{d}_\mathbf{0}", "confidence": 0.95},
+    }
+    client = FakeVisionClient(responders={"equation": lambda request: answers[request.model]})
+    fix = transcribe(element, b"png", client=client, settings=make_settings())
+    assert [c.model for c in fix.calls] == [CHEAP_MODEL, MAIN_MODEL]
+    assert fix.equation is not None and fix.equation.latex == r"\mathbf{d}_\mathbf{0}"
+    assert fix.status is Status.ACCEPTED and fix.review == "none"
 
 
 def test_meaning_level_difference_needs_a_decision(monkeypatch):

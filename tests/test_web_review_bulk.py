@@ -144,7 +144,7 @@ def test_confidence_is_a_word_and_a_number(rich):
 def test_checks_and_reasons_are_explained_not_coded(rich):
     page = page_of(rich)
     style = card(page, "p2-e2")
-    assert "A letter that is bold in the PDF (a vector) is plain in this transcription" in style
+    assert "a bold letter, a vector, is plain here" in style
     assert "<code>equation.text_layer_style: style_mismatch</code>" in style
     heading = card(page, "p1-e3")
     assert "Only weak signs say this is a heading" in heading
