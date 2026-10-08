@@ -263,6 +263,8 @@ def create_app(
         finally:
             if ctx.worker is not None:
                 await run_in_threadpool(ctx.worker.stop)
+            if ctx.tracer is not None:
+                await run_in_threadpool(ctx.tracer.flush)
             engine.dispose()
 
     app = FastAPI(

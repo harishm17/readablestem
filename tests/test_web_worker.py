@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import contextlib
 import json
 import logging
 import threading
@@ -27,6 +28,7 @@ from a11y_stem.web.views import job_error_message
 from a11y_stem.web.worker import (
     MAX_ATTEMPTS,
     JobCancelled,
+    Worker,
     db_safe,
     error_code_for,
     job_caps,
@@ -678,3 +680,72 @@ def test_deleting_a_stuck_job_frees_the_worker_before_the_time_limit(env, caplog
     release.set()
     messages = " ".join(r.getMessage() for r in caplog.records)
     assert "conversion_abandoned" in messages and "job_timeout" not in messages
+
+
+# --------------------------------------------------------------------------- tracing
+
+
+class RecordingTracer:
+    """A tracer that keeps span names and attributes (content-free by contract)."""
+
+    def __init__(self) -> None:
+        self.spans: list[tuple[str, dict]] = []
+        self.flushed = 0
+
+    @contextlib.contextmanager
+    def span(self, name: str, **attrs):
+        record = (name, dict(attrs))
+        self.spans.append(record)
+
+        class Handle:
+            def set(self, **more) -> None:
+                record[1].update(more)
+
+            update = set
+
+        yield Handle()
+
+    def flush(self) -> None:
+        self.flushed += 1
+
+
+def test_with_tracing_on_the_app_hands_one_tracer_to_every_conversion(tmp_path, monkeypatch):
+    """make_tracer used to have no caller: TRACING_ENABLED did nothing."""
+    from a11y_stem.pipeline.run import convert_pdf
+    from a11y_stem.web import app as app_module
+
+    tracer = RecordingTracer()
+    monkeypatch.setattr(app_module, "make_tracer", lambda settings: tracer)
+    env = WebEnv(tmp_path, run_worker=True, worker_poll_s=60, tracing_enabled=True)
+    with env.running():
+        assert env.ctx.tracer is tracer
+        assert env.ctx.worker is not None and env.ctx.worker.tracer is tracer
+        env.allow(ALICE)
+        job_id = queue_job(env)
+        worker = Worker(
+            env.settings,
+            env.ctx.factory,
+            converter=convert_pdf,
+            client_factory=lambda s, b: FakeVisionClient(budget=b),
+            tracer=env.ctx.tracer,
+        )
+        assert worker.run_once() == job_id
+    assert env.job(job_id).status == "done"
+    names = [name for name, _ in tracer.spans]
+    assert names[0] == "document" and "assemble" in names
+    assert tracer.flushed >= 1  # flushed when the app shuts down
+
+
+def test_without_tracing_the_converter_gets_no_tracer_argument(env):
+    seen: dict = {}
+
+    def converter(pdf_bytes, /, *, settings, client, progress=None, **extra):
+        seen.update(extra)
+        return fake_output()
+
+    assert env.ctx.tracer is None
+    queue_job(env)
+    worker = env.worker()
+    worker.converter = converter
+    worker.run_once()
+    assert seen == {}

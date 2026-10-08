@@ -194,6 +194,18 @@ secret key in Secret Manager when tracing is enabled). If the `tracing` extra is
 or the client cannot start, the app logs `tracing_disabled` with a `reason` and carries
 on without traces. Keep it off for any run on `private-inputs/`.
 
+Where the tracer comes from: `create_app` calls `make_tracer(settings)` once and the
+worker passes it to every `convert_pdf` (`app_started` logs `tracing=true|false`); it is
+flushed when the app shuts down. `a11y-stem convert` does the same for one run. With
+tracing off the converter gets no tracer at all.
+
+Retention: traces hold ids, codes, token counts and costs, never document content, but
+they live in Langfuse, outside the app's hourly purge. TODO(Harish): before turning
+tracing on in production, set the Langfuse project's data retention (Project settings >
+Data retention, if your plan has it) to match `RETENTION_HOURS` or as short as allowed,
+and make the privacy page say where traces go and for how long (it does when
+`TRACING_ENABLED=true`; check the wording).
+
 What a span can carry is an allowlist (`ALLOWED_ATTRIBUTES` in
 `observability/tracing.py`): ids, step, kind, model (or a comma-separated list of the
 models a step used), prompt version, attempt, fallback flag, status, outcome, reason,
