@@ -36,9 +36,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
           enable-cache: true
       # The tracing extra (Langfuse) is optional at runtime but its code is type-checked
-      # and its masking is tested, so CI installs it.
+      # and its masking is tested, so CI installs it. The browser group adds only the
+      # playwright Python package: `ty check src` must resolve `playwright.sync_api`
+      # (eval/render.py, pipeline/html_checks.py). No browser binaries are installed, so
+      # tests that need Chromium stay deselected by the `browser` marker.
       - name: Install (locked)
-        run: uv sync --locked --all-extras
+        run: uv sync --locked --all-extras --group browser
       - name: Ruff lint
         run: uv run ruff check .
       - name: Ruff format check
@@ -172,7 +175,7 @@ jobs:
             if [ ! -f "$current" ]; then
               echo "::error::$baseline has no matching $current"; exit 1
             fi
-            uv run a11y-stem eval gate --current "$current" --baseline "$baseline"
+            uv run a11y-stem eval gate --require-current --current "$current" --baseline "$baseline"
           done
 
   secret-scan:

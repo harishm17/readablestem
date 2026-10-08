@@ -936,14 +936,40 @@ def render_page_pdf(
 _BODY_OPEN = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
 
 
-def demo_note_html(page: PageSource, *, date: str) -> str:
-    """Short accessible note placed above the converted page in the public demo."""
+# Marks a demo built with the offline client; `ops.launch` refuses to call it finished.
+PLACEHOLDER_ATTR = 'data-a11y-stem-demo="placeholder"'
+
+
+def demo_note_html(
+    page: PageSource, *, date: str, source_url: str | None = None, placeholder: bool = False
+) -> str:
+    """Short accessible note placed above the converted page in the public demo.
+
+    It links back to the app and, when `source_url` is given, to the source code (the
+    AGPL notice every page of the service carries). A `placeholder` demo (built with the
+    offline client) says so in a marked paragraph.
+    """
     esc = html.escape
     authors = ", ".join(page.authors) if page.authors else "OpenStax authors"
+    fake = (
+        f"<p {PLACEHOLDER_ATTR}><strong>Placeholder output.</strong> This demo was built "
+        "with the offline test client: the equations and descriptions below are "
+        "placeholders, not real model output.</p>\n"
+        if placeholder
+        else ""
+    )
+    source = (
+        f' a11y-stem is free, open-source software; its complete source code is at <a href="'
+        f'{esc(source_url, quote=True)}">{esc(source_url)}</a> (it uses PyMuPDF under the '
+        "GNU Affero General Public License v3)."
+        if source_url
+        else ""
+    )
     return (
         '<aside aria-label="About this demo" style="border:2px solid #1a4f8b;'
         'padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;">\n'
-        "<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print "
+        + fake
+        + "<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print "
         f"of “{esc(page.page_title)}” from <cite>{esc(page.book_title)}</cite> by "
         f"{esc(authors)} (OpenStax), converted on {esc(date)}. Equations, headings and "
         "image descriptions below are the tool's proposals with confidence scores; the "
@@ -954,13 +980,21 @@ def demo_note_html(page: PageSource, *, date: str) -> str:
         f'<a href="{esc(page.license_url, quote=True)}">{esc(page.license_name)}</a> '
         f"({esc(page.license_short)}). Access for free at openstax.org. a11y-stem is not "
         "affiliated with or endorsed by OpenStax.</p>\n"
+        f'<p><a href="/">Back to a11y-stem</a>.{source}</p>\n'
         "</aside>\n"
     )
 
 
-def wrap_demo_html(converted_html: str, page: PageSource, *, date: str) -> str:
+def wrap_demo_html(
+    converted_html: str,
+    page: PageSource,
+    *,
+    date: str,
+    source_url: str | None = None,
+    placeholder: bool = False,
+) -> str:
     """Insert the demo note at the start of <body>; wrap a bare fragment in a document."""
-    note = demo_note_html(page, date=date)
+    note = demo_note_html(page, date=date, source_url=source_url, placeholder=placeholder)
     match = _BODY_OPEN.search(converted_html)
     if match:
         return converted_html[: match.end()] + "\n" + note + converted_html[match.end() :]

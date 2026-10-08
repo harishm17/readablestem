@@ -11,7 +11,7 @@ from sqlalchemy import func, select
 from starlette.requests import Request
 
 from a11y_stem.web.database import as_utc, utc_today
-from a11y_stem.web.db import Blob, Job, QuotaDay, SpendDay, session_scope
+from a11y_stem.web.db import Blob, Job, QuotaDay, SpendDay, User, session_scope
 from a11y_stem.web.routes.jobs import content_disposition, download_filename
 from a11y_stem.web.security import VIEW_CSP
 from a11y_stem.web.uploads import (
@@ -243,6 +243,40 @@ def test_safe_filename(raw, expected):
 # --------------------------------------------------------------------------- limits
 
 
+def test_uploads_in_progress_are_bounded_in_total_and_per_user(web):
+    """Each upload costs about three times its size in memory and nothing limited how
+    many ran at once: ten 19 MB uploads took the web process from 225 MB to 802 MB."""
+    gate = web.ctx.uploads
+    assert gate.limit == web.settings.max_concurrent_uploads
+    with session_scope(web.ctx.factory) as session:
+        alice_id = session.scalar(select(User.id).where(User.email == ALICE))
+    assert alice_id is not None
+
+    assert gate.enter(alice_id) is None  # an upload of Alice's is still in progress
+    try:
+        response = upload(web.browser, make_pdf(1))
+        assert response.status_code == 429 and response.headers["retry-after"] == "10"
+        assert "Your other upload is still in progress" in response.text
+    finally:
+        gate.leave(alice_id)
+
+    others = [f"someone-{i}" for i in range(gate.limit)]
+    for other in others:
+        assert gate.enter(other) is None
+    try:
+        response = upload(web.browser, make_pdf(1))
+        assert response.status_code == 503 and "Too many uploads right now" in response.text
+    finally:
+        for other in others:
+            gate.leave(other)
+    assert count(web, Job) == 0
+
+    assert upload(web.browser, make_pdf(1)).status_code == 303
+    assert gate.in_progress == 0  # released after a success ...
+    assert upload(web.browser, b"not a pdf").status_code == 415
+    assert gate.in_progress == 0  # ... and after a rejection
+
+
 def test_daily_page_quota_returns_429_and_changes_nothing(web):
     for _ in range(4):  # quota 20 pages; 4 x 5 pages fits exactly
         assert upload(web.browser, make_pdf(5)).status_code == 303
@@ -323,6 +357,9 @@ def test_status_fragment_is_204_until_something_changes(web):
     )
     assert finished.status_code == 200
     assert finished.headers["hx-refresh"] == "true"  # reload to show the results
+    # htmx takes the document title from the fragment, so the tab title follows it.
+    assert finished.text.startswith("<title>Finished: notes.pdf | a11y-stem</title>")
+    assert "<title>" not in fragment.text  # not without htmx (it would be in <body>)
 
 
 def test_queue_position_is_shown(web):
@@ -347,7 +384,9 @@ def test_status_poll_after_the_session_ends_sends_the_page_to_sign_in(web):
 
 def test_status_poll_for_a_deleted_job_reloads_the_page(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    web.browser.post(
+        f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser), "confirm": "yes"}
+    )
     response = web.browser.get(f"/jobs/{job_id}/status?v=x", headers={"HX-Request": "true"})
     assert response.status_code == 404 and response.headers["hx-refresh"] == "true"
 
@@ -450,14 +489,30 @@ def test_malformed_job_ids_are_404(web, job_id):
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
 
 
+def test_delete_asks_first_and_one_post_without_confirmation_deletes_nothing(web):
+    """WCAG 3.3.4: deleting stored user data must be confirmed, reversible or checked."""
+    job_id = finished_job(web)
+    blobs = count(web, Blob)
+    page = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    assert page.status_code == 200
+    assert "Delete notes.pdf?" in page.text and "cannot be undone" in page.text
+    assert 'name="confirm" value="yes"' in page.text
+    assert f'<a href="/jobs/{job_id}">No, keep it</a>' in page.text
+    assert count(web, Job) == 1 and count(web, Blob) == blobs
+    assert web.browser.get(f"/jobs/{job_id}/delete").status_code == 200  # the same page
+
+
 def test_delete_now_removes_the_job_and_everything_derived(web):
     job_id = finished_job(web)
     assert count(web, Blob) > 1  # upload + crops
-    response = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
+    response = web.browser.post(
+        f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser), "confirm": "yes"}
+    )
     assert response.status_code == 303 and response.headers["location"] == "/app"
     assert count(web, Job) == 0 and count(web, Blob) == 0
     page = web.browser.get("/app").text
     assert "have been deleted" in page
+    assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
 
 
@@ -473,3 +528,36 @@ def test_retention_date_is_shown(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
     expected = (datetime.now(UTC) + timedelta(hours=24)).strftime("%b %Y")
     assert expected in web.browser.get(f"/jobs/{job_id}").text
+
+
+def test_a_job_past_its_retention_time_is_gone_before_the_purge_runs(web):
+    """retain_until was only checked by the hourly purge: if the scheduler stopped, an
+    expired document stayed viewable and downloadable."""
+    job_id = finished_job(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.retain_until = datetime.now(UTC) - timedelta(minutes=1)
+    for path in ("", "/status", "/view", "/download", "/review", "/crops/p1-e3.png"):
+        assert web.browser.get(f"/jobs/{job_id}{path}").status_code == 404, path
+    assert job_id not in web.browser.get("/app").text
+    assert count(web, Job) == 1  # still in the database until the purge
+
+
+def test_the_worker_purges_expired_jobs_if_the_scheduler_does_not(web, caplog, monkeypatch):
+    import logging
+
+    from a11y_stem.web import worker as worker_module
+
+    caplog.set_level(logging.INFO)
+    job_id = finished_job(web)
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.retain_until = datetime.now(UTC) - timedelta(hours=2)
+    monkeypatch.setattr(worker_module, "PURGE_FIRST_S", 0.0)
+    worker = web.worker()
+    assert worker.purge_backstop() == 1
+    assert count(web, Job) == 0 and count(web, Blob) == 0
+    assert "purge_backstop_deleted" in caplog.messages
+    assert worker.purge_backstop() is None  # not due again for an hour

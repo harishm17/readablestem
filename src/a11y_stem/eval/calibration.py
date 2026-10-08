@@ -26,7 +26,7 @@ from __future__ import annotations
 import csv
 import json
 import random
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -305,6 +305,12 @@ def _reference(figure: dict) -> str:
     return (image.get("alt") or "").strip()
 
 
+def probe_image_url(figure: dict) -> str:
+    """URL of the figure image whose alt text is the probe's reference."""
+    image = next((img for img in figure.get("images", []) if img.get("url")), {})
+    return str(image.get("url") or "")
+
+
 def probe_figures(records: Iterable[dict], limit: int | None = None) -> list[dict]:
     """Gold figure records that have a reference alt (the probes need one)."""
     figures = [r for r in records if r.get("kind") == "figure" and _reference(r)]
@@ -321,16 +327,29 @@ def run_probes(
     settings: Settings,
     paraphrases: dict[str, str] | None = None,
     judge: Judge | None = None,
+    images: Mapping[str, bytes] | None = None,
 ) -> tuple[dict, list[dict]]:
-    """Judge every probe candidate. Stops cleanly when the budget is exhausted."""
+    """Judge every probe candidate. Stops cleanly when the budget is exhausted.
+
+    `images` (figure id -> PNG) attaches each figure's image to its judge calls, the way
+    the figures eval judges (the prompt then treats the image as the ground truth).
+    Without it the judge runs text-only, a different instrument: the report says which
+    (`judge_mode`), and probes from one mode do not speak for the other.
+    """
     judge_fn = judge or judge_mod.judge_alt
     candidates = probe_candidates(figures, paraphrases)
     items: list[dict] = []
     stopped = None
     for row in candidates:
+        image = images.get(row["id"]) if images is not None else None
         try:
             judgement = judge_fn(
-                row["candidate"], row["reference"], row["caption"], client=client, settings=settings
+                row["candidate"],
+                row["reference"],
+                row["caption"],
+                client=client,
+                settings=settings,
+                image=image,
             )
         except BudgetExceeded as exc:
             stopped = f"budget_{exc.scope}"
@@ -352,7 +371,9 @@ def run_probes(
                 "judge_cost_usd": judgement.call.cost_usd,
             }
         )
-    return probe_report(items, n_planned=len(candidates), stopped=stopped), items
+    report = probe_report(items, n_planned=len(candidates), stopped=stopped)
+    report["judge_mode"] = "image" if images is not None else "text_only"
+    return report, items
 
 
 def probe_report(items: Sequence[dict], *, n_planned: int, stopped: str | None) -> dict:
@@ -456,7 +477,8 @@ def format_agreement(report: dict) -> str:
 def format_probes(report: dict) -> str:
     status = "complete" if report["complete"] else f"PARTIAL ({report['stopped_reason']})"
     lines = [
-        f"## Judge bias probes ({report['n']} of {report['n_planned']} judgements, {status})",
+        f"## Judge bias probes ({report['n']} of {report['n_planned']} judgements, {status}, "
+        f"judge: {report.get('judge_mode', 'text_only').replace('_', ' ')})",
         "",
         "| probe | should | pass rate | as expected | mean score | mean chars |",
         "|---|---|---|---|---|---|",

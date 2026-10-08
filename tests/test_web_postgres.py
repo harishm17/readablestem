@@ -209,6 +209,54 @@ def test_two_workers_claim_every_job_exactly_once(factory, tmp_path):
     assert sorted(claimed) == sorted(ids)
 
 
+def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_path):
+    """Every reservation adds its hold to the job's row in one conditional UPDATE, so 20
+    step threads (or a dead attempt plus a retry) cannot pass the job's cap together."""
+    [job_id] = queue_jobs(factory, 1)
+    worker = make_worker(factory, tmp_path)
+    worker.guard = DbSpendGuard(factory, 100.0)
+    claim = worker.claim()
+    assert claim is not None
+    attempt = worker._start_attempt(claim, 0.0, 0, 1)
+    max_usd, _ = worker_caps(worker)
+    granted = []
+    lock = threading.Lock()
+
+    def reserve_many() -> None:
+        for _ in range(10):
+            with contextlib.suppress(BudgetExceeded):
+                reservation = attempt.budget.reserve(0.01)
+                with lock:
+                    granted.append(reservation)
+
+    run_threads(20, reserve_many)
+    assert len(granted) == round(max_usd / 0.01)
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, job_id)
+        assert job is not None
+        assert job.cost_usd == pytest.approx(max_usd)
+        assert job.model_calls == len(granted)
+
+
+def worker_caps(worker: Worker) -> tuple[float, int]:
+    from a11y_stem.web.worker import job_caps
+
+    return job_caps(worker.settings, 1)
+
+
+def test_jobs_of_removed_users_are_skipped_by_the_skip_locked_claim(factory, tmp_path):
+    first, second = queue_jobs(factory, 2)
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, first)
+        assert job is not None
+        other = db.User(email="removed@example.org", is_allowed=False)
+        session.add(other)
+        session.flush()
+        job.user_id = other.id
+    claim = make_worker(factory, tmp_path).claim()
+    assert claim is not None and claim.job_id == second
+
+
 def test_worker_stores_results_with_postgres_types(factory, tmp_path):
     [job_id] = queue_jobs(factory, 1)
     worker = make_worker(factory, tmp_path)

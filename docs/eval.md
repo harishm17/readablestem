@@ -121,7 +121,15 @@ Conventions for every task:
   in flight was paid for in part and then dropped (`dropped_usd` is the difference).
 - **Latency** per item is the sum of its model calls' `latency_ms` (calls within an item
   run one after another). It excludes rendering and local processing. The document task
-  uses `DocumentStats.latency_ms` per page instead.
+  is different: its item is one OpenStax *section* printed to a PDF of 13-16 pages, and
+  its latency is `DocumentStats.latency_ms`, the wall-clock time of converting that whole
+  PDF. (The report's `latency_ms.basis` string still says "sum of model-call latencies"
+  for every task; that string lives in `eval/pipeline_eval.py`.)
+- **Cost per page.** For the document task `per_item_usd` is per *section*, not per PDF
+  page: the first real run cost $0.161 for 3 sections of 16, 14 and 13 PDF pages, which
+  is $0.054 per section but **$0.0037 per PDF page**. Quote the per-PDF-page figure for
+  anything about running cost. In production, `ops report` gives cost per converted page
+  from the aggregates.
 
 ### equations
 
@@ -193,7 +201,9 @@ context_text=caption)`, then grade the proposed alt text with the judge.
 The judge (`eval/judge.py`, prompt `models/prompts/judge_figure.md`) uses the main model
 (gpt-6.1-sol) with no fallback, so the instrument never changes mid-run. It sees three
 texts as fenced data, in this order: the candidate, the OpenStax reference alt, the
-caption. It does not see the image, and nothing tells it which system wrote which text.
+caption, and the figure's image (the prompt then treats the image as the ground truth;
+without an image it treats the reference as the facts). Nothing tells it which system
+wrote which text.
 Each text is capped (900 / 800 / 200 characters, marked " [cut]") so the block stays under
 the 2000-character fence limit; 2 of the 13 sample references exceed 800 characters.
 Output schema: `conveys_key_information` (bool), `factual_error` (bool), `score` (1-5),
@@ -246,6 +256,10 @@ Bias probes, run on gold figures with a reference alt (no human needed):
 | `empty` | "" | fail |
 | `irrelevant` | the alt text of the figure half the list away (a fixed unrelated sentence if there is only one figure) | fail |
 
+The probes attach each figure's image, like the figures eval (`judge_mode: image`);
+`--text-only` runs the older text-only judge, a different instrument (`--fake` runs skip
+the image downloads). Probe results from one mode say nothing about the other.
+
 Per probe: `pass_rate`, `as_expected_rate`, `mean_score`, `mean_chars`. **Length bias** is
 paired: per figure, verbose score minus reference score, averaged (`mean_score_delta`),
 plus the same for pass/fail (`pass_rate_delta`) and the mean length ratio. Figures where
@@ -262,14 +276,26 @@ Compares a current report with a baseline report of the same task.
 | `mean_teds` | equations | drops by more than 0.02 |
 | `cost_per_equation` (`cost.per_item_usd`) | equations | rises by more than 25% (a zero baseline only allows zero) |
 | `heading_recall` | headings | drops by more than 0.03 |
+| `heading_precision` | headings | drops by more than 0.03 |
 | `figure_judge_pass_rate` | figures | drops by more than 0.05 |
+| `document_detection_recall` | document | drops by more than 0.02 |
+| `document_detection_precision` | document | drops by more than 0.03 |
+| `document_matched_exact_lenient` | document | drops by more than 0.03 |
+| `document_axe_violations` | document | rises at all (`max_increase`, limit 0) |
+| `document_cost` (`cost.per_item_usd`) | document | rises by more than 25% |
 
 Exit 0: all within tolerance. Exit 1: a tracked metric regressed, or is missing from the
 current report. Exit 2: not comparable, so no verdict: different task, different gold
-manifest, different item selection (e.g. another `--limit`), or a partial run on either
-side. Changed pipeline version, prompt versions, model ids or client are listed under the
-table (they are usually why the gate is being run). Tolerances live in
-`data/eval/tolerances.json`; an entry with only `name` and `limit` adjusts a default.
+manifest, different item selection (e.g. another `--limit`), a partial run on either
+side, or a different judge (prompt version or model; `judge_changed`). The judge check
+exists because `figures-run2` against `figures-run1` used to pass: the judge had started
+seeing the image, and the pass rate went from 0.46 to 0.92 with the same alt texts.
+Changed pipeline version, step prompt versions, model ids or client are listed under the
+table (they are usually why the gate is being run). With `--require-current` (CI uses
+it) the gate also refuses (`stale_report`) a current report produced with other prompts
+or models than the code under test, so a prompt change cannot pass on an old committed
+`latest-<task>.json`. Tolerances live in `data/eval/tolerances.json`; an entry with only
+`name` and `limit` adjusts a default.
 
 ## Report format
 
@@ -337,12 +363,37 @@ uv run a11y-stem eval calibrate --judge data/eval/judged.jsonl --labels data/eva
 uv run a11y-stem eval calibrate --probes --max-usd 0.50 --out data/eval/probes.json
 ```
 
-Baselines and the gate: after reviewing a full run, copy it to
-`data/eval/baseline-<task>.json` and commit it. Then, for any change:
+Baselines and the gate: after reviewing a full run, promote it and commit the file
+(`promote` refuses partial and fake runs, and for `latest` a report made with other
+prompts or models than the code):
 
 ```
-uv run a11y-stem eval gate --current data/eval/latest-equations.json --baseline data/eval/baseline-equations.json
+uv run a11y-stem eval promote .local/eval/equations-run3.json --as baseline
+uv run a11y-stem eval promote .local/eval/equations-run3.json --as latest
+uv run a11y-stem eval gate --require-current --current data/eval/latest-equations.json --baseline data/eval/baseline-equations.json
 ```
+
+After a prompt or model change, re-run the task, promote the new report `--as latest`
+and commit it with the change; CI's gate fails (exit 2) until you do.
+
+TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The real runs
+are in the main checkout's `.local/eval/` (equations-run3, headings-run1, figures-run2,
+document-run1); review them and promote each as both baseline and latest. Note that
+figures-run1 was graded by the older text-only judge and cannot be a baseline for runs
+graded with the image.
+
+Weekly sample (drift check between full runs): a 5% share of the gold units, seeded by
+the ISO week, scored like any other run (`eval/sample.py`). Reports go to
+`.local/eval/weekly/<week>-<task>.json` (git-ignored):
+
+```
+uv run a11y-stem eval sample --task equations --max-usd 0.10
+uv run a11y-stem eval sample --task figures --fraction 0.05 --week 2026-W41 --max-usd 0.10
+```
+
+TODO(Harish): decide whether to schedule it (it spends money; `eval-live.yml` is
+manual-only on purpose), and whether opted-in production pages should join the sample
+once their review labels exist as gold.
 
 Public demo (do not commit the output until the page is chosen):
 
@@ -381,8 +432,10 @@ gold set are looked up live and pass the same license gate as `gold fetch`.
   trees can read the same.
 - **The judge is a model.** Its pass rate means "agrees with gpt-6.1-sol reading the
   OpenStax alt text", not "helps a blind student". It treats the reference as truth, and
-  OpenStax alt texts vary from 39 to 980 characters in length and style. It does not see
-  the image. Until `eval calibrate` shows good agreement with Harish's labels (and the
+  OpenStax alt texts vary from 39 to 980 characters in length and style. Since it sees
+  the image (and the prompt makes the image the ground truth), its numbers are not
+  comparable with the earlier text-only runs. Until `eval calibrate` shows good
+  agreement with Harish's labels (and the
   CI on kappa is narrow enough to mean something; 13 figures is not), judge numbers are
   provisional.
 - **Headings.** 50 of 121 gold headings are the same two words ("Teacher Support"), so
@@ -407,7 +460,8 @@ gold set are looked up live and pass the same license gate as `gold fetch`.
 | `src/a11y_stem/eval/judge.py` | figure judge request, schema, pass rule |
 | `src/a11y_stem/models/prompts/judge_figure.md` | judge instructions (versioned by hash) |
 | `src/a11y_stem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
-| `src/a11y_stem/eval/gate.py` | regression gate |
+| `src/a11y_stem/eval/gate.py` | regression gate (comparability, judge and stale-report checks) |
+| `src/a11y_stem/eval/sample.py` | the weekly seeded sample of the gold set |
 | `src/a11y_stem/cli/eval_cli.py` | `eval pipeline/gate/calibrate/render`, `demo build` |
 | `data/eval/tolerances.json` | gate tolerances |
 | `tests/test_eval_*.py` | offline tests; `-m browser` runs the Chromium ones |

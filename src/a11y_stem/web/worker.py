@@ -7,11 +7,18 @@ queue is safe with several workers or instances:
   wait on, or take, the same row). SQLite: a conditional UPDATE (`... WHERE status =
   'queued'`) whose rowcount says who won. Fresh jobs go before retried ones (fewest
   attempts first, then oldest), so a PDF that keeps killing the process cannot jump
-  ahead of everyone else's work after each restart.
+  ahead of everyone else's work after each restart. Jobs of someone removed from the
+  allowlist are never claimed (removal also stops the ones already queued or running;
+  see `web.auth.set_allowed`).
+- While less than one model call's worth (`spend.largest_reservation_usd`) is left under
+  the daily cap, nothing is claimed: queued jobs wait for the next UTC day instead of
+  running into a document with every element "not converted".
 - The conversion runs on its own thread. The worker thread waits for it and extends the
   job's lease (`lease_until`) every `lease_s / 3`. If the process dies, the lease runs
   out and the next worker requeues the job; after `MAX_ATTEMPTS` claims it is failed
-  with "lease_expired" instead of retried forever.
+  with "lease_expired" instead of retried forever. `Worker.stop` (process shutdown)
+  cancels the running attempt and ends its lease at once, so another instance can
+  requeue the job without waiting for the lease to run out.
 - Every job has a time limit (`job_time_limit_s`). Past it the worker stops extending
   the lease, cancels the conversion, fails the job with "timeout" and moves on to the
   next job, so one hung document cannot hold the only worker thread for ever. Python
@@ -20,21 +27,35 @@ queue is safe with several workers or instances:
   restarts.
 - A conversion is cancelled as soon as this worker no longer owns the job: the user
   deleted it, retention purged it, or another worker requeued it after a lost lease.
-  Ownership is checked in the database before every spend reservation (so no further
-  crop or text is sent to the model), on every progress callback and on every
-  heartbeat. Cancellation raises `JobCancelled` (a `BudgetExceeded`, so the model client
-  and the pipeline stop new work the way they do for a spent budget) and the outcome is
+  Ownership is checked in the database on every spend reservation (so no further crop
+  or text is sent to the model), on every progress callback and on every heartbeat.
+  Cancellation raises `JobCancelled` (a `BudgetExceeded`, so the model client and the
+  pipeline stop new work the way they do for a spent budget) and the outcome is
   "discarded", not a failure.
-- `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB` cap the job, not one attempt: spend
-  and calls so far are written to the job on every heartbeat and progress callback, and
-  a retried attempt gets only what is left.
+- The job caps (`job_caps`: `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB`, lowered for
+  short documents by the per-page allowances) cover the job, not one attempt, and are
+  enforced on the job's row: every spend reservation is one conditional UPDATE that adds
+  the hold to `jobs.cost_usd` and `jobs.model_calls` only if this attempt still owns the
+  job and the totals stay under the caps; settling replaces the hold with the actual
+  cost. An attempt that dies mid-call leaves its holds counted (erring on the side of
+  spending less, like the daily cap), so a retry never gets more than what is left and
+  the job's totals are always current.
+- Retention backstop: once an hour the worker loop runs the purge itself
+  (`ops.retention.purge_expired`, logged as `purge_done source=worker`). The hourly
+  Cloud Scheduler call stays the primary path; this keeps the 24-hour deletion promise
+  if the scheduler stops (a rotated token, a paused job). A backstop run that deletes
+  anything logs `purge_backstop_deleted`, which means the scheduler is late.
 - Results are stored only if this worker still owns the job (same attempt, still
   running), so a job deleted or requeued meanwhile is never resurrected. If storing
   fails (a database error, after one retry of a transient one) the job is failed with
   "store_failed" rather than left running, which would convert (and pay for) it again.
 
 Failures become `Job.error_code` categories: `LayoutError.code`, "budget_<scope>",
-"timeout", "store_failed" or "internal_error". Nothing from the document is logged.
+"timeout", "store_failed", "model_not_configured" or "internal_error". A finished job
+can carry a code too (`result_outcome`): "budget_<scope>" when a spend cap stopped model
+work part way (the result is partial), "scanned_pages" when some pages were only images.
+A result with nothing in it fails as "no_content", or "scanned" when every page was an
+image. Nothing from the document is logged.
 """
 
 from __future__ import annotations
@@ -43,7 +64,7 @@ import logging
 import re
 import threading
 import time
-from collections.abc import Callable, Mapping
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING, Any, Protocol
@@ -52,16 +73,17 @@ from sqlalchemy import delete, select, update
 from sqlalchemy.exc import OperationalError
 from sqlalchemy.orm import Session, sessionmaker
 
-from a11y_stem.config import Settings
+from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
-from a11y_stem.core.types import ConversionOutput
+from a11y_stem.core.types import ConversionOutput, DocumentResult
 from a11y_stem.web.database import rowcount
-from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
+from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.logsafe import log_event, log_exception
-from a11y_stem.web.spend import DbSpendGuard
+from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
 
 if TYPE_CHECKING:
     from a11y_stem.models.base import VisionClient
+    from a11y_stem.observability.tracing import Tracer
     from a11y_stem.pipeline.run import ProgressFn
 
 logger = logging.getLogger(__name__)
@@ -70,8 +92,8 @@ MAX_ATTEMPTS = 3
 DEFAULT_LEASE_S = 120.0
 # Time limit for one conversion: a base (layout, assembly, a slow start) plus a share per
 # page for the model calls, with retries and fallback. Generous for real documents; it is
-# there so a hung conversion cannot hold the worker for ever. Not a setting yet
-# (config.py is not this package's); tune it here.
+# there so a hung conversion cannot hold the worker for ever. Not a setting yet; tune it
+# here.
 JOB_BASE_S = 300.0
 JOB_PER_PAGE_S = 90.0
 # After a timeout, how long to wait for the cancelled conversion to wind down before the
@@ -80,12 +102,24 @@ TIMEOUT_GRACE_S = 30.0
 # One retry of the result write after a transient database error (connection lost,
 # database locked) before the job is failed with "store_failed".
 STORE_RETRY_DELAY_S = 1.0
+# The retention backstop: first run this long after the loop starts, then this often.
+PURGE_FIRST_S = 600.0
+PURGE_EVERY_S = 3600.0
 DISCARDED = "discarded"
 _CODE = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
+# Float sums of many small costs drift by ~1e-16; this keeps an exact fit under a cap.
+_EPSILON = 1e-9
+# Codes a finished (DONE) job can carry; see `result_outcome`.
+BUDGET_STOPS = frozenset({"budget_daily", "budget_job_usd", "budget_job_calls"})
+SCANNED_PAGES = "scanned_pages"
 
 
 class Converter(Protocol):
-    """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments."""
+    """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments.
+
+    `tracer` is passed only when tracing is on, so a fake without that argument works in
+    every other case.
+    """
 
     def __call__(
         self,
@@ -95,6 +129,7 @@ class Converter(Protocol):
         settings: Settings,
         client: VisionClient,
         progress: ProgressFn | None = None,
+        tracer: Tracer | None = None,
     ) -> ConversionOutput: ...
 
 
@@ -108,11 +143,16 @@ def default_converter() -> Converter:
 
 
 def default_client_factory(settings: Settings, budget: JobBudget) -> VisionClient:
-    """The real model client (WP1), imported only when a job actually runs."""
+    """The real model client (WP1), imported only when a job actually runs.
+
+    With FAKE_MODELS=true (dev and test only; `Settings.check_production` refuses it in
+    production) the offline client answers instead, still charging `budget`, so the app
+    can be tried end to end without an OpenAI key.
+    """
     from a11y_stem import models
 
     make_vision_client = models.make_vision_client
-    return make_vision_client(settings, budget)
+    return make_vision_client(settings, budget, fake=settings.fake_models)
 
 
 def error_code_for(exc: BaseException) -> str:
@@ -125,13 +165,51 @@ def error_code_for(exc: BaseException) -> str:
     if isinstance(exc, BudgetExceeded):
         scope = str(exc.scope)
         return f"budget_{scope}" if _CODE.match(scope) else "budget_exceeded"
+    if isinstance(exc, ConfigError):  # e.g. no OpenAI key: every job would fail the same way
+        return "model_not_configured"
     return "internal_error"
+
+
+def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
+    """Status and code for a conversion that returned a result.
+
+    Nothing to convert is a failure: "scanned" when every analysed page was only a
+    picture of a page, "no_content" when the result has no elements at all. Otherwise
+    the job is done, with a code when it is incomplete: the spend cap that stopped model
+    work ("budget_<scope>"), else "scanned_pages" when some pages were only images.
+    """
+    analysed = {page.page for page in result.stats.per_page}
+    image_only = set(result.image_only_pages)
+    if image_only and analysed <= image_only:
+        return JobStatus.FAILED, "scanned"
+    if not result.elements:
+        return JobStatus.FAILED, "no_content"
+    if result.stopped_by in BUDGET_STOPS:
+        return JobStatus.DONE, result.stopped_by
+    if image_only:
+        return JobStatus.DONE, SCANNED_PAGES
+    return JobStatus.DONE, None
 
 
 def job_time_limit_s(page_count: int, settings: Settings) -> float:
     """How long one conversion of `page_count` pages may run before it is stopped."""
     pages = page_count if page_count > 0 else settings.max_pages_per_job
     return JOB_BASE_S + JOB_PER_PAGE_S * min(pages, settings.max_pages_per_job)
+
+
+def job_caps(settings: Settings, page_count: int) -> tuple[float, int]:
+    """(max USD, max model calls) for a whole job of `page_count` pages, all attempts.
+
+    `MAX_USD_PER_JOB` and `MAX_MODEL_CALLS_PER_JOB`, lowered for short documents to the
+    per-page allowances times the pages. Without that, one dense page (layout puts no
+    limit on figures per page) could use a long document's whole allowance, and a user's
+    daily page quota would not bound what they can spend in a day.
+    """
+    pages = page_count if page_count > 0 else settings.max_pages_per_job
+    return (
+        min(settings.max_usd_per_job, pages * settings.max_usd_per_page),
+        min(settings.max_model_calls_per_job, pages * settings.max_model_calls_per_page),
+    )
 
 
 def db_safe(value: Any) -> Any:
@@ -162,14 +240,33 @@ class JobCancelled(BudgetExceeded):
 
 @dataclass
 class _AttemptBudget(JobBudget):
-    """`JobBudget` that asks first whether the job may still spend (`before_reserve`)."""
+    """`JobBudget` that also holds every reservation on the job's database row.
 
-    before_reserve: Callable[[], None] | None = field(default=None, repr=False)
+    `hold_on_job(amount)` runs first: it adds the hold to the job's totals if the job is
+    still this attempt's and stays under its caps, else raises `JobCancelled` or
+    `BudgetExceeded`. If the in-memory or the daily cap then refuses, `release_on_job`
+    takes the hold off again. `settle_on_job(delta)` replaces the hold with the actual
+    cost.
+    """
+
+    hold_on_job: Callable[[float], None] | None = field(default=None, repr=False)
+    release_on_job: Callable[[float], None] | None = field(default=None, repr=False)
+    settle_on_job: Callable[[float], None] | None = field(default=None, repr=False)
 
     def reserve(self, amount_usd: float) -> Reservation:
-        if self.before_reserve is not None:
-            self.before_reserve()  # raises JobCancelled
-        return super().reserve(amount_usd)
+        if self.hold_on_job is not None:
+            self.hold_on_job(amount_usd)
+        try:
+            return super().reserve(amount_usd)
+        except BaseException:
+            if self.release_on_job is not None:
+                self.release_on_job(amount_usd)
+            raise
+
+    def settle(self, reservation: Reservation, actual_usd: float) -> None:
+        super().settle(reservation, actual_usd)
+        if self.settle_on_job is not None:
+            self.settle_on_job(max(0.0, actual_usd) - reservation.amount_usd)
 
 
 @dataclass(frozen=True)
@@ -180,24 +277,16 @@ class Claim:
 
 @dataclass
 class _Attempt:
-    """One claim being converted: its budget, the job's spend before it, cancellation."""
+    """One claim being converted: its budget, the job's caps and spend before it,
+    cancellation."""
 
     claim: Claim
     prior_usd: float
     prior_calls: int
+    max_usd: float  # the whole job's caps (every attempt), see `job_caps`
+    max_calls: int
     budget: JobBudget = field(init=False)
     cancelled: threading.Event = field(default_factory=threading.Event)
-
-    def totals(
-        self, cost_usd: float | None = None, model_calls: int | None = None
-    ) -> dict[str, Any]:
-        """The job's `cost_usd` and `model_calls`: earlier attempts plus this one."""
-        cost = self.budget.spent_usd if cost_usd is None else cost_usd
-        calls = self.budget.calls if model_calls is None else model_calls
-        return {
-            "cost_usd": round(self.prior_usd + cost, 8),
-            "model_calls": self.prior_calls + calls,
-        }
 
 
 @dataclass
@@ -221,6 +310,8 @@ class Worker:
         clock: Callable[[], datetime] = utcnow,
         max_job_s: float | None = None,
         timeout_grace_s: float = TIMEOUT_GRACE_S,
+        headroom_usd: float | None = None,
+        tracer: Tracer | None = None,
     ) -> None:
         self.settings = settings
         self.factory = factory
@@ -231,8 +322,16 @@ class Worker:
         self.clock = clock
         self.max_job_s = max_job_s  # overrides job_time_limit_s (tests)
         self.timeout_grace_s = timeout_grace_s
+        # Less than this left under the daily cap: claim nothing (see the module docstring).
+        self.headroom_usd = (
+            largest_reservation_usd(settings) if headroom_usd is None else headroom_usd
+        )
+        self.tracer = tracer  # None: the converter's own default (no tracing)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
+        self._current: _Attempt | None = None
+        self._paused = False
+        self._next_purge = time.monotonic() + PURGE_FIRST_S
 
     # ------------------------------------------------------------------ queue
 
@@ -274,7 +373,9 @@ class Worker:
         return requeued, failed
 
     def claim(self, now: datetime | None = None) -> Claim | None:
-        """Take the next queued job (fewest attempts, then oldest), or None."""
+        """Take the next queued job (fewest attempts, then oldest), or None.
+
+        Only jobs whose owner is still on the allowlist are taken."""
         now = now or self.clock()
         claimed = {
             "status": JobStatus.RUNNING,
@@ -283,12 +384,17 @@ class Worker:
             "attempts": Job.attempts + 1,
             "error_code": None,
         }
-        oldest = select(Job.id).where(Job.status == JobStatus.QUEUED)
-        oldest = oldest.order_by(Job.attempts, Job.created_at, Job.id).limit(1)
+        oldest = (
+            select(Job.id)
+            .join(User, User.id == Job.user_id)
+            .where(Job.status == JobStatus.QUEUED, User.is_allowed.is_(True))
+            .order_by(Job.attempts, Job.created_at, Job.id)
+            .limit(1)
+        )
         for _ in range(5):  # SQLite: lose a race, try the next job
             with session_scope(self.factory) as session:
                 postgres = session.get_bind().dialect.name == "postgresql"
-                stmt = oldest.with_for_update(skip_locked=True) if postgres else oldest
+                stmt = oldest.with_for_update(skip_locked=True, of=Job) if postgres else oldest
                 job_id = session.scalar(stmt)
                 if job_id is None:
                     return None
@@ -306,6 +412,13 @@ class Worker:
                     return Claim(job_id=job_id, attempt=int(attempt or 1))
         return None
 
+    def budget_closed(self) -> bool:
+        """True while not even one model call fits under today's cap."""
+        cap_reached = getattr(self.guard, "cap_reached", None)
+        if not callable(cap_reached):  # a guard without a snapshot (tests, CLI)
+            return False
+        return bool(cap_reached(self.headroom_usd))
+
     def _owned(self, claim: Claim):
         """WHERE clause: the job is still running under this claim."""
         return (
@@ -318,19 +431,12 @@ class Worker:
         with session_scope(self.factory) as session:
             return session.scalar(select(Job.id).where(*self._owned(claim))) is not None
 
-    def extend_lease(
-        self,
-        claim: Claim,
-        *,
-        pages_done: int | None = None,
-        totals: Mapping[str, object] | None = None,
-    ) -> bool:
-        """Push the lease forward, recording progress and spend so far. False once this
-        worker no longer owns the job."""
+    def extend_lease(self, claim: Claim, *, pages_done: int | None = None) -> bool:
+        """Push the lease forward, recording progress. False once this worker no longer
+        owns the job."""
         values: dict[str, object] = {"lease_until": self._lease_until(self.clock())}
         if pages_done is not None:
             values["pages_done"] = pages_done
-        values.update(totals or {})
         with session_scope(self.factory) as session:
             return (
                 rowcount(
@@ -344,15 +450,82 @@ class Worker:
                 == 1
             )
 
+    # ------------------------------------------------------------------ spend on the job row
+
+    def _hold_on_job(self, attempt: _Attempt, amount_usd: float) -> None:
+        """Add one reservation to the job's totals, or raise.
+
+        One conditional UPDATE: the job must still be running under this attempt, and its
+        totals (every attempt's settled spend plus open holds) must stay under the job's
+        caps. JobCancelled if the job is no longer ours, BudgetExceeded("job_usd" or
+        "job_calls") if a cap would be passed.
+        """
+        if attempt.cancelled.is_set():
+            raise JobCancelled()
+        with session_scope(self.factory) as session:
+            won = rowcount(
+                session.execute(
+                    update(Job)
+                    .where(
+                        *self._owned(attempt.claim),
+                        Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON,
+                        Job.model_calls + 1 <= attempt.max_calls,
+                    )
+                    .values(cost_usd=Job.cost_usd + amount_usd, model_calls=Job.model_calls + 1)
+                    .execution_options(synchronize_session=False)
+                )
+            )
+            if won == 1:
+                return
+            row = session.execute(
+                select(Job.cost_usd, Job.model_calls).where(*self._owned(attempt.claim))
+            ).one_or_none()
+        if row is None:
+            self._cancel(attempt, "not_owned")
+            raise JobCancelled()
+        if int(row.model_calls or 0) + 1 > attempt.max_calls:
+            raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")
+        raise BudgetExceeded("job_usd", f"job spend cap ${attempt.max_usd:.2f} reached")
+
+    def _adjust_job(self, attempt: _Attempt, cost_delta: float, calls_delta: int) -> None:
+        """Change the job's totals by a delta (a released hold or a settled call), whoever
+        owns the job now: the hold was added to this row. Never raises."""
+        if not cost_delta and not calls_delta:
+            return
+        try:
+            with session_scope(self.factory) as session:
+                session.execute(
+                    update(Job)
+                    .where(Job.id == attempt.claim.job_id)
+                    .values(
+                        cost_usd=Job.cost_usd + cost_delta,
+                        model_calls=Job.model_calls + calls_delta,
+                    )
+                    .execution_options(synchronize_session=False)
+                )
+        except Exception as exc:  # the hold stays counted: errs on the side of less spend
+            log_exception(logger, "job_spend_update_failed", exc, job_id=attempt.claim.job_id)
+
     # ------------------------------------------------------------------ one attempt
 
-    def _start_attempt(self, claim: Claim, prior_usd: float, prior_calls: int) -> _Attempt:
-        attempt = _Attempt(claim=claim, prior_usd=prior_usd, prior_calls=prior_calls)
+    def _start_attempt(
+        self, claim: Claim, prior_usd: float, prior_calls: int, page_count: int
+    ) -> _Attempt:
+        max_usd, max_calls = job_caps(self.settings, page_count)
+        attempt = _Attempt(
+            claim=claim,
+            prior_usd=prior_usd,
+            prior_calls=prior_calls,
+            max_usd=max_usd,
+            max_calls=max_calls,
+        )
         attempt.budget = _AttemptBudget(
             guard=self.guard,
-            max_usd=max(0.0, self.settings.max_usd_per_job - prior_usd),
-            max_calls=max(0, self.settings.max_model_calls_per_job - prior_calls),
-            before_reserve=lambda: self._ensure_owned(attempt),
+            max_usd=max(0.0, max_usd - prior_usd),
+            max_calls=max(0, max_calls - prior_calls),
+            hold_on_job=lambda amount: self._hold_on_job(attempt, amount),
+            release_on_job=lambda amount: self._adjust_job(attempt, -amount, -1),
+            settle_on_job=lambda delta: self._adjust_job(attempt, delta, 0),
         )
         return attempt
 
@@ -361,23 +534,10 @@ class Worker:
             attempt.cancelled.set()
             log_event(logger, "job_cancelled", job_id=attempt.claim.job_id, reason=reason)
 
-    def _ensure_owned(self, attempt: _Attempt) -> None:
-        """Before each spend reservation: raise JobCancelled if the job is no longer ours."""
-        if attempt.cancelled.is_set():
-            raise JobCancelled()
-        try:
-            owned = self.owns(attempt.claim)
-        except Exception as exc:  # cannot tell; the spend guard's own query decides
-            log_exception(logger, "ownership_check_failed", exc, job_id=attempt.claim.job_id)
-            return
-        if not owned:
-            self._cancel(attempt, "not_owned")
-            raise JobCancelled()
-
     def _beat(self, attempt: _Attempt, *, pages_done: int | None = None) -> None:
-        """Extend the lease and record spend so far; cancel if the job is gone."""
+        """Extend the lease and record progress; cancel if the job is gone."""
         try:
-            owned = self.extend_lease(attempt.claim, pages_done=pages_done, totals=attempt.totals())
+            owned = self.extend_lease(attempt.claim, pages_done=pages_done)
         except Exception as exc:  # a missed beat is retried; the lease has slack
             log_exception(logger, "lease_refresh_failed", exc, job_id=attempt.claim.job_id)
             return
@@ -401,9 +561,19 @@ class Worker:
         def target() -> None:
             try:
                 client = self.client_factory(self.settings, attempt.budget)
-                run.output = self.converter(
-                    pdf, settings=self.settings, client=client, progress=self._progress(attempt)
-                )
+                progress = self._progress(attempt)
+                if self.tracer is None:
+                    run.output = self.converter(
+                        pdf, settings=self.settings, client=client, progress=progress
+                    )
+                else:
+                    run.output = self.converter(
+                        pdf,
+                        settings=self.settings,
+                        client=client,
+                        progress=progress,
+                        tracer=self.tracer,
+                    )
             except Exception as exc:  # handed to the worker thread
                 run.error = exc
 
@@ -458,10 +628,23 @@ class Worker:
         if job is None:  # deleted between claim and start
             log_event(logger, "job_result_discarded", job_id=claim.job_id)
             return DISCARDED
-        attempt = self._start_attempt(claim, float(job.cost_usd or 0.0), int(job.model_calls or 0))
+        page_count = int(job.page_count or 0)
+        attempt = self._start_attempt(
+            claim, float(job.cost_usd or 0.0), int(job.model_calls or 0), page_count
+        )
         if pdf is None:
             return self._finish_failed(attempt, "upload_missing")
-        limit_s = self.time_limit_s(int(job.page_count or 0))
+        self._current = attempt
+        try:
+            return self._convert_and_store(attempt, pdf, page_count, started)
+        finally:
+            self._current = None
+
+    def _convert_and_store(
+        self, attempt: _Attempt, pdf: bytes, page_count: int, started: float
+    ) -> str:
+        claim = attempt.claim
+        limit_s = self.time_limit_s(page_count)
         thread, run = self._start_conversion(attempt, pdf)
         finished = self._wait(attempt, thread, limit_s)
         if not finished and not attempt.cancelled.is_set():
@@ -476,6 +659,10 @@ class Worker:
             code = error_code_for(exc)
             log_exception(logger, "job_failed", exc, job_id=claim.job_id, error_code=code)
             return self._finish_failed(attempt, code)
+        status, code = result_outcome(run.output.result)
+        if status == JobStatus.FAILED:
+            log_event(logger, "job_failed", job_id=claim.job_id, error_code=code)
+            return self._finish_failed(attempt, code or "internal_error")
         return self._store(attempt, run.output, time.monotonic() - started)
 
     def _finish_failed(self, attempt: _Attempt, code: str) -> str:
@@ -485,7 +672,6 @@ class Worker:
             "error_code": code,
             "finished_at": self.clock(),
             "lease_until": None,
-            **attempt.totals(),
         }
         with session_scope(self.factory) as session:
             updated = rowcount(
@@ -519,6 +705,7 @@ class Worker:
             logger,
             "job_done",
             job_id=job_id,
+            outcome=result_outcome(result)[1],
             pages=result.stats.pages,
             fixes=len(result.fixes),
             model_calls=result.stats.model_calls,
@@ -536,8 +723,9 @@ class Worker:
             return self._write_result(attempt, output)
 
     def _write_result(self, attempt: _Attempt, output: ConversionOutput) -> bool:
-        """One transaction: crops, result, html, totals, DONE. False if not ours."""
+        """One transaction: crops, result, html, outcome code, DONE. False if not ours."""
         result = output.result
+        _, code = result_outcome(result)
         with session_scope(self.factory) as session:
             job = session.get(Job, attempt.claim.job_id, with_for_update=True)
             if (
@@ -559,14 +747,17 @@ class Worker:
                 )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
-            totals = attempt.totals(
-                result.stats.cost_usd or attempt.budget.spent_usd,
-                result.stats.model_calls or attempt.budget.calls,
+            # The row already counts every reservation (`_hold_on_job`). A converter that
+            # reports more than went through the budget (a test fake) is counted as well.
+            job.cost_usd = max(
+                float(job.cost_usd or 0.0), round(attempt.prior_usd + result.stats.cost_usd, 8)
             )
-            job.cost_usd = totals["cost_usd"]
-            job.model_calls = totals["model_calls"]
+            job.model_calls = max(
+                int(job.model_calls or 0), attempt.prior_calls + result.stats.model_calls
+            )
             job.pages_done = job.page_count
             job.status = JobStatus.DONE
+            job.error_code = code
             job.finished_at = self.clock()
             job.lease_until = None
         return True
@@ -574,16 +765,49 @@ class Worker:
     # ------------------------------------------------------------------ loop
 
     def run_once(self) -> str | None:
-        """Requeue expired leases, then claim and process one job. Returns its id."""
+        """Requeue expired leases, then claim and process one job. Returns its id.
+
+        Claims nothing while the daily budget is spent (`budget_closed`)."""
         self.requeue_expired()
+        if self.budget_closed():
+            if not self._paused:
+                self._paused = True
+                log_event(logger, "claims_paused", logging.WARNING, reason="daily_budget")
+            return None
+        if self._paused:
+            self._paused = False
+            log_event(logger, "claims_resumed")
         claim = self.claim()
         if claim is None:
             return None
         self.process(claim)
         return claim.job_id
 
+    def purge_backstop(self) -> int | None:
+        """Run the retention purge if it is due (see the module docstring). Returns the
+        jobs deleted, or None when it was not due or failed. Never raises."""
+        if time.monotonic() < self._next_purge:
+            return None
+        self._next_purge = time.monotonic() + PURGE_EVERY_S
+        from a11y_stem.ops.retention import purge_expired
+
+        try:
+            stats = purge_expired(self.factory, self.clock(), source="worker")
+        except Exception as exc:
+            log_exception(logger, "purge_backstop_failed", exc)
+            return None
+        if stats.jobs_deleted:
+            log_event(
+                logger,
+                "purge_backstop_deleted",
+                logging.WARNING,
+                jobs_deleted=stats.jobs_deleted,
+            )
+        return stats.jobs_deleted
+
     def _loop(self) -> None:
         while not self._stop.is_set():
+            self.purge_backstop()
             try:
                 ran = self.run_once()
             except Exception as exc:  # e.g. database briefly unreachable
@@ -601,9 +825,23 @@ class Worker:
         log_event(logger, "worker_started")
 
     def stop(self, timeout: float = 10.0) -> None:
-        """Ask the loop to stop after the current job. A job still running when the
-        process exits is picked up again once its lease expires."""
+        """Stop the loop. A job being converted is cancelled (no more model calls) and its
+        lease ended now, so another instance requeues it at once instead of after the
+        lease runs out."""
         self._stop.set()
+        attempt = self._current
+        if attempt is not None:
+            self._cancel(attempt, "shutdown")
+            try:
+                with session_scope(self.factory) as session:
+                    session.execute(
+                        update(Job)
+                        .where(*self._owned(attempt.claim))
+                        .values(lease_until=self.clock())
+                        .execution_options(synchronize_session=False)
+                    )
+            except Exception as exc:  # the lease still runs out on its own
+                log_exception(logger, "lease_release_failed", exc, job_id=attempt.claim.job_id)
         if self._thread is not None:
             self._thread.join(timeout=timeout)
         log_event(logger, "worker_stopped")

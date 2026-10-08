@@ -5,15 +5,17 @@
 
 from __future__ import annotations
 
+import logging
+
 import pytest
 from alembic import command
 from alembic.autogenerate import compare_metadata
 from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 from a11y_stem.config import ConfigError
-from a11y_stem.web import db
+from a11y_stem.web import database, db
 from a11y_stem.web.database import (
     alembic_config,
     alembic_ini_path,
@@ -85,4 +87,35 @@ def test_dev_and_test_create_tables_directly(tmp_path):
     engine = db.make_engine(f"sqlite:///{tmp_path}/dev.db")
     prepare_database(engine, make_settings(tmp_path, env="dev"))
     assert "jobs" in inspect(engine).get_table_names()
+    engine.dispose()
+
+
+def set_revision(engine, revision: str) -> None:
+    with engine.begin() as conn:
+        conn.execute(text("UPDATE alembic_version SET version_num = :r"), {"r": revision})
+
+
+def test_a_database_migrated_by_a_newer_release_still_starts(tmp_path, caplog):
+    """Rolling back to an older revision (or that revision restarting between a ship's
+    migrate and service steps) used to fail start-up with exit 3 once any newer release
+    had migrated: the image did not know the database's revision."""
+    url = f"sqlite:///{tmp_path}/ahead.db"
+    upgrade(url)
+    engine = db.make_engine(url)
+    set_revision(engine, "9a9a9a9a9a9a")  # a revision this image has never heard of
+    caplog.set_level(logging.WARNING)
+    require_migrated(engine)
+    assert "schema_ahead" in caplog.messages
+    engine.dispose()
+
+
+def test_a_database_behind_this_release_is_refused(tmp_path, monkeypatch):
+    url = f"sqlite:///{tmp_path}/behind.db"
+    upgrade(url)
+    engine = db.make_engine(url)
+    [current] = migration_heads() or {""}
+    monkeypatch.setattr(database, "migration_heads", lambda: {"f00dfeedbeef"})
+    monkeypatch.setattr(database, "known_revisions", lambda: {current, "f00dfeedbeef"})
+    with pytest.raises(ConfigError, match="behind"):
+        require_migrated(engine)
     engine.dispose()

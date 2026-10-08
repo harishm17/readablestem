@@ -14,6 +14,7 @@ CI also runs 3.14).
 | `make test-network` | Live OpenStax API test (`pytest -m network`) |
 | `make lint` | `ruff check` + `ruff format --check` |
 | `make fmt` | Format and auto-fix |
+| `make ci-local` | What CI's `lint-test` job runs (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
 | `make eval-plumbing` | Plumbing check only: scores each gold equation against itself, so it always prints 1.0. Does **not** test normalisation |
@@ -42,7 +43,9 @@ any subdirectory. Outside a checkout they fall back to the working directory. Ba
 | `src/a11y_stem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/a11y_stem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/a11y_stem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
-| `src/a11y_stem/pipeline/parse.py` | PDF -> elements stub (PyMuPDF); vision step is a TODO |
+| `src/a11y_stem/pipeline/parse.py` | the quick line-level view behind `a11y-stem parse` (a debugging aid) and `equation_score`, which the layout step reuses |
+| `src/a11y_stem/pipeline/` | the conversion pipeline (layout, steps, assemble, run); see docs/layout.md, docs/steps.md, docs/output.md |
+| `src/a11y_stem/web/`, `src/a11y_stem/ops/` | the hosted app and its cron, retention and reports; see docs/web.md, docs/operations.md |
 | `src/a11y_stem/cli/main.py` | `a11y-stem` command |
 | `data/gold/` | Committed sample gold set, `manifest.json`, `ATTRIBUTION.md` |
 | `docs/decisions/` | Architecture decision records |

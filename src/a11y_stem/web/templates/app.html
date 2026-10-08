@@ -9,7 +9,7 @@
 <div class="notice notice-warning">
   <h2>Conversions are paused for today</h2>
   <p>Today's budget for conversions has been used up. Uploads open again after midnight UTC.
-    Documents already in the queue may stop early.</p>
+    Documents already in the queue wait until then.</p>
 </div>
 {% endif %}
 
@@ -62,10 +62,12 @@
       <tr>
         <th scope="row"><a href="/jobs/{{ job.id }}">{{ job.filename }}</a></th>
         <td>{{ job.created_at|utc }}</td>
-        <td><span class="status-badge status-{{ job.status }}">{{ job.status_label }}</span></td>
+        {% set outcome = outcomes.get(job.id) if outcomes is defined else none %}
+        <td><span class="status-badge status-{{ job.status }}">{{ outcome.label if outcome else job.status_label }}</span></td>
         <td>{{ job.page_count }}</td>
         <td>{{ job.retain_until|utc }}</td>
         <td>
+          {# Posts without confirm=yes: the next page asks before anything is deleted. #}
           <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
             <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
             <button type="submit" class="button-secondary">Delete<span class="visually-hidden"> {{ job.filename }}</span></button>

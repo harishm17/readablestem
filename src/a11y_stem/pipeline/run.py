@@ -23,8 +23,16 @@ Design notes:
 - Calls a step made before it raised were still billed, so each step gets a recording
   wrapper around the client and those calls are kept on the FAILED fix: cost and call
   counts stay true.
-- Static checks of the HTML are returned on `PipelineOutput.checks` (a subclass of
-  `ConversionOutput`), because `DocumentResult` has no field for them yet.
+- Static checks of the HTML are stored on `DocumentResult.html_checks` and, as before,
+  returned on `PipelineOutput.checks` (a subclass of `ConversionOutput`).
+- Scanned pages: a page whose only content is one image covering it, with no text, is a
+  picture of a page. Layout drops such an image as a page background, so the pipeline
+  checks the pages where layout found no text (`page_kinds`), adds the page as a figure
+  element that is FAILED with reason "scanned_page" before any model work (cropped, so the
+  output keeps the page image, flagged), and lists the pages on
+  `DocumentResult.image_only_pages`. The web app reports them to the user.
+- Run-level outcomes are recorded on the result, content-free: `stopped_by` (the
+  "budget_<scope>" that stopped model work early, else None) and `html_checks`.
 - `layout` (WP2) keeps a few opened PDFs cached for cropping. Once the last crop is made
   (or the run fails) the document is released, so a long-lived worker does not keep a
   user's PDF in memory after its job.
@@ -36,6 +44,7 @@ Design notes:
 
 from __future__ import annotations
 
+import contextlib
 import contextvars
 import logging
 import threading
@@ -54,6 +63,7 @@ from pydantic import Field
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded
 from a11y_stem.core.types import (
+    BBox,
     Check,
     ConversionOutput,
     DocumentResult,
@@ -76,6 +86,7 @@ from a11y_stem.pipeline import (
     heading_step,
     html_checks,
     layout,
+    page_kinds,
 )
 
 log = logging.getLogger(__name__)
@@ -91,14 +102,16 @@ _MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE)
 # Errors that mean the run itself is misconfigured, not that one element is hard: they
 # stop the run and propagate (see the module docstring).
 FATAL_ERRORS: tuple[type[Exception], ...] = (ConfigError, UnknownModelError)
+# Fix.reason of the figure that stands for a scanned page (nothing on it to convert).
+SCANNED_PAGE_REASON = "scanned_page"
+_PAGE_TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
 
 
 class PipelineOutput(ConversionOutput):
     """`ConversionOutput` plus the static checks of `result.html`.
 
-    `DocumentResult` has no field for document-level checks yet, so they travel here.
-    Code that only knows `ConversionOutput` can ignore them or recompute them with
-    `html_checks.static_checks(result.html)` (deterministic and fast).
+    The same checks are on `result.html_checks` (stored with the result); this field is
+    kept for callers written before that existed.
     """
 
     checks: list[Check] = Field(default_factory=list)
@@ -510,6 +523,8 @@ class _Run:
             self.fixes[element.id] = _failed(element, "crop_error")
             return
         self.crops[element.id] = png
+        if element.id in self.fixes:  # decided before any model work: a scanned page
+            return
         if self.stop.scope is not None:  # still cropped: the output shows the original
             self.fixes[element.id] = _failed(element, self.stop.reason())
             return
@@ -620,6 +635,92 @@ def _prompt_versions(fixes: list[Fix]) -> dict[str, str]:
     return versions
 
 
+# --------------------------------------------------------------------------- scanned pages
+
+
+def _image_only_pages(
+    pdf_bytes: bytes, page_list: list[int], elements: list[Element]
+) -> dict[int, BBox]:
+    """Pages that are only a picture of a page, with each page's box.
+
+    Only pages on which layout found no text are opened, so a normal document costs
+    nothing here. `layout.analyze` has already rendered every analysed page in its crash
+    probe, so reading these pages again in this process is safe. PyMuPDF is not
+    thread-safe: hold layout's lock (when it has one) like every other PyMuPDF call.
+    """
+    with_text = {e.page for e in elements if e.kind in _PAGE_TEXT_KINDS}
+    candidates = [page for page in page_list if page not in with_text]
+    if not candidates:
+        return {}
+    import pymupdf
+
+    found: dict[int, BBox] = {}
+    lock = getattr(layout, "_LOCK", None)
+    with lock if lock is not None else contextlib.nullcontext():
+        pymupdf.TOOLS.mupdf_display_errors(False)
+        pymupdf.TOOLS.mupdf_display_warnings(False)
+        try:
+            doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
+            try:
+                for number in candidates:
+                    page = doc[number]
+                    if page_kinds.page_kind(page) is page_kinds.PageKind.IMAGE_ONLY:
+                        rect = page.rect
+                        found[number] = (rect.x0, rect.y0, rect.x1, rect.y1)
+            finally:
+                doc.close()
+        except Exception as exc:  # a detection problem never fails the conversion
+            log.warning("scanned-page check failed: %s", type(exc).__name__)
+            return {}
+        finally:
+            pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
+    return found
+
+
+def _next_id(page: int, elements: list[Element]) -> str:
+    """A free "p{page+1}-e{index}" id on this page (one past the highest index used)."""
+    prefix = f"p{page + 1}-e"
+    used = [
+        int(e.id.removeprefix(prefix))
+        for e in elements
+        if e.id.startswith(prefix) and e.id.removeprefix(prefix).isdecimal()
+    ]
+    return f"{prefix}{max(used) + 1 if used else 0}"
+
+
+def _with_page_images(
+    elements: list[Element], scans: dict[int, BBox]
+) -> tuple[list[Element], list[Fix]]:
+    """`elements` plus one figure per scanned page (placed after the page's other
+    elements, orders renumbered), and the FAILED fixes that keep them from the model."""
+    if not scans:
+        return elements, []
+    added: list[Element] = []
+    result: list[Element] = []
+    pending = sorted(scans)
+    for element in elements:
+        while pending and pending[0] < element.page:
+            added.append(_page_image(pending.pop(0), scans, elements))
+            result.append(added[-1])
+        result.append(element)
+    for page in pending:
+        added.append(_page_image(page, scans, elements))
+        result.append(added[-1])
+    renumbered = [e.model_copy(update={"order": i}) for i, e in enumerate(result)]
+    return renumbered, [_failed(e, SCANNED_PAGE_REASON) for e in added]
+
+
+def _page_image(page: int, scans: dict[int, BBox], elements: list[Element]) -> Element:
+    return Element(
+        id=_next_id(page, elements),
+        kind=Kind.FIGURE,
+        page=page,
+        bbox=scans[page],
+        order=0,  # renumbered by the caller
+        reasons=[SCANNED_PAGE_REASON],
+    )
+
+
 # --------------------------------------------------------------------------- entry point
 
 
@@ -701,7 +802,10 @@ def convert_pdf(
             doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
             elements = sorted(doc.elements, key=lambda e: e.order)
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
+            scans = _image_only_pages(pdf_bytes, page_list, elements)
+            elements, scan_fixes = _with_page_images(elements, scans)
             fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
+            fixes.update({f.element_id: f for f in scan_fixes})
             run = _Run(
                 pdf_bytes=pdf_bytes,
                 settings=settings,
@@ -742,6 +846,7 @@ def convert_pdf(
             cost_usd=stats.cost_usd,
             latency_ms=stats.latency_ms,
             reason=run.stop.reason() if run.stop.scope is not None else None,
+            image_only_pages=len(scans),
             checks_failed=sum(1 for c in checks if not c.passed),
             **_status_counts("fixes", ordered),
         )
@@ -762,5 +867,8 @@ def convert_pdf(
         fixes=ordered,
         stats=stats,
         html=html,
+        stopped_by=run.stop.reason() if run.stop.scope is not None else None,
+        image_only_pages=sorted(scans),
+        html_checks=checks,
     )
     return PipelineOutput(result=result, crops=run.crops, checks=checks)

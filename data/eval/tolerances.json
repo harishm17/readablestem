@@ -1,10 +1,16 @@
 {
-  "_comment": "Tracked metrics for `a11y-stem eval gate`. max_drop is an absolute drop in a rate (0.02 = 2 percentage points); max_rel_increase is a relative rise (0.25 = +25%). Entries replace the built-in defaults by name. See docs/eval.md.",
+  "_comment": "Tracked metrics for `a11y-stem eval gate`. max_drop is an absolute drop in a rate (0.02 = 2 percentage points); max_rel_increase is a relative rise (0.25 = +25%); max_increase is an absolute rise of a count (0 = any increase fails). Entries replace the built-in defaults by name. See docs/eval.md.",
   "tolerances": [
     {"name": "exact_lenient", "task": "equations", "path": "metrics.exact_lenient", "rule": "max_drop", "limit": 0.02},
     {"name": "mean_teds", "task": "equations", "path": "metrics.mean_teds", "rule": "max_drop", "limit": 0.02},
     {"name": "cost_per_equation", "task": "equations", "path": "cost.per_item_usd", "rule": "max_rel_increase", "limit": 0.25},
     {"name": "heading_recall", "task": "headings", "path": "metrics.recall", "rule": "max_drop", "limit": 0.03},
-    {"name": "figure_judge_pass_rate", "task": "figures", "path": "metrics.judge_pass_rate", "rule": "max_drop", "limit": 0.05}
+    {"name": "heading_precision", "task": "headings", "path": "metrics.precision", "rule": "max_drop", "limit": 0.03},
+    {"name": "figure_judge_pass_rate", "task": "figures", "path": "metrics.judge_pass_rate", "rule": "max_drop", "limit": 0.05},
+    {"name": "document_detection_recall", "task": "document", "path": "metrics.detection_recall", "rule": "max_drop", "limit": 0.02},
+    {"name": "document_detection_precision", "task": "document", "path": "metrics.detection_precision", "rule": "max_drop", "limit": 0.03},
+    {"name": "document_matched_exact_lenient", "task": "document", "path": "metrics.matched_exact_lenient", "rule": "max_drop", "limit": 0.03},
+    {"name": "document_axe_violations", "task": "document", "path": "metrics.axe_violations", "rule": "max_increase", "limit": 0},
+    {"name": "document_cost", "task": "document", "path": "cost.per_item_usd", "rule": "max_rel_increase", "limit": 0.25}
   ]
 }

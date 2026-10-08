@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Service status{% endblock %}
+{% block content %}
+<h1>Service status</h1>
+<dl class="summary-list">
+  <div><dt>Service</dt><dd>{{ "Up" if database_ok else "Having problems: the database is not answering. Please try again later." }}</dd></div>
+  {% if database_ok %}
+  <div><dt>Conversions today</dt><dd>{{ "Open" if conversions_open else "Paused: today's budget is used up. They start again after 00:00 UTC." }}</dd></div>
+  <div><dt>Documents waiting</dt><dd>{{ waiting }}</dd></div>
+  <div><dt>Documents converting</dt><dd>{{ converting }}</dd></div>
+  {% endif %}
+</dl>
+<p class="hint">This page shows the state right now. Whatever it says, uploaded documents
+  are deleted {{ retention_hours }} hours after upload ({{ opt_in_days }} days if the
+  uploader chose to keep them longer). What the tool cannot do yet is on the
+  <a href="/limits">known limits</a> page.</p>
+{% endblock %}

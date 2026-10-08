@@ -4,22 +4,19 @@ Exception messages can carry document text (a parser quoting the line it choked 
 validator echoing LaTeX), so they are never logged. What is logged about an exception is
 its type and where it happened (file:line:function of the innermost frames), which is
 enough to find the bug without seeing the document.
+
+Every line is structured (`observability.logging.log_fields`): the message is the event
+name alone and the fields are top-level JSON keys, so Logs Explorer can match
+`jsonPayload.message="job_failed"` exactly and filter on `jsonPayload.error_code`.
 """
 
 from __future__ import annotations
 
 import logging
-import traceback
-from pathlib import Path
 
-Field = str | int | float | bool | None
+from a11y_stem.observability.logging import exception_fields, log_fields
 
-
-def exception_summary(exc: BaseException, *, frames: int = 6) -> dict[str, str]:
-    """Type and code locations of an exception; never its message or locals."""
-    stack = traceback.extract_tb(exc.__traceback__)[-frames:]
-    where = " < ".join(f"{Path(f.filename).name}:{f.lineno}:{f.name}" for f in reversed(stack))
-    return {"exc_type": type(exc).__name__, "where": where}
+Field = str | int | float | bool | None | list[str]
 
 
 def log_event(
@@ -30,9 +27,10 @@ def log_event(
     Callers must only pass content-free values (ids, numbers, codes); never filenames,
     emails or document text.
     """
-    text = " ".join(f"{key}={value}" for key, value in fields.items())
-    logger.log(level, "%s %s", event, text, extra={"event": event, "fields": fields})
+    log_fields(logger, level, event, stacklevel=2, **fields)
 
 
 def log_exception(logger: logging.Logger, event: str, exc: BaseException, **fields: Field) -> None:
-    log_event(logger, event, logging.ERROR, **fields, **exception_summary(exc))
+    """`log_event` at ERROR plus `error_type` and `stack` (code locations, innermost last;
+    never the message)."""
+    log_fields(logger, logging.ERROR, event, stacklevel=2, **fields, **exception_fields(exc))

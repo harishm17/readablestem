@@ -284,7 +284,7 @@ def test_cost_above_the_reservation_is_settled_in_full_and_warned(caplog):
         MAIN_MODEL, n_images=1, text_chars=0, max_output_tokens=1024
     )
     assert budget.spent_usd == pytest.approx(call.cost_usd)  # real spend, not the estimate
-    assert "exceeded its reservation" in caplog.text
+    assert "model_call_over_reservation" in caplog.messages
 
 
 # --- request shape ------------------------------------------------------------------------
@@ -463,7 +463,12 @@ def test_status_and_error_code_of_an_unexpected_200_body_are_logged(caplog):
     client, _ = client_for(ScriptedHTTP(raw_reply(200, body)))
     with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
         client.run(make_request(), Out)
-    assert "error=UnexpectedBody status=200 code=server_error" in caplog.text
+    fields = logged_fields(caplog, "model_call")
+    assert (fields["error"], fields["status"], fields["code"]) == (
+        "UnexpectedBody",
+        200,
+        "server_error",
+    )
     assert SECRET not in caplog.text
 
 
@@ -654,17 +659,18 @@ def test_failure_log_names_the_error_class_status_and_code(caplog):
     client, _ = client_for(ScriptedHTTP(http_error(429, "rate_limit_exceeded")))
     with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
         client.run(make_request(), Out)
-    assert "outcome=api_error" in caplog.text
-    assert "error=RateLimitError" in caplog.text
-    assert "status=429" in caplog.text
-    assert "code=rate_limit_exceeded" in caplog.text
+    fields = logged_fields(caplog, "model_call")
+    assert fields["outcome"] == "api_error"
+    assert fields["error"] == "RateLimitError"
+    assert fields["status"] == 429
+    assert fields["code"] == "rate_limit_exceeded"
 
 
 def test_free_text_error_codes_are_not_logged(caplog):
     client, _ = client_for(ScriptedHTTP(http_error(400, f"Weird {SECRET} code")))
     with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
         client.run(make_request(), Out)
-    assert "code=other" in caplog.text
+    assert logged_fields(caplog, "model_call")["code"] == "other"
     assert SECRET not in caplog.text
 
 
@@ -881,3 +887,12 @@ def test_a_huge_context_reserves_no_more_than_the_capped_text_it_sends():
     assert len(sent) < 2400
     # Only the " [truncated]" marker separates the two.
     assert huge_reserved == pytest.approx(capped_reserved, abs=1e-4)
+
+
+def logged_fields(caplog, event: str) -> dict:
+    """Fields of the last `event` line (`observability.logging.log_fields`)."""
+    from a11y_stem.observability.logging import FIELDS_ATTR
+
+    records = [r for r in caplog.records if r.getMessage() == event]
+    assert records, f"no {event} line logged"
+    return getattr(records[-1], FIELDS_ATTR)

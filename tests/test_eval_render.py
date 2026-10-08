@@ -291,6 +291,18 @@ def test_demo_note_goes_right_after_body_and_is_escaped():
     assert "compliant" not in wrapped.lower()
 
 
+def test_demo_links_back_to_the_app_and_to_the_source_and_marks_placeholders():
+    page = page_source()
+    wrapped = wrap_demo_html(
+        "<main></main>", page, date="2026-10-07", source_url="https://example.org/src"
+    )
+    assert '<a href="/">Back to a11y-stem</a>' in wrapped
+    assert '<a href="https://example.org/src">' in wrapped and "Affero" in wrapped
+    assert "data-a11y-stem-demo" not in wrapped
+    fake = wrap_demo_html("<main></main>", page, date="2026-10-07", placeholder=True)
+    assert 'data-a11y-stem-demo="placeholder"' in fake and "Placeholder output." in fake
+
+
 def test_demo_wraps_a_fragment_in_a_document():
     wrapped = wrap_demo_html("<main><p>x</p></main>", page_source(), date="2026-10-07")
     assert wrapped.startswith("<!doctype html>")

@@ -7,8 +7,10 @@ goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
 
 | What | When | Where |
 |---|---|---|
-| Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header) |
+| Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
+| Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the scheduler is late |
 | Uptime check of `/healthz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when it fails for 10 minutes |
+| Cron alerts | Cloud Monitoring (log-based metrics) | Emails `ALERT_EMAIL` when there is no `cron_done` for 2 hours, or on any `cron_refused`, `aggregate_failed`, `purge_backstop_deleted`, `purge_backstop_failed` or failed Cloud Scheduler attempt |
 | Outside-in check of `/healthz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set |
 | Dependency updates | Weekly, Dependabot | One grouped PR per ecosystem (uv, actions, Docker) |
 
@@ -69,10 +71,13 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `call:fallback` | calls made on the other model after a failure |
 | same | `call:escalated` | fixes re-asked on a different model without a failure (e.g. a low-confidence `gpt-6-luna` answer sent to `gpt-6.1-sol`) |
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
-| same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran |
+| same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran (a heading edit keeps them; checks in the earliest `before` snapshot are counted when it has them) |
+| `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
-| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted` |
-| `job` | `pages` | pages converted (a sum, not a count of jobs) |
+| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`; on done jobs the outcome code (`error:budget_daily`, `error:scanned_pages`) |
+| `job` | `pages` | pages of done jobs (a sum, not a count of jobs) |
+| `job` | `cost_microusd` | model spend of done jobs in millionths of a dollar (a sum): `sum(cost_microusd) / sum(pages) / 1e6` is the production cost per page |
+| `job` | `latency:lt60s` ... `latency:ge600s` | done jobs by conversion wall time (buckets 60, 120, 300, 600 s) |
 | `job` | `aggregate:invalid_result` | stored results that no longer parse (schema drift) |
 
 Every part of a category must look like a code (lower case letters, digits, `_ . -`, at
@@ -103,7 +108,15 @@ FROM error_aggregates WHERE step = 'equation' GROUP BY day ORDER BY day;
 -- Model reliability: outcomes per model
 SELECT category, sum(count) FROM error_aggregates
 WHERE category LIKE 'call:%:outcome:%' GROUP BY category ORDER BY 2 DESC;
+
+-- Production cost per converted page, last 30 days
+SELECT sum(count) FILTER (WHERE category = 'cost_microusd') / 1e6
+       / nullif(sum(count) FILTER (WHERE category = 'pages'), 0) AS usd_per_page
+FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 ```
+
+`a11y-stem ops report --days 7` prints the weekly error-analysis tables from these rows
+(through the Cloud SQL Auth Proxy, like the other `ops` commands).
 
 ## Logs
 
@@ -178,12 +191,33 @@ Pass ids, counts and category codes as keyword fields. Do not build a message st
 out of values, and never pass document text under a neutral key name: the filter catches
 names, not meaning.
 
+Code on a standard-library logger (the web app and worker use `web.logsafe.log_event`
+and `log_exception`; the OpenAI client logs `model_call`, `model_call_retry` and
+`model_call_retry_skipped`) goes through `observability.logging.log_fields`: the message
+is the event name alone and the fields become top-level keys, so
+`jsonPayload.message="job_failed" AND jsonPayload.error_code="internal_error"` or
+`jsonPayload.message="model_call" AND jsonPayload.code="project_spend_limit_exceeded"`
+work as written. `log_exception` adds `error_type` and `stack`, as the chain does for
+`exc_info`.
+
 ## Tracing (Langfuse)
 
 Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (`deploy.sh` stores the
 secret key in Secret Manager when tracing is enabled). If the `tracing` extra is missing
 or the client cannot start, the app logs `tracing_disabled` with a `reason` and carries
 on without traces. Keep it off for any run on `private-inputs/`.
+
+Where the tracer comes from: `create_app` calls `make_tracer(settings)` once and the
+worker passes it to every `convert_pdf` (`app_started` logs `tracing=true|false`); it is
+flushed when the app shuts down. `a11y-stem convert` does the same for one run. With
+tracing off the converter gets no tracer at all.
+
+Retention: traces hold ids, codes, token counts and costs, never document content, but
+they live in Langfuse, outside the app's hourly purge. TODO(Harish): before turning
+tracing on in production, set the Langfuse project's data retention (Project settings >
+Data retention, if your plan has it) to match `RETENTION_HOURS` or as short as allowed,
+and make the privacy page say where traces go and for how long (it does when
+`TRACING_ENABLED=true`; check the wording).
 
 What a span can carry is an allowlist (`ALLOWED_ATTRIBUTES` in
 `observability/tracing.py`): ids, step, kind, model (or a comma-separated list of the
@@ -214,12 +248,13 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 |---|---|---|
 | Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
 | `/healthz` answers 503 | The database: Cloud SQL instance state, connections | See "Too many connections" below |
-| Conversions fail with `reason:budget_daily` | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed. Raise the cap only on purpose; it resets at 00:00 UTC |
+| Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`) |
+| "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | See the next rows. The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the scheduler anyway |
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
 | Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
 | `unaggregated_deleted` above 0 | The cron history | Some statistics are lost for those jobs; nothing else to do |
-| Purge itself failing | `purge_done` missing for over an hour | Treat as a privacy incident: run `a11y-stem ops purge` by hand, then fix the cause |
+| Purge itself failing | `purge_done` missing for over an hour (from both `source=cron` and `source=worker`), or `purge_backstop_failed` | Treat as a privacy incident: run `a11y-stem ops purge` by hand, then fix the cause. Job pages already answer 404 once `retain_until` has passed, purged or not |
 | Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections; keep `--max-instances=2` or move to `db-g1-small` (50) |
 | Weekly GitHub uptime run failed | The run's log | Same as the uptime alert; also check the custom domain and certificate |
 
@@ -233,7 +268,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | `postgres` | `pytest -m postgres` against a Postgres 16 service container |
 | `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
 | `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as Cloud Build's `--tag` build may use), and checks the entry point and non-root user |
-| `eval-gate` | `a11y-stem eval gate` when `data/eval/latest.json` and `baseline.json` are committed |
+| `eval-gate` | `a11y-stem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
 | `secret-scan` | gitleaks over the full history |
 
 Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes

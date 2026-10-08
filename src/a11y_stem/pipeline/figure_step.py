@@ -43,7 +43,7 @@ from a11y_stem.core.types import Check, Element, FigureFix, FigureType, Fix, Kin
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline.validate import check_alt, has_errors
+from a11y_stem.pipeline.validate import check_alt, clean_alt, has_errors
 
 PROMPT_NAME = "figure"
 # "<name>-<sha8 of the prompt text>": changes whenever the prompt file changes.
@@ -142,7 +142,7 @@ def _evaluate(output: FigureOutput | None, calls: list[ModelCall], element: Elem
             code="decorative_conflict" if conflict else None,
         )
         return _Candidate(output, calls, "", [*check_alt("", decorative=True), consistency])
-    alt = " ".join(output.alt.split())
+    alt = clean_alt(output.alt)  # stored as validated: no bidi controls or invisible marks
     return _Candidate(output, calls, alt, check_alt(alt, decorative=False, caption=element.caption))
 
 

@@ -13,6 +13,10 @@ collide, and SQLite serialises writers, so concurrent reservations never oversho
 
 A process that dies between reserve and settle leaves its hold in place until the UTC day
 ends. That errs on the side of spending less, which is the point of the cap.
+
+`largest_reservation_usd(settings)` is the threshold below which the day counts as spent:
+uploads are refused and the worker stops claiming jobs once less than that is left,
+because no element could be converted with it.
 """
 
 from __future__ import annotations
@@ -26,6 +30,7 @@ from datetime import date, datetime
 from sqlalchemy import case, select, update
 from sqlalchemy.orm import Session, sessionmaker
 
+from a11y_stem.config import Settings
 from a11y_stem.core.budget import BudgetExceeded, Reservation
 from a11y_stem.web.database import insert_ignore, rowcount, utc_today
 from a11y_stem.web.db import SpendDay, session_scope, utcnow
@@ -135,3 +140,31 @@ class DbSpendGuard:
         """True when not even `headroom_usd` (e.g. one cheap model call) fits today."""
         remaining = self.snapshot().remaining_usd
         return remaining is not None and remaining <= headroom_usd
+
+
+def largest_reservation_usd(settings: Settings) -> float:
+    """Worst-case cost of the largest single model call the pipeline reserves.
+
+    That is a crop plus its fenced neighbouring text, at the larger output limit of the
+    two steps, on the dearer model (a display equation sent to the main model: about
+    $0.031 at 2026-10 prices). With less than this left under the daily cap the first
+    reservation of a typical document fails, so admitting an upload, or claiming a job,
+    would only produce a document with everything flagged "not converted".
+    """
+    from a11y_stem.models.base import fence_untrusted
+    from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
+    from a11y_stem.pipeline import equation_step, figure_step, run
+
+    # Neighbouring text is up to CONTEXT_CHARS plus separators and "..." markers.
+    context = fence_untrusted("x" * (run.CONTEXT_CHARS + 64))
+    largest = 0.0
+    for model in (settings.main_model, settings.cheap_model):
+        for tokens in (equation_step.MAX_OUTPUT_TOKENS, figure_step.MAX_OUTPUT_TOKENS):
+            try:
+                cost = estimate_max_cost_usd(
+                    model, n_images=1, text_chars=len(context), max_output_tokens=tokens
+                )
+            except UnknownModelError:  # refused at the first call anyway (FATAL_ERRORS)
+                continue
+            largest = max(largest, cost)
+    return largest

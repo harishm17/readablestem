@@ -180,6 +180,17 @@ class DocumentResult(BaseModel):
     fixes: list[Fix] = Field(default_factory=list)
     stats: DocumentStats
     html: str = ""
+    # Run-level outcome, content-free like the codes above. `stopped_by` is the reason a
+    # spend cap stopped model work early ("budget_daily", "budget_job_usd",
+    # "budget_job_calls"): every equation and figure not done by then is FAILED with that
+    # reason and keeps its original image. None when the run was not cut short.
+    stopped_by: str | None = None
+    # 0-based pages that are only a picture of a page (one image covering it, no text):
+    # scanned pages. There is nothing to convert on them; the output keeps the image,
+    # flagged as not converted.
+    image_only_pages: list[int] = Field(default_factory=list)
+    # Static checks of `html` (pipeline.html_checks.static_checks) when it was rendered.
+    html_checks: list[Check] = Field(default_factory=list)
 
     def fix_for(self, element_id: str) -> Fix | None:
         return next((f for f in self.fixes if f.element_id == element_id), None)

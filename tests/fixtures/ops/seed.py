@@ -123,6 +123,8 @@ def sentinel_result() -> DocumentResult:
 EXPECTED_DONE_COUNTS = {
     ("job", "status:done"): 1,
     ("job", "pages"): 2,
+    ("job", "cost_microusd"): 6000,  # stats.cost_usd 0.006
+    ("job", "latency:lt60s"): 1,  # stats.latency_ms 5000
     ("equation", "status:needs_review"): 2,
     ("equation", "status:failed"): 1,
     ("equation", "check:latex.allowed_commands:unknown_command"): 1,

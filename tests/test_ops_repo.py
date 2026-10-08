@@ -64,6 +64,15 @@ def test_ci_runs_type_checks_and_the_marked_suites():
     assert jobs["lint-test"]["strategy"]["matrix"]["python-version"] == ["3.12", "3.14"]
 
 
+def test_lint_test_installs_what_the_type_check_imports():
+    """`ty check src` resolves `playwright.sync_api` (eval/render.py, html_checks.py). Without
+    the browser group it reports unresolved imports and the job fails on both legs."""
+    steps = workflow(ROOT / ".github" / "workflows" / "ci.yml")["jobs"]["lint-test"]["steps"]
+    install = next(s["run"] for s in steps if s.get("name") == "Install (locked)")
+    assert "--locked" in install
+    assert "--group browser" in install or "--all-groups" in install
+
+
 @pytest.mark.parametrize("path", WORKFLOWS, ids=lambda p: p.name)
 def test_no_expressions_inside_run_scripts(path):
     """Inputs and variables reach scripts through `env:`; `${{ }}` pasted into a script

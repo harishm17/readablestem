@@ -7,9 +7,12 @@ it state anything false) plus a 1-5 usefulness score. `eval calibrate` measures 
 those answers can be trusted against Harish's own labels before any number is published.
 
 Design choices:
-- Text only. The judge sees the candidate, the reference alt and the caption, not the
-  image: the reference is the ground truth, and leaving the image out keeps each call
-  cheap and keeps the judge from writing its own description to compare against.
+- The image, when given. The figures eval passes the figure's PNG (`image=`), and the
+  prompt then makes the image the ground truth: OpenStax alt texts vary from 39 to 980
+  characters, and some leave out what a figure shows. Without an image the reference is
+  the ground truth (the text-only mode). The two modes are different instruments: the
+  gate refuses to compare reports graded by different judge prompts, and the bias
+  probes record which mode they ran in (`judge_mode`).
 - Blind. Nothing in the request says which system wrote the candidate (the bias probes
   in `calibration.py` even feed it the reference itself as a candidate).
 - Main model (`settings.main_model`, gpt-6.1-sol) with no fallback: a judge that silently

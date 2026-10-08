@@ -254,6 +254,7 @@ def _cmd_convert(args: argparse.Namespace) -> int:
 
 
 def _convert(args: argparse.Namespace) -> int:
+    from a11y_stem.observability.tracing import make_tracer
     from a11y_stem.pipeline.html_checks import axe_checks, static_checks
     from a11y_stem.pipeline.layout import LayoutError
     from a11y_stem.pipeline.run import FATAL_ERRORS, PipelineOutput, convert_pdf
@@ -282,6 +283,8 @@ def _convert(args: argparse.Namespace) -> int:
     if not args.fake:
         _check_model_setup(settings)
     client = _make_client(settings, budget, fake=args.fake)
+    # NoopTracer unless TRACING_ENABLED and the Langfuse keys are set (content-free spans).
+    tracer = make_tracer(settings)
     try:
         output = convert_pdf(
             pdf_bytes,
@@ -289,6 +292,7 @@ def _convert(args: argparse.Namespace) -> int:
             client=client,
             pages=pages,
             progress=_progress,
+            tracer=tracer,
             notice=FAKE_NOTICE if args.fake else None,
         )
     except FATAL_ERRORS as exc:  # the client's own setup failed on its first request
@@ -300,6 +304,8 @@ def _convert(args: argparse.Namespace) -> int:
             else ""
         )
         raise _CliError(f"cannot convert {args.pdf}: {exc.code}{hint}") from None
+    finally:
+        tracer.flush()  # spans are exported in batches; send them before the process exits
 
     html = output.result.html
     checks = output.checks if isinstance(output, PipelineOutput) else static_checks(html)
