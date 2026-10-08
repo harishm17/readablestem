@@ -232,8 +232,10 @@ def test_failures_become_category_codes_and_logs_stay_content_free(env, caplog, 
     assert job.status == "failed" and job.error_code == code
     assert job.finished_at is not None and job.lease_until is None
     assert error_code_for(exc) == code
+    [failed] = [r for r in caplog.records if r.getMessage() == "job_failed"]
+    assert failed.a11y_fields["error_code"] == code
+    assert failed.a11y_fields["error_type"].endswith(type(exc).__name__)
     text = " ".join(f"{r.getMessage()} {r.__dict__}" for r in caplog.records)
-    assert f"error_code={code}" in text and type(exc).__name__ in text
     for secret in SECRETS:
         assert secret not in text
 

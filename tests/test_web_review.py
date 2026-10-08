@@ -291,7 +291,8 @@ def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
     caplog.set_level(logging.DEBUG)
     response = post(web, "p1-e3", action="accept\nSECRET-DOC-TEXT fake log line")
     assert response.status_code == 422
-    assert "review_invalid" in caplog.text and "action=unknown" in caplog.text
+    [record] = [r for r in caplog.records if r.getMessage() == "review_invalid"]
+    assert record.a11y_fields["action"] == "unknown"
     assert "SECRET" not in caplog.text
 
 

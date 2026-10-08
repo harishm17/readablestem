@@ -14,6 +14,11 @@ keep course material out of the logs:
   Exception messages are dropped: a pydantic error on model output, for example, quotes
   the LaTeX it rejected.
 
+Code that logs through the standard library uses `log_fields(logger, level, event,
+**fields)`: the message is just the event name (so `jsonPayload.message="purge_done"`
+matches exactly) and every field becomes a top-level JSON key (`jsonPayload.error_code`),
+going through the same privacy filter as everything else (`lift_fields`).
+
 Below WARNING only our own loggers (and uvicorn's and alembic's lifecycle lines) are
 written: third-party DEBUG and INFO lines print URLs with query strings (the OpenAI SDK's
 httpx2 does) or request bodies, so LOG_LEVEL=DEBUG never turns them on. Uvicorn's access
@@ -110,6 +115,10 @@ _SEVERITY = {
 }
 # Structural keys added by the chain itself; never scrubbed.
 _STRUCTURAL = frozenset({"event", "level", "logger", "time", "error_type", "stack"})
+# LogRecord attribute holding the fields of a `log_fields` line.
+FIELDS_ATTR = "a11y_fields"
+# Keys a lifted field may not take (it gets a trailing "_" instead).
+_LIFT_RESERVED = frozenset({"event", "level", "logger", "time", "severity", "message"})
 _WORD_SPLIT = re.compile(r"[^a-z0-9]+")
 _CAMEL = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
@@ -209,6 +218,17 @@ def _frame(entry: traceback.FrameSummary) -> str:
     return f"{'/'.join(parts[-3:])}:{entry.lineno}:{entry.name}"
 
 
+def exception_fields(exc: BaseException) -> dict[str, Any]:
+    """`error_type` and `stack` (code locations, innermost last) of an exception; never
+    its message or locals, which can quote document text."""
+    exc_type = type(exc)
+    fields: dict[str, Any] = {"error_type": f"{exc_type.__module__}.{exc_type.__qualname__}"}
+    if exc.__traceback__ is not None:
+        frames = traceback.extract_tb(exc.__traceback__)[-MAX_FRAMES:]
+        fields["stack"] = [_frame(f) for f in frames]
+    return fields
+
+
 def exception_codes(_: WrappedLogger, __: str, event_dict: EventDict) -> EventDict:
     """Replace `exc_info` with the exception type and code locations, never its message."""
     event_dict.pop("stack_info", None)
@@ -221,6 +241,32 @@ def exception_codes(_: WrappedLogger, __: str, event_dict: EventDict) -> EventDi
         frames = traceback.extract_tb(tb)[-MAX_FRAMES:]
         event_dict["stack"] = [_frame(f) for f in frames]
     return event_dict
+
+
+def lift_fields(_: WrappedLogger, __: str, event_dict: EventDict) -> EventDict:
+    """Copy the fields of a `log_fields` record to top-level keys (before the privacy
+    filter, which then treats them like any other key)."""
+    record = event_dict.get("_record")
+    fields = getattr(record, FIELDS_ATTR, None) if record is not None else None
+    if not isinstance(fields, Mapping):
+        return event_dict
+    for key, value in fields.items():
+        name = str(key)
+        if name in _LIFT_RESERVED or name in event_dict:
+            name += "_"
+        event_dict[name] = value
+    return event_dict
+
+
+def log_fields(
+    logger: logging.Logger, level: int, event: str, *, stacklevel: int = 1, **fields: Any
+) -> None:
+    """One structured line through stdlib logging: the message is `event` alone and each
+    field becomes a top-level JSON key. Pass ids, counts and category codes only.
+
+    `stacklevel` as for `logging.Logger.log`, counted from the caller of this function
+    (a wrapper passes 2 so the record points at its own caller)."""
+    logger.log(level, event, extra={FIELDS_ATTR: fields}, stacklevel=stacklevel + 1)
 
 
 def cloud_severity(_: WrappedLogger, method_name: str, event_dict: EventDict) -> EventDict:
@@ -238,6 +284,7 @@ def _shared_processors() -> list[Processor]:
         structlog.stdlib.add_log_level,
         structlog.stdlib.PositionalArgumentsFormatter(),
         structlog.processors.TimeStamper(fmt="iso", utc=True, key="time"),
+        lift_fields,
         exception_codes,
         privacy_filter,
         cloud_severity,

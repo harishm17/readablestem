@@ -12,6 +12,7 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
+from a11y_stem.observability.logging import FIELDS_ATTR
 from a11y_stem.ops.retention import PurgeStats
 from a11y_stem.web.db import ErrorAggregate, SpendDay, User, session_scope
 from a11y_stem.web.security import APP_CSP, SecurityHeadersMiddleware
@@ -285,9 +286,11 @@ def test_unhandled_errors_give_a_500_page_and_log_only_the_type(web, monkeypatch
     assert response.status_code == 500
     assert "Something went wrong" in response.text and "SECRET" not in response.text
     assert response.headers["content-security-policy"] == APP_CSP
-    assert "exc_type=ValueError" in caplog.text
-    assert "route=/privacy" in caplog.text
-    assert "SECRET" not in caplog.text
+    errors = [r for r in caplog.records if getattr(r, FIELDS_ATTR, {}).get("route")]
+    assert errors, "the unhandled error is logged with its route"
+    fields = getattr(errors[-1], FIELDS_ATTR)
+    assert fields["error_type"] == "builtins.ValueError" and fields["route"] == "/privacy"
+    assert "SECRET" not in caplog.text and "SECRET" not in str(fields)
 
 
 def test_validation_errors_do_not_echo_input(web):

@@ -360,3 +360,37 @@ def test_middleware_logs_route_template_not_path_or_query(capsys):
     ]
     assert all(isinstance(r["latency_ms"], int) and r["latency_ms"] >= 0 for r in records)
     assert SENTINEL not in out
+
+
+# --------------------------------------------------------------------------- structured events
+
+
+def test_web_events_are_structured_json_with_the_event_as_the_message(capsys):
+    """`log_event` lines used to put every field into the message string, so
+    `jsonPayload.message="job_failed"` never matched and `jsonPayload.error_code` did not
+    exist; the exception location was cut off at 200 characters."""
+    from a11y_stem.web.logsafe import log_event, log_exception
+
+    configure_logging(Settings(_env_file=None))
+    logger = logging.getLogger("a11y_stem.web.worker")
+    log_event(logger, "cron_refused", logging.WARNING)
+    try:
+        raise RuntimeError(f"{SENTINEL} quoted from the document")
+    except RuntimeError as exc:
+        log_exception(logger, "job_failed", exc, job_id="abc123", error_code="internal_error")
+    log_event(logger, "upload_rejected", code="page_quota", filename=SENTINEL, message="x")
+    refused, failed, rejected = lines(capsys)
+
+    assert refused["message"] == "cron_refused" and refused["severity"] == "WARNING"
+    assert failed["message"] == "job_failed" and failed["severity"] == "ERROR"
+    assert failed["error_code"] == "internal_error" and failed["job_id"] == "abc123"
+    assert failed["error_type"] == "builtins.RuntimeError"
+    assert failed["stack"] and all(len(frame) <= MAX_STRING for frame in failed["stack"])
+    assert failed["stack"][-1].endswith(
+        "test_web_events_are_structured_json_with_the_event_as_the_message"
+    )
+    # Lifted fields pass the privacy filter like any other key, and cannot take over
+    # the chain's own keys.
+    assert rejected["code"] == "page_quota" and "filename" not in rejected
+    assert rejected["message"] == "upload_rejected" and rejected["message_"] == "x"
+    assert SENTINEL not in json.dumps([refused, failed, rejected])

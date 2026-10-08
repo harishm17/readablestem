@@ -178,6 +178,15 @@ Pass ids, counts and category codes as keyword fields. Do not build a message st
 out of values, and never pass document text under a neutral key name: the filter catches
 names, not meaning.
 
+Code on a standard-library logger (the web app and worker use `web.logsafe.log_event`
+and `log_exception`; the OpenAI client logs `model_call`, `model_call_retry` and
+`model_call_retry_skipped`) goes through `observability.logging.log_fields`: the message
+is the event name alone and the fields become top-level keys, so
+`jsonPayload.message="job_failed" AND jsonPayload.error_code="internal_error"` or
+`jsonPayload.message="model_call" AND jsonPayload.code="project_spend_limit_exceeded"`
+work as written. `log_exception` adds `error_type` and `stack`, as the chain does for
+`exc_info`.
+
 ## Tracing (Langfuse)
 
 Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (`deploy.sh` stores the

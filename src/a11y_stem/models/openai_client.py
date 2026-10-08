@@ -77,6 +77,7 @@ from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation
 from a11y_stem.core.types import ModelCall, Outcome
 from a11y_stem.models.base import T, VisionRequest, fence_untrusted
 from a11y_stem.models.pricing import cost_usd, estimate_max_cost_usd
+from a11y_stem.observability.logging import log_fields
 
 log = logging.getLogger(__name__)
 
@@ -204,11 +205,13 @@ class OpenAIVisionClient:
             except BudgetExceeded as exc:
                 # No room for another send. Return the failure we have rather than raise, so
                 # the sends already made (and charged) are not lost to the caller.
-                log.info(
-                    "model call retry skipped: step=%s model=%s budget_scope=%s",
-                    request.step,
-                    request.model,
-                    exc.scope,
+                log_fields(
+                    log,
+                    logging.INFO,
+                    "model_call_retry_skipped",
+                    step=request.step,
+                    model=request.model,
+                    budget_scope=exc.scope,
                 )
                 break
             delay = _retry_delay_s(len(replies), reply.retry_after_s)
@@ -271,14 +274,15 @@ class OpenAIVisionClient:
         if charge > estimate:
             # The reservation is meant to be an upper bound; if it is not, the estimate in
             # models/pricing.py needs widening (e.g. longer instructions than it assumes).
-            log.warning(
-                "model call cost exceeded its reservation: step=%s model=%s "
-                "prompt_version=%s estimate_usd=%.6f actual_usd=%.6f",
-                request.step,
-                request.model,
-                request.prompt_version,
-                estimate,
-                charge,
+            log_fields(
+                log,
+                logging.WARNING,
+                "model_call_over_reservation",
+                step=request.step,
+                model=request.model,
+                prompt_version=request.prompt_version,
+                estimate_usd=round(estimate, 6),
+                actual_usd=round(charge, 6),
             )
         return reply, charge
 
@@ -569,18 +573,19 @@ def _safe_code(code: object) -> str | None:
 
 def _log_retry(request: VisionRequest, reply: _Reply, *, sends: int, delay_s: float) -> None:
     """One line per resend, category codes only (see `_log_call`)."""
-    log.info(
-        "model call retry: step=%s model=%s prompt_version=%s sends=%d outcome=%s "
-        "error=%s status=%s code=%s delay_s=%.3f",
-        request.step,
-        request.model,
-        request.prompt_version,
-        sends,
-        reply.outcome,
-        reply.error,
-        reply.status,
-        reply.code,
-        delay_s,
+    log_fields(
+        log,
+        logging.INFO,
+        "model_call_retry",
+        step=request.step,
+        model=request.model,
+        prompt_version=request.prompt_version,
+        sends=sends,
+        outcome=reply.outcome,
+        error=reply.error,
+        status=reply.status,
+        code=reply.code,
+        delay_s=round(delay_s, 3),
     )
 
 
@@ -589,27 +594,27 @@ def _log_call(call: ModelCall, reply: _Reply, *, sends: int) -> None:
 
     Never the exception message or body: an API error can echo the request, which carries
     document content. Failures log at WARNING so outages are visible at the default level.
+    Every value is its own JSON key (`jsonPayload.code="project_spend_limit_exceeded"`).
     """
-    log.log(
+    log_fields(
+        log,
         logging.DEBUG if call.outcome == "ok" else logging.WARNING,
-        "model call: step=%s model=%s prompt_version=%s outcome=%s fallback=%s sends=%d "
-        "input_tokens=%d cached_input_tokens=%d output_tokens=%d reasoning_tokens=%d "
-        "cost_usd=%.6f latency_ms=%d error=%s status=%s code=%s",
-        call.step,
-        call.model,
-        call.prompt_version,
-        call.outcome,
-        call.is_fallback,
-        sends,
-        call.input_tokens,
-        call.cached_input_tokens,
-        call.output_tokens,
-        call.reasoning_tokens,
-        call.cost_usd,
-        call.latency_ms,
-        reply.error,
-        reply.status,
-        reply.code,
+        "model_call",
+        step=call.step,
+        model=call.model,
+        prompt_version=call.prompt_version,
+        outcome=call.outcome,
+        fallback=call.is_fallback,
+        sends=sends,
+        input_tokens=call.input_tokens,
+        cached_input_tokens=call.cached_input_tokens,
+        output_tokens=call.output_tokens,
+        reasoning_tokens=call.reasoning_tokens,
+        cost_usd=round(call.cost_usd, 6),
+        latency_ms=call.latency_ms,
+        error=reply.error,
+        status=reply.status,
+        code=reply.code,
     )
 
 
