@@ -852,12 +852,15 @@ always went to My documents. Now:
   expired". A form whose token is from before the reviewer signed in again (in another
   tab) says the form has expired and links **Back to the decision**;
 - with JavaScript, what is typed into a decision's fields is kept as a draft in this
-  tab's `sessionStorage`, under the form's address (ids only), and put back when that
+  tab's `sessionStorage`, under the form's address (ids only; plus the form's
+  `data-draft-key` where two forms post to one address, as a table's cell form, keyed by
+  the cell, and its headers form do), and put back when that
   decision is shown again, with a line under the field ("What you typed before is back
   here. It is not saved yet.") that the field's description includes. The sign-in page
   for that form says the text is kept. A draft never leaves the browser and is gone when
-  the tab is closed; it is forgotten when the decision is saved, when the page is drawn
-  with that text anyway, and on Sign out in that tab.
+  the tab is closed; it is forgotten when the decision is saved (every form of that
+  address), when the page is drawn with that text anyway, and on Sign out in that tab.
+  Choosing a table cell from the list is navigation, so it keeps no draft.
 
 Only pages of this app are remembered (`/app`, `/admin`, a job's page, review screen,
 list view or HTML, with a query of ids and numbers; one pattern), so it is not an open

@@ -320,3 +320,30 @@ def test_the_shortcuts_reach_the_table_card(site, browser, job):
     page.wait_for_url(f"{url}?item=p1-e3")
     assert "Table 1: Accepted." in page.get_by_role("status").inner_text()
     context.close()
+
+
+def test_choosing_a_cell_keeps_no_draft_and_one_tables_draft_stays_with_it(site, browser, job):
+    """The cell list is navigation: picking a cell and saving it leaves no "not saved
+    yet" line, and nothing carries over to another table. A typed cell's draft belongs
+    to that cell's form only."""
+    context, page = open_page(browser, site)
+    url = f"{site.base}/jobs/{job}/review"
+    page.goto(f"{url}?item=p1-e1")
+    page.locator("summary", has_text="Change the table").click()
+    page.locator("#cell-pick-p1-e1").select_option("r1c1")
+    page.get_by_role("button", name="Change this cell").click()
+    page.wait_for_url(re.compile(r".*cell=r1c1$"))
+    page.locator("#cell-p1-e1").fill("10 m")
+    page.get_by_role("button", name=re.compile("^Save cell")).click()
+    page.wait_for_url(f"{url}?item=p1-e1")
+    assert "Row 2, column 2 changed" in page.get_by_role("status").inner_text()
+    assert page.locator(".kept-draft").count() == 0
+    drafts = "Object.keys(sessionStorage).filter(k => k.includes('draft'))"
+    assert page.evaluate(drafts) == []
+    # A cell picked on table 1, then table 2 opened: its box stays closed.
+    page.locator("summary", has_text="Change the table").click()
+    page.locator("#cell-pick-p1-e1").select_option("r2c0")
+    page.goto(f"{url}?item=p2-e1")
+    assert page.locator("details.table-edit[open]").count() == 0
+    assert page.locator(".kept-draft").count() == 0
+    context.close()

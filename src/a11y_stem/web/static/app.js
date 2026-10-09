@@ -392,8 +392,30 @@
   }
   if (!store) return;
 
+  // A form's draft is kept under its action, plus its data-draft-key where two forms
+  // post to one place (a table's cell form and its headers form), so neither restores,
+  // removes or overwrites the other's.
   function key(form) {
-    return PREFIX + form.getAttribute("action");
+    var own = form.getAttribute("data-draft-key");
+    return PREFIX + form.getAttribute("action") + (own ? "#" + own : "");
+  }
+
+  // Every draft kept for one action (all of its forms).
+  function forget(action) {
+    var base = PREFIX + action;
+    for (var i = store.length - 1; i >= 0; i--) {
+      var name = store.key(i);
+      if (name === base || (name && name.indexOf(base + "#") === 0)) store.removeItem(name);
+    }
+  }
+
+  function kept(action) {
+    var base = PREFIX + action;
+    for (var i = 0; i < store.length; i++) {
+      var name = store.key(i);
+      if (name === base || (name && name.indexOf(base + "#") === 0)) return true;
+    }
+    return false;
   }
 
   function valueOf(field) {
@@ -490,7 +512,7 @@
 
   function start() {
     var saved = document.querySelector("[data-saved]");
-    if (saved) store.removeItem(PREFIX + saved.getAttribute("data-saved"));
+    if (saved) forget(saved.getAttribute("data-saved"));
     var forms = [];
     document.querySelectorAll("form [data-edit-field]").forEach(function (field) {
       var form = field.form;
@@ -503,7 +525,7 @@
     });
     // The page for a form refused because the session ended: say the text is kept.
     document.querySelectorAll("[data-draft-for]").forEach(function (hint) {
-      if (store.getItem(PREFIX + hint.getAttribute("data-draft-for"))) hint.hidden = false;
+      if (kept(hint.getAttribute("data-draft-for"))) hint.hidden = false;
     });
     // Signing out in this tab forgets every draft (a shared computer).
     document.querySelectorAll('form[action="/logout"]').forEach(function (form) {

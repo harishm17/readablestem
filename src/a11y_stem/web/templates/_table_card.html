@@ -69,7 +69,7 @@
   <summary>Change the table</summary>
   {% if t.editing %}
   {% set c = t.editing %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-cell-form{% if item.edited %} is-edited{% endif %}">
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-cell-form{% if item.edited %} is-edited{% endif %}" data-draft-key="cell-{{ c.ref }}">
     {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="cell"><input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
     <div class="field{% if cell_err %} field-error{% endif %}">
       <label for="cell-{{ eid }}">{{ "LaTeX in" if c.maths else "Text in" }} {{ c.position|lower }}</label>
@@ -92,7 +92,8 @@
       <label for="cell-pick-{{ eid }}">Cell to change</label>
       {{ table_error(item, "cell") }}
       <div class="inline-controls">
-        <select id="cell-pick-{{ eid }}" name="cell" data-edit-field{% if cell_err %} aria-describedby="cell-error-{{ eid }}" aria-invalid="true"{% endif %}>
+        {# Choosing a cell is navigation, not an edit: no draft is kept of it. #}
+        <select id="cell-pick-{{ eid }}" name="cell"{% if cell_err %} aria-describedby="cell-error-{{ eid }}" aria-invalid="true"{% endif %}>
           {% for c in t.cells %}<option value="{{ c.ref }}">{{ c.label }}</option>{% endfor %}
         </select>
         <button type="submit" class="button-secondary">Change this cell</button>
@@ -102,7 +103,7 @@
   {% endif %}
   {% set row_on = (item.values.get("header_row") == "on") if "header_row" in item.values else t.header_row %}
   {% set col_on = (item.values.get("header_col") == "on") if "header_col" in item.values else t.header_col %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-headers">
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-headers" data-draft-key="headers">
     {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers">
     <fieldset class="table-fieldset{% if header_err %} field-error{% endif %}" aria-describedby="header-hint-{{ eid }}{% if header_err %} header-error-{{ eid }}{% endif %}">
       <legend>Headers</legend>
