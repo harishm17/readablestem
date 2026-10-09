@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>PHYS 1301 Lab handout: motion, materials and particles</title>
+<!-- Written for the a11y-stem tables eval (MIT). No third-party text. -->
+<style>
+@page { size: Letter; margin: 0.9in; }
+body { font-family: "Liberation Serif", "DejaVu Serif", serif; font-size: 11pt; line-height: 1.35; }
+math { font-family: "Noto Sans Math", "STIX Two Math", math; }
+h1 { font-family: "Liberation Sans", sans-serif; font-size: 18pt; margin: 0 0 8pt; }
+h2 { font-family: "Liberation Sans", sans-serif; font-size: 13pt; margin: 16pt 0 6pt; }
+p { margin: 0 0 7pt; }
+table { border-collapse: collapse; margin: 6pt 0 12pt; }
+caption { caption-side: top; text-align: left; font-weight: bold; padding-bottom: 3pt; }
+th, td { padding: 2pt 8pt; text-align: left; vertical-align: top; }
+table.ruled th, table.ruled td { border: 0.5pt solid #555; }
+table.ruled thead th { background: #e8e8e8; }
+table.booktabs { border-top: 1.2pt solid #000; border-bottom: 1.2pt solid #000; }
+table.booktabs thead tr:last-child th { border-bottom: 0.6pt solid #000; }
+table.booktabs thead tr.group th[colspan] { border-bottom: 0.4pt solid #000; }
+table.lined td, table.lined th { border-bottom: 0.4pt solid #999; }
+table.lined thead th { border-bottom: 1pt solid #000; }
+table.long thead { display: table-header-group; }
+table.long tr { break-inside: avoid; }
+table.form td { padding: 6pt 10pt 6pt 0; }
+td.num { text-align: right; }
+</style>
+</head>
+<body>
+<h1>PHYS 1301 Lab 3: Motion, materials and particles</h1>
+
+<table class="form" role="presentation">
+<tr><td>Name: ______________________</td><td>Section: ________</td><td>Date: ____________</td></tr>
+<tr><td>Lab partner: ________________</td><td>Station: ________</td><td>Instructor initials: ____</td></tr>
+</table>
+
+<h2>Part A. A cart on a track</h2>
+<p>A motion sensor recorded the position of the cart every half second. Use the table to
+estimate the velocity and the acceleration of the cart. Each column gives the quantity
+named in its header; the derivatives were found by finite differences.</p>
+
+<table class="ruled">
+<caption>Table 1. Position, velocity and acceleration of the cart</caption>
+<thead>
+<tr>
+<th scope="col">Time <math><mi>t</mi></math> (s)</th>
+<th scope="col">Position <math><mi>x</mi><mo>(</mo><mi>t</mi><mo>)</mo></math> (m)</th>
+<th scope="col">Velocity <math><mi>v</mi><mo>=</mo><mfrac><mrow><mi>d</mi><mi>x</mi></mrow><mrow><mi>d</mi><mi>t</mi></mrow></mfrac></math> (m/s)</th>
+<th scope="col">Acceleration <math><mi>a</mi><mo>=</mo><mfrac><mrow><msup><mi>d</mi><mn>2</mn></msup><mi>x</mi></mrow><mrow><mi>d</mi><msup><mi>t</mi><mn>2</mn></msup></mrow></mfrac></math> (m/s²)</th>
+</tr>
+</thead>
+<tbody>
+<tr><td class="num">0.0</td><td class="num">0.000</td><td class="num">0.00</td><td class="num">0.40</td></tr>
+<tr><td class="num">0.5</td><td class="num">0.050</td><td class="num">0.20</td><td class="num">0.40</td></tr>
+<tr><td class="num">1.0</td><td class="num">0.200</td><td class="num">0.40</td><td class="num">0.40</td></tr>
+<tr><td class="num">1.5</td><td class="num">0.450</td><td class="num">0.60</td><td class="num">0.40</td></tr>
+<tr><td class="num">2.0</td><td class="num">0.800</td><td class="num">0.80</td><td class="num">0.40</td></tr>
+<tr><td class="num">2.5</td><td class="num">1.250</td><td class="num">1.00</td><td class="num">0.40</td></tr>
+</tbody>
+</table>
+
+<p>The acceleration is constant, so the position grows as the square of the time:
+<math><mi>x</mi><mo>=</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>a</mi><msup><mi>t</mi><mn>2</mn></msup></math>.</p>
+
+<h2>Part B. Elastic properties of materials</h2>
+<p>The wire you stretch in Part C is one of the materials below. Two of the columns share a
+heading: both moduli describe stiffness, one under tension and one under shear.</p>
+
+<table class="booktabs">
+<caption>Table 2. Elastic moduli and density</caption>
+<thead>
+<tr class="group">
+<th scope="col" rowspan="2">Material</th>
+<th scope="colgroup" colspan="2">Modulus (GPa)</th>
+<th scope="col" rowspan="2">Density <math><mi>ρ</mi></math> (kg/m³)</th>
+</tr>
+<tr>
+<th scope="col">Young’s <math><mi>E</mi></math></th>
+<th scope="col">Shear <math><mi>G</mi></math></th>
+</tr>
+</thead>
+<tbody>
+<tr><td>Steel</td><td class="num">200</td><td class="num">80</td><td class="num">7850</td></tr>
+<tr><td>Aluminium</td><td class="num">70</td><td class="num">26</td><td class="num">2700</td></tr>
+<tr><td>Brass</td><td class="num">100</td><td class="num">37</td><td class="num">8500</td></tr>
+<tr><td>Copper</td><td class="num">117</td><td class="num">44</td><td class="num">8960</td></tr>
+<tr><td>Glass</td><td class="num">65</td><td class="num">26</td><td class="num">2500</td></tr>
+</tbody>
+</table>
+
+<h2>Part C. The particles in the wire</h2>
+<p>Each row of the next table is one property and each column one particle, so read it
+across: the first cell of a row names the property.</p>
+
+<table class="lined">
+<caption>Table 3. Properties of the electron, proton and neutron</caption>
+<thead>
+<tr><td></td><th scope="col">Electron</th><th scope="col">Proton</th><th scope="col">Neutron</th></tr>
+</thead>
+<tbody>
+<tr><th scope="row">Charge (C)</th>
+<td><math><mo>−</mo><mn>1.602</mn><mo>×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>19</mn></mrow></msup></math></td>
+<td><math><mn>1.602</mn><mo>×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>19</mn></mrow></msup></math></td>
+<td>0</td></tr>
+<tr><th scope="row">Mass (kg)</th>
+<td><math><mn>9.109</mn><mo>×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>31</mn></mrow></msup></math></td>
+<td><math><mn>1.673</mn><mo>×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>27</mn></mrow></msup></math></td>
+<td><math><mn>1.675</mn><mo>×</mo><msup><mn>10</mn><mrow><mo>−</mo><mn>27</mn></mrow></msup></math></td></tr>
+<tr><th scope="row">Spin</th><td>1/2</td><td>1/2</td><td>1/2</td></tr>
+<tr><th scope="row">Found in</th><td>Shells around the nucleus</td><td>Nucleus</td><td>Nucleus</td></tr>
+</tbody>
+</table>
+
+<h2>Part D. Reference data</h2>
+<p>You will need the vapour pressure of water to correct the gas volume collected over
+water in Part E. The table runs over a page break; its header is repeated on the next page.</p>
+
+<table class="ruled long">
+<caption>Table 4. Vapour pressure of water</caption>
+<thead>
+<tr><th scope="col">Temperature (°C)</th><th scope="col">Pressure (kPa)</th><th scope="col">Pressure (mmHg)</th></tr>
+</thead>
+<tbody>
+<tr><td class="num">0</td><td class="num">0.611</td><td class="num">4.58</td></tr>
+<tr><td class="num">4</td><td class="num">0.813</td><td class="num">6.10</td></tr>
+<tr><td class="num">8</td><td class="num">1.073</td><td class="num">8.05</td></tr>
+<tr><td class="num">12</td><td class="num">1.403</td><td class="num">10.52</td></tr>
+<tr><td class="num">16</td><td class="num">1.818</td><td class="num">13.63</td></tr>
+<tr><td class="num">20</td><td class="num">2.339</td><td class="num">17.54</td></tr>
+<tr><td class="num">24</td><td class="num">2.985</td><td class="num">22.39</td></tr>
+<tr><td class="num">28</td><td class="num">3.782</td><td class="num">28.37</td></tr>
+<tr><td class="num">32</td><td class="num">4.759</td><td class="num">35.70</td></tr>
+<tr><td class="num">36</td><td class="num">5.947</td><td class="num">44.61</td></tr>
+<tr><td class="num">40</td><td class="num">7.384</td><td class="num">55.38</td></tr>
+<tr><td class="num">44</td><td class="num">9.112</td><td class="num">68.35</td></tr>
+<tr><td class="num">48</td><td class="num">11.17</td><td class="num">83.79</td></tr>
+<tr><td class="num">52</td><td class="num">13.62</td><td class="num">102.2</td></tr>
+<tr><td class="num">56</td><td class="num">16.51</td><td class="num">123.8</td></tr>
+<tr><td class="num">60</td><td class="num">19.93</td><td class="num">149.5</td></tr>
+<tr><td class="num">64</td><td class="num">23.93</td><td class="num">179.5</td></tr>
+<tr><td class="num">68</td><td class="num">28.59</td><td class="num">214.4</td></tr>
+<tr><td class="num">72</td><td class="num">34.00</td><td class="num">255.0</td></tr>
+<tr><td class="num">76</td><td class="num">40.24</td><td class="num">301.8</td></tr>
+<tr><td class="num">80</td><td class="num">47.41</td><td class="num">355.6</td></tr>
+<tr><td class="num">84</td><td class="num">55.62</td><td class="num">417.2</td></tr>
+<tr><td class="num">88</td><td class="num">64.98</td><td class="num">487.4</td></tr>
+<tr><td class="num">92</td><td class="num">75.65</td><td class="num">567.4</td></tr>
+<tr><td class="num">96</td><td class="num">87.73</td><td class="num">658.0</td></tr>
+<tr><td class="num">100</td><td class="num">101.3</td><td class="num">760.0</td></tr>
+</tbody>
+</table>
+
+<p>Subtract the vapour pressure at the water temperature from the room pressure to find
+the pressure of the dry gas.</p>
+</body>
+</html>

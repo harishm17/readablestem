@@ -23,20 +23,35 @@ increase for cost, and an absolute increase for counts (axe violations).
 `data/eval/tolerances.json` overrides the defaults by name. With 30 equations one item
 is 0.033, so the default 0.02 tolerance fails on any single lost item:
 on purpose, while the gold set is this small.
+
+Floors (the tables task): absolute bars a report must meet with or without a baseline,
+so `eval gate --current latest-tables-local.json` alone gives a verdict. A floor can be
+for one mode only (TEDS: 0.84 without the model, 0.88 with it). The real-document floors
+are a second, separate part: they apply only when the report measured the private real
+documents (`metrics.real_documents`), and are reported as skipped otherwise. The starting
+floors sit a little under table-bench's measurements (docs/eval.md "tables"); the
+tolerances file can move them (`{"floors": [{"name": ..., "minimum": ...}]}`).
 """
 
 from __future__ import annotations
 
 import json
 import sys
-from dataclasses import asdict, dataclass
+from contextlib import suppress
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
 from typing import Any, Literal
 
-Rule = Literal["max_drop", "max_rel_increase", "max_increase"]
+Rule = Literal["max_drop", "max_rel_increase", "max_increase", "minimum", "maximum"]
 RULES = ("max_drop", "max_rel_increase", "max_increase")
-# Report prompt_versions keys -> prompt file names (models/prompts/<name>.md).
-PROMPT_FILES = {"equation": "equation", "figure": "figure", "judge": "judge_figure"}
+# Report prompt_versions keys -> prompt file names (models/prompts/<name>.md). A prompt
+# file that does not exist yet (the table step's, until it sends prompts) is skipped.
+PROMPT_FILES = {
+    "equation": "equation",
+    "figure": "figure",
+    "judge": "judge_figure",
+    "table": "table",
+}
 
 
 class GateRefused(ValueError):
@@ -84,7 +99,83 @@ DEFAULT_TOLERANCES: tuple[Tolerance, ...] = (
     ),
     Tolerance("document_axe_violations", "document", "metrics.axe_violations", "max_increase", 0),
     Tolerance("document_cost", "document", "cost.per_item_usd", "max_rel_increase", 0.25),
+    Tolerance("table_detection_recall", "tables", "metrics.detection_recall", "max_drop", 0.02),
+    Tolerance(
+        "table_detection_precision", "tables", "metrics.detection_precision", "max_drop", 0.03
+    ),
+    Tolerance("table_teds", "tables", "metrics.teds", "max_drop", 0.02),
+    Tolerance(
+        "table_column_header_exact", "tables", "metrics.column_header_exact", "max_drop", 0.03
+    ),
+    Tolerance("table_cost", "tables", "cost.per_table_usd", "max_rel_increase", 0.25),
 )
+
+
+@dataclass(frozen=True)
+class Floor:
+    """An absolute bar: the value at `path` must be >= `minimum` (or <= `maximum`).
+
+    `mode`: only for reports of that mode (tables: "local" or "model"). `part`: "main",
+    or "real" for the real-document gate, which only applies when the report measured
+    real documents (`metrics.real_documents` is not null).
+    """
+
+    name: str
+    task: str
+    path: str
+    minimum: float | None = None
+    maximum: float | None = None
+    mode: str | None = None
+    part: Literal["main", "real"] = "main"
+
+
+# Starting floors for tables (PDF-RECOMMENDATION.md 4.6 and its challenge): a little
+# under table-bench's measurements. Replace them with the 95% CI lower bounds of the first
+# full in-repo run (TODO(Harish): after the integrator's first full run).
+DEFAULT_FLOORS: tuple[Floor, ...] = (
+    Floor("table_detection_recall", "tables", "metrics.detection_recall", minimum=0.86),
+    Floor("table_detection_precision", "tables", "metrics.detection_precision", minimum=0.93),
+    Floor("table_teds_local", "tables", "metrics.teds", minimum=0.84, mode="local"),
+    Floor("table_teds_model", "tables", "metrics.teds", minimum=0.88, mode="model"),
+    Floor("table_column_header_exact", "tables", "metrics.column_header_exact", minimum=0.75),
+    Floor(
+        "table_wrong_cells_not_flagged",
+        "tables",
+        "metrics.text_fidelity.wrong_cells_not_flagged",
+        maximum=0,
+    ),
+    Floor(
+        "real_table_precision",
+        "tables",
+        "metrics.real_documents.precision",
+        minimum=0.95,
+        part="real",
+    ),
+    Floor(
+        "real_table_full_extent_recall",
+        "tables",
+        "metrics.real_documents.full_extent_recall",
+        minimum=0.85,
+        part="real",
+    ),
+)
+
+
+def load_floors(path: Path | None) -> list[Floor]:
+    """Default floors, with entries of the tolerances file's "floors" list replacing (by
+    name; an entry may give only `minimum` or `maximum`) or adding to them."""
+    by_name = {f.name: f for f in DEFAULT_FLOORS}
+    if path is None:
+        return list(by_name.values())
+    data = json.loads(path.read_text(encoding="utf-8"))
+    for entry in data.get("floors", []):
+        name = entry["name"]
+        merged = (asdict(by_name[name]) if name in by_name else {}) | entry
+        missing = {"task", "path"} - merged.keys()
+        if missing or (merged.get("minimum") is None and merged.get("maximum") is None):
+            raise ValueError(f"floor {name!r} needs task, path and a minimum or maximum")
+        by_name[name] = Floor(**merged)
+    return list(by_name.values())
 
 
 def load_tolerances(path: Path | None) -> list[Tolerance]:
@@ -136,7 +227,9 @@ class GateRow:
     delta: float | None
     rule: Rule
     limit: float
-    status: str  # "ok" | "regressed" | "missing" | "no_baseline"
+    # "ok" | "regressed" | "missing" | "no_baseline"; floors: "ok" | "below_floor" |
+    # "missing" | "skipped" (a real-document floor when no real documents were measured)
+    status: str
 
 
 @dataclass
@@ -144,10 +237,12 @@ class GateResult:
     task: str
     rows: list[GateRow]
     notes: list[str]
+    floors: list[GateRow] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
-        return not any(r.status in {"regressed", "missing"} for r in self.rows)
+        failing = {"regressed", "missing", "below_floor"}
+        return not any(r.status in failing for r in [*self.rows, *self.floors])
 
 
 def check_comparable(current: dict, baseline: dict) -> None:
@@ -165,6 +260,18 @@ def check_comparable(current: dict, baseline: dict) -> None:
             f"(current {str(cur_ds.get('manifest_sha256'))[:12]}, "
             f"baseline {str(base_ds.get('manifest_sha256'))[:12]}); re-run the baseline "
             "on the current gold set",
+        )
+    if cur_ds.get("authored_sha256") != base_ds.get("authored_sha256"):
+        raise GateRefused(
+            "manifest_mismatch",
+            "reports were produced from different authored documents (tables); re-run the "
+            "baseline on the current set",
+        )
+    if current.get("mode") != baseline.get("mode"):
+        raise GateRefused(
+            "mode_mismatch",
+            f"different modes: current {current.get('mode')!r}, baseline "
+            f"{baseline.get('mode')!r} (local and model runs measure different things)",
         )
     if cur_ds.get("selection_sha256") != base_ds.get("selection_sha256"):
         raise GateRefused(
@@ -202,7 +309,11 @@ def code_versions() -> dict[str, str]:
     """Prompt versions of the code under test, keyed like a report's `prompt_versions`."""
     from a11y_stem.models.prompts import load_prompt
 
-    return {key: load_prompt(name).version for key, name in PROMPT_FILES.items()}
+    versions = {}
+    for key, name in PROMPT_FILES.items():
+        with suppress(FileNotFoundError):  # a step that sends no prompt yet
+            versions[key] = load_prompt(name).version
+    return versions
 
 
 def check_current(report: dict, versions: dict[str, str], models: dict[str, str]) -> None:
@@ -267,6 +378,62 @@ def compare(current: dict, baseline: dict, tolerances: list[Tolerance]) -> GateR
     return GateResult(task=task, rows=rows, notes=_notes(current, baseline))
 
 
+def floor_rows(report: dict, floors: list[Floor]) -> list[GateRow]:
+    """Every floor of this report's task (and mode), checked against the report.
+
+    A real-document floor is "skipped" when the report did not measure real documents
+    (no private input directory); a missing value is "missing", which fails.
+    """
+    task, mode = report.get("task"), report.get("mode")
+    rows = []
+    for f in floors:
+        if f.task != task or (f.mode is not None and f.mode != mode):
+            continue
+        rule: Rule = "minimum" if f.minimum is not None else "maximum"
+        limit = float(f.minimum if f.minimum is not None else f.maximum or 0.0)
+        value = lookup(report, f.path)
+        if f.part == "real" and (report.get("metrics") or {}).get("real_documents") is None:
+            status = "skipped"
+        elif value is None:
+            status = "missing"
+        elif rule == "minimum":
+            status = "ok" if value >= limit - 1e-9 else "below_floor"
+        else:
+            status = "ok" if value <= limit + 1e-9 else "below_floor"
+        rows.append(GateRow(f.name, None, value, None, rule, limit, status))
+    return rows
+
+
+def has_floors(task: str | None, floors: list[Floor]) -> bool:
+    return any(f.task == task for f in floors)
+
+
+def gate(
+    current: dict,
+    baseline: dict | None,
+    tolerances: list[Tolerance],
+    floors: list[Floor],
+) -> GateResult:
+    """Floors of the current report's task, plus the regression check when there is a
+    baseline. Raises GateRefused when neither applies, or the reports are not comparable."""
+    task = current.get("task")
+    if baseline is None:
+        if not has_floors(task, floors):
+            raise GateRefused(
+                "no_baseline", f"task {task!r} has no floors: give --baseline to compare"
+            )
+        result = GateResult(task=str(task), rows=[], notes=[])
+    else:
+        result = compare(current, baseline, tolerances)
+    result.floors = floor_rows(current, floors)
+    if any(r.status == "skipped" for r in result.floors):
+        result.notes.append(
+            "real-document gate skipped: the report measured no private real documents "
+            "(private-inputs/tables/ with labels.json)"
+        )
+    return result
+
+
 def _num(value: float | None, pct: bool = False) -> str:
     if value is None:
         return "n/a"
@@ -276,12 +443,12 @@ def _num(value: float | None, pct: bool = False) -> str:
 
 
 def format_table(result: GateResult) -> str:
-    lines = [
-        f"Eval gate: {result.task}",
-        "",
-        "| metric | baseline | current | change | allowed | status |",
-        "|---|---|---|---|---|---|",
-    ]
+    lines = [f"Eval gate: {result.task}", ""]
+    if result.rows or not result.floors:
+        lines += [
+            "| metric | baseline | current | change | allowed | status |",
+            "|---|---|---|---|---|---|",
+        ]
     for r in result.rows:
         relative = r.rule == "max_rel_increase"
         if relative:
@@ -299,35 +466,49 @@ def format_table(result: GateResult) -> str:
             f"| {r.name} | {_num(r.baseline)} | {_num(r.current)} | {change} | {allowed} "
             f"| {r.status.upper() if r.status != 'ok' else 'ok'} |"
         )
-    if not result.rows:
+    if not result.rows and not result.floors:
         lines.append("| (no tracked metrics for this task) | | | | | |")
+    if result.floors:
+        if result.rows:
+            lines.append("")
+        lines += ["| floor | current | bar | part | status |", "|---|---|---|---|---|"]
+        for r in result.floors:
+            bar = f">= {r.limit:g}" if r.rule == "minimum" else f"<= {r.limit:g}"
+            part = "real documents" if r.name.startswith("real_") else "gold"
+            status = r.status.upper() if r.status != "ok" else "ok"
+            lines.append(f"| {r.name} | {_num(r.current)} | {bar} | {part} | {status} |")
     if result.notes:
         lines += ["", *[f"- {n}" for n in result.notes]]
-    lines += ["", "PASS" if result.passed else "FAIL: tracked metric(s) regressed"]
+    verdict = "FAIL: tracked metric(s) regressed or below a floor"
+    lines += ["", "PASS" if result.passed else verdict]
     return "\n".join(lines) + "\n"
 
 
 def run_gate(
     current_path: Path,
-    baseline_path: Path,
+    baseline_path: Path | None,
     tolerance_path: Path | None,
     *,
     require_current: bool = False,
 ) -> int:
-    """Print the diff table; return the exit code (0 pass, 1 regression, 2 refused).
+    """Print the diff table; return the exit code (0 pass, 1 regression or a metric
+    below its floor, 2 refused).
 
+    Without a baseline only the floors are checked (tasks that have them: tables).
     `require_current`: also refuse a current report whose prompts or models differ from
     the code under test (CI sets it; see the module docstring).
     """
     current = json.loads(current_path.read_text(encoding="utf-8"))
-    baseline = json.loads(baseline_path.read_text(encoding="utf-8"))
+    baseline = json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path else None
     try:
         if require_current:
             from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
 
             models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
             check_current(current, code_versions(), models)
-        result = compare(current, baseline, load_tolerances(tolerance_path))
+        result = gate(
+            current, baseline, load_tolerances(tolerance_path), load_floors(tolerance_path)
+        )
     except GateRefused as exc:
         print(f"error: cannot compare ({exc.code}): {exc}", file=sys.stderr)
         return 2
