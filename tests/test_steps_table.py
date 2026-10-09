@@ -274,6 +274,46 @@ def test_case_is_compared_because_units_depend_on_it():
     assert codes(fix) == {"text_mismatch"}
 
 
+def test_blank_cells_left_out_move_values_to_another_column():
+    # OpenStax Statistics 3.4 (gold tab-002): blanks printed "___", which the model leaves
+    # out, so 14 lands under "The Coastline" although every row keeps its words.
+    pdf = [
+        ["Sex", "The Coastline", "Near Lakes and Streams", "On Mountain Peaks", "Total"],
+        ["Female", "18", "16", "___", "45"],
+        ["Male", "___", "___", "14", "55"],
+        ["Total", "___", "41", "___", "___"],
+    ]
+    model = answer(
+        [
+            [head(t) for t in pdf[0]],
+            ["Female", "18", "16", "45"],
+            ["Male", "14", "55"],
+            ["Total", "41"],
+        ]
+    )
+    fix = run(by_model(cheap=model, main=model), element(local(pdf)))
+    assert models(fix) == [CHEAP_MODEL, MAIN_MODEL]
+    assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"cell_mismatch"})
+
+
+def test_values_swapped_within_a_row_need_review():
+    pdf = [["Planet", "Mass", "Radius"], ["Mars", "0.107", "0.532"]]
+    model = answer([[head("Planet"), head("Mass"), head("Radius")], ["Mars", "0.532", "0.107"]])
+    fix = run(by_model(cheap=model, main=model), element(local(pdf)))
+    assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"cell_mismatch"})
+
+
+def test_a_moved_cell_boundary_is_not_only_spacing():
+    pdf = [["A", "B"], ["1.5", "23"]]
+    model = answer([[head("A"), head("B")], ["1.52", "3"]])
+    fix = run(by_model(cheap=model, main=model), element(local(pdf)))
+    assert (fix.status, fix.review, codes(fix)) == (
+        Status.NEEDS_REVIEW,
+        "required",
+        {"text_mismatch"},
+    )
+
+
 def test_grids_that_disagree_escalate_then_need_review():
     # The PDF's layout split the last row in two; the model kept one row.
     split = [*FREE_FALL[:3], ["2", "19.6", "19.6"], ["", "", ""]]
@@ -419,6 +459,68 @@ def test_repeated_labels_are_not_row_headers():
     grid = grid_from_output(TableOutput.model_validate(answer(rows)), caption=None)
     assert grid is not None and grid.header_cols == 0
     assert [c.header for c in grid.cells if c.row > 0] == [None] * 4
+
+
+SIDE_BY_SIDE = [
+    ["Planet", "Mass", "Planet", "Mass"],
+    ["Mercury", "0.33", "Jupiter", "1898"],
+    ["Venus", "4.87", "Saturn", "568"],
+]
+
+
+def side_by_side(second: list[str]) -> dict:
+    rows = [[head(t) for t in SIDE_BY_SIDE[0]]]
+    for row, label in zip(SIDE_BY_SIDE[1:], second, strict=True):
+        rows.append([rowh(row[0]), row[1], rowh(label), row[3]])
+    return answer(rows)
+
+
+def test_side_by_side_tables_keep_both_label_columns_with_headers_and_ids():
+    # Two tables printed side by side: Jupiter, not Mercury, labels 1898.
+    fix = run(by_model(cheap=side_by_side(["Jupiter", "Saturn"])), element(local(SIDE_BY_SIDE)))
+    grid = fix.table.grid
+    assert (fix.status, fix.review) == (Status.ACCEPTED, "none")
+    assert grid.header_cols == 1
+    assert [c.header for c in grid.cells if c.row == 1] == ["row", None, "row", None]
+    html = render([(element(local(SIDE_BY_SIDE)), fix)])
+    assert '<td headers="p1-e4-r0c3 p1-e4-r1c2">1898</td>' in html
+    assert '<th id="p1-e4-r1c2" scope="row">Jupiter</th>' in html
+
+
+def test_a_second_label_column_that_is_not_labels_drops_the_first_one_too():
+    # Repeated labels in the second half cannot be row headers; Mercury's scope="row"
+    # would then cover them, so no row headers at all, and a note says so.
+    pdf = [SIDE_BY_SIDE[0], ["Mercury", "0.33", "Moon", "1898"], ["Venus", "4.87", "Moon", "568"]]
+    fix = run(by_model(cheap=side_by_side(["Moon", "Moon"])), element(local(pdf)))
+    grid = fix.table.grid
+    assert {c.header for c in grid.cells if c.row > 0} == {None} and grid.header_cols == 0
+    assert (fix.status, fix.review, codes(fix)) == (
+        Status.ACCEPTED,
+        "optional",
+        {"row_headers_dropped"},
+    )
+    assert models(fix) == [CHEAP_MODEL]  # a note: no escalation
+
+
+def test_a_second_level_of_row_headers_is_kept():
+    rows = [
+        [head("Type"), head("Material"), head("c (J/kg K)")],
+        [rowh("Metal", row_span=2), rowh("Aluminium"), "900"],
+        [rowh("Copper"), "385"],
+        [rowh("Liquid", row_span=2), rowh("Water"), "4186"],
+        [rowh("Ethanol"), "2440"],
+    ]
+    grid = grid_from_output(TableOutput.model_validate(answer(rows)), caption=None)
+    assert grid is not None and (grid.header_rows, grid.header_cols) == (1, 2)
+    assert [c.text for c in grid.cells if c.header == "row"] == [
+        "Metal",
+        "Aluminium",
+        "Copper",
+        "Liquid",
+        "Water",
+        "Ethanol",
+    ]
+    assert apply_header_policy(grid) == grid
 
 
 def test_a_label_value_table_gets_row_headers_and_no_header_row():

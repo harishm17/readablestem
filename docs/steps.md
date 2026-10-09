@@ -606,9 +606,10 @@ full description is in [tables.md](tables.md). In short:
   not a data table -> ABSTAINED `not_data_table`; no usable answer -> the local grid with
   first-row headers, NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
   FAILED `table_not_rebuilt`. No model confidence: `Fix.confidence` is None.
-- Header policy: header rows from the top; row headers only for a first column of
-  non-empty, non-numeric, distinct labels the model marked; the caption only from
-  layout's "Table N" caption.
+- Header policy: header rows from the top; row headers only for columns of non-empty,
+  non-numeric, distinct labels the model marked (leading ones, or a second label column
+  after data cells, written with headers/id); the caption only from layout's "Table N"
+  caption.
 
 ## Privacy
 

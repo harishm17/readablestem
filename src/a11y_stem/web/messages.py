@@ -135,6 +135,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("table.cell_text", "text_mismatch"): "A word or number in the rebuilt table differs from "
     "the text stored in the PDF (missing, added twice or changed), so compare the cells with "
     "the image.",
+    ("table.cell_text", "cell_mismatch"): "Every word and number is in the right row, but one "
+    "sits in a different column than in the PDF (an empty cell left out, or two values "
+    "swapped), so check each row's cells against the image.",
     ("table.cell_text", "row_mismatch"): "Every word and number is there, but one sits in a "
     "different row than in the PDF, so check the rows against the image.",
     ("table.cell_text", "whitespace_differs"): "The cells match the text stored in the PDF "
@@ -154,6 +157,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "check those letters.",
     ("table.math_style", "style_cosmetic"): "A letter's style in a maths cell differs from "
     "the PDF only where it does not change the meaning, so this was accepted as it is.",
+    ("table.row_headers", "row_headers_dropped"): "A column of row labels comes after data "
+    "cells and could not be used as one, so the table has no row headers: check that each "
+    "value can still be found by its row.",
     ("table.source", "local_grid"): "No model could read this table, so this is the grid "
     "built from the PDF's own text with the first row as headers: check it against the image.",
     # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)

@@ -291,11 +291,18 @@ mark an identifying first column as row headers. Both are valid; the rules are:
   `"colgroup"`). A "row" flag in a header row (the corner cell) is a column header. A row
   of one full-width header cell counts as a header row only above the column labels (a
   group label over every column); below them it is a section.
-- **Row headers** only when the model marks the first column's body cells as row
-  headers **and** those cells are non-empty, not numbers (a cell whose first letter or
-  digit is a digit: "2019", "-3.5", "2 kg") and all different (planets, substances,
-  quantities). Otherwise they are data cells: gpt-6-luna marked numeric first columns as
-  row headers in 14 of 59 bench tables. Row flags anywhere else are dropped.
+- **Row headers** only for a column whose body cells the model marks as row headers
+  **and** that are non-empty, not numbers (a cell whose first letter or digit is a
+  digit: "2019", "-3.5", "2 kg") and all different (planets, substances, quantities).
+  Otherwise they are data cells: gpt-6-luna marked numeric first columns as row headers
+  in 14 of 59 bench tables. The leading such columns are the row headers (`header_cols`;
+  two when a row-spanning group label such as "Metal" comes before "Aluminium",
+  "Copper"). A label column after data cells is the second of two tables printed side
+  by side ("Planet | Mass | Planet | Mass"): it is kept, and `table_html` then writes
+  headers/id, so 1898 is labelled Jupiter, not Mercury. A column marked so after data
+  cells whose cells are not labels would leave the row headers to its left labelling
+  its half of each row (`scope="row"` covers the whole row), so those are dropped too,
+  with the note `row_headers_dropped`. Partial row flags are dropped.
 - **Label/value tables** ("Mass | 2 kg") therefore get row headers and no `<thead>`.
 - **Sections:** a header cell across the full width of the body is a section heading
   (`scope="rowgroup"`, its own `<tbody>`).
@@ -315,13 +322,15 @@ All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
 | `table.grid_agreement` | `grid_size_differs`, `spans_differ` | the model and the local grid disagree on rows x columns or merged cells (only with a local grid) | required |
 | `table.cell_text` | `text_mismatch` | a word, number or meaningful symbol dropped, added twice, invented or changed | required |
 | `table.cell_text` | `row_mismatch` | every word is there, one is in another row than in the PDF | required |
-| `table.cell_text` | `whitespace_differs` | equal once spacing is ignored ("12 345" and "12345", "tempera- ture") | optional note |
+| `table.cell_text` | `cell_mismatch` | every row's words are there, one is in another column of its row (an empty cell left out, two values swapped) | required |
+| `table.cell_text` | `whitespace_differs` | each cell equal to the PDF cell in its place once spacing is ignored ("12 345" and "12345", "tempera- ture") | optional note |
 | `table.cell_text` | `no_pdf_text` | no PDF words to compare (no local grid with text, no element text) | required |
 | `table.math` | `invalid_latex` | a maths cell's LaTeX fails a validator (error severity; the cell shows its text) | required |
 | `table.math_symbols` | `symbol_mismatch` | a maths cell's letters, digits or Greek letters differ from the PDF glyphs in its place | required |
 | `table.math_signs` | `sign_mismatch` | a sign or relation in a maths cell differs (the equation step's `compare_signs`) | required |
 | `table.math_style` | `style_mismatch` / `style_cosmetic` | a meaning-level letter style (a bold vector read as plain) / a cosmetic one | required / optional note |
 | `table.source` | `local_grid` | no model answer was usable: the proposal is the local grid | required |
+| `table.row_headers` | `row_headers_dropped` | the model marked a column after data cells as row headers that are not labels, so the row headers to its left were dropped too | optional note |
 
 **The cell-text bijection.** The words compared are numbers (with a minus sign glued to
 them at the start, or after a space, an opening bracket, a colon, a semicolon, a comma or
@@ -333,10 +342,14 @@ characters dropped, dashes and minus signs folded into one, pdfTeX's U+2206 into
 is kept (mW is not MW); brackets, quotes, commas and full stops are not compared. The
 non-maths cells of the answer, as a multiset, must equal the PDF's words:
 
-- with a local grid of the same size, **row by row**: each answer row against the local
-  row with the same number, leaving out the local cells where the answer has maths (the
-  maths checks compare those). A row-by-row failure whose totals still match is
-  `row_mismatch`; one that holds once all spacing is removed is `whitespace_differs`;
+- with a local grid of the same size, **cell by cell**: each answer cell against the
+  local cell in its place (row by row when the merged cells differ, which is
+  `spans_differ` anyway), leaving out the local cells where the answer has maths (the
+  maths checks compare those). A failure whose row totals still match is
+  `cell_mismatch` (a value moved to another column: the blank cells the model left out
+  of "Male | ___ | ___ | 14 | 55" put 14 under the wrong heading); one whose table totals
+  match is `row_mismatch`; one where each cell holds once all spacing is removed is
+  `whitespace_differs` (a cell boundary moved, "1.5 | 23" read as "1.52 | 3", is not);
 - otherwise (the grids disagree, or only `Element.text` is there) over the **whole
   table**: no word may be added, and the PDF words no text cell accounts for must be
   exactly the maths cells' letters and digits (a maths cell's text layer is flattened,
@@ -363,7 +376,7 @@ First matching rule wins (content-features.md "Review tiers"):
 | 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with first-row headers | (check `local_grid`) | required |
 | 3b | no usable answer, no local grid | FAILED | `model_<outcome>` or `invalid_table` | required (image kept) |
 | 4 | every check passed | ACCEPTED | | none |
-| 5 | only notes failed (`whitespace_differs`, `style_cosmetic`) | ACCEPTED | | optional |
+| 5 | only notes failed (`whitespace_differs`, `style_cosmetic`, `row_headers_dropped`) | ACCEPTED | | optional |
 | 6 | otherwise | NEEDS_REVIEW, the model's grid | | required |
 
 The model gives no confidence: the checks decide, so `Fix.confidence` is None. A table
@@ -437,8 +450,6 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 
 ### Known limits
 
-- Values swapped between two columns of the same row keep every row's words, so the
-  bijection does not see it (grid agreement and the review screen are the guard).
 - A maths cell is compared as a bag of letters and digits (as an equation is): digits
   in the wrong order inside one maths cell are missed. Plain numbers are text cells
   (LaTeX without commands or scripts is treated as text), so the word check covers them.

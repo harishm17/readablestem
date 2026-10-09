@@ -30,10 +30,15 @@ with empty cells, whitespace collapsed, and LaTeX kept only for real maths (a ce
 `5.2\\ \\text{m/s}` is plain text). Then the header policy (`apply_header_policy`):
 
 - the column header rows are the top rows whose cells are all headers (in `<thead>`);
-- row headers only when the model marks the first column's body cells as row headers
-  and those cells are non-empty, not numbers, and all different (planets, quantities);
-  otherwise they are data cells, so a numeric first column is never a row header. A
-  label/value table therefore gets row headers and no header row;
+- row headers only for a column whose body cells the model marks as row headers and
+  that are non-empty, not numbers, and all different (planets, quantities); otherwise
+  they are data cells, so a numeric first column is never a row header. A label/value
+  table therefore gets row headers and no header row. The leading such columns are the
+  row headers (two levels when a row-spanning group label comes first); one after data
+  cells is the second of two tables side by side, written with headers/id. When a
+  column marked so after data cells is not labels, the row headers to its left would
+  label its half of each row, so they are dropped too, with a note
+  (`row_headers_dropped`);
 - a header cell across the full width of the body is a section heading;
 - the caption is the "Table N" caption layout found beside the table (`Element.caption`),
   never the model's: a caption is never invented.
@@ -49,11 +54,14 @@ Checks (content-free codes; docs/tables.md):
   cells agree with the grid layout built from the PDF (`grid_size_differs`,
   `spans_differ`): two independent readings that agree;
 - `table.cell_text`: the cell-text bijection. The words and numbers of the model's
-  non-maths cells, as a multiset, equal the PDF's words for the table, and each row's
-  words come from the matching row of the local grid (`text_mismatch`: a word or number
-  dropped, duplicated, invented or changed; `row_mismatch`: one in the wrong row). When
-  only the spacing differs ("12 345" for "12345", a word broken at the end of a line),
-  it is a note (`whitespace_differs`). With no PDF words to compare: `no_pdf_text`;
+  non-maths cells, as a multiset, equal the PDF's words for the table, and with a local
+  grid of the same size each cell's words are those of the local cell in its place
+  (`text_mismatch`: a word or number dropped, duplicated, invented or changed;
+  `row_mismatch`: one in the wrong row; `cell_mismatch`: one in the wrong column of its
+  row, such as an empty cell the model left out or two values swapped). When only the
+  spacing within each cell differs ("12 345" for "12345", a word broken at the end of a
+  line), it is a note (`whitespace_differs`). With no PDF words to compare:
+  `no_pdf_text`;
 - `table.math`: every maths cell's LaTeX passes `validate.check_latex`,
   `safe_latex_to_mathml` and `check_mathml` (`invalid_latex`; that cell then shows its
   text);
@@ -70,8 +78,8 @@ Status rules, in order (docs/design/content-features.md "Review tiers"):
    grid) -> the local grid with first-row headers, NEEDS_REVIEW (check `table.source`,
    code `local_grid`); without a local grid FAILED "model_<outcome>" or "invalid_table";
 4. every check passed -> ACCEPTED, review "none";
-5. only notes failed (`NOTE_CODES`: spacing, a cosmetic maths style) -> ACCEPTED,
-   review "optional";
+5. only notes failed (`NOTE_CODES`: spacing, a cosmetic maths style, row headers
+   dropped) -> ACCEPTED, review "optional";
 6. otherwise (a failed bijection, grid agreement, maths or header check, after
    escalation) -> NEEDS_REVIEW with the proposal (review "required").
 The model gives no confidence: the checks decide, so `Fix.confidence` is None.
@@ -141,9 +149,9 @@ OUTPUT_TOKENS_PER_SLOT = 40
 MIN_OUTPUT_TOKENS = 4096
 MAX_OUTPUT_TOKENS = 16384
 # Failed checks that are only notes: the fix is still ACCEPTED (review "optional").
-NOTE_CODES = frozenset({"whitespace_differs", "style_cosmetic"})
+NOTE_CODES = frozenset({"whitespace_differs", "style_cosmetic", "row_headers_dropped"})
 # Failed checks a second reading cannot change: they never escalate.
-NO_ESCALATION_CODES = frozenset({"whitespace_differs", "no_pdf_text"})
+NO_ESCALATION_CODES = frozenset({"whitespace_differs", "no_pdf_text", "row_headers_dropped"})
 # `grid_problems` codes about the grid itself; the others are about its headers.
 STRUCTURE_PROBLEMS = frozenset({"no_cells", "cell_out_of_bounds", "cells_overlap", "grid_hole"})
 # Placing cells marks each slot it covers; a well-formed grid marks each slot once, so
@@ -334,6 +342,12 @@ def _cell(out: CellOutput, row: int, col: int, row_span: int, col_span: int) -> 
 def grid_from_output(output: TableOutput, *, caption: str | None) -> TableGrid | None:
     """The model's rows as a `TableGrid` (source "model", header policy applied), or
     None when they cannot be one: no rows, or past the size limits."""
+    placed = _grid_with_policy(output, caption=caption)
+    return placed[0] if placed is not None else None
+
+
+def _grid_with_policy(output: TableOutput, *, caption: str | None) -> tuple[TableGrid, bool] | None:
+    """`grid_from_output`, and whether the header policy dropped row headers."""
     rows = len(output.rows)
     if not 0 < rows <= MAX_TABLE_ROWS:
         return None
@@ -376,7 +390,7 @@ def grid_from_output(output: TableOutput, *, caption: str | None) -> TableGrid |
         )
     except ValidationError:
         return None
-    return apply_header_policy(grid)
+    return _header_policy(grid)
 
 
 def _plain(cell: TableCell) -> str:
@@ -392,11 +406,52 @@ def is_numeric(cell: TableCell) -> bool:
 
 def apply_header_policy(grid: TableGrid) -> TableGrid:
     """Header flags as the output writes them (see the module docstring): header rows
-    from the top, row headers only for a first column of distinct labels, full-width
-    header cells in the body as section headings, no flag on an empty cell.
+    from the top, row headers only for columns of distinct labels, full-width header
+    cells in the body as section headings, no flag on an empty cell.
 
     A row of one full-width header cell is a header row only above the column labels
     (a group label over every column); below them it starts a section of the body."""
+    return _header_policy(grid)[0]
+
+
+def _row_header_columns(cells: list[TableCell], is_body: Any) -> tuple[set[int], bool]:
+    """The columns whose body cells the model marked as row headers and that are labels
+    (non-empty, not numbers, all different), and whether a marked label column had to
+    be dropped.
+
+    Every column is looked at, not only the first: the leading ones are the row headers
+    proper (two levels when a row-spanning group label comes first), and a column of
+    labels after data cells is the second table of two side by side, which `table_html`
+    writes with headers/id (its last row may be empty). A column marked so after data
+    cells whose cells are not labels would leave the row headers to its left labelling
+    its half of each row (`scope="row"` covers the whole row), so those are dropped too:
+    `dropped` says so."""
+    columns: defaultdict[int, list[TableCell]] = defaultdict(list)
+    for cell in cells:
+        if is_body(cell):
+            columns[cell.col].append(cell)
+    kept: set[int] = set()
+    dropped = False
+    after_data = False
+    for col in sorted(columns):
+        filled = [c for c in columns[col] if not c.is_empty]
+        # Leading columns must be complete; after data cells, at most half empty.
+        enough = len(filled) * (2 if after_data else 1) >= len(columns[col])
+        marked = bool(filled) and enough and all(c.header == "row" for c in filled)
+        labels = [_plain(c).casefold() for c in filled]
+        if marked and not any(map(is_numeric, filled)) and len(set(labels)) == len(labels):
+            kept.add(col)
+            continue
+        if marked and after_data and kept:
+            dropped = True
+            kept.clear()
+        after_data = True
+    return kept, dropped
+
+
+def _header_policy(grid: TableGrid) -> tuple[TableGrid, bool]:
+    """`apply_header_policy`, and whether a column the model marked as row-header labels
+    was made data (`row_headers_dropped`, a note)."""
     cells = [c.model_copy(update={"header": None}) if c.is_empty else c for c in grid.cells]
     anchored: defaultdict[int, list[TableCell]] = defaultdict(list)
     for cell in cells:
@@ -418,14 +473,12 @@ def apply_header_policy(grid: TableGrid) -> TableGrid:
         labelled = labelled or not section
         header_rows += 1
 
-    first_column = [c for c in cells if c.row >= header_rows and c.col == 0 and not full_width(c)]
-    labels = [_plain(c).casefold() for c in first_column]
-    row_headers = (
-        bool(first_column)
-        and all(c.header == "row" and not c.is_empty for c in first_column)
-        and not any(is_numeric(c) for c in first_column)
-        and len(set(labels)) == len(labels)
+    row_columns, dropped = _row_header_columns(
+        cells, lambda c: c.row >= header_rows and not full_width(c)
     )
+    header_cols = 0
+    while header_cols in row_columns:
+        header_cols += 1
     out = []
     for cell in cells:
         header = cell.header
@@ -433,12 +486,13 @@ def apply_header_policy(grid: TableGrid) -> TableGrid:
             header = "col" if header else None  # a "row" corner cell is a column header
         elif full_width(cell) and header:
             header = "row"  # a section heading
-        elif header == "row" and not (row_headers and cell.col == 0):
+        elif header == "row" and cell.col not in row_columns:
             header = None
         out.append(cell if header == cell.header else cell.model_copy(update={"header": header}))
-    return grid.model_copy(
-        update={"cells": out, "header_rows": header_rows, "header_cols": int(row_headers)}
+    policy = grid.model_copy(
+        update={"cells": out, "header_rows": header_rows, "header_cols": header_cols}
     )
+    return policy, dropped
 
 
 def first_row_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
@@ -545,10 +599,22 @@ def _rows_code(grid: TableGrid, local: TableGrid) -> str | None:
         return Counter(w for c in cells for w in words(c.text))
 
     pairs = list(zip(model_rows, pdf_rows, strict=True))
-    if all(bag(m) == bag(p) for m, p in pairs):
+    if _spans(grid) == _spans(local):
+        # Each text cell against the PDF cell in its place: a value in the wrong column
+        # (a blank cell the model left out, two values swapped) keeps its row's words.
+        cells = [
+            ([cell], [local.cells[i] for i in _counterparts(cell, owner) if i not in maths])
+            for cell in grid.cells
+            if not cell.latex
+        ]
+    else:  # merged cells differ (spans_differ): rows are the finest pairing
+        cells = pairs
+    if all(bag(m) == bag(p) for m, p in cells):
         return None
-    if all(_joined(m) == _joined(p) for m, p in pairs):
+    if all(_joined(m) == _joined(p) for m, p in cells):
         return "whitespace_differs"
+    if all(bag(m) == bag(p) for m, p in pairs):
+        return "cell_mismatch"
     if sum((bag(m) for m, _ in pairs), Counter()) == sum((bag(p) for _, p in pairs), Counter()):
         return "row_mismatch"
     return "text_mismatch"
@@ -740,9 +806,19 @@ class _Candidate:
 def _evaluate(output: TableOutput | None, calls: list[ModelCall], element: Element) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
-    candidate = _Candidate(output, calls, grid_from_output(output, caption=caption_of(element)))
+    placed = _grid_with_policy(output, caption=caption_of(element))
+    candidate = _Candidate(output, calls, placed[0] if placed is not None else None)
     if candidate.grid is not None and output.is_data_table:
         candidate.checks = table_checks(candidate.grid, element)
+        if placed is not None and placed[1]:
+            candidate.checks.append(
+                Check(
+                    name="table.row_headers",
+                    passed=False,
+                    severity="warning",
+                    code="row_headers_dropped",
+                )
+            )
     return candidate
 
 
