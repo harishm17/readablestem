@@ -481,18 +481,20 @@ def test_layout_emits_table_elements_in_reading_order_with_their_captions():
     assert "Table 1" not in texts and "Table 2" not in texts and "12.69" not in texts
 
 
-def test_blank_ruled_tables_are_no_longer_figures_and_numeric_ones_no_longer_equations():
+def test_a_blank_worksheet_and_unruled_numbers_become_tables_not_loose_cells():
     def fill(page):
         write(page, 72, 100, PROSE[0])
-        grid_table(page, [["", "", ""]], y0=130, blank_rows=4)  # a form with no header
+        grid_table(page, [["Trial", "Length (m)", "Time (s)"]], y0=130, blank_rows=4)
         write(page, 72, 250, PROSE[1])
         for r, row in enumerate(PENDULUM[1:]):  # numbers in aligned columns, no rules
             for c, text in enumerate(row):
                 write(page, 150 + 90 * c, 280 + 16 * r, text)
 
-    kinds = {e.kind for e in analyze(pdf(fill)).elements}
-    assert Kind.FIGURE not in kinds
-    assert Kind.TABLE in kinds
+    elements = analyze(pdf(fill)).elements
+    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.TABLE, Kind.PARAGRAPH, Kind.TABLE]
+    blank, numbers = (e for e in elements if e.kind == Kind.TABLE)
+    assert blank.table is not None and (blank.table.rows, blank.table.cols) == (5, 3)
+    assert numbers.table is not None and (numbers.table.rows, numbers.table.cols) == (3, 3)
 
 
 def test_header_cells_are_not_headings_and_rules_are_not_figures():

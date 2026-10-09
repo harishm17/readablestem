@@ -139,6 +139,10 @@ short, 13 are now at full extent; two stay short because one box holds two table
 table and a plot). The 9 tables the detector never proposed (booktabs-style blank tables
 in the dvips manual) stay missed.
 
+What claiming changes: with detection switched off, layout put a display equation inside
+48 of these 76 tables, a figure inside 6 and a heading inside 21 (an element whose centre
+falls in the table's box); now each is one TABLE element.
+
 **These numbers are optimistic.** The arbitration was developed on these same pages, so
 expect lower precision and recall on new documents. Before `FEATURE_TABLES` is turned on,
 check it on a private set of 3-5 real course PDFs kept out of git (the challenge's
@@ -161,7 +165,7 @@ How to repeat: the benchmark, the labels and the challenge's scripts are in
 `a11y-research` (`pdf-eval-2026-10-09.tgz`, `pdf-eval-challenge-2026-10-09.tgz`); the
 scripts and result files behind this section are in
 `a11y-research/tables-detect-eval-2026-10-09.tgz` (`evaluate_full.py` for the manuals,
-`tb/predict.py` and `tb/score.py` for the benchmark, `time_analyze.py`; run them pinned
+`tb/predict.py` and `tb/score.py` for the benchmark, `misrouted.py`, `time_analyze.py`; run them pinned
 with `taskset -c N`). The manuals come from the public URLs in the challenge section of
 `PDF-RECOMMENDATION.md`. The tables-eval work turns this into `a11y-stem eval tables`.
 
@@ -185,7 +189,8 @@ with `taskset -c N`). The manuals come from the public URLs in the challenge sec
 `make fuzz-tables` (`tests/test_tables_fuzz.py`, marked `slow`): byte mutants of the
 repo's own fixtures (MIT, no instructor content) go through `layout.analyze` in a child
 process each, as a job would; a child that the probe let in and that then dies or hangs
-fails the check. `TABLE_FUZZ_MUTANTS` (default 300) and `TABLE_FUZZ_JOBS` set the size.
+fails the check. `TABLE_FUZZ_MUTANTS` (default 300) and `TABLE_FUZZ_JOBS` set the size. On 2026-10-09 the
+300 mutants took a minute on this box, with no escape.
 Run it, with the table numbers above, the extraction tests and the thread-pin test,
 before any bump of `pymupdf`, `pymupdf-layout` or `onnxruntime`. PyMuPDF 2.0 moves the
 layout add-on into `pymupdf` itself; see the 2026-10-09 amendment of

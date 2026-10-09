@@ -27,7 +27,7 @@ table-model:
 # the probe and the table detector; fails if a file passes the probe and then kills the
 # table step (docs/tables.md "Upgrade check"). Takes a few minutes.
 fuzz-tables:
-	uv run pytest -q -m slow tests/test_tables_fuzz.py
+	uv run pytest -q -s -m slow tests/test_tables_fuzz.py
 
 lint:
 	uv run ruff check .
