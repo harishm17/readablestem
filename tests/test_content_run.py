@@ -186,3 +186,17 @@ def test_the_table_step_keeps_tables_as_images_until_it_is_built():
     fix = REAL_REBUILD(element, b"", client=FakeVisionClient(), settings=settings())
     assert fix.status is Status.FAILED and fix.reason == "table_not_rebuilt"
     assert fix.table is None and fix.review == "required"
+
+
+@pytest.mark.xfail(
+    strict=True,
+    reason="the tables-review work adds TABLE to the review screen; remove this marker then "
+    "(docs/design/content-features.md: it merges before or with tables-detect)",
+)
+def test_every_kind_that_asks_for_a_decision_is_on_the_review_screen():
+    """A required decision the review screen cannot show would keep a job from ever
+    being done (the job page counts every pending fix)."""
+    from a11y_stem.web.review import GROUP_KINDS
+
+    asking = {Kind.EQUATION, Kind.FIGURE, Kind.HEADING, Kind.TABLE}
+    assert asking <= set(GROUP_KINDS)
