@@ -367,8 +367,8 @@
     <div class="page-tools">
       <ul class="legend" aria-label="What the marks mean">
         <li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>
-        {% if "repeat" in page.tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Part of a decision counted on another page</li>{% endif %}
-        <li><span class="key key-optional" aria-hidden="true"></span> Optional check (a note)</li>
+        {% if "repeat" in page.tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Same decision, other page</li>{% endif %}
+        <li><span class="key key-optional" aria-hidden="true"></span> Optional check</li>
         {% if show_accepted %}<li><span class="key key-accepted" aria-hidden="true"></span> Accepted</li>{% endif %}
       </ul>
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>

@@ -544,7 +544,8 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
    at, focused or selected, so it never covers the words around it at rest. Its link
    name always says what it is. */
 .box-optional .box-tag, .box-accepted .box-tag {
-  display: none; right: auto; left: calc(var(--fl, 0%) - 4px); top: calc(var(--ft, 0%) - 21px);
+  display: none; right: auto;
+  left: var(--tag-left, calc(var(--fl, 0%) - 4px)); top: var(--label-top, calc(var(--ft, 0%) - 21px));
   min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px; background: #fff; font-size: 11px;
 }
 .box-optional .box-tag { color: var(--mark-optional); border: 1px dashed var(--mark-optional); }

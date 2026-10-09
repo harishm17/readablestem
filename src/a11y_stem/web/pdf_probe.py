@@ -22,15 +22,16 @@ The review screen uses the same child, with the same memory cap, for two more th
 (`web.page_images` is the caller):
 
 - `python -m a11y_stem.web.pdf_probe render PAGE ZOOM MAX_SIDE [--clip X0,Y0,X1,Y1]
-  [--mark X0,Y0,X1,Y1 --chars HEX,...] [--box X0,Y0,X1,Y1] [--snap 1]` writes one PNG of
-  a page (or of a region of it) to stdout, its long side at most `MAX_SIDE` (never more
-  than `RENDER_MAX_SIDE_PX`). `--mark` outlines the glyphs of the listed characters
-  (Unicode code points in hex) inside that region, so a flagged symbol is outlined in
-  the PDF's own image; `--box` outlines a whole region (a heading among the lines around
-  it); `--snap 1` moves the region's top and bottom to whole lines and paints over the
-  words its right edge would cut (`snap_band`, from the page's text here in the child),
-  so no slice of a line or a word shows. On any failure it writes nothing and exits with
-  status 2.
+  [--mark X0,Y0,X1,Y1 --chars HEX,...] [--box X0,Y0,X1,Y1] [--snap 1] [--trim 1]`
+  writes one PNG of a page (or of a region of it) to stdout, its long side at most
+  `MAX_SIDE` (never more than `RENDER_MAX_SIDE_PX`). `--mark` outlines the glyphs of the
+  listed characters (Unicode code points in hex) inside that region, so a flagged symbol
+  is outlined in the PDF's own image; `--box` outlines a whole region (a heading among
+  the lines around it); `--snap 1` moves the region's top and bottom to whole lines and
+  paints over the words its right edge would cut (`snap_band`, from the page's text here
+  in the child), so no slice of a line or a word shows; `--trim 1` paints over the words
+  its left and right edges cut, leaving the region as asked (an equation's compare
+  crop). On any failure it writes nothing and exits with status 2.
 - `python -m a11y_stem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 
@@ -271,13 +272,32 @@ def snap_band(
     across_left = [w.x0 for w in words if w.x0 < left < w.x1]
     if across_left:
         left = max(min(across_left) - pad, area.x0 - SNAP_MAX_GROW_PT)
-    # Descenders can reach below a word's box (a "p" in Times): paint a little more.
-    hide = [
-        pymupdf.Rect(max(w.x0 - 0.6, left), w.y0 - 1.0, w.x1 + 0.6, w.y1 + 0.3 * w.height)
-        for w in words
-        if w.x0 < right < w.x1
-    ]
+    hide = [_cover(w) for w in words if w.x0 < right < w.x1]
     return pymupdf.Rect(left, top, right, bottom) & page.rect, hide
+
+
+def _cover(word: pymupdf.Rect) -> pymupdf.Rect:
+    """What to paint over to hide a word. Descenders can reach below a word's box (a "p"
+    in Times), so a little more than the box."""
+    import pymupdf
+
+    return pymupdf.Rect(word.x0 - 0.6, word.y0 - 1.0, word.x1 + 0.6, word.y1 + 0.3 * word.height)
+
+
+def cut_words(page: pymupdf.Page, area: pymupdf.Rect) -> list[pymupdf.Rect]:
+    """What to paint over so no word shows cut at the left or right edge of `area` (an
+    equation's compare crop: its edges stay where they are, so the proposal drawn under
+    it keeps its scale)."""
+    import pymupdf
+
+    out = []
+    for w in page.get_text("words", flags=pymupdf.TEXT_MEDIABOX_CLIP):
+        word = pymupdf.Rect(w[:4])
+        if word.y1 <= area.y0 or word.y0 >= area.y1:
+            continue
+        if word.x0 < area.x0 < word.x1 or word.x0 < area.x1 < word.x1:
+            out.append(_cover(word))
+    return out
 
 
 def render(
@@ -291,11 +311,13 @@ def render(
     chars: str = "",
     box: tuple[float, float, float, float] | None = None,
     snap: bool = False,
+    trim: bool = False,
 ) -> bytes:
     """PNG of one page (0-based), or of `clip` on it, at `zoom` pixels per point, its long
     side capped at `max_side` (and `RENDER_MAX_SIDE_PX`). `box` is outlined as a whole
     (a heading among the lines around it); with `snap` the clip is first moved to whole
-    lines and words round it (`snap_band`). Raises ProbeRejected."""
+    lines and words round it (`snap_band`); with `trim` the words its side edges cut are
+    painted over (`cut_words`). Raises ProbeRejected."""
     import pymupdf
 
     doc = _open(data)
@@ -310,6 +332,9 @@ def render(
             keep = pymupdf.Rect(box) if box is not None else None
             area, hide = snap_band(current, area, keep)
             for rect in hide:  # in this child's copy only: it is never saved
+                current.draw_rect(rect, color=None, fill=HIDE_COLOR, width=0)
+        elif trim and clip is not None:
+            for rect in cut_words(current, area):
                 current.draw_rect(rect, color=None, fill=HIDE_COLOR, width=0)
         if area.is_empty or area.width < 0.5 or area.height < 0.5:
             raise ProbeRejected("empty_region")
@@ -349,6 +374,7 @@ def _render_main(args: list[str], data: bytes) -> int:
         chars=chars,
         box=_rect(options["--box"]) if "--box" in options else None,
         snap=options.get("--snap") == "1",
+        trim=options.get("--trim") == "1",
     )
     sys.stdout.buffer.write(png)
     return 0

@@ -379,3 +379,26 @@ def test_a_heading_with_nothing_above_it_starts_its_band_just_above_it():
     assert snapped.y0 > 90  # the rule is not in the band
     assert snapped.y0 == pytest.approx(heading.y0 - pdf_probe.SNAP_ABOVE_PT)
     doc.close()
+
+
+def test_an_equation_crop_paints_over_the_words_its_sides_cut():
+    """The compare crop keeps its edges (the proposal under it is drawn at its scale),
+    but a word its left or right edge cuts is painted over rather than shown in part."""
+    doc = pymupdf.open(stream=review_pdf(), filetype="pdf")
+    page = doc[0]
+    omega = next(e for e in review_output().result.elements if e.id == "p1-e2")
+    x0, y0, x1, y1 = omega.bbox
+    area = pymupdf.Rect(x0 - 30, y0 - 2, x1 + 30, y1 + 2)
+    covers = pdf_probe.cut_words(page, area)
+    cut = [
+        pymupdf.Rect(w[:4])
+        for w in page.get_text("words")
+        if w[3] > area.y0 and w[1] < area.y1 and (w[0] < area.x0 < w[2] or w[0] < area.x1 < w[2])
+    ]
+    assert cut and len(covers) == len(cut)
+    assert all(any(c.contains(w) for c in covers) for w in cut)
+    doc.close()
+    clip = (area.x0, area.y0, area.x1, area.y1)
+    plain = pdf_probe.render(review_pdf(), page=0, zoom=4, max_side=1600, clip=clip)
+    trimmed = pdf_probe.render(review_pdf(), page=0, zoom=4, max_side=1600, clip=clip, trim=True)
+    assert png_size(plain) == png_size(trimmed) and plain != trimmed

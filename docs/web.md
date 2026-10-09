@@ -86,10 +86,10 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation or figure |
 | GET `/jobs/{id}/review?item=&page=&accepted=1` | owner | Review screen: one decision at a time beside its page (below) |
 | GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind, with bulk accept |
-| GET `/jobs/{id}/review/marks.css` | owner | Where each mark goes on its page image, and the compare sizes (element ids and numbers only) |
-| GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored |
-| GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the lines around it (outlined), a figure |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting. A hidden `view` field (`split` or `list`) says which view to go back to |
+| GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
+| GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond two renders in progress for one person, 503 when the instance's two render slots stay busy |
+| GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure; 429 and 503 as for pages |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
@@ -288,9 +288,11 @@ geometry), `web/page_images.py` and `web/pdf_probe.py` (rendering in a child pro
 order, eligibility, validation), `web/messages.py` (what each code means). Tests:
 `tests/test_web_review_split.py` (the screen, deciding, older results),
 `tests/test_web_page_images.py` (routes, ownership, retention, headers, a failing child),
-`tests/test_web_compare_queue.py`, `tests/test_web_review_split_browser.py` (axe at 1440
-and 390 px, 320 px reflow, target sizes, no JavaScript, focus, shortcuts, forced colours;
-`browser` marker), and for the list view `tests/test_web_review.py` (one fix),
+`tests/test_web_compare_queue.py`, `tests/test_web_marks.py` (where the marks go),
+`tests/test_web_review_split_browser.py` (axe at 1440 and 390 px, also on a dense page
+with accepted items shown, 320 px reflow, target sizes, the selected mark inside the page
+region on narrow and short screens, no JavaScript, Accept after typing, focus, shortcuts,
+forced colours, an image retried; `browser` marker), and for the list view `tests/test_web_review.py` (one fix),
 `tests/test_web_review_bulk.py` (order, landing, bulk accept),
 `tests/test_web_review_messages.py` (every code has a sentence),
 `tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
@@ -317,8 +319,10 @@ the results".
 
 - *Equation*: the PDF and the proposal at the same size. The PDF row is a crop a little
   wider than the equation (`compare.context_clip`: four font sizes of words on each side
-  of an inline one), so the weight of a letter can be judged against the body text; the
-  proposal's MathML is drawn under it at the crop's scale (font size and left edge in
+  of an inline one), so the weight of a letter can be judged against the body text (a
+  word the crop's side edges cut is painted over in the child, `--trim`, so only whole
+  words show and the crop keeps its size); the proposal's MathML is drawn under it at
+  the crop's scale (font size and left edge in
   `cqw` from `marks.css`). The differing symbol is outlined in both: in the crop by the
   child process (`--mark`: the glyphs of those characters inside the equation's box), in
   the MathML by a `class="flagged"` the sanitiser adds to the tokens holding it. A short
@@ -328,15 +332,38 @@ the results".
   styles ("The ω is bold in the PDF (a vector) but plain in the proposal."), symbols
   ("The PDF has 8 where the proposal has 3.") and signs (minus, plus, plus-minus counted
   on both sides). Nothing of this is stored: it is worked out again from the element's
-  text layer when the screen is shown. Accept and Reject, with "Edit the LaTeX" folded
-  (open when there is no proposal or an error).
+  text layer when the screen is shown. A style the text layer cannot carry is not a
+  difference: a double-struck R from an MSBM font (likewise script and fraktur) is a
+  plain "R" there, so for `\mathbb{R}` the screen says "The proposal has a double-struck
+  ℝ. The PDF's text cannot show that style, so check it in the image." instead of
+  calling the PDF's R plain (unless the R is known to come from a regular text font).
+  The proposal is drawn in Latin Modern Math (served from `static/vendor/fonts`, see
+  its README), the OpenType math font of the family LaTeX PDFs are set in: in the
+  browser's default math font a plain omega is as heavy as a bold Computer Modern one.
+  Accept and Reject, with "Edit the LaTeX" folded (open when there is no proposal or an
+  error). When the proposal *changes the meaning* (a "Yes" in the table), the fix comes
+  first: a one-click **Use bold ω** (`compare.suggest_fix`: the proposal's LaTeX with
+  only that letter's style changed, `\boldsymbol` for Greek, `\mathbf` for an upright
+  Latin letter, `\mathbb`/`\mathcal`/`\mathfrak` for a lost letter style, or the bold
+  taken off; posted as an edit, so it goes through the same checks, and offered only
+  when those checks pass and the same comparison then finds no meaning-level
+  difference), the edit box open, and Accept as the secondary **Accept anyway**.
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
   Accept, Save edit and Reject.
 - *Heading group*: one card. "“Teacher Support” appears 11 times as a bold line in the
   body text size.", the first one in its band of the page (`compare.band_clip`, the
   heading outlined), the pages it is on, **Keep as headings at level 3** and **Make bold
   text**, "Choose another level" folded (open when keeping them at the proposed level
-  would skip a level), and "Decide them one by one" in the list view.
+  would skip a level), and "Decide them one by one" in the list view. The band is
+  snapped to whole lines in the render child (`pdf_probe.snap_band`, from the page's own
+  text): the line across its top comes in whole (a box title right above a heading is
+  the context that matters), a later line across its bottom is left out, the words its
+  right edge would cut are painted over (each line ends on a whole word), and with
+  nothing above the heading it starts just above it. Once decided, the card says what
+  the headings are now ("All 11 were made bold text.") and offers the other choice again
+  for all of them ("Change all 11: Keep as headings at level 3"; `scope=all`, so the
+  group decision acts on every heading of the group, decided or not, and leaves alone
+  the ones already that way).
 - *Single heading*: its band of the page, text and level, a level select.
 
 "Details for this item" (folded) keeps the confidence, every failed check with its
@@ -350,38 +377,60 @@ Accepted. 2 decisions left." A refused edit comes back on the same decision (422
 error summary and the field open.
 
 **Optional checks (M)**, folded, below the decision: each a link ("Equation 2, page 1")
-and a short note ("A letter's style differs slightly; the meaning is the same."). Opening
+and a short note ("A letter's style differs slightly; the meaning is the same."; for a
+style the PDF's text cannot show, "The proposal has a double-struck ℝ, a style the PDF's
+text cannot show."). Opening
 one shows it in the decision's place ("Optional check", "Accepted, with a note"), still
 editable, with a link back to the decision at hand.
 
 **The page** (left on a wide screen, sticky, below on a phone). "Page 1 of 16", the pages
 as numbered links with "N to decide" only where a decision is open (an open decision
 counts on the page of its first heading still waiting, so the pages add up to the total),
-a legend, "Show accepted (N)", and the page image in its own named, focusable scroll
-region ("Page 1 image with 5 marks"). Every fix on the page is marked by a link to it:
+a legend (only the kinds of mark on the page), "Show accepted (N)", and the page image
+in its own named, focusable scroll region ("Page 1 image with 5 marks"). Every fix on
+the page is marked by a link to it:
 
 | Mark | Shape | Text |
 |---|---|---|
 | A decision still open | solid frame, numbered disc beside it (the decision's number) | "1: Equation 5, needs your decision (1 of 3)" |
+| A heading group's heading on another page than the one its decision counts on ("Same decision, other page") | thinner frame, the number in an outlined disc | "1: Heading 24, “Teacher Support”, repeated heading, part of decision 1 of 3 (first on page 1)" |
 | The selected one | thicker blue frame, blue disc, `aria-current` | the same |
 | An optional check | dashed frame; "Note" label on hover, focus or selection | "Note: Equation 2, optional check" |
-| Accepted or decided | dotted frame and a tick, only with "Show accepted" | "Heading 1, accepted automatically" |
+| Accepted or decided | dotted frame (a tick on hover, focus or selection), only with "Show accepted" | "Heading 1, accepted automatically" |
 
-Every mark is a link of at least 24 x 24 CSS px (WCAG 2.5.8; a mark is centred on its
-item and grows to that size), positioned from `marks.css` (the CSP allows no inline
-styles). The marks keep their own colours in forced-colours mode (`forced-color-adjust:
-none` on the page frame): the page image stays white whatever the theme, and system
-colours would make them white on white. Below 64rem the page keeps about 1 CSS px per
-point (`min-width: 36rem`) and scrolls inside its region; the page itself never scrolls
+So a page whose chip has no "N to decide" never shows a solid decision mark: a group
+counts on the page of its first heading still waiting, and its headings elsewhere get
+the lighter mark.
+
+A mark is two boxes (`web.marks`, positions from `marks.css`; the CSP allows no inline
+styles): an invisible link, the clickable area, at least 24 x 24 CSS px (WCAG 2.5.8) at
+the smallest size the page is drawn (the page frame is at least 36rem wide at every
+window width, about 1 CSS px per point for a Letter page, and scrolls inside its region
+when narrower), and inside it a frame that hugs the item, so frames never cross the
+lines above and below. On a dense page (an inline equation on every line, accepted ones
+shown) links that size would overlap, and a click in the overlap would go to the wrong
+item: overlapping links are pushed apart, each by part of the overlap, never so far that
+a link stops covering the middle of its own item (pairs squeezed along one axis are
+tried along the other). The frames stay put. The layout covers every fix of the page,
+shown or not, so no subset a view shows overlaps. A mark's number sits left of its
+frame, or for an equation in a line of text in the page margin on the same line (its
+"Note" label and tick too), so it covers no word. The marks keep their own colours in forced-colours mode
+(`forced-color-adjust: none` on the page frame): the page image stays white whatever the
+theme, and system colours would make them white on white. The page itself never scrolls
 sideways (320 CSS px included).
 
 **Page images.** Rendered when the browser asks, from the job's own upload, in the
 upload probe's child process (`python -m a11y_stem.web.pdf_probe render ...`, 768 MB
 address space cap, 20 s timeout; `web.page_images`), never in the web process: a page
 that crashes MuPDF kills a child. Whole pages at 144 dpi (long side at most 2000 px),
-regions at most 1600 px, never more than 2400 px whatever is asked. At most two children
-run at once per instance; a request that waits more than 10 s for one gets a 503. Nothing
-is stored and nothing is cached: the responses carry `Cache-Control: private, no-store`
+regions at most 1600 px, never more than 2400 px whatever is asked. A render needs a
+slot (`page_images.render_slot`), taken *before* the upload is loaded, so no waiting
+request holds a copy of the PDF: two per person (a review page asks for two images at a
+time; one more is refused at once with a 429 and `Retry-After: 2`, so one signed-in
+user's burst cannot tie up the instance), two children at once per instance (a request
+waits at most 3 s for one, then 503). A burst of 150 requests from one user now renders
+two images and refuses the rest at once, and other pages stay fast. Nothing is stored
+and nothing is cached: the responses carry `Cache-Control: private, no-store`
 like the crops, a job past its retention time or deleted answers 404 (`owned_job`), and
 someone else's job 404 too. A failed render answers 503 (logged as `page_image_failed`
 with a code, no content); the decision still works, and the screen says the image could
@@ -389,16 +438,29 @@ not be shown (with JavaScript) and points to the list view.
 
 **Page sizes.** The marks need each page's size in points: `DocumentResult.page_sizes`
 (0-based page -> width, height, as layout measured it) is stored with every result from
-this release on. A result stored before it has none, so the screen asks the PDF (`sizes`
-in the same child) each time; if that fails too, the page is shown without marks ("The
-marks could not be placed on this page") and every item is still in the list view.
+this release on. A result stored before it has none, so the screen asks the PDF once
+(`sizes` in the same child, in a render slot) and stores the answer in the job's
+`result_json` (only that key is added; the result still loads as before), so the next
+view, its `marks.css` and its region images start no child for it; if that fails too,
+the page is shown without marks ("The marks could not be placed on this page") and every
+item is still in the list view.
 Results stored before review tiers load as before (`default_review`), each waiting heading
 then its own decision.
 
+**Accept never drops an edit.** Accept and Save edit share a form; Accept keeps the
+proposal and never used the fields, so a correction typed and then accepted out of habit
+was lost without a word. Accept with the LaTeX, the alt text, "Decorative" or the level
+changed from the proposal is refused on that field ("You changed the LaTeX. Choose Save
+edit to use your change, or undo it to accept the proposal."), the change kept in the
+field and Save edit made the main button; nothing is saved. Fields the form did not send
+are not compared (both views).
+
 **JavaScript** (`static/app.js`) only enhances: it scrolls the page region so the
-selected mark is in view (side by side, also the window when the mark is near the foot of
-a page, never so far that the decision's heading leaves the window), says so when a page
-image fails, makes "Save
+selected mark is in its visible box, working inside the region only (stacked, the region
+starts below the window, and a window term used to scroll it to its end; side by side it
+also moves the window when the mark is near the foot of a page, never so far that the
+decision's heading leaves the window), asks once more after 1.5 s for an image that was
+refused for a moment and only then says the page image could not be shown, makes "Save
 edit" the main button once a field of the decision is changed, and offers keyboard
 shortcuts: N next decision, P previous, A accept, E go to the edit field. They are off
 until turned on ("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys

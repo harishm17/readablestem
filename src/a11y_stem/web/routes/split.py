@@ -834,7 +834,12 @@ def _box_rules(mark: marks.Mark, size: tuple[float, float]) -> str:
         f"--fw:{_pct(fx1 - fx0, lw)};--fh:{_pct(fy1 - fy0, lh)}"
     )
     if mark.tag_x is not None:
-        rule += f";--tag-left:calc({_pct(mark.tag_x - lx0, lw)} - 11px);--tag-right:auto"
+        # In the margin, on the item's line: the number, and a note's or tick's label.
+        middle = _pct((fy0 + fy1) / 2 - ly0, lh)
+        rule += (
+            f";--tag-left:calc({_pct(mark.tag_x - lx0, lw)} - 11px);--tag-right:auto"
+            f";--label-top:calc({middle} - 9px)"
+        )
     return rule + "}"
 
 
@@ -947,6 +952,7 @@ def _render_region(
             clip=clip,
             mark=element.bbox,
             chars=compare_equation(element, fix).pdf_marks,
+            trim=True,
         )
     if fix.kind is Kind.HEADING:
         return page_images.render_region(

@@ -194,11 +194,11 @@ def test_a_page_without_a_count_shows_no_solid_decision_mark(split):
     )
     assert "box-required" not in page.split('<div class="page-frame">', 1)[1]
     legend = text_of(section(page, '<ul class="legend"', "</ul>"))
-    assert "Part of a decision counted on another page" in legend
+    assert "Same decision, other page" in legend
     # Page 1 keeps the solid marks, and its legend has no such line.
     first = screen(split)
     assert 'class="box box-required"' in boxes(first)["p1-e7"]
-    assert "Part of a decision" not in section(first, '<ul class="legend"', "</ul>")
+    assert "Same decision" not in section(first, '<ul class="legend"', "</ul>")
     # The group selected: the mark on page 2 is the current one, still not "required".
     selected = boxes(screen(split, f"?item={GROUP}&page=2"))["p2-e0"]
     assert 'class="box box-repeat is-current"' in selected
@@ -218,7 +218,11 @@ def test_marks_stylesheet_places_marks_and_sizes_the_proposal(split):
     )
     assert re.search(box, css)
     # An equation in a line of text has its number in the page margin; a heading not.
-    assert re.search(r"#box-p1-e2\{[^}]*--tag-left:calc\(-[\d.]+% - 11px\);--tag-right:auto\}", css)
+    assert re.search(
+        r"#box-p1-e2\{[^}]*--tag-left:calc\(-[\d.]+% - 11px\);--tag-right:auto;"
+        r"--label-top:calc\([\d.]+% - 9px\)\}",
+        css,
+    )
     assert not re.search(r"#box-p1-e3\{[^}]*--tag-left", css)
     assert re.search(r"#cmp-p1-e2 \.cmp-math\{font-size:[\d.]+cqw;margin-left:[\d.]+cqw\}", css)
     # Ids and numbers only.

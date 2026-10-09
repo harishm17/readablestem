@@ -146,10 +146,13 @@ def render_region(
     chars: Iterable[str] = (),
     box: BBox | None = None,
     snap: bool = False,
+    trim: bool = False,
 ) -> bytes:
     """PNG of page `page` (0-based), or of `clip` on it; glyphs of `chars` inside `mark`
     are outlined, and so is `box` as a whole; with `snap` the clip's edges move to whole
-    lines and words (`pdf_probe.snap_band`). Raises RenderFailed."""
+    lines and words (`pdf_probe.snap_band`); with `trim` the words its left and right
+    edges cut are painted over, the clip unchanged (`pdf_probe.cut_words`). Raises
+    RenderFailed."""
     args = ["render", str(page), f"{zoom:.4f}", str(max_side)]
     if clip is not None:
         args += ["--clip", _numbers(clip)]
@@ -160,6 +163,8 @@ def render_region(
         args += ["--box", _numbers(box)]
     if snap:
         args += ["--snap", "1"]
+    if trim:
+        args += ["--trim", "1"]
     png = _child(args, pdf, RENDER_TIMEOUT_S)
     if not png.startswith(PNG_MAGIC):
         raise RenderFailed()
