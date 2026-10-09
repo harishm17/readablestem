@@ -16,6 +16,7 @@ import logging
 import re
 import unicodedata
 from datetime import datetime, timedelta
+from functools import partial
 from typing import Annotated, Any
 from urllib.parse import quote
 
@@ -259,11 +260,15 @@ def _upload_error_page(
     pages: int | None = None,
     left: int | None = None,
     headers: dict[str, str] | None = None,
+    course: str = "",
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code)
     message = upload_error_message(code, ctx, filename, pages, left)
     context = app_context(ctx, user)
+    # The course chosen stays chosen (the form marks it only among the user's courses),
+    # so the file chosen again is read with the course's notation.
+    context["chosen_course"] = course
     # With no pages left the form is replaced by a notice (app.html): the summary's link
     # goes there instead of to a file field that is not on the page.
     field_id = "upload-closed" if context["pages_left"] == 0 else "pdf"
@@ -321,10 +326,13 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         return await run_in_threadpool(_upload_error_page, request, user, exc.code, exc.status_code)
     if not csrf_valid(request, form.fields.get(CSRF_FIELD)):
         raise CsrfFailed()
-    if form.data is None:
-        return await run_in_threadpool(_upload_error_page, request, user, "missing_file", 400)
     # Course choice (notation memory): one of the user's own courses, or none.
     course_id = (form.fields.get("course") or None) if notation.enabled(ctx.settings) else None
+    chosen = course_id or ""
+    if form.data is None:
+        return await run_in_threadpool(
+            partial(_upload_error_page, request, user, "missing_file", 400, course=chosen)
+        )
     if course_id is not None and not await run_in_threadpool(_users_course, ctx, user, course_id):
         return await run_in_threadpool(_course_error_page, request, user)
     try:
@@ -333,13 +341,16 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         )
     except UploadRejected as exc:
         return await run_in_threadpool(
-            _upload_error_page,
-            request,
-            user,
-            exc.code,
-            exc.status_code,
-            form.filename,
-            exc.pages,
+            partial(
+                _upload_error_page,
+                request,
+                user,
+                exc.code,
+                exc.status_code,
+                form.filename,
+                exc.pages,
+                course=chosen,
+            )
         )
     keep = form.fields.get("keep") == "on"
     try:
@@ -348,15 +359,18 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         )
     except QuotaRefused as exc:
         return await run_in_threadpool(
-            _upload_error_page,
-            request,
-            user,
-            "page_quota",
-            429,
-            form.filename,
-            exc.pages,
-            left=exc.left,
-            headers={"Retry-After": "3600"},
+            partial(
+                _upload_error_page,
+                request,
+                user,
+                "page_quota",
+                429,
+                form.filename,
+                exc.pages,
+                left=exc.left,
+                headers={"Retry-After": "3600"},
+                course=chosen,
+            )
         )
     log_event(logger, "job_created", job_id=job_id, pages=pages, opt_in=keep)
     # Usage events (web/events.py): `uploaded`, and `reuploaded` for the same file again.

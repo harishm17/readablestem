@@ -285,6 +285,18 @@ def test_an_upload_for_a_course_records_it_and_the_job_page_says_so(web):
     assert 'id="job-course"' not in web.browser.get(f"/jobs/{plain}").text
 
 
+def test_an_upload_error_keeps_the_course_chosen(web):
+    # A file that is not a PDF: the form comes back with the course still chosen, so the
+    # file chosen again is read with the course's notation.
+    course_id = new_course(web.browser, "Physics 1, fall term")
+    response = upload_for(web.browser, course_id, pdf=b"not a pdf at all")
+    assert response.status_code == 415 and "is not a PDF" in response.text
+    assert f'<option value="{course_id}" selected>Physics 1, fall term</option>' in response.text
+    # Without a course chosen, none is.
+    response = upload_for(web.browser, None, pdf=b"not a pdf at all")
+    assert " selected>" not in response.text.split('id="course"', 1)[1].split("</select>")[0]
+
+
 def test_an_upload_for_someone_elses_course_is_refused(web):
     bob = web.client()
     login(bob, BOB)
