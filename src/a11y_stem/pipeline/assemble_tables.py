@@ -93,16 +93,24 @@ _STACKED_DIGITS = re.compile("[\u00b9\u00b2\u00b3\u2070\u2074-\u2079][0-9]")
 
 def flattened_maths(cell: TableCell) -> bool:
     """Does this cell of the grid read from the PDF hold maths its text gives flat, so it
-    must not be shown as it is: an accent (a vector arrow, a hat) as a combining mark or
-    a spacing accent, a stacked fraction (a raised digit before a baseline one), or a
-    raised run written "^(...)". A maths cell (`latex`) and a superscript on its own
-    ("m/s²", "10⁵") read fine. Pure: the text is all it looks at."""
+    must not be shown as it is: an arrow over a symbol (U+20D0-U+20FF), another accent (a
+    combining mark or a spacing accent, as TeX draws a hat) on a word of at most three
+    letters (a maths symbol, "mv" with its arrow; an accented word such as "Mu\u00a8ller"
+    from an OT1 font is text), a stacked fraction (a raised digit before a baseline one),
+    or a raised run written "^(...)". A maths cell (`latex`) and a superscript on its own
+    ("m/s\u00b2", "10\u2075") read fine. Pure: the text is all it looks at."""
     if cell.latex is not None or not cell.text:
         return False
     text = cell.text
     if "^(" in text or _STACKED_DIGITS.search(text):
         return True
-    return any(unicodedata.category(ch) == "Mn" or ch in _SPACING_ACCENTS for ch in text)
+    for word in text.split():
+        if any("\u20d0" <= ch <= "\u20ff" for ch in word):
+            return True
+        accented = any(unicodedata.category(ch) == "Mn" or ch in _SPACING_ACCENTS for ch in word)
+        if accented and sum(ch.isalpha() for ch in word) <= 3:
+            return True
+    return False
 
 
 def flattened_cells(grid: TableGrid) -> list[TableCell]:

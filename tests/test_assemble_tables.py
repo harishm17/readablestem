@@ -403,3 +403,23 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
         {"id": "p1-e2", "overflows": True, "focusable": True},
     ]
     assert focused == "p1-e2"  # the only tab stop
+
+
+@pytest.mark.parametrize(
+    ("text", "flat"),
+    [
+        ("K = \u00b92mv\u00b2", True),  # a stacked 1/2 (raised 1, baseline 2)
+        ("p = mv\u20d7", True),  # a vector arrow as a combining mark
+        ("x\u0302", True),  # a hat on one letter
+        ("e^(i\u03c9t)", True),  # a raised run written out
+        ("g (m/s\u00b2)", False),  # a superscript on its own reads fine
+        ("1.01\u00d710\u2075", False),
+        ("M\u00fcller", False),  # an accented word, precomposed ...
+        ("Mu\u00a8ller", False),  # ... or as an OT1 font draws it: text, not maths
+        ("Ethanol", False),
+    ],
+)
+def test_flattened_maths_in_the_grid_read_from_the_pdf(text, flat):
+    from a11y_stem.pipeline.assemble_tables import flattened_maths
+
+    assert flattened_maths(TableCell(row=0, col=0, text=text)) is flat
