@@ -17,6 +17,7 @@ turns them off.
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass
 
 from sqlalchemy.orm import Session
@@ -82,7 +83,7 @@ def parse(will_post: str, minutes: str) -> tuple[Answers, list[FieldError]]:
         errors.append(FieldError(WILL_POST_FIELD, "Choose yes, no or not sure."))
     typed = minutes.strip().removesuffix("minutes").removesuffix("min").strip()
     if typed:
-        if typed.isdigit() and int(typed) <= MAX_MINUTES:
+        if re.fullmatch(r"[0-9]{1,6}", typed) and int(typed) <= MAX_MINUTES:  # ASCII digits only
             answers.minutes = int(typed)
         else:
             errors.append(

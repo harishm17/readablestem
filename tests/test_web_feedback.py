@@ -101,6 +101,9 @@ def test_both_questions_are_optional(web):
         ({"minutes": "about an hour"}, "minutes-saved", "whole number from 0 to 2000"),
         ({"minutes": "-5"}, "minutes-saved", "whole number"),
         ({"minutes": "100000"}, "minutes-saved", "whole number"),
+        # Unicode digits that int() refuses (a superscript two) are an error, not a 500.
+        ({"minutes": "\u00b2"}, "minutes-saved", "whole number"),
+        ({"minutes": "\u2075"}, "minutes-saved", "whole number"),
         ({"will_post": "maybe"}, "will-post-yes", "Choose yes, no or not sure."),
     ],
 )
