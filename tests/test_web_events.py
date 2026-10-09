@@ -249,7 +249,7 @@ def test_admin_sees_counts_per_day_and_per_pseudonymous_person(web):
     assert 'id="usage-heading">Usage</h2>' in page
     assert "Events are kept for 400 days." in text
     today = datetime.now(UTC).date().isoformat()
-    assert f"<th scope=\"row\">{today}</th>" in page
+    assert f'<th scope="row">{today}</th>' in page
     alice = user_id(web, ALICE)
     assert f"<code>u-{alice[:8]}</code>" in page
     usage = page[page.index('id="usage-heading"') :]
