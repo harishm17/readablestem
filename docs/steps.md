@@ -48,6 +48,7 @@ tell the model that text between `<document_text>` tags is data, not instruction
 |---|---|---|
 | `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
+| `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
 
 Why `array{rcl}`: latex2mathml 3.81.1 renders `aligned` as one flat row with literal `&`
 tokens, and OpenStax writes multi-line equations as a three-column `mtable`
@@ -107,7 +108,7 @@ fixes have `equation=None`; the original crop stays in the output, flagged.
 | 1 | No parsed output | FAILED | `model_<outcome>` |
 | 2 | Confidence < `abstain_confidence` | ABSTAINED | `low_confidence` |
 | 3 | Not decorative and the alt text fails an error-level check | FAILED | `invalid_alt` |
-| 4 | Confidence >= the accept bar and no failed check other than a warning note: `too_long` (150-300 characters), `redundant_prefix` | ACCEPTED (review `optional` with notes, else `none`) | |
+| 4 | Confidence >= the accept bar and no failed check other than a warning note: `too_long` (150-300 characters), `redundant_prefix`, `long_description_unsure` (long descriptions on) | ACCEPTED (review `optional` with notes, else `none`) | |
 | 5 | Otherwise | NEEDS_REVIEW | |
 
 A caption copy (`caption_copy`) is not a note: it describes nothing the reader does not
@@ -126,6 +127,26 @@ and a tiny figure escalates to the main model first.
 
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
+
+### Long descriptions, data tables and colour (FEATURE_LONG_DESCRIPTIONS)
+
+Off by default (`ConversionOptions.long_descriptions`, read with `options.current()`).
+Off, the step sends `figure.md` and `FigureOutput` exactly as before, and the fix has
+none of the fields below. On, it sends `figure_long.md` with `FigureLongOutput` in the
+same single call per attempt (`max_output_tokens` 4,096), and the context also gets
+`Labels in the figure: ...`, the text layout found in and beside the figure
+(`Element.text`, at most 600 characters, fenced like the rest). Routing, escalation and
+the status rules above are unchanged; the answer adds (`pipeline/figure_details.py`):
+
+| Field on `FigureFix` | Stored when | Check and tier |
+|---|---|---|
+| `long_description` | the answer is usable after cleaning (one paragraph per line, invisible characters removed): 40-2,000 characters, at most 12 lines, no URL, markup, file name or placeholder (the alt-text rules of those codes). Anything else is dropped, never shown | `figure.long_description` passes; `long_description_unsure` (warning, a note in `NOTE_CODES`) when the model said part of the figure was hard to read: review "optional". A chart or diagram left without one gets the notice `long_description_missing` (optional; `figure_step.long_description_missing(fix)` says when) |
+| `data_table` | charts only, when the rows are rectangular, at most 60 rows and 12 columns, no cell over 120 characters, and the body has at least one number: a `TableGrid` (source "model", the header row as column headers, the first column as row headers) | `figure.data_values` passes when `data_values_from_text` |
+| `data_values_from_text` | with a data table | True only when the model says every value is printed in the figure **and** every number in the table appears in the PDF's own text in the figure region (`Element.text`). Numbers are read the same way on both sides: minus signs (U+2212, en dash, figure dash) become "-", but only where they cannot be a dash between two numbers or words; thousands separators (",", thin and no-break spaces before a group of three) are removed; "0.50" equals "0.5" and ".5"; superscripts and subscripts are not numbers. Otherwise False: the warning `values_from_image` fails, which is not a note, so the figure is NEEDS_REVIEW, a required decision ("values read from the image"), whatever its confidence. A raster chart has no PDF text, so its table always asks |
+| `colour_only` | the model says the figure tells things apart by colour alone | none: the status and tier do not change; the job page lists the notice `colour_only` |
+
+Decorative answers carry none of these. Both conditions on `data_values_from_text` are
+needed: a table whose numbers are all tick labels can still have been placed by eye.
 
 ## Text-layer cross-check (equations)
 
@@ -466,6 +487,13 @@ name, URL or placeholder.
 OpenStax's own alt text in the gold set triggers only `too_long` and `redundant_prefix`
 (it is written for a different, longer format), never an error-level content rule.
 
+### Figure checks with long descriptions on
+
+| Check name | Code | Severity | Fails when |
+|---|---|---|---|
+| `figure.long_description` | `long_description_unsure` | warning (a note) | the model marked its long description unsure |
+| `figure.data_values` | `values_from_image` | warning (a required decision) | some value of the data table is not printed in the PDF text inside the figure, or the model says it read one off the chart |
+
 ## Speech (`mathml_to_speech`)
 
 Deterministic English for the review screen and report; the output HTML keeps MathML
@@ -539,6 +567,7 @@ never reaches the instructions, and that the equation's text layer is never sent
 | `tests/test_style_check.py` | the letter-style check: meaning-level and cosmetic cases, layout's bold and regular letters |
 | `tests/test_sign_check.py` | the sign and relation check: flips and drops that must flag, hyphens, ranges, product style, accents and long arrows that must not; tiers, escalation and the single confidence factor; the LaTeX fixtures' CMSY signs and the Chromium fixtures; a course page printed by Chromium (`browser`); a result stored by pipeline 0.2.0 still loads |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
+| `tests/test_steps_figure_long.py` | long descriptions on and off: the request off is what it was, the long prompt and fenced labels on, cleaning and dropping long descriptions, the unsure note, values from the text or the image, tables that are dropped, colour only, number normalisation and the data grid |
 | `tests/test_steps_live.py` | `live_model`: a gold equation rendered from MathML in Chromium and a generated bar chart, through the real API |
 | `tests/test_steps_support.py` | helpers, including `fallback_router`, a stand-in for WP1's router used until it merges |
 
@@ -571,6 +600,13 @@ decorative rules were added; the prompt versions have changed since.
   output they are far more likely to be an injection or a confused transcription.
 - Confidence is the model's own estimate (scaled by the cross-check). Calibration against
   the gold set is WP7's job.
+- Long descriptions: numbers in the long description itself are not checked against the
+  PDF (a long description is not a decision; tier "none"), only the data table's. A
+  number that is printed in the figure but split or styled differently in the text
+  layer ("10³" flattened to "103", a value split across two labels) makes the table
+  "read from the image": a decision too many, never one too few. The model sometimes
+  mentions the data table in its description despite the prompt; a reviewer who
+  removes the table should edit that sentence too.
 
 ## Second automated check (Decisions API)
 

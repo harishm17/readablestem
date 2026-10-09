@@ -47,7 +47,7 @@ from defusedxml import DefusedXmlException
 from a11y_stem import __version__
 from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from a11y_stem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, Status
-from a11y_stem.pipeline import assemble_tables, inline_text
+from a11y_stem.pipeline import assemble_tables, figure_details, figure_images, inline_text
 from a11y_stem.pipeline.safe_html import MATHML_ATTRIBUTES as MATHML_ATTRIBUTES
 from a11y_stem.pipeline.safe_html import MATHML_ELEMENTS as MATHML_ELEMENTS
 from a11y_stem.pipeline.safe_html import MATHML_NS as MATHML_NS
@@ -667,28 +667,57 @@ class _Renderer:
         )
 
     def figure(self, element: Element) -> str:
+        """A figure: its image (re-encoded for the student file, `figure_images`), alt
+        text and caption, then its long description and data table folded in a
+        `<details>` when it has them (`figure_details`); or the original, flagged."""
         fix = self.fixes.get(element.id)
         caption = (
             f"<figcaption>{self.rich(element.caption)}</figcaption>"
             if element.caption and element.caption.strip()
             else ""
         )
+        proposal = fix.figure if fix is not None else None
+
+        def picture(alt: str) -> str:
+            img = figure_images.img_html(
+                self.crops.get(element.id),
+                alt,
+                _size_attrs(element),
+                proposal.figure_type if proposal is not None else None,
+            )
+            return img if img is not None else self.original(element, alt)
+
         if fix is None:
             reason = "no_fix"
         elif fix.status in NOT_CONVERTED:
             reason = fix.reason or ""
-        elif fix.figure is None or not (fix.figure.decorative or fix.figure.alt.strip()):
+        elif proposal is None or not (proposal.decorative or proposal.alt.strip()):
             reason = "no_output"
         else:
-            alt = "" if fix.figure.decorative else fix.figure.alt.strip()
+            alt = "" if proposal.decorative else proposal.alt.strip()
             if _is_png(self.crops.get(element.id)):
-                image = self.original(element, alt)
+                image = picture(alt)
             else:  # no crop to show: the description itself is the content
                 image = f"<p>{_escape(alt)}</p>" if alt else ""
             if not alt and not caption:  # decorative: no empty "figure" for screen readers
                 return f'<div class="decorative"{self.id_attr(element.id)}>{image}</div>'
-            return f"<figure{self.id_attr(element.id)}>{image}{caption}</figure>"
-        figure = f"<figure>{self.original(element, FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
+            html = f"<figure{self.id_attr(element.id)}>{image}{caption}</figure>"
+            if not figure_details.has_details(proposal):
+                return html
+            # The long description and data table follow the figure, folded (W3C WAI
+            # complex images: a short alt plus a long description next to the image).
+            self.add_style("figure_description", figure_details.DETAILS_CSS)
+            table_id = assemble_tables.id_prefix(element.id) + "-data"
+            if proposal.data_table is not None:
+                if self.claim_id(f"{table_id}-caption") is None:
+                    table_id = None  # an id already used (a layout bug): no table
+                else:
+                    self.add_style("table", assemble_tables.TABLE_CSS)
+            details = figure_details.render_details(
+                proposal, element.caption, table_id=table_id, authored_class=AUTHORED_CLASS
+            )
+            return html + details
+        figure = f"<figure>{picture(FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
         return self.flag_block(element, reason, figure, "Needs a description.", FIGURE_NOTE)
 
     def original(self, element: Element, alt: str) -> str:

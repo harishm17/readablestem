@@ -206,6 +206,12 @@ class ReviewItem:
     table: TableCard | None = None
     # The form was refused because another tab changed the item (offer a reload).
     stale: bool = False
+    # Figures with long descriptions on: the proposal's long description, and its chart
+    # data table as HTML (`table_html`, captioned like the student file's) with the id
+    # prefix its caption id starts with. None when the figure has none.
+    long_description: str | None = None
+    data_table: Markup | None = None
+    data_table_id: str | None = None
 
     @property
     def open(self) -> bool:
@@ -315,12 +321,15 @@ def _item(
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
+    details = _figure_details(fix, element)
     values: dict[str, str] = {}
     if fix.equation is not None:
         values["latex"] = fix.equation.latex
     if fix.figure is not None:
         values["alt"] = fix.figure.alt
         values["decorative"] = "on" if fix.figure.decorative else ""
+        if details.get("long_description") is not None:
+            values["long_description"] = details["long_description"]
     if fix.heading is not None:
         # The select offers the level the document shows, not one it would move.
         suggested = place.suggested if place is not None else None
@@ -359,7 +368,36 @@ def _item(
         optional=optional,
         second_check=triage.second_check_note(fix),
         table=table,
+        **details,
     )
+
+
+def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
+    """A figure's long description and data table for its card (figures work). The long
+    description field is offered when the figure has one or a data table, or when it is
+    a chart or diagram described with long descriptions on but left without one (the
+    notice `long_description_missing`), so the reviewer can write it; "" when empty."""
+    from a11y_stem.pipeline import assemble_tables, figure_details, figure_step, table_html
+
+    figure = fix.figure
+    if figure is None or figure.decorative:
+        return {}
+    long_description = figure.long_description
+    if long_description is None and (
+        figure.data_table is not None or figure_step.long_description_missing(fix)
+    ):
+        long_description = ""
+    shown: dict[str, Any] = {"long_description": long_description}
+    if figure.data_table is not None:
+        table_id = "review-" + assemble_tables.id_prefix(fix.element_id) + "-data"
+        caption = element.caption if element is not None else None
+        grid = figure.data_table.model_copy(
+            update={"caption": figure_details.table_caption(figure, caption)}
+        )
+        # Escaped and rebuilt by the serialiser (cell text escaped, MathML allowlisted).
+        shown["data_table"] = Markup(table_html.render_table(grid, id_prefix=table_id))
+        shown["data_table_id"] = table_id
+    return shown
 
 
 def _check_view(check: Check, *, note: bool = False) -> CheckView:
@@ -665,6 +703,9 @@ def review_action(
     header_row: Annotated[str | None, Form()] = None,
     header_col: Annotated[str | None, Form()] = None,
     version: Annotated[str | None, Form()] = None,
+    # Figures with long descriptions on (web.review `_edited_details`).
+    long_description: Annotated[str | None, Form()] = None,
+    remove_data_table: Annotated[str | None, Form()] = None,
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
     "tables", "headings"), a bulk accept in that group; when it is a heading group's key
@@ -704,6 +745,8 @@ def review_action(
         "cell": cell,
         "header_row": header_row,
         "header_col": header_col,
+        "long_description": long_description,
+        "remove_data_table": remove_data_table,
     }
     form = {name: value for name, value in sent.items() if value is not None}
     try:

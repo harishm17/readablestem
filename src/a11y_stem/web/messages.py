@@ -156,6 +156,12 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "the PDF only where it does not change the meaning, so this was accepted as it is.",
     ("table.source", "local_grid"): "No model could read this table, so this is the grid "
     "built from the PDF's own text with the first row as headers: check it against the image.",
+    # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)
+    ("figure.data_values", "values_from_image"): "The values in the data table were read "
+    "from the image, not from text in the PDF, so check them against the figure or "
+    "remove the table.",
+    ("figure.long_description", "long_description_unsure"): "Part of the figure was hard "
+    "to read, so the longer description may be wrong in places; worth a look.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",

@@ -7,7 +7,8 @@ The web route owns the transaction; this module owns the rules:
   it; the reviewer can also keep the original by rejecting it), and never with a field
   of the form changed from the proposal (the change would be dropped silently: the
   reviewer is asked to Save edit it or undo it),
-- edit: the reviewer's LaTeX / alt text / heading level goes through the same cleaning
+- edit: the reviewer's LaTeX / alt text / heading level (and a figure's long
+  description, `pipeline.figure_details`) goes through the same cleaning
   and deterministic validators as model output (`equation_step.clean_latex`,
   `validate.clean_alt`, `pipeline.validate`) before it is stored; error-level failures
   are shown back to the reviewer, nothing is saved. A heading level the output's
@@ -367,13 +368,14 @@ def _refuse_unsaved_change(fix: Fix, form: Mapping[str, str]) -> None:
 
         alt = validate.clean_alt(form["alt"])
         decorative = form.get("decorative") in {"on", "true", "1"}
-        values = {"alt": alt, "decorative": "on" if decorative else ""}
+        values = {"alt": alt, "decorative": "on" if decorative else "", **_details_values(form)}
         if decorative != fix.figure.decorative:
             message = "You changed “Decorative”. " + UNSAVED.format(undo="change it back")
             raise ReviewInvalid([FieldError(field_id("decorative", eid), message)], values)
         if not decorative and alt != validate.clean_alt(fix.figure.alt):
             message = "You changed the alt text. " + UNSAVED.format(undo="undo it")
             raise ReviewInvalid([FieldError(field_id("alt", eid), message)], values)
+        _refuse_unsaved_details(fix, form, values)
     if fix.heading is not None and "level" in form and form["level"] != str(fix.heading.level):
         message = "You changed the level. " + UNSAVED.format(undo="set it back")
         raise ReviewInvalid([FieldError(field_id("level", eid), message)], {"level": form["level"]})
@@ -491,7 +493,7 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
     # controls, zero-width spaces) removed and whitespace collapsed, as for model output.
     alt = validate.clean_alt(form.get("alt", ""))
     decorative = form.get("decorative") in {"on", "true", "1"}
-    values = {"alt": alt, "decorative": "on" if decorative else ""}
+    values = {"alt": alt, "decorative": "on" if decorative else "", **_details_values(form)}
     if decorative:
         alt = ""
     elif not alt:
@@ -510,9 +512,90 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
             [FieldError(fid, "The alt text was not saved. " + describe_failed(failed))], values
         )
     figure_type = fix.figure.figure_type if fix.figure else "other"
-    fix.figure = FigureFix(figure_type=figure_type, alt=alt, decorative=decorative)
-    fix.checks = checks
+    details, detail_checks = _edited_details(fix, form, values, decorative=decorative)
+    fix.figure = FigureFix(figure_type=figure_type, alt=alt, decorative=decorative, **details)
+    fix.checks = checks + detail_checks
     return [c for c in checks if not c.passed]
+
+
+# --------------------------------------------------------------------------- figure details
+
+# Long descriptions and chart data tables (FEATURE_LONG_DESCRIPTIONS, pipeline.figure_details).
+# The split view's figure card sends `long_description` when the figure has one, and the
+# `remove_data_table` checkbox when it has a table; a form without them (the list view)
+# keeps both as they are, so an alt-text edit there never loses them.
+_CHECKED = frozenset({"on", "true", "1"})
+LONG_NOT_SAVED = (
+    "The longer description was not saved: use plain sentences, at least 40 characters "
+    "and at most 12 lines, with no web address or markup."
+)
+
+
+def _details_values(form: Mapping[str, str]) -> dict[str, str]:
+    """The reviewer's long description and table choice, re-shown when a form is refused."""
+    values: dict[str, str] = {}
+    if "long_description" in form:
+        values["long_description"] = form["long_description"].replace("\r\n", "\n")
+    if form.get("remove_data_table") in _CHECKED:
+        values["remove_data_table"] = "on"
+    return values
+
+
+def _refuse_unsaved_details(fix: Fix, form: Mapping[str, str], values: dict[str, str]) -> None:
+    """Accept with the long description changed, or "Remove the data table" ticked, would
+    drop the change silently: refused like a changed alt text."""
+    from a11y_stem.pipeline import figure_details
+
+    figure, eid = fix.figure, fix.element_id
+    if figure is None:
+        return
+    if "long_description" in form:
+        typed = figure_details.clean_long_description(form["long_description"])
+        if typed != (figure.long_description or ""):
+            message = "You changed the longer description. " + UNSAVED.format(undo="undo it")
+            raise ReviewInvalid([FieldError(field_id("longdesc", eid), message)], values)
+    if form.get("remove_data_table") in _CHECKED and figure.data_table is not None:
+        message = "You chose to remove the data table. " + UNSAVED.format(undo="untick it")
+        raise ReviewInvalid([FieldError(field_id("datatable", eid), message)], values)
+
+
+def _edited_details(
+    fix: Fix, form: Mapping[str, str], values: dict[str, str], *, decorative: bool
+) -> tuple[dict[str, Any], list[Check]]:
+    """The long description, data table and colour flag an edited figure keeps, and the
+    checks that stay with them. A decorative figure keeps none of them (it is hidden
+    from screen readers). The long description is cleaned and checked like the model's
+    (`figure_details`); an empty one removes it. The data table cannot be edited, only
+    removed; when it stays, so does its `figure.data_values` check (where its values
+    came from is still true)."""
+    from a11y_stem.pipeline import figure_details
+
+    old = fix.figure
+    if old is None or decorative:
+        return {}, []
+    long_description = old.long_description
+    if "long_description" in form:
+        fid = field_id("longdesc", fix.element_id)
+        text = figure_details.clean_long_description(form["long_description"])
+        if len(text) > figure_details.LONG_MAX_CHARS:
+            limit = figure_details.LONG_MAX_CHARS
+            message = f"Keep the longer description under {limit:,} characters."
+            raise ReviewInvalid([FieldError(fid, message)], values)
+        if text and not figure_details.long_description_ok(text):
+            raise ReviewInvalid([FieldError(fid, LONG_NOT_SAVED)], values)
+        long_description = text or None
+    table, from_text = old.data_table, old.data_values_from_text
+    if form.get("remove_data_table") in _CHECKED:
+        table, from_text = None, None
+    kept = table is not None
+    checks = [c for c in fix.checks if c.name == "figure.data_values"] if kept else []
+    details = {
+        "long_description": long_description,
+        "data_table": table,
+        "data_values_from_text": from_text,
+        "colour_only": old.colour_only,
+    }
+    return details, checks
 
 
 _LEVEL = re.compile(r"[1-6]")  # ASCII only: "²".isdigit() is True, int("²") fails

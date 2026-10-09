@@ -1,0 +1,150 @@
+{
+  "schema_version": 1,
+  "task": "figures",
+  "date": "2026-10-09",
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {
+    "figure": "figure_long-a2c98225",
+    "judge": "judge_figure-137e2607",
+    "judge_long": "judge_long_description-ba1c35dc"
+  },
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna",
+    "judge": "gpt-6.1-sol"
+  },
+  "models_used": [
+    "gpt-6.1-sol"
+  ],
+  "client": "openai",
+  "dataset": {
+    "gold_dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "limit": null,
+    "unit": "figure",
+    "selection_sha256": "ff55fd8f6e2e932fd674df868a755e7871e91ca5d1143afb81cb92af979977d9"
+  },
+  "n_planned": 13,
+  "n": 13,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "proposal_rate": 1.0,
+    "check_pass_rate": 1.0,
+    "failed_check_codes": {},
+    "by_status": {
+      "accepted": 10,
+      "needs_review": 3
+    },
+    "figure_types": {
+      "chart": 4,
+      "diagram": 5,
+      "illustration": 1,
+      "photo": 3
+    },
+    "with_reference": 13,
+    "judge_measured": 13,
+    "judge_errors": 0,
+    "judge_pass_rate": 0.8461538461538461,
+    "judge_pass_rate_ci95": [
+      0.5776536874893673,
+      0.9567418220347709
+    ],
+    "judge_pass_rate_answered": 0.8461538461538461,
+    "judge_mean_score": 4.461538461538462,
+    "judge_factual_error_rate": 0.0,
+    "decorative_rate": 0.0,
+    "second_check": {
+      "mode": "note",
+      "versions": [
+        "figure_alt-16a00e69"
+      ],
+      "ran": 10,
+      "answered": 10,
+      "outcomes": {
+        "ok": 10
+      },
+      "flagged": 1,
+      "flag_rate": 0.1,
+      "flagged_ids": [
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-004"
+      ],
+      "scores": {
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-000": 0.95,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-001": 0.95,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-002": 0.75,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-003": 0.95,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-004": 0.030000000000000027,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-005": 0.95,
+        "openstax/physics/2-2-speed-and-velocity/fig-000": 0.89,
+        "openstax/physics/2-2-speed-and-velocity/fig-001": 0.79,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-000": 0.8,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-004": 0.95
+      },
+      "agreement_with_judge": {
+        "n": 10,
+        "raw_agreement": 0.8,
+        "kappa": -0.1111,
+        "confusion": {
+          "flag_and_judge_fail": 0,
+          "flag_and_judge_pass": 1,
+          "no_flag_and_judge_fail": 1,
+          "no_flag_and_judge_pass": 8
+        },
+        "auroc_score_vs_judge_fail": 0.6667
+      },
+      "cost_usd": 0.0007939,
+      "per_figure_usd": 6.107e-05,
+      "requests": 10
+    },
+    "long_descriptions": {
+      "figures": 13,
+      "described": 9,
+      "described_rate": 0.6923076923076923,
+      "complex_figures": 9,
+      "complex_described_rate": 1.0,
+      "mean_chars": 479.77777777777777,
+      "judged": 9,
+      "judge_errors": 0,
+      "pass_rate": 1.0,
+      "pass_rate_ci95": [
+        0.700854948272956,
+        1.0
+      ],
+      "accurate_rate": 1.0,
+      "complete_rate": 1.0,
+      "invented_values_rate": 0.0,
+      "mean_score": 5.0,
+      "unsure": 0,
+      "data_tables": 3,
+      "data_tables_judged": 3,
+      "table_values_ok_rate": 1.0,
+      "table_wrong_values": 0,
+      "values_from_text": 0,
+      "colour_only": 0,
+      "required_decisions": 3,
+      "required_for_values": 3,
+      "judge_usd": 0.033852
+    }
+  },
+  "cost": {
+    "total_usd": 0.1237236,
+    "pipeline_usd": 0.0526379,
+    "per_item_usd": 0.004049069230769231,
+    "per_item_unit": "figure",
+    "model_calls": 35,
+    "verifier_usd": 0.0007939,
+    "verifier_per_item_usd": 6.106923076923077e-05,
+    "verifier_requests": 10,
+    "judge_usd": 0.0710857,
+    "budget_spent_usd": 0.12372360000000002,
+    "budget_calls": 35,
+    "dropped_usd": 1.3877787807814457e-17
+  },
+  "latency_ms": {
+    "p50": 7673.0,
+    "p95": 15921.400000000001,
+    "n": 13,
+    "basis": "sum of model-call latencies per item (excludes rendering)"
+  }
+}
