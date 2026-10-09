@@ -105,6 +105,10 @@ first row), `<th scope="row">`, a body split into one `<tbody>` per section with
 cannot say which headers apply (a row header after data cells, a column header below the
 header rows, or nested column headers whose spans cross). Cell text and captions are
 escaped; a maths cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
+header cell that is only maths also gets its reading (`speech.mathml_to_speech`) as
+visually hidden text, with the MathML hidden from assistive technology: browsers name a
+`<th>` from its text, never from MathML, and screen readers announce a cell's headers by
+name (the static rule `html.table_header_text` does not count MathML as header text). A
 broken grid (`core.types.grid_problems`) still renders as a rectangular table.
 
 `pipeline/assemble_tables.py` wraps a rebuilt table in a box that scrolls sideways on a

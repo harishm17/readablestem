@@ -216,8 +216,26 @@ def mismatched_grid() -> TableGrid:
     )
 
 
+def maths_header_grid() -> TableGrid:
+    """A column header that is only maths (g in m/s^2), as the model writes it."""
+    return TableGrid(
+        rows=2,
+        cols=2,
+        cells=[
+            c(0, 0, "Time (s)", header="col"),
+            maths_cell(0, 1, "g (m/s^2)", r"g\ (\text{m/s}^2)").model_copy(
+                update={"header": "col"}
+            ),
+            c(1, 0, "0.319"),
+            c(1, 1, "9.83"),
+        ],
+        header_rows=1,
+    )
+
+
 ALL_GRIDS = {
     "simple": simple_grid,
+    "maths_header": maths_header_grid,
     "two_level": two_level_grid,
     "row_headers": row_header_grid,
     "label_value": label_value_grid,
@@ -382,6 +400,43 @@ def test_maths_cells_are_sanitised_mathml():
     assert "KE = 1/2 mv2" not in html  # the text layer is only the fallback
     block = render_table(maths_grid(), id_prefix="t1", math_display="block")
     assert block.count('<math display="block">') == 2
+
+
+def test_a_header_that_is_only_maths_is_named_by_its_reading():
+    # Browsers name a <th> from its text, never from MathML: without the reading the
+    # column of g values would be announced with no header.
+    html = render_table(maths_header_grid(), id_prefix="t1")
+    assert (
+        '<th scope="col"><span class="visually-hidden a11y-stem">g open parenthesis m/s '
+        'squared close parenthesis</span><span aria-hidden="true"><math display="inline">'
+    ) in html
+    assert html.count("<math") == 1
+    assert not [c for c in html_checks.static_checks(page([html])) if not c.passed]
+    # A maths data cell is left as it is: its text is the MathML itself.
+    assert "<td><math" in render_table(maths_grid(), id_prefix="t2")
+
+
+@pytest.mark.browser
+def test_chromium_names_a_maths_header_by_its_reading():
+    sync_api = pytest.importorskip("playwright.sync_api")
+    html = page([render_table(maths_header_grid(), id_prefix="t1")])
+    with sync_api.sync_playwright() as playwright:
+        try:
+            browser = playwright.chromium.launch()
+        except sync_api.Error:
+            pytest.skip("Chromium for Playwright is not installed")
+        try:
+            tab = browser.new_page()
+            tab.set_content(html)
+            nodes = tab.context.new_cdp_session(tab).send("Accessibility.getFullAXTree")["nodes"]
+        finally:
+            browser.close()
+    names = [
+        n.get("name", {}).get("value")
+        for n in nodes
+        if n.get("role", {}).get("value") == "columnheader"
+    ]
+    assert names == ["Time (s)", "g open parenthesis m/s squared close parenthesis"]
 
 
 def test_a_maths_cell_whose_mathml_cannot_be_shown_falls_back_to_its_text():

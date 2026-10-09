@@ -5,6 +5,10 @@ Follows the W3C WAI tables tutorial (https://www.w3.org/WAI/tutorials/tables/):
 - `<caption>` only when the grid has one (a "Table N" caption found in the PDF; never
   invented). It gets the id `{id_prefix}-caption` so a wrapper can be named by it.
 - The first `header_rows` rows go in `<thead>`, the rest in `<tbody>`.
+- A header cell that is only maths gets its reading (`speech.mathml_to_speech`) as
+  visually hidden text, the MathML hidden from assistive technology: browsers name a
+  `<th>` from its text, never from MathML, and screen readers announce a cell's
+  headers by name.
 - Header cells are `<th>`: a column header ("col") gets `scope="col"`, or
   `scope="colgroup"` when it is in the first row and spans several columns (the column
   groups are then written as `<colgroup>` elements, which that scope needs); a row
@@ -39,6 +43,9 @@ from dataclasses import dataclass, field
 from a11y_stem.core.types import TableCell, TableGrid
 from a11y_stem.pipeline.safe_html import Display, escape_text, sanitize_mathml
 
+# The class of the tool's own words (`assemble.AUTHORED_CLASS`: `lang="en"` in a document
+# in another language).
+AUTHORED_CLASS = "a11y-stem"
 # An id prefix must itself be a plain id, so every id made from it is one too.
 _ID_PREFIX = re.compile(r"[A-Za-z][A-Za-z0-9_.:\-]{0,63}")
 
@@ -242,7 +249,29 @@ class _Writer:
             if headers:
                 attrs += f' headers="{" ".join(headers)}"'
         tag = "th" if header else "td"
-        return f"<{tag}{attrs}>{self.content(placed.cell)}</{tag}>"
+        content = self.content(placed.cell)
+        if header and content.startswith("<math"):
+            content = self.named_maths(placed.cell, content)
+        return f"<{tag}{attrs}>{content}</{tag}>"
+
+    def named_maths(self, cell: TableCell, mathml: str) -> str:
+        """A header that is only maths, with its reading as text: browsers give a header
+        cell no name from MathML, and screen readers announce a column's or a row's
+        header by its name as they move through the cells. The MathML is hidden from
+        them so the header is not read twice; the reading is the tool's own English."""
+        from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
+
+        try:
+            reading = mathml_to_speech(cell.mathml or "")
+        except SpeechError:
+            reading = ""
+        reading = " ".join((reading or cell.text or cell.latex or "").split())
+        if not reading:
+            return mathml
+        return (
+            f'<span class="visually-hidden {AUTHORED_CLASS}">{escape_text(reading)}</span>'
+            f'<span aria-hidden="true">{mathml}</span>'
+        )
 
     def scope(self, placed: _Placed) -> str:
         if placed.cell.header == "col":

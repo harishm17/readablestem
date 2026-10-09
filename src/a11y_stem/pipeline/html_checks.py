@@ -37,7 +37,7 @@ document without one gets exactly the rules above:
 |---|---|---|
 | html.table_headers | table_no_headers | a data table without a single `<th>` |
 | html.table_header_scope | th_without_scope | a `<th>` with no `scope` (see below) |
-| html.table_header_text | empty_th | a `<th>` with no text (or img alt) in it |
+| html.table_header_text | empty_th | a `<th>` with no text outside maths (or img alt, aria-label) |
 | html.table_caption | table_caption_missing | a caption left in the text (warning, below) |
 | html.table_layout | layout_table | a table with `role="presentation"` or `"none"` |
 
@@ -317,6 +317,7 @@ class _Tables(HTMLParser):
         self.blocks: list[tuple[str, str | int]] = []
         self._open: list[int] = []  # tables being read (nested ones too)
         self._header: _HeaderCell | None = None
+        self._math = 0  # depth of <math> inside the header cell being read
         self._paragraph: list[str] | None = None
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
@@ -347,9 +348,12 @@ class _Tables(HTMLParser):
                 scope=bool((values.get("scope") or "").strip()),
                 has_id=bool((values.get("id") or "").strip()),
             )
+            self._header.text.append(values.get("aria-label") or "")
             table.headers.append(self._header)
         elif tag == "img" and self._header is not None:
             self._header.text.append(values.get("alt") or "")
+        elif tag == "math" and self._header is not None:
+            self._math += 1  # Chromium names a header from its text, never from MathML
 
     def handle_endtag(self, tag: str) -> None:
         if tag == "table" and self._open:
@@ -357,11 +361,14 @@ class _Tables(HTMLParser):
             self._header = None
         elif tag == "th":
             self._header = None
+            self._math = 0
+        elif tag == "math" and self._math:
+            self._math -= 1
         elif tag == "p":
             self._end_paragraph()
 
     def handle_data(self, data: str) -> None:
-        if self._header is not None:
+        if self._header is not None and not self._math:
             self._header.text.append(data)
         if self._paragraph is not None and not self._open:
             self._paragraph.append(data)

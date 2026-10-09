@@ -254,6 +254,13 @@ def test_documents_without_tables_get_no_table_rules():
             ["empty_th"],
         ),
         (
+            # only maths: Chromium gives the header no name, so screen readers announce
+            # none while moving through its column
+            '<table><tr><th scope="col"><math display="inline"><mi>x</mi></math></th></tr>'
+            "<tr><td>1</td></tr></table>",
+            ["empty_th"],
+        ),
+        (
             '<table role="presentation"><tr><td>Name</td><td>Box</td></tr></table>',
             ["layout_table"],
         ),
@@ -278,8 +285,10 @@ def test_table_rules_fail_on_broken_tables(body, codes):
     [
         # headers/id instead of scope (the serialiser's irregular tables)
         '<table><tr><th id="h1">A</th></tr><tr><td headers="h1">1</td></tr></table>',
-        # a header holding only maths, or an image with alt text
-        '<table><tr><th scope="col"><math display="inline"><mi>x</mi></math></th></tr>'
+        # a header holding maths with its reading as text (table_html), or an image with
+        # alt text
+        '<table><tr><th scope="col"><span class="visually-hidden">x</span><span '
+        'aria-hidden="true"><math display="inline"><mi>x</mi></math></span></th></tr>'
         "<tr><td>1</td></tr></table>",
         '<table><tr><th scope="col"><img alt="Velocity" src="data:,"></th></tr>'
         "<tr><td>1</td></tr></table>",

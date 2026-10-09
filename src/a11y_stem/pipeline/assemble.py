@@ -50,7 +50,13 @@ from defusedxml import DefusedXmlException
 from a11y_stem import __version__
 from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from a11y_stem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, Status
-from a11y_stem.pipeline import assemble_tables, figure_details, figure_images, inline_text
+from a11y_stem.pipeline import (
+    assemble_tables,
+    figure_details,
+    figure_images,
+    inline_text,
+    table_html,
+)
 from a11y_stem.pipeline.safe_html import MATHML_ATTRIBUTES as MATHML_ATTRIBUTES
 from a11y_stem.pipeline.safe_html import MATHML_ELEMENTS as MATHML_ELEMENTS
 from a11y_stem.pipeline.safe_html import MATHML_NS as MATHML_NS
@@ -61,8 +67,9 @@ from a11y_stem.pipeline.safe_html import Display, sanitize_mathml
 from a11y_stem.pipeline.safe_html import escape_text as _escape
 from a11y_stem.pipeline.safe_html import split_tag as _split_tag
 
-# Class on every element whose text this module wrote (notes, labels, the about section).
-AUTHORED_CLASS = "a11y-stem"
+# Class on every element whose text this module wrote (notes, labels, the about section);
+# the table serialiser marks a maths header's reading with it too.
+AUTHORED_CLASS = table_html.AUTHORED_CLASS
 
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
