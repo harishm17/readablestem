@@ -46,6 +46,7 @@ PIPELINE_MODULES = (
     "html_checks",
     "run",
     "table_step",
+    "notation_memory",
 )
 CHECK_NAME = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")
 PLACEHOLDER = "{}"
