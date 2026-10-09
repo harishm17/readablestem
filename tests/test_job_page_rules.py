@@ -458,3 +458,9 @@ def test_the_draft_sentence_says_what_students_get():
         "For 1 equation and 1 figure, students will get the tool's suggestion as it is. "
         "1 equation is an image marked “Not converted”."
     )
+
+
+def test_plural_losses_take_are():
+    assert job_page._lost_sentence(["rows"]) == "The rows and columns are gone."
+    assert job_page._lost_sentence(["limits"]) == "The limits above and below are gone."
+    assert job_page._lost_sentence(["power"]) == "The power is gone."

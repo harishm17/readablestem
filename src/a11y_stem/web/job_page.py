@@ -428,9 +428,14 @@ def _bold_lost(element: Element, fix: Fix) -> bool:
     return _bold(element.text or "") and ('mathvariant="bold' in mathml or _bold(mathml))
 
 
+# Structure codes whose words are plural ("the rows and columns are gone").
+PLURAL_LOST = frozenset({"rows", "limits"})
+
+
 def _lost_sentence(parts: list[str]) -> str:
-    words = [LOST_WORDS[p] for p in parts if p in LOST_WORDS]
-    verb = "is" if len(words) == 1 else "are"
+    known = [p for p in parts if p in LOST_WORDS]
+    words = [LOST_WORDS[p] for p in known]
+    verb = "is" if len(words) == 1 and known[0] not in PLURAL_LOST else "are"
     sentence = f"{join_words(words)} {verb} gone."
     return sentence[0].upper() + sentence[1:]
 

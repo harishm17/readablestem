@@ -350,6 +350,11 @@ def test_notices_are_listed_per_page_with_their_decisions(web):
     worth = section(html, "worth-checking-heading")
     assert "The whole document: The language of the document was detected" in page_text(worth)
     assert '<a href="#language-heading">Check the language</a>' in worth
+    # Each sentence is a sentence: a space before the link, after the notice's own.
+    assert 'right. <a href="#language-heading">Check the language</a>.' in worth
+    assert re.search(
+        rf'[.)] <a href="/jobs/{job_id}/review\?item=p1-e9">Decide it</a>', not_handled
+    )
     # The table's decision is counted once, with the others, not again for its notice.
     assert "Need your decision 4" in page_text(section(html, "results-heading"))
 
