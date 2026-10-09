@@ -752,6 +752,7 @@ def _delete_now(request: Request, job_id: str, user: CurrentUser) -> Response:
         job = owned_job(session, job_id, user)
         # The one supported deletion path: counts the job's categories before deleting.
         delete_jobs(session, [job.id])
+        events.forget_upload(session, job_id)  # the file's fingerprint goes with it
     log_event(logger, "job_deleted", job_id=job_id, reason="user")
     flash(request, "Your document and everything made from it have been deleted.")
     return RedirectResponse("/app", status_code=303)

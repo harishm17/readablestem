@@ -552,6 +552,12 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
     assert "have been deleted" in page
     assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
+    # The upload's usage event stays for the counts, without the file's fingerprint.
+    from a11y_stem.web.db import Event
+
+    with session_scope(web.ctx.factory) as session:
+        uploads = session.scalars(select(Event).where(Event.job_ref == job_id)).all()
+        assert [(e.name, e.code) for e in uploads if e.name == "uploaded"] == [("uploaded", None)]
 
 
 def test_app_lists_the_users_jobs_newest_first(web):

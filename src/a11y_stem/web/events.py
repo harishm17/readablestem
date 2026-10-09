@@ -29,7 +29,9 @@ user's id, cut to 96 bits: it can tell "the same file as this person's earlier u
 and nothing more. Neither the file nor its plain hash can be got back from it (a plain
 hash would let anyone with a copy of a public PDF check who had uploaded it), and the
 same file uploaded by two people gives two unrelated fingerprints. Rotating
-SESSION_SECRET makes the next upload of a file look new.
+SESSION_SECRET makes the next upload of a file look new. "Delete now" clears the
+fingerprint of that upload (`forget_upload`): the `uploaded` row stays for the counts,
+but nothing derived from the deleted file does.
 
 Events are pseudonymous (the random user id), deleted with the user
 (`ops.retention.erase_user`) and after `EVENT_RETENTION_DAYS` (`ops.retention`). With
@@ -184,6 +186,17 @@ def fingerprint(settings: Settings, user_id: str, data: bytes) -> str:
     digest = hashlib.sha256(data).hexdigest()
     mark = hmac.new(key, f"{user_id}:{digest}".encode(), hashlib.sha256).hexdigest()
     return "fp:" + mark[:24]
+
+
+def forget_upload(session: Session, job_id: str) -> None:
+    """Clear the file fingerprint of a job's `uploaded` event, in the caller's
+    transaction, when its owner deletes it ("Delete now": everything made from the file
+    goes). The row stays for the counts; that upload no longer counts as "the same file
+    again" for a later one."""
+    for event in session.scalars(
+        select(Event).where(Event.job_ref == job_id, Event.name == UPLOADED)
+    ):
+        event.code = None
 
 
 def record_upload(

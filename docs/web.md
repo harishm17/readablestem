@@ -303,7 +303,8 @@ and `minutes_saved`. Each row is a user id, a name, a job id, a code and a numbe
 `tests/test_web_content_schema.py`). The fingerprint is an HMAC of the file's SHA-256
 under a key derived from `SESSION_SECRET`, salted with the user id and cut to 96 bits:
 it matches that person's uploads of the same bytes and nothing else, and is never the
-plain hash. A failing event is logged as `event_failed` and dropped; the action it
+plain hash. "Delete now" clears it (`events.forget_upload`): the `uploaded` row stays
+for the counts, but nothing derived from the deleted file does. A failing event is logged as `event_failed` and dropped; the action it
 records carries on. The events of a review decision are written in its transaction.
 
 `/admin` counts them per UTC day (last 28 days) and per pseudonymous person (`u-` and
