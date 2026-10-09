@@ -122,7 +122,9 @@ def build(name: str) -> None:
     source = (folder / f"{stem}.html").read_text(encoding="utf-8")
     pdf = _fix_date(print_html(source))
     (folder / f"{stem}.pdf").write_bytes(pdf)
-    lines = [json.dumps(r, ensure_ascii=False, sort_keys=True) for r in gold_records(name, source, pdf)]
+    lines = [
+        json.dumps(r, ensure_ascii=False, sort_keys=True) for r in gold_records(name, source, pdf)
+    ]
     (folder / "gold.jsonl").write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {name}/{stem}.pdf and {name}/gold.jsonl ({len(lines)} gold tables)")
 
