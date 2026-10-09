@@ -21,6 +21,7 @@ from markupsafe import Markup
 from a11y_stem.core.types import Element, Fix, TableCell, TableGrid, grid_problems
 from a11y_stem.pipeline.assemble_tables import id_prefix, rebuilt_grid
 from a11y_stem.pipeline.table_html import render_table
+from a11y_stem.pipeline.table_step import STRUCTURE_PROBLEMS
 from a11y_stem.web.review import (
     cell_label,
     find_cell,
@@ -134,6 +135,20 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
     )
     if grid is not None:
         card.cells = cell_choices(grid)
-        reported = {c.code for c in fix.failed_checks}
-        card.problems = [grid_problem_sentence(p) for p in grid_problems(grid) if p not in reported]
+        card.problems = [
+            grid_problem_sentence(p) for p in grid_problems(grid) if not _reported(p, fix)
+        ]
     return card
+
+
+def _reported(problem: str, fix: Fix) -> bool:
+    """A structural problem the step's failed checks already explain on the card: the
+    problem's own code, or the table step's broader code for it (`table.grid`
+    grid_invalid for a broken grid, `table.headers` header_problem for the headers), so
+    the card does not say the same thing twice."""
+    reported = {c.code for c in fix.failed_checks}
+    if problem in reported:
+        return True
+    if problem in STRUCTURE_PROBLEMS:
+        return "grid_invalid" in reported
+    return "header_problem" in reported

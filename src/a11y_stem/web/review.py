@@ -965,16 +965,14 @@ def table_checks(grid: TableGrid, element: Element | None) -> list[Check]:
 
     They are `pipeline.table_step.table_checks(grid, element)` (the grid's structure and
     headers, agreement with the grid read from the PDF, the cells' words, the maths
-    cells), pure functions of the stored grid and element. Until the table step has
-    them, and for a table whose element is gone, there are none; structural problems are
-    refused by the edit itself either way (`_refuse_new_problems`)."""
+    cells), pure functions of the stored grid and element, looked up at call time like
+    the other validators. A table whose element is gone has none; structural problems
+    are refused by the edit itself either way (`_refuse_new_problems`)."""
     from a11y_stem.pipeline import table_step
 
-    # Looked up by name: the table step and this screen were built side by side.
-    run_checks = getattr(table_step, "table_checks", None)
-    if run_checks is None or element is None:
+    if element is None:
         return []
-    return list(run_checks(grid, element))
+    return list(table_step.table_checks(grid, element))
 
 
 def _refuse_new_problems(

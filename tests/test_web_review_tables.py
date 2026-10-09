@@ -39,7 +39,7 @@ from a11y_stem.pipeline import table_step
 from a11y_stem.pipeline.table_html import render_table
 from a11y_stem.web import queue
 from a11y_stem.web.db import ReviewEdit, session_scope
-from a11y_stem.web.messages import UNKNOWN_CHECK_MESSAGE
+from a11y_stem.web.messages import CHECK_MESSAGES
 from a11y_stem.web.review import (
     NO_TABLE_TO_ACCEPT,
     STALE_MESSAGE,
@@ -493,13 +493,14 @@ def test_every_change_runs_the_table_checks_again(tables, monkeypatch):
         code = "text_mismatch" if wrong else None
         return [Check(name="table.cell_text", passed=not wrong, severity="warning", code=code)]
 
-    monkeypatch.setattr(table_step, "table_checks", fake_checks, raising=False)
+    monkeypatch.setattr(table_step, "table_checks", fake_checks)
     page = follow(tables, post(tables, "p1-e1", action="edit", change="cell", row="1", col="1",
                                cell="11"))  # fmt: skip
     assert "Row 2, column 2 changed." in page
     assert "1 check gives a warning: see the notes on it." in page
     findings = section(panel(page), 'class="explained table-findings"', "</div>")
-    assert UNKNOWN_CHECK_MESSAGE in findings
+    # The table step's own sentence for the finding (web/messages.py, tables-step block).
+    assert unescape(findings).count(CHECK_MESSAGES[("table.cell_text", "text_mismatch")]) == 1
     # Still wrong after a change of headers.
     post(tables, "p1-e1", action="edit", change="headers", header_row="on")
     assert [c.code for c in fix_of(tables, "p1-e1").failed_checks] == ["text_mismatch"]
@@ -840,3 +841,27 @@ def test_a_table_kept_as_an_image_cannot_be_accepted_or_changed():
             apply_review(result, "p1-e0", "edit", {"change": change})
     change = apply_review(result, "p1-e0", "reject", {})
     assert change.fix.status is Status.REJECTED
+
+
+def test_the_card_does_not_say_a_problem_twice():
+    """A structural problem the table step already reported under its broader code
+    (`table.grid` grid_invalid, `table.headers` header_problem) is not listed again in
+    the card's own sentences; one the step did not report still is."""
+    from a11y_stem.web.table_card import table_card
+
+    g = plain([["a", "b"], ["c", "d"]])
+    g = g.model_copy(update={"cells": g.cells[:3]})  # a hole where "d" was
+    result = result_with(g)
+    fix = result.fix_for("p1-e0")
+    assert fix is not None
+    assert table_card(fix, result.elements[0]).problems == [
+        "There is a gap in the table where no cell is."
+    ]
+    fix.checks = [Check(name="table.grid", passed=False, severity="warning", code="grid_invalid")]
+    assert table_card(fix, result.elements[0]).problems == []
+    fix.checks = [
+        Check(name="table.headers", passed=False, severity="warning", code="header_problem")
+    ]
+    assert table_card(fix, result.elements[0]).problems == [
+        "There is a gap in the table where no cell is."
+    ]
