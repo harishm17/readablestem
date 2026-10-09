@@ -288,6 +288,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs",
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/review/{element_id}",
+        "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/login",
         "/logout",
     ]

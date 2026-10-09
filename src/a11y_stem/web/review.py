@@ -10,10 +10,14 @@ The web route owns the transaction; this module owns the rules:
 - edit: the reviewer's LaTeX / alt text / heading level goes through the same cleaning
   and deterministic validators as model output (`equation_step.clean_latex`,
   `validate.clean_alt`, `pipeline.validate`) before it is stored; error-level failures
-  are shown back to the reviewer, nothing is saved. A heading level the output's
-  outline repair would change (one that skips a level after the heading before it) is
-  refused, with the levels that fit; so is accepting a proposed level the repair would
-  change (after a heading before it was rejected or changed),
+  are shown back to the reviewer, nothing is saved. LaTeX also gets the proposal's
+  checks against the PDF's own text (`web.edit_check`: symbols, a vector's bold,
+  signs): an edit that differs there where it changes the meaning is not used unless
+  the reviewer chooses "Use my edit anyway" (`anyway`). An edit that changes nothing is
+  refused too ("Nothing changed"), so it is never counted as a correction. A heading
+  level the output's outline repair would change (one that skips a level after the
+  heading before it) is refused, with the levels that fit; so is accepting a proposed
+  level the repair would change (after a heading before it was rejected or changed),
 - reject: the original stays in the document, flagged,
 - bulk accept: many fixes of one kind at once, but only the ones a single "Accept" could
   take (NEEDS_REVIEW, a proposal, no failed error-level check, and for a heading a
@@ -67,6 +71,7 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
+from a11y_stem.web.edit_check import MEANING_CODES
 from a11y_stem.web.messages import confidence_percent, explain_check
 
 if TYPE_CHECKING:
@@ -106,7 +111,8 @@ class FieldError:
 
 
 class ReviewInvalid(Exception):
-    """The reviewer's input was not saved. Messages name checks, never repeat content."""
+    """The reviewer's input was not saved. Messages are shown to that reviewer only and
+    never logged; they may name what was typed (an unknown command), never other content."""
 
     def __init__(self, errors: list[FieldError], values: dict[str, str] | None = None) -> None:
         super().__init__("review input rejected")
@@ -154,6 +160,8 @@ class ReviewChange:
     warnings: list[Check] = field(default_factory=list)
     # Other headings the output now writes at a different level (reading order).
     moved: list[str] = field(default_factory=list)
+    # An edit used although it differs from the PDF where it changes the meaning.
+    anyway: bool = False
 
 
 @dataclass
@@ -295,8 +303,10 @@ SNAPSHOT_FIELDS = frozenset(
     {"status", "equation", "figure", "heading", "table", "checks", "reviewed"}
 )
 # Beside the fields, a ReviewEdit's `after` holds the review version its write made (a
-# number), so the edits of one write can be found again (`undo_last`).
+# number), so the edits of one write can be found again (`undo_last`), and `True` under
+# ANYWAY_KEY for an edit used although it differs from the PDF (`apply_review`).
 WRITE_KEY = "write"
+ANYWAY_KEY = "anyway"
 
 
 def snapshot(fix: Fix) -> dict[str, Any]:
@@ -318,9 +328,18 @@ def describe_failed(checks: list[Check]) -> str:
 
 
 def apply_review(
-    result: DocumentResult, element_id: str, action: str, form: Mapping[str, str]
+    result: DocumentResult,
+    element_id: str,
+    action: str,
+    form: Mapping[str, str],
+    *,
+    anyway: bool = False,
 ) -> ReviewChange:
-    """Apply one decision to `result` in place. Raises LookupError or ReviewInvalid."""
+    """Apply one decision to `result` in place. Raises LookupError or ReviewInvalid.
+
+    `anyway`: the reviewer chose "Use my edit anyway" for LaTeX that differs from the
+    PDF's text where it changes the meaning (`web.edit_check`); the failed checks stay
+    on the fix, and `ReviewChange.anyway` says so."""
     fix = result.fix_for(element_id)
     if fix is None:
         raise LookupError(element_id)
@@ -342,18 +361,24 @@ def apply_review(
         _refuse_unsaved_change(fix, form)
     # Only a heading decision can move other headings: the outline before it, to compare.
     places = heading_places(result) if fix.kind is Kind.HEADING else {}
+    overridden = False
     if action == "edit":
-        warnings = _edit(result, fix, element, form)
+        warnings = _edit(result, fix, element, form, anyway=anyway)
+        overridden = anyway and any(c.code in MEANING_CODES for c in warnings)
     fix.status = STATUS_FOR_ACTION[action]
     fix.reviewed = True  # a reviewer's Accept is not the pipeline's automatic one
     _recount(result)
+    after = snapshot(fix)
+    if overridden:
+        after[ANYWAY_KEY] = True  # the ReviewEdit records the explicit choice
     return ReviewChange(
         fix=fix,
         action=action,
         before=before,
-        after=snapshot(fix),
+        after=after,
         warnings=warnings,
         moved=_moved_by(places, heading_places(result), element_id) if places else [],
+        anyway=overridden,
     )
 
 
@@ -418,10 +443,15 @@ def _recount(result: DocumentResult) -> None:
 
 
 def _edit(
-    result: DocumentResult, fix: Fix, element: Element | None, form: Mapping[str, str]
+    result: DocumentResult,
+    fix: Fix,
+    element: Element | None,
+    form: Mapping[str, str],
+    *,
+    anyway: bool = False,
 ) -> list[Check]:
     if fix.kind is Kind.EQUATION:
-        return _edit_equation(fix, element, form)
+        return _edit_equation(fix, element, form, anyway=anyway)
     if fix.kind is Kind.FIGURE:
         return _edit_figure(fix, element, form)
     if fix.kind is Kind.HEADING:
@@ -433,57 +463,55 @@ def _blocking(checks: list[Check]) -> list[Check]:
     return [c for c in checks if not c.passed and c.severity == "error"]
 
 
-def _edit_equation(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
-    from a11y_stem.pipeline import equation_step, validate
+def plain_failed(checks: list[Check]) -> str:
+    """The reviewer-facing sentences for failed checks, without codes (those stay in the
+    "Details" of the item, for bug reports)."""
+    return " ".join(explain_check(c).text for c in checks)
+
+
+def _refuse_no_op(fix: Fix, fid: str, what: str, values: dict[str, str]) -> None:
+    """Saving a field as it was is not a correction: say so instead of recording one (it
+    would also count as an edit in ops). A rejected fix is the exception: saving its
+    proposal unchanged puts it back in the document."""
+    if fix.status is Status.REJECTED:
+        return
+    if fix.pending and can_accept(fix):
+        message = f"Nothing changed. Choose Accept to keep it as it is, or change the {what} first."
+    else:
+        message = f"Nothing changed: this is the {what} it already has."
+    raise ReviewInvalid([FieldError(fid, message)], values)
+
+
+def _edit_equation(
+    fix: Fix, element: Element | None, form: Mapping[str, str], *, anyway: bool = False
+) -> list[Check]:
+    from a11y_stem.web import edit_check
 
     fid = field_id("latex", fix.element_id)
     typed = form.get("latex", "").strip()
     values = {"latex": typed}  # re-shown as typed when it is refused
-    # The cleaning model output gets: "$v = at$" loses its dollars, and a bare "%" (a
-    # percent sign here, a comment to the converter) is escaped instead of silently
-    # dropping the rest of the line.
-    latex = equation_step.clean_latex(typed)
-    if not latex:
-        raise ReviewInvalid([FieldError(fid, "Enter the LaTeX for this equation.")], values)
-    if len(latex) > MAX_LATEX_CHARS:
+    if len(typed) > MAX_LATEX_CHARS:
         raise ReviewInvalid(
             [FieldError(fid, f"Keep the LaTeX under {MAX_LATEX_CHARS} characters.")], values
         )
-    checks = list(validate.check_latex(latex))
-    if failed := _blocking(checks):
-        raise ReviewInvalid(
-            [FieldError(fid, "The LaTeX was not saved. " + describe_failed(failed))], values
-        )
-    if fix.equation is not None:
-        display = fix.equation.display
-    else:
-        display = (element.display if element else None) or "block"
-    try:
-        mathml = validate.safe_latex_to_mathml(latex, display)
-    except ValueError:  # LatexConversionError and latex2mathml's own errors
-        raise ReviewInvalid(
-            [FieldError(fid, "The LaTeX was not saved: it could not be converted to MathML.")],
-            values,
-        ) from None
-    mathml_checks = list(validate.check_mathml(mathml))
-    if failed := _blocking(mathml_checks):
-        raise ReviewInvalid(
-            [FieldError(fid, "The LaTeX was not saved. " + describe_failed(failed))], values
-        )
-    fix.equation = EquationFix(latex=latex, mathml=mathml, speech=_speech(mathml), display=display)
-    fix.checks = checks + mathml_checks
+    # The cleaning model output gets ("$v = at$" loses its dollars, a bare "%" is escaped
+    # instead of silently dropping the rest of the line), then the proposal's checks.
+    checked = edit_check.check_equation_edit(element, fix, typed)
+    if checked.empty:
+        raise ReviewInvalid([FieldError(fid, "Enter the LaTeX for this equation.")], values)
+    if checked.unchanged:
+        _refuse_no_op(fix, fid, "LaTeX", values)
+    if checked.mathml is None:
+        raise ReviewInvalid([FieldError(fid, edit_check.blocking_message(checked))], values)
+    if checked.meaning and not anyway:
+        refused = ReviewInvalid([FieldError(fid, edit_check.meaning_message(checked))], values)
+        refused.override = True
+        raise refused
+    fix.equation = EquationFix(
+        latex=checked.latex, mathml=checked.mathml, speech=checked.speech, display=checked.display
+    )
+    fix.checks = checked.checks
     return [c for c in fix.checks if not c.passed]
-
-
-def _speech(mathml: str) -> str:
-    """Speech text is a reading aid on the review screen; a failure must not block saving."""
-    from a11y_stem.pipeline import speech
-
-    try:
-        return speech.mathml_to_speech(mathml)
-    except Exception as exc:
-        logger.warning("speech_failed", extra={"exc_type": type(exc).__name__})
-        return ""
 
 
 def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
@@ -495,6 +523,12 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
     alt = validate.clean_alt(form.get("alt", ""))
     decorative = form.get("decorative") in {"on", "true", "1"}
     values = {"alt": alt, "decorative": "on" if decorative else ""}
+    if (
+        fix.figure is not None
+        and decorative == fix.figure.decorative
+        and (decorative or alt == validate.clean_alt(fix.figure.alt))
+    ):
+        _refuse_no_op(fix, fid, "alt text", values)
     if decorative:
         alt = ""
     elif not alt:
@@ -510,7 +544,7 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
     )
     if failed := _blocking(checks):
         raise ReviewInvalid(
-            [FieldError(fid, "The alt text was not saved. " + describe_failed(failed))], values
+            [FieldError(fid, "Your alt text was not saved. " + plain_failed(failed))], values
         )
     figure_type = fix.figure.figure_type if fix.figure else "other"
     fix.figure = FigureFix(figure_type=figure_type, alt=alt, decorative=decorative)
@@ -633,6 +667,8 @@ def _edit_heading(
         )
     level = int(raw)
     _refuse_moved_level(result, fix.element_id, level, values={"level": raw})
+    if fix.heading is not None and fix.heading.level == level:
+        _refuse_no_op(fix, fid, "level", {"level": raw})
     if fix.heading is not None:
         text = fix.heading.text
     else:

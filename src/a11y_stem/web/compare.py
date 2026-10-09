@@ -78,6 +78,9 @@ class EquationCompare:
     pdf_marks: set[str] = field(default_factory=set)  # characters to outline on the crop
     proposal_marks: set[str] = field(default_factory=set)  # ... in the proposed MathML
     summary: str | None = None  # the one sentence that says what to look at
+    # Every sentence, by what it is about: "style" (a style that changes the meaning),
+    # "symbol", "sign", "cosmetic" (a style that does not) and "unseen".
+    said: dict[str, list[str]] = field(default_factory=dict)
 
     @property
     def has_text_layer(self) -> bool:
@@ -127,15 +130,21 @@ def _shown(letter: str, style: str) -> str:
     return letter
 
 
-def _style_sentence(letter: str, pdf: str, proposal: str, meaning: bool) -> str:
+def _style_sentence(
+    letter: str, pdf: str, proposal: str, meaning: bool, other: str = "the proposal"
+) -> str:
     vector = " (a vector)" if meaning else ""
     if pdf.startswith("bold") and not proposal.startswith("bold"):
-        text = f"The {letter} is bold in the PDF{vector} but {proposal} in the proposal."
+        text = f"The {letter} is bold in the PDF{vector} but {proposal} in {other}."
     elif proposal.startswith("bold") and not pdf.startswith("bold"):
-        text = f"The {letter} is {pdf} in the PDF but bold{vector} in the proposal."
+        text = f"The {letter} is {pdf} in the PDF but bold{vector} in {other}."
     else:
-        text = f"The {letter} is {pdf} in the PDF but {proposal} in the proposal."
+        text = f"The {letter} is {pdf} in the PDF but {proposal} in {other}."
     return text if meaning else text[:-1] + ", which does not change the meaning."
+
+
+def _capital(words: str) -> str:
+    return words[:1].upper() + words[1:]
 
 
 def _times(n: int) -> str:
@@ -146,9 +155,12 @@ def _signs(text: str) -> Counter[str]:
     return Counter(SIGNS[ch] for ch in text if ch in SIGNS)
 
 
-def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
+def compare_equation(
+    element: Element | None, fix: Fix, *, other: str = "the proposal"
+) -> EquationCompare:
     """The differences the step's text-layer checks look at, letter by letter. Empty
-    when the PDF has no text layer for the equation or there is no proposal."""
+    when the PDF has no text layer for the equation or there is no proposal. `other`
+    names the transcription in the sentences ("your edit" for a reviewer's LaTeX)."""
     out = EquationCompare()
     if element is None or fix.kind is not Kind.EQUATION or fix.equation is None:
         return out
@@ -162,7 +174,7 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
     except Exception:  # unparsable MathML: the checks say so; nothing to compare
         return out
     pdf = _layer_letters(text, element.regular_letters or "")
-    sentences: list[tuple[int, str]] = []  # (priority, sentence): meaning first
+    sentences: list[tuple[int, str, str]] = []  # (priority, about, sentence): meaning first
     for letter in sorted(pdf.keys() & got.keys()):
         verdict = _letter_verdict(pdf[letter], got[letter], letter)
         pdf_style, proposal_style = _pdf_style(pdf[letter]), _proposal_style(got[letter])
@@ -176,7 +188,8 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
             sentences.append(
                 (
                     3,
-                    f"The proposal has a {out.unseen[-1]}. The PDF's text cannot show "
+                    "unseen",
+                    f"{_capital(other)} has a {out.unseen[-1]}. The PDF's text cannot show "
                     "that style, so check it in the image.",
                 )
             )
@@ -188,7 +201,11 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
         out.pdf_marks.add(letter)
         out.proposal_marks.add(letter)
         sentences.append(
-            (0 if meaning else 2, _style_sentence(letter, pdf_style, proposal_style, meaning))
+            (
+                0 if meaning else 2,
+                "style" if meaning else "cosmetic",
+                _style_sentence(letter, pdf_style, proposal_style, meaning, other),
+            )
         )
     expected, proposed = _symbol_bag(text), _symbol_bag(mathml_text)
     missing = sorted((expected - proposed).elements())
@@ -203,11 +220,13 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
         if got_n:
             out.proposal_marks.add(symbol)
     if len(missing) == 1 and len(extra) == 1:
-        sentences.append((1, f"The PDF has {missing[0]} where the proposal has {extra[0]}."))
+        sentences.append((1, "symbol", f"The PDF has {missing[0]} where {other} has {extra[0]}."))
     elif missing:
-        sentences.append((1, f"The PDF has {_listed(missing)}, which the proposal does not."))
+        sentences.append((1, "symbol", f"The PDF has {_listed(missing)}, which {other} does not."))
     elif extra:
-        sentences.append((1, f"The proposal has {_listed(extra)}, which the PDF does not."))
+        sentences.append(
+            (1, "symbol", f"{_capital(other)} has {_listed(extra)}, which the PDF does not.")
+        )
     pdf_signs, got_signs = _signs(text), _signs(mathml_text)
     for sign in sorted(set(pdf_signs) | set(got_signs)):
         pdf_n, got_n = pdf_signs[sign], got_signs[sign]
@@ -217,10 +236,12 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
         out.pdf_marks.update(ch for ch, name in SIGNS.items() if name == sign)
         out.proposal_marks.update(ch for ch, name in SIGNS.items() if name == sign)
         sentences.append(
-            (1, f"The PDF has {_signs_word(pdf_n, sign)}; the proposal has {got_n or 'none'}.")
+            (1, "sign", f"The PDF has {_signs_word(pdf_n, sign)}; {other} has {got_n or 'none'}.")
         )
     if sentences:
-        out.summary = min(sentences, key=lambda s: s[0])[1]
+        out.summary = min(sentences, key=lambda s: s[0])[2]
+    for _, about, sentence in sorted(sentences, key=lambda s: s[0]):
+        out.said.setdefault(about, []).append(sentence)
     return out
 
 

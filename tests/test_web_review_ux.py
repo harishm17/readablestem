@@ -177,3 +177,190 @@ def test_a_form_without_a_version_is_still_applied(ux):
     assert post(ux, "p1-e2", action="accept").status_code == 303
     assert post(ux, "p1-e6", action="accept").status_code == 303
     assert version_of(ux) == 2
+
+
+# --------------------------------------------------------------------------- MF3 edits
+
+
+MEANING = (
+    "Your LaTeX differs from the PDF where it changes the meaning: The ω is bold in the PDF "
+    "(a vector) but plain in your edit. Correct it, or choose Use my edit anyway if you are "
+    "sure."
+)
+
+
+def test_an_edit_that_changes_the_meaning_is_not_used_without_asking(ux):
+    # A plain omega again (written another way), where the PDF has a bold one.
+    response = post(ux, "p1-e2", action="edit", latex=r"{\omega}", version="0")
+    assert response.status_code == 422
+    body = panel(response.text)
+    assert MEANING in text_of(body)
+    assert '<a href="#latex-p1-e2">' in response.text  # the error summary
+    assert re.search(r'value="edit_anyway"[^>]*>Use my edit anyway<', body)
+    assert "{\\omega}</textarea>" in body
+    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
+    assert edits(ux) == [] and version_of(ux) == 0
+
+
+def test_bold_omega_typed_as_words_is_caught(ux):
+    response = post(ux, "p1-e2", action="edit", latex=r"bold \omega", version="0")
+    assert response.status_code == 422
+    assert "Your edit has b, d, l and o, which the PDF does not." in text_of(panel(response.text))
+
+
+def test_use_my_edit_anyway_saves_it_and_records_the_choice(ux):
+    response = post(ux, "p1-e2", action="edit_anyway", latex=r"{\omega}", version="0")
+    assert response.status_code == 303
+    fix = stored(ux).fix_for("p1-e2")
+    assert fix.status.value == "edited" and fix.equation.latex == r"{\omega}"
+    # The failed check stays on the fix: the record shows what the reviewer overrode.
+    assert any(c.code == "style_mismatch" and not c.passed for c in fix.checks)
+    (edit,) = edits(ux)
+    assert edit.action == "edit" and edit.after["anyway"] is True
+    page = ux.browser.get(response.headers["location"]).text
+    assert "Your edit was saved as you wrote it, although it differs from the PDF." in page
+
+
+def test_a_correct_edit_passes_the_same_checks_as_a_proposal(ux):
+    response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
+    assert response.status_code == 303
+    fix = stored(ux).fix_for("p1-e2")
+    names = {c.name: c.passed for c in fix.checks}
+    assert names["equation.text_layer"] and names["equation.text_layer_style"]
+    assert names["latex.converts"] and names["speech.generated"]
+    assert fix.equation.speech == "bold omega"
+    assert "anyway" not in edits(ux)[0].after
+
+
+def test_saving_an_unchanged_edit_changes_nothing(ux):
+    response = post(ux, "p1-e2", action="edit", latex="  \\omega ", version="0")
+    assert response.status_code == 422
+    assert (
+        "Nothing changed. Choose Accept to keep it as it is, or change the LaTeX first."
+        in text_of(panel(response.text))
+    )
+    alt = "A car on a road between a house and a school."
+    response = post(ux, "p1-e6", action="edit", alt=alt, version="0")
+    assert response.status_code == 422
+    assert "Nothing changed." in text_of(panel(response.text))
+    assert edits(ux) == [] and version_of(ux) == 0
+
+
+def test_saving_a_rejected_figures_text_unchanged_puts_it_back(ux):
+    assert post(ux, "p1-e6", action="reject", version="0").status_code == 303
+    alt = "A car on a road between a house and a school."
+    assert post(ux, "p1-e6", action="edit", alt=alt, version="1").status_code == 303
+    assert stored(ux).fix_for("p1-e6").status.value == "edited"
+
+
+@pytest.mark.parametrize(
+    ("latex", "sentence"),
+    [
+        (r"\frac{a}{b", "It has one more { than }: add the missing }."),
+        (r"\frac{a}}{b}", "It has one more } than {: add the missing {."),
+        (r"\omegaa + \foo", r"\omegaa and \foo are not commands this tool supports"),
+        (r"\input{x}", r"\input could read files or change settings, so it is never allowed."),
+        (r"\begin{tikzpicture}x\end{tikzpicture}", "The tikzpicture environment is not supported"),
+    ],
+)
+def test_latex_that_cannot_be_used_is_explained_by_naming_the_problem(latex, sentence):
+    from a11y_stem.pipeline.validate import check_latex
+    from a11y_stem.web.edit_check import latex_problems
+
+    failed = [c for c in check_latex(latex) if not c.passed]
+    said = " ".join(latex_problems(latex, failed))
+    assert said.startswith(sentence) or f" {sentence}" in said, said
+    assert "latex." not in said  # no check codes
+
+
+def test_the_edit_checks_are_the_equation_steps_own():
+    """`web.edit_check.evaluate` runs the step's evaluation without a model answer: the
+    same checks, codes and MathML as `equation_step._evaluate` on the same LaTeX."""
+    from a11y_stem.core.types import Element, Kind
+    from a11y_stem.pipeline import equation_step
+    from a11y_stem.web.edit_check import evaluate
+
+    cases = [
+        (r"\omega", "𝛚", "inline"),
+        (r"\boldsymbol{\omega}", "𝛚", "inline"),
+        (r"e^{\lambda t}", "e−λt", "block"),
+        (r"v = d / t", "v = d / t", "block"),
+        (r"x^2 + 3", "x2 + 8", "block"),
+        (r"\mathbf{d}_0 = 0", "\U0001d41d\U0001d7ce = 0", "block"),
+        (r"\frac{a}{b", "a b", "block"),
+        (r"a + b", None, "block"),
+    ]
+    for latex, text, display in cases:
+        element = Element(
+            id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0, text=text,
+            display=display,
+        )  # fmt: skip
+        output = equation_step.EquationOutput(is_equation=True, latex=latex, confidence=1.0)
+        step = equation_step._evaluate(output, [], element, display)
+        mathml, speech, checks = evaluate(step.latex, display, element)
+        assert mathml == step.mathml, latex
+        assert speech == step.speech, latex
+        assert [(c.name, c.passed, c.code) for c in checks] == [
+            (c.name, c.passed, c.code) for c in step.checks
+        ], latex
+
+
+# --------------------------------------------------------------------------- live check
+
+
+def live(env, latex: str, target: str = "p1-e2"):
+    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"), "latex": latex}
+    return env.browser.post(f"/jobs/{env.job_id}/review/{target}/check", data=data)
+
+
+def test_the_live_check_says_what_save_edit_would(ux):
+    response = live(ux, r"{\omega}")
+    assert response.status_code == 200
+    html = response.text
+    assert "<!doctype" not in html.lower()  # a fragment, not a page
+    assert "Differs from the PDF:" in html
+    assert "The ω is bold in the PDF (a vector) but plain in your edit." in html
+    assert '<p id="live-status-p1-e2" hx-swap-oob="innerHTML">' in html
+    assert "Your LaTeX differs from the PDF where it changes the meaning." in html
+    assert '<math xmlns="http://www.w3.org/1998/Math/MathML"' in html  # the preview
+    good = live(ux, r"\boldsymbol{\omega}").text
+    assert "Your LaTeX can be saved: it matches the PDF&#39;s own text." in good
+    assert "Read aloud roughly as:</span> “bold omega”" in good
+    broken = live(ux, r"\frac{a}{b").text
+    assert "Cannot be used yet:" in broken and "It has one more { than }" in broken
+    assert "Your LaTeX cannot be saved yet. The problem is listed below." in broken
+    # Unchanged: nothing to say, and the status emptied.
+    same = live(ux, r"\omega").text
+    assert "<math" not in same
+    assert '<p id="live-status-p1-e2" hx-swap-oob="innerHTML"></p>' in same
+    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"  # nothing saved
+    assert edits(ux) == []
+
+
+def test_the_live_check_needs_the_owner_a_token_and_an_equation(ux):
+    assert live(ux, "x", target="p1-e6").status_code == 404  # a figure
+    assert live(ux, "x", target="p9-e9").status_code == 404
+    forged = ux.browser.post(
+        f"/jobs/{ux.job_id}/review/p1-e2/check", data={"csrf_token": "forged", "latex": "x"}
+    )
+    assert forged.status_code == 403
+    # Signed out in another tab: the session's token still matches, and the answer is
+    # empty, so the page the reviewer is typing in stays as it is.
+    csrf = token(ux.browser, f"/jobs/{ux.job_id}/review")
+    with session_scope(ux.ctx.factory) as session:
+        job = session.get(Job, ux.job_id)
+        assert job is not None
+        job.user.session_version += 1
+    gone = ux.browser.post(
+        f"/jobs/{ux.job_id}/review/p1-e2/check", data={"csrf_token": csrf, "latex": "x"}
+    )
+    assert gone.status_code == 204 and gone.text == ""
+
+
+def test_the_live_check_logs_no_content(ux, caplog, capsys):
+    import logging
+
+    caplog.set_level(logging.DEBUG)
+    live(ux, r"\SECRETLATEX{x} + \omega")
+    assert "SECRETLATEX" not in caplog.text
+    assert "SECRETLATEX" not in capsys.readouterr().out

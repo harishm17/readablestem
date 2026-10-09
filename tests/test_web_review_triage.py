@@ -327,7 +327,7 @@ def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
     card = group_card(page)
     # Working through them one by one: their cards stay unfolded, with a link back.
     assert '<details class="done-group group-members" open>' in card
-    assert "Heading 3 on page 2: Rejected." in card
+    assert "Heading 3 on page 2: Made ordinary text, not a heading." in card
     assert "appears 3 times as a bold line in the body text size (2 still waiting)." in card
     assert "Apply to all 2" in card and "Make all 2 bold text" in card
     assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page

@@ -149,6 +149,7 @@
   {% if err %}<p class="error-message" id="actions-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
   <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
     <button type="submit" name="action" value="edit" class="button">Save edit<span class="visually-hidden"> to {{ name }}</span></button>
+    {% if item.override %}<button type="submit" name="action" value="edit_anyway" class="button-secondary" aria-describedby="latex-error-{{ eid }}">Use my edit anyway<span class="visually-hidden"> for {{ name }}</span></button>{% endif %}
     {% if item.can_accept %}
     <button type="submit" name="action" value="accept" class="button-secondary">Accept<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}

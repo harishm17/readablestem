@@ -29,10 +29,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
 from pydantic import TypeAdapter
 from sqlalchemy import select
@@ -58,14 +58,18 @@ from a11y_stem.web.deps import (
     CurrentUser,
     PageError,
     UserDep,
+    current_user,
     get_ctx,
     pop_flash,
     render,
+    require_csrf,
 )
+from a11y_stem.web.edit_check import EditCheck, check_equation_edit
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.mathml import try_sanitize_mathml
 from a11y_stem.web.messages import explain_check, explain_reason
 from a11y_stem.web.review import (
+    MAX_LATEX_CHARS,
     FieldError,
     ReviewInvalid,
     heading_places,
@@ -814,6 +818,7 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
     if item is not None and item.element_id == target:
         item.edited = any(item.values.get(k, "") != v for k, v in exc.values.items())
         item.values.update(exc.values)
+        item.override = exc.override
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
 
@@ -826,6 +831,65 @@ def review_screen(
     request: Request, job_id: str, user: UserDep, item: str = "", page: str = "", accepted: str = ""
 ) -> Response:
     return split_page(request, job_id, user, item=item, page=page, show_accepted=accepted == "1")
+
+
+def live_status(check: EditCheck) -> str:
+    """The one sentence the live check puts in the field's polite live region."""
+    if check.unchanged:
+        return ""
+    if check.empty:
+        return "Type the LaTeX for this equation."
+    if check.blocking:
+        return "Your LaTeX cannot be saved yet. " + _problems(len(check.blocking))
+    if check.meaning:
+        return "Your LaTeX differs from the PDF where it changes the meaning. " + _problems(
+            len(check.meaning)
+        )
+    if check.notes:
+        notes = "1 small note" if len(check.notes) == 1 else f"{len(check.notes)} small notes"
+        return f"Your LaTeX can be saved, with {notes} below."
+    if check.has_text_layer:
+        return "Your LaTeX can be saved: it matches the PDF's own text."
+    return "Your LaTeX can be saved. The PDF has no text here to compare it with."
+
+
+def _problems(n: int) -> str:
+    return "The problem is listed below." if n == 1 else f"The {n} problems are listed below."
+
+
+@router.post("/jobs/{job_id}/review/{element_id}/check", dependencies=[Depends(require_csrf)])
+def live_check(
+    request: Request, job_id: str, element_id: str, latex: Annotated[str, Form()] = ""
+) -> Response:
+    """The checks Save edit would run, on the LaTeX being typed (htmx, debounced): an HTML
+    fragment, nothing stored and nothing logged but the request line. Signed out (the
+    session ended in another tab), it answers 204 and changes nothing on the page, so
+    the background request never takes the reviewer away from what they are typing."""
+    user = current_user(request)
+    if user is None:
+        return Response(status_code=204)
+    if not ELEMENT_ID.match(element_id):
+        raise PageError(404, *NOT_FOUND)
+    _, result, _ = _load(request, job_id, user)
+    fix = result.fix_for(element_id)
+    if fix is None or fix.kind is not Kind.EQUATION:
+        raise PageError(404, *NOT_FOUND)
+    element = next((e for e in result.elements if e.id == element_id), None)
+    typed = latex.strip()
+    if len(typed) > MAX_LATEX_CHARS:
+        check = EditCheck(latex=typed, mathml=None, speech="", checks=[], display="block")
+        check.blocking = [f"Keep the LaTeX under {MAX_LATEX_CHARS} characters."]
+    else:
+        check = check_equation_edit(element, fix, typed)
+    context = {
+        "check": check,
+        "eid": element_id,
+        "label": f"Equation {item_numbers(result).get(element_id, 0)}",
+        "mathml": try_sanitize_mathml(check.mathml),
+        "status": live_status(check),
+    }
+    # Not `render`: that would take the session's one-time notices with it.
+    return get_ctx(request).templates.TemplateResponse(request, "_edit_check.html", context)
 
 
 def _pct(value: float, whole: float) -> str:

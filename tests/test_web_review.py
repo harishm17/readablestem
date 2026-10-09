@@ -12,7 +12,7 @@ packages and are monkeypatched with small deterministic fakes here.
 from __future__ import annotations
 
 import re
-from html import escape
+from html import escape, unescape
 
 import pytest
 from sqlalchemy import func, select
@@ -398,7 +398,8 @@ def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#review-progress"
     page = review_page(web)
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Rejected.' in progress
+    # "Reject" is named for what it does, and so is its notice.
+    assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Kept without a description' in progress
     assert "Nothing left that needs your decision." in progress
 
 
@@ -411,10 +412,14 @@ def test_saving_an_equation_edit_validates_and_stores_it(web):
     assert fix.equation.latex == "x^2 + 1"
     assert fix.equation.mathml == '<math display="block"><mi>x^2 + 1</mi></math>'
     assert fix.equation.speech == "spoken form" and fix.equation.display == "block"
+    # The checks a proposal gets (web.edit_check): this equation has no text in the PDF,
+    # so there are no text-layer checks.
     assert [c.name for c in fix.checks] == [
         "latex.allowed_commands",
         "latex.plain_text_arguments",
+        "latex.converts",
         "mathml.well_formed",
+        "speech.generated",
     ]
     assert edits(web)[0].after["equation"]["latex"] == "x^2 + 1"
 
@@ -436,11 +441,12 @@ def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     assert response.status_code == 422
     assert "<title>Error: All items as a list" in response.text
     assert '<a href="#latex-p1-e3">' in response.text  # error summary links to the field
-    # Explained in words, with the code in brackets for a bug report.
-    assert "The LaTeX was not saved. The LaTeX uses a command that is not on the list" in (
-        response.text
+    # Explained in words that name the problem; the code is for the Details, not here.
+    assert (
+        "Your LaTeX was not saved. \\bad is not a command this tool supports: check for a "
+        "typo, or write it another way." in unescape(response.text)
     )
-    assert "(latex.allowed_commands: unknown_command)" in response.text
+    assert "(latex.allowed_commands: unknown_command)" not in response.text
     assert "\\bad{y}</textarea>" in response.text  # the reviewer's input is kept
     assert 'aria-invalid="true"' in response.text
     assert result(web) == before and edits(web) == []
@@ -458,7 +464,7 @@ def test_an_invalid_edit_to_a_decided_fix_opens_it_so_the_error_link_works(web):
 def test_latex_that_cannot_become_mathml_is_not_saved(web):
     response = post(web, "p1-e3", action="edit", latex="\\fail")
     assert response.status_code == 422
-    assert "could not be converted to MathML" in response.text
+    assert "It could not be turned into an equation" in response.text
     assert edits(web) == []
 
 
@@ -490,7 +496,8 @@ def test_figure_alt_text_failing_a_check_is_not_saved(web):
     response = post(web, "p1-e4", action="edit", alt="Image of a graph")
     assert response.status_code == 422
     assert '<a href="#alt-p1-e4">' in response.text
-    assert "The alt text was not saved. The alt text starts with words like" in response.text
+    assert "Your alt text was not saved. The alt text starts with words like" in response.text
+    assert "(alt.no_redundant_prefix" not in response.text  # codes are for the Details only
     assert "Image of a graph</textarea>" in response.text
     assert "(this text has 16)" in response.text  # counts the reviewer's input
     assert edits(web) == []

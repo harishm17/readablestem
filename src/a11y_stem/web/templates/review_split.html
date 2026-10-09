@@ -103,12 +103,22 @@
     <summary>Edit the LaTeX</summary>
     <div class="field{% if err %} field-error{% endif %}">
       <label for="latex-{{ eid }}">LaTeX for {{ item.label|lower }}</label>
-      <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Save edit checks your change again and uses it.{% else %}Type the LaTeX for the equation in the image, then choose Save edit.{% endif %}</p>
+      <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Save edit checks your LaTeX against the PDF, as it does a proposal, and uses it.{% else %}Type the LaTeX for the equation in the image, then choose Save edit.{% endif %}</p>
       {{ error_line(item, "latex") }}
+      {# With JavaScript, htmx checks the LaTeX as it is typed (a pause of 0.6 s first) and
+         shows the result below; the server-side checks on Save edit are the same. #}
       <textarea id="latex-{{ eid }}" name="latex" rows="2" spellcheck="false" autocapitalize="off" data-edit-field
-                aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
+                hx-post="/jobs/{{ job.id }}/review/{{ eid }}/check" hx-trigger="input changed delay:600ms" hx-target="#live-check-{{ eid }}" hx-swap="innerHTML" hx-sync="this:replace"
+                aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %} live-status-{{ eid }}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
+      <p class="live-status" id="live-status-{{ eid }}" role="status"></p>
+      <div class="live-check" id="live-check-{{ eid }}"></div>
     </div>
     {{ save_button(item, main=anyway and not p.suggestion) }}
+    {% if item.override %}
+    {# Offered only after Save edit was refused because the LaTeX differs from the PDF
+       where that changes the meaning (web.edit_check). #}
+    <button type="submit" name="action" value="edit_anyway" class="button-secondary" data-role="anyway" aria-describedby="latex-error-{{ eid }}">Use my edit anyway<span class="visually-hidden"> for {{ item.label|lower }}</span></button>
+    {% endif %}
   </details>
   {{ decide_row(item, "Reject keeps the image of the original, marked “not converted”.", anyway) }}
 </form>

@@ -126,8 +126,33 @@ router = APIRouter()
 DONE_MESSAGES = {
     "accept": "Accepted.",
     "edit": "Your edit passed the required checks and was saved.",
-    "reject": "Rejected. The original from the PDF is kept in the document.",
+    "reject": "The original from the PDF is kept in the document.",
 }
+# "Reject" is named for what it does, so its notice says that too.
+REJECT_DONE = {
+    Kind.EQUATION: "Kept as an image of the original. Screen readers will say “Equation not "
+    "converted”.",
+    Kind.FIGURE: "Kept without a description, marked “Needs a description”.",
+    Kind.HEADING: "Made ordinary text, not a heading.",
+}
+EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
+ANYWAY_DONE = "Your edit was saved as you wrote it, although it differs from the PDF."
+
+
+def done_message(change: ReviewChange) -> str:
+    """What the notice after one decision says (content-free: it lives in the session)."""
+    if change.action == "reject":
+        return REJECT_DONE.get(change.fix.kind, DONE_MESSAGES["reject"])
+    if change.anyway:
+        return ANYWAY_DONE
+    message = DONE_MESSAGES.get(change.action, "Done.")
+    if change.warnings:
+        n = len(change.warnings)
+        message += f" {n} {'check gives a warning' if n == 1 else 'checks give warnings'}: "
+        message += "see the notes on it."
+    return message
+
+
 # A flash whose target starts with this belongs to a group (a bulk action), not to one fix.
 GROUP_FLASH = "group:"
 # ... and this one to a heading group's card (a group decision).
@@ -231,6 +256,9 @@ class ReviewItem:
     # The form comes back with the reviewer's own change in a field (a refused Accept or
     # edit): "Save edit" is then the main button.
     edited: bool = False
+    # An edit refused only because it differs from the PDF where that changes the
+    # meaning: the form offers "Use my edit anyway".
+    override: bool = False
 
     @property
     def open(self) -> bool:
@@ -565,6 +593,7 @@ def _apply_invalid(
     item = items.get(target)
     if item is not None:
         item.values.update(exc.values)
+        item.override = exc.override
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
 
@@ -746,13 +775,17 @@ def review_action(
         )
     sent = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
     form = {name: value for name, value in sent.items() if value is not None}
+    # "Use my edit anyway": an edit the reviewer chose to use although it differs from
+    # the PDF's text where that changes the meaning (web.edit_check).
+    anyway = action == EDIT_ANYWAY
+    action = "edit" if anyway else action
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
-            change = apply_review(result, element_id, action, form)
+            change = apply_review(result, element_id, action, form, anyway=anyway)
             job.html = rerender_html(result, _crops(session, job.id))
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
@@ -773,12 +806,9 @@ def review_action(
         element_id=element_id,
         action=action,
         status=STATUS_FOR_ACTION[action].value,
+        anyway=change.anyway,
     )
-    message = DONE_MESSAGES[action]
-    if change.warnings:
-        n = len(change.warnings)
-        message += f" {n} {'check gives a warning' if n == 1 else 'checks give warnings'}: "
-        message += "see the notes on it."
+    message = done_message(change)
     message += _moved_message(change.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
