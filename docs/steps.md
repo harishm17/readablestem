@@ -496,6 +496,32 @@ raises `SpeechError` with a content-free message. In the equation step a speech 
 is a warning (`speech.generated`, code `speech_failed`), not an error, and only an optional
 note: the output keeps MathML only, so a missing reading aid changes nothing a student gets.
 
+## Table step
+
+`pipeline/table_step.py` (`rebuild`, prompt `table.md`), behind `FEATURE_TABLES`; the
+full description is in [tables.md](tables.md). In short:
+
+- Same shape as equations: gpt-6-luna reads the crop first (router fallback on API
+  errors), gpt-6.1-sol is asked once when a check fails or the answer says the crop is
+  not a data table, and the better answer is kept. Spend goes through the same
+  `JobBudget` reservations; `BudgetExceeded` propagates.
+- The answer is rows of cells (text, LaTeX for maths cells, header flags, spans), placed
+  as HTML places them. The PDF's own words for the table are not sent to the model: they
+  are the input of the checks, as an equation's text layer is.
+- Checks: the grid and its headers (`grid_problems`, no header at all); agreement with
+  the local grid from detection (rows x columns, merged cells); the cell-text bijection
+  (the words, numbers and meaningful symbols of the text cells equal the PDF's words,
+  row by row when the grids agree); maths cells through the LaTeX and MathML validators
+  and this page's symbol, sign and style rules against the PDF glyphs in their place.
+- Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic maths style ->
+  ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
+  not a data table -> ABSTAINED `not_data_table`; no usable answer -> the local grid with
+  first-row headers, NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
+  FAILED `table_not_rebuilt`. No model confidence: `Fix.confidence` is None.
+- Header policy: header rows from the top; row headers only for a first column of
+  non-empty, non-numeric, distinct labels the model marked; the caption only from
+  layout's "Table N" caption.
+
 ## Privacy
 
 `Check.code`, `Fix.reason` and `ModelCall.outcome` are category codes. Exception
