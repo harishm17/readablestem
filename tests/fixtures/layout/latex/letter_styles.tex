@@ -1,0 +1,11 @@
+% Letters whose style is in the font, not the text layer: MSBM (\mathbb), CMSY
+% (\mathcal), RSFS (\mathscr) and EUFM (\mathfrak) draw plain "R", "L", "H" and "g".
+% tests/test_letter_style_fonts.py checks layout writes them as Unicode maths letters.
+\documentclass{article}
+\usepackage{amsmath,amssymb,mathrsfs}
+\pagestyle{empty}
+\begin{document}
+Let the map be
+\[ f:\mathbb{R}^n \to \mathbb{C}, \quad \mathcal{L} = T - V, \quad \mathscr{H} \in \mathfrak{g}, \quad \mathbf{F} = m\mathbf{a}, \quad R = 5 \]
+where $R$ is a resistance.
+\end{document}

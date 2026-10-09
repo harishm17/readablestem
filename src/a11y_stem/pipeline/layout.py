@@ -256,6 +256,15 @@ _REGULAR_FACE = re.compile(
     re.IGNORECASE,
 )
 _MONO_FONT = re.compile(r"mono|courier|consolas|menlo|inconsolata|cmtt|sftt", re.IGNORECASE)
+# TeX fonts whose letters are a style the text layer drops: MSBM's R is \mathbb{R}, the
+# reals, but its text layer says "R". (pattern, style, capitals only): MSBM, bbm and
+# dsrom draw double-struck capitals; CMSY's capitals are \mathcal and EUSM, EUSB and RSFS
+# (\mathscr) draw script capitals; EUFM and EUFB are fraktur in both cases.
+_LETTER_STYLE_FONTS = (
+    (re.compile(r"^(?:msbm\d|bbm\d|bbmss|dsrom|dsss)", re.IGNORECASE), "double-struck", True),
+    (re.compile(r"^(?:cmsy\d|cmbsy\d|eusm\d|eusb\d|rsfs)", re.IGNORECASE), "script", True),
+    (re.compile(r"^(?:eufm\d|eufb\d)", re.IGNORECASE), "fraktur", False),
+)
 _MARKUP = re.compile(r"</?[A-Za-z][\w:.-]*\s*/?>|</")
 _BOLD_FLAG = 16
 _ITALIC_FLAG = 2
@@ -760,9 +769,13 @@ class _Char:
 
     @property
     def styled(self) -> str:
-        """The character with its bold weight kept as a Unicode math letter (bold d ->
-        U+1D41D), as Chromium-printed PDFs already store it. Equation text layers use
-        this so the equation step can check that a bold vector stayed bold."""
+        """The character with its style kept as a Unicode math letter (bold d -> U+1D41D;
+        MSBM's R -> U+211D, the reals), as Chromium-printed PDFs already store it.
+        Equation text layers use this so the equation step can check that a bold vector
+        stayed bold and that the reals stayed the reals."""
+        style = _letter_style(self.font) if self.c.isascii() and self.c.isalpha() else None
+        if style is not None and (self.c.isupper() or not style[1]):
+            return styled_char(self.c, style[0])
         return styled_char(self.c, "bold") if self.bold else self.c
 
     @property
@@ -772,6 +785,17 @@ class _Char:
         if not self.c.isalpha() or self.bold or char_variant(self.c) not in (None, "italic"):
             return False
         return bool(_REGULAR_FACE.match(self.font.split("+", 1)[-1].replace(" ", "")))
+
+
+@lru_cache(maxsize=1024)
+def _letter_style(font: str) -> tuple[str, bool] | None:
+    """(style, capitals only) when the font draws its letters in a style the text layer
+    drops (`_LETTER_STYLE_FONTS`), else None."""
+    name = font.split("+", 1)[-1]
+    for pattern, style, capitals in _LETTER_STYLE_FONTS:
+        if pattern.match(name):
+            return style, capitals
+    return None
 
 
 @lru_cache(maxsize=1024)
@@ -909,7 +933,7 @@ class _Row:
 
     @cached_property
     def styled_text(self) -> str:
-        """`text` with bold letters as Unicode math bold (equation text layers only)."""
+        """`text` with styled letters as Unicode math letters (equation text layers only)."""
         return "".join(c.styled for c in self.chars)
 
     @cached_property

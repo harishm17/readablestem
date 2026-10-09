@@ -143,7 +143,7 @@ def test_the_note_is_an_optional_check_with_no_axe_violations(
     site, browser, job, axe_source, viewport
 ):
     context, page = open_page(browser, site, viewport=viewport)
-    page.goto(f"{site.base}/jobs/{job}/review")
+    page.goto(f"{site.base}/jobs/{job}/review/list")
     decisions = page.locator("#needs-decision-title").inner_text()
     assert decisions == "Needs your decision (1)"  # the equation only, not the figure
     optional = page.locator("#optional-checks")
@@ -158,9 +158,15 @@ def test_the_note_is_an_optional_check_with_no_axe_violations(
     unfolded = axe_violations(page, axe_source)
     width = sideways_overflow(page)
     _screenshot(page, f"second-check-review-{viewport['width']}px.png")
+    # The Split View lists it among the optional checks, with its short line.
+    page.goto(f"{site.base}/jobs/{job}/review")
+    split_text = page.locator("main").text_content() or ""
+    split = axe_violations(page, axe_source)
     context.close()
+    assert "Worth a look: a second automated check doubts the alt text." in split_text
     assert not folded, describe(folded)
     assert not unfolded, describe(unfolded)
+    assert not split, describe(split)
     if viewport is NARROW:
         assert width == 0
     for word in ("verified", "checked for accuracy", "compl" + "iant"):

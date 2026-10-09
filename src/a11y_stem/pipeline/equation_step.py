@@ -21,8 +21,8 @@ the model, so the cross-check stays independent. Letter styles are compared too
 (`text_layer_style`): a bold vector read as a plain scalar (or a letter known to be
 plain read as a bold vector), or a double-struck, script or fraktur letter read as a
 plain one, is meaning-level and is treated like a symbol mismatch; any other style
-difference (the bold subscript of a bold symbol, a bold digit, a double-struck R the
-text layer cannot show) is cosmetic, an optional note only. Signs and relations are
+difference (the bold subscript of a bold symbol, a bold digit, a double-struck R from
+a font layout does not know) is cosmetic, an optional note only. Signs and relations are
 compared as well (`signs.compare_signs`, check `equation.text_layer_signs`): a minus
 that was dropped or added, ± read as +, ≤ read as <, = read as ≈, a dot product read
 as a cross product. That is meaning-level too, and asked only when the
@@ -241,6 +241,7 @@ class _LetterStyles:
     bold: int = 0  # occurrences in a bold style
     plain: int = 0  # occurrences in no bold style
     other: set[str] = field(default_factory=set)  # non-bold style groups (double-struck...)
+    styled: Counter[str] = field(default_factory=Counter)  # occurrences per `other` group
     known_plain: bool = False  # PDF only: a plain occurrence is known to be plain
 
 
@@ -255,6 +256,7 @@ class _MathLetters:
     other_bold: int = 0
     other_plain: int = 0
     styles: set[str] = field(default_factory=set)  # non-bold style groups
+    styled: Counter[str] = field(default_factory=Counter)  # occurrences per `styles` group
 
 
 def _group(variant: str | None) -> str:
@@ -276,6 +278,7 @@ def _layer_letters(text_layer: str, regular: str) -> dict[str, _LetterStyles]:
         entry.plain += 1
         if group != PLAIN:
             entry.other.add(group)
+            entry.styled[group] += 1
         # Explicitly plain: a math italic code point (Chromium and Word write them), or a
         # glyph layout found in a regular font with a bold face (`Element.regular_letters`).
         if variant == "italic" or base in regular:
@@ -313,6 +316,7 @@ def _mathml_letters(mathml: str) -> dict[str, _MathLetters]:
                 group = _group(char_variant(ch) or variant)
                 if group != BOLD and group != PLAIN:
                     entry.styles.add(group)
+                    entry.styled[group] += 1
                 if group == BOLD:
                     if variable:
                         entry.var_bold += 1
@@ -346,7 +350,17 @@ def _letter_verdict(pdf: _LetterStyles, got: _MathLetters, letter: str) -> Style
     there, so `\\mathbb{R}` for it adds a style rather than losing one)."""
     if (pdf.other & LETTER_STYLES) - got.styles:
         return "meaning"
-    differs = pdf.other != got.styles
+    differs = pdf.other != got.styles or pdf.styled != got.styled
+    # Counted per occurrence too, for a letter the PDF shows both ways (the reals and a
+    # variable R in one equation): one more plain R and one fewer reals is a lost style,
+    # one more reals and one fewer plain R a variable read as the reals.
+    pdf_plain = pdf.plain - pdf.styled.total()
+    got_plain = got.var_plain + got.other_plain - got.styled.total()
+    for style in LETTER_STYLES:
+        if pdf.styled[style] > got.styled[style] and got_plain > pdf_plain:
+            return "meaning"
+        if got.styled[style] > pdf.styled[style] and pdf_plain > got_plain and pdf.known_plain:
+            return "meaning"
     if letter.isalpha():
         lost = pdf.bold - (got.var_bold + got.other_bold)  # bold occurrences not bold now
         if lost > 0:

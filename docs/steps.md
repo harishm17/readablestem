@@ -188,15 +188,20 @@ returns `None` (the text layer says nothing about style), `"match"`, `"meaning"`
       font with a bold face (`Element.regular_letters`: Computer Modern CMR/CMMI, Times,
       DejaVu, STIX, ...; docs/layout.md);
   - a double-struck, script or fraktur letter that the text layer encodes as such (its
-    own code point: `ℝ`, `ℒ`, `𝔤`, as Chromium, Word and unicode-math PDFs write them)
-    read without that style: the reals read as a variable `R` (`𝑥∈ℝ` -> `x \in R`), a
-    Lagrangian read as `L`.
+    own code point: `ℝ`, `ℒ`, `𝔤`, as Chromium, Word and unicode-math PDFs write them;
+    or a TeX font that draws only that style, which layout turns into the code point:
+    MSBM, bbm and dsrom capitals are double-struck, CMSY, EUSM and RSFS capitals script,
+    EUFM and EUFB letters fraktur) read without that style: the reals read as a variable
+    `R` (`𝑥∈ℝ` -> `x \in R`), a Lagrangian read as `L`. Counted per occurrence, so in
+    an equation with both the reals and a variable R, a lost ℝ is caught, and so is a
+    variable R (known plain) read as the reals.
 - **Cosmetic** (code `style_cosmetic`; an optional note, no confidence change; a
   cheap-model answer still escalates for a second reading): every other difference: the
   bold label of a bold symbol (`𝐝𝐟` -> `\mathbf{d}_{\text{f}}`, a bold "avg"), a bold
   digit, alone too (`𝐝𝟎` -> `\mathbf{d}_0`; the zero vector `𝟎` read as `0`: the policy
-  keeps digits cosmetic), a style the text layer cannot show (MSBM's double-struck R is
-  a plain `R` there, so `\mathbb{R}` adds a style rather than losing one), a lost
+  keeps digits cosmetic), a style the text layer cannot show (a double-struck R from a
+  font layout does not know is a plain `R` there, so `\mathbb{R}` adds a style rather
+  than losing one; the review screen calls it "a style the PDF's text cannot show"), a lost
   sans-serif or monospace style, and a plain letter of unknown weight made bold (a font
   that does not mark bold says nothing).
 
@@ -205,7 +210,9 @@ LaTeX handout's `\mathbb{R}^n` are cosmetic; the handout's bold omega read as `\
 meaning-level. A review of the triage added the vectors in the scripts of a plain base
 and the encoded double-struck, script and fraktur letters (both were cosmetic for a day;
 neither changes a verdict on the 181 recorded real answers). `tests/test_style_check.py`
-pins each.
+pins each. On 2026-10-09 layout started reading the TeX style fonts (above), so the
+handout's `\mathbb{R}^n` is now a match, not a cosmetic note, and `\mathbb{R}` read as
+`R` there is meaning-level (`tests/test_letter_style_fonts.py`, on a Tectonic PDF).
 
 ## Sign and relation check (equations)
 
