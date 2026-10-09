@@ -177,11 +177,12 @@ def test_inline_text_places_equations_and_escapes_the_rest():
     assert out == f"a &lt; b <math> and {inline_marker('p9-e9')}."
 
 
-def test_text_seams_change_nothing_yet():
+def test_the_passage_seam_writes_the_language():
+    # The text work's tests (tests/test_text_*.py) cover links, colour and language.
     element = Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 1, 1), order=0,
                       text="Plain text.", lang="fr")  # fmt: skip
-    assert inline_text.passage_attrs(element) == ""
-    assert '<p id="p1-e0">Plain text.</p>' in render([element], [])
+    assert inline_text.passage_attrs(element) == ' lang="fr"'
+    assert '<p id="p1-e0" lang="fr">Plain text.</p>' in render([element], [])
 
 
 # --------------------------------------------------------------------------- browser
