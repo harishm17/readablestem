@@ -96,6 +96,18 @@ load_config() {
     require LANGFUSE_PUBLIC_KEY
     SECRETS="$SECRETS,LANGFUSE_SECRET_KEY=langfuse-secret-key:latest"
   fi
+  # Microsoft sign-in is optional: on when MS_CLIENT_ID is set, and then it needs the
+  # directories allowed to use it (the app refuses to start with half of the settings).
+  MS_CLIENT_ID=${MS_CLIENT_ID:-}
+  if [ -n "$MS_CLIENT_ID" ]; then
+    require MS_ALLOWED_TENANTS
+    local tenant
+    for tenant in ${MS_ALLOWED_TENANTS//,/ }; do
+      [[ "$tenant" =~ ^[0-9a-fA-F]{8}(-[0-9a-fA-F]{4}){3}-[0-9a-fA-F]{12}$ ]] ||
+        die "MS_ALLOWED_TENANTS must list directory (tenant) ids, comma-separated"
+    done
+    SECRETS="$SECRETS,MS_CLIENT_SECRET=ms-client-secret:latest"
+  fi
 }
 
 sql_connection_name() {
@@ -270,6 +282,9 @@ step_secrets() {
   if [ "$TRACING_ENABLED" = true ]; then
     ensure_secret langfuse-secret-key LANGFUSE_SECRET_KEY ask
   fi
+  if [ -n "$MS_CLIENT_ID" ]; then
+    ensure_secret ms-client-secret MS_CLIENT_SECRET ask
+  fi
 }
 
 cloudsql_flag() { # $1: --set-cloudsql-instances flag form for services and jobs
@@ -306,6 +321,10 @@ write_env_file() {
     yaml_line ADMIN_EMAILS "$ADMIN_EMAILS"
     yaml_line RUN_WORKER true
     yaml_line TRACING_ENABLED "$TRACING_ENABLED"
+    if [ -n "$MS_CLIENT_ID" ]; then
+      yaml_line MS_CLIENT_ID "$MS_CLIENT_ID"
+      yaml_line MS_ALLOWED_TENANTS "$MS_ALLOWED_TENANTS"
+    fi
     for name in MAX_USD_PER_JOB MAX_MODEL_CALLS_PER_JOB MAX_PAGES_PER_JOB MAX_UPLOAD_MB \
       RETENTION_HOURS OPT_IN_RETENTION_DAYS SOURCE_URL LOG_LEVEL LANGFUSE_PUBLIC_KEY \
       LANGFUSE_HOST; do

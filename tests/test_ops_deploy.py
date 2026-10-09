@@ -206,6 +206,37 @@ def test_tracing_is_opt_in_and_its_key_is_a_secret(env):
     assert "LANGFUSE_PUBLIC_KEY is not set" in run(env).stderr
 
 
+MS_TENANT = "11111111-1111-4111-8111-111111111111"
+
+
+def test_microsoft_sign_in_is_opt_in_and_its_secret_is_a_secret(env):
+    first = run(env)
+    assert first.returncode == 0, first.stderr
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    assert "MS_CLIENT" not in deploy["env_file"] + " ".join(deploy["argv"])
+
+    env.update(
+        MS_CLIENT_ID="00000000-aaaa-4bbb-8ccc-000000000001",
+        MS_ALLOWED_TENANTS=f"{MS_TENANT},{MS_TENANT.replace('1', '2')}",
+        MS_CLIENT_SECRET="ms-secret-should-never-print",
+    )
+    result = run(env, "secrets", "service")
+    assert result.returncode == 0, result.stderr
+    deploys = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    argv, env_file = " ".join(deploys[-1]["argv"]), deploys[-1]["env_file"]
+    assert "MS_CLIENT_SECRET=ms-client-secret:latest" in argv
+    assert "MS_CLIENT_ID: '00000000-aaaa-4bbb-8ccc-000000000001'" in env_file
+    assert f"MS_ALLOWED_TENANTS: '{MS_TENANT},22222222-2222-4222-8222-222222222222'" in env_file
+    adds = [c for c in calls(env) if c["argv"][2:5] == ["secrets", "versions", "add"]]
+    assert sum("ms-client-secret" in c["argv"] for c in adds) == 1
+    assert "ms-secret-should-never-print" not in env_file + result.stdout + result.stderr
+
+    del env["MS_ALLOWED_TENANTS"]
+    assert "MS_ALLOWED_TENANTS is not set" in run(env).stderr
+    env["MS_ALLOWED_TENANTS"] = "organizations"
+    assert "directory (tenant) ids" in run(env).stderr
+
+
 def policies(env: dict[str, str]) -> dict[str, dict]:
     return {c["policy"]["displayName"]: c["policy"] for c in calls(env) if "policy" in c}
 
