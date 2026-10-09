@@ -282,7 +282,7 @@ def test_long_description_missing_is_never_raised_with_the_option_off():
         (f"from 1{EN}3 s", ["1", "3"]),  # a range, not minus three
         (f"x {MINUS} 3", ["3"]),  # a minus between terms is not a sign
         (f"y = {MINUS}3", ["-3"]),
-        (f"10{SUP3} and v2 and CO2", ["10"]),  # superscripts and indices are not numbers
+        (f"10{SUP3} and v2 and CO2", ["10", "3"]),  # an exponent is a number; indices not
         (f"({MINUS}2, 4.0)", ["-2", "4"]),
         ("-0", ["0"]),
         ("", []),
@@ -290,6 +290,19 @@ def test_long_description_missing_is_never_raised_with_the_option_off():
 )
 def test_numbers_are_read_the_same_way_from_tables_and_text(text, numbers):
     assert figure_details.numbers_in(text) == [Decimal(n) for n in numbers]
+
+
+def test_an_exponent_is_compared_too():
+    # Exponents printed as superscripts are numbers of their own: a table that writes them
+    # with a caret matches the figure, and one with another exponent does not.
+    sup = {"2": "\u00b2", "3": "\u00b3", "4": "\u2074"}
+    printed = f"Earth 5.97\u00d710{sup['2']}{sup['4']} Mars 6.42\u00d710{sup['2']}{sup['3']}"
+    header = ["Planet", "Mass (kg)"]
+    right = figure_details.data_grid(header, [["Earth", "5.97 x 10^24"], ["Mars", "6.42 x 10^23"]])
+    wrong = figure_details.data_grid(header, [["Earth", "5.97 x 10^24"], ["Mars", "6.42 x 10^25"]])
+    assert right is not None and wrong is not None
+    assert figure_details.values_in_text(right, printed)
+    assert not figure_details.values_in_text(wrong, printed)
 
 
 def test_values_in_text_needs_every_number():

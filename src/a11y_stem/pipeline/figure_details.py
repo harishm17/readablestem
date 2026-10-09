@@ -30,6 +30,7 @@ depends on the stored fix only (docs/design/content-features.md rule 3).
 from __future__ import annotations
 
 import re
+import unicodedata
 from decimal import Decimal, InvalidOperation
 
 from a11y_stem.core.types import FigureFix, TableCell, TableGrid
@@ -59,12 +60,17 @@ _EN_DASH = chr(0x2013)
 # A number as printed: an optional sign (only where it cannot be a dash between two
 # numbers or words: "1-3" is 1 and 3), digits with optional thousands groups ("1,000",
 # "1 000" with a thin or no-break space), and an optional decimal part (".5" too). ASCII
-# digits only, so superscripts ("10³") and subscripts never count as numbers.
+# digits only: subscripts never count, and a run of superscripts is read as a number of
+# its own first (`_SUPERSCRIPT_RUN`), so 10²⁴ is 10 and 24 and its exponent is
+# compared too (6.42 x 10²³ is not printed where the text says 10²⁴).
 _NUMBER = re.compile(
     r"(?<![0-9A-Za-z.])(?P<sign>-)?"
     rf"(?P<int>[0-9]{{1,3}}(?:[,{_GROUP_SPACES}][0-9]{{3}})+(?![0-9])|[0-9]+)?"
     r"(?:\.(?P<frac>[0-9]+))?"
 )
+# Superscript digits and signs: a run becomes " ^" and its plain form ("10^24", as a model
+# types an exponent), so it is read as a number apart from its base.
+_SUPERSCRIPT_RUN = re.compile("[\u00b2\u00b3\u00b9\u2070\u2074-\u207b]+")
 # Minus signs, as PDFs and models write them, become "-" before numbers are read.
 _MINUS = str.maketrans(dict.fromkeys(_MINUS_SIGNS, "-"))
 _GROUP_SEPARATORS = str.maketrans("", "", "," + _GROUP_SPACES)
@@ -106,7 +112,8 @@ def numbers_in(text: str | None) -> list[Decimal]:
     """Every number printed in `text`, normalised ("−0.50" and "-0.5" are equal, "1,000"
     is 1000). Read the same way from a table cell and from the PDF's text."""
     found: list[Decimal] = []
-    for match in _NUMBER.finditer((text or "").translate(_MINUS)):
+    plain = _SUPERSCRIPT_RUN.sub(lambda m: " ^" + unicodedata.normalize("NFKC", m[0]), text or "")
+    for match in _NUMBER.finditer(plain.translate(_MINUS)):
         whole, frac = match["int"], match["frac"]
         if whole is None and frac is None:
             continue
