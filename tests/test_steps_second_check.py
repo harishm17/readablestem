@@ -343,14 +343,11 @@ def test_results_stored_before_the_check_still_load():
     assert fix.verifier_cost_usd == 0
 
 
-def test_the_committed_demo_report_still_loads():
+def test_a_report_stored_before_the_check_still_loads():
     from pathlib import Path
 
-    import a11y_stem
-
-    report = Path(a11y_stem.__file__).parent / "web" / "static" / "demo" / "report.json"
-    if not report.is_file():
-        pytest.skip("no demo report in this checkout")
+    # The demo as converted with pipeline 0.2.0, frozen (the live demo is rebuilt).
+    report = Path(__file__).resolve().parent / "fixtures" / "stored" / "demo-report-0.2.0.json"
     stored = json.loads(report.read_text(encoding="utf-8"))["result"]
     result = DocumentResult.model_validate(stored)  # written before the check existed
     assert result.fixes and all(f.verifications == [] for f in result.fixes)

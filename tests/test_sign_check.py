@@ -35,7 +35,8 @@ from test_steps_support import equation_element, make_settings, use_fallback_rou
 
 FIXTURES = Path(__file__).parent / "fixtures" / "layout"
 LATEX = FIXTURES / "latex"
-DEMO_REPORT = Path(__file__).resolve().parents[1] / "src" / "a11y_stem" / "web" / "static" / "demo"
+# The demo as it was committed with pipeline 0.2.0, frozen: the live demo is rebuilt.
+STORED_0_2_0 = Path(__file__).resolve().parent / "fixtures" / "stored" / "demo-report-0.2.0.json"
 
 PNG = b"\x89PNG equation crop"
 SETTINGS = make_settings()
@@ -696,9 +697,9 @@ def test_the_reviewer_reads_a_plain_sentence():
 
 
 def test_results_stored_before_the_sign_check_still_load():
-    # The committed demo was converted with pipeline 0.2.0 (no sign check): it loads,
-    # keeps its tiers, and every failed check still has a sentence.
-    stored = json.loads((DEMO_REPORT / "report.json").read_text(encoding="utf-8"))["result"]
+    # The demo as converted with pipeline 0.2.0 (no sign check): it loads, keeps its
+    # tiers, and every failed check still has a sentence.
+    stored = json.loads(STORED_0_2_0.read_text(encoding="utf-8"))["result"]
     result = DocumentResult.model_validate(stored)
     assert result.pipeline_version == "0.2.0"
     assert all(c.name != "equation.text_layer_signs" for f in result.fixes for c in f.checks)
