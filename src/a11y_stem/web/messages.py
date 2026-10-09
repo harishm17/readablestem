@@ -10,6 +10,9 @@ Every code the pipeline can emit has an entry here: `tests/test_web_review_messa
 reads the pipeline's source, collects every check name/code pair and fix reason, and
 fails when one has no message (or when a message belongs to a code that no longer
 exists). An unknown code still gets a neutral sentence plus the code, never a blank.
+
+Notices (`DocumentResult.notices`, the job page's list beyond the review decisions) have
+their own table, `NOTICE_MESSAGES`, one entry per code in `core.types.NOTICE_CODES`.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from a11y_stem.core.types import Check
+from a11y_stem.core.types import Check, Notice
 from a11y_stem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
@@ -183,6 +186,9 @@ REASON_MESSAGES: dict[str, str] = {
     "model_skipped": "No model was asked about this item.",
     # Heading step
     "heading.empty_text": "This heading has no text, so it cannot be used as a heading.",
+    # Table step (pipeline.table_step)
+    "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
+    "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
     # Orchestrator (pipeline.run)
     "internal_error": "Something went wrong while this item was processed, so the original "
     "is kept, but you can still fill it in yourself.",
@@ -197,8 +203,37 @@ REASON_MESSAGES: dict[str, str] = {
     "budget_unknown": "A spending limit was reached before this item was converted.",
 }
 
+# DocumentResult.notices: one sentence per notice code for the job page's list ("Not
+# handled in this file" and "Worth checking"; core.types.Notice). Kept apart from the
+# check and fix-reason tables because a notice is not a review decision. Every code in
+# core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py). The wording
+# is a placeholder until the builder that emits each code writes its own sentence.
+NOTICE_MESSAGES: dict[str, str] = {
+    "table_not_rebuilt": "A table is kept as an image of the original, so screen readers "
+    "cannot read its cells.",
+    "scanned_page": "A page is only a picture of a page (a scan), so nothing on it could "
+    "be converted.",
+    "code_block": "Program code is kept as plain text, without its layout or highlighting.",
+    "footnote": "A footnote is kept where it falls in the text, not linked to its mark.",
+    "colour_reference": "The text refers to a colour (for example, shown in red), so add "
+    "a cue that does not depend on seeing the colour.",
+    "colour_only": "A figure tells things apart by colour alone, so add labels or patterns "
+    "that do not depend on seeing the colour.",
+    "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
+    "email address.",
+    "link_text_unclear": "A link's text does not say where it goes (for example, click "
+    "here), so reword it.",
+    "lang_detected": "The language of the document was detected from its text, so check it "
+    "is right.",
+    "lang_assumed": "The PDF does not say which language it is in and none was detected, "
+    "so English is assumed: check it is right.",
+    "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
+    "long description yet.",
+}
+
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
+UNKNOWN_NOTICE_MESSAGE = "Something in this file may need a look."
 
 SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth checking"}
 # Failed checks of a fix accepted with optional notes (`Fix.review == "optional"`): they
@@ -233,6 +268,11 @@ def explain_check(check: Check) -> Explained:
 def explain_reason(reason: str) -> Explained:
     text = REASON_MESSAGES.get(reason)
     return Explained(text or UNKNOWN_REASON_MESSAGE, reason, known=text is not None)
+
+
+def explain_notice(notice: Notice) -> Explained:
+    text = NOTICE_MESSAGES.get(notice.code)
+    return Explained(text or UNKNOWN_NOTICE_MESSAGE, notice.code, known=text is not None)
 
 
 def severity_label(check: Check) -> str:

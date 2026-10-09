@@ -1,7 +1,7 @@
 """The conversion pipeline end to end.
 
 convert_pdf: layout.analyze -> heading_fixes -> per page: crops (serial, calling thread)
--> equation/figure steps (thread pool) -> assemble.render_html ->
+-> equation/figure/table steps (thread pool) -> assemble.render_html ->
 html_checks.static_checks.
 
 Design notes:
@@ -40,6 +40,13 @@ Design notes:
   numbers, models, token counts, costs, statuses and reason codes, never document text.
   Attributes are scalars only (WP6 drops anything else); each model request gets its own
   `model_call` span opened with `model=`, which WP6 records as a Langfuse generation.
+- Options (`ConversionOptions`: feature flags and the course's notation) are in force for
+  the whole run (`pipeline.options.using`), so every step reads them with
+  `options.current()`, pool threads included (each task runs in a copy of the context).
+  They decide what the steps produce; the stored result alone decides the HTML.
+- Content features (docs/design/content-features.md) hook in here: TABLE elements go to
+  `table_step.rebuild` like equations and figures go to their steps; `stage_progress`
+  receives `ProgressEvent`s; notices and source facts go on the result.
 """
 
 from __future__ import annotations
@@ -66,6 +73,7 @@ from a11y_stem.core.budget import BudgetExceeded
 from a11y_stem.core.types import (
     BBox,
     Check,
+    ConversionOptions,
     ConversionOutput,
     DocumentResult,
     DocumentStats,
@@ -73,7 +81,10 @@ from a11y_stem.core.types import (
     Fix,
     Kind,
     ModelCall,
+    Notice,
     PageStats,
+    ProgressEvent,
+    SourceFacts,
     Status,
     inline_marker,
 )
@@ -88,23 +99,32 @@ from a11y_stem.pipeline import (
     html_checks,
     layout,
     page_kinds,
+    table_step,
 )
+from a11y_stem.pipeline import options as run_options
 
 log = logging.getLogger(__name__)
 
 # 0.3.0 (2026-10-08): review rules changed, a sign or relation that differs from the text
 # layer is a required decision (`signs.compare_signs`). Results and eval reports from
 # 0.2.0 were made under the old review policy.
-PIPELINE_VERSION = "0.3.0"
+# 0.4.0 (2026-10-09): the content-feature data model (docs/design/content-features.md):
+# TABLE elements and fixes, figure long descriptions and data tables, links, colour
+# runs, passage languages, notices and source facts on the result, conversion options.
+# Results from 0.3.0 load unchanged (every new field has a default); a table detected by
+# 0.4.0 is a required decision ("table_not_rebuilt") until rebuilding is switched on.
+PIPELINE_VERSION = "0.4.0"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
+# Live progress by stage, for the job page (content-free; see `ProgressEvent`).
+StageProgressFn = Callable[[ProgressEvent], None]
 
 # Neighbouring text sent with each crop as untrusted context (the client fences it).
 # List items are text too: a display equation inside a numbered solution step is
 # introduced by that step, not by the paragraph before the list.
 CONTEXT_CHARS = 600
 _TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
-_MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE)
+_MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE, Kind.TABLE)
 # Errors that mean the run itself is misconfigured, not that one element is hard: they
 # stop the run and propagate (see the module docstring).
 FATAL_ERRORS: tuple[type[Exception], ...] = (ConfigError, UnknownModelError)
@@ -312,9 +332,12 @@ def _inline_context(element: Element, parent: Element) -> str | None:
     return f"{_tail(before, half)}[this equation]{_head(after, half)}".strip()
 
 
+_CONTEXT_LABELS = {Kind.FIGURE: "[this figure]", Kind.TABLE: "[this table]"}
+
+
 def _neighbour_context(element: Element, before: str | None, after: str | None) -> str | None:
     half = CONTEXT_CHARS // 2
-    label = "[this figure]" if element.kind is Kind.FIGURE else "[this equation]"
+    label = _CONTEXT_LABELS.get(element.kind, "[this equation]")
     parts = []
     if before:
         parts.append(_tail(_without_markers(before), half))
@@ -379,6 +402,8 @@ def _step_for(kind: Kind) -> tuple[str, Callable[..., Fix]]:
     # function without touching this one.
     if kind is Kind.EQUATION:
         return "equation", equation_step.transcribe
+    if kind is Kind.TABLE:
+        return "table", table_step.rebuild
     return "figure", figure_step.describe
 
 
@@ -501,6 +526,8 @@ class _Run:
 
     pdf_bytes: bytes
     settings: Settings
+    options: ConversionOptions
+    stage_progress: StageProgressFn | None  # the job-page builder emits ProgressEvents
     client: VisionClient
     tracer: Tracer
     pages: _Pages
@@ -513,7 +540,7 @@ class _Run:
     futures: dict[Future[_Done], Element]
 
     def process_page(self, page: int, elements: list[Element]) -> None:
-        """Crop this page's equations and figures here (PyMuPDF), queue their steps."""
+        """Crop this page's equations, figures and tables here (PyMuPDF), queue their steps."""
         work = [e for e in elements if e.kind in _MODEL_KINDS]
         with _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)):
             for element in work:
@@ -630,7 +657,11 @@ def _stats(
 def _prompt_versions(fixes: list[Fix]) -> dict[str, str]:
     """Declared step prompt versions, overridden by the versions actually sent."""
     versions: dict[str, str] = {}
-    for step, module in (("equation", equation_step), ("figure", figure_step)):
+    for step, module in (
+        ("equation", equation_step),
+        ("figure", figure_step),
+        ("table", table_step),
+    ):
         declared = getattr(module, "PROMPT_VERSION", None)
         if isinstance(declared, str) and declared:
             versions[step] = declared
@@ -786,6 +817,8 @@ def convert_pdf(
     concurrency: int = 4,
     notice: str | None = None,
     source_note: str | None = None,
+    options: ConversionOptions | None = None,
+    stage_progress: StageProgressFn | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
@@ -801,7 +834,46 @@ def convert_pdf(
     `notice` is plain text shown at the top of the HTML (the CLI uses it to mark an
     offline test run); `source_note` is plain text for its "About this conversion"
     section, e.g. an OpenStax attribution.
+
+    `options` (feature flags, the course's notation) are in force for the whole run, for
+    every step to read with `pipeline.options.current()`; None means
+    `ConversionOptions.from_settings(settings)`. `stage_progress` receives a
+    `ProgressEvent` per stage on the calling thread (none are sent yet: the job-page
+    work adds them); like `progress`, an exception from it aborts the run.
     """
+    if options is None:
+        options = ConversionOptions.from_settings(settings)
+    with run_options.using(options):
+        return _convert(
+            pdf_bytes,
+            settings=settings,
+            client=client,
+            pages=pages,
+            progress=progress,
+            tracer=tracer,
+            concurrency=concurrency,
+            notice=notice,
+            source_note=source_note,
+            options=options,
+            stage_progress=stage_progress,
+        )
+
+
+def _convert(
+    pdf_bytes: bytes,
+    *,
+    settings: Settings,
+    client: VisionClient,
+    pages: list[int] | None,
+    progress: ProgressFn | None,
+    tracer: Tracer | None,
+    concurrency: int,
+    notice: str | None,
+    source_note: str | None,
+    options: ConversionOptions,
+    stage_progress: StageProgressFn | None,
+) -> ConversionOutput:
+    """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
@@ -817,6 +889,8 @@ def convert_pdf(
             run = _Run(
                 pdf_bytes=pdf_bytes,
                 settings=settings,
+                options=options,
+                stage_progress=stage_progress,
                 client=client,
                 tracer=tracer,
                 pages=_Pages(page_list, progress),
@@ -866,6 +940,10 @@ def convert_pdf(
         stats.cost_usd,
         stats.latency_ms,
     )
+    # Content-free additions of the content features (docs/design/content-features.md):
+    # each feature adds its notices here; the job-page work measures the source facts.
+    notices: list[Notice] = []
+    source_facts: SourceFacts | None = None
     result = DocumentResult(
         pipeline_version=PIPELINE_VERSION,
         prompt_versions=_prompt_versions(ordered),
@@ -879,5 +957,7 @@ def convert_pdf(
         image_only_pages=sorted(scans),
         html_checks=checks,
         page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
+        notices=notices,
+        source_facts=source_facts,
     )
     return PipelineOutput(result=result, crops=run.crops, checks=checks)
