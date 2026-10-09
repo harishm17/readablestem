@@ -88,9 +88,13 @@ escaped; a maths cell is MathML rebuilt by `sanitize_mathml` (its text otherwise
 broken grid (`core.types.grid_problems`) still renders as a rectangular table.
 
 `pipeline/assemble_tables.py` wraps a rebuilt table in a box that scrolls sideways on a
-narrow screen and takes focus (named by the caption, else "Table"), and keeps the image of
-any table that was not rebuilt. Table CSS is added only to documents with a rebuilt
-table, so other documents are byte-for-byte what 0.3.0 wrote.
+narrow screen; a table that may be wider than a 320 px screen
+(`estimate_min_width_em` >= `WIDE_TABLE_EM`) is also a tab stop, named by the caption
+(else "Table"), so keyboard users can scroll it, as wide equations are. A proposal without
+a caption gets the element's "Table N" caption (layout took it out of the text). Any table
+that was not rebuilt keeps its image, flagged. Table CSS is added only to documents with
+a rebuilt table, so other documents are byte-for-byte what 0.3.0 wrote. The table step,
+its checks and the width estimate's calibration: [tables.md](tables.md).
 
 ## Lists
 
@@ -305,6 +309,11 @@ There is no dark mode yet.
 | `html.math_display` | `math_missing_display` (warning) |
 | `html.self_contained` | `external_resource` |
 | `html.wording` | `banned_wording` |
+| `html.table_headers` | `table_no_headers` (a data table without `<th>`; documents with a table only, like the four below) |
+| `html.table_header_scope` | `th_without_scope` (unless the `<th>` has an id and its table uses `headers`) |
+| `html.table_header_text` | `empty_th` |
+| `html.table_caption` | `table_caption_missing` (warning: a "Table N" paragraph beside a table with no `<caption>`) |
+| `html.table_layout` | `layout_table` (`role="presentation"` or `"none"` on a table) |
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/a11y_stem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,

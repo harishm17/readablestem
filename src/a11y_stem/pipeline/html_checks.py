@@ -22,6 +22,23 @@ elements carrying `assemble.AUTHORED_CLASS` (the notes and the about section). C
 text is the instructor's, not a claim by this tool: mechanics uses "compliance" for the
 flexibility of a beam.
 
+Documents with a `<table>` get five more rules (`_table_rules`, docs/tables.md), so a
+document without one gets exactly the rules above:
+
+| Check name | Code when it fails | What it catches |
+|---|---|---|
+| html.table_headers | table_no_headers | a data table without a single `<th>` |
+| html.table_header_scope | th_without_scope | a `<th>` with no `scope` (see below) |
+| html.table_header_text | empty_th | a `<th>` with no text (or img alt) in it |
+| html.table_caption | table_caption_missing | a caption left in the text (warning, below) |
+| html.table_layout | layout_table | a table with `role="presentation"` or `"none"` |
+
+A `<th>` without `scope` passes when it has an id and its table uses `headers` (the
+serialiser's irregular tables). The caption rule fails for a data table without
+`<caption>` right beside a "Table N ..." paragraph (layout's caption pattern, so "Table 2
+shows that ..." is not one). The output never uses a table for layout, so the last rule
+only fails on HTML made some other way.
+
 `axe_checks` runs the vendored axe-core (vendor/README.md) in headless Chromium when the
 `browser` dependency group and its browser are installed, and returns one skipped
 warning otherwise. Results carry rule ids and impact only, never page content.
@@ -33,6 +50,7 @@ import hashlib
 import logging
 import re
 from collections import Counter
+from dataclasses import dataclass, field
 from functools import cache
 from html.parser import HTMLParser
 from importlib import resources
@@ -215,6 +233,147 @@ def static_checks(html: str) -> list[Check]:
         ),
         _check("html.self_contained", doc.external == 0, "external_resource"),
         _check("html.wording", not _BANNED.search(authored), "banned_wording"),
+        *_table_rules(html),
+    ]
+
+
+# --------------------------------------------------------------------------- tables
+
+# "Table 2.1 Speeds of ...", "TABLE 3: ...", but not "Table 2 shows that ..." (layout's
+# "Figure N" caption rule, for tables).
+TABLE_CAPTION = re.compile(
+    r"^(?:Table|TABLE|Tab\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
+    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
+)
+PRESENTATIONAL_ROLES = frozenset({"presentation", "none"})
+# Blocks that can sit between a paragraph and a table (wrapper <div>s do not count: a
+# rebuilt table sits in one).
+_TABLE_NEIGHBOUR_BLOCKS = frozenset(
+    {"h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "dl", "figure", "pre", "blockquote",
+     "hr", "img", "math", "aside", "section"}
+)  # fmt: skip
+
+
+@dataclass
+class _HeaderCell:
+    scope: bool
+    has_id: bool
+    text: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _TableFacts:
+    presentational: bool
+    caption: bool = False
+    uses_headers: bool = False  # a cell lists its headers (`headers`/`id` instead of scope)
+    headers: list[_HeaderCell] = field(default_factory=list)
+
+
+class _Tables(HTMLParser):
+    """One pass gathering what the table rules need: each table's header cells and
+    caption, and the order of paragraphs, tables and other blocks outside tables."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tables: list[_TableFacts] = []
+        # ("p", text), ("table", index into `tables`) or ("block", ""), in document order.
+        self.blocks: list[tuple[str, str | int]] = []
+        self._open: list[int] = []  # tables being read (nested ones too)
+        self._header: _HeaderCell | None = None
+        self._paragraph: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "table":
+            role = (values.get("role") or "").strip().lower()
+            self.tables.append(_TableFacts(presentational=role in PRESENTATIONAL_ROLES))
+            if not self._open:
+                self._end_paragraph()
+                self.blocks.append(("table", len(self.tables) - 1))
+            self._open.append(len(self.tables) - 1)
+        elif self._open:
+            self._in_table(tag, values)
+        elif tag == "p":
+            self._end_paragraph()
+            self._paragraph = []
+        elif tag in _TABLE_NEIGHBOUR_BLOCKS and self._paragraph is None:
+            self.blocks.append(("block", ""))
+
+    def _in_table(self, tag: str, values: dict[str, str | None]) -> None:
+        table = self.tables[self._open[-1]]
+        if tag == "caption":
+            table.caption = True
+        if tag in ("td", "th") and (values.get("headers") or "").strip():
+            table.uses_headers = True
+        if tag == "th":
+            self._header = _HeaderCell(
+                scope=bool((values.get("scope") or "").strip()),
+                has_id=bool((values.get("id") or "").strip()),
+            )
+            table.headers.append(self._header)
+        elif tag == "img" and self._header is not None:
+            self._header.text.append(values.get("alt") or "")
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "table" and self._open:
+            self._open.pop()
+            self._header = None
+        elif tag == "th":
+            self._header = None
+        elif tag == "p":
+            self._end_paragraph()
+
+    def handle_data(self, data: str) -> None:
+        if self._header is not None:
+            self._header.text.append(data)
+        if self._paragraph is not None and not self._open:
+            self._paragraph.append(data)
+
+    def _end_paragraph(self) -> None:
+        if self._paragraph is not None:
+            self.blocks.append(("p", " ".join("".join(self._paragraph).split())))
+            self._paragraph = None
+
+    def caption_left_in_text(self, index: int) -> bool:
+        """Is a "Table N ..." paragraph right before or after table `index`?"""
+        at = self.blocks.index(("table", index))
+        beside = [self.blocks[i] for i in (at - 1, at + 1) if 0 <= i < len(self.blocks)]
+        return any(
+            kind == "p" and isinstance(text, str) and bool(TABLE_CAPTION.match(text))
+            for kind, text in beside
+        )
+
+
+def _table_rules(html: str) -> list[Check]:
+    """The table rules (see the module docstring); none for a document without tables."""
+    doc = _Tables()
+    doc.feed(html)
+    doc.close()
+    if not doc.tables:
+        return []
+    data = [(i, t) for i, t in enumerate(doc.tables) if not t.presentational]
+    top_level = {index for kind, index in doc.blocks if kind == "table"}
+    return [
+        _check("html.table_headers", all(t.headers for _, t in data), "table_no_headers"),
+        _check(
+            "html.table_header_scope",
+            all(h.scope or (t.uses_headers and h.has_id) for _, t in data for h in t.headers),
+            "th_without_scope",
+        ),
+        _check(
+            "html.table_header_text",
+            all("".join(h.text).strip() for t in doc.tables for h in t.headers),
+            "empty_th",
+        ),
+        _check(
+            "html.table_caption",
+            not any(
+                not t.caption and i in top_level and doc.caption_left_in_text(i) for i, t in data
+            ),
+            "table_caption_missing",
+            severity="warning",
+        ),
+        _check("html.table_layout", not any(t.presentational for t in doc.tables), "layout_table"),
     ]
 
 

@@ -1,0 +1,291 @@
+{
+ "source": "table-bench tables.tex (written for the table benchmark, no third-party text), table T6-row-headers: a crop of tables.pdf; the local grid is the gold structure filled with the PDF's words by position (a stand-in for tables-detect)",
+ "recorded": "2026-10-09 with models/prompts/table.md as first committed",
+ "caption": "Table 6: Surface gravity of the planets.",
+ "local": {
+  "rows": 5,
+  "cols": 4,
+  "header_rows": 1,
+  "cells": [
+   {
+    "row": 0,
+    "col": 0,
+    "text": "Planet",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 1,
+    "text": "(1024 Mass kg)",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 2,
+    "text": "Radius (km)",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 3,
+    "text": "(m/s2) g",
+    "header": "col"
+   },
+   {
+    "row": 1,
+    "col": 0,
+    "text": "Mercury"
+   },
+   {
+    "row": 1,
+    "col": 1,
+    "text": "0.330"
+   },
+   {
+    "row": 1,
+    "col": 2,
+    "text": "2440"
+   },
+   {
+    "row": 1,
+    "col": 3,
+    "text": "3.7"
+   },
+   {
+    "row": 2,
+    "col": 0,
+    "text": "Venus"
+   },
+   {
+    "row": 2,
+    "col": 1,
+    "text": "4.87"
+   },
+   {
+    "row": 2,
+    "col": 2,
+    "text": "6052"
+   },
+   {
+    "row": 2,
+    "col": 3,
+    "text": "8.9"
+   },
+   {
+    "row": 3,
+    "col": 0,
+    "text": "Earth"
+   },
+   {
+    "row": 3,
+    "col": 1,
+    "text": "5.97"
+   },
+   {
+    "row": 3,
+    "col": 2,
+    "text": "6371"
+   },
+   {
+    "row": 3,
+    "col": 3,
+    "text": "9.8"
+   },
+   {
+    "row": 4,
+    "col": 0,
+    "text": "Mars"
+   },
+   {
+    "row": 4,
+    "col": 1,
+    "text": "0.642"
+   },
+   {
+    "row": 4,
+    "col": 2,
+    "text": "3390"
+   },
+   {
+    "row": 4,
+    "col": 3,
+    "text": "3.7"
+   }
+  ]
+ },
+ "answers": {
+  "gpt-6-luna": {
+   "is_data_table": true,
+   "caption": "",
+   "rows": [
+    {
+     "cells": [
+      {
+       "text": "Planet",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Mass (10²⁴ kg)",
+       "latex": "\\text{Mass}\n(10^{24}\\ \\text{kg})",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Radius (km)",
+       "latex": "\\text{Radius}\\ (\\text{km})",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "g (m/s²)",
+       "latex": "g\\ (\\text{m/s}^2)",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Mercury",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "0.330",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2440",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "3.7",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Venus",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "4.87",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "6052",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "8.9",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Earth",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "5.97",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "6371",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "9.8",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Mars",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "0.642",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "3390",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "3.7",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "expected": {
+  "status": "accepted",
+  "failed": [],
+  "models": [
+   "gpt-6-luna"
+  ]
+ }
+}
