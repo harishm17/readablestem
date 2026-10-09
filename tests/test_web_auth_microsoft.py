@@ -673,3 +673,23 @@ def test_only_rs256_is_accepted():
             now=time.time(),
         )
     assert refused.value.reason == "bad_algorithm"
+
+
+# --------------------------------------------------------------------------- integration
+
+
+def test_a_university_sign_in_comes_back_to_the_page_asked_for_and_is_counted(ms):
+    """Microsoft sign-in ends where every sign-in ends (`auth._signed_in`): back to the
+    page asked for while signed out (`web.return_to`, the review-screen work) and one
+    `signed_in` usage event (`web.events`)."""
+    from a11y_stem.web.db import Event
+
+    ms.allow(ALICE)
+    asked = ms.browser.get("/app?from=bookmark")
+    assert (asked.status_code, asked.headers["location"]) == (303, "/login")
+    response = ms_sign_in(ms)
+    assert response.status_code == 303
+    assert response.headers["location"] == "/app?from=bookmark"
+    with session_scope(ms.ctx.factory) as session:
+        names = list(session.scalars(select(Event.name).where(Event.user_id == user_id(ms, ALICE))))
+    assert names == ["signed_in"]
