@@ -460,6 +460,19 @@ default (`Untitled document`, `Microsoft Word - ...`); otherwise the first level
 `lang` is the catalog `/Lang` when it looks like a language tag, else `en`. The text pass
 decides the document's language from there (it detects one when the PDF has none).
 
+### Code blocks and footnotes (notices)
+
+`Layout.notices` carries two layout facts the job page lists under "Not handled in this
+file" (review "none": no decision; `_layout_notices`):
+
+- `code_block`: a paragraph or list item with at least 12 glyphs, 80 % of them in a
+  monospaced font (MuPDF's flag, or a name such as Courier, cmtt, Consolas). Its text is
+  kept, but not its line breaks and indentation, which decide what belongs to a Python
+  loop's body.
+- `footnote`: a paragraph or list item in the bottom 40 % of the page, in a smaller font
+  than the body, that starts with a digit, `*`, a dagger or `§` printed raised in the
+  text above it on the same page. It is kept where it falls, not linked to its mark.
+
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 
 After layout and before any step, `run` calls `text_pass.apply` once. It reads the PDF

@@ -109,7 +109,7 @@ for things without an element.
 | `scanned_page` | required (the page's FAILED figure fix, unchanged) | a figure fix with reason `scanned_page` |
 | `colour_only` | optional | a figure fix with `colour_only` |
 | `long_description_missing` | optional | a chart or diagram fix without `long_description`, with long descriptions on |
-| `code_block`, `footnote` | none | layout facts |
+| `code_block`, `footnote` | none | layout facts (`Layout.notices`, `layout._layout_notices`) |
 | `colour_reference`, `link_scheme_dropped`, `link_text_unclear` | optional | the text pass |
 | `lang_detected`, `lang_assumed` | optional (confirm on the job page) | the text pass |
 

@@ -72,7 +72,7 @@ import pymupdf
 
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
-from a11y_stem.core.types import BBox, Element, Kind, TableGrid, inline_marker
+from a11y_stem.core.types import BBox, Element, Kind, Notice, TableGrid, inline_marker
 from a11y_stem.pipeline import options as run_options
 from a11y_stem.pipeline import tables
 from a11y_stem.pipeline.notation_memory import (
@@ -302,6 +302,9 @@ class Layout:
     page_sizes: list[tuple[float, float]] = field(default_factory=list)  # per analysed page
     title: str | None = None  # PDF metadata title, else the first level-1 heading
     lang: str = "en"  # PDF /Lang if present, else "en"
+    # Layout facts the job page lists ("Not handled in this file", review "none"): a
+    # block of program code, a footnote (`_layout_notices`). Codes and ids only.
+    notices: list[Notice] = field(default_factory=list)
 
 
 # ============================================================================ public API
@@ -3713,7 +3716,8 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         for n in selected
     ]
     _settle_bold_letters(pages)
-    elements = _to_elements(pages, ctx)
+    block_ids: dict[int, str] = {}
+    elements = _to_elements(pages, ctx, block_ids)
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
         levels = heading_levels(elements)
@@ -3725,17 +3729,71 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         page_sizes=[p.size for p in pages],
         title=title,
         lang=_document_lang(doc),
+        notices=_layout_notices(pages, ctx, block_ids),
     )
 
 
-def _to_elements(pages: list[_PageBlocks], ctx: _Context) -> list[Element]:
-    """Blocks -> Elements with ids "p{page+1}-e{index}" and a global reading order."""
+# A paragraph or list item set in a monospaced font (at least this share of its glyphs,
+# and this many of them) is program code: its text is kept, but its line breaks and
+# indentation (which decide a Python loop's body) are not.
+CODE_MONO_SHARE = 0.8
+CODE_MIN_GLYPHS = 12
+# A footnote: a block in the bottom part of the page (below this share of its height), in
+# a smaller font than the body, that starts with a mark (a digit, *, a dagger) printed
+# raised in the text above it on the same page.
+FOOTNOTE_ZONE = 0.6
+FOOTNOTE_SIZE = 0.92
+_FOOTNOTE_MARKS = frozenset("*\u2020\u2021\u00a7")
+
+
+def _layout_notices(
+    pages: list[_PageBlocks], ctx: _Context, block_ids: dict[int, str]
+) -> list[Notice]:
+    """The code blocks and footnotes the job page lists under "Not handled in this file"
+    (review "none": no decision; docs/design/content-features.md "Notices")."""
+    notices: list[Notice] = []
+    for page in pages:
+        raised: set[str] = set()  # marks printed raised above, on this page
+        for block in page.blocks:
+            element_id = block_ids.get(id(block))
+            if block.kind not in _TEXT_BLOCKS or element_id is None:
+                continue
+            ink = [c for row in block.rows for c in row.chars if not c.blank]
+            if len(ink) >= CODE_MIN_GLYPHS and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(
+                ink
+            ):
+                notices.append(Notice(code="code_block", page=page.number, element_id=element_id,
+                                      review="none"))  # fmt: skip
+            elif ink and _footnote(block, ink[0].c, page, ctx, raised):
+                notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
+                                      review="none"))  # fmt: skip
+            for row in block.rows:
+                raised |= {c.c for c in row.chars if row.is_script(c) and c.c.strip()}
+    return notices
+
+
+def _footnote(
+    block: _Block, first: str, page: _PageBlocks, ctx: _Context, raised: set[str]
+) -> bool:
+    small = block.font_size is not None and block.font_size < FOOTNOTE_SIZE * ctx.body
+    low = block.bbox[1] >= FOOTNOTE_ZONE * page.size[1]
+    mark = first.isdigit() or first in _FOOTNOTE_MARKS
+    return small and low and mark and first in raised
+
+
+def _to_elements(
+    pages: list[_PageBlocks], ctx: _Context, block_ids: dict[int, str] | None = None
+) -> list[Element]:
+    """Blocks -> Elements with ids "p{page+1}-e{index}" and a global reading order
+    (`block_ids` gets each block's element id)."""
     elements: list[Element] = []
     levels = _list_levels((b for page in pages for b in page.blocks), 0.6 * ctx.body)
     for page in pages:
         ids = (f"p{page.number + 1}-e{index}" for index in count())
         for block in page.blocks:
             element_id = next(ids)
+            if block_ids is not None:
+                block_ids[id(block)] = element_id
             if block.kind in _TEXT_BLOCKS:
                 children = []
                 parts = []

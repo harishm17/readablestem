@@ -180,3 +180,66 @@ def test_notices_never_change_the_decision_count():
     assert triage.required_decisions(with_notices.fixes) == triage.required_decisions(fixes)
     assert notices.section(with_notices.notices[0]) == "not_handled"
     assert notices.section(with_notices.notices[1]) == "worth_checking"
+
+
+# --------------------------------------------------------------------------- layout facts
+
+
+def code_and_footnote_pdf(code_font: str = "cour") -> bytes:
+    """A handout with a Python loop set in Courier and a footnote whose mark is raised in
+    the text above it."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page()
+    page.insert_text((72, 72), "Loops in Python", fontsize=18, fontname="helv")
+    lines = [
+        "The loop below adds the numbers from one to ten and prints the total once the loop",
+        "has finished. Indentation decides which lines belong to the body of the loop.",
+    ]
+    y = 102
+    for line in lines:
+        page.insert_text((72, y), line, fontsize=11, fontname="helv")
+        y += 15
+    width = pymupdf.get_text_length(lines[-1], fontname="helv", fontsize=11)
+    page.insert_text((72 + width + 0.5, y - 19), "1", fontsize=7, fontname="helv")
+    y += 10
+    for line in ["total = 0", "for i in range(1, 11):", "    total += i", "print(total)"]:
+        page.insert_text((90, y), line, fontsize=10, fontname=code_font)
+        y += 13
+    page.insert_text((72, y + 10), "Run it and check that it prints 55.", fontsize=11)
+    page.draw_line((72, 720), (200, 720))
+    page.insert_text((72, 735), "1 Python counts from zero unless told otherwise.", fontsize=8)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_layout_lists_a_code_block_and_a_footnote_as_notices_with_no_decision():
+    from a11y_stem.pipeline.layout import analyze
+
+    layout = analyze(code_and_footnote_pdf())
+    by_id = {e.id: e for e in layout.elements}
+    found = [(n.code, n.review, (by_id[n.element_id].text or "")[:9]) for n in layout.notices]
+    assert found == [("code_block", "none", "total = 0"), ("footnote", "none", "1 Python ")]
+    # Plain text paragraphs, a footnote-sized line without a raised mark: nothing.
+    plain = analyze(code_and_footnote_pdf(code_font="helv"))
+    assert all(n.code != "code_block" for n in plain.notices)
+
+
+def test_a_conversion_carries_the_layout_notices_to_the_job_page():
+    from a11y_stem.config import Settings
+    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from a11y_stem.models.fake import FakeVisionClient
+    from a11y_stem.pipeline.run import convert_pdf
+
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
+    output = convert_pdf(
+        code_and_footnote_pdf(),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        client=FakeVisionClient(budget=budget),
+    )
+    result = output.result
+    codes = [n.code for n in notices.current(result)]
+    assert "code_block" in codes and "footnote" in codes
+    assert triage.required_decisions(result.fixes) == 0

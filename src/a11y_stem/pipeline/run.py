@@ -1048,7 +1048,7 @@ def _convert(
     # each feature adds its notices here (the text pass's first); those that follow from
     # the fixes are derived once, then everything is merged (one notice per code and
     # element, or code and page) and ordered by page and reading order.
-    notices: list[Notice] = [*text.notices]
+    notices: list[Notice] = [*text.notices, *doc.notices]
     derived = notice_rules.from_fixes(
         elements, ordered, long_descriptions=options.long_descriptions
     )
