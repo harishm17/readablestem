@@ -26,8 +26,10 @@ wording is tested in one place. Design notes:
 - **Notices** (`notice_lists`): `pipeline.notices.current` sorted into "Not handled in
   this file" and "Worth checking", one sentence each (`web.messages`), with the page
   and a link to the decision when a notice has one.
-- **Language** (`LANGUAGES`, `language_line`, `set_language`): the document language
-  and where it came from, and the instructor's choice (lang_source "user").
+- **Language** (`language_line`, `language_choices`): the document language and where
+  it came from, for the control that sets it. The names are the text work's
+  (`pipeline.language.LANGUAGE_NAMES`); the change itself is
+  `pipeline.text_pass.set_document_language` (lang_source "user").
 """
 
 from __future__ import annotations
@@ -50,6 +52,7 @@ from a11y_stem.core.types import (
     SourceFacts,
     Status,
 )
+from a11y_stem.pipeline import language as languages
 from a11y_stem.pipeline import notices as notice_rules
 from a11y_stem.pipeline.source_facts import flattened_parts
 from a11y_stem.pipeline.speech import GREEK, SYMBOLS
@@ -704,36 +707,6 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
 
 # --------------------------------------------------------------------------- language
 
-# Languages offered by the change control: BCP 47 tag -> English name. A document's own
-# tag outside this list is kept and shown as it is. The text work has its own list
-# (`pipeline.language.LANGUAGE_NAMES`); once both are merged, one list serves both.
-LANGUAGES: dict[str, str] = {
-    "en": "English",
-    "es": "Spanish",
-    "fr": "French",
-    "de": "German",
-    "it": "Italian",
-    "pt": "Portuguese",
-    "nl": "Dutch",
-    "pl": "Polish",
-    "ru": "Russian",
-    "uk": "Ukrainian",
-    "el": "Greek",
-    "tr": "Turkish",
-    "ar": "Arabic",
-    "he": "Hebrew",
-    "fa": "Persian",
-    "hi": "Hindi",
-    "bn": "Bengali",
-    "ur": "Urdu",
-    "zh-Hans": "Chinese (simplified)",
-    "zh-Hant": "Chinese (traditional)",
-    "ja": "Japanese",
-    "ko": "Korean",
-    "vi": "Vietnamese",
-    "id": "Indonesian",
-    "sw": "Swahili",
-}
 # Notices that ask the instructor to confirm the language; confirming answers them.
 LANGUAGE_NOTICES = frozenset({"lang_detected", "lang_assumed"})
 SOURCE_WORDS = {
@@ -744,13 +717,14 @@ SOURCE_WORDS = {
 }
 
 
-def language_name(tag: str) -> str:
-    """ "English" for "en" and "en-US"; the tag itself for one this page does not know."""
-    if tag in LANGUAGES:
-        return LANGUAGES[tag]
-    primary = tag.split("-", 1)[0].lower()
-    name = LANGUAGES.get(primary)
-    return f"{name} ({tag})" if name else tag
+def language_label(tag: str) -> str:
+    """ "English" for "en", "Portuguese (pt-BR)" for a tag with a region, the tag itself
+    for a language the control does not list (`pipeline.language.LANGUAGE_NAMES`, the
+    one list of names)."""
+    if tag in languages.LANGUAGE_NAMES:
+        return languages.LANGUAGE_NAMES[tag]
+    name = languages.language_name(tag)
+    return f"{name} ({tag})" if name != tag else tag
 
 
 def language_source(result: DocumentResult) -> str | None:
@@ -768,7 +742,7 @@ def language_source(result: DocumentResult) -> str | None:
 def language_line(result: DocumentResult) -> str:
     """ "English (detected; your PDF did not say)"."""
     words = SOURCE_WORDS.get(language_source(result) or "", "")
-    name = language_name(result.lang)
+    name = language_label(result.lang)
     return f"{name} ({words})" if words else name
 
 
@@ -779,31 +753,10 @@ def language_needs_check(result: DocumentResult) -> bool:
 def language_choices(current: str) -> list[tuple[str, str]]:
     """(tag, name) for the select in alphabetical order, the current language first if
     it is not listed."""
-    choices = sorted(LANGUAGES.items(), key=lambda item: item[1])
-    if current not in LANGUAGES:
-        choices.insert(0, (current, language_name(current)))
+    choices = sorted(languages.LANGUAGE_NAMES.items(), key=lambda item: item[1])
+    if current not in languages.LANGUAGE_NAMES:
+        choices.insert(0, (current, language_label(current)))
     return choices
-
-
-def set_language(result: DocumentResult, tag: str) -> DocumentResult:
-    """The stored result with the instructor's choice: the document language,
-    lang_source "user", the notices that asked for it answered, and passages no longer
-    marked when they are now in the document's own language. The input is unchanged; the
-    caller re-renders the HTML and stores both.
-
-    The same contract as the text work's `pipeline.text_pass.set_document_language`,
-    which also works the passage languages out again: once both are merged, the route
-    calls that one and this function goes (docs/web.md "The job page")."""
-    elements = [
-        e.model_copy(update={"lang": None})
-        if e.lang is not None and e.lang.lower() == tag.lower()
-        else e
-        for e in result.elements
-    ]
-    notices = [n for n in result.notices if n.code not in LANGUAGE_NOTICES]
-    return result.model_copy(
-        update={"lang": tag, "lang_source": "user", "elements": elements, "notices": notices}
-    )
 
 
 # --------------------------------------------------------------------------- finish line

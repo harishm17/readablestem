@@ -416,9 +416,12 @@ def test_the_language_line_says_where_the_language_came_from():
 
 
 def test_setting_the_language_answers_its_notices_and_unmarks_passages():
+    """The job page's control uses the text work's rule (`set_document_language`)."""
+    from a11y_stem.pipeline.text_pass import set_document_language
+
     result = card_result(UNTAGGED, notices=[Notice(code="lang_assumed"), Notice(code="footnote")])
     result.elements[5].lang = "fr"
-    changed = job_page.set_language(result, "fr")
+    changed = set_document_language(result, "fr")
     assert (changed.lang, changed.lang_source) == ("fr", "user")
     assert [n.code for n in changed.notices] == ["footnote"]
     assert changed.elements[5].lang is None

@@ -24,6 +24,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from a11y_stem.core.types import DocumentResult
+from a11y_stem.pipeline import language as languages
+from a11y_stem.pipeline import text_pass
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web import notation
 from a11y_stem.web.database import as_utc, utc_today
@@ -435,14 +437,19 @@ def set_language(
         job = owned_job(session, job_id, user, lock=True)
         require_done(job)
         result = DocumentResult.model_validate(job.result_json or {})
-        if lang not in page_rules.LANGUAGES and lang != result.lang:
-            raise PageError(
-                400,
-                "Language not changed",
-                "Choose the language from the list on the document's page.",
-                context={"job_id": job_id},
-            )
-        result = page_rules.set_language(result, lang)
+        refused = PageError(
+            400,
+            "Language not changed",
+            "Choose the language from the list on the document's page.",
+            context={"job_id": job_id},
+        )
+        if lang not in languages.LANGUAGE_NAMES and lang != result.lang:
+            raise refused
+        try:
+            # The text work's rule: notices answered, passages worked out again.
+            result = text_pass.set_document_language(result, lang)
+        except ValueError:
+            raise refused from None
         crops = _crops(session, job.id)
         from a11y_stem.web.review import rerender_html
 
@@ -452,8 +459,8 @@ def set_language(
     log_event(logger, "language_set", job_id=job_id)
     flash(
         request,
-        f"The language is now {page_rules.language_name(lang)}. The HTML file was made again "
-        "with it.",
+        f"The language is now {page_rules.language_label(result.lang)}. "
+        "The HTML file was made again with it.",
     )
     return RedirectResponse(f"/jobs/{job_id}#language-heading", status_code=303)
 

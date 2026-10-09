@@ -457,16 +457,15 @@ From top to bottom:
    automatic checks of the file.
 7. **Language**: "Language: English (detected; your PDF did not say)" ("from your PDF",
    "assumed; ...", "you chose it"; a result made before detection existed counts as
-   "from your PDF" when the PDF has /Lang) and a select of 25 languages with "Confirm
-   this language" (when it was detected or assumed) or "Use this language". The POST
-   (CSRF-checked, owner only, finished jobs only, only a listed language or the
-   document's own) sets `lang` and `lang_source="user"`, drops the `lang_detected` and
-   `lang_assumed` notices, unmarks passages now in the document's language
-   (`job_page.set_language`), makes the HTML again (`review.rerender_html`, with the day
-   of the last decision for the student note) and bumps `jobs.result_version`. The
-   language tag is not logged. The text work has the same function with passage
-   detection (`text_pass.set_document_language`) and its own list of languages
-   (`language.LANGUAGE_NAMES`): once both are merged, the route uses those.
+   "from your PDF" when the PDF has /Lang) and a select of the languages in
+   `pipeline.language.LANGUAGE_NAMES` (35) with "Confirm this language" (when it was
+   detected or assumed) or "Use this language". The POST (CSRF-checked, owner only,
+   finished jobs only, only a listed language or the document's own) goes through the
+   text pass's rule (`text_pass.set_document_language`): `lang` and
+   `lang_source="user"`, the `lang_detected` and `lang_assumed` notices dropped, and the
+   passage languages worked out again against the new language. Then it makes the HTML
+   again (`review.rerender_html`, with the day of the last decision for the student
+   note) and bumps `jobs.result_version`. The language tag is not logged.
 
 ## Review screen
 
