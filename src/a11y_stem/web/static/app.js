@@ -49,6 +49,164 @@
   });
 })();
 
+/* Times (UX review MF16). The server writes every time as
+ * <time class="local-time" datetime="2026-10-09T23:32:00Z">9 Oct 2026, 23:32 UTC</time>
+ * (the `utc` template filter). This rewrites it in the reader's own time zone, with how
+ * far away it is when that is within a week: "Fri, Oct 9, 6:32 PM CDT (in 23 hours)".
+ * Without JavaScript the UTC text stays. The pages are in English, so the words are
+ * English whatever the browser's language; only the time zone is the reader's. Lists
+ * swapped in by htmx are rewritten too.
+ */
+(function () {
+  "use strict";
+
+  var LANG = document.documentElement.lang || "en";
+  var WEEK_MS = 7 * 24 * 3600 * 1000;
+  var stamp, relative;
+  try {
+    stamp = new Intl.DateTimeFormat(LANG, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      timeZoneName: "short",
+    });
+    relative = new Intl.RelativeTimeFormat(LANG, { numeric: "auto" });
+  } catch (e) {
+    return; // no Intl: the UTC text stays
+  }
+
+  function distance(ms) {
+    var minutes = Math.round(ms / 60000);
+    if (minutes === 0) return "";
+    if (Math.abs(minutes) < 60) return relative.format(minutes, "minute");
+    var hours = Math.round(ms / 3600000);
+    if (Math.abs(hours) < 48) return relative.format(hours, "hour");
+    return relative.format(Math.round(ms / 86400000), "day");
+  }
+
+  function localise() {
+    document.querySelectorAll("time.local-time[datetime]:not([data-local])").forEach(function (el) {
+      var when = new Date(el.getAttribute("datetime"));
+      if (isNaN(when.getTime())) return;
+      var ms = when.getTime() - Date.now();
+      var away = Math.abs(ms) < WEEK_MS ? distance(ms) : "";
+      el.textContent = stamp.format(when) + (away ? " (" + away + ")" : "");
+      el.setAttribute("data-local", "");
+    });
+  }
+
+  localise();
+  document.addEventListener("htmx:afterSettle", localise);
+})();
+
+/* Upload form (app.html, UX review MF21). Says at once when the chosen file is not a
+ * PDF, is empty or is larger than the limit, instead of after sending all of it (35 s
+ * at 5 Mbit/s for a refusal the browser can make instantly). While a good file is
+ * sent, says so ("Uploading notes.pdf. Keep this tab open.") and keeps a second click
+ * from sending it twice. The server checks everything again; without this file the
+ * form works the same, only slower to say no.
+ */
+(function () {
+  "use strict";
+
+  var input = document.getElementById("pdf");
+  if (!input || !input.hasAttribute("data-max-bytes") || !input.form) return;
+  var form = input.form;
+  var box = document.getElementById("pdf-check");
+  var status = document.getElementById("upload-status");
+  var button = form.querySelector('button[type="submit"]');
+  var field = input.closest(".field");
+  var maxBytes = Number(input.getAttribute("data-max-bytes"));
+  var maxMb = input.getAttribute("data-max-mb");
+  var describedBy = input.getAttribute("aria-describedby") || "";
+  var serverError = input.getAttribute("aria-invalid") === "true";
+  if (!box || !status || !button || !field) return;
+
+  function problem(file) {
+    if (!file) return "";
+    var pdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
+    if (!pdf) return file.name + " is not a PDF. Choose a PDF file.";
+    if (file.size === 0) return file.name + " is empty. Choose a PDF that has content.";
+    if (file.size > maxBytes) {
+      return (
+        file.name + " is larger than " + maxMb + " MB. Split it into smaller PDFs and " +
+        "upload each one."
+      );
+    }
+    return "";
+  }
+
+  // The same markup as the server's field error (app.html), in a live region.
+  function show(message) {
+    box.textContent = "";
+    if (!message) {
+      input.setAttribute("aria-describedby", describedBy);
+      if (!serverError) {
+        field.classList.remove("field-error");
+        input.removeAttribute("aria-invalid");
+      }
+      return;
+    }
+    var line = document.createElement("p");
+    line.className = "error-message";
+    line.id = "pdf-check-error";
+    var prefix = document.createElement("span");
+    prefix.className = "visually-hidden";
+    prefix.textContent = "Error: ";
+    line.appendChild(prefix);
+    line.appendChild(document.createTextNode(message));
+    box.appendChild(line);
+    field.classList.add("field-error");
+    input.setAttribute("aria-invalid", "true");
+    input.setAttribute("aria-describedby", (describedBy + " pdf-check-error").trim());
+  }
+
+  input.addEventListener("change", function () {
+    show(problem(input.files && input.files[0]));
+  });
+
+  form.addEventListener("submit", function (event) {
+    var file = input.files && input.files[0];
+    var message = problem(file);
+    if (message) {
+      event.preventDefault();
+      show(message);
+      input.focus();
+      return;
+    }
+    if (!file) return; // the server answers "Choose a PDF file to upload."
+    if (button.getAttribute("aria-disabled") === "true") {
+      event.preventDefault(); // already sending
+      return;
+    }
+    status.textContent = "Uploading " + file.name + ". Keep this tab open.";
+    button.setAttribute("aria-disabled", "true");
+  });
+
+  // Back to this page from the next one (the browser's page cache): ready again.
+  window.addEventListener("pageshow", function () {
+    status.textContent = "";
+    button.removeAttribute("aria-disabled");
+  });
+})();
+
+/* After a download (_after_download.html, web/feedback.py): the two optional questions
+ * are in the page but hidden until the download link is used. Without JavaScript they
+ * show on the next visit, and a link leads to them.
+ */
+(function () {
+  "use strict";
+
+  var questions = document.querySelector("[data-after-download]");
+  if (!questions) return;
+  document.addEventListener("click", function (event) {
+    if (!(event.target instanceof Element)) return;
+    if (event.target.closest('a[href$="/download"]')) questions.hidden = false;
+  });
+})();
+
 /* Review screen (review_split.html). Everything there works without this; it only:
  *
  * - scrolls the page image, inside its own region, so the selected item's mark is in

@@ -25,6 +25,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
@@ -39,7 +40,7 @@ from a11y_stem.web.database import as_utc, prepare_database
 from a11y_stem.web.db import make_engine, make_sessionmaker
 from a11y_stem.web.deps import AppContext, CsrfFailed, LoginRequired, PageError, render
 from a11y_stem.web.logsafe import log_event
-from a11y_stem.web.routes import admin, cron, jobs, pages, review, split
+from a11y_stem.web.routes import admin, cron, feedback, jobs, pages, review, split
 from a11y_stem.web.security import (
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
@@ -69,7 +70,7 @@ ERROR_TEXT = {
     400: ("Something was wrong with that request", "Please go back and try again."),
     401: ("Please sign in", "Sign in to continue."),
     403: ("Not allowed", "You do not have access to this page."),
-    404: ("Page not found", "There is nothing at this address, or it is not yours to see."),
+    404: ("Page not found", "There is nothing at this address. Check the link, or start again."),
     405: ("Not allowed", "That action is not available at this address."),
     413: ("Request too large", "That request was larger than this page accepts."),
 }
@@ -78,9 +79,23 @@ ERROR_TEXT = {
 # --------------------------------------------------------------------------- templates
 
 
-def _utc(value: datetime | None) -> str:
+def _utc_text(value: datetime | None) -> str:
     value = as_utc(value)
     return f"{value.day} {value:%b %Y, %H:%M} UTC" if value else ""
+
+
+def _utc(value: datetime | None) -> Markup:
+    """A time for the page body: `<time datetime>` saying it in UTC, which app.js rewrites
+    in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
+    JavaScript the UTC text stays (UX review MF16). Not for <title> or attributes: use
+    `utc_text` there."""
+    value = as_utc(value)
+    if value is None:
+        return Markup("")
+    stamp = value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return Markup('<time class="local-time" datetime="{}">{}</time>').format(
+        stamp, _utc_text(value)
+    )
 
 
 def _usd(value: float | None) -> str:
@@ -96,6 +111,7 @@ def make_templates() -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.filters["utc_text"] = _utc_text
     env.filters["usd"] = _usd
     return Jinja2Templates(env=env)
 
@@ -304,7 +320,7 @@ def create_app(
     app.add_exception_handler(RequestValidationError, _on_validation_error)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    for module in (pages, jobs, split, review, admin, cron):
+    for module in (pages, jobs, split, review, feedback, admin, cron):
         app.include_router(module.router)
     app.include_router(auth_router)
     return app

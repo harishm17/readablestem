@@ -64,9 +64,12 @@ MAGIC_WINDOW = 1024
 
 
 class ProbeRejected(Exception):
-    def __init__(self, code: str) -> None:
+    """`code` is a category; `pages` the page count when it is the reason."""
+
+    def __init__(self, code: str, pages: int | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.pages = pages
 
 
 def looks_like_pdf(data: bytes) -> bool:
@@ -94,9 +97,11 @@ def probe(data: bytes, *, max_pages: int) -> int:
             raise ProbeRejected("encrypted")
         pages = doc.page_count
         if pages == 0:
-            raise ProbeRejected("no_pages")
+            # A file cut short (a download that did not finish) opens only after MuPDF
+            # repairs it, and its page tree is often lost: damaged, not empty.
+            raise ProbeRejected("damaged" if doc.is_repaired else "no_pages")
         if pages > max_pages:
-            raise ProbeRejected("too_many_pages")
+            raise ProbeRejected("too_many_pages", pages=pages)
         _check_pages(doc)
     finally:
         doc.close()
@@ -398,6 +403,8 @@ def main(argv: list[str] | None = None) -> int:
         answer: dict[str, object] = {"ok": True, "pages": probe(data, max_pages=max_pages)}
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
+        if exc.pages is not None:
+            answer["pages"] = exc.pages
     except Exception:
         answer = {"ok": False, "code": "unreadable"}
     sys.stdout.write(json.dumps(answer) + "\n")
