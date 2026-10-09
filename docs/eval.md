@@ -1059,8 +1059,8 @@ turns readable words into a picture. With `FEATURE_TABLES` off the same two grid
 page). Fixed after this run (`tables.is_word_grid`): a ruled grid of a few short words
 with no digit and no "Table N" caption stays text, as in 0.3.0. Layout now claims no
 table on the three sections (checked offline after the sync with `feat/beta-app`), so
-with the flags off the document's review load is 0.3.0's 10, and with every flag on the
-2 grid decisions go (not re-measured with the models). What to do when the model calls a
+tables add no decision there with the flags off, and with every flag on the 2 grid
+decisions go (neither re-measured with the models). What to do when the model calls a
 claimed grid "not a data table" is still open (docs/design/content-features.md).
 
 ### Tables (`--task tables`)
