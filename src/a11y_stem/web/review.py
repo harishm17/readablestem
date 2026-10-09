@@ -20,6 +20,16 @@ The web route owns the transaction; this module owns the rules:
   level the output keeps). FAILED and ABSTAINED fixes have nothing safe to accept and
   are never included.
 
+A table is edited one change at a time (`edit_table`, the "tables" section below): use
+the grid read from the PDF (`Element.table`), make the first row or column a header or
+not, or change one cell's text (a maths cell's LaTeX goes through the equation
+validators). Each is refused, with nothing saved, when it would leave the grid with a
+structural problem it did not have (`core.types.grid_problems`).
+
+Every review write moves the job's `result_version` on (`guard_result_version`); a form
+that carries the version it was made from is refused when the job has moved on since
+(another tab or window changed it), so a stale page never overwrites a newer decision.
+
 A heading decision can change the level the output writes for later headings (the
 children of a rejected heading move up together). Stored levels are not rewritten, so
 restoring the heading puts them back; instead `heading_places` tells the review screen
@@ -27,7 +37,8 @@ the level each heading is written at, and `ReviewChange.moved` names the other h
 a decision moved.
 
 It also decides the order of the review screen. A reviewer's time should go where the
-risk is, so fixes are grouped by kind (equations, then figures, then headings); within a
+risk is, so fixes are grouped by kind (equations, then figures, then tables, then
+headings); within a
 group the ones still waiting for a decision come first, in page and reading order, then
 the ones accepted with an optional note (`Fix.review == "optional"`), then the ones
 already accepted or decided (both collapsed on the page).
@@ -61,6 +72,10 @@ from a11y_stem.core.types import (
     HeadingFix,
     Kind,
     Status,
+    TableCell,
+    TableFix,
+    TableGrid,
+    grid_problems,
 )
 from a11y_stem.web.messages import confidence_percent, explain_check
 
@@ -72,7 +87,14 @@ MAX_LATEX_CHARS = 5000
 MAX_ALT_CHARS = 1000
 
 # Review screen groups, in priority order, and the slug each has in URLs and anchors.
-GROUP_SLUGS = {Kind.EQUATION: "equations", Kind.FIGURE: "figures", Kind.HEADING: "headings"}
+# A wrong table changes what a student reads as much as a wrong figure description, so
+# tables come before headings.
+GROUP_SLUGS = {
+    Kind.EQUATION: "equations",
+    Kind.FIGURE: "figures",
+    Kind.TABLE: "tables",
+    Kind.HEADING: "headings",
+}
 GROUP_KINDS = tuple(GROUP_SLUGS)
 # Waiting for a decision: a proposal to check, or nothing usable (the reviewer can write
 # one, or reject to confirm the original stays).
@@ -115,6 +137,9 @@ class ReviewChange:
     warnings: list[Check] = field(default_factory=list)
     # Other headings the output now writes at a different level (reading order).
     moved: list[str] = field(default_factory=list)
+    # What an edit changed, when "edited" alone does not say (a table: which cell, which
+    # headers). Positions and fixed words only, never the document's text.
+    note: str = ""
 
 
 @dataclass
@@ -243,7 +268,7 @@ def group_anchor(group_key: str) -> str:
 
 
 def has_proposal(fix: Fix) -> bool:
-    return any(p is not None for p in (fix.equation, fix.figure, fix.heading))
+    return any(p is not None for p in (fix.equation, fix.figure, fix.heading, fix.table))
 
 
 def can_accept(fix: Fix) -> bool:
@@ -254,7 +279,7 @@ def can_accept(fix: Fix) -> bool:
 
 def snapshot(fix: Fix) -> dict[str, Any]:
     """What a ReviewEdit stores as before/after (deleted with the job)."""
-    return fix.model_dump(mode="json", include={"status", "equation", "figure", "heading"})
+    return fix.model_dump(mode="json", include={"status", "equation", "figure", "heading", "table"})
 
 
 def field_id(prefix: str, element_id: str) -> str:
@@ -280,8 +305,11 @@ def apply_review(
     element = next((e for e in result.elements if e.id == element_id), None)
     before = snapshot(fix)
     warnings: list[Check] = []
+    note = ""
     if action == "accept" and not has_proposal(fix):
         message = "There is no proposal to accept. Edit it, or reject it to keep the original."
+        if fix.kind is Kind.TABLE:
+            message = NO_TABLE_TO_ACCEPT
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
     if action == "accept" and not can_accept(fix):
         message = "This proposal failed a required check, so it cannot be accepted as it is. "
@@ -293,7 +321,9 @@ def apply_review(
         _refuse_unsaved_change(fix, form)
     # Only a heading decision can move other headings: the outline before it, to compare.
     places = heading_places(result) if fix.kind is Kind.HEADING else {}
-    if action == "edit":
+    if action == "edit" and fix.kind is Kind.TABLE:
+        warnings, note = edit_table(fix, element, form)
+    elif action == "edit":
         warnings = _edit(result, fix, element, form)
     fix.status = STATUS_FOR_ACTION[action]
     fix.reviewed = True  # a reviewer's Accept is not the pipeline's automatic one
@@ -305,6 +335,7 @@ def apply_review(
         after=snapshot(fix),
         warnings=warnings,
         moved=_moved_by(places, heading_places(result), element_id) if places else [],
+        note=note,
     )
 
 
@@ -385,17 +416,38 @@ def _blocking(checks: list[Check]) -> list[Check]:
 
 
 def _edit_equation(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
+    typed = form.get("latex", "").strip()
+    if fix.equation is not None:
+        display = fix.equation.display
+    else:
+        display = (element.display if element else None) or "block"
+    latex, mathml, checks = checked_latex(
+        typed,
+        display,
+        field_id("latex", fix.element_id),
+        {"latex": typed},  # re-shown as typed when it is refused
+        empty="Enter the LaTeX for this equation.",
+    )
+    fix.equation = EquationFix(latex=latex, mathml=mathml, speech=_speech(mathml), display=display)
+    fix.checks = checks
+    return [c for c in fix.checks if not c.passed]
+
+
+def checked_latex(
+    typed: str, display: str, fid: str, values: dict[str, str], *, empty: str
+) -> tuple[str, str, list[Check]]:
+    """A reviewer's LaTeX through what model output goes through: cleaned, checked,
+    converted to MathML and that checked too. Returns (latex, mathml, every check run);
+    raises ReviewInvalid on `fid` (with `values` re-shown) at the first error-level
+    failure, or with `empty` when nothing is left after cleaning."""
     from a11y_stem.pipeline import equation_step, validate
 
-    fid = field_id("latex", fix.element_id)
-    typed = form.get("latex", "").strip()
-    values = {"latex": typed}  # re-shown as typed when it is refused
     # The cleaning model output gets: "$v = at$" loses its dollars, and a bare "%" (a
     # percent sign here, a comment to the converter) is escaped instead of silently
     # dropping the rest of the line.
     latex = equation_step.clean_latex(typed)
     if not latex:
-        raise ReviewInvalid([FieldError(fid, "Enter the LaTeX for this equation.")], values)
+        raise ReviewInvalid([FieldError(fid, empty)], values)
     if len(latex) > MAX_LATEX_CHARS:
         raise ReviewInvalid(
             [FieldError(fid, f"Keep the LaTeX under {MAX_LATEX_CHARS} characters.")], values
@@ -405,10 +457,6 @@ def _edit_equation(fix: Fix, element: Element | None, form: Mapping[str, str]) -
         raise ReviewInvalid(
             [FieldError(fid, "The LaTeX was not saved. " + describe_failed(failed))], values
         )
-    if fix.equation is not None:
-        display = fix.equation.display
-    else:
-        display = (element.display if element else None) or "block"
     try:
         mathml = validate.safe_latex_to_mathml(latex, display)
     except ValueError:  # LatexConversionError and latex2mathml's own errors
@@ -421,9 +469,7 @@ def _edit_equation(fix: Fix, element: Element | None, form: Mapping[str, str]) -
         raise ReviewInvalid(
             [FieldError(fid, "The LaTeX was not saved. " + describe_failed(failed))], values
         )
-    fix.equation = EquationFix(latex=latex, mathml=mathml, speech=_speech(mathml), display=display)
-    fix.checks = checks + mathml_checks
-    return [c for c in fix.checks if not c.passed]
+    return latex, mathml, checks + mathml_checks
 
 
 def _speech(mathml: str) -> str:
@@ -766,6 +812,257 @@ def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[Revi
     if changes:
         _recount(result)
     return changes
+
+
+# --------------------------------------------------------------------------- tables
+
+# The changes a table edit can make (the form's `change` field).
+TABLE_CHANGES = ("cell", "headers", "use_local")
+MAX_CELL_CHARS = 1000
+NO_TABLE_TO_ACCEPT = (
+    "There is no rebuilt table to accept. Use the grid read from the PDF, if there is one, "
+    "or keep the image."
+)
+
+# What each `core.types.grid_problems` code means, for the table card and for an edit
+# that is refused. Positions and fixed words only.
+GRID_PROBLEM_SENTENCES = {
+    "no_cells": "The table has no cells.",
+    "cell_out_of_bounds": "A cell reaches past the edge of the table.",
+    "cells_overlap": "Two cells cover the same place in the table.",
+    "grid_hole": "There is a gap in the table where no cell is.",
+    "headers_cover_table": "The headers would cover the whole table, leaving no row or "
+    "column for data.",
+    "header_span_into_body": "A cell in the header row reaches down into the rows below it.",
+    "header_below_body": "A column header sits below the header rows.",
+    "data_in_header_rows": "A cell in the header row is not marked as a header.",
+    "data_in_header_cols": "A cell in the header column is not marked as a header.",
+}
+
+
+def grid_problem_sentence(code: str) -> str:
+    return GRID_PROBLEM_SENTENCES.get(code, "The table's grid has a problem.")
+
+
+def usable_local_grid(element: Element | None) -> TableGrid | None:
+    """The grid layout read from the PDF's own words and lines (`Element.table`), when it
+    could be used as it is: a data table with cells and no structural problem."""
+    grid = element.table if element is not None else None
+    if grid is None or not grid.is_data or not grid.cells or grid_problems(grid):
+        return None
+    return grid
+
+
+def first_row_is_header(grid: TableGrid) -> bool:
+    return grid.header_rows > 0
+
+
+def first_col_is_header(grid: TableGrid) -> bool:
+    """The output makes the first column's body cells row headers: `header_cols` says so,
+    or every non-empty one of them already is one (a model may mark the cells and not
+    the count)."""
+    if grid.header_cols > 0:
+        return True
+    firsts = [c for c in _first_col_body(grid) if not c.is_empty]
+    return bool(firsts) and all(c.header == "row" for c in firsts)
+
+
+def _first_col_body(grid: TableGrid) -> list[TableCell]:
+    """Cells anchored in the first column below the header rows, other than section
+    headings (a row header across the whole width)."""
+    return [
+        c
+        for c in grid.cells
+        if c.col == 0 and c.row >= grid.header_rows and not (c.header and c.col_span >= grid.cols)
+    ]
+
+
+def with_header_row(grid: TableGrid, on: bool) -> TableGrid:
+    """The grid with its first row as the column headers, or with no header rows (every
+    column header becomes a data cell)."""
+    if on == first_row_is_header(grid):
+        return grid
+    cells = [c.model_copy() for c in grid.cells]
+    for cell in cells:
+        if on and cell.row == 0 and cell.header is None:
+            cell.header = "col"
+        elif not on and cell.header == "col":
+            cell.header = None
+    return grid.model_copy(update={"cells": cells, "header_rows": 1 if on else 0})
+
+
+def with_header_col(grid: TableGrid, on: bool) -> TableGrid:
+    """The grid with its first column as row headers (below the header rows), or with
+    none (those cells become data cells; section headings stay)."""
+    if on == first_col_is_header(grid):
+        return grid
+    first = {id(c) for c in _first_col_body(grid)}
+    cells = []
+    for cell in grid.cells:
+        copy = cell.model_copy()
+        if id(cell) in first:
+            if on and copy.header is None:
+                copy.header = "row"
+            elif not on and copy.header == "row":
+                copy.header = None
+        cells.append(copy)
+    return grid.model_copy(update={"cells": cells, "header_cols": 1 if on else 0})
+
+
+def cell_label(cell: TableCell) -> str:
+    """Where a cell is, 1-based ("Row 2, column 3"), with the rows or columns it spans."""
+    rows = f"row {cell.row + 1}"
+    if cell.row_span > 1:
+        rows = f"rows {cell.row + 1} to {cell.row + cell.row_span}"
+    cols = f"column {cell.col + 1}"
+    if cell.col_span > 1:
+        cols = f"columns {cell.col + 1} to {cell.col + cell.col_span}"
+    return f"{rows}, {cols}".capitalize()
+
+
+def find_cell(grid: TableGrid, row: int, col: int) -> TableCell | None:
+    """The cell anchored at (row, col), 0-based; the first one when a broken grid has two."""
+    return next((c for c in grid.cells if c.row == row and c.col == col), None)
+
+
+_INDEX = re.compile(r"[0-9]{1,4}")  # ASCII digits only, as for heading levels
+
+
+def edit_table(
+    fix: Fix, element: Element | None, form: Mapping[str, str]
+) -> tuple[list[Check], str]:
+    """Apply one table edit (`form["change"]`, one of TABLE_CHANGES) to `fix.table`.
+    Returns (failed checks to warn about, what changed in words). Raises ReviewInvalid,
+    with nothing changed, for an edit the page never offers or one that fails a check."""
+    eid = fix.element_id
+    change = form.get("change", "")
+    if change == "use_local":
+        grid = usable_local_grid(element)
+        if grid is None:
+            message = "There is no grid read from the PDF that could be used for this table."
+            raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
+        fix.table = TableFix(grid=grid.model_copy(deep=True))
+        fix.checks = []
+        return [], "The table now uses the grid read from the PDF."
+    if fix.table is None:
+        message = (
+            "There is no rebuilt table to change. Use the grid read from the PDF, if there "
+            "is one, or keep the image."
+        )
+        raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
+    if change == "headers":
+        return _edit_headers(fix, fix.table.grid, form)
+    if change == "cell":
+        return _edit_cell(fix, fix.table.grid, form)
+    raise ReviewInvalid([FieldError(field_id("actions", eid), "Choose what to change.")])
+
+
+def _refuse_new_problems(
+    before: TableGrid, after: TableGrid, fid: str, what: str, values: dict[str, str]
+) -> None:
+    """Raise ReviewInvalid when `after` has a structural problem `before` did not have
+    (one the proposal already had is left for the reviewer to judge)."""
+    new = [p for p in grid_problems(after) if p not in grid_problems(before)]
+    if new:
+        sentences = " ".join(grid_problem_sentence(p) for p in new)
+        message = f"{what} not saved. {sentences} ({'; '.join(new)})"
+        raise ReviewInvalid([FieldError(fid, message)], values)
+
+
+def _edit_headers(fix: Fix, grid: TableGrid, form: Mapping[str, str]) -> tuple[list[Check], str]:
+    fid = field_id("header-row", fix.element_id)
+    row = form.get("header_row") in {"on", "true", "1"}
+    col = form.get("header_col") in {"on", "true", "1"}
+    values = {"header_row": "on" if row else "", "header_col": "on" if col else ""}
+    if row == first_row_is_header(grid) and col == first_col_is_header(grid):
+        message = "The headers are already like that. Tick or untick a box, then Save headers."
+        raise ReviewInvalid([FieldError(fid, message)], values)
+    edited = with_header_col(with_header_row(grid, row), col)
+    _refuse_new_problems(grid, edited, fid, "The headers were", values)
+    fix.table = TableFix(grid=edited)
+    fix.checks = []
+    first_row = "The first row is a header" if row else "The first row is not a header"
+    first_col = "the first column is a header" if col else "the first column is not a header"
+    return [], f"{first_row}, and {first_col}."
+
+
+def _edit_cell(fix: Fix, grid: TableGrid, form: Mapping[str, str]) -> tuple[list[Check], str]:
+    from a11y_stem.pipeline import validate
+
+    eid = fix.element_id
+    fid = field_id("cell", eid)
+    raw_row, raw_col = form.get("row", ""), form.get("col", "")
+    typed = form.get("cell", "")
+    values = {"row": raw_row, "col": raw_col, "cell": typed}
+    cell = None
+    if _INDEX.fullmatch(raw_row) and _INDEX.fullmatch(raw_col):
+        cell = find_cell(grid, int(raw_row), int(raw_col))
+    if cell is None:
+        message = "That cell is not in the table any more. Choose it again from the list."
+        raise ReviewInvalid([FieldError(field_id("cell-pick", eid), message)])
+    edited = cell.model_copy()
+    checks: list[Check] = []
+    if cell.latex is not None:
+        # A maths cell: its LaTeX is checked as an equation's is, and shown in the line.
+        latex, mathml, checks = checked_latex(
+            typed.strip(), "inline", fid, values, empty="Enter the LaTeX for this cell."
+        )
+        if (latex, mathml) == (cell.latex, cell.mathml):
+            raise ReviewInvalid(
+                [FieldError(fid, "This is the LaTeX the cell has already.")], values
+            )
+        edited.latex, edited.mathml = latex, mathml
+    else:
+        # What is stored is what is shown: invisible format characters (bidi controls,
+        # zero-width spaces) removed and whitespace collapsed, as for alt text.
+        text = validate.clean_alt(typed)
+        if len(text) > MAX_CELL_CHARS:
+            message = f"Keep the text of one cell under {MAX_CELL_CHARS} characters."
+            raise ReviewInvalid([FieldError(fid, message)], values)
+        if text == cell.text:
+            raise ReviewInvalid([FieldError(fid, "This is the text the cell has already.")], values)
+        edited.text = text
+    # Text typed into an empty cell of the header rows or column is a header too.
+    if edited.header is None and not edited.is_empty:
+        if edited.row < grid.header_rows:
+            edited.header = "col"
+        elif edited.col < grid.header_cols:
+            edited.header = "row"
+    cells = [edited if c is cell else c for c in grid.cells]
+    after = grid.model_copy(update={"cells": cells})
+    _refuse_new_problems(grid, after, fid, "The cell was", values)
+    fix.table = TableFix(grid=after)
+    fix.checks = checks
+    return [c for c in checks if not c.passed], f"{cell_label(cell)} changed."
+
+
+# --------------------------------------------------------------------------- stale tabs
+
+STALE_MESSAGE = (
+    "Your change was not saved: this item was changed in another tab or window after "
+    "this page was opened, and what you see now is the latest version."
+)
+
+
+class StaleReview(ReviewInvalid):
+    """A review form made from an older version of the job's result (`guard_result_version`)."""
+
+
+def guard_result_version(current: int | None, sent: str | None, field: str) -> int:
+    """The job's `result_version` after one more review write.
+
+    Every review write stores this (the routes do, in the same transaction as the write,
+    with the job row locked), so the version moves on with every change. A form that
+    sent the version it was made from (its hidden `version` field, `sent`; the page
+    reads it from `JobView.result_version`) is refused with StaleReview when
+    the job has moved on since: another tab or window changed the review, and writing
+    now could undo that change or apply this one to a different table. A form without
+    the field (older pages, scripts) is not checked. `field` is the id of the control the
+    error goes on (the form's actions: `field_id("actions", element_id)` for one fix)."""
+    version = current or 0
+    if sent is not None and sent.strip() != str(version):
+        raise StaleReview([FieldError(field, STALE_MESSAGE)])
+    return version + 1
 
 
 # --------------------------------------------------------------------------- output

@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% block title %}{% if errors %}Error: {% endif %}All items as a list: {{ job.filename }}{% endblock %}
+{% from "_table_card.html" import table_list_proposal, table_list_actions with context %}
 
 {% macro notice_box(notice) %}
 <div class="notice" role="status">
@@ -48,7 +49,7 @@
 {% endif %}
 
 <div class="fix-body">
-  {% if item.kind in ("equation", "figure") %}
+  {% if item.kind in ("equation", "figure", "table") %}
   <figure class="crop">
     {% if item.crop_url %}
     <img src="{{ item.crop_url }}" loading="lazy"
@@ -91,10 +92,15 @@
     <p><strong>{% if item.heading_in_document %}In the document: level {{ item.heading_shown }}.{% else %}If accepted, it would be level {{ item.heading_shown }}.{% endif %}</strong>
       Level {{ item.heading_level }} would skip a level after the heading before it, which the document never does.</p>
     {% endif %}
+    {% elif item.kind == "table" %}
+    {{ table_list_proposal(item) }}
     {% endif %}
   </div>
 </div>
 
+{% if item.kind == "table" %}
+{{ table_list_actions(item) }}
+{% else %}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="review-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="list">
   {% if item.kind == "equation" %}
@@ -149,6 +155,7 @@
     <button type="submit" name="action" value="reject" class="button-secondary">Reject<span class="visually-hidden"> {{ name }}</span></button>
   </div>
 </form>
+{% endif %}
 {% endmacro %}
 
 {# One card for repeated headings: one decision for all of the ones still waiting. #}

@@ -5,7 +5,9 @@ a fix that needs a decision is one, and a group of repeated headings that share 
 `Fix.group_key` is one for all of its headings. The queue holds every decision the
 pipeline asked for (`Fix.review == "required"`, plus anything still waiting, for results
 stored before tiers existed), in the review order of `web.review` (equations, then
-figures, then headings, each in page and reading order), numbered from 1. Numbers do not
+figures, then tables, then headings, each in page and reading order), numbered from 1. A
+table kept as an image is a decision like any other (keep the image, or use the grid
+read from the PDF). Numbers do not
 change while the reviewer works, so "Decision 2 of 3" names the same thing before and
 after decision 1 is made; a decision is *open* while any of its fixes is still waiting.
 

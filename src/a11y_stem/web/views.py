@@ -139,6 +139,9 @@ class JobView:
     model_calls: int
     queue_ahead: int = 0
     summary: ResultSummary | None = None
+    # `jobs.result_version` as loaded with the result: review forms send it back, so a
+    # form made before another tab changed the review is refused (web.review).
+    result_version: int = 0
 
     @property
     def finished(self) -> bool:
@@ -170,6 +173,7 @@ class JobView:
 DECISION_NOUNS = {
     Kind.EQUATION: ("equation", "equations"),
     Kind.FIGURE: ("figure", "figures"),
+    Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
 }
 
@@ -267,4 +271,5 @@ def job_view(session: Session, job: Job, *, with_summary: bool = False) -> JobVi
         model_calls=job.model_calls,
         queue_ahead=ahead,
         summary=summarise(job.result_json) if with_summary else None,
+        result_version=job.result_version or 0,
     )

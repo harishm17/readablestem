@@ -11,8 +11,8 @@ The list view:
 
 Layout (see `web.review` for the rules), in three sections:
 
-1. "Needs your decision (N)": equations, then figures, then headings, each listing the
-   fixes still waiting (page and reading order). Repeated headings that share a
+1. "Needs your decision (N)": equations, then figures, then tables, then headings, each
+   listing the fixes still waiting (page and reading order). Repeated headings that share a
    `Fix.group_key` are one card with one decision for all of them ("Apply to all 11",
    "Make all 11 bold text", or one level for all); their own cards are folded inside it.
    N counts decisions, so such a group counts once. Groups offer bulk accept for
@@ -25,9 +25,11 @@ Layout (see `web.review` for the rules), in three sections:
    worth a look instead of calling it small.
 3. "Accepted or decided": everything else, folded away.
 
-A decision is one transaction: lock the job row, apply the decision to the stored result
-(`web.review`), store a `ReviewEdit` per changed fix, re-render the output HTML once with
-the pipeline's assembler, save. If any step fails nothing changes. Without JavaScript
+A decision is one transaction: lock the job row, refuse a form made from an older
+version of the result (`web.review.guard_result_version`: another tab changed it), apply
+the decision to the stored result (`web.review`), store a `ReviewEdit` per changed fix,
+re-render the output HTML once with the pipeline's assembler, move the job's
+`result_version` on, save. If any step fails nothing changes. Without JavaScript
 each button is a normal form POST that redirects to the next decision still waiting
 (`#item-<id>`, or `#group-card-<key>` for a heading group), where a notice links back to
 the one just changed.
@@ -77,6 +79,7 @@ from a11y_stem.web.review import (
     BULK_THRESHOLDS,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
+    TABLE_CHANGES,
     BulkRequest,
     FieldError,
     FixGroup,
@@ -84,14 +87,18 @@ from a11y_stem.web.review import (
     HeadingPlace,
     ReviewChange,
     ReviewInvalid,
+    StaleReview,
     apply_bulk_accept,
     apply_group,
     apply_review,
     at_or_above,
     bulk_eligible,
+    bulk_field_id,
     can_accept,
+    field_id,
     group_anchor,
     group_fixes,
+    guard_result_version,
     heading_level_written,
     heading_moved,
     heading_places,
@@ -105,6 +112,7 @@ from a11y_stem.web.review import (
     review_anchor,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
+from a11y_stem.web.table_card import TableCard, table_card
 from a11y_stem.web.views import (
     KIND_LABELS,
     JobView,
@@ -128,7 +136,13 @@ HEADING_GROUP_FLASH = "heading-group:"
 NOUNS = {
     Kind.EQUATION: ("equation", "equations"),
     Kind.FIGURE: ("figure", "figures"),
+    Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
+}
+# Keeping a table's image is not "rejecting" anything the reviewer saw as a proposal when
+# there was none, so it says what the document now has.
+TABLE_DONE_MESSAGES = {
+    "reject": "The image of the table is kept in the document, marked “not converted”.",
 }
 
 
@@ -188,6 +202,10 @@ class ReviewItem:
     # The form comes back with the reviewer's own change in a field (a refused Accept or
     # edit): "Save edit" is then the main button.
     edited: bool = False
+    # Tables: the proposal as the student would get it, and what can be changed.
+    table: TableCard | None = None
+    # The form was refused because another tab changed the item (offer a reload).
+    stale: bool = False
 
     @property
     def open(self) -> bool:
@@ -336,6 +354,7 @@ def _item(
         values=values,
         optional=optional,
         second_check=triage.second_check_note(fix),
+        table=table_card(fix, element) if fix.kind is Kind.TABLE else None,
     )
 
 
@@ -513,6 +532,7 @@ def _apply_invalid(
     item = items.get(target)
     if item is not None:
         item.values.update(exc.values)
+        item.stale = isinstance(exc, StaleReview)
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
 
@@ -634,9 +654,16 @@ def review_action(
     min_confidence: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
     scope: Annotated[str, Form()] = "",
+    change: Annotated[str | None, Form()] = None,
+    row: Annotated[str | None, Form()] = None,
+    col: Annotated[str | None, Form()] = None,
+    cell: Annotated[str | None, Form()] = None,
+    header_row: Annotated[str | None, Form()] = None,
+    header_col: Annotated[str | None, Form()] = None,
+    version: Annotated[str | None, Form()] = None,
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
-    "headings"), a bulk accept in that group; when it is a heading group's key
+    "tables", "headings"), a bulk accept in that group; when it is a heading group's key
     ("hg-p1-e7"), one decision for every heading of that group still waiting (with
     `scope=all`, for every heading of the group: a decided group decided again).
 
@@ -644,33 +671,57 @@ def review_action(
     Sharing the route keeps a single CSRF-checked, ownership-checked way to change a
     review. `view` says which view the form was on (module docstring). The fields are
     passed on only when the form sent them: Accept refuses a changed one
-    (`web.review.apply_review`), and a field that was not sent was not changed.
+    (`web.review.apply_review`), and a field that was not sent was not changed. A table
+    edit says what it changes (`change`: "cell" with `row`, `col` and `cell`, "headers"
+    with the `header_row` and `header_col` boxes, or "use_local"). `version` is the
+    job's `result_version` the form was made from: a form made before another tab
+    changed the review is refused (`web.review.guard_result_version`).
     """
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
     view = LIST_VIEW if view == LIST_VIEW else "split"
     if kind_for_slug(element_id) is not None:
-        return _bulk_action(request, job_id, element_id, user, action, min_confidence, view)
+        return _bulk_action(
+            request, job_id, element_id, user, action, min_confidence, view, version
+        )
     if is_group_key(element_id):
         every = scope == "all"
-        return _group_action(request, job_id, element_id, user, action, level or "", view, every)
-    sent = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
+        return _group_action(
+            request, job_id, element_id, user, action, level or "", view, every, version
+        )
+    sent = {
+        "latex": latex,
+        "alt": alt,
+        "decorative": decorative,
+        "level": level,
+        "change": change,
+        "row": row,
+        "col": col,
+        "cell": cell,
+        "header_row": header_row,
+        "header_col": header_col,
+    }
     form = {name: value for name, value in sent.items() if value is not None}
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            next_version = guard_result_version(
+                job.result_version, version, field_id("actions", element_id)
+            )
             result = DocumentResult.model_validate(job.result_json or {})
-            change = apply_review(result, element_id, action, form)
+            change_made = apply_review(result, element_id, action, form)
             job.html = rerender_html(result, _crops(session, job.id))
             job.result_json = result.model_dump(mode="json", exclude={"html"})
-            session.add(_review_edit(job.id, user, change))
+            job.result_version = next_version
+            session.add(_review_edit(job.id, user, change_made))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
-        log_event(logger, "review_invalid", job_id=job_id, action=logged_action)
+        event = "review_stale" if isinstance(exc, StaleReview) else "review_invalid"
+        log_event(logger, event, job_id=job_id, action=logged_action)
         return _invalid_page(request, job_id, user, view, element_id, exc)
     log_event(
         logger,
@@ -679,15 +730,28 @@ def review_action(
         element_id=element_id,
         action=action,
         status=STATUS_FOR_ACTION[action].value,
+        # A table edit's kind (a fixed code: anything else was refused).
+        change=change if change in TABLE_CHANGES and action == "edit" else None,
     )
+    table = change_made.fix.kind is Kind.TABLE
     message = DONE_MESSAGES[action]
-    if change.warnings:
-        n = len(change.warnings)
+    if table:
+        message = TABLE_DONE_MESSAGES.get(action, message)
+    if change_made.note:
+        message = f"{change_made.note} {message}"
+    if change_made.warnings:
+        n = len(change_made.warnings)
         message += f" {n} {'check gives a warning' if n == 1 else 'checks give warnings'}: "
         message += "see the notes on it."
-    message += _moved_message(change.moved, item_numbers(result))
+    message += _moved_message(change_made.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
+        if table and action == "edit":
+            # A table is often changed more than once (a header, then a cell): the
+            # reviewer stays on it, and sees the table as it is now.
+            from a11y_stem.web.routes.split import review_url
+
+            return RedirectResponse(review_url(job_id, item=element_id), status_code=303)
         return _split_redirect(job_id, result, element_id)
     return RedirectResponse(_landing(job_id, result, element_id), status_code=303)
 
@@ -714,16 +778,21 @@ def _group_action(
     level: str,
     view: str,
     every: bool = False,
+    version: str | None = None,
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            next_version = guard_result_version(
+                job.result_version, version, field_id("group-actions", group_key)
+            )
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
+                job.result_version = next_version
                 session.add_all(_review_edit(job.id, user, c) for c in outcome.changes)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
@@ -801,6 +870,7 @@ def _bulk_action(
     action: str,
     min_confidence: str,
     view: str,
+    version: str | None = None,
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
@@ -808,11 +878,13 @@ def _bulk_action(
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
             bulk = parse_bulk(slug, action, min_confidence)
+            next_version = guard_result_version(job.result_version, version, bulk_field_id(slug))
             result = DocumentResult.model_validate(job.result_json or {})
             changes = apply_bulk_accept(result, bulk)
             if changes:  # nothing left to accept: no write, no re-render (idempotent)
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
+                job.result_version = next_version
                 session.add_all(_review_edit(job.id, user, c) for c in changes)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="bulk")
