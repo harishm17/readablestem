@@ -760,7 +760,11 @@ def _document_language(
         # Layout only reports a language other than the default from the PDF's /Lang.
         return language.document_tag(layout_lang) or language.DEFAULT_LANG, "pdf", []
     texts = [e.text or "" for e in elements if e.kind in (*RUNNING_KINDS, Kind.HEADING)]
-    detected = language.document_language(texts)
+    try:
+        detected = language.document_language(texts)
+    except Exception as exc:  # the detector (its model file, NumPy) failing to load
+        log.warning("language detection failed: %s", type(exc).__name__)
+        detected = None
     if detected is not None:
         return detected, "detected", [Notice(code="lang_detected")]
     return language.DEFAULT_LANG, "default", [Notice(code="lang_assumed")]
@@ -768,12 +772,17 @@ def _document_language(
 
 def passages(elements: Sequence[Element], document_lang: str) -> dict[str, str | None]:
     """Element id -> the passage's language when it differs from the document's, for
-    every paragraph and list item (None where it does not)."""
-    return {
-        e.id: language.passage_language(e.text or "", document_lang)
-        for e in elements
-        if e.kind in RUNNING_KINDS and e.text
-    }
+    every paragraph and list item (None where it does not). A detector that cannot run
+    marks no passage; links, cross-references and colours do not depend on it."""
+    try:
+        return {
+            e.id: language.passage_language(e.text or "", document_lang)
+            for e in elements
+            if e.kind in RUNNING_KINDS and e.text
+        }
+    except Exception as exc:
+        log.warning("passage language detection failed: %s", type(exc).__name__)
+        return {}
 
 
 # ============================================================================ the pass

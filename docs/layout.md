@@ -588,7 +588,11 @@ The detector is py3langid 0.4 (BSD-3-Clause), chosen 2026-10-09 over two others:
 The test sentences were English with maths ("Let f be continuous on [a, b]", "Office
 hours: Tuesday and Thursday, 2 to 4 pm"), French, German, Spanish, Italian, Portuguese,
 Dutch and a Latin tag. py3langid loads in about 0.3 s (once per process) and takes well
-under a millisecond per paragraph.
+under a millisecond per paragraph. It unpacks its model through a temporary file; when
+that cannot be written (a full temporary directory) the model is unpacked in memory
+instead. If the detector still cannot run, the document gets the default language with
+`lang_assumed` and no passage is marked, and the rest of the pass (links,
+cross-references, colour runs) is kept: only the language depends on it.
 
 ### Colour (FEATURE_COLOUR)
 

@@ -20,7 +20,7 @@ from a11y_stem.core.types import (
     Notice,
     inline_marker,
 )
-from a11y_stem.pipeline import text_pass
+from a11y_stem.pipeline import language, text_pass
 from a11y_stem.pipeline.assemble import render_html
 from a11y_stem.pipeline.layout import Glyph
 from a11y_stem.pipeline.text_pass import (
@@ -628,6 +628,38 @@ def test_a_failing_pass_leaves_the_elements_as_they_were(monkeypatch):
     result = text_pass.apply(b"not a pdf", elements, pages=[0])
     assert (result.lang, result.lang_source) == ("en", "default")
     assert result.notices == [Notice(code="lang_assumed")]
+
+
+def test_a_language_detector_that_cannot_load_leaves_links_and_references(monkeypatch, caplog):
+    # py3langid failing to load (a full temporary directory: OSError 122) used to throw
+    # away every link, cross-reference and colour run with it.
+    def broken():
+        raise OSError(122, "Disk quota exceeded")
+
+    monkeypatch.setattr(language, "_classifier", broken)
+    text = f"Read the syllabus and Figure 2.3. {ENGLISH}"
+    link = PdfLink(0, rect_of(text, "syllabus"), "uri", uri="https://example.org/s")
+    with caplog.at_level(logging.WARNING):
+        result = annotate([el("p1-e0", text=text), FIGURES[0]], pdf_with(line(text), link))
+    assert links_of(result, "p1-e0") == [
+        ("uri", "syllabus", "https://example.org/s"),
+        ("crossref", "Figure 2.3", "f1"),
+    ]
+    assert (result.lang, result.lang_source, result.notices) == (
+        "en",
+        "default",
+        [Notice(code="lang_assumed")],
+    )
+    assert "language detection failed: OSError" in caplog.text
+
+
+def test_the_detector_loads_without_a_temporary_file(monkeypatch):
+    def no_temp(*args, **kwargs):
+        raise OSError(122, "Disk quota exceeded")
+
+    monkeypatch.setattr(language, "_identifier", None)
+    monkeypatch.setattr("tempfile.TemporaryFile", no_temp)
+    assert language.detect(ENGLISH)[0] == "en"
 
 
 def test_counts_are_numbers_only():

@@ -63,14 +63,48 @@ _identifier: Any = None
 
 
 def _classifier() -> Any:
-    """py3langid's identifier with probabilities, loaded once (it takes ~0.3 s)."""
+    """py3langid's identifier with probabilities, loaded once (it takes ~0.3 s).
+
+    py3langid unpacks its model through a temporary file; when that cannot be written (a
+    full or read-only temporary directory) the model is unpacked in memory instead (68
+    MB, once). A failure is not kept: the next call tries again."""
     global _identifier
     with _lock:
         if _identifier is None:
             from py3langid.langid import MODEL_FILE, LanguageIdentifier
 
-            _identifier = LanguageIdentifier.from_model_file(MODEL_FILE, norm_probs=True)
+            try:
+                _identifier = LanguageIdentifier.from_model_file(MODEL_FILE, norm_probs=True)
+            except OSError:
+                _identifier = _in_memory(MODEL_FILE)
         return _identifier
+
+
+def _in_memory(model_file: str) -> Any:
+    """py3langid's identifier from its model file, unpacked without a temporary file
+    (as `py3langid.modelio.load_model` does, through memory)."""
+    import io
+    import lzma
+    from pathlib import Path
+
+    import numpy as np
+    from py3langid.langid import MODEL_DIR, LanguageIdentifier
+    from py3langid.modelio import _to_array
+
+    path = Path(model_file)
+    path = path if path.is_absolute() else MODEL_DIR / path
+    with lzma.open(path) as source:
+        buffer = io.BytesIO(source.read())
+    with np.load(buffer, allow_pickle=False) as data:
+        return LanguageIdentifier(
+            np.asarray(data["ptc"]),
+            np.asarray(data["pc"]),
+            data["classes"].tolist(),
+            _to_array(data["nextmove"]),
+            data["out_feat"].tolist(),
+            norm_probs=True,
+            tk_row=_to_array(data["nextmove_row"]),
+        )
 
 
 def prose(text: str) -> tuple[str, int, int]:
