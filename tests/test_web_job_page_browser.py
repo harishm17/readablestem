@@ -267,5 +267,6 @@ def test_the_finish_line_downloads_in_one_click(site, browser, jobs):
     assert link.get_attribute("href") == f"/jobs/{jobs['ready']}/download"
     with page.expect_download() as download:
         link.click()
-    assert download.value.suggested_filename.endswith("-accessible.html")
+    # The title's slug and the start of the job id (ux-a, MF24).
+    assert download.value.suggested_filename.endswith(f"-{jobs['ready'][:6]}.html")
     context.close()

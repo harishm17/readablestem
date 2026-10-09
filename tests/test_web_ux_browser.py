@@ -279,9 +279,13 @@ def test_the_questions_appear_after_a_download_and_save(site, browser):
     page.goto(f"{site.base}/jobs/{job_id}")
     questions = page.locator("#feedback")
     assert questions.is_hidden()
+    # Decisions are open, so the job page's download asks first (/draft, job-page work);
+    # once a download is recorded the questions show on the job page.
+    page.get_by_role("link", name=re.compile(r"^Download a draft")).click()
     with page.expect_download() as download:
-        page.get_by_role("link", name="Download the HTML file").click()
+        page.get_by_role("link", name="Download the draft anyway").click()
     assert download.value.suggested_filename == f"secret-heading-kinematics-{job_id[:6]}.html"
+    page.goto(f"{site.base}/jobs/{job_id}")
     assert questions.is_visible()
     page.get_by_label("Not sure").check()
     page.get_by_label("About how many minutes did this save you?").fill("lots")

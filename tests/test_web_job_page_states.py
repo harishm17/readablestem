@@ -117,6 +117,14 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
     assert "Before you share" in ready and "Put it in your course" in ready
     assert "Do not paste it into a page editor" in ready
+    # One link to the posting help (ux-a's Canvas steps), in "Put it in your course";
+    # the two questions after a download follow it, hidden until a download.
+    main = html[html.index("<main") : html.index("</main>")]  # the footer links it too
+    assert main.count('href="/help/posting"') == 1
+    assert 'href="/help/posting">How to post it in your course</a>' in section(
+        html, "ready-heading"
+    )
+    assert html.index('id="course-heading"') < html.index('id="feedback"')
     assert "draft" not in html.lower()
 
 
