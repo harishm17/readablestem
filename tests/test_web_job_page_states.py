@@ -117,6 +117,9 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
     assert "Before you share" in ready and "Put it in your course" in ready
     assert "Do not paste it into a page editor" in ready
+    # As the posting help says: the HTML is the main version, linked where the PDF was.
+    assert "link to it where the PDF was linked, so it is the main version" in ready
+    assert "next to the PDF" not in ready
     # One link to the posting help (ux-a's Canvas steps), in "Put it in your course";
     # the two questions after a download follow it, hidden until a download.
     main = html[html.index("<main") : html.index("</main>")]  # the footer links it too

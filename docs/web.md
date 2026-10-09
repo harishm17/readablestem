@@ -580,7 +580,9 @@ From top to bottom:
    download as the main button, the student version, "Before you share" (read it
    through; the notes, optional; what is not handled) and "Put it in your course"
    ("How to post it in your course" links the Canvas steps on `/help/posting`; upload it
-   as a file next to the PDF, do not paste it into a page editor; the tested steps per
+   as a file and link it where the PDF was, as the main version, the PDF kept only as a
+   labelled print copy, as the help page says; do not paste it into a page editor; the
+   tested steps per
    LMS are `TODO(Harish)`), then the two questions after a download ("After a
    download"). Deleting is a quiet button at the end of the page.
 4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
