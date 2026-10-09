@@ -476,6 +476,26 @@ def test_unnamed_glyphs_widen_but_never_hide_a_dropped_sign():
     assert differs(f"{IT['a']}= {MINUS}9.8 \uf02d", r"a = 9.8") == (signs.MINUS,)
 
 
+def test_brace_and_bracket_pieces_are_no_sign():
+    # Review 2026-10-08: pdfTeX writes CMEX brace, bracket, parenthesis, integral and
+    # radical pieces at Adobe's private-use code points (U+F8E5-U+F8FE). As "any sign"
+    # the five pieces of a cases brace hid up to five added signs.
+    pieces = "\uf8f1\uf8f2\uf8f3\uf8f4\uf8eb\uf8ec\uf8ed\uf8ee\uf8ef\uf8f0\uf8f5\uf8e5\uf6be"
+    tokens = layer_signs(f"{pieces} {IT['x']} = 1")
+    assert tokens.any_sign == 0 and tokens.any_arrow == 0
+    assert differs(f"\uf8f1 \uf8f2 {IT['x']} = 1 \uf8f3", r"x = -1") == (signs.MINUS,)
+    assert differs(f"\uf8f1 \uf8f2 {IT['x']} = 1 \uf8f3", r"x \le 1") == (
+        signs.EQUALS,
+        signs.LESS_EQUAL,
+    )
+    # The arrow extenders among them (U+F8E6, U+F8E7) are part of an arrow: arrows only.
+    tokens = layer_signs(f"{IT['x']} \uf8e7→ {IT['y']}")
+    assert tokens.any_sign == 0 and tokens.any_arrow == 1
+    assert differs(f"{IT['x']} \uf8e7→ {IT['y']}", r"x \longrightarrow y") == ()
+    # Other private-use code points (Symbol's minus U+F02D without a map) stay any sign.
+    assert layer_signs("a \uf02d b").any_sign == 1
+
+
 def test_signs_inside_mn_and_hand_written_mathml_count():
     # latex2mathml writes "-9.8" as <mo>−</mo><mn>9.8</mn>; other MathML (a gold file,
     # a hand edit) may put the sign inside <mn> or use an ASCII hyphen in <mo>.
@@ -654,6 +674,12 @@ def equation(layout: Layout, text: str) -> Element:
     return found[0]
 
 
+# calculus_notes: sgn(x) as a cases brace, which pdfTeX writes as five CMEX pieces.
+SGN = "\uf8f1 \uf8f21 x > 0 \uf8f4 sgn(x) = 0 x = 0 \uf8f4 \uf8f3 −1 x < 0"
+SGN_RIGHT = (
+    r"\operatorname{sgn}(x) = \begin{cases} 1 & x > 0 \\ 0 & x = 0 \\ -1 & x < 0 \end{cases}"
+)
+
 # (fixture, text layer as layout reads it, the right LaTeX, a sign error)
 LATEX_CASES = [
     (
@@ -683,11 +709,10 @@ LATEX_CASES = [
     ("calculus_notes", "e −1", r"e - 1", r"e + 1"),
     ("calculus_notes", "|r| < 1", r"\lvert r \rvert < 1", r"\lvert r \rvert \le 1"),
     (
-        # The cases brace comes out as private-use glyphs (CMEX pieces): they widen the
-        # ranges, but the dropped minus of "-1" is still certain.
+        # pdfTeX writes the cases brace's CMEX pieces at private-use code points: no sign.
         "calculus_notes",
-        "\uf8f1 \uf8f21 x > 0 \uf8f4 sgn(x) = 0 x = 0 \uf8f4 \uf8f3 −1 x < 0",
-        r"\operatorname{sgn}(x) = \begin{cases} 1 & x > 0 \\ 0 & x = 0 \\ -1 & x < 0 \end{cases}",
+        SGN,
+        SGN_RIGHT,
         r"\operatorname{sgn}(x) = \begin{cases} 1 & x > 0 \\ 0 & x = 0 \\ 1 & x < 0 \end{cases}",
     ),
     (
@@ -804,6 +829,20 @@ def test_latex_pdf_sign_error_through_the_step():
     fix = run(by_model(main=out(r"\lambda^2 - 5\lambda + 2 = 0,")), element)
     assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
     right = run(by_model(main=out(r"\lambda^2 - 5\lambda - 2 = 0,")), element)
+    assert right.status is Status.ACCEPTED and right.review == "none"
+
+
+def test_latex_pdf_brace_pieces_do_not_hide_an_added_sign():
+    # Review 2026-10-08: sgn is -1 for positive x in this answer. The five brace pieces
+    # counted as "any sign" and it was accepted with nothing to review.
+    element = equation(layout_of(LATEX / "calculus_notes.pdf"), SGN)
+    added = SGN_RIGHT.replace(r"\begin{cases} 1", r"\begin{cases} -1")
+    assert differs(element.text, added) == (signs.MINUS,)
+    fix = run(by_model(main=out(added)), element)
+    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
+    relation = SGN_RIGHT.replace(r"0 & x = 0", r"0 & x \ge 0")
+    assert differs(element.text, relation) == (signs.EQUALS, signs.GREATER_EQUAL)
+    right = run(by_model(main=out(SGN_RIGHT)), element)
     assert right.status is Status.ACCEPTED and right.review == "none"
 
 

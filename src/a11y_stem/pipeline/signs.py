@@ -55,15 +55,18 @@ create a flag on its own:
   is a minus. Except a single hyphen with a digit after it and a digit or a single
   lowercase letter before it: typed maths flattens 10<sup>-19</sup> to "10-19" and
   m s<sup>-2</sup> to "m s-2", so that is a minus. The figure dash, em dash and
-  horizontal bar (Chromium prints \\overline as
-  U+2015) are uncertain. A run of minus or = glyphs glued to an arrow head is one
-  uncertain minus (or equals): a shaft, or a real sign touching the head. One exception:
-  a single U+2212 touching a → that its letter follows at once, after an operator, an
-  opening bracket or nothing ("= −→𝑥"), is Chromium's minus before a vector arrow, so it
-  is certain. A glyph the PDF cannot name (private use, U+FFFD; old Symbol and MT Extra
-  fonts put operators there) may be any sign: it widens every class. A relation directly
-  beside a private-use glyph may have a negation slash laid over it (KaTeX prints \\neq
-  as "=" under its \\not glyph, U+E020, which is only ever that slash), so it counts as
+  horizontal bar (Chromium prints \\overline as U+2015) are uncertain. A run of minus or
+  = glyphs glued to an arrow head is one uncertain minus (or equals): a shaft, or a real
+  sign touching the head. One exception: a single U+2212 touching a → that its letter
+  follows at once, after an operator, an opening bracket or nothing ("= −→𝑥"), is
+  Chromium's minus before a vector arrow, so it is certain. A glyph the PDF cannot name
+  (private use, U+FFFD; old Symbol and MT Extra fonts put operators there) may be any
+  sign: it widens every class. Except the pieces of extensible braces, brackets,
+  parentheses, integrals and radicals that pdfTeX writes at Adobe's private-use code
+  points (U+F8E5-U+F8FE; a cases brace is five of them): they are no sign, and the two
+  arrow extenders among them widen the arrow classes only. A relation directly beside a
+  private-use glyph may have a negation slash laid over it (KaTeX prints \\neq as "="
+  under its \\not glyph, U+E020, which is only ever that slash), so it counts as
   uncertain, and so does its negation;
 - MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain (a leading
   minus inside `<mn>` included; latex2mathml writes ± and ∼ as `<mi>`). An accent (the
@@ -243,8 +246,22 @@ def _unknown_arrow(ch: str) -> bool:
     return "ARROW" in name or "HARPOON" in name
 
 
+# Adobe's private-use code points for the pieces of Symbol-font extensible glyphs (glyph
+# list names radicalex to bracerightbt): pdfTeX writes CMEX brace, bracket, parenthesis,
+# integral and radical pieces there, and the dotless j of \hat{\jmath} at U+F6BE. None is
+# a sign. U+F8E6 and U+F8E7 (arrowvertex, arrowhorizex) are arrow extenders: part of an
+# arrow, so they widen the arrow classes only.
+_ARROW_EXTENDERS = frozenset("\uf8e6\uf8e7")
+_NO_SIGN = (frozenset(map(chr, range(0xF8E5, 0xF8FF))) - _ARROW_EXTENDERS) | {"\uf6be"}
+
+
 def _unnamed(ch: str) -> bool:
-    """A glyph the PDF could not name: private use or the replacement character."""
+    """A glyph the PDF could not name (private use or the replacement character) that may
+    be any sign: not one of the pieces and letters of `_NO_SIGN` or `_ARROW_EXTENDERS`.
+    U+FFFD stays any sign: Tectonic writes brace pieces there, but newtx writes \\cong and
+    vector accents there too."""
+    if ch in _NO_SIGN or ch in _ARROW_EXTENDERS:
+        return False
     return ch == "\N{REPLACEMENT CHARACTER}" or unicodedata.category(ch) == "Co"
 
 
@@ -428,7 +445,7 @@ def layer_signs(text_layer: str) -> SignTokens:
             continue  # only ever a slash over a relation, counted with that relation
         elif _unnamed(ch):
             out.any_sign += 1
-        elif _unknown_arrow(ch):
+        elif _unknown_arrow(ch) or ch in _ARROW_EXTENDERS:
             out.any_arrow += 1
     return out
 
