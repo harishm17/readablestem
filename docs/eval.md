@@ -24,6 +24,7 @@ real heading outline. That makes a page an answer key. The harness:
 | `headings` | each page printed to PDF | `layout.analyze` + `heading_step.heading_fixes` | gold h1-h6 |
 | `figures` | each figure's image file | `figure_step.describe` | OpenStax alt text, via an LLM judge |
 | `document` | each page printed to PDF | `run.convert_pdf` (everything) | gold equations; HTML checks |
+| `tables` | each table gold page printed in three table styles, plus authored documents | `layout.analyze` (tables) and `table_step.rebuild` | gold tables (see "Tables" below) |
 
 ## Datasets
 
@@ -363,7 +364,8 @@ table (they are usually why the gate is being run). With `--require-current` (CI
 it) the gate also refuses (`stale_report`) a current report produced with other prompts
 or models than the code under test, so a prompt change cannot pass on an old committed
 `latest-<task>.json`. Tolerances live in `data/eval/tolerances.json`; an entry with only
-`name` and `limit` adjusts a default.
+`name` and `limit` adjusts a default. The tables task also has absolute floors, checked
+with or without a baseline (see "Tables": "Gate").
 
 ## Report format
 
@@ -381,7 +383,9 @@ or models than the code under test, so a prompt change cannot pass on an old com
 
 `--items PATH` also writes one JSON line per item (per page for headings and document),
 including predicted LaTeX, MathML or alt text. These come from public OpenStax pages; the
-harness never reads anything from `private-inputs/`.
+harness never reads anything from `private-inputs/`, except the tables task's
+real-document check, which reads `private-inputs/tables/` and reports counts only (see
+"Tables").
 
 ## How to rerun
 
@@ -682,6 +686,191 @@ LaTeX text, is not usable as a signal on bold vectors; that is what shadow mode 
 Before any equation gate: label real crops, compare the predicate form the research
 measured (variant b), and keep the text-layer style rule as the bold check.
 
+## Tables (`--task tables`, 2026-10-09)
+
+Status: the task, its gold and its gate are built (branch `feat/tables-eval`); table
+detection (`pipeline/tables.py`) and the table step are built in parallel, so until they
+merge a run finds no tables (recall 0). The scorer was checked against the research
+benchmark first (below). Code: `eval/tables.py`; design: `PDF-RECOMMENDATION.md` 4.6 and
+its challenge (Harish's research notes, not in the repo).
+
+### Gold
+
+| Set | Where | Licence | Documents | Data tables | Layout tables |
+|---|---|---|---|---|---|
+| OpenStax | `data/gold/tables/` (13 pages of *Physics* and *Statistics*, table records only) | CC BY 4.0 | 13 pages x 3 print styles = 39 | 54 x 3 = 162 | 10 x 3 = 30 (the "Key Terms" grids) |
+| Authored | `data/authored/tables/` (`README.md` there) | MIT | 6 | 35 (32 source tables; 3 run over two pages) | 3 |
+
+- **OpenStax pages.** `a11y-stem gold fetch --set tables --date 2026-10-08` fetches them
+  (the license and state gates of `gold fetch` apply; `ATTRIBUTION.md` is generated). They
+  are table-bench's corrected gold (64 tables, 54 data tables): the committed records are
+  line for line the ones table-bench scored. `data/gold/tables` is a gold set of its own
+  (its own `manifest.json`); the other tasks do not read it (`gold_scoring.
+  iter_gold_records` leaves nested sets out), so their selections are unchanged.
+- **Print styles.** `eval.render` takes `table_style`: `grid` (every cell ruled),
+  `booktabs` (rules above, below and under the header row only) and `norules`. The three
+  prints are table-bench's (same CSS): on this machine they print the same text on the
+  same pages, except the attribution line, which now names the authors.
+- **Gold pages.** Gold has no table boxes, and a table's page depends on the print, so
+  each gold table gets its page from the print (`assign_pages`): the first page from the
+  previous table's on whose text holds at least 95% of the most any page holds of its
+  words; then, by reading order (longest common subsequence of the table's words in row
+  order with a window of the page's words, pages chosen in order), a first-pass page that
+  scores under 0.6 moves when another scores at least 0.15 more. That second pass is the
+  fix for *Statistics* 4.2, whose small tables (tab-005, tab-006) first landed on page 4,
+  which only mentions their words; they are on page 6. `reference_pages.json` records the
+  pages on the reference prints; a report gives `pages_differ_from_reference` (0 on this
+  machine for all 192 prints).
+- **Authored documents** cover what the OpenStax prints lack: LaTeX (Tectonic) and Word
+  (exported by LibreOffice) toolchains, explicit row headers, two-level headers, maths in
+  header cells, tables split across pages (one gold table per page, sharing a `cluster`),
+  an unruled LaTeX table, PowerPoint's default table style, a form laid out as a table,
+  and table-like traps (a matrix, `align*`, `cases`, multiple choice in two columns).
+
+### Modes
+
+| Mode | What runs | Scored grid | Review load | Spend |
+|---|---|---|---|---|
+| `local` | `layout.analyze` (detection and the grid from the PDF's own words and lines) | `Element.table` | `table_step.rebuild` with tables off: each table kept as an image, a required decision | none (no `--max-usd`) |
+| `model` | the same, then `table_step.rebuild` on each table's crop with tables on (pool of `--concurrency` threads) | `Fix.table.grid`; a table kept as an image scores 0 | the step's own tiers | `--max-usd` caps it (`--fake` for plumbing) |
+
+Detection is matched on the detector's own grid in both modes, so a table the step kept as
+an image still counts as found. A step that raises becomes a FAILED fix
+(`internal_error`), as in `run`; a spend stop ends the run partial, as in the other tasks.
+
+### Metrics
+
+| Metric | Definition |
+|---|---|
+| `detection_recall`, `detection_precision` | A predicted data table matches a gold table on the same page by content (gold has no boxes): word-token F1 >= 0.5, or F1 of the letters and digits >= 0.7 for maths-heavy tables (ranked on one scale as F1 - 0.2), pairs taken greedily, best first, one to one. A prediction matched to a layout table counts neither way. Predictions the pipeline itself called layout tables (`is_data` False) are not data tables and take no part |
+| `teds`, `teds_found` | TEDS (Zhong et al. 2020): 1 - TED / max(nodes) over table -> row -> cell trees. Unit cost to delete or insert a node; relabelling a cell costs 1 for another tag or span, else the normalised Levenshtein distance of its text (`eval/ted.py` relabel hook). Text is NFKC, one delta, one minus, no spaces. `teds` counts a missed table as 0; `teds_found` is over found tables only. Headers are ignored, as in table-bench, so its numbers reproduce |
+| `teds_structure` (`_found`) | the same with cell text ignored |
+| `teds_with_headers` (`_found`) | the same, with a header cell (and its direction) a different tag from a data cell |
+| `headers.column`, `headers.row` | precision, recall and F1 of header cells as (row, column, scope, text), micro-averaged over found tables; `exact`: share of gold tables with such headers whose header texts (a multiset) equal gold's; a missed table is not exact |
+| `column_header_exact` | `headers.column.exact`: the headline header number (OpenStax marks only column headers, so row headers proposed for an identifying first column are a convention gap, counted apart as `row_headers_where_gold_has_none`) |
+| `header_exact` | table-bench's: all header texts equal gold's |
+| `data_vs_layout` | `accuracy_on_negatives`: layout tables no data-table prediction matched; `data_called_layout`: missed data tables a layout-table prediction covers |
+| `maths` | per gold maths cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |
+| `text_fidelity` | cells whose text is gold's (exact after normalisation, else the same letters and digits); `wrong_cells` per table = max(predicted cells left over, gold cells left over), so a misread number is one, two cells merged into one are two; `wrong_cells_not_flagged`: wrong cells in found tables whose fix is not a required decision. Must be 0 |
+| `by_style`, `by_feature` | recall, precision, TEDS and column headers per print style and authored, and for tables with spans, maths or row headers |
+| `review_load` | the table fixes' tiers (`core.triage`): `required_decisions`, per table and per PDF page, `optional`, `needs_review_share`, `kept_as_image`, `required_by_reason`; `flags` (precision and recall over found tables, wrong = a wrong cell, another structure, column headers not exact, or kept as an image) and `wrong_not_required` |
+| `cost` | `per_table_usd`, `per_pdf_page_usd`, `seconds_per_table_p50`/`p95` (model time), model calls; `latency_ms` is per document, wall clock (layout, crops, the step; printing excluded) |
+
+Statistics: rates get a Wilson interval (`detection_precision_ci95`,
+`accuracy_on_negatives_ci95`); numbers over gold tables get a cluster bootstrap over source
+tables, so the three prints of one OpenStax table (and the two parts of a split table) are
+one draw: `detection_recall_ci95`, `teds_ci95`, `teds_structure_ci95`,
+`column_header_exact_ci95`, `header_exact_ci95` (2,000 resamples, seed 0).
+
+The report has the format of the other tasks plus `mode`, `dataset.styles` and
+`dataset.authored_sha256` (one hash over the authored index, gold and PDFs). `--items`
+writes one row per document with every table's numbers (gold ids, no cell text).
+
+### The scorer reproduces table-bench
+
+table-bench (2026-10-08) measured two local pipelines on 170 tables (162 OpenStax prints and
+8 authored LaTeX and Word tables): A, PyMuPDF union+refine with its own grid, TEDS 0.820;
+B, the same boxes with SLANet-plus's grid, TEDS 0.868. `eval.tables` gives the same number
+for every one of the 170 tables (detection, TEDS, TEDS-structure, header exact): recall
+0.912, precision 0.957 and 0.951, TEDS 0.8203 and 0.8680, header exact 0.759 and 0.806.
+`tests/test_eval_tables_bench.py` checks it on a committed excerpt (five documents, both
+rows, with the numbers table-bench's own scorer gives on them), and on all 170 tables when
+`TABLE_BENCH_EVIDENCE` points at the unpacked research archive. Fed table-bench's row A
+detections in place of `layout.analyze`, the task itself (its own prints, page assignment
+and matching) gives table-bench's numbers on the 162 OpenStax tables: recall 0.914,
+precision 0.955, TEDS 0.823 (cluster bootstrap 0.767-0.877).
+
+### Real documents (the gate's second part)
+
+The OpenStax prints cannot show what the research's challenge found on four real lab
+manuals (393 pages): vector figures, tables of contents and equations taken for tables
+(precision 0.68) and blank worksheet tables cut to their header row (full-extent recall
+0.72). So the task also checks detection on a private set of real course PDFs when there
+is one: `private-inputs/tables/` (git-ignored; or `--real-dir`) with the PDFs and
+`labels.json`:
+
+```
+{"schema_version": 1,
+ "documents": [{"file": "manual.pdf",
+                "pages": [0, 1, 2],
+                "tables": [{"page": 2, "bbox": [x0, y0, x1, y1]}]}]}
+```
+
+Pages are 0-based; boxes are PDF points in PyMuPDF's page frame (`Element.bbox`'s);
+`pages` (optional) limits the check to the pages that were labelled. A predicted data
+table is a real table when it shares at least half of the smaller box with a labelled one;
+a labelled table is found at full extent when one prediction covers at least 90% of it and
+at least 75% of that prediction lies inside it (not cut short, not merged with a plot).
+`metrics.real_documents` holds counts only: documents, pages, labelled, predicted and true
+tables, `precision`, `full_extent_recall` (Wilson intervals), `any_extent_recall`, error
+codes and the labels file's SHA-256. No file name, page or text leaves the private folder.
+The research's four public manuals are copyrighted: use them for local work only, never
+commit them or their labels.
+
+TODO(Harish): add 3-5 of your own course PDFs (or colleagues' with permission) to
+`private-inputs/tables/` and label their tables; the real-document gate has no data
+until then.
+
+### Gate
+
+`a11y-stem eval gate --current data/eval/latest-tables-local.json` checks the floors with
+no baseline (with `--baseline` it also checks regressions: TEDS, recall and column-header
+exact may drop 0.02-0.03, precision 0.03, cost per table rise 25%; a baseline of the
+other mode or other authored documents is refused).
+
+| Floor | Mode | Bar |
+|---|---|---|
+| `table_detection_recall` | both | >= 0.86 |
+| `table_detection_precision` | both | >= 0.93 |
+| `table_teds_local` | local | >= 0.84 |
+| `table_teds_model` | model | >= 0.88 |
+| `table_column_header_exact` | both | >= 0.75 |
+| `table_wrong_cells_not_flagged` | both | 0 |
+| `real_table_precision` | real documents | >= 0.95 |
+| `real_table_full_extent_recall` | real documents | >= 0.85 |
+
+The real-document floors apply only when the report measured real documents; otherwise
+they show as skipped and do not fail the gate. Exit 0: every floor (and tolerance) met;
+1: a metric below its floor, regressed or missing; 2: not comparable. The starting floors
+sit a little under table-bench's measurements; `data/eval/tolerances.json` can move them
+(`{"floors": [{"name": "table_teds_local", "minimum": 0.85}]}`).
+
+TODO(Harish): after the first full in-repo run (both modes), replace the floors with the
+lower ends of its 95% intervals, and decide whether CI gates on the committed
+`latest-tables-local.json`.
+
+### How to run
+
+```
+uv run a11y-stem gold fetch --set tables --date 2026-10-08     # only to refresh the gold
+uv run a11y-stem eval pipeline --task tables --mode local --items .local/eval/tables-local.jsonl
+uv run a11y-stem eval pipeline --task tables --mode model --max-usd 1.00
+uv run a11y-stem eval gate --current data/eval/latest-tables-local.json
+```
+
+`--styles grid,norules` prints fewer styles, `--no-authored` leaves the authored documents
+out, `--limit N` takes the first N documents (a page's three prints are next to each
+other). Printing needs Chromium and the OpenStax page XHTML in `.cache/openstax` (`gold
+fetch` fills it); figure images download once into `.cache/eval/images`. A local run
+prints 39 pages and reads 6 PDFs, then calls no model. A model run costs about $0.0007
+per table on gpt-6-luna (table-bench), more for the tables that escalate: about $0.15
+for the 197 data tables if few escalate, under $3 if all went to gpt-6.1-sol.
+`data/authored/tables/make_authored.py` rebuilds the two HTML documents and their gold.
+
+### What the table numbers do not show
+
+- **Prints, not course files.** 162 of the 197 data tables are OpenStax web pages printed
+  by one browser in three styles: clean text, one font, figures as images, no tables of
+  contents. The challenge's real manuals scored far lower on detection. Read the real-
+  document part as soon as a private set exists.
+- **Header conventions.** OpenStax marks only column headers. Row headers on an
+  identifying first column are valid markup but are not in its gold; that is why the
+  headline header number is column headers only. Row-header gold: 7 authored tables.
+- **Text equality is not meaning.** TEDS weighs a misread digit in a long cell lightly; the
+  text-fidelity count and its gate (0 unflagged wrong cells) are what catch it.
+- **Matching by content.** Without gold boxes, a prediction that holds half of a table's
+  words matches it; a table cut short can still count as found (`teds` then shows it).
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -739,5 +928,10 @@ measured (variant b), and keep the text-layer style rule as the bold check.
 | `src/a11y_stem/eval/gate.py` | regression gate (comparability, judge and stale-report checks) |
 | `src/a11y_stem/eval/sample.py` | the weekly seeded sample of the gold set |
 | `src/a11y_stem/cli/eval_cli.py` | `eval pipeline/gate/calibrate/render`, `demo build` |
+| `src/a11y_stem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
+| `src/a11y_stem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
+| `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
+| `data/authored/tables/` | authored table documents (MIT): sources, PDFs, gold, `make_authored.py` |
+| `tests/fixtures/tables/table_bench_excerpt.json` | table-bench predictions and its scores on five documents |
 | `data/eval/tolerances.json` | gate tolerances |
 | `tests/test_eval_*.py` | offline tests; `-m browser` runs the Chromium ones |
