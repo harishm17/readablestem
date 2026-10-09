@@ -8,6 +8,7 @@ goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
 | What | When | Where |
 |---|---|---|
 | Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
+| Decisions canary | At most once per UTC day, inside the hourly cron, after the purge | `ops.canary.maybe_run_daily`: 20 fixed requests to the Decisions API, compared with committed answers; `decisions_canary_drift` (ERROR) on any move over 0.02. See "Decisions canary" below |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the scheduler is late |
 | Uptime check of `/healthz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when it fails for 10 minutes |
 | Cron alerts | Cloud Monitoring (log-based metrics) | Emails `ALERT_EMAIL` when there is no `cron_done` for 2 hours, or on any `cron_refused`, `aggregate_failed`, `purge_backstop_deleted`, `purge_backstop_failed` or failed Cloud Scheduler attempt |
@@ -23,6 +24,7 @@ gcloud scheduler jobs run a11y-stem-cron --location="$REGION" --project="$PROJEC
 DATABASE_URL=postgresql+psycopg://... uv run a11y-stem ops cron
 uv run a11y-stem ops aggregate
 uv run a11y-stem ops purge
+uv run --env-file .env a11y-stem ops decisions-canary --max-usd 0.02   # no database needed
 ```
 
 `ops cron` exits 1 if aggregation failed, but only after the purge has run.
@@ -75,6 +77,11 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `tier:<tier>:<reason>` | why each required or optional fix has its tier: each failed check code, its `Fix.reason`, `heading.repeated_label` for a member of a group of repeated headings, or `below_accept` when only the confidence held it back (`core.triage.tier_reasons`) |
 | same | `decisions:required` | decisions the pipeline asked a person for: one per required fix, but one per group of repeated headings (`sum(decisions:required) / sum(pages)` is the review load per page) |
 | same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran (a heading edit keeps them; checks in the earliest `before` snapshot are counted when it has them) |
+| `equation`, `figure` | `verify:<check>:<stage>:outcome:<outcome>` | answers of the second automated check (ADR 0005): `check` is `figure_alt` or `equation_match`, `stage` `final` or `cheap`, `outcome` `ok` or why there is none (`timeout`, `refused`, `budget_exceeded`, ...) |
+| same | `verify:<check>:<stage>:flagged` | answers past the threshold: a figure's optional note; an equation's "would flag" (shadow, nothing changed) |
+| same | `verify:<check>:<stage>:score:<tenth>` | the score in tenths (`0.0` to `0.9`): figures min(P(ok), 1 - P(factual error)), low = possible mismatch; equations P(meaning_changing), high = possible mismatch. Lets a new threshold be read off past days |
+| same | `verify:cost_microusd` | the check's spend (a sum; also inside the job's `cost_microusd`) |
+| `canary` | `decisions:run`, `decisions:<status>` | the day's canary claim and its result (`ok`, `drift`, `failed`, `stale`) |
 | `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
 | `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`; on done jobs the outcome code (`error:budget_daily`, `error:scanned_pages`) |
@@ -123,6 +130,16 @@ FROM error_aggregates WHERE day >= current_date - 30;
 SELECT category, sum(count) FROM error_aggregates
 WHERE category LIKE 'call:%:outcome:%' GROUP BY category ORDER BY 2 DESC;
 
+-- Second automated check: figure notes per checked figure, and its spend per page
+SELECT sum(count) FILTER (WHERE category = 'verify:figure_alt:final:flagged')::float
+         / nullif(sum(count) FILTER (WHERE category = 'verify:figure_alt:final:outcome:ok'), 0)
+         AS figure_flag_rate,
+       sum(count) FILTER (WHERE category = 'verify:cost_microusd') / 1e6
+         / nullif((SELECT sum(count) FROM error_aggregates
+                   WHERE step = 'job' AND category = 'pages' AND day >= current_date - 30), 0)
+         AS check_usd_per_page
+FROM error_aggregates WHERE day >= current_date - 30;
+
 -- Production cost per converted page, last 30 days
 SELECT sum(count) FILTER (WHERE category = 'cost_microusd') / 1e6
        / nullif(sum(count) FILTER (WHERE category = 'pages'), 0) AS usd_per_page
@@ -155,6 +172,8 @@ resource.labels.service_name="a11y-stem"`):
 | Slow pages | `jsonPayload.message="request" AND jsonPayload.latency_ms>5000` |
 | Hourly cleanup | `jsonPayload.message=("aggregate_done" OR "purge_done" OR "aggregate_failed" OR "aggregate_on_delete_failed")` |
 | Tracing problems | `jsonPayload.message=("tracing_disabled" OR "trace_failed")` |
+| Decisions API | `jsonPayload.message=("decision_call" OR "verifier_unavailable")` (failures are WARNING; `outcome`, `status`, `code`, `request_id`) |
+| Decisions canary | `jsonPayload.message=("decisions_canary_ok" OR "decisions_canary_drift" OR "decisions_canary_incomplete" OR "decisions_canary_failed")`, and `jsonPayload.decisions_canary` on `cron_done` |
 
 ### What can never be in a log line
 
@@ -216,6 +235,48 @@ is the event name alone and the fields become top-level keys, so
 work as written. `log_exception` adds `error_type` and `stack`, as the chain does for
 `exc_info`.
 
+## Decisions canary
+
+The second automated check (ADR 0005, docs/steps.md) compares the Decisions API's
+probabilities with fixed thresholds. Those thresholds mean nothing once the answers
+under them move, and the API is in beta: one model, no version pinning. Its answers are
+deterministic, so a fixed set of requests answered differently on one day is a change
+of the model or the service, seen the day it happens.
+
+- **Requests:** `src/a11y_stem/ops/canary_requests.json`: 20 synthetic cases (6 figure
+  checks on a bar chart and a force diagram drawn with PyMuPDF, with right, wrong and
+  generic alt texts; 6 equation checks on three drawn equations, right and wrong
+  LaTeX; 8 plain true/false statements). The figure and equation cases are built with
+  the production question builders, so they ask what the pipeline asks. No document
+  content.
+- **Expected answers:** `src/a11y_stem/ops/canary_expected.json`, recorded live on
+  2026-10-08 and checked on a second run the same day (20 of 20 identical). Each case
+  stores the SHA-256 of its request as sent; `tests/test_ops_second_check.py` fails when
+  the question wording, the framing or an image changes without a re-recording.
+- **Alert:** an answer that moved by more than 0.02 (or a refusal that appeared or went
+  away) logs one ERROR line `decisions_canary_drift` with the counts, the largest move
+  and the case ids, and the command exits 1. A case that got no answer is
+  `decisions_canary_incomplete` (WARNING), not drift.
+- **In the hourly cron** (`POST /internal/cron/aggregate-and-purge`), after the purge:
+  at most once per UTC day. The first cron run of the day claims it by inserting the
+  aggregate row (day, `canary`, `decisions:run`) if it is missing, so two instances or
+  two runs cannot both send it; a claimed day is not retried, even if the run failed.
+  Fail-open: nothing about the canary changes the cron's response or its status code.
+  Off with `DECISIONS_CANARY=false`, and never with `ENV=test`, `FAKE_MODELS` or no
+  key. It reserves through a `JobBudget` of $0.02 on the daily spend cap; a run costs
+  about $0.00075. `ops cron` (the by-hand cron) does not run it; use the command below.
+- **By hand:** `uv run --env-file .env a11y-stem ops decisions-canary --max-usd 0.02`
+  (exit 0 no drift, 1 drift, 2 could not compare). After a deliberate change (new
+  question wording, new canary cases) or a drift you have looked at and accept:
+  `... ops decisions-canary --max-usd 0.02 --record`, review the diff of
+  `canary_expected.json`, commit it with the change, and re-check the thresholds on
+  labelled data (docs/eval.md).
+
+TODO(Harish): the drift line is an ERROR in Cloud Logging, but no alert policy emails it
+yet. To be told by email, add `decisions_canary_drift` to the
+`$SERVICE-cron-problems` log metric in `deploy/deploy.sh` (it then reports as a "cron or
+purge problem"), or give it a policy of its own.
+
 ## Tracing (Langfuse)
 
 Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (`deploy.sh` stores the
@@ -273,6 +334,8 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | Purge itself failing | `purge_done` missing for over an hour (from both `source=cron` and `source=worker`), or `purge_backstop_failed` | Treat as a privacy incident: run `a11y-stem ops purge` by hand, then fix the cause. Job pages already answer 404 once `retain_until` has passed, purged or not |
 | Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections; keep `--max-instances=2` or move to `db-g1-small` (50) |
 | Weekly GitHub uptime run failed | The run's log | Same as the uptime alert; also check the custom domain and certificate |
+| `decisions_canary_drift` | The line's `drifted_cases` and `max_delta`; `a11y-stem ops decisions-canary --max-usd 0.02` to see each moved answer | The Decisions API's answers changed under the thresholds. Conversions are unaffected (the check is a note or a shadow and fails open); to stop the figure notes meanwhile set `DECISIONS_FIGURE_VERIFY=false`. Re-measure the thresholds (docs/eval.md), then re-record the canary |
+| Many `decision_call` WARNINGs or `verify:*:outcome:timeout` counts | `outcome`, `status`, `code` on the lines | Decisions API trouble. Nothing to do for conversions (fail-open); the check's answers are missing for those fixes |
 
 ## CI and dependency updates
 

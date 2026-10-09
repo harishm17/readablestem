@@ -277,6 +277,32 @@ heading. Figures and unmatched equations have no answer key in these tasks: they
 in the load, not in the flags. A gold heading the pipeline missed is not an item a
 person could be asked about, so it is not in flag recall (it is in heading recall).
 
+### Second automated check (figures, equations, document)
+
+The Decisions API check of ADR 0005 (docs/steps.md "Second automated check") runs in
+every real eval when its settings are on (the default; `DECISIONS_FIGURE_VERIFY=false`
+or `DECISIONS_EQUATION_SHADOW=false` turn it off for a run). Code:
+`eval/verifier_metrics.py`. Per item in the JSONL: `verifier_*` (figures) or `shadow_*`
+(equations; `shadow_cheap_*` for the cheap answer before escalation), plus
+`verifier_cost_usd`, `verifier_latency_ms`, `verifier_requests`. Report:
+`metrics.second_check` and, in `cost`, `verifier_usd`, `verifier_per_item_usd`
+(document: `verifier_per_pdf_page_usd`). Its cost is part of `pipeline_usd` and
+`per_item_usd`: the app pays it too.
+
+| Metric | Task | Definition |
+|---|---|---|
+| `answered`, `outcomes` | figures | accepted figures the check answered; outcome codes of every check that ran (`ok`, `timeout`, `refused`, ...) |
+| `flagged`, `flag_rate` | figures | answered figures with min(P(ok), 1 - P(factual error)) below `DECISIONS_FIGURE_FLAG_BELOW` (0.5): the ones that get the optional note; flagged / answered |
+| `agreement_with_judge` | figures | over figures with both an answer and a judge verdict, flag against judge fail: `raw_agreement`, `kappa` (Cohen's), `confusion`, and `auroc_score_vs_judge_fail` (how well 1 - score ranks the judge's failures above its passes; threshold-free) |
+| `final.auroc_vs_wrong` | equations | AUROC of P(meaning_changing) on the final proposal against wrong (not `exact_lenient`); `..._excluding_scorer_gaps` without the 5 known scorer gaps |
+| `final.would_flag`, `would_flag_precision`, `would_flag_recall` | equations | proposals at or above `DECISIONS_EQUATION_FLAG_AT` (0.2) and how many of them are wrong / how many wrong ones they include. Shadow: nothing was flagged in the app |
+| `cheap_stage` | equations | answers on the cheap model's answer before escalation: how many, how many would flag, mean P(meaning_changing). The cheap answer is not kept on the fix, so it is not scored against gold |
+| `equations_matched` | document | the same as `final`, over the equations matched to gold |
+| `figure_checked`, `figure_flagged`, `equation_checked`, `equation_would_flag` | document | counts over every fix of the converted pages |
+
+Agreement with the judge is agreement between two models, not validity: only Harish's
+labels (`eval calibrate`) can say which one is right.
+
 ### Judge calibration (`eval calibrate`)
 
 Agreement with Harish's labels, on figures the judge graded:
@@ -580,6 +606,34 @@ optional notes (5 more main-model calls over the two documents, a few tenths of 
 the call totals also move with the other escalations). The bold omega that remains is
 still required. No `symbol_mismatch` fired in any run.
 
+## Second automated check (2026-10-08, ADR 0005)
+
+Branch `feat/decisions-verifier`, same prompts and models as above, the check on (its
+defaults). Reports: `/tmp/dv-figures.json`, `/tmp/dv-equations.json`,
+`/tmp/dv-document.json` (and `-items.jsonl`); not committed. Spent $0.25 in all
+(figures $0.089 with the judge, equations $0.050, document $0.114, canary and live test
+$0.002).
+
+| Measure | Result |
+|---|---|
+| figures: answered / flagged | 13 of 13 accepted figures / 1 (flag rate 0.077): figure 2.9, the dense vector diagram the research also flagged; the judge passed it (score 4) |
+| figures: agreement with the judge | 11 of 13 (kappa -0.08: the one flag and the judge's one failure are different figures); the judge's failure, 2.13 (score 3), had the second-lowest score, 0.55, just above the 0.5 threshold; AUROC of the score against judge failures 0.92 |
+| figures: cost, latency | $0.00008 per figure (2% of describing it); 0.28 s median per check (0.2-1.9 s) |
+| equations: shadow AUROC against not exact_lenient | 0.45 (0.48 without scorer gaps): no ranking signal on this sample, whose 7 wrong items are 5 scorer gaps, a bold subscript and a misplaced comma, not meaning-level errors |
+| equations: what drives P(meaning_changing) | bold: every correct equation with a `\mathbf` vector scored 0.20-0.59 (median 0.37) and every plain one 0.01-0.16 (median 0.02), so the 0.2 shadow threshold would flag 16 of 30 (all 12 correct bold ones). The 6 cheap answers escalated (on this sample, so far always for a dropped bold) scored 0.02-0.09 and their bold final proposals 0.31-0.46: the check does not see bold in these crops |
+| equations: cost | $0.00004 per equation, 36 requests (30 final, 6 cheap stage) |
+| document: answers | 71 (16 figures, 55 equations), all answered |
+| document: review load | 2 figure notes, so optional notes 23 -> 25 (0.58 per PDF page); required decisions unchanged, 9 (0.21 per page) |
+| document: shadow on the 30 matched equations | AUROC 0.57 (0.68 without scorer gaps); 9 would flag |
+| **added cost per page** | **$0.00010 per PDF page** (3.8% of this run's $0.0026 per page) |
+
+Reading it: the figure check costs little and adds about one optional note per 20 PDF
+pages, but on this sample it has no observed true positive yet (as in the research: 0 of
+3 real flags right), so it stays a note. The equation check, as worded for an image and
+LaTeX text, is not usable as a signal on bold vectors; that is what shadow mode is for.
+Before any equation gate: label real crops, compare the predicate form the research
+measured (variant b), and keep the text-layer style rule as the bold check.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -631,6 +685,7 @@ still required. No `symbol_mismatch` fired in any run.
 | `src/a11y_stem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
 | `src/a11y_stem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
 | `src/a11y_stem/eval/judge.py` | figure judge request, schema, pass rule |
+| `src/a11y_stem/eval/verifier_metrics.py` | the second automated check's eval metrics |
 | `src/a11y_stem/models/prompts/judge_figure.md` | judge instructions (versioned by hash) |
 | `src/a11y_stem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
 | `src/a11y_stem/eval/gate.py` | regression gate (comparability, judge and stale-report checks) |
