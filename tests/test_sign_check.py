@@ -317,6 +317,29 @@ def test_a_stacked_relation_read_as_another_relation_is_caught():
     assert differs(f"|{IT['x']}|= 1", r"|x| < 1") == (signs.LESS,)
 
 
+def test_katex_negation_overlay_makes_the_relation_uncertain():
+    # Review 2026-10-08: KaTeX (0.16, printed by Chromium) draws \neq as a plain "=" with
+    # its private-use slash U+E020 laid over it, so the text layer reads "a =\\ue020b".
+    assert differs("a =\ue020b", r"a \neq b") == ()
+    assert differs("x =\ue020−1", r"x \ne -1") == ()
+    # It cannot tell = from ≠, but another relation, or a dropped minus, is still caught.
+    assert differs("a =\ue020b", r"a < b") == (signs.LESS,)
+    assert differs("x =\ue020−1", r"x \ne 1") == (signs.MINUS,)
+    # U+FFFD beside a relation (TeX brace pieces, newtx accents) is no overlay: the = stays
+    # certain (U+FFFD itself may be any sign, so the ≈ range is widened).
+    assert differs(f"{IT['a']}=\ufffd{IT['b']}", r"a \approx b") == (signs.EQUALS,)
+
+
+def test_latex2mathml_not_is_the_relation_or_its_negation():
+    # \not= is a zero-width slash before a plain "=" in latex2mathml's MathML; TeX composes
+    # the PDF's glyphs into one (≠), so either may be what the PDF shows.
+    assert differs("a ≠ b", r"a \not= b") == ()
+    assert differs("x ≮ y", r"x \not< y") == ()
+    assert differs("x ≰y", r"x \not\le y") == ()
+    assert differs("a = b", r"a \not= b") == ()
+    assert differs("a < b", r"a \not= b") == (signs.LESS,)
+
+
 def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
     # Only a swap of × and · is meaning-level: a missing sign may be juxtaposition
     # (a scalar times a vector), which the text layer cannot tell apart.

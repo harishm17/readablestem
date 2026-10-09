@@ -56,11 +56,16 @@ create a flag on its own:
   a single U+2212 touching a → that its letter follows at once, after an operator, an
   opening bracket or nothing ("= −→𝑥"), is Chromium's minus before a vector arrow, so it
   is certain. A glyph the PDF cannot name (private use, U+FFFD; old Symbol and MT Extra
-  fonts put operators there) may be any sign: it widens every class;
+  fonts put operators there) may be any sign: it widens every class. A relation directly
+  beside a private-use glyph may have a negation slash laid over it (KaTeX prints \\neq
+  as "=" under its \\not glyph, U+E020, which is only ever that slash), so it counts as
+  uncertain, and so does its negation;
 - MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain (a leading
   minus inside `<mn>` included; latex2mathml writes ± and ∼ as `<mi>`). An accent (the
   `<mo>` script of `<mover>`/`<munder>`: \\vec's arrow, \\tilde's ~) is uncertain:
-  Chromium prints it as a standalone →, TeX as a combining accent or not at all. In
+  Chromium prints it as a standalone →, TeX as a combining accent or not at all. A
+  relation after latex2mathml's \\not (a zero-width slash) is uncertain, and so is its
+  negation: TeX composes the two into ≠, Chromium prints them apart. In
   `<mtext>` a hyphen between letters or digits is a word hyphen and is skipped
   ("time-dependent"); any other sign there is uncertain.
 
@@ -117,6 +122,8 @@ VECTOR_PRODUCT = "vector-product"
 
 ARROWS = frozenset({RIGHT_ARROW, LEFT_ARROW, BOTH_ARROW, IMPLIES, IMPLIED_BY, IFF})
 PRODUCTS = frozenset({CROSS, DOT})
+# Every other class is a relation or an arrow, which a negation slash can overlay.
+OPERATIONS = frozenset({MINUS, PLUS, PLUS_MINUS, MINUS_PLUS}) | PRODUCTS
 
 
 def _classes(table: dict[str, str]) -> dict[str, str]:
@@ -229,6 +236,14 @@ def _unnamed(ch: str) -> bool:
     return ch == "\N{REPLACEMENT CHARACTER}" or unicodedata.category(ch) == "Co"
 
 
+# KaTeX's \not glyph (`\@not` in its symbol table, font KaTeX_Main), laid over a relation.
+_KATEX_NOT = "\ue020"
+# A negation slash: what TeX lays over a relation for \not, and what latex2mathml writes
+# as a zero-width slash before it (`<mpadded width="0"><mtext>⧸</mtext></mpadded><mo>=</mo>`).
+_NOT_OVERLAY = "\N{COMBINING LONG SOLIDUS OVERLAY}"
+_NEGATION_SLASHES = frozenset("\N{BIG SOLIDUS}\N{COMBINING LONG SOLIDUS OVERLAY}")
+
+
 @dataclass
 class SignTokens:
     """One side's sign tokens: each class is an interval [certain, certain + uncertain]."""
@@ -282,12 +297,25 @@ def _join_arrows(text: str) -> str:
     return text
 
 
-def _uncertain_relation(text: str, index: int, cls: str) -> bool:
-    """A relation glyph that may be part of another relation.
+def _overlaid(text: str, index: int, cls: str) -> bool:
+    """A relation glyph next to a private-use glyph, which may be a slash laid over it:
+    KaTeX prints \\neq as "=" with its \\not glyph (U+E020) over it. U+FFFD is left out:
+    TeX's brace pieces and newtx's accents come out as U+FFFD beside an "="."""
+    if cls in OPERATIONS:
+        return False
+    beside = text[max(index - 1, 0) : index] + text[index + 1 : index + 2]
+    return any(_unnamed(ch) and ch != "\N{REPLACEMENT CHARACTER}" for ch in beside)
 
-    An = straight after "|": TeX prints \\models as "|=", while Chromium writes "|𝑥|= 1"
-    with no space before a relation, so "|=" cannot simply be folded."""
+
+def _models_bar(text: str, index: int, cls: str) -> bool:
+    """An = straight after "|": TeX prints \\models as "|=", while Chromium writes
+    "|𝑥|= 1" with no space before a relation, so "|=" cannot simply be folded."""
     return cls == EQUALS and index > 0 and text[index - 1] == "|"
+
+
+def _negation(ch: str) -> str | None:
+    """The class of a relation with a negation slash over it (= gives ≠, < gives ≮)."""
+    return _SIGNS.get(unicodedata.normalize("NFC", ch + _NOT_OVERLAY))
 
 
 def _minus_before_vector_arrow(text: str, start: int, end: int) -> bool:
@@ -335,7 +363,13 @@ def layer_signs(text_layer: str) -> SignTokens:
             continue
         cls = _SIGNS.get(ch)
         if cls is not None:
-            if _uncertain_relation(text, index, cls):
+            if _overlaid(text, index, cls):
+                # This relation or its negation (a negation slash may be what is over it).
+                out.uncertain[cls] += 1
+                negation = _negation(ch)
+                if negation is not None:
+                    out.uncertain[negation] += 1
+            elif _models_bar(text, index, cls):
                 out.uncertain[cls] += 1
             else:
                 out.certain[cls] += 1
@@ -343,6 +377,8 @@ def layer_signs(text_layer: str) -> SignTokens:
                 _bold_letter(_operand(text, index, step)) for step in (-1, 1)
             ):
                 out.vector_products += 1
+        elif ch == _KATEX_NOT:
+            continue  # only ever a slash over a relation, counted with that relation
         elif _unnamed(ch):
             out.any_sign += 1
         elif _unknown_arrow(ch):
@@ -350,7 +386,12 @@ def layer_signs(text_layer: str) -> SignTokens:
     return out
 
 
-def _count_math(text: str, out: SignTokens, *, accent: bool) -> None:
+def _negation_slash(elem: Any) -> bool:
+    """latex2mathml's \\not: an element holding nothing but a negation slash."""
+    return "".join(elem.itertext()).strip() in _NEGATION_SLASHES and len(elem) <= 1
+
+
+def _count_math(text: str, out: SignTokens, *, accent: bool, negated: bool = False) -> None:
     counts = out.uncertain if accent else out.certain
     for ch in unicodedata.normalize("NFC", text):
         if ch in _LOOSE_DASHES:
@@ -358,7 +399,16 @@ def _count_math(text: str, out: SignTokens, *, accent: bool) -> None:
         elif ch in _DASHES:
             counts[MINUS] += 1  # in a maths token a hyphen is a minus
         elif ch in _SIGNS:
-            counts[_SIGNS[ch]] += 1
+            cls = _SIGNS[ch]
+            if negated and cls not in OPERATIONS:
+                # \not over this relation: the PDF may show it composed (≠) or not (=).
+                out.uncertain[cls] += 1
+                negation = _negation(ch)
+                if negation is not None:
+                    out.uncertain[negation] += 1
+                negated = False
+            else:
+                counts[cls] += 1
         elif _unknown_arrow(ch):
             out.any_arrow += 1
 
@@ -380,7 +430,7 @@ def mathml_signs(mathml: str) -> SignTokens:
     """Sign tokens of a MathML tree (see the module docstring for what is uncertain)."""
     out = SignTokens()
 
-    def walk(elem: Any, accent: bool) -> None:
+    def walk(elem: Any, accent: bool, negated: bool) -> None:
         tag = elem.tag.rsplit("}", 1)[-1]
         if tag in _ANNOTATIONS:
             return
@@ -388,14 +438,19 @@ def mathml_signs(mathml: str) -> SignTokens:
             _count_text(elem.text or "", out)
             return
         if tag in _MATH_TOKENS:
-            _count_math(elem.text or "", out, accent=accent)
+            _count_math(elem.text or "", out, accent=accent, negated=negated)
             return
         under_over = tag in _UNDER_OVER
+        negate = False
         for index, child in enumerate(elem):
+            if _negation_slash(child):
+                negate = True
+                continue
             script_mo = under_over and index > 0 and child.tag.rsplit("}", 1)[-1] == "mo"
-            walk(child, script_mo)
+            walk(child, script_mo, negate)
+            negate = False
 
-    walk(DET.fromstring(mathml, forbid_dtd=True), False)
+    walk(DET.fromstring(mathml, forbid_dtd=True), False, False)
     return out
 
 
