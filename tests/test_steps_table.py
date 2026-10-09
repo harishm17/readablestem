@@ -9,6 +9,7 @@ local grids stand for what tables-detect builds from the PDF's words (`Element.t
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -871,17 +872,60 @@ def test_a_conversion_with_tables_on_writes_the_rebuilt_table(monkeypatch):
 # --------------------------------------------------------------------------- recorded answers
 
 
-@pytest.mark.parametrize("name", sorted(p.stem for p in FIXTURES.glob("*.json")))
+RECORDED = sorted(p.stem for p in FIXTURES.glob("*.json"))
+
+
+def test_there_are_recorded_answers():
+    assert len(RECORDED) >= 5
+
+
+@pytest.mark.parametrize("name", RECORDED)
 def test_recorded_answers(name):
-    """Real model answers (gpt-6-luna, 2026-10-09) on table crops of public CC BY pages,
-    with the local grid made from the same PDF's words: see tests/fixtures/tables/."""
+    """Real answers of gpt-6-luna and gpt-6.1-sol (2026-10-09) on crops of the authored
+    LaTeX tables of the table benchmark, with a local grid of the same PDF's words (each
+    fixture says where it comes from). The step must come to the same result offline."""
     case = json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
-    grid = TableGrid.model_validate(case["local"])
+    answers = case["answers"]
     fix = rebuild(
-        element(grid, caption=case.get("caption")),
+        element(TableGrid.model_validate(case["local"]), caption=case["caption"]),
         PNG,
-        client=by_model(cheap=case["answer"], main=case["answer"]),
+        client=by_model(cheap=answers.get(CHEAP_MODEL), main=answers.get(MAIN_MODEL)),
         settings=SETTINGS,
     )
-    assert fix.status.value == case["expected"]["status"], [c.code for c in fix.failed_checks]
-    assert sorted(c.code for c in fix.failed_checks) == case["expected"]["failed"]
+    expected = case["expected"]
+    assert fix.status.value == expected["status"], [c.code for c in fix.failed_checks]
+    assert sorted(c.code for c in fix.failed_checks) == expected["failed"]
+    assert models(fix) == expected["models"]
+    if fix.status is Status.ACCEPTED:
+        html = render([(element(caption=case["caption"]), fix)])
+        assert [c for c in static_checks(html) if not c.passed] == []
+
+
+def misread(cell: dict) -> None:
+    """Change the cell's last plain letter or digit (not part of a LaTeX command)."""
+    field = "latex" if cell["latex"] else "text"
+    found = list(re.finditer(r"(?<![\\A-Za-z])[0-9A-Za-z]", cell[field]))
+    at = found[-1].start()
+    old = cell[field][at]
+    new = {"9": "8", "z": "y", "Z": "Y"}.get(old, chr(ord(old) + 1))
+    cell[field] = cell[field][:at] + new + cell[field][at + 1 :]
+
+
+def test_recorded_answers_with_a_misread_symbol_are_caught():
+    """The same recorded answers, with one letter or digit changed as a misreading would
+    change it: the bijection or a maths check catches it in every table."""
+    for name in RECORDED:
+        case = json.loads((FIXTURES / f"{name}.json").read_text(encoding="utf-8"))
+        if case["expected"]["status"] != "accepted":
+            continue
+        answer = case["answers"][CHEAP_MODEL]
+        body = [c for row in reversed(answer["rows"][1:]) for c in row["cells"]]
+        misread(next(c for c in body if re.search(r"[0-9A-Za-z]", c["latex"] or c["text"])))
+        fix = rebuild(
+            element(TableGrid.model_validate(case["local"]), caption=case["caption"]),
+            PNG,
+            client=by_model(cheap=answer, main=answer),
+            settings=SETTINGS,
+        )
+        assert fix.status is Status.NEEDS_REVIEW, name
+        assert codes(fix) & {"text_mismatch", "symbol_mismatch"}, (name, codes(fix))

@@ -1,0 +1,343 @@
+{
+ "source": "table-bench tables.tex (written for the table benchmark, no third-party text), table T5-unruled: a crop of tables.pdf; the local grid is the gold structure filled with the PDF's words by position (a stand-in for tables-detect)",
+ "recorded": "2026-10-09 with models/prompts/table.md as first committed",
+ "caption": "Table 5: Values of f and f′.",
+ "local": {
+  "rows": 6,
+  "cols": 4,
+  "header_rows": 1,
+  "cells": [
+   {
+    "row": 0,
+    "col": 0,
+    "text": "x",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 1,
+    "text": "f(x)",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 2,
+    "text": "f′(x)",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 3,
+    "text": "Forward diﬀerence",
+    "header": "col"
+   },
+   {
+    "row": 1,
+    "col": 0,
+    "text": "−2"
+   },
+   {
+    "row": 1,
+    "col": 1,
+    "text": "−4"
+   },
+   {
+    "row": 1,
+    "col": 2,
+    "text": "10"
+   },
+   {
+    "row": 1,
+    "col": 3,
+    "text": "5.0"
+   },
+   {
+    "row": 2,
+    "col": 0,
+    "text": "−1"
+   },
+   {
+    "row": 2,
+    "col": 1,
+    "text": "1"
+   },
+   {
+    "row": 2,
+    "col": 2,
+    "text": "1"
+   },
+   {
+    "row": 2,
+    "col": 3,
+    "text": "−1.0"
+   },
+   {
+    "row": 3,
+    "col": 0,
+    "text": "0"
+   },
+   {
+    "row": 3,
+    "col": 1,
+    "text": "0"
+   },
+   {
+    "row": 3,
+    "col": 2,
+    "text": "−2"
+   },
+   {
+    "row": 3,
+    "col": 3,
+    "text": "−1.0"
+   },
+   {
+    "row": 4,
+    "col": 0,
+    "text": "1"
+   },
+   {
+    "row": 4,
+    "col": 1,
+    "text": "−1"
+   },
+   {
+    "row": 4,
+    "col": 2,
+    "text": "1"
+   },
+   {
+    "row": 4,
+    "col": 3,
+    "text": "5.0"
+   },
+   {
+    "row": 5,
+    "col": 0,
+    "text": "2"
+   },
+   {
+    "row": 5,
+    "col": 1,
+    "text": "4"
+   },
+   {
+    "row": 5,
+    "col": 2,
+    "text": "10"
+   },
+   {
+    "row": 5,
+    "col": 3,
+    "text": "17.0"
+   }
+  ]
+ },
+ "answers": {
+  "gpt-6-luna": {
+   "is_data_table": true,
+   "caption": "Table 5: Values of f and f′.",
+   "rows": [
+    {
+     "cells": [
+      {
+       "text": "x",
+       "latex": "x",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "f(x)",
+       "latex": "f(x)",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "f′(x)",
+       "latex": "f'(x)",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Forward difference",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "−2",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "−4",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "10",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "5.0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "−1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "−1.0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "−2",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "−1.0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "−1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "5.0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "2",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "4",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "10",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "17.0",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "expected": {
+  "status": "accepted",
+  "failed": [],
+  "models": [
+   "gpt-6-luna"
+  ]
+ }
+}

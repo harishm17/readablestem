@@ -1,0 +1,343 @@
+{
+ "source": "table-bench tables.tex (written for the table benchmark, no third-party text), table T3-maths-in-cells: a crop of tables.pdf; the local grid is the gold structure filled with the PDF's words by position (a stand-in for tables-detect)",
+ "recorded": "2026-10-09 with models/prompts/table.md as first committed",
+ "caption": "Table 3: Deﬁnitions of mechanical quantities.",
+ "local": {
+  "rows": 6,
+  "cols": 4,
+  "header_rows": 1,
+  "cells": [
+   {
+    "row": 0,
+    "col": 0,
+    "text": "Quantity",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 1,
+    "text": "Symbol",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 2,
+    "text": "Deﬁnition",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 3,
+    "text": "SI unit",
+    "header": "col"
+   },
+   {
+    "row": 1,
+    "col": 0,
+    "text": "Average velocity"
+   },
+   {
+    "row": 1,
+    "col": 1,
+    "text": "¯v"
+   },
+   {
+    "row": 1,
+    "col": 2,
+    "text": "∆x ¯v = ∆t"
+   },
+   {
+    "row": 1,
+    "col": 3,
+    "text": "s−1 m"
+   },
+   {
+    "row": 2,
+    "col": 0,
+    "text": "Acceleration"
+   },
+   {
+    "row": 2,
+    "col": 1,
+    "text": "a"
+   },
+   {
+    "row": 2,
+    "col": 2,
+    "text": "dv a = dt"
+   },
+   {
+    "row": 2,
+    "col": 3,
+    "text": "s−2 m"
+   },
+   {
+    "row": 3,
+    "col": 0,
+    "text": "Momentum⃗"
+   },
+   {
+    "row": 3,
+    "col": 1,
+    "text": "p⃗"
+   },
+   {
+    "row": 3,
+    "col": 2,
+    "text": "p = m⃗v"
+   },
+   {
+    "row": 3,
+    "col": 3,
+    "text": "s−1 kg m"
+   },
+   {
+    "row": 4,
+    "col": 0,
+    "text": "Kinetic energy"
+   },
+   {
+    "row": 4,
+    "col": 1,
+    "text": "K"
+   },
+   {
+    "row": 4,
+    "col": 2,
+    "text": "1 K = 2mv2"
+   },
+   {
+    "row": 4,
+    "col": 3,
+    "text": "J"
+   },
+   {
+    "row": 5,
+    "col": 0,
+    "text": "Work"
+   },
+   {
+    "row": 5,
+    "col": 1,
+    "text": "W"
+   },
+   {
+    "row": 5,
+    "col": 2,
+    "text": "∫⃗ W = F · d⃗r"
+   },
+   {
+    "row": 5,
+    "col": 3,
+    "text": "J"
+   }
+  ]
+ },
+ "answers": {
+  "gpt-6-luna": {
+   "is_data_table": true,
+   "caption": "",
+   "rows": [
+    {
+     "cells": [
+      {
+       "text": "Quantity",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Symbol",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Definition",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "SI unit",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Average velocity",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "v̄",
+       "latex": "\\bar{v}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "v̄ = Δx/Δt",
+       "latex": "\\bar{v} = \\frac{\\Delta x}{\\Delta t}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "m s⁻¹",
+       "latex": "\\text{m}\\ \\text{s}^{-1}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Acceleration",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "a",
+       "latex": "a",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "a = dv/dt",
+       "latex": "a = \\frac{dv}{dt}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "m s⁻²",
+       "latex": "\\text{m}\\ \\text{s}^{-2}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Momentum",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "p⃗",
+       "latex": "\\vec{p}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "p⃗ = mv⃗",
+       "latex": "\\vec{p} = m\\vec{v}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "kg m s⁻¹",
+       "latex": "\\text{kg}\\ \\text{m}\\ \\text{s}^{-1}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Kinetic energy",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "K",
+       "latex": "K",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "K = ½mv²",
+       "latex": "K = \\frac{1}{2}mv^{2}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "J",
+       "latex": "\\text{J}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Work",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "W",
+       "latex": "W",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "W = ∫ F⃗ · dr⃗",
+       "latex": "W = \\int \\vec{F} \\cdot d\\vec{r}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "J",
+       "latex": "\\text{J}",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "expected": {
+  "status": "accepted",
+  "failed": [],
+  "models": [
+   "gpt-6-luna"
+  ]
+ }
+}
