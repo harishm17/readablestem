@@ -1,0 +1,11 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {"id": "tablebench-latex", "pdf": "tablebench-latex/tables.pdf", "gold": "tablebench-latex/gold.jsonl", "toolchain": "latex"},
+    {"id": "tablebench-word", "pdf": "tablebench-word/word_tables.pdf", "gold": "tablebench-word/gold.jsonl", "toolchain": "chromium"},
+    {"id": "handout-latex", "pdf": "handout-latex/handout.pdf", "gold": "handout-latex/gold.jsonl", "toolchain": "latex"},
+    {"id": "handout-word", "pdf": "handout-word/handout.pdf", "gold": "handout-word/gold.jsonl", "toolchain": "word"},
+    {"id": "maths-and-headers", "pdf": "maths-and-headers/maths_and_headers.pdf", "gold": "maths-and-headers/gold.jsonl", "toolchain": "chromium"},
+    {"id": "slides", "pdf": "slides/slides.pdf", "gold": "slides/gold.jsonl", "toolchain": "chromium"}
+  ]
+}
