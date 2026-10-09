@@ -17,6 +17,7 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from a11y_stem.web import notation
 from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import (
@@ -136,12 +137,17 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
             quota=ctx.settings.per_user_daily_page_quota,
             day=utc_today(),
         )
+        # The upload form's course choice (notation memory); None hides it.
+        courses = (
+            notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
+        )
     return {
         "jobs": views,
         "outcomes": outcomes,
         "pages_left": left,
         "spend_closed": spend_closed,
         "active": "app",
+        "courses": courses,
     }
 
 
@@ -208,6 +214,10 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         raise CsrfFailed()
     if form.data is None:
         return await run_in_threadpool(_upload_error_page, request, user, "missing_file", 400)
+    # Course choice (notation memory): one of the user's own courses, or none.
+    course_id = (form.fields.get("course") or None) if notation.enabled(ctx.settings) else None
+    if course_id is not None and not await run_in_threadpool(_users_course, ctx, user, course_id):
+        return await run_in_threadpool(_course_error_page, request, user)
     try:
         pages = await run_in_threadpool(
             lambda: inspect_pdf_isolated(form.data or b"", max_pages=ctx.settings.max_pages_per_job)
@@ -216,14 +226,49 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         return await run_in_threadpool(_upload_error_page, request, user, exc.code, exc.status_code)
     keep = form.fields.get("keep") == "on"
     job_id = await run_in_threadpool(
-        _store_upload, ctx, user, form.filename, form.data, pages, keep
+        _store_upload, ctx, user, form.filename, form.data, pages, keep, course_id
     )
     log_event(logger, "job_created", job_id=job_id, pages=pages, opt_in=keep)
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
+def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, str] | None:
+    """The course the job is read for (id and name), for the job page; None without
+    one or with the feature off."""
+    ctx = get_ctx(request)
+    if not notation.enabled(ctx.settings):
+        return None
+    with session_scope(ctx.factory) as session:
+        course = notation.job_course(session, owned_job(session, job_id, user))
+        return {"id": course.id, "name": course.name} if course is not None else None
+
+
+def _users_course(ctx: AppContext, user: CurrentUser, course_id: str) -> bool:
+    if not JOB_ID.match(course_id):
+        return False
+    with session_scope(ctx.factory) as session:
+        return notation.owned_course(session, course_id, user.id) is not None
+
+
+def _course_error_page(request: Request, user: CurrentUser) -> Response:
+    """The upload form again when its course is not one of the user's (deleted meanwhile
+    in another tab, or a changed form). Nothing was uploaded."""
+    ctx = get_ctx(request)
+    log_event(logger, "upload_rejected", code="unknown_course")
+    message = "That course was not found. Choose one of your courses, or \u201cNo course\u201d."
+    errors = [{"field_id": "course", "message": message}]
+    context = app_context(ctx, user) | {"errors": errors, "field_errors": {"course": errors[0]}}
+    return render(request, "app.html", context, status_code=400)
+
+
 def _store_upload(
-    ctx: AppContext, user: CurrentUser, filename: str, data: bytes, pages: int, keep: bool
+    ctx: AppContext,
+    user: CurrentUser,
+    filename: str,
+    data: bytes,
+    pages: int,
+    keep: bool,
+    course_id: str | None = None,
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction."""
     s = ctx.settings
@@ -255,6 +300,7 @@ def _store_upload(
             opt_in_retention=keep,
             retain_until=now + keep_for,
             created_at=now,
+            course_id=course_id,
         )
         session.add(job)
         session.flush()
@@ -301,6 +347,7 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     """
     job, outcome = load_job_status(request, job_id, user)
     context = status_context(job, outcome) | {"auto_reload": auto == "1"}
+    context["course"] = _job_course(request, job_id, user)  # notation memory
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})

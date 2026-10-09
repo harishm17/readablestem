@@ -1,0 +1,16 @@
+{# "Remember for this course" (notation memory, routes/courses.py `review_context`):
+   after a decision that settled a styled letter ("Use bold ω", accepting a bold d), one
+   button that adds it to the job's course. Only with FEATURE_NOTATION_MEMORY on, a
+   course on the job, and a letter the course does not have yet. #}
+{% if remember is defined and remember %}
+<form method="post" action="/courses/{{ remember.course_id }}/remember" class="remember-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <input type="hidden" name="job" value="{{ job.id }}">
+  <input type="hidden" name="item" value="{{ remember_item or '' }}">
+  <input type="hidden" name="symbol" value="{{ remember.symbol }}">
+  <input type="hidden" name="meaning" value="{{ remember.meaning }}">
+  <p class="hint" id="remember-hint">From your last decision. Your next documents for this
+    course will use it; you can change it on <a href="/courses/{{ remember.course_id }}">the course page</a>.</p>
+  <button type="submit" class="button-secondary" aria-describedby="remember-hint">Remember for {{ remember.course_name }}: {{ remember.phrase }}</button>
+</form>
+{% endif %}

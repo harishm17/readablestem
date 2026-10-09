@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{# Courses (routes/courses.py): only with FEATURE_NOTATION_MEMORY on. #}
+{% set field_errors = field_errors|default({}) %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}Your courses{% endblock %}
+{% block content %}
+<h1>Your courses</h1>
+{% include "_error_summary.html" %}
+<p class="lede">A course keeps the notation you use, such as “bold d is a vector”. When you
+  convert a document for a course, the tool reads its letters the way your course writes
+  them, and says them that way on the review screen.</p>
+
+<section aria-labelledby="list-heading">
+  <h2 id="list-heading">Courses</h2>
+  {% if courses %}
+  <div class="table-scroll">
+  <table>
+    <caption class="visually-hidden">Your courses, by name</caption>
+    <thead>
+      <tr><th scope="col">Course</th><th scope="col">Symbols</th></tr>
+    </thead>
+    <tbody>
+      {% for course in courses %}
+      <tr>
+        <th scope="row"><a href="/courses/{{ course.id }}">{{ course.name }}</a></th>
+        <td>{{ course.entries }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>You have no courses yet.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="add-heading">
+  <h2 id="add-heading">Add a course</h2>
+  {% if courses|length >= max_courses %}
+  <p>You have {{ max_courses }} courses, the most you can keep. Delete one you no longer use
+    to add another.</p>
+  {% else %}
+  <form method="post" action="/courses" novalidate>
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% set err = field_errors.get("name") %}
+    <div class="field{% if err %} field-error{% endif %}">
+      <label for="name">Course name</label>
+      <p class="hint" id="name-hint">For example “Physics 1, fall term”. Only you see it.</p>
+      {% if err %}<p class="error-message" id="name-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}
+      <input type="text" id="name" name="name" maxlength="200" autocomplete="off" value="{{ values.get('name', '') }}"
+             aria-describedby="name-hint{% if err %} name-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
+    </div>
+    <button type="submit" class="button">Add course</button>
+  </form>
+  {% endif %}
+</section>
+<p><a href="/app">Back to my documents</a></p>
+{% endblock %}

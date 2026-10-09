@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{# Edit one symbol of a course (routes/courses.py). #}
+{% set field_errors = field_errors|default({}) %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}Edit {{ entry.words }}: {{ course.name }}{% endblock %}
+{% macro error_line(name) %}{% set err = field_errors.get(name) %}{% if err %}<p class="error-message" id="{{ name }}-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}{% endmacro %}
+{% block content %}
+<h1>Edit {{ entry.words }}</h1>
+{% include "_error_summary.html" %}
+<p>In <a href="/courses/{{ course.id }}">{{ course.name }}</a>.</p>
+<form method="post" action="/courses/{{ course.id }}/entries/{{ entry.id }}" novalidate>
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% set err = field_errors.get("symbol") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="symbol">Symbol</label>
+    <p class="hint" id="symbol-hint">In words, in LaTeX or as the character: {{ examples }}.</p>
+    {{ error_line("symbol") }}
+    <input type="text" id="symbol" name="symbol" maxlength="64" autocomplete="off" spellcheck="false" value="{{ values.get('symbol', '') }}"
+           aria-describedby="symbol-hint{% if err %} symbol-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
+  </div>
+  {% set err = field_errors.get("meaning") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="meaning">What it means</label>
+    {{ error_line("meaning") }}
+    <select id="meaning" name="meaning"{% if err %} aria-describedby="meaning-error" aria-invalid="true"{% endif %}>
+      {% for value, label in meanings.items() %}<option value="{{ value }}"{% if values.get("meaning") == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+  </div>
+  {% set err = field_errors.get("note") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="note">Note (optional)</label>
+    <p class="hint" id="note-hint">For you, such as “displacement”. Up to 200 characters.</p>
+    {{ error_line("note") }}
+    <input type="text" id="note" name="note" maxlength="200" autocomplete="off" value="{{ values.get('note', '') }}"
+           aria-describedby="note-hint{% if err %} note-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}>
+  </div>
+  <ul class="actions">
+    <li><button type="submit" class="button">Save</button></li>
+    <li><a href="/courses/{{ course.id }}#entries">Cancel</a></li>
+  </ul>
+</form>
+{% endblock %}

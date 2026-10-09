@@ -1,0 +1,6 @@
+{# The job's course (notation memory): set only with FEATURE_NOTATION_MEMORY on and a
+   course chosen at upload. #}
+{% if course is defined and course %}
+<p id="job-course">Course: <a href="/courses/{{ course.id }}">{{ course.name }}</a>. This
+  document is read with its notation.</p>
+{% endif %}

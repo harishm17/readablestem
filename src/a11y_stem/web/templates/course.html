@@ -1,0 +1,106 @@
+{% extends "base.html" %}
+{# One course and its notation (routes/courses.py). #}
+{% set field_errors = field_errors|default({}) %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}{{ course.name }}{% endblock %}
+{% macro error_line(name) %}{% set err = field_errors.get(name) %}{% if err %}<p class="error-message" id="{{ name }}-error"><span class="visually-hidden">Error: </span>{{ err.message }}</p>{% endif %}{% endmacro %}
+{% macro described(name, hint=True) %}{% set err = field_errors.get(name) %} aria-describedby="{% if hint %}{{ name }}-hint{% endif %}{% if hint and err %} {% endif %}{% if err %}{{ name }}-error{% endif %}"{% if err %} aria-invalid="true"{% endif %}{% endmacro %}
+{% block content %}
+<h1>{{ course.name }}</h1>
+{% include "_error_summary.html" %}
+<p class="lede">The symbols this course uses and what they mean. Documents you convert for
+  this course use them: a letter your course writes in bold is read as bold, and it is
+  read aloud by its meaning (“vector d” for a bold d that is a vector).</p>
+
+<section aria-labelledby="entries-heading" id="entries" tabindex="-1">
+  <h2 id="entries-heading">Notation</h2>
+  {% if entries %}
+  <div class="table-scroll">
+  <table>
+    <caption class="visually-hidden">Symbols of {{ course.name }}</caption>
+    <thead>
+      <tr>
+        <th scope="col">Symbol</th>
+        <th scope="col">Means</th>
+        <th scope="col">Note</th>
+        <th scope="col">Added</th>
+        <th scope="col">Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for entry in entries %}
+      <tr>
+        <th scope="row"><span aria-hidden="true">{{ entry.canonical }}</span> {{ entry.words }}{% if entry.symbol != entry.words %} <span class="meta">(you wrote “{{ entry.symbol }}”)</span>{% endif %}</th>
+        <td>{{ entry.meaning_label }}</td>
+        <td>{{ entry.note or "" }}</td>
+        <td>{{ "From a review" if entry.source == "review" else "By you" }}</td>
+        <td>
+          <ul class="actions">
+            <li><a href="/courses/{{ course.id }}/entries/{{ entry.id }}">Edit<span class="visually-hidden"> {{ entry.words }}</span></a></li>
+            <li><form method="post" action="/courses/{{ course.id }}/entries/{{ entry.id }}/delete" class="inline-form">
+              <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+              <button type="submit" class="link-button">Remove<span class="visually-hidden"> {{ entry.words }}</span></button>
+            </form></li>
+          </ul>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No symbols yet. Add the ones your course writes in a special way, such as bold
+    vectors or a double-struck R for the real numbers.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="add-heading">
+  <h2 id="add-heading">Add a symbol</h2>
+  <form method="post" action="/courses/{{ course.id }}/entries" novalidate>
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field{% if field_errors.get('symbol') %} field-error{% endif %}">
+      <label for="symbol">Symbol</label>
+      <p class="hint" id="symbol-hint">In words, in LaTeX or as the character: {{ examples }}.</p>
+      {{ error_line("symbol") }}
+      <input type="text" id="symbol" name="symbol" maxlength="64" autocomplete="off" spellcheck="false" value="{{ values.get('symbol', '') }}"{{ described("symbol") }}>
+    </div>
+    <div class="field{% if field_errors.get('meaning') %} field-error{% endif %}">
+      <label for="meaning">What it means</label>
+      {{ error_line("meaning") }}
+      <select id="meaning" name="meaning"{{ described("meaning", hint=False) if field_errors.get("meaning") else "" }}>
+        {% for value, label in meanings.items() %}<option value="{{ value }}"{% if values.get("meaning") == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </div>
+    <div class="field{% if field_errors.get('note') %} field-error{% endif %}">
+      <label for="note">Note (optional)</label>
+      <p class="hint" id="note-hint">For you, such as “displacement”. Up to 200 characters.</p>
+      {{ error_line("note") }}
+      <input type="text" id="note" name="note" maxlength="200" autocomplete="off" value="{{ values.get('note', '') }}"{{ described("note") }}>
+    </div>
+    <button type="submit" class="button">Add symbol</button>
+  </form>
+</section>
+
+<section aria-labelledby="rename-heading">
+  <h2 id="rename-heading">Rename the course</h2>
+  <form method="post" action="/courses/{{ course.id }}/rename" novalidate>
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field{% if field_errors.get('rename') %} field-error{% endif %}">
+      <label for="rename">Course name</label>
+      {{ error_line("rename") }}
+      <input type="text" id="rename" name="name" maxlength="200" autocomplete="off" value="{{ rename_value }}"{{ described("rename", hint=False) if field_errors.get("rename") else "" }}>
+    </div>
+    <button type="submit" class="button-secondary">Rename</button>
+  </form>
+</section>
+
+<section aria-labelledby="delete-heading">
+  <h2 id="delete-heading">Delete the course</h2>
+  <p>Deletes the course and its notation. Documents you converted for it keep their results.</p>
+  {# Posts without confirm=yes: the next page asks before anything is deleted. #}
+  <form method="post" action="/courses/{{ course.id }}/delete">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-danger">Delete course</button>
+  </form>
+</section>
+<p><a href="/courses">All your courses</a></p>
+{% endblock %}

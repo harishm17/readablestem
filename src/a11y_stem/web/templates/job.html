@@ -16,6 +16,7 @@
 {% endblock %}
 {% block content %}
 <h1>{{ job.filename }}</h1>
+{% include "_job_course.html" %}
 <div id="job-status-region" role="status">
   {% include "_job_status.html" %}
 </div>
