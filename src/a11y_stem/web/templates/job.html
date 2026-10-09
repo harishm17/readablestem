@@ -73,6 +73,7 @@
     <li><a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></li>
     <li><a href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
   </ul>
+  {% include "_after_download.html" %}
   <p class="hint">The converted document is a single HTML file with the equations, headings
     and figure descriptions built in. Check it before you share it with students.</p>
   {% if s.checks_run %}

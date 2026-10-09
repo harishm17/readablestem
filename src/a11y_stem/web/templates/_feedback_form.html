@@ -1,0 +1,32 @@
+{# The two optional questions after a download (web/feedback.py), on the job page
+   (_after_download.html) and on their own page (feedback.html). Needs fb_job_id,
+   fb_choices, fb_values (what was typed) and fb_errors (field id -> message). #}
+<form method="post" action="/jobs/{{ fb_job_id }}/feedback" novalidate class="feedback-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% set post_error = fb_errors.get("will-post-yes") %}
+  <fieldset class="field choice-field{% if post_error %} field-error{% endif %}"{% if post_error %} aria-describedby="will-post-error"{% endif %}>
+    <legend>Will you post this for students?</legend>
+    {% if post_error %}
+    <p class="error-message" id="will-post-error"><span class="visually-hidden">Error: </span>{{ post_error }}</p>
+    {% endif %}
+    <div class="choice-row">
+      {% for value, label in fb_choices %}
+      {% set choice_id = "will-post-" ~ value|replace("_", "-") %}
+      <span class="choice"><input type="radio" id="{{ choice_id }}" name="will_post" value="{{ value }}"{% if fb_values.get("will_post") == value %} checked{% endif %}><label for="{{ choice_id }}">{{ label }}</label></span>
+      {% endfor %}
+    </div>
+  </fieldset>
+  {% set minutes_error = fb_errors.get("minutes-saved") %}
+  <div class="field{% if minutes_error %} field-error{% endif %}">
+    <label for="minutes-saved">About how many minutes did this save you?</label>
+    <p class="hint" id="minutes-hint">A rough guess is fine, as a whole number. Leave it
+      empty if you are not sure.</p>
+    {% if minutes_error %}
+    <p class="error-message" id="minutes-error"><span class="visually-hidden">Error: </span>{{ minutes_error }}</p>
+    {% endif %}
+    <input type="text" inputmode="numeric" id="minutes-saved" name="minutes" class="input-short"
+           autocomplete="off" value="{{ fb_values.get('minutes', '') }}"
+           aria-describedby="minutes-hint{% if minutes_error %} minutes-error{% endif %}"{% if minutes_error %} aria-invalid="true"{% endif %}>
+  </div>
+  <button type="submit" class="button-secondary">Send answers</button>
+</form>
