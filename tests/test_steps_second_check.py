@@ -9,6 +9,7 @@ import logging
 import pytest
 
 from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
+from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from a11y_stem.core.types import DocumentResult, Fix, Status
 from a11y_stem.models.fake import FakeVisionClient
@@ -102,6 +103,8 @@ def test_a_possible_mismatch_is_an_optional_note_never_a_decision(ok, fe):
     )
     assert explain_check(check).text == NOTE
     assert fix.verifications[0].flagged is True
+    # The code the review screen looks for to say "worth a look" (`core.triage`).
+    assert check.code == triage.SECOND_CHECK_MISMATCH and triage.second_check_note(fix)
     # Everything but the note is what the figure would have been without the check.
     assert without_check_fields(fix) == without_check_fields(describe_with(figure_out()))
 

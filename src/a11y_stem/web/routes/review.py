@@ -12,7 +12,9 @@ Layout (see `web.review` for the rules), in three sections:
 2. "Optional checks (M)": fixes accepted automatically with a note (a cosmetic style
    difference, a heading with weak evidence, a long alt text), folded away in a
    <details>, each note in plain English. Nothing there blocks "done"; each can still be
-   edited or rejected.
+   edited or rejected. A note of the second automated check (a possible mismatch between
+   the alt text and the image) is listed there too, by policy, but the page says it is
+   worth a look instead of calling it small.
 3. "Accepted or decided": everything else, folded away.
 
 A decision is one transaction: lock the job row, apply the decision to the stored result
@@ -35,6 +37,7 @@ from markupsafe import Markup
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
@@ -170,6 +173,7 @@ class ReviewItem:
     can_accept: bool
     values: dict[str, str]
     optional: bool = False  # accepted automatically with optional notes (`checks`)
+    second_check: bool = False  # ... one of them the second automated check's
     errors: dict[str, str] = field(default_factory=dict)  # field prefix -> message
     notices: list[Notice] = field(default_factory=list)  # changes elsewhere, shown above
     changed: list[str] = field(default_factory=list)  # changes to this fix, shown inside
@@ -320,6 +324,7 @@ def _item(
         can_accept=can_accept(fix) and fix.status is not Status.ACCEPTED and not moved,
         values=values,
         optional=optional,
+        second_check=triage.second_check_note(fix),
     )
 
 
@@ -546,6 +551,7 @@ def _page(
         "deciding": [g for g in groups.values() if g.units or g.error or g.notices],
         "optional": optional,
         "optional_open": any(item.open for item in optional),
+        "second_checks": sum(item.second_check for item in optional),
         "done": done,
         "done_open": any(item.open for item in done),
         "errors": [{"field_id": e.field_id, "message": e.message} for e in errors],

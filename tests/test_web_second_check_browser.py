@@ -148,6 +148,10 @@ def test_the_note_is_an_optional_check_with_no_axe_violations(
     assert decisions == "Needs your decision (1)"  # the equation only, not the figure
     optional = page.locator("#optional-checks")
     assert NOTE in (optional.text_content() or "")  # folded: in the page, not shown yet
+    lead = " ".join(optional.locator("p").first.inner_text().split())
+    assert "something small" not in lead  # the note is not called small
+    assert "a second automated check found a possible mismatch" in lead
+    assert "worth a look" in lead
     folded = axe_violations(page, axe_source)
     unfold_everything(page)
     assert NOTE in optional.inner_text()  # unfolded, the item's summary line says it
@@ -171,5 +175,6 @@ def test_the_job_page_counts_the_note_as_optional(site, browser, job, axe_source
     _screenshot(page, "second-check-job.png")
     context.close()
     assert "1 need your decision" in text or "1 needs your decision" in text
-    assert "Optional checks" in text
+    assert "Optional checks (accepted; nothing required, 1 worth a look)" in text
+    assert "nothing to do" not in text
     assert not violations, describe(violations)

@@ -301,7 +301,17 @@ reflow, keyboard, no JavaScript; `browser` marker).
    "optional"`: a bold subscript, a double-struck R the PDF cannot show, a heading with
    weak evidence, a long alt text), folded into a `<details>`. Each item's summary line is
    its note in plain English (`web/messages.py`); unfolding it shows the full card, which
-   can still be edited or rejected. Nothing here counts toward "done".
+   can still be edited or rejected. Nothing here counts toward "done". The second
+   automated check's note on a figure (ADR 0005: a possible mismatch between the alt
+   text and the image) is listed here by policy, but it is not something small, so the
+   page does not call it that: when there is one, the line at the top says "... optional
+   checks do not hold anything up, but 1 of them is worth a look" instead of "can be
+   looked at if you want", the intro says such figures are worth a look (a wrong alt text
+   changes what a screen reader user hears; the check is new and can be wrong, so it does
+   not hold up the document), the section's lead counts them apart from the small notes,
+   and their card says "Optional check (worth a look; it does not hold up the document)"
+   instead of "nothing to do unless you disagree" (`core.triage.second_check_note`;
+   tests in `tests/test_web_second_check_review.py`).
 3. **Accepted or decided**: everything else, folded.
 
 A table of contents at the top links to each section and kind group with its counts.
@@ -412,7 +422,9 @@ all" for equations) is refused with a 422 and an error linked to the threshold s
 once; failed and not-converted items too, since each needs a decision) and is broken down
 by kind, each linking to its group ("3 need your decision: 1 equation, 1 figure, 1 group
 of repeated headings."). "Optional checks (accepted; nothing to do)" counts the notes
-nobody has opened; they never count toward done. The summary also counts
+nobody has opened; they never count toward done. When some of them are the second
+automated check's, the label says so: "Optional checks (accepted; nothing required, 1
+worth a look)". The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
 HTML file that did not pass, each as a sentence from `web/messages.py` with its code

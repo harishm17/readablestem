@@ -109,6 +109,9 @@ class ResultSummary:
     # Accepted automatically with an optional note nobody has looked at: never counted
     # toward "done".
     optional: int = 0
+    # ... of which the second automated check's (a possible alt text mismatch), which
+    # the page calls worth a look rather than "nothing to do".
+    second_check: int = 0
     list_items: int = 0  # list item elements (no fixes: lists are rebuilt as they are)
     # Static checks of the stored HTML (re-run after every review decision): how many
     # ran, and the ones that failed. `checks_run` is 0 for results stored without them.
@@ -205,6 +208,7 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
             if any(u[0].kind is kind for u in waiting)
         },
         optional=sum(f.optional_note for f in result.fixes),
+        second_check=sum(triage.second_check_note(f) for f in result.fixes),
         list_items=sum(e.kind is Kind.LIST_ITEM for e in result.elements),
         checks_run=len(result.html_checks),
         failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],

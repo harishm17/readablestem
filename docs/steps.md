@@ -403,7 +403,7 @@ the worker and the eval need no extra argument; steps find it with
 | Questions | predicates `ok` (conveys the key information with no factual error) and `fe` (states something the image contradicts), worded as in the research (`FIGURE_OK`, `FIGURE_FACTUAL_ERROR`) | one choice `verdict`: `match`, `cosmetic`, `meaning_changing`, in that order, always (choice answers favour the first value listed, +0.11 on average, so `match` goes first and the order never changes without re-measuring) |
 | Score | min(P(ok), 1 - P(factual error)); low = possible mismatch | P(meaning_changing); high = possible mismatch |
 | Threshold | `DECISIONS_FIGURE_FLAG_BELOW` = 0.5 (pre-registered) | `DECISIONS_EQUATION_FLAG_AT` = 0.2 ("would flag" in the aggregates and the eval only) |
-| When it flags | warning check `figure.second_check` fails with code `second_check_mismatch`, a note (`NOTE_CODES`): the figure stays ACCEPTED, review "optional", confidence unchanged; the review screen lists it under "Optional checks": "A second automated check found a possible mismatch between the alt text and the image; worth a look." | nothing changes: not the status, the confidence, the tier, the checks or escalation |
+| When it flags | warning check `figure.second_check` fails with code `second_check_mismatch`, a note (`NOTE_CODES`): the figure stays ACCEPTED, review "optional", confidence unchanged; the review screen lists it under "Optional checks": "A second automated check found a possible mismatch between the alt text and the image; worth a look.", and never calls it something small or "nothing to do" (docs/web.md "Order") | nothing changes: not the status, the confidence, the tier, the checks or escalation |
 
 Every answer, or why there is none, is a `Verification` on `Fix.verifications` (check,
 stage `final` or `cheap`, mode, outcome, probabilities rounded to 4 places, flagged,
@@ -455,5 +455,6 @@ crops are at most 5% (docs/eval.md "Second automated check").
 | `tests/test_models_decisions_client.py` | request shape (detail high, no refused parameter), answer parsing, outcomes, spend accounting, privacy of the log line |
 | `tests/test_models_verifier.py` | question wording and order, fencing, verdicts, fail-open, the fake, the factory and `verifier_of` |
 | `tests/test_steps_second_check.py` | the figure note, thresholds, fail-open, the off switch; equation shadow answers change nothing in every route; stored results still load |
+| `tests/test_web_second_check_review.py` | the wording around the note on the review screen and the job page: worth a look, never "something small" or "nothing to do" |
 | `tests/test_web_second_check_browser.py` | `browser`: the note on the review screen under Optional checks; axe-core at 1280 and 320 CSS px |
 | `tests/test_decisions_live.py` | `live_model`: four real requests (about $0.0002) |
