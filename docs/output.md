@@ -52,7 +52,12 @@ breaks it: Canvas's sanitizer keeps only http, https and relative image sources,
 removes the `<style>` block, `<main>` and `tabindex`, so the hidden "Equation" labels
 show, printed list markers double ("1. (a)") and wide equations lose their scroll box
 (read from Canvas's sanitizer allowlist, FEATURE-REVIEW "Beta 5"; not yet tried in a live
-course). Moodle's HTML purifier drops `data:` images and MathML. The app's help page
+course). Pipeline 0.4.0 output loses more: the colour of coloured text
+(FEATURE_COLOUR's runs are `.tc-*` rules in `<style>`, so "the terms shown in red"
+then points at nothing), the `headers` attribute (allowed on neither `td` nor `th`), so
+an irregular table's header associations go, and the tab stops of wide tables' and
+chart data tables' scroll boxes (`tabindex`); `details`, `summary`, `caption`,
+`colgroup` and `math` survive. Moodle's HTML purifier drops `data:` images and MathML. The app's help page
 `/help/posting` (`web/templates/help_posting.html`) gives the steps for Canvas (upload to
 Files, link it where the PDF was, check it in Student View), says to make the HTML the
 main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
