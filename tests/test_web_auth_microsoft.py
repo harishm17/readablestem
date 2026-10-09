@@ -482,6 +482,30 @@ def test_google_sign_ins_off_the_allowlist_record_nothing(ms):
     assert identities(ms) == [] and BOB not in emails(ms)
 
 
+def test_a_first_sign_in_that_loses_a_race_finds_the_link(ms, monkeypatch):
+    """Two first sign-ins at once: the one whose insert hits the unique key (the other
+    linked the identity meanwhile) is tried again and finds the link (Postgres, for
+    real: test_web_auth_postgres.py)."""
+    from a11y_stem.web import identities as store
+
+    ms.allow(ALICE)
+    alice = user_id(ms, ALICE)
+    identity = store.Identity("microsoft", issuer(TENANT), "sub-raced", TENANT)
+    with session_scope(ms.ctx.factory) as session:
+        store.link(session, alice, identity)  # the other sign-in got there first
+    looked = []
+    real = store.user_with
+
+    def not_yet_on_the_first_look(session, wanted):
+        looked.append(wanted)
+        return None if len(looked) == 1 else real(session, wanted)
+
+    monkeypatch.setattr(store, "user_with", not_yet_on_the_first_look)
+    result = store.microsoft_sign_in(ms.ctx.factory, identity, ALICE, None)
+    assert result.user_id == alice and len(looked) == 2
+    assert [row[4] for row in identities(ms)] == [alice]
+
+
 # --------------------------------------------------------------------------- sessions
 
 
