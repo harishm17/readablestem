@@ -966,8 +966,21 @@ def _already(fix: Fix, action: str, level: int | None) -> bool:
 def bulk_eligible(fix: Fix, places: Mapping[str, HeadingPlace]) -> bool:
     """What a bulk accept may take: exactly what a single "Accept" could (for a heading,
     only a level the output keeps; `places` from `heading_places`), and only while it is
-    still waiting for review (a reviewer's own decision is never overwritten)."""
-    return fix.status is Status.NEEDS_REVIEW and can_accept(fix) and not heading_moved(fix, places)
+    still waiting for review (a reviewer's own decision is never overwritten). Never a
+    chart data table whose values were read from the image: the values are the decision,
+    and the confidence a bulk accept goes by is the alt text's, not theirs."""
+    return (
+        fix.status is Status.NEEDS_REVIEW
+        and can_accept(fix)
+        and not heading_moved(fix, places)
+        and not values_from_image(fix)
+    )
+
+
+def values_from_image(fix: Fix) -> bool:
+    """A figure whose chart data table has values read from the image (`figure.data_values`
+    failed): a person must look at them."""
+    return any(c.name == "figure.data_values" and not c.passed for c in fix.checks)
 
 
 def at_or_above(fix: Fix, min_percent: int) -> bool:

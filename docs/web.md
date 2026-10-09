@@ -729,7 +729,10 @@ the results".
   with long descriptions on but left without one (the notice `long_description_missing`),
   so the reviewer can write it; the table box only with a table. A form without these
   fields (the list view) keeps both, and marking a figure decorative drops both. The
-  list view does not show them yet.
+  list view shows the data table (as students will get it) and the longer description,
+  with a link to change them on the review screen. A bulk accept never takes a figure
+  whose data table has values read from the image (`web.review.values_from_image`): its
+  threshold is the alt text's confidence, and the values are the decision.
 - *Heading group*: one card. "“Teacher Support” appears 11 times as a bold line in the
   body text size.", the first one in its band of the page (`compare.band_clip`, the
   heading outlined), the pages it is on, **Keep as headings at level 3** and **Make bold

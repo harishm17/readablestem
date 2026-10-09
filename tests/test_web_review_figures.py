@@ -242,3 +242,25 @@ def test_reject_keeps_the_figure_flagged_without_its_details(card):
     assert post(card, "p1-e6", action="reject", **SHOWN).status_code == 303
     html = download(card)
     assert "<details" not in html and "Needs a description." in html
+
+
+def test_the_list_view_shows_the_data_table_and_bulk_accept_leaves_it(card):
+    """The values read from the image are the decision: the list view shows them (with the
+    longer description), and its bulk accept, which goes by the alt text's confidence,
+    leaves the figure for a person."""
+    from fixtures.web.support import token
+
+    body = card.browser.get(f"/jobs/{card.job_id}/review/list").text
+    assert "were read from the image" in body
+    assert "Data table, as students will get it" in body
+    assert ">Distance (km)</th>" in body and ">1.5</td>" in body
+    assert "moving towards the school" in body
+    data = {
+        "csrf_token": token(card.browser, f"/jobs/{card.job_id}/review/list"),
+        "action": "accept_confident",
+        "min_confidence": "60",
+        "view": "list",
+    }
+    card.browser.post(f"/jobs/{card.job_id}/review/figures", data=data)
+    fix = stored(card).fix_for("p1-e6")
+    assert fix is not None and fix.status is Status.NEEDS_REVIEW

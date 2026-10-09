@@ -92,6 +92,17 @@
     <p>No proposal yet: this figure needs a description.</p>
     {% endif %}
     {% if item.caption %}<p><strong>Caption in the PDF:</strong> {{ item.caption }}</p>{% endif %}
+    {# Long descriptions on: what students will also get, the data table first (when its
+       values were read from the image, it is what the decision is about). #}
+    {% if item.data_table %}
+    <p class="part-label">Data table, as students will get it</p>
+    <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+    {% endif %}
+    {% if item.long_description %}
+    <p class="part-label">Longer description</p>
+    <p class="long-proposal">{{ item.long_description }}</p>
+    {% endif %}
+    {% if item.data_table or item.long_description %}<p class="hint">To change the data table or the longer description, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>{% endif %}
     {% elif item.kind == "heading" %}
     <p class="part-label">Heading text</p>
     <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
