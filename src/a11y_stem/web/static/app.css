@@ -469,49 +469,72 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 }
 .key-required { background: var(--mark-required); color: #fff; border-radius: 0.7rem; }
 .key-optional { background: var(--bg); min-width: 1.9rem; border: 1.5px dashed var(--mark-optional); border-radius: 3px; }
-.key-accepted { background: var(--bg); color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); border-radius: 0.7rem; }
+.key-repeat { background: var(--bg); color: var(--mark-required); border: 2px solid var(--mark-required); border-radius: 0.7rem; }
+.key-accepted { background: var(--bg); min-width: 1.9rem; color: var(--mark-accepted); border: 1.5px dotted var(--mark-accepted); border-radius: 3px; }
 .page-scroll {
   position: relative; overflow: auto; border-radius: 4px; background: var(--desk);
   max-height: 80vh; overscroll-behavior: contain;
 }
 .page-scroll:focus-visible { outline-offset: -3px; }
-.page-frame { position: relative; margin: 0 auto; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); forced-color-adjust: none; }
+/* At least 36rem wide at every window width (about 1 CSS px per point for a Letter page):
+   web.marks sizes the clickable areas for that (MIN_PAGE_PX). Narrower, the page
+   scrolls inside its region. */
+.page-frame { position: relative; margin: 0 auto; min-width: 36rem; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); forced-color-adjust: none; }
 .page-image { display: block; width: 100%; height: auto; }
 .page-note { margin: 0.5rem 0 0; font-size: 0.95rem; }
 .page-failed:not([hidden]) { display: block; }
 
+/* A mark is a link (the clickable area: at least 24 x 24 CSS px, overlapping no other
+   mark; web.marks places it) with a frame inside that hugs the item. The link itself is
+   invisible; clicks on the frame and the tag go to it. */
 .box {
-  position: absolute; transform: translate(-50%, -50%); min-width: 24px; min-height: 24px;
-  border-radius: 3px; text-decoration: none; color: inherit;
+  position: absolute; display: block; min-width: 24px; min-height: 24px;
+  border-radius: 4px; text-decoration: none; color: inherit;
 }
-.box-required { border: 2.5px solid var(--mark-required); box-shadow: 0 0 0 1.5px #fff, inset 0 0 0 1px #fff; background: rgb(253 243 225 / 0.18); }
-.box-optional { border: 1.5px dashed var(--mark-optional); box-shadow: 0 0 0 1px #fff; }
-.box-accepted { border: 1.5px dotted var(--mark-accepted); box-shadow: 0 0 0 1px #fff; }
-.box.is-current { border: 3px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(26 79 160 / 0.28); background: rgb(232 238 250 / 0.2); }
-/* The number sits just outside the box on the left (in the margin, for a heading), so it
-   never covers the item itself. */
+/* marks.css gives each mark its frame inside the link (--fl, --ft, --fw, --fh) and, for an
+   equation in a line of text, its number's place in the page margin (--tag-left). */
+.box-frame {
+  position: absolute; display: block; border-radius: 3px; pointer-events: none;
+  left: var(--fl, 0%); top: var(--ft, 0%); width: var(--fw, 100%); height: var(--fh, 100%);
+}
+.box-required .box-frame { border: 2.5px solid var(--mark-required); box-shadow: 0 0 0 1.5px #fff, inset 0 0 0 1px #fff; background: rgb(253 243 225 / 0.18); }
+/* A heading group's heading on a page other than the one its decision counts on: the
+   same number, outlined instead of filled, and a thinner frame. */
+.box-repeat .box-frame { border: 2px solid var(--mark-required); box-shadow: 0 0 0 1px #fff; }
+.box-optional .box-frame { border: 1.5px dashed var(--mark-optional); box-shadow: 0 0 0 1px #fff; }
+.box-accepted .box-frame { border: 1.5px dotted var(--mark-accepted); box-shadow: 0 0 0 1px #fff; }
+.box.is-current { z-index: 1; }
+.box.is-current .box-frame { border: 3px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(26 79 160 / 0.28); background: rgb(232 238 250 / 0.2); }
+.box:hover .box-frame { border-style: solid; }
+/* The number sits just outside the frame on the left (in the margin, for a heading), or
+   in the page margin on the same line for an equation in a line of text. */
 .box-tag {
-  position: absolute; right: calc(100% + 4px); top: 50%; margin-top: -12px;
+  position: absolute; pointer-events: none;
+  right: var(--tag-right, calc(100% - var(--fl, 0%) + 4px)); left: var(--tag-left, auto);
+  top: calc(var(--ft, 0%) + var(--fh, 100%) / 2 - 11px);
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
-  font: 700 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; white-space: nowrap;
+  min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px;
+  font: 700 12.5px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; white-space: nowrap;
   box-shadow: 0 0 0 1.5px #fff;
 }
 .box-required .box-tag { background: var(--mark-required); color: #fff; }
-/* Optional checks stay quiet: a dashed frame (the legend says what it means), with its
-   "Note" label only while it is pointed at, focused or selected, so it never covers the
-   words around it at rest. Its link name always says "Note: ..., optional check". */
-.box-optional .box-tag {
-  display: none; right: auto; left: -4px; top: -21px; margin-top: 0; min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px;
-  background: #fff; color: var(--mark-optional); border: 1px dashed var(--mark-optional); font-size: 11px;
+.box-repeat .box-tag { background: #fff; color: var(--mark-required); border: 2px solid var(--mark-required); }
+/* Optional checks and accepted items stay quiet: the frame's shape (dashed, dotted; the
+   legend says which is which) with its label ("Note", a tick) only while it is pointed
+   at, focused or selected, so it never covers the words around it at rest. Its link
+   name always says what it is. */
+.box-optional .box-tag, .box-accepted .box-tag {
+  display: none; right: auto; left: calc(var(--fl, 0%) - 4px); top: calc(var(--ft, 0%) - 21px);
+  min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px; background: #fff; font-size: 11px;
 }
-.box-optional:hover .box-tag, .box-optional:focus-visible .box-tag, .box-optional.is-current .box-tag { display: inline-flex; }
-.box-accepted .box-tag { margin-top: -9px; min-width: 18px; height: 18px; padding: 0; background: #fff; color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); font-size: 12px; }
+.box-optional .box-tag { color: var(--mark-optional); border: 1px dashed var(--mark-optional); }
+.box-accepted .box-tag { color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); font-size: 12px; }
+.box-optional:hover .box-tag, .box-optional:focus-visible .box-tag, .box-optional.is-current .box-tag,
+.box-accepted:hover .box-tag, .box-accepted:focus-visible .box-tag, .box-accepted.is-current .box-tag { display: inline-flex; }
 .box.is-current .box-tag { background: var(--mark-current); color: #fff; border: 0; }
-.box:hover { border-style: solid; }
 /* Focus: after the status rules, so a focused mark always shows the focus ring. */
-.page-frame .box:focus-visible { outline: 3px solid var(--focus); outline-offset: 3px; box-shadow: 0 0 0 6px var(--focus-halo); z-index: 2; }
-.page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 3px; z-index: 2; }
+.page-frame .box:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); z-index: 2; }
+.page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 2px; z-index: 2; }
 
 @media (forced-colors: active) {
   .step, .page-chip, .pill { border: 2px solid CanvasText; }
@@ -524,7 +547,6 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
    and scrolls inside its own region; "Show on the page" (and app.js) scroll it to the
    mark. The page itself never scrolls sideways. */
 @media (max-width: 63.99rem) {
-  .page-frame { min-width: 36rem; }
   .page-scroll { max-height: 75vh; }
 }
 

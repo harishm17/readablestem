@@ -38,7 +38,7 @@ from sqlalchemy import select
 
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import page_images, queue
+from a11y_stem.web import marks, page_images, queue
 from a11y_stem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
@@ -86,7 +86,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
-BOX_PAD_PT = 2.5  # a mark is this much bigger than the element on every side
 HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
 FIGURE_REGION_ZOOM = 2.0
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
@@ -117,7 +116,9 @@ class Box:
     href: str
     tag: str  # what the mark shows: the decision number, "Note" or "✓"
     name: str  # the rest of the link's accessible name (after the tag)
-    tier: str  # "required", "optional" or "accepted"
+    # "required", "repeat" (a group's heading on another page than the one its decision
+    # counts on), "optional" or "accepted"
+    tier: str
     current: bool = False
 
 
@@ -145,6 +146,11 @@ class PageView:
     @property
     def placed(self) -> bool:
         return self.width is not None and self.height is not None
+
+    @property
+    def tiers(self) -> set[str]:
+        """The kinds of mark on the page (the legend lists only these)."""
+        return {b.tier for b in self.boxes}
 
 
 @dataclass
@@ -533,9 +539,17 @@ class SplitBuilder:
                         else f"{label}, repeated heading"
                     )
                 of = f"{decision.number} of {len(self.queue)}"
-                name = f"{what}, needs your decision ({of})"
+                home = queue.page_of(decision.lead, self.elements)
+                if decision.is_group and home is not None and home != index:
+                    # A group's heading on another page than the one the decision counts
+                    # on (`queue.open_by_page`): a lighter mark, so a page without "N to
+                    # decide" never shows a solid decision mark.
+                    name = f"{what}, part of decision {of} (first on page {home + 1})"
+                    tier = "repeat"
+                else:
+                    name = f"{what}, needs your decision ({of})"
                 boxes.append(
-                    Box(fix.element_id, href, str(decision.number), name, "required", is_current)
+                    Box(fix.element_id, href, str(decision.number), name, tier, is_current)
                 )
             elif tier == "optional":
                 name = f"{label}, optional check"
@@ -764,28 +778,56 @@ def _pct(value: float, whole: float) -> str:
     return f"{100 * value / whole:.3f}%"
 
 
+def _box_rules(mark: marks.Mark, size: tuple[float, float]) -> str:
+    """A mark's link on the page (percent of the page), and as custom properties for
+    app.css: its frame inside the link (--fl, --ft, --fw, --fh, percent of the link) and,
+    for one in a line of text, where its number goes in the margin (--tag-left)."""
+    width, height = size
+    lx0, ly0, lx1, ly1 = mark.link
+    fx0, fy0, fx1, fy1 = mark.frame
+    lw, lh = max(lx1 - lx0, 0.01), max(ly1 - ly0, 0.01)
+    rule = (
+        f"#box-{mark.element_id}{{left:{_pct(lx0, width)};top:{_pct(ly0, height)};"
+        f"width:{_pct(lw, width)};height:{_pct(lh, height)};"
+        f"--fl:{_pct(fx0 - lx0, lw)};--ft:{_pct(fy0 - ly0, lh)};"
+        f"--fw:{_pct(fx1 - fx0, lw)};--fh:{_pct(fy1 - fy0, lh)}"
+    )
+    if mark.tag_x is not None:
+        rule += f";--tag-left:calc({_pct(mark.tag_x - lx0, lw)} - 11px);--tag-right:auto"
+    return rule + "}"
+
+
 @router.get("/jobs/{job_id}/review/marks.css")
 def marks_css(request: Request, job_id: str, user: UserDep) -> Response:
-    """Where each mark goes on its page image, and the size the proposal of each equation
-    is drawn at under its crop. Element ids and numbers only."""
+    """Where each mark goes on its page image (`web.marks`: a frame round the element and
+    a clickable area of at least 24 CSS px that overlaps no other), and the size the
+    proposal of each equation is drawn at under its crop. Element ids and numbers only."""
     _, result, _ = _load(request, job_id, user)
     sizes = resolve_page_sizes(request, job_id, user, result)
     elements = {e.id: e for e in result.elements}
     rules = []
+    by_page: dict[int, dict[str, tuple[float, float, float, float]]] = {}
+    inline = frozenset(
+        e.id for e in result.elements if e.kind is Kind.EQUATION and e.display == "inline"
+    )
+    text: dict[int, tuple[float, float]] = {}  # how far each page's content reaches
+    for e in result.elements:
+        left, right = text.get(e.page, (e.bbox[0], e.bbox[2]))
+        text[e.page] = (min(left, e.bbox[0]), max(right, e.bbox[2]))
     for fix in result.fixes:
         element = elements.get(fix.element_id)
-        if element is None or fix.kind not in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+        if element is not None and fix.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+            by_page.setdefault(element.page, {})[element.id] = element.bbox
+    for page, boxes in sorted(by_page.items()):
+        size = sizes.get(page)
+        if size is not None:
+            placed = marks.place(boxes, size, inline=inline, text=text.get(page))
+            rules.extend(_box_rules(m, size) for m in placed.values())
+    for fix in result.fixes:
+        element = elements.get(fix.element_id)
+        if element is None:
             continue
         size = sizes.get(element.page)
-        if size is not None:
-            width, height = size
-            x0, y0, x1, y1 = element.bbox
-            x0, y0, x1, y1 = x0 - BOX_PAD_PT, y0 - BOX_PAD_PT, x1 + BOX_PAD_PT, y1 + BOX_PAD_PT
-            centre = _pct((x0 + x1) / 2, width), _pct((y0 + y1) / 2, height)
-            rules.append(
-                f"#box-{element.id}{{left:{centre[0]};top:{centre[1]};"
-                f"width:{_pct(x1 - x0, width)};height:{_pct(y1 - y0, height)}}}"
-            )
         if fix.kind is Kind.EQUATION:
             clip = context_clip(element, size)
             geometry = compare_geometry(element, clip, max_side_px=page_images.REGION_MAX_SIDE_PX)
@@ -859,6 +901,7 @@ def region_image(request: Request, job_id: str, element_id: str, user: UserDep) 
                 max_side=page_images.REGION_MAX_SIDE_PX,
                 clip=band_clip(element, size),
                 box=element.bbox,
+                snap=True,
             )
         else:
             x0, y0, x1, y1 = element.bbox

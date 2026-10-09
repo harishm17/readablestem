@@ -181,13 +181,45 @@ def test_the_page_list_counts_each_decision_once(split):
     assert 'aria-current="page"' in chips[0][1]
 
 
+def test_a_page_without_a_count_shows_no_solid_decision_mark(split):
+    """Page 2 has the group's third heading, but the decision counts on page 1 (its first
+    heading waiting), so page 2's chip has no count: its mark is the lighter "part of a
+    decision counted on another page", not a solid "needs your decision"."""
+    page = screen(split, "?item=p1-e2&page=2")
+    mark = boxes(page)["p2-e0"]
+    assert 'class="box box-repeat"' in mark
+    assert (
+        "3: Heading 4, “Teacher Support”, repeated heading, part of decision 3 of 3 "
+        "(first on page 1)" in text_of(mark)
+    )
+    assert "box-required" not in page.split('<div class="page-frame">', 1)[1]
+    legend = text_of(section(page, '<ul class="legend"', "</ul>"))
+    assert "Part of a decision counted on another page" in legend
+    # Page 1 keeps the solid marks, and its legend has no such line.
+    first = screen(split)
+    assert 'class="box box-required"' in boxes(first)["p1-e7"]
+    assert "Part of a decision" not in section(first, '<ul class="legend"', "</ul>")
+    # The group selected: the mark on page 2 is the current one, still not "required".
+    selected = boxes(screen(split, f"?item={GROUP}&page=2"))["p2-e0"]
+    assert 'class="box box-repeat is-current"' in selected
+
+
 def test_marks_stylesheet_places_marks_and_sizes_the_proposal(split):
     response = split.browser.get(f"/jobs/{split.job_id}/review/marks.css")
     assert response.status_code == 200
     assert response.headers["content-type"].startswith("text/css")
     assert response.headers["cache-control"] == "private, no-store"
     css = response.text
-    assert re.search(r"#box-p1-e2\{left:[\d.]+%;top:[\d.]+%;width:[\d.]+%;height:[\d.]+%\}", css)
+    # The clickable area on the page, and the frame round the item inside it.
+    number = r"-?[\d.]+%"
+    box = (
+        rf"#box-p1-e2\{{left:{number};top:{number};width:{number};height:{number};"
+        rf"--fl:{number};--ft:{number};--fw:{number};--fh:{number}"
+    )
+    assert re.search(box, css)
+    # An equation in a line of text has its number in the page margin; a heading not.
+    assert re.search(r"#box-p1-e2\{[^}]*--tag-left:calc\(-[\d.]+% - 11px\);--tag-right:auto\}", css)
+    assert not re.search(r"#box-p1-e3\{[^}]*--tag-left", css)
     assert re.search(r"#cmp-p1-e2 \.cmp-math\{font-size:[\d.]+cqw;margin-left:[\d.]+cqw\}", css)
     # Ids and numbers only.
     assert not re.search(r"Teacher|Vectors|ω|car", css)

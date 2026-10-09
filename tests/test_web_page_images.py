@@ -262,3 +262,65 @@ def test_not_a_pdf_fails_in_the_parent_too():
         page_images.render_page(b"%PDF-1.4 this is not really a pdf", 0)
     with pytest.raises(page_images.RenderFailed):
         page_images.page_sizes(b"<html>")
+
+
+def _band_pdf() -> bytes:
+    """A box title, a heading under it, and a paragraph of several lines after it."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 100), "Teacher Support", fontname="hebo", fontsize=14)
+    page.insert_text((72, 124), "Teacher Support", fontname="hebo", fontsize=10.5)
+    css = "p { font-family: serif; font-size: 11pt; margin: 0; }"
+    words = " ".join(f"word{i}" for i in range(80))
+    page.insert_htmlbox(pymupdf.Rect(72, 132, 540, 220), f"<p>{words}</p>", css=css)
+    data = doc.tobytes()
+    doc.close()
+    return data
+
+
+def test_a_headings_band_shows_whole_lines_and_whole_words():
+    """The band round a heading used to slice the line above (the box title) and the last
+    line, and to stop mid-word on the right. Snapped, every line is in or out whole, and
+    every word the right edge crosses is painted over."""
+    doc = pymupdf.open(stream=_band_pdf(), filetype="pdf")
+    page = doc[0]
+    heading = page.search_for("Teacher Support")[1]
+    # band_clip's shape: 1.6 font sizes above, 3 below, about half the page wide.
+    area = pymupdf.Rect(heading.x0 - 15, heading.y0 - 16.8, 72 + 0.55 * 612, heading.y1 + 31.5)
+    snapped, hidden = pdf_probe.snap_band(page, area, heading)
+    for rect in pdf_probe._ink_lines(page):
+        inside = snapped.y0 <= rect.y0 and rect.y1 <= snapped.y1
+        outside = rect.y1 <= snapped.y0 or rect.y0 >= snapped.y1
+        assert inside or outside, (rect, snapped)  # no slice of a line
+    title = min(pdf_probe._ink_lines(page), key=lambda r: r.y0)
+    assert snapped.y0 <= title.y0 < area.y0 < title.y1  # the box title: cut before, whole now
+    crossing = [
+        pymupdf.Rect(w[:4])
+        for w in page.get_text("words")
+        if w[0] < snapped.x1 < w[2] and w[3] > snapped.y0 and w[1] < snapped.y1
+    ]
+    assert crossing, "the test's band should cut words on the right"
+    assert len(hidden) == len(crossing)
+    for word, cover in zip(
+        sorted(crossing, key=lambda r: r.y0), sorted(hidden, key=lambda r: r.y0), strict=True
+    ):
+        assert cover.contains(pymupdf.Rect(max(word.x0, snapped.x0), word.y0, word.x1, word.y1))
+    doc.close()
+    # Rendered with --snap the child paints them over: the image differs from the plain one.
+    clip = (area.x0, area.y0, area.x1, area.y1)
+    plain = pdf_probe.render(_band_pdf(), page=0, zoom=2, max_side=1600, clip=clip)
+    snapped_png = pdf_probe.render(_band_pdf(), page=0, zoom=2, max_side=1600, clip=clip, snap=True)
+    assert plain != snapped_png
+
+
+def test_a_heading_with_nothing_above_it_starts_its_band_just_above_it():
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.draw_line((60, 90), (550, 90), color=(0, 0, 0), width=1)  # a box's bottom rule
+    page.insert_text((72, 112), "Distance", fontname="hebo", fontsize=12)
+    heading = page.search_for("Distance")[0]
+    area = pymupdf.Rect(heading.x0 - 18, heading.y0 - 19.2, 400, heading.y1 + 36)
+    snapped, _ = pdf_probe.snap_band(page, area, heading)
+    assert snapped.y0 > 90  # the rule is not in the band
+    assert snapped.y0 == pytest.approx(heading.y0 - pdf_probe.SNAP_ABOVE_PT)
+    doc.close()

@@ -22,12 +22,15 @@ The review screen uses the same child, with the same memory cap, for two more th
 (`web.page_images` is the caller):
 
 - `python -m a11y_stem.web.pdf_probe render PAGE ZOOM MAX_SIDE [--clip X0,Y0,X1,Y1]
-  [--mark X0,Y0,X1,Y1 --chars HEX,...] [--box X0,Y0,X1,Y1]` writes one PNG of a page (or
-  of a region of it) to stdout, its long side at most `MAX_SIDE` (never more than
-  `RENDER_MAX_SIDE_PX`). `--mark` outlines the glyphs of the listed characters (Unicode
-  code points in hex) inside that region, so a flagged symbol is outlined in the PDF's
-  own image; `--box` outlines a whole region (a heading among the lines around it). On
-  any failure it writes nothing and exits with status 2.
+  [--mark X0,Y0,X1,Y1 --chars HEX,...] [--box X0,Y0,X1,Y1] [--snap 1]` writes one PNG of
+  a page (or of a region of it) to stdout, its long side at most `MAX_SIDE` (never more
+  than `RENDER_MAX_SIDE_PX`). `--mark` outlines the glyphs of the listed characters
+  (Unicode code points in hex) inside that region, so a flagged symbol is outlined in
+  the PDF's own image; `--box` outlines a whole region (a heading among the lines around
+  it); `--snap 1` moves the region's top and bottom to whole lines and paints over the
+  words its right edge would cut (`snap_band`, from the page's text here in the child),
+  so no slice of a line or a word shows. On any failure it writes nothing and exits with
+  status 2.
 - `python -m a11y_stem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 
@@ -199,6 +202,84 @@ def _outline_glyphs(
         page.draw_rect(outline, color=MARK_COLOR, width=width_pt)
 
 
+SNAP_PAD_PT = 1.5  # room left round the text when a band is snapped to whole lines
+SNAP_MAX_GROW_PT = 40.0  # a band edge never moves further than this to take a line in
+SNAP_ABOVE_PT = 5.0  # room above a heading with no line above it in its band
+INK_ABOVE, INK_BELOW = 0.8, 0.25  # of the font size, from the baseline
+HIDE_COLOR = (1.0, 1.0, 1.0)  # a word cut by the band's right edge is painted over
+
+
+def _ink_lines(page: pymupdf.Page) -> list[pymupdf.Rect]:
+    """Each text line's box from its baselines: cap height above, descenders below. The
+    boxes MuPDF reports use the fonts' full ascent and descent, so lines one above the
+    other overlap there, and no edge between them would cut neither."""
+    import pymupdf
+
+    out = []
+    for block in page.get_text("dict", flags=pymupdf.TEXT_MEDIABOX_CLIP).get("blocks", []):
+        for line in block.get("lines", []):
+            spans = [s for s in line.get("spans", []) if s.get("text", "").strip()]
+            if not spans:
+                continue
+            x0, _, x1, _ = line["bbox"]
+            y0 = min(s["origin"][1] - INK_ABOVE * s["size"] for s in spans)
+            y1 = max(s["origin"][1] + INK_BELOW * s["size"] for s in spans)
+            out.append(pymupdf.Rect(x0, y0, x1, y1))
+    return out
+
+
+def snap_band(
+    page: pymupdf.Page, area: pymupdf.Rect, keep: pymupdf.Rect | None = None
+) -> tuple[pymupdf.Rect, list[pymupdf.Rect]]:
+    """`area` with its top and bottom moved so it cuts no line of text, and the words its
+    right edge would cut (to be painted over, so each line ends on a whole word, as
+    ragged as left-aligned text). A line across the top edge comes in whole (the line
+    just above a heading is context worth seeing), and with no line above `keep` (the
+    heading) the band starts just above it; a line across the bottom edge is left out,
+    unless it is the first line below the heading. A word across the left edge moves
+    that edge out to take it in. Only lines that share some width with the area count,
+    so the next column is not pulled in. No edge moves more than `SNAP_MAX_GROW_PT`."""
+    import pymupdf
+
+    pad = SNAP_PAD_PT
+    top, bottom, left, right = area.y0, area.y1, area.x0, area.x1
+    beside = sorted(
+        (r for r in _ink_lines(page) if r.x1 > left and r.x0 < right), key=lambda r: r.y0
+    )
+    head_top = keep.y0 if keep is not None else top
+    head_bottom = keep.y1 if keep is not None else top
+    above = [r for r in beside if r.y1 <= head_top + 0.5]
+    under = [r for r in beside if r.y0 >= head_bottom - 0.5]
+    across_top = [r for r in above if r.y0 < top < r.y1]
+    if across_top:
+        top = max(min(r.y0 for r in across_top) - pad, area.y0 - SNAP_MAX_GROW_PT)
+    elif keep is not None and not [r for r in above if r.y0 >= top]:
+        # No line above the heading in the band: only space, or a rule from a box
+        # above. Start just above the heading instead.
+        top = max(top, keep.y0 - SNAP_ABOVE_PT)
+    across_bottom = [r for r in under if r.y0 < bottom < r.y1]
+    if across_bottom:
+        # The first line under the heading comes in whole; any later one is left out.
+        cut = across_bottom[0]
+        first = cut is under[0]
+        bottom = min(cut.y1 + pad, area.y1 + SNAP_MAX_GROW_PT) if first else cut.y0 - pad
+    words = [
+        pymupdf.Rect(w[:4])
+        for w in page.get_text("words", flags=pymupdf.TEXT_MEDIABOX_CLIP)
+        if w[3] > top + 0.5 and w[1] < bottom - 0.5
+    ]
+    across_left = [w.x0 for w in words if w.x0 < left < w.x1]
+    if across_left:
+        left = max(min(across_left) - pad, area.x0 - SNAP_MAX_GROW_PT)
+    # Descenders can reach below a word's box (a "p" in Times): paint a little more.
+    hide = [
+        pymupdf.Rect(max(w.x0 - 0.6, left), w.y0 - 1.0, w.x1 + 0.6, w.y1 + 0.3 * w.height)
+        for w in words
+        if w.x0 < right < w.x1
+    ]
+    return pymupdf.Rect(left, top, right, bottom) & page.rect, hide
+
+
 def render(
     data: bytes,
     *,
@@ -209,10 +290,12 @@ def render(
     mark: tuple[float, float, float, float] | None = None,
     chars: str = "",
     box: tuple[float, float, float, float] | None = None,
+    snap: bool = False,
 ) -> bytes:
     """PNG of one page (0-based), or of `clip` on it, at `zoom` pixels per point, its long
     side capped at `max_side` (and `RENDER_MAX_SIDE_PX`). `box` is outlined as a whole
-    (a heading among the lines around it). Raises ProbeRejected."""
+    (a heading among the lines around it); with `snap` the clip is first moved to whole
+    lines and words round it (`snap_band`). Raises ProbeRejected."""
     import pymupdf
 
     doc = _open(data)
@@ -223,6 +306,11 @@ def render(
         if max(current.rect.width, current.rect.height) > MAX_PAGE_SIDE_PT:
             raise ProbeRejected("page_too_large")
         area = current.rect if clip is None else pymupdf.Rect(clip) & current.rect
+        if snap and clip is not None:
+            keep = pymupdf.Rect(box) if box is not None else None
+            area, hide = snap_band(current, area, keep)
+            for rect in hide:  # in this child's copy only: it is never saved
+                current.draw_rect(rect, color=None, fill=HIDE_COLOR, width=0)
         if area.is_empty or area.width < 0.5 or area.height < 0.5:
             raise ProbeRejected("empty_region")
         side = min(max_side, RENDER_MAX_SIDE_PX)
@@ -260,6 +348,7 @@ def _render_main(args: list[str], data: bytes) -> int:
         mark=_rect(options["--mark"]) if "--mark" in options else None,
         chars=chars,
         box=_rect(options["--box"]) if "--box" in options else None,
+        snap=options.get("--snap") == "1",
     )
     sys.stdout.buffer.write(png)
     return 0

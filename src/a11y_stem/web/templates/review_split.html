@@ -367,8 +367,9 @@
     <div class="page-tools">
       <ul class="legend" aria-label="What the marks mean">
         <li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>
+        {% if "repeat" in page.tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Part of a decision counted on another page</li>{% endif %}
         <li><span class="key key-optional" aria-hidden="true"></span> Optional check (a note)</li>
-        {% if show_accepted %}<li><span class="key key-accepted" aria-hidden="true">✓</span> Accepted</li>{% endif %}
+        {% if show_accepted %}<li><span class="key key-accepted" aria-hidden="true"></span> Accepted</li>{% endif %}
       </ul>
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>
     </div>
@@ -376,7 +377,9 @@
       <div class="page-frame">
         <img class="page-image" src="{{ page.image_url }}" alt="Page {{ page.number }} of the PDF." width="{{ (page.width or 612)|round|int }}" height="{{ (page.height or 792)|round|int }}">
         {% for b in page.boxes %}
-        <a id="box-{{ b.element_id }}" class="box box-{{ b.tier }}{% if b.current %} is-current{% endif %}" href="{{ b.href }}"{% if b.current %} aria-current="true"{% endif %}><span class="box-tag" aria-hidden="true">{{ b.tag }}</span><span class="visually-hidden">{% if b.tier != "accepted" %}{{ b.tag }}: {% endif %}{{ b.name }}</span></a>
+        {# The link is the clickable area (at least 24 CSS px, overlapping no other mark);
+           the frame inside it hugs the item. Both placed by marks.css (web.marks). #}
+        <a id="box-{{ b.element_id }}" class="box box-{{ b.tier }}{% if b.current %} is-current{% endif %}" href="{{ b.href }}"{% if b.current %} aria-current="true"{% endif %}><span class="box-frame" aria-hidden="true"></span><span class="box-tag" aria-hidden="true">{{ b.tag }}</span><span class="visually-hidden">{% if b.tier != "accepted" %}{{ b.tag }}: {% endif %}{{ b.name }}</span></a>
         {% endfor %}
       </div>
       {% if not page.placed %}<p class="page-note">The marks could not be placed on this page. Every item is still in <a href="{{ list_url }}">the list view</a>.</p>{% endif %}

@@ -52,7 +52,8 @@
 /* Review screen (review_split.html). Everything there works without this; it only:
  *
  * - scrolls the page image, inside its own region, so the selected item's mark is in
- *   view (the window only as far as keeps the decision's heading in view);
+ *   the region's visible box (side by side, also the window, only as far as keeps the
+ *   decision's heading in view; stacked, never the window);
  * - says so when a page image cannot be loaded;
  * - makes "Save edit" the main button once a field of the decision is changed, so an
  *   edit is less likely to be dropped by pressing Accept out of habit;
@@ -65,18 +66,26 @@
 
   var STORE = "a11y-stem.review-shortcuts";
 
+  // How far to scroll along one axis so a mark at `start` (from the region's visible
+  // edge) of length `size` sits a third of the way in, or as far in as it fits.
+  function offset(start, size, visible) {
+    if (start >= 0 && start + size <= visible) return 0;
+    return start - Math.max(0, Math.min(visible / 3, visible - size));
+  }
+
   function bringMarkIntoView() {
     var region = document.querySelector(".page-scroll");
     var mark = region && region.querySelector(".box.is-current");
     if (!region || !mark) return;
+    // Inside the region only, against its own visible box: where the window happens to
+    // be does not matter (stacked, the region starts below the window on a phone, at
+    // 320 px and at 400% zoom, and any window term would overshoot).
     var r = region.getBoundingClientRect();
     var m = mark.getBoundingClientRect();
-    var visibleBottom = Math.min(r.bottom, window.innerHeight);
-    if (m.top >= r.top && m.bottom <= visibleBottom && m.left >= r.left && m.right <= r.right) {
-      return;
-    }
-    region.scrollTop += m.top - r.top - (visibleBottom - r.top) / 3;
-    region.scrollLeft += m.left - r.left - region.clientWidth / 3;
+    var top = m.top - r.top - region.clientTop;
+    var left = m.left - r.left - region.clientLeft;
+    region.scrollTop += offset(top, m.height, region.clientHeight);
+    region.scrollLeft += offset(left, m.width, region.clientWidth);
     // Side by side (wide screens), the page pane starts below the header, so a mark near
     // the bottom of a page can stay below the window. Move the window just enough, and
     // never so far that the decision's heading leaves the top of the window.

@@ -25,7 +25,7 @@ from collections.abc import Iterator
 
 import pytest
 
-from fixtures.web.review_doc import GROUP, review_output, review_pdf
+from fixtures.web.review_doc import GROUP, dense_output, dense_pdf, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv
 from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
@@ -120,13 +120,12 @@ def walk(page, site, job: str, check) -> None:
     page.goto(f"{url}?accepted=1")
     check("accepted shown")
     page.goto(url)
-    page.locator("#decision summary", has_text="Edit the LaTeX").click()
     page.get_by_label("LaTeX for equation 1").fill(r"\notacommand{x}")
     page.get_by_role("button", name="Save edit to equation 1").click()
     page.locator(".error-summary").wait_for()
     check("refused edit")
     page.goto(url)
-    page.get_by_role("button", name="Accept equation 1").click()
+    page.get_by_role("button", name="Accept anyway equation 1").click()
     page.wait_for_url(f"{url}?item=p1-e6")
     wait_images(page)
     check("decision 2: figure")
@@ -183,12 +182,54 @@ def test_the_page_image_is_a_named_focusable_region_that_scrolls_on_a_phone(site
     loaded = page.locator(".page-image").evaluate("img => img.naturalWidth")
     assert loaded > 1000  # rendered from the upload
     # The selected mark was scrolled into view inside the region (app.js).
-    inside = page.evaluate(
-        """() => { const r = document.querySelector('.page-scroll').getBoundingClientRect();
-                   const m = document.querySelector('.box.is-current').getBoundingClientRect();
-                   return m.left >= r.left && m.right <= r.right; }"""
+    assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
+    context.close()
+
+
+REGION_GEOMETRY = """() => {
+  const region = document.querySelector('.page-scroll');
+  const r = region.getBoundingClientRect();
+  const m = document.querySelector('.box.is-current').getBoundingClientRect();
+  return {top: m.top - r.top - region.clientTop, left: m.left - r.left - region.clientLeft,
+          width: m.width, height: m.height, visibleWidth: region.clientWidth,
+          visibleHeight: region.clientHeight, scrollTop: region.scrollTop,
+          windowY: window.scrollY};
+}"""
+
+
+def mark_in_region(page) -> bool:
+    """The selected mark lies inside the page region's visible box, both ways; a mark
+    bigger than the box (a figure at 400% zoom) starts at its edge."""
+    g = page.evaluate(REGION_GEOMETRY)
+
+    def inside(start: float, size: float, visible: float) -> bool:
+        if size > visible:
+            return abs(start) <= 0.5
+        return start >= -0.5 and start + size <= visible + 0.5
+
+    return inside(g["top"], g["height"], g["visibleHeight"]) and inside(
+        g["left"], g["width"], g["visibleWidth"]
     )
-    assert inside
+
+
+@pytest.mark.parametrize(
+    "viewport",
+    [NARROW, {"width": 320, "height": 180}, {"width": 844, "height": 390}, PHONE],
+    ids=["320x640", "320x180 (400% zoom)", "844x390 (landscape phone)", "390x844"],
+)
+@pytest.mark.parametrize("item", ["", "?item=p1-e6", f"?item={GROUP}&page=2"])
+def test_stacked_the_selected_mark_is_inside_the_page_region(site, browser, job, viewport, item):
+    """Stacked, the page region starts below the window. app.js used to add a window term
+    to the region's scroll, which scrolled it to its very end: the mark sat above the
+    visible part. It must be inside, and the window must not move."""
+    context, page = open_page(browser, site, viewport=viewport)
+    page.goto(f"{site.base}/jobs/{job}/review{item}")
+    wait_images(page)
+    assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
+    assert page.evaluate("window.scrollY") == 0
+    # Scrolling the window down to the region shows the mark (nothing scrolls it away).
+    page.locator(".page-scroll").scroll_into_view_if_needed()
+    assert mark_in_region(page), page.evaluate(REGION_GEOMETRY)
     context.close()
 
 
@@ -226,7 +267,7 @@ def test_focus_moves_to_the_next_decisions_heading_after_each_decision(
     context, page = open_page(browser, site, javascript=javascript)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(url)
-    page.get_by_role("button", name="Accept equation 1").click()
+    page.get_by_role("button", name="Accept anyway equation 1").click()
     page.wait_for_url(f"{url}?item=p1-e6")
     _wait_focus(page, "decision-title")
     status = page.get_by_role("status")
@@ -252,11 +293,13 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     page.goto(f"{site.base}/jobs/{job}")
     page.get_by_role("link", name=re.compile("^Review fixes")).click()
     assert page.locator("#decision-title").inner_text().startswith("Decision 1 of 3")
-    # Decision 1: correct the LaTeX (the edit box opens without scripts).
-    page.locator("#decision summary", has_text="Edit the LaTeX").click()
-    page.get_by_label("LaTeX for equation 1").fill(r"\boldsymbol{\omega}")
-    page.get_by_role("button", name="Save edit to equation 1").click()
+    # Decision 1: the omega must be bold; the suggested fix is one button.
+    page.get_by_role("button", name="Use bold ω in equation 1").click()
     page.wait_for_url(f"{url}?item=p1-e6")
+    assert (
+        "Equation 1: Your edit passed the required checks"
+        in page.get_by_role("status").inner_text()
+    )
     # Decision 2: write better alt text.
     page.get_by_label("Alt text for figure 1").fill("A car drives along a road from a house.")
     page.get_by_role("button", name="Save edit to figure 1").click()
@@ -274,6 +317,96 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     context.close()
 
 
+def test_typing_a_fix_then_pressing_accept_keeps_the_fix_without_javascript(site, browser, job):
+    """Accept and Save edit share a form; Accept used to drop what was typed and accept
+    the proposal the screen flagged. Without JavaScript nothing restyles the buttons, so
+    the server must refuse it."""
+    context, page = open_page(browser, site, javascript=False)
+    url = f"{site.base}/jobs/{job}/review"
+    page.goto(url)
+    field = page.get_by_label("LaTeX for equation 1")
+    field.fill(r"\boldsymbol{\omega}")
+    page.get_by_role("button", name="Accept anyway equation 1").click()
+    summary = page.locator(".error-summary")
+    assert "You changed the LaTeX." in summary.inner_text()
+    assert page.get_by_label("LaTeX for equation 1").input_value() == r"\boldsymbol{\omega}"
+    # Save edit is now the main (filled) button; Accept is not.
+    save, accept = (
+        page.get_by_role("button", name=n).evaluate("e => getComputedStyle(e).backgroundColor")
+        for n in ("Save edit to equation 1", "Accept anyway equation 1")
+    )
+    assert save == "rgb(26, 79, 160)" and accept != save
+    page.get_by_role("button", name="Save edit to equation 1").click()
+    page.wait_for_url(f"{url}?item=p1-e6")
+    assert (
+        "Equation 1: Your edit passed the required checks"
+        in page.get_by_role("status").inner_text()
+    )
+    context.close()
+    result = site.job(job).result_json
+    fix = next(f for f in result["fixes"] if f["element_id"] == "p1-e2")
+    assert (fix["status"], fix["equation"]["latex"]) == ("edited", r"\boldsymbol{\omega}")
+
+
+@pytest.fixture
+def dense_job(site, browser) -> Iterator[str]:
+    """A finished job of the dense handout page (fixtures.web.review_doc.dense_output)."""
+    site.converter.output = dense_output()
+    try:
+        context = browser.new_context()
+        page = context.new_page()
+        sign_in(page, site.base, ALICE)
+        page.goto(f"{site.base}/app")
+        page.get_by_label("PDF file").set_input_files(
+            files=[{"name": "dense.pdf", "mimeType": "application/pdf", "buffer": dense_pdf()}]
+        )
+        page.get_by_role("button", name="Upload and convert").click()
+        page.wait_for_url(f"{site.base}/jobs/*")
+        job_id = page.url.rsplit("/", 1)[-1]
+        context.close()
+        assert site.run_worker() == job_id
+        yield job_id
+    finally:
+        site.converter.output = review_output()
+
+
+OVERLAPS = """() => {
+  const rects = [...document.querySelectorAll('.page-frame .box')].map(
+    b => [b.id, b.getBoundingClientRect()]);
+  const out = [];
+  for (let i = 0; i < rects.length; i++) for (let j = i + 1; j < rects.length; j++) {
+    const [a, ra] = rects[i], [b, rb] = rects[j];
+    const w = Math.min(ra.right, rb.right) - Math.max(ra.left, rb.left);
+    const h = Math.min(ra.bottom, rb.bottom) - Math.max(ra.top, rb.top);
+    if (w > 0.5 && h > 0.5) out.push([a, b, Math.round(w), Math.round(h)]);
+  }
+  return out;
+}"""
+
+
+@pytest.mark.parametrize("viewport", [DESKTOP, PHONE], ids=["1440px", "390px"])
+def test_a_dense_page_with_accepted_shown_keeps_every_target_whole(
+    site, browser, dense_job, axe_source, viewport
+):
+    """An inline equation on every line, accepted ones shown: 24 px marks centred on each
+    overlapped, so a click in the overlap went to the wrong item (axe: target-size,
+    "partially obscured"). Now no two clickable areas overlap and axe passes."""
+    context, page = open_page(browser, site, viewport=viewport)
+    page.goto(f"{site.base}/jobs/{dense_job}/review?accepted=1")
+    wait_images(page)
+    assert page.locator(".page-frame .box").count() == 18
+    assert page.evaluate(OVERLAPS) == []
+    sizes = page.eval_on_selector_all(
+        ".page-frame .box",
+        "els => els.map(e => [e.id, e.getBoundingClientRect().width, "
+        "e.getBoundingClientRect().height])",
+    )
+    assert not [s for s in sizes if s[1] < 24 or s[2] < 24], sizes
+    found = strict_axe(page, axe_source)
+    assert not found, describe(found)
+    context.close()
+
+
 def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser, job):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"
@@ -283,8 +416,7 @@ def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser
     assert page.url == url  # off by default
     page.locator("#shortcuts summary").click()
     page.get_by_label("Use keyboard shortcuts on this screen").check()
-    page.locator("#decision summary", has_text="Edit the LaTeX").click()
-    field = page.get_by_label("LaTeX for equation 1")
+    field = page.get_by_label("LaTeX for equation 1")  # open: the meaning changes
     field.focus()
     page.keyboard.type("n a p")
     assert page.url == url and "n a p" in field.input_value()
@@ -305,7 +437,7 @@ def test_forced_colors_keep_the_marks_visible_on_the_page_image(site, browser, j
     wait_images(page)
     colours = page.evaluate(
         """() => ['.box-required:not(.is-current)', '.box.is-current', '.box-optional'].map(
-             s => getComputedStyle(document.querySelector(s)).borderTopColor)"""
+             s => getComputedStyle(document.querySelector(s + ' .box-frame')).borderTopColor)"""
     )
     assert colours == ["rgb(122, 75, 0)", "rgb(26, 79, 160)", "rgb(75, 90, 117)"], colours
     page.locator(".box-optional").focus()

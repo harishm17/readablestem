@@ -182,3 +182,124 @@ def review_output() -> ConversionOutput:
     )
     return ConversionOutput(result=result, crops={k: v for k, v in crops.items() if k in {
         "p1-e2", "p1-e5", "p1-e6", "p2-e2"}})  # fmt: skip
+
+
+# --------------------------------------------------------------------------- a dense page
+
+# A handout column as the real LaTeX handout has it: an inline equation on nearly every
+# line, two to a line, set 13 pt apart, under a numbered heading, and a display equation.
+# One decision (a bold w, a vector, read as a plain w), one optional note, every other
+# equation accepted: with "Show accepted" the page is as dense as review pages get.
+DENSE_LINES = [
+    ("A vector", "v", "is a list of", "n", "real numbers."),
+    ("Vectors of the same length", "u", "add component by", "i", "component."),
+    ("A body turning with angular velocity", "w", "moves a point", "r", "along."),
+    ("The length", "x", "is the square root of", "y", "and more."),
+    ("When", "A", "is square the system", "b", "has one answer."),
+    ("Each root", "c", "gives a vector", "q", "of its own."),
+    ("The product", "k", "of two", "m", "numbers."),
+    ("For every", "t", "the value", "s", "is set."),
+]
+DENSE_REQUIRED = "w"  # bold in the PDF, plain in the proposal
+DENSE_OPTIONAL = "x"
+BOLD_W = "\U0001d430"  # MATHEMATICAL BOLD SMALL W
+
+
+def _dense_layout() -> list[tuple[str, bool, float, float, float]]:
+    """(text, is an equation, x, baseline y, width) of every piece of the dense page."""
+    out = []
+    y = 104.0
+    for before, first, middle, second, after in DENSE_LINES:
+        x = 72.0
+        for part, maths in ((before, False), (first, True), (middle, False), (second, True),
+                            (after, False)):  # fmt: skip
+            bold = part == DENSE_REQUIRED
+            font = "tibo" if bold else ("tiit" if maths else "tiro")
+            width = pymupdf.get_text_length(part, fontname=font, fontsize=11)
+            out.append((part, maths, x, y, width))
+            x += width + 3.2
+        y += 13.0
+    return out
+
+
+@cache
+def dense_pdf() -> bytes:
+    doc = pymupdf.open()
+    page = doc.new_page(width=PAGE[0], height=PAGE[1])
+    page.insert_text((72, 84), "2 Matrices", fontname="hebo", fontsize=14)
+    for part, maths, x, y, _w in _dense_layout():
+        font = "tibo" if part == DENSE_REQUIRED else ("tiit" if maths else "tiro")
+        page.insert_text((x, y), part, fontname=font, fontsize=11)
+    page.insert_text((250, 222), "v = d / t", fontname="tiro", fontsize=11)
+    doc.subset_fonts()
+    data = doc.tobytes(garbage=3, deflate=True)
+    doc.close()
+    return data
+
+
+def dense_output() -> ConversionOutput:
+    doc = pymupdf.open(stream=dense_pdf(), filetype="pdf")
+    page = doc[0]
+    elements = [
+        Element(id="p1-e0", kind=Kind.HEADING, page=0, bbox=_box(page, "2 Matrices"), order=0,
+                text="2 Matrices", font_size=14, bold=True),
+    ]  # fmt: skip
+    fixes = [
+        Fix(element_id="p1-e0", kind=Kind.HEADING, status=Status.ACCEPTED, confidence=0.95,
+            heading=HeadingFix(level=1, text="2 Matrices")),
+    ]  # fmt: skip
+    order = 1
+    for part, maths, x, y, width in _dense_layout():
+        if not maths:
+            continue
+        eid = f"p1-e{order}"
+        box = (round(x, 2), round(y - 8.5, 2), round(x + width, 2), round(y + 2.5, 2))
+        text = BOLD_W if part == DENSE_REQUIRED else part
+        elements.append(
+            Element(id=eid, kind=Kind.EQUATION, page=0, bbox=box, order=order, text=text,
+                    font_size=11, display="inline")
+        )  # fmt: skip
+        equation = EquationFix(latex=part, mathml=_mathml(part, "inline"), speech=part,
+                               display="inline")  # fmt: skip
+        if part == DENSE_REQUIRED:
+            fix = Fix(element_id=eid, kind=Kind.EQUATION, status=Status.NEEDS_REVIEW,
+                      confidence=0.59, review="required", equation=equation,
+                      checks=[Check(name="equation.text_layer_style", passed=False,
+                                    severity="warning", code="style_mismatch")])  # fmt: skip
+        elif part == DENSE_OPTIONAL:
+            fix = Fix(element_id=eid, kind=Kind.EQUATION, status=Status.ACCEPTED,
+                      confidence=0.9, review="optional", equation=equation,
+                      checks=[Check(name="equation.text_layer_style", passed=False,
+                                    severity="warning", code="style_cosmetic")])  # fmt: skip
+        else:
+            fix = Fix(
+                element_id=eid,
+                kind=Kind.EQUATION,
+                status=Status.ACCEPTED,
+                confidence=0.97,
+                equation=equation,
+            )
+        fixes.append(fix)
+        order += 1
+    eid = f"p1-e{order}"
+    elements.append(
+        Element(id=eid, kind=Kind.EQUATION, page=0, bbox=_box(page, "v = d / t"), order=order,
+                text="v = d / t", font_size=11, display="block")
+    )  # fmt: skip
+    fixes.append(
+        Fix(element_id=eid, kind=Kind.EQUATION, status=Status.ACCEPTED, confidence=0.97,
+            equation=EquationFix(latex="v = d / t", mathml=_mathml("v = d / t", "block"),
+                                 speech="v = d / t"))
+    )  # fmt: skip
+    doc.close()
+    result = DocumentResult(
+        pipeline_version="test",
+        title="Matrices",
+        elements=elements,
+        fixes=fixes,
+        stats=DocumentStats(pages=1, cost_usd=0.01, latency_ms=5, model_calls=4),
+        html="<!doctype html><html lang='en'><head><title>Matrices</title></head>"
+        "<body><main><h1>Matrices</h1></main></body></html>",
+        page_sizes={0: PAGE},
+    )
+    return ConversionOutput(result=result, crops={})
