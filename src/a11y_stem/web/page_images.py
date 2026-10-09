@@ -89,15 +89,18 @@ def render_region(
     clip: BBox | None = None,
     mark: BBox | None = None,
     chars: Iterable[str] = (),
+    box: BBox | None = None,
 ) -> bytes:
     """PNG of page `page` (0-based), or of `clip` on it; glyphs of `chars` inside `mark`
-    are outlined. Raises RenderFailed."""
+    are outlined, and so is `box` as a whole. Raises RenderFailed."""
     args = ["render", str(page), f"{zoom:.4f}", str(max_side)]
     if clip is not None:
         args += ["--clip", _numbers(clip)]
     hexes = ",".join(f"{ord(c):x}" for c in sorted(set(chars)) if len(c) == 1)
     if mark is not None and hexes:
         args += ["--mark", _numbers(mark), "--chars", hexes]
+    if box is not None:
+        args += ["--box", _numbers(box)]
     png = _child(args, pdf, RENDER_TIMEOUT_S)
     if not png.startswith(PNG_MAGIC):
         raise RenderFailed()

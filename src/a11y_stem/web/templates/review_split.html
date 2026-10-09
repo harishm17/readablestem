@@ -72,9 +72,9 @@
     {% for row in p.compare.rows %}
     <tr class="{{ 'diff-meaning' if row.meaning else 'diff-cosmetic' }}">
       <th scope="row"><span class="diff-symbol">{{ row.symbol }}</span> <span class="diff-what">{{ row.what|lower }}</span></th>
-      <td>{{ row.pdf }}</td>
-      <td>{{ row.proposal }}</td>
-      <td>{% if row.meaning %}<strong>Yes</strong>{% else %}No{% endif %}</td>
+      <td data-label="In the PDF">{{ row.pdf }}</td>
+      <td data-label="Proposal">{{ row.proposal }}</td>
+      <td data-label="Changes the meaning">{% if row.meaning %}<strong>Yes</strong>{% else %}No{% endif %}</td>
     </tr>
     {% endfor %}
   </tbody>
@@ -179,8 +179,9 @@
     <button type="submit" name="action" value="reject" class="button-secondary">Make bold text<span class="visually-hidden"> (all {{ n }} “{{ hg.text }}”)</span></button>
   </form>
 </div>
-{% if hg.keep < n %}<p class="hint">Keeping them leaves out {{ n - hg.keep }} the document would show at another level: choose a level for {{ "it" if n - hg.keep == 1 else "them" }} below.</p>{% endif %}
-<details class="edit-box"{% if hg.error %} open{% endif %}>
+{% if not hg.keep %}<p class="hint">At level {{ hg.level }} they would skip a level after the heading before them, so choose the level to keep them at.</p>
+{% elif hg.keep < n %}<p class="hint">Keeping them leaves out {{ n - hg.keep }} the document would show at another level: choose a level for {{ "it" if n - hg.keep == 1 else "them" }} below.</p>{% endif %}
+<details class="edit-box"{% if hg.error or not hg.keep %} open{% endif %}>
   <summary>Choose another level</summary>
   <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}">
     {{ hidden_fields() }}
@@ -211,7 +212,7 @@
     <p class="review-lede">{{ headline }}</p>
   </div>
   <div class="review-meta">
-    {% if steps %}
+    {% if steps|length > 1 and steps|length <= max_steps %}
     <nav class="steps" aria-label="Decisions">
       <ol>
         {% for s in steps %}
@@ -220,6 +221,13 @@
       </ol>
       <p class="steps-count">{{ decided }} of {{ total }} decided</p>
     </nav>
+    {% elif steps|length > max_steps %}
+    {# Many decisions: a bar instead of a row of numbers (previous and next links are on
+       the decision itself, and every one is in the list view). One decision: neither. #}
+    <div class="steps">
+      <progress class="steps-bar" max="{{ total }}" value="{{ decided }}" aria-labelledby="steps-count"></progress>
+      <p class="steps-count" id="steps-count">{{ decided }} of {{ total }} decided</p>
+    </div>
     {% endif %}
     <ul class="review-links">
       <li><a href="{{ list_url }}">All items as a list</a></li>
@@ -243,6 +251,7 @@
       <a href="/jobs/{{ job.id }}/view">Open it in this browser</a></p>
     {% else %}
     {% if panel.why %}<p class="why">{{ panel.why }}</p>{% endif %}
+    {% if panel.mode == "item" and panel.status_class == "pill-optional" %}<p class="hint">It was accepted: nothing to do unless you disagree.</p>{% endif %}
     {% if panel.show_on_page %}<p class="on-page"><a href="{{ panel.show_on_page }}">Show on the page</a></p>{% endif %}
     {% if panel.group %}{{ group_body(panel) }}
     {% elif panel.item.kind == "equation" %}{{ equation_body(panel) }}
@@ -323,7 +332,7 @@
     <div class="page-tools">
       <ul class="legend" aria-label="What the marks mean">
         <li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>
-        <li><span class="key key-optional" aria-hidden="true">Note</span> Optional check</li>
+        <li><span class="key key-optional" aria-hidden="true"></span> Optional check (a note)</li>
         {% if show_accepted %}<li><span class="key key-accepted" aria-hidden="true">✓</span> Accepted</li>{% endif %}
       </ul>
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>

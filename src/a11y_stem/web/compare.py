@@ -44,11 +44,11 @@ SIGN_CHARS = {"minus": "−", "plus": "+", "plus-minus": "±", "minus-plus": "�
 # The compare crop: this many font sizes of page on each side of the equation.
 INLINE_PAD_EM = 4.0
 BLOCK_PAD_EM = 1.5
-VERTICAL_PAD_EM = 0.45
+VERTICAL_PAD_EM = 0.2  # more pulls in the descenders of the line above
 DEFAULT_FONT_PT = 10.0
-# Shown at most this many CSS px per point (a 10 pt equation at 40 px), and rendered at
+# Shown at most this many CSS px per point (a 10 pt equation at 35 px), and rendered at
 # twice that for sharp text on a 2x screen.
-COMPARE_PX_PER_PT = 4.0
+COMPARE_PX_PER_PT = 3.5
 
 
 @dataclass(frozen=True)
@@ -230,14 +230,14 @@ def context_clip(element: Element, page_size: tuple[float, float] | None) -> BBo
 
 
 def band_clip(element: Element, page_size: tuple[float, float] | None) -> BBox:
-    """A heading with the lines around it: enough to see what kind of line it is."""
+    """A heading with the lines around it (one above, two below) and about half a page
+    width of them: enough to see whether it opens a section or starts a paragraph."""
     font = element.font_size or DEFAULT_FONT_PT
     x0, y0, x1, y1 = element.bbox
     width = page_size[0] if page_size else x1 + 30 * font
-    return _clamp(
-        (x0 - 2 * font, y0 - 2.2 * font, max(x1 + 2 * font, width * 0.62), y1 + 3.4 * font),
-        page_size,
-    )
+    left = x0 - 1.5 * font
+    right = max(x1 + 2 * font, left + 0.55 * width)
+    return _clamp((left, y0 - 1.6 * font, right, y1 + 3.0 * font), page_size)
 
 
 @dataclass(frozen=True)

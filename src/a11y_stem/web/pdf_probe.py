@@ -22,11 +22,12 @@ The review screen uses the same child, with the same memory cap, for two more th
 (`web.page_images` is the caller):
 
 - `python -m a11y_stem.web.pdf_probe render PAGE ZOOM MAX_SIDE [--clip X0,Y0,X1,Y1]
-  [--mark X0,Y0,X1,Y1 --chars HEX,...]` writes one PNG of a page (or of a region of it)
-  to stdout, its long side at most `MAX_SIDE` (never more than `RENDER_MAX_SIDE_PX`).
-  `--mark` outlines the glyphs of the listed characters (Unicode code points in hex)
-  inside that region, so a flagged symbol is outlined in the PDF's own image. On any
-  failure it writes nothing and exits with status 2.
+  [--mark X0,Y0,X1,Y1 --chars HEX,...] [--box X0,Y0,X1,Y1]` writes one PNG of a page (or
+  of a region of it) to stdout, its long side at most `MAX_SIDE` (never more than
+  `RENDER_MAX_SIDE_PX`). `--mark` outlines the glyphs of the listed characters (Unicode
+  code points in hex) inside that region, so a flagged symbol is outlined in the PDF's
+  own image; `--box` outlines a whole region (a heading among the lines around it). On
+  any failure it writes nothing and exits with status 2.
 - `python -m a11y_stem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 
@@ -207,9 +208,11 @@ def render(
     clip: tuple[float, float, float, float] | None = None,
     mark: tuple[float, float, float, float] | None = None,
     chars: str = "",
+    box: tuple[float, float, float, float] | None = None,
 ) -> bytes:
     """PNG of one page (0-based), or of `clip` on it, at `zoom` pixels per point, its long
-    side capped at `max_side` (and `RENDER_MAX_SIDE_PX`). Raises ProbeRejected."""
+    side capped at `max_side` (and `RENDER_MAX_SIDE_PX`). `box` is outlined as a whole
+    (a heading among the lines around it). Raises ProbeRejected."""
     import pymupdf
 
     doc = _open(data)
@@ -228,6 +231,11 @@ def render(
         if mark is not None and chars:
             wanted = {_fold(c) for c in chars}
             _outline_glyphs(current, pymupdf.Rect(mark), wanted, MARK_WIDTH_PX / scale)
+        if box is not None:
+            gap = 2 * MARK_GAP_PT
+            x0, y0, x1, y1 = box
+            outline = pymupdf.Rect(x0 - gap, y0 - gap, x1 + gap, y1 + gap)
+            current.draw_rect(outline, color=MARK_COLOR, width=MARK_WIDTH_PX / scale)
         pixmap = current.get_pixmap(matrix=pymupdf.Matrix(scale, scale), clip=area, alpha=False)
         return pixmap.tobytes("png")
     finally:
@@ -251,6 +259,7 @@ def _render_main(args: list[str], data: bytes) -> int:
         clip=_rect(options["--clip"]) if "--clip" in options else None,
         mark=_rect(options["--mark"]) if "--mark" in options else None,
         chars=chars,
+        box=_rect(options["--box"]) if "--box" in options else None,
     )
     sys.stdout.buffer.write(png)
     return 0

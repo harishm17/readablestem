@@ -120,7 +120,7 @@ def open_page(browser, site, *, viewport=WIDE, javascript: bool = True):
 
 
 def review_url(site, job: str) -> str:
-    return f"{site.base}/jobs/{job}/review"
+    return f"{site.base}/jobs/{job}/review/list"
 
 
 def unfold_everything(page) -> None:

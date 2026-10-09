@@ -40,6 +40,7 @@ from a11y_stem.core.types import DocumentResult, Fix, Kind
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
 from a11y_stem.web import page_images, queue
 from a11y_stem.web.compare import (
+    COMPARE_PX_PER_PT,
     CompareGeometry,
     EquationCompare,
     band_clip,
@@ -83,8 +84,9 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
-BOX_PAD_PT = 1.5  # a mark is this much bigger than the element on every side
+BOX_PAD_PT = 2.5  # a mark is this much bigger than the element on every side
 HEADING_REGION_ZOOM = 3.0
+MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
 FIGURE_REGION_ZOOM = 2.0
 
 # Short notes for the folded list of optional checks (the card itself has the full
@@ -437,8 +439,8 @@ class SplitBuilder:
             )
             clip = context_clip(element, size)
             panel.compare_size = (
-                round((clip[2] - clip[0]) * 4.0, 1),
-                round((clip[3] - clip[1]) * 4.0, 1),
+                round((clip[2] - clip[0]) * COMPARE_PX_PER_PT, 1),
+                round((clip[3] - clip[1]) * COMPARE_PX_PER_PT, 1),
             )
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             outlined = ", the symbol to check outlined" if compare.pdf_marks else ""
@@ -449,10 +451,14 @@ class SplitBuilder:
         panel.why = _why(fix, panel.compare)
 
     def _group_panel(self, panel: Panel, decision: queue.Decision) -> None:
+        # The card asks about the headings still waiting; once none is, it only says so
+        # (the group's label and style come from all of them).
         members = list(decision.waiting) or list(decision.fixes)
         for fix in members:
             self.item(fix)
         group = _heading_group(self.result, members, self.items, self.elements, self.places)
+        if not decision.open:
+            group.members, group.keep = [], 0
         panel.group = group
         lead = decision.lead
         page = self.page_of(lead)
@@ -686,6 +692,7 @@ def split_page(
         "alt_guideline": ALT_WARN_CHARS,
         "show_accepted": show_accepted,
         "list_url": f"/jobs/{builder.job_id}/review/list",
+        "max_steps": MAX_STEPS,
     }
     return render(request, "review_split.html", context, status_code=status_code)
 
@@ -811,6 +818,7 @@ def region_image(request: Request, job_id: str, element_id: str, user: UserDep) 
                 zoom=HEADING_REGION_ZOOM,
                 max_side=page_images.REGION_MAX_SIDE_PX,
                 clip=band_clip(element, size),
+                box=element.bbox,
             )
         else:
             x0, y0, x1, y1 = element.bbox

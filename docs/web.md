@@ -84,8 +84,12 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation or figure |
-| GET `/jobs/{id}/review` | owner | Review screen |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting |
+| GET `/jobs/{id}/review?item=&page=&accepted=1` | owner | Review screen: one decision at a time beside its page (below) |
+| GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind, with bulk accept |
+| GET `/jobs/{id}/review/marks.css` | owner | Where each mark goes on its page image, and the compare sizes (element ids and numbers only) |
+| GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored |
+| GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the lines around it (outlined), a figure |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting. A hidden `view` field (`split` or `list`) says which view to go back to |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
@@ -277,13 +281,132 @@ and scripts.
 
 ## Review screen
 
-Code: `web/routes/review.py` (page and form handling), `web/review.py` (rules: order,
-eligibility, validation), `web/messages.py` (what each code means). Tests:
-`tests/test_web_review.py` (one fix), `tests/test_web_review_bulk.py` (order, landing,
-bulk accept), `tests/test_web_review_messages.py` (every code has a sentence),
-`tests/test_web_review_triage.py` (decisions, optional checks, heading groups) and
-`tests/test_web_review_browser.py`, `tests/test_web_review_triage_browser.py` (axe,
-reflow, keyboard, no JavaScript; `browser` marker).
+Code: `web/routes/split.py` (the review screen, page images, marks), `web/queue.py` (the
+decisions, numbered, in order), `web/compare.py` (what differs in an equation, crop
+geometry), `web/page_images.py` and `web/pdf_probe.py` (rendering in a child process),
+`web/routes/review.py` (the decision POST and the list view), `web/review.py` (rules:
+order, eligibility, validation), `web/messages.py` (what each code means). Tests:
+`tests/test_web_review_split.py` (the screen, deciding, older results),
+`tests/test_web_page_images.py` (routes, ownership, retention, headers, a failing child),
+`tests/test_web_compare_queue.py`, `tests/test_web_review_split_browser.py` (axe at 1440
+and 390 px, 320 px reflow, target sizes, no JavaScript, focus, shortcuts, forced colours;
+`browser` marker), and for the list view `tests/test_web_review.py` (one fix),
+`tests/test_web_review_bulk.py` (order, landing, bulk accept),
+`tests/test_web_review_messages.py` (every code has a sentence),
+`tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
+`tests/test_web_review_browser.py` and `tests/test_web_review_triage_browser.py`.
+
+Real documents need only one to three decisions under the review policy
+(docs/design/beta-architecture.md "Review tiers": OpenStax 2.1 three heading groups, the
+LaTeX handout one equation), so the screen asks them one at a time beside the page they
+are on. It is the Split View design Harish chose on 2026-10-08, with ideas taken from the
+queue and outline prototypes.
+
+### The review screen (`/jobs/{id}/review`)
+
+**Top.** One sentence, counting decisions (a heading group is one): "3 things need your
+decision. Everything else was accepted; optional checks are below." ("2 of 3 decisions
+left. ...", "All decisions made. ..."). No instruction paragraph: the buttons say what
+they do. Beside it, the decisions as numbered steps (made, current, waiting; a bar when
+there are more than 12, nothing when there is one), "All items as a list" and "Back to
+the results".
+
+**The decision** (right on a wide screen, first on a phone). "Decision 1 of 3", what it is
+("Equation 5, page 1, in a sentence"), its state in words ("Needs your decision",
+"Decided: Edited by you"), then one sentence that says what to look at, and the item:
+
+- *Equation*: the PDF and the proposal at the same size. The PDF row is a crop a little
+  wider than the equation (`compare.context_clip`: four font sizes of words on each side
+  of an inline one), so the weight of a letter can be judged against the body text; the
+  proposal's MathML is drawn under it at the crop's scale (font size and left edge in
+  `cqw` from `marks.css`). The differing symbol is outlined in both: in the crop by the
+  child process (`--mark`: the glyphs of those characters inside the equation's box), in
+  the MathML by a `class="flagged"` the sanitiser adds to the tokens holding it. A short
+  table "What differs" gives the same in text (symbol, in the PDF, proposal, changes the
+  meaning: yes or no), from the equation step's own rules (`equation_step._layer_letters`,
+  `_mathml_letters`, `_letter_verdict`, `_symbol_bag`, imported, not copied): letter
+  styles ("The ω is bold in the PDF (a vector) but plain in the proposal."), symbols
+  ("The PDF has 8 where the proposal has 3.") and signs (minus, plus, plus-minus counted
+  on both sides). Nothing of this is stored: it is worked out again from the element's
+  text layer when the screen is shown. Accept and Reject, with "Edit the LaTeX" folded
+  (open when there is no proposal or an error).
+- *Figure*: its image (the stored crop), the caption, and the alt text field with
+  Accept, Save edit and Reject.
+- *Heading group*: one card. "“Teacher Support” appears 11 times as a bold line in the
+  body text size.", the first one in its band of the page (`compare.band_clip`, the
+  heading outlined), the pages it is on, **Keep as headings at level 3** and **Make bold
+  text**, "Choose another level" folded (open when keeping them at the proposed level
+  would skip a level), and "Decide them one by one" in the list view.
+- *Single heading*: its band of the page, text and level, a level select.
+
+"Details for this item" (folded) keeps the confidence, every failed check with its
+sentence and code. Previous and next decision links close the card. After Accept, Save
+edit or Reject the form redirects (303) to the next decision still open after this one
+(`queue.next_open`, wrapping round), or to the done state: "All decisions made" with
+**Download the accessible HTML**. There the decision's heading takes focus (`autofocus`
+on the `tabindex="-1"` heading, which works without JavaScript; no URL fragment, which
+would cancel autofocus) and is described by a status line above it: "Equation 1:
+Accepted. 2 decisions left." A refused edit comes back on the same decision (422) with the
+error summary and the field open.
+
+**Optional checks (M)**, folded, below the decision: each a link ("Equation 2, page 1")
+and a short note ("A letter's style differs slightly; the meaning is the same."). Opening
+one shows it in the decision's place ("Optional check", "Accepted, with a note"), still
+editable, with a link back to the decision at hand.
+
+**The page** (left on a wide screen, sticky, below on a phone). "Page 1 of 16", the pages
+as numbered links with "N to decide" only where a decision is open (an open decision
+counts on the page of its first heading still waiting, so the pages add up to the total),
+a legend, "Show accepted (N)", and the page image in its own named, focusable scroll
+region ("Page 1 image with 5 marks"). Every fix on the page is marked by a link to it:
+
+| Mark | Shape | Text |
+|---|---|---|
+| A decision still open | solid frame, numbered disc beside it (the decision's number) | "1: Equation 5, needs your decision (1 of 3)" |
+| The selected one | thicker blue frame, blue disc, `aria-current` | the same |
+| An optional check | dashed frame; "Note" label on hover, focus or selection | "Note: Equation 2, optional check" |
+| Accepted or decided | dotted frame and a tick, only with "Show accepted" | "Heading 1, accepted automatically" |
+
+Every mark is a link of at least 24 x 24 CSS px (WCAG 2.5.8; a mark is centred on its
+item and grows to that size), positioned from `marks.css` (the CSP allows no inline
+styles). The marks keep their own colours in forced-colours mode (`forced-color-adjust:
+none` on the page frame): the page image stays white whatever the theme, and system
+colours would make them white on white. Below 64rem the page keeps about 1 CSS px per
+point (`min-width: 36rem`) and scrolls inside its region; the page itself never scrolls
+sideways (320 CSS px included).
+
+**Page images.** Rendered when the browser asks, from the job's own upload, in the
+upload probe's child process (`python -m a11y_stem.web.pdf_probe render ...`, 768 MB
+address space cap, 20 s timeout; `web.page_images`), never in the web process: a page
+that crashes MuPDF kills a child. Whole pages at 144 dpi (long side at most 2000 px),
+regions at most 1600 px, never more than 2400 px whatever is asked. At most two children
+run at once per instance; a request that waits more than 10 s for one gets a 503. Nothing
+is stored and nothing is cached: the responses carry `Cache-Control: private, no-store`
+like the crops, a job past its retention time or deleted answers 404 (`owned_job`), and
+someone else's job 404 too. A failed render answers 503 (logged as `page_image_failed`
+with a code, no content); the decision still works, and the screen says the image could
+not be shown (with JavaScript) and points to the list view.
+
+**Page sizes.** The marks need each page's size in points: `DocumentResult.page_sizes`
+(0-based page -> width, height, as layout measured it) is stored with every result from
+this release on. A result stored before it has none, so the screen asks the PDF (`sizes`
+in the same child) each time; if that fails too, the page is shown without marks ("The
+marks could not be placed on this page") and every item is still in the list view.
+Results stored before review tiers load as before (`default_review`), each waiting heading
+then its own decision.
+
+**JavaScript** (`static/app.js`) only enhances: it scrolls the page region (never the
+window) so the selected mark is in view, says so when a page image fails, makes "Save
+edit" the main button once a field of the decision is changed, and offers keyboard
+shortcuts: N next decision, P previous, A accept, E go to the edit field. They are off
+until turned on ("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys
+with Ctrl, Alt or Meta, and never act while focus is in a field.
+
+### The list view (`/jobs/{id}/review/list`)
+
+Every fix of the document, grouped by kind, as the review screen was before the split
+view; it keeps bulk accept. Its forms send `view=list`, so a decision there comes back to
+the list's next card.
 
 **Order.** Only meaning-level problems ask for a decision (docs/design/beta-architecture.md
 "Review tiers"), so the page has three sections:
@@ -375,9 +498,9 @@ nothing is saved.
   a test checks it against the assembler's output for every outline of up to four
   headings.
 
-After a decision the browser is redirected (303) to `#item-<id>` of the next fix still
-waiting, after this one in review order and wrapping round to the first, or to
-`#review-progress` when none are left. A one-time notice there links back to the fix
+After a decision on the list view the browser is redirected (303) to
+`/jobs/{id}/review/list#item-<id>` of the next fix still waiting, after this one in review
+order and wrapping round to the first, or to `#review-progress` when none are left. A one-time notice there links back to the fix
 that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
 The landing item has `tabindex="-1"`, so the next Tab reaches that link.
 
@@ -405,8 +528,9 @@ all" for equations) is refused with a 422 and an error linked to the threshold s
 
 **Job page.** "Need your decision" counts the decisions still waiting (a heading group
 once; failed and not-converted items too, since each needs a decision) and is broken down
-by kind, each linking to its group ("3 need your decision: 1 equation, 1 figure, 1 group
-of repeated headings."). "Optional checks (accepted; nothing to do)" counts the notes
+by kind, each linking to the first decision of that kind on the review screen
+(`?item=<key>`; "3 need your decision: 1 equation, 1 figure, 1 group of repeated
+headings."). "Optional checks (accepted; nothing to do)" counts the notes
 nobody has opened; they never count toward done. The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
@@ -443,7 +567,8 @@ Referrer-Policy: same-origin
 X-Frame-Options: DENY
 Cross-Origin-Opener-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
-Cache-Control: no-store            (everything except /static/)
+Cache-Control: no-store            (everything except /static/; page images and
+                                    marks.css: private, no-store)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
@@ -460,7 +585,10 @@ forms or reading our cookies.
 The app pages have no inline scripts, styles or event handlers (a test scans the
 templates). htmx is vendored at `web/static/vendor/` (version, hashes and licence in its
 README) and configured to need no `eval`, inject no `<style>` and keep no history cache.
-Our own script, `web/static/app.js`, only places error summary links (below).
+Our own script, `web/static/app.js`, places error summary links (below) and adds the
+review screen's enhancements (scrolling the page image to the selected mark, opt-in
+keyboard shortcuts; see "Review screen"). The review screen's per-job geometry comes as
+a stylesheet from our origin (`marks.css`), not as inline styles.
 
 ## Accessibility of the app itself
 
@@ -498,7 +626,18 @@ every page at 320 CSS px with a long underscored file name, with and without the
 and that following an error summary link leaves the field's label and error message in
 view, with and without JavaScript (`test_web_review_browser.py` does the same for the
 heading-level and LaTeX errors at 320 CSS px); and walks the upload-to-review flow with
-JavaScript off.
+JavaScript off. `test_web_review_split_browser.py` runs the WCAG 2.2 AA and
+best-practice rules (target size included) at moderate and above on every state of the
+review screen at 1440 and 390 CSS px, checks 320 CSS px reflow with and without text
+spacing, measures every mark (at least 24 x 24 CSS px), completes a whole review with
+JavaScript off, checks that focus lands on the next decision's heading after each
+decision, that shortcuts are opt-in and never fire while typing, and that the marks keep
+their colours in forced-colours mode.
+
+Contrast of the review screen's own colours (`tests/test_web_review_split.py` computes
+them from `app.css`): mark outlines on the white page image at least 3:1 (decision
+#7a4b00 7.4:1, selected #1a4fa0 7.9:1, optional #4b5a75 7.0:1, accepted #1d6b35 6.5:1),
+white text on the numbered discs at least 4.5:1.
 
 ## Privacy
 
@@ -538,6 +677,7 @@ URL comes from `DATABASE_URL` (or the settings, which read `.env`).
 | `uv run pytest tests/test_web_*.py` | Offline web tests (SQLite) plus the Postgres ones when a server is available |
 | `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check |
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
+| `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

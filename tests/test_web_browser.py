@@ -175,6 +175,7 @@ def describe(violations: list[dict]) -> str:
         "/app",
         "/jobs/{id}",
         "/jobs/{id}/review",
+        "/jobs/{id}/review/list",
         "/privacy",
         "/terms",
         "/limits",
@@ -277,8 +278,11 @@ def test_review_page_renders_mathml(site, browser, finished_job):
     context = browser.new_context()
     page = context.new_page()
     sign_in(page, site.base, ALICE)
-    page.goto(f"{site.base}/jobs/{finished_job}/review")
+    page.goto(f"{site.base}/jobs/{finished_job}/review/list")
     box = page.locator("#fix-p1-e3 .mathml-preview math").bounding_box()
+    assert box is not None and box["width"] > 0
+    page.goto(f"{site.base}/jobs/{finished_job}/review")  # the review screen's decision 1
+    box = page.locator("#decision .cmp-math math").bounding_box()
     assert box is not None and box["width"] > 0
     context.close()
 
@@ -329,7 +333,10 @@ def test_everything_works_without_javascript(site, browser):
     page.reload()
     assert page.locator("#results-heading").is_visible()
     assert page.locator('meta[http-equiv="refresh"]').count() == 0
-    page.get_by_role("link", name="Review fixes").click()
+    page.get_by_role("link", name=re.compile("^Review fixes")).click()
+    page.get_by_role("button", name="Reject equation 2").click()
+    assert "Rejected" in page.locator("#decision-notice").inner_text()
+    page.get_by_role("link", name="All items as a list").click()
     page.locator("#fix-p1-e4").get_by_role("button", name="Reject").click()
     assert "Rejected" in page.locator("#review-progress").inner_text()
     context.close()

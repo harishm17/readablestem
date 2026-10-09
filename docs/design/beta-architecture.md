@@ -118,6 +118,13 @@ Where it lives: `pipeline/equation_step.py` (`text_layer_symbols_differ`,
 (`Element.regular_letters`), `core/triage.py`, `web/review.py`, `web/routes/review.py`,
 `web/views.py`, `ops/aggregate.py`, `ops/report.py`, `eval/pipeline_eval.py`.
 
+The review screen asks the decisions one at a time beside the page they are on (the
+Split View design, chosen 2026-10-08; docs/web.md "Review screen"): `web/queue.py`
+numbers the decisions, `web/compare.py` says what differs in an equation from the step's
+own rules, and `web/routes/split.py` shows each with its page, rendered on demand in the
+upload probe's child process (`web/page_images.py`). The full list stays at
+`/jobs/{id}/review/list`.
+
 ## Rules every work package follows
 
 1. **Privacy.** Document content (text, images, LaTeX, alt text, filenames, emails) never

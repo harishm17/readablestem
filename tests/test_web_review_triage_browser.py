@@ -82,7 +82,7 @@ def job(site, browser) -> str:
 
 
 def walk_group_states(page, site, job: str, check) -> None:
-    url = f"{site.base}/jobs/{job}/review"
+    url = f"{site.base}/jobs/{job}/review/list"
     page.goto(url)
     check("group waiting, optional checks folded")
     unfold_everything(page)
@@ -122,7 +122,7 @@ def test_group_decision_states_have_no_serious_or_critical_axe_violations(
 
 def test_group_buttons_say_what_they_act_on(site, browser, job):
     context, page = open_page(browser, site)
-    page.goto(f"{site.base}/jobs/{job}/review")
+    page.goto(f"{site.base}/jobs/{job}/review/list")
     unfold_everything(page)
     # Names with curly quotes are YAML-quoted in the snapshot: - 'button "..."'
     names = re.findall(r"""- '?button "([^"]+)"'?""", page.locator("main").aria_snapshot())
@@ -139,7 +139,7 @@ def test_group_buttons_say_what_they_act_on(site, browser, job):
 
 def test_group_decisions_work_without_javascript(site, browser, job):
     context, page = open_page(browser, site, javascript=False)
-    url = f"{site.base}/jobs/{job}/review"
+    url = f"{site.base}/jobs/{job}/review/list"
     page.goto(url)
     card = page.locator(f"#group-card-{GROUP}")
     assert "appears 3 times" in card.inner_text()

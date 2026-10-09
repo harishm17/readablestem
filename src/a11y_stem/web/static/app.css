@@ -283,7 +283,7 @@ progress { width: 16rem; height: 1.1rem; }
 :root {
   --desk: #e7e9ee;
   --mark-required: #7a4b00;   /* 7.4:1 on white; tag text white on it 7.4:1 */
-  --mark-optional: #4b5a75;   /* 6.6:1 on white */
+  --mark-optional: #4b5a75;   /* 7.0:1 on white */
   --mark-accepted: #1d6b35;   /* 6.5:1 on white */
   --mark-current: #1a4fa0;    /* 7.9:1 on white */
   --tint-required: #fdf3e1;
@@ -316,6 +316,7 @@ progress { width: 16rem; height: 1.1rem; }
 .step-done::after { content: "\2713"; font-size: 0.8rem; margin-left: 0.15rem; }
 .step-current { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--mark-current); }
 .steps-count { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.steps-bar { width: 12rem; height: 0.8rem; accent-color: var(--ok); }
 
 /* Layout: decision first in the DOM; on a wide screen the page sits on the left. */
 .split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
@@ -467,7 +468,7 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
   padding: 0 0.3rem; font-weight: 700; font-size: 0.75rem; line-height: 1;
 }
 .key-required { background: var(--mark-required); color: #fff; border-radius: 0.7rem; }
-.key-optional { background: var(--bg); color: var(--mark-optional); border: 1px dashed var(--mark-optional); border-radius: 3px; }
+.key-optional { background: var(--bg); min-width: 1.9rem; border: 1.5px dashed var(--mark-optional); border-radius: 3px; }
 .key-accepted { background: var(--bg); color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); border-radius: 0.7rem; }
 .page-scroll {
   position: relative; overflow: auto; border-radius: 4px; background: var(--desk);
@@ -487,18 +488,25 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .box-optional { border: 1.5px dashed var(--mark-optional); box-shadow: 0 0 0 1px #fff; }
 .box-accepted { border: 1.5px dotted var(--mark-accepted); box-shadow: 0 0 0 1px #fff; }
 .box.is-current { border: 3px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(26 79 160 / 0.28); background: rgb(232 238 250 / 0.2); }
+/* The number sits just outside the box on the left (in the margin, for a heading), so it
+   never covers the item itself. */
 .box-tag {
-  position: absolute; left: -14px; top: -14px; display: inline-flex; align-items: center; justify-content: center;
+  position: absolute; right: calc(100% + 4px); top: 50%; margin-top: -12px;
+  display: inline-flex; align-items: center; justify-content: center;
   min-width: 24px; height: 24px; padding: 0 6px; border-radius: 12px;
   font: 700 13px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; white-space: nowrap;
   box-shadow: 0 0 0 1.5px #fff;
 }
 .box-required .box-tag { background: var(--mark-required); color: #fff; }
+/* Optional checks stay quiet: a dashed frame (the legend says what it means), with its
+   "Note" label only while it is pointed at, focused or selected, so it never covers the
+   words around it at rest. Its link name always says "Note: ..., optional check". */
 .box-optional .box-tag {
-  left: -4px; top: -21px; min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px;
+  display: none; right: auto; left: -4px; top: -21px; margin-top: 0; min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px;
   background: #fff; color: var(--mark-optional); border: 1px dashed var(--mark-optional); font-size: 11px;
 }
-.box-accepted .box-tag { left: -10px; top: -10px; min-width: 18px; height: 18px; padding: 0; background: #fff; color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); font-size: 12px; }
+.box-optional:hover .box-tag, .box-optional:focus-visible .box-tag, .box-optional.is-current .box-tag { display: inline-flex; }
+.box-accepted .box-tag { margin-top: -9px; min-width: 18px; height: 18px; padding: 0; background: #fff; color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); font-size: 12px; }
 .box.is-current .box-tag { background: var(--mark-current); color: #fff; border: 0; }
 .box:hover { border-style: solid; }
 /* Focus: after the status rules, so a focused mark always shows the focus ring. */
@@ -512,7 +520,32 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
   .decision-notice { border: 2px solid CanvasText; }
 }
 
+/* Below the two-column layout the page keeps a legible size (about 1 CSS px per point)
+   and scrolls inside its own region; "Show on the page" (and app.js) scroll it to the
+   mark. The page itself never scrolls sideways. */
+@media (max-width: 63.99rem) {
+  .page-frame { min-width: 36rem; }
+  .page-scroll { max-height: 75vh; }
+}
+
+/* "What differs" on a phone: one row per symbol, each value with its column's name, so
+   no word is broken mid-word to fit four columns. */
+@media (max-width: 30rem) {
+  .diff-table thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .diff-table, .diff-table caption, .diff-table tbody, .diff-table tr, .diff-table th,
+  .diff-table td { display: block; }
+  .diff-table tr { padding: 0.35rem 0; border-bottom: 1px solid var(--rule); }
+  .diff-table th, .diff-table td { border: 0; padding: 0.05rem 0; overflow-wrap: normal; }
+  .diff-table td::before { content: attr(data-label) ": "; color: var(--muted); }
+}
+
 @media (max-width: 40rem) {
+  /* A heading's band is half a page wide: on a phone, keep its start (where the heading
+     is) at a readable size and let the right-hand end go. */
+  .region-image { width: 100%; height: 7.5rem; object-fit: cover; object-position: left center; }
   .review-head h1 { font-size: 1.35rem; }
   .decision-area { padding: 0.9rem 0.9rem 1rem; }
   .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; }
