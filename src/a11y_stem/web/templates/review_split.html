@@ -365,12 +365,16 @@
     </nav>
     {% endif %}
     <div class="page-tools">
+      {# Only the kinds of mark on this page (a selected decision's marks are blue). #}
+      {% set tiers = page.tiers %}
+      {% if tiers %}
       <ul class="legend" aria-label="What the marks mean">
-        <li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>
-        {% if "repeat" in page.tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Same decision, other page</li>{% endif %}
-        <li><span class="key key-optional" aria-hidden="true"></span> Optional check</li>
-        {% if show_accepted %}<li><span class="key key-accepted" aria-hidden="true"></span> Accepted</li>{% endif %}
+        {% if "required" in tiers %}<li><span class="key key-required" aria-hidden="true">1</span> Needs your decision</li>{% endif %}
+        {% if "repeat" in tiers %}<li><span class="key key-repeat" aria-hidden="true">1</span> Same decision, other page</li>{% endif %}
+        {% if "optional" in tiers %}<li><span class="key key-optional" aria-hidden="true"></span> Optional check</li>{% endif %}
+        {% if "accepted" in tiers %}<li><span class="key key-accepted" aria-hidden="true"></span> Accepted</li>{% endif %}
       </ul>
+      {% endif %}
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>
     </div>
     <div class="page-scroll" role="region" tabindex="0" aria-label="Page {{ page.number }} image{% if page.boxes %} with {{ page.boxes|length }} {{ 'mark' if page.boxes|length == 1 else 'marks' }}{% endif %}">

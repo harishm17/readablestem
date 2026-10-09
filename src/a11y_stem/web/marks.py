@@ -31,7 +31,8 @@ from dataclasses import dataclass
 
 BBox = tuple[float, float, float, float]
 
-FRAME_PAD_PT = 2.5  # the frame is this much bigger than the element on every side
+FRAME_PAD_PT = 3.0  # the frame is this much bigger than the element on every side (its border
+# is drawn inside, so this is the room between the border and the item)
 MIN_TARGET_PX = 24  # WCAG 2.5.8
 MIN_PAGE_PX = 576  # the page frame's min-width (36rem at the default 16 px), app.css
 TARGET_MARGIN = 1.05  # a little over 24 px, so rounding never leaves 23.9

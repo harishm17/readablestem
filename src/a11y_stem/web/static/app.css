@@ -481,6 +481,7 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .page-chip[aria-current="page"] { border: 2px solid var(--mark-current); font-weight: 700; }
 .chip-count { background: var(--mark-required); color: #fff; border-radius: 999px; padding: 0 0.45rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
 .page-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 1rem; margin: 0.6rem 0; font-size: 0.9rem; }
+.toggle-accepted { margin-left: auto; }
 .legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; color: var(--text); }
 .legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
 .key {
@@ -524,7 +525,7 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .box-optional .box-frame { border: 1.5px dashed var(--mark-optional); box-shadow: 0 0 0 1px #fff; }
 .box-accepted .box-frame { border: 1.5px dotted var(--mark-accepted); box-shadow: 0 0 0 1px #fff; }
 .box.is-current { z-index: 1; }
-.box.is-current .box-frame { border: 3px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 6px rgb(26 79 160 / 0.28); background: rgb(232 238 250 / 0.2); }
+.box.is-current .box-frame { border: 2.5px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(26 79 160 / 0.25); background: rgb(232 238 250 / 0.15); }
 .box:hover .box-frame { border-style: solid; }
 /* The number sits just outside the frame on the left (in the margin, for a heading), or
    in the page margin on the same line for an equation in a line of text. */
@@ -558,6 +559,8 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 2px; z-index: 2; }
 
 @media (forced-colors: active) {
+  /* The legend keys show what the marks look like, and the marks keep their colours. */
+  .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
   .step, .page-chip, .pill { border: 2px solid CanvasText; }
   .step-current, .page-chip[aria-current="page"] { outline: 3px solid Highlight; outline-offset: 2px; }
   .cmp-math .flagged { outline-color: Highlight; }
@@ -588,7 +591,11 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 @media (max-width: 40rem) {
   /* A heading's band is half a page wide: on a phone, keep its start (where the heading
      is) at a readable size and let the right-hand end go. */
-  .region-image { width: 100%; height: 7.5rem; object-fit: cover; object-position: left center; }
+  .region-image {
+    width: 100%; height: 7.5rem; object-fit: cover; object-position: left center;
+    -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+    mask-image: linear-gradient(to right, #000 78%, transparent);
+  }
   .review-head h1 { font-size: 1.35rem; }
   .decision-area { padding: 0.9rem 0.9rem 1rem; }
   .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; }

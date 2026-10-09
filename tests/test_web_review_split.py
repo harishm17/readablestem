@@ -351,6 +351,9 @@ def test_every_decision_then_done(split):
     )
     assert "All decisions made. Everything else was accepted" in page
     assert page.count("step step-done") == 3
+    # The legend lists only the marks on the page: nothing needs a decision now.
+    legend = text_of(section(page, '<ul class="legend"', "</ul>"))
+    assert legend == "Optional check"
     result = stored(split)
     assert {f.element_id: f.status.value for f in result.fixes if f.reviewed} == {
         "p1-e2": "edited", "p1-e6": "accepted", "p1-e3": "rejected", "p1-e7": "rejected",

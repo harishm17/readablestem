@@ -118,6 +118,14 @@ def result(env) -> DocumentResult:
     return DocumentResult.model_validate(env.job(env.job_id).result_json)
 
 
+def settled(env) -> DocumentResult:
+    """The stored result once the review screen has been shown. The fake result has no
+    page sizes (like one stored before they existed), and the first view of the review
+    screen stores them; a "nothing changed" comparison starts from there."""
+    env.browser.get(f"/jobs/{env.job_id}/review")
+    return result(env)
+
+
 def edits(env) -> list[ReviewEdit]:
     with session_scope(env.ctx.factory) as session:
         return list(session.scalars(select(ReviewEdit).order_by(ReviewEdit.created_at)))
@@ -423,7 +431,7 @@ def test_an_edit_with_warnings_is_saved_and_the_warning_explained(web):
 
 
 def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
-    before = result(web)
+    before = settled(web)
     response = post(web, "p1-e3", action="edit", latex="\\bad{y}")
     assert response.status_code == 422
     assert "<title>Error: All items as a list" in response.text
@@ -561,7 +569,7 @@ def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
 
 
 def test_a_failed_rerender_changes_nothing(web):
-    before = result(web)
+    before = settled(web)
     web.pipeline.render_raises = RuntimeError("SECRET-DOC-TEXT assembler bug")
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 500
