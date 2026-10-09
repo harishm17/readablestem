@@ -6,12 +6,13 @@ lands here and not in `assemble.py` (docs/design/content-features.md). It writes
 - a rebuilt table, when the fix has a usable one (`Fix.table`, its status not in
   `KEPT_ORIGINAL_STATUSES`, a data table): `table_html.render_table` inside a wrapper
   that scrolls sideways on a narrow screen (WCAG 1.4.10 lets a data table keep its two
-  dimensions) and can take focus, so keyboard users can scroll it too. Whether a table
-  is wider than the screen is only known in the reader's browser, and the file works
-  without scripts, so every rebuilt table gets the wrapper: a narrow one simply does not
-  scroll. It is a named group (the caption, else "Table"), so the extra tab stop says
-  what it is. A table with no caption of its own gets the element's "Table N" caption,
-  which layout took out of the text, so the caption is never lost;
+  dimensions). Whether a table is wider than the screen is only known in the reader's
+  browser, and the file works without scripts, so every rebuilt table gets the wrapper:
+  a narrow one simply does not scroll. A table that may be too wide for a 320 px screen
+  (`estimate_min_width_em`) also takes focus, so keyboard users can scroll it, and is a
+  named group (the caption, else "Table"), so the extra tab stop says what it is. A
+  table with no caption of its own gets the element's "Table N" caption, which layout
+  took out of the text, so the caption is never lost;
 - otherwise the image of the table, kept and flagged like a figure or an equation that
   was not converted: a fixed alt text, the caption, a border and a "Not converted."
   note (never colour alone). `data-reason` says why ("table_not_rebuilt" when rebuilding
