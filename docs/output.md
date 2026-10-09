@@ -177,6 +177,7 @@ type, so a stored result re-renders to the same file. Equation images are not to
 | File | Before | After | Images |
 |---|---|---|---|
 | The public demo (OpenStax Physics 2.3, 7 figures; stored result re-rendered with its crops) | 2,210 KB (gzip 1,657 KB) | 666 KB (gzip 460 KB) | 3 JPEG (a photo, two raster charts), 4 PNG |
+| The committed demo page, rebuilt on 0.4.0 (2026-10-09; the 0.3.0 build before) | 2,211 KB (gzip 1,657 KB) | 668 KB (gzip 461 KB) | the same 3 JPEG and 4 PNG |
 | `tests/fixtures/layout/` PDFs converted offline (`lecture_notes`, `two_column`, `worked_example`; one small figure each) | 35, 14, 40 KB | the same | PNG kept: line art, smaller than JPEG |
 
 A page-sized crop (1700 x 2200 px) takes about 0.15-0.3 s to re-encode, so a document of

@@ -406,7 +406,7 @@ with or without a baseline (see "Tables": "Gate").
 | Field | Content |
 |---|---|
 | `schema_version`, `task`, `date` | `date` comes from `--date` (default: today, taken in the CLI) |
-| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. The committed `data/eval/latest-*.json` are 0.2.0 reports until they are regenerated after the sign check merges. 0.4.0 (2026-10-09) added the content-feature data model (docs/design/content-features.md) without changing equations, figures or headings, so 0.4.0 and 0.3.0 reports compare. Since the integration layout detects tables, and each one kept as an image is a required decision of its own (2 more on the document gold, its ruled key-term grids, flags off or on); with every flag on, chart data tables read from the image add theirs ("Content features after integration") |
+| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. 0.4.0 (2026-10-09) added the content features (docs/design/content-features.md) without changing equations, figures or headings while the flags are off, so 0.4.0 and 0.3.0 reports compare. Layout detects tables whatever the flags say, and each table kept as an image is a required decision of its own; on the document gold it claims none (its ruled key-term grids stay text, `tables.is_word_grid`). With every flag on, chart data tables read from the image add theirs ("Content features after integration"). Which version made each committed `data/eval/latest-*.json`: "Results" |
 | `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, `openai` or `fake` |
 | `dataset` | `gold_dir`, `manifest_sha256`, `limit`, `unit`, `selection_sha256` (hash of the planned item ids) |
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
@@ -486,9 +486,10 @@ uv run a11y-stem eval gate --require-current --current data/eval/latest-equation
 After a prompt or model change, re-run the task, promote the new report `--as latest`
 and commit it with the change; CI's gate fails (exit 2) until you do.
 
-TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The final real
-runs on the finished beta code (2026-10-08) are committed as `data/eval/latest-<task>.json`
-(see "Results" below); review them and promote each as the baseline. Earlier runs are in
+TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The real runs of
+2026-10-09 are committed as `data/eval/latest-<task>.json` (pipeline 0.3.0; headings
+re-run on 0.4.0; see "Results" below); review them and promote each as the baseline,
+after equations, figures and document are re-run on 0.4.0. Earlier runs are in
 the main checkout's `.local/eval/`. figures-run1 was graded by the older text-only judge
 and cannot be a baseline for runs graded with the image.
 
@@ -508,9 +509,15 @@ once their review labels exist as gold.
 Public demo:
 
 A provisional demo is committed: OpenStax *Physics* 2.3 "Position vs. Time Graphs" (13 PDF
-pages, 27 model calls, $0.026, built 2026-10-09 with the real models on pipeline 0.3.0; axe-core clean at
-1100 and 320 CSS px). It shows the pipeline's proposals as they come, including ones a
-reviewer would fix (equation 2.5 has a plain v where the book has a bold vector).
+pages, 27 model calls, $0.055, built 2026-10-09 with the real models on pipeline 0.4.0
+with every content flag off, as in production; axe-core clean at 1100 and 320 CSS px, no
+horizontal scrolling at 320). It shows the pipeline's proposals as they come, including
+ones a reviewer would fix: equation 2.5 has a plain v where the book has a bold vector,
+which the review screen asks about (one of its 4 required decisions; the other 3 are
+repeated headings). The 0.3.0 build made the same 27 calls with the same input tokens for
+$0.026: the provider's prompt cache answered 38,356 of its 38,437 input tokens, against
+20,826 this time (same prompts and models). The page is 668 KB with the
+smaller figure images (docs/output.md, MF23); the 0.3.0 build was 2,211 KB.
 TODO(Harish): keep this page or choose another, then rebuild with the command below. A
 `--fake` build is marked as a placeholder and `ops launch-check` flags it.
 
@@ -528,6 +535,18 @@ gold set are looked up live and pass the same license gate as `gold fetch`.
 
 Reports: `data/eval/latest-<task>.json`. Sample: 3 sections of OpenStax *Physics* ch. 2 (CC
 BY 4.0). Small: read the confidence intervals before reading the point estimates.
+
+Pipeline 0.4.0 (the content features, every flag off): the headings task was re-run on
+0.4.0 (no model calls) and gave the same numbers to the last digit; its report is now
+the committed one. The equations, figures and document reports are still the 0.3.0 runs.
+They are not stale for the gate: `eval gate --require-current` passes on all four,
+because it compares prompts and models (`equation-df0e12f1`, `figure-ac51f42d`,
+`judge_figure-137e2607`, the same models), not the pipeline version. Nor should their
+numbers move with the flags off: the equation and figure steps send the same prompts
+and keep the same rules without course notation or long descriptions, and layout finds
+the same 55 equations and 138 headings on the three sections, and no table. Still, each
+report should name the code that made it: equations, figures and document are to be
+re-run on 0.4.0 (about $0.28) before any of them is promoted as a baseline.
 
 | Task | n | Headline | Cost |
 |---|---|---|---|
@@ -1035,9 +1054,14 @@ Reading it: outside the new items the tiers call for, the review load is the 0.3
 from the image": required); the 2 key-term grids are the "Key Terms" boxes OpenStax prints
 as a ruled grid of single words: detection claims them, the model rightly says they are
 not data tables, and the table is then kept as an image, which needs a decision and
-turns readable words into a picture. With `FEATURE_TABLES` off the same two grids are
-`table_not_rebuilt` decisions, so merging detection alone already makes this 12 (0.279
-per PDF page). That is an open product question (docs/design/content-features.md).
+turns readable words into a picture. With `FEATURE_TABLES` off the same two grids were
+`table_not_rebuilt` decisions, so merging detection alone made this 12 (0.279 per PDF
+page). Fixed after this run (`tables.is_word_grid`): a ruled grid of a few short words
+with no digit and no "Table N" caption stays text, as in 0.3.0. Layout now claims no
+table on the three sections (checked offline after the sync with `feat/beta-app`), so
+with the flags off the document's review load is 0.3.0's 10, and with every flag on the
+2 grid decisions go (not re-measured with the models). What to do when the model calls a
+claimed grid "not a data table" is still open (docs/design/content-features.md).
 
 ### Tables (`--task tables`)
 
@@ -1074,7 +1098,9 @@ powers written as `^` in text cells are a prompt issue for the table step to tak
 | `tests/fixtures/layout/latex/links_language_colour.pdf` | 1 | 0 | 4 web links, 4 cross-references and 2 internal links all resolve; the French passage is marked; 2 colour classes, the lowest at 4.53:1 | $0.003 |
 | demo `source.pdf` (OpenStax Physics 2.3) | 13 | 9 (0.3.0 demo: 3) | the same 3 headings; 5 chart data tables read from the image; 1 equation whose bold v the model dropped (a right catch) | $0.066 |
 
-All four pass the static checks and axe.
+All four pass the static checks and axe. The committed demo was rebuilt afterwards with
+every flag off ("Public demo" above): 4 required decisions, the same 3 headings and
+again equation 2.5's dropped bold v.
 
 ## What the numbers do not show
 

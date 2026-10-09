@@ -339,11 +339,13 @@ features after integration"):
 - **The tables gate in model mode** fails `wrong cells not flagged` (14 on grid and
   authored, 8 on the partial booktabs/norules run): mostly gold spellings and
   run-to-run variation, 2 real (a wrapped last row cut by the table box).
-- **Not merged here:** `feat/beta-app` has `0ecf511` (eval reports and the demo rebuilt
-  on 0.3.0), which `feat/content-contracts` was cut before. Merging the integration
-  branch into `feat/beta-app` conflicts on `web/static/demo/index.html`, and the
-  `report.json` it brings changes the demo golden: regenerate the demo page and
-  `UPDATE_GOLDEN=1` then. The demo page was not regenerated with the smaller images
-  (figures work) for the same reason.
+- **Synced with `feat/beta-app`** (its `0ecf511`, `0fcb6f1`, `9ad41db`: the 0.3.0 eval
+  reports and demo, the frozen 0.2.0 demo report, the CI fonts and the Type3 xfail),
+  merged into this branch. The public demo was then rebuilt on 0.4.0 with every flag off
+  (smaller images: 2,211 KB to 668 KB; 4 required decisions; docs/eval.md "Public
+  demo"). The demo golden follows the rebuilt report; the 0.2.0 one it was written from
+  is kept as its own golden case (`stored_demo_0_2_0`), unchanged. The headings report
+  is 0.4.0; equations, figures and document are still 0.3.0 runs, which the gate accepts
+  (same prompts and models) and are to be re-run on 0.4.0 (docs/eval.md "Results").
 - `FEATURE_TABLES` stays off until detection is checked on a private set of real course
   PDFs (the real-document floors are skipped without one).
