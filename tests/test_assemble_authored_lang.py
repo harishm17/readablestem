@@ -53,3 +53,31 @@ def test_an_english_document_is_unchanged():
     for lang in ("en", "en-GB"):
         body = render(lang).split("</head>", 1)[1]
         assert ' lang="en"' not in body
+
+
+def test_the_tools_words_in_the_student_file_speak_to_students():
+    """The flag notes are read by students: what is missing and whom to ask, never the
+    reviewer's to-do ("Review it before publishing", UX review MF7)."""
+    elements = [
+        *ELEMENTS,
+        Element(id="p1-e3", kind=Kind.FIGURE, page=0, bbox=(0, 0, 1, 1), order=3),
+        Element(id="p1-e4", kind=Kind.TABLE, page=0, bbox=(0, 0, 1, 1), order=4,
+                caption="Table 1 Speeds."),
+        Element(id="p1-e5", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=5,
+                text="a = v/t", display="block"),
+    ]  # fmt: skip
+    fixes = [
+        *FIXES,
+        Fix(element_id="p1-e3", kind=Kind.FIGURE, status=Status.ABSTAINED,
+            reason="low_confidence"),
+        Fix(element_id="p1-e4", kind=Kind.TABLE, status=Status.FAILED,
+            reason="table_not_rebuilt"),
+        Fix(element_id="p1-e5", kind=Kind.EQUATION, status=Status.REJECTED),
+    ]  # fmt: skip
+    html = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={})
+    notes = re.findall(r'<p class="flag-note a11y-stem"[^>]*>(.*?)</p>', html)
+    assert len(notes) == 4
+    words = " ".join(re.sub(r"<[^>]+>", " ", n) for n in notes).casefold()
+    for reviewer_word in ("review", "publish", "reject", "proposal", "decision"):
+        assert reviewer_word not in words, reviewer_word
+    assert words.count("ask your instructor") == 4

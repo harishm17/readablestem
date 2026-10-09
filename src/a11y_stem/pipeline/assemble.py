@@ -95,11 +95,15 @@ FLAGGED_NOTE = (
     "instructor for a version you can read."
 )
 CONTACT = "If something is hard to read or looks wrong, tell your instructor."
+# The flag notes speak to students, as the about section does (UX review MF7): what is
+# missing, and whom to ask. Never reviewer wording ("review", "publishing").
 EQUATION_NOTE = (
     "This equation is shown as an image of the original, so screen readers cannot read "
-    "it. Review it before publishing."
+    "it. Ask your instructor for a version you can read."
 )
-FIGURE_NOTE = "This figure has no text description yet. Review it before publishing."
+FIGURE_NOTE = (
+    "This figure has no text description yet. Ask your instructor for a description of it."
+)
 
 # Fix statuses whose proposal is not used: the original stays, flagged.
 NOT_CONVERTED = KEPT_ORIGINAL_STATUSES

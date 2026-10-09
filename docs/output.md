@@ -88,7 +88,7 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
   <p class="flag-note a11y-stem" role="note"><span class="flag-label">Not converted.</span>
   This equation is shown as an image of the original, so screen readers cannot read it.
-  Review it before publishing.</p></div>
+  Ask your instructor for a version you can read.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
