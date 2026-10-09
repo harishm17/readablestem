@@ -4,9 +4,12 @@ the deterministic fix for a bold letter in running text (pipeline/notation_memor
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from a11y_stem.config import MAIN_MODEL
+from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
 from a11y_stem.core.notation import canonical_symbol
 from a11y_stem.core.types import ConversionOptions, Element, Kind, NotationEntry, Status
 from a11y_stem.models.fake import FakeVisionClient
@@ -31,6 +34,7 @@ from a11y_stem.pipeline.notation_memory import (
     phrase,
     readings,
 )
+from a11y_stem.pipeline.run import convert_pdf
 from a11y_stem.pipeline.speech import mathml_to_speech
 from a11y_stem.pipeline.validate import safe_latex_to_mathml
 from test_steps_support import equation_element, make_settings, use_fallback_router
@@ -348,3 +352,37 @@ def test_without_the_reason_a_bold_letter_goes_to_the_model():
     element = bold_element(BOLD_A).model_copy(update={"reasons": ["math font or symbol"]})
     run(client, element)
     assert client.requests
+
+
+# --------------------------------------------------------------------------- a whole run
+
+
+def convert_handout(on: bool):
+    """The two-column handout of MF2 through the real run, with a model client that
+    refuses every call (so only the deterministic fixes are usable)."""
+    pdf = (Path(__file__).parent / "fixtures/layout/latex/linear_algebra_twocol.pdf").read_bytes()
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=200)
+    client = FakeVisionClient(budget=budget)
+    opts = ConversionOptions(notation_memory=on)
+    return convert_pdf(pdf, settings=SETTINGS, client=client, options=opts).result
+
+
+def test_a_run_makes_the_handouts_bold_letters_maths_without_a_model_call():
+    result = convert_handout(on=True)
+    letters = [e for e in result.elements if BOLD_LETTER_REASON in e.reasons]
+    assert len(letters) == 11  # 10 bold vectors in the prose and a bold omega
+    for element in letters:
+        fix = result.fix_for(element.id)
+        assert fix is not None and fix.status is Status.ACCEPTED, element.id
+        assert fix.review == "none" and fix.calls == []
+        assert element.parent_id is not None  # inline, inside its paragraph
+    # "the multiple of bold a closest to bold b": maths, no longer heard as the article "a".
+    assert result.html.count(f"<mi>{BOLD_A}</mi>") == 5
+    assert {f.element_id for f in result.fixes if f.review == "required"}.isdisjoint(
+        e.id for e in letters
+    )
+
+
+def test_a_run_with_the_flag_off_leaves_the_handouts_prose_as_it_was():
+    result = convert_handout(on=False)
+    assert not any(BOLD_LETTER_REASON in e.reasons for e in result.elements)
