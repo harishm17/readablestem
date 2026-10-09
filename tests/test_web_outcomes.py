@@ -572,3 +572,28 @@ def test_the_upload_probe_child_caps_its_own_address_space():
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert int(out.stdout) == 512 * 1024 * 1024
+
+
+def test_headlines_count_tables_with_equations_and_figures():
+    """tables.pdf: 13 equations and 5 tables. An outage headline used to say '13 of 18
+    equations and figures', and a budget stop '13 of 13' with 3 tables also stopped."""
+
+    def fix(kind: str, reason: str | None = None) -> dict:
+        return {"kind": kind, "status": "failed" if reason else "accepted", "reason": reason}
+
+    outage = {
+        "fixes": [fix("equation", "model_timeout")] * 13
+        + [fix("table", "model_api_error")] * 3
+        + [fix("table")] * 2
+    }
+    message = job_outcome(status="done", error_code=None, result_json=outage)
+    assert message is not None
+    assert "did not answer for 16 of 18 equations and tables" in message.message
+    budget = {
+        "fixes": [fix("equation", "budget_job_usd")] * 13
+        + [fix("table", "budget_job_usd")] * 3
+        + [fix("figure")]
+    }
+    message = job_outcome(status="done", error_code="budget_job_usd", result_json=budget)
+    assert message is not None
+    assert "16 of 17 equations, figures and tables were not converted" in message.message

@@ -39,21 +39,36 @@ def _plural(n: int, one: str, many: str) -> str:
     return one if n == 1 else many
 
 
-def _not_converted(result_json: dict[str, Any] | None, reason: str) -> tuple[int, int] | None:
-    """(fixes FAILED with `reason`, equation and figure fixes) from a stored result."""
+# The kinds a model converts, in the order the headlines name them.
+_MODEL_KINDS = ("equation", "figure", "table")
+_KIND_PLURALS = {"equation": "equations", "figure": "figures", "table": "tables"}
+
+
+def _kinds_phrase(fixes: list[dict[str, Any]]) -> str:
+    """ "equations and figures", or "equations, figures and tables" when the document has
+    tables: the kinds its model fixes are of (equations and figures when it has none)."""
+    present = [_KIND_PLURALS[k] for k in _MODEL_KINDS if any(f.get("kind") == k for f in fixes)]
+    words = present or ["equations", "figures"]
+    if len(words) == 1:
+        return words[0]
+    return ", ".join(words[:-1]) + " and " + words[-1]
+
+
+def _not_converted(result_json: dict[str, Any] | None, reason: str) -> tuple[int, int, str] | None:
+    """(fixes FAILED with `reason`, model fixes, what they are) from a stored result."""
     if not result_json:
         return None
     fixes = [f for f in result_json.get("fixes") or [] if isinstance(f, dict)]
-    model_fixes = [f for f in fixes if f.get("kind") in {"equation", "figure"}]
+    model_fixes = [f for f in fixes if f.get("kind") in _MODEL_KINDS]
     stopped = [f for f in model_fixes if f.get("status") == "failed" and f.get("reason") == reason]
-    return len(stopped), len(model_fixes)
+    return len(stopped), len(model_fixes), _kinds_phrase(model_fixes)
 
 
-def _count_sentence(counts: tuple[int, int] | None, cause: str) -> str:
+def _count_sentence(counts: tuple[int, int, str] | None, cause: str) -> str:
     if counts is None or counts[1] == 0:
         return f"{cause}: some equations and figures were not converted."
-    n, total = counts
-    return f"{cause}: {n} of {total} equations and figures were not converted."
+    n, total, kinds = counts
+    return f"{cause}: {n} of {total} {kinds} were not converted."
 
 
 def _pages_text(pages: list[int]) -> str:
@@ -78,11 +93,11 @@ KEPT = "The HTML keeps their original images, marked “Not converted”."
 # enough of them in on the review screen.
 MODEL_OUTAGE = "model_outage"
 OUTAGE_REASONS = frozenset({"model_api_error", "model_timeout"})
-_MODEL_KINDS = frozenset({"equation", "figure", "table"})
 
 
-def _outage(result_json: dict[str, Any] | None) -> tuple[int, int] | None:
-    """(fixes the service failed, model fixes) when more than half failed that way."""
+def _outage(result_json: dict[str, Any] | None) -> tuple[int, int, str] | None:
+    """(fixes the service failed, model fixes, what they are) when more than half failed
+    that way."""
     if not result_json:
         return None
     fixes = [f for f in result_json.get("fixes") or [] if isinstance(f, dict)]
@@ -90,7 +105,9 @@ def _outage(result_json: dict[str, Any] | None) -> tuple[int, int] | None:
         f for f in fixes if f.get("kind") in _MODEL_KINDS and f.get("reason") != "scanned_page"
     ]
     failed = [f for f in model if f.get("status") == "failed" and f.get("reason") in OUTAGE_REASONS]
-    return (len(failed), len(model)) if failed and 2 * len(failed) > len(model) else None
+    if failed and 2 * len(failed) > len(model):
+        return len(failed), len(model), _kinds_phrase(model)
+    return None
 
 
 FAILED_MESSAGES = {
@@ -125,9 +142,9 @@ def job_outcome(
     if status == JobStatus.FAILED and error_code in FAILED_MESSAGES:
         return JobOutcome(error_code, "Stopped", FAILED_MESSAGES[error_code])
     if status == JobStatus.DONE and not error_code and (outage := _outage(result_json)):
-        n, total = outage
+        n, total, kinds = outage
         message = (
-            f"The AI service did not answer for {n} of {total} equations and figures, so "
+            f"The AI service did not answer for {n} of {total} {kinds}, so "
             f"they were not converted. Nothing is wrong with your PDF. {KEPT} Upload the "
             "document again later to convert them."
         )
