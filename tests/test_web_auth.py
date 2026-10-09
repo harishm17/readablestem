@@ -283,6 +283,14 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     assert posts == [
         "/admin/allowlist",
         "/admin/allowlist/remove",
+        # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
+        "/courses",
+        "/courses/{course_id}/delete",
+        "/courses/{course_id}/entries",
+        "/courses/{course_id}/entries/{entry_id}",
+        "/courses/{course_id}/entries/{entry_id}/delete",
+        "/courses/{course_id}/remember",
+        "/courses/{course_id}/rename",
         "/dev-login",
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
@@ -293,6 +301,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     ]
     for path in posts:
         url = path.replace("{job_id}", JOB).replace("{element_id}", "p1-e1")
+        url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB)
         if path == "/jobs":
             response = web.browser.post(
                 url, data={"csrf_token": "forged"}, files={"pdf": ("a.pdf", b"%PDF-1.4", "x")}
