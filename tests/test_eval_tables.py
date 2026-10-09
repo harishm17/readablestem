@@ -7,8 +7,8 @@ import pymupdf
 import pytest
 
 from a11y_stem.core.types import TableCell, TableGrid
-from a11y_stem.eval import ted
 from a11y_stem.eval import tables as T
+from a11y_stem.eval import ted
 
 SPEEDS = (
     "<table><thead><tr><th scope='col'>Medium</th><th scope='col'>v (m/s)</th></tr></thead>"
@@ -233,7 +233,7 @@ def test_wrong_cells_in_a_table_nobody_is_asked_about_are_the_gate_number():
 
 def test_layout_tables_kept_out_and_data_tables_called_layout():
     golds = [gold("g", GOLD), gold("k", KEY_TERMS, layout=True)]
-    rows, false, extra = T.score_documents(golds, [pred(SAME, is_data=False), pred(KEY_TERMS)])
+    rows, _, extra = T.score_documents(golds, [pred(SAME, is_data=False), pred(KEY_TERMS)])
     dl = T.data_vs_layout(rows, extra["layout"])
     assert dl["layout_negatives"] == 1 and dl["layout_kept_out"] == 0  # called data
     assert dl["data_called_layout"] == 1

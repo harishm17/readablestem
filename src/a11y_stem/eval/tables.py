@@ -1649,8 +1649,13 @@ def score_real_document(
             anywhere += 1
         if any(i >= FULL_COVER * _area(gbox) and i >= FULL_PURITY * _area(b) for i, b in overlaps):
             full += 1
-    return {"predicted": len(preds), "true": true, "labelled": len(golds), "full": full,
-            "anywhere": anywhere}  # fmt: skip
+    return {
+        "predicted": len(preds),
+        "true": true,
+        "labelled": len(golds),
+        "full": full,
+        "anywhere": anywhere,
+    }
 
 
 def real_document_metrics(real_dir: Path) -> dict | None:
@@ -1747,11 +1752,17 @@ def format_markdown(report: dict) -> str:
     lines += pe._table(
         ["direction", "precision", "recall", "f1", "tables exact", "tables"],
         (
-            (name, h[name]["precision"], h[name]["recall"], h[name]["f1"], h[name]["exact"],
-             h[name]["tables"])
+            (
+                name,
+                h[name]["precision"],
+                h[name]["recall"],
+                h[name]["f1"],
+                h[name]["exact"],
+                h[name]["tables"],
+            )
             for name in ("column", "row")
         ),
-    )  # fmt: skip
+    )
     lines.append(
         f"Gold data tables without headers: {h['gold_tables_without_headers']}; found tables "
         f"given row headers where gold has none: {h['row_headers_where_gold_has_none']}."
@@ -1775,11 +1786,18 @@ def format_markdown(report: dict) -> str:
     lines += pe._table(
         ["style", "n", "recall", "precision", "teds", "teds found", "column headers exact"],
         (
-            (s, v["n"], v["recall"], v["precision"], v["teds"], v["teds_found"],
-             v["column_header_exact"])
+            (
+                s,
+                v["n"],
+                v["recall"],
+                v["precision"],
+                v["teds"],
+                v["teds_found"],
+                v["column_header_exact"],
+            )
             for s, v in m["by_style"].items()
         ),
-    )  # fmt: skip
+    )
     load = m["review_load"]
     lines += ["", "### Review load", ""]
     lines += pe._table(

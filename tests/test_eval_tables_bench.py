@@ -101,7 +101,7 @@ def test_the_excerpt_covers_misses_false_tables_and_layout_tables(excerpt):
     golds = gold_tables(excerpt["gold"])
     assert any(g.is_layout for g in golds)
     for row in ("A", "B"):
-        rows, false, extra = T.score_documents(golds, predictions(excerpt["predictions"][row]))
+        rows, _, extra = T.score_documents(golds, predictions(excerpt["predictions"][row]))
         assert any(not r["detected"] for r in rows)
         assert any(not x["kept_out"] for x in extra["layout"])  # a match to a layout table
         assert any(r["has_row_headers"] for r in rows) and any(r["has_span"] for r in rows)
