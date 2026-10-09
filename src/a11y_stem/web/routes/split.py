@@ -6,10 +6,12 @@ decision first):
 - the decision at hand ("Decision 1 of 3"), with what to look at: for an equation the
   PDF and the proposal at the same size, the differing symbol outlined in both and the
   difference as a short table (`web.compare`); for a figure its image and the alt text
-  field; for repeated headings one card for the whole group. Accept, Save edit and
-  Reject post to the same route as the list view (`routes/review.py`), which redirects
-  to the next decision still open (`?item=<key>`), where the decision's heading takes
-  focus and says what just changed;
+  field; for a table its image and the table as the student would get it, with what can
+  be changed (`web.table_card`, `templates/_table_card.html`; after a change to a table
+  the reviewer stays on it); for repeated headings one card for the whole group. Accept,
+  Save edit and Reject post to the same route as the list view (`routes/review.py`),
+  which redirects to the next decision still open (`?item=<key>`), where the decision's
+  heading takes focus and says what just changed;
 - the optional checks (accepted automatically with a note), folded;
 - the page the decision is on, as an image rendered on demand from the upload
   (`web.page_images`), with every fix on it marked: a numbered box per decision still
@@ -66,8 +68,10 @@ from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.mathml import try_sanitize_mathml
 from a11y_stem.web.messages import explain_check, explain_reason
 from a11y_stem.web.review import (
+    GROUP_KINDS,
     FieldError,
     ReviewInvalid,
+    StaleReview,
     heading_places,
     item_numbers,
 )
@@ -90,7 +94,11 @@ router = APIRouter()
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
 HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
 FIGURE_REGION_ZOOM = 2.0
+TABLE_REGION_ZOOM = 2.0
+TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
+# The kinds the review screen shows (marks, optional checks, items): its groups.
+REVIEW_KINDS = frozenset(GROUP_KINDS)
 
 # Short notes for the folded list of optional checks (the card itself has the full
 # sentence from web.messages). Codes without one use the full sentence.
@@ -210,6 +218,10 @@ class Panel:
     redo_bold: bool = False
     back_href: str | None = None  # an item outside the queue: back to the decision at hand
     back_label: str = ""
+    # A decided table (the reviewer stays on it after each change): the next decision
+    # still open, to go on when done with it.
+    continue_href: str | None = None
+    continue_label: str = ""
 
 
 def review_url(
@@ -418,7 +430,7 @@ class SplitBuilder:
             if decision is not None:
                 return decision, None
             fix = self.result.fix_for(key)
-            if fix is not None and fix.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+            if fix is not None and fix.kind in REVIEW_KINDS:
                 return None, fix
         return queue.first_open(self.queue), None
 
@@ -473,6 +485,11 @@ class SplitBuilder:
                 panel.back_href = self.decision_url(current)
                 panel.back_label = f"Back to decision {current.number}"
         self._fix_panel(panel, fix)
+        if fix.kind is Kind.TABLE and decision is not None and not decision.open:
+            onward = queue.next_open(self.queue, decision)
+            if onward is not None:
+                panel.continue_href = self.decision_url(onward)
+                panel.continue_label = f"Go on to decision {onward.number}"
         return panel
 
     def _fix_panel(self, panel: Panel, fix: Fix) -> None:
@@ -516,6 +533,18 @@ class SplitBuilder:
         elif fix.kind is Kind.HEADING and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_alt = f"{item.label} in the PDF, with the lines around it."
+        elif fix.kind is Kind.TABLE:
+            if element is not None:
+                panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+                panel.region_alt = f"{item.label} in the PDF, outlined, with the lines around it."
+            # The card lists every finding itself; the line above it says only why there
+            # is no rebuilt table (not once the reviewer gave it one: the grid read from
+            # the PDF), or that the model was not sure enough.
+            rebuilt = item.table is not None and item.table.in_document
+            listed = fix.failed_checks or (item.table and item.table.problems)
+            if (fix.reason and not rebuilt) or not (fix.reason or listed):
+                panel.why = _why(fix, None)
+            return
         panel.why = _why(fix, panel.compare)
 
     def _group_panel(self, panel: Panel, decision: queue.Decision) -> None:
@@ -563,7 +592,7 @@ class SplitBuilder:
             element = self.elements.get(fix.element_id)
             if element is None or element.page != index:
                 continue
-            if fix.kind not in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+            if fix.kind not in REVIEW_KINDS:
                 continue
             tier = _tier(fix)
             is_current = fix.element_id in selected
@@ -659,11 +688,7 @@ class SplitBuilder:
         far = (1 << 30, 1 << 30)
         rank = {e.id: (e.page, e.order) for e in self.result.elements}
         notes = sorted(
-            (
-                f
-                for f in self.result.fixes
-                if f.optional_note and f.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}
-            ),
+            (f for f in self.result.fixes if f.optional_note and f.kind in REVIEW_KINDS),
             key=lambda f: rank.get(f.element_id, far),
         )
         out = []
@@ -747,10 +772,13 @@ def split_page(
     show_accepted: bool = False,
     invalid: tuple[str, ReviewInvalid] | None = None,
     status_code: int = 200,
+    cell: str = "",
 ) -> Response:
     builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted)
     decision, fix = builder.select(item)
     panel = builder.panel(decision, fix)
+    if cell and panel.item is not None and panel.item.table is not None:
+        panel.item.table.pick(cell)  # "Change a cell": that cell's form is open
     errors: list[FieldError] = []
     if invalid is not None:
         errors = invalid[1].errors
@@ -805,8 +833,12 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
     if item is not None and item.element_id == target:
         item.edited = any(item.values.get(k, "") != v for k, v in exc.values.items())
         item.values.update(exc.values)
+        item.stale = isinstance(exc, StaleReview)
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
+        if item.table is not None and "row" in exc.values:
+            # A refused cell: its form open again, with what the reviewer typed.
+            item.table.pick_at(exc.values["row"], exc.values.get("col", ""))
 
 
 # --------------------------------------------------------------------------- routes
@@ -814,9 +846,18 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
 
 @router.get("/jobs/{job_id}/review")
 def review_screen(
-    request: Request, job_id: str, user: UserDep, item: str = "", page: str = "", accepted: str = ""
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    item: str = "",
+    page: str = "",
+    accepted: str = "",
+    cell: str = "",
 ) -> Response:
-    return split_page(request, job_id, user, item=item, page=page, show_accepted=accepted == "1")
+    """`cell` ("r1c2"): a table's "Change a cell" choice, whose form is then open."""
+    return split_page(
+        request, job_id, user, item=item, page=page, show_accepted=accepted == "1", cell=cell
+    )
 
 
 def _pct(value: float, whole: float) -> str:
@@ -866,7 +907,7 @@ def marks_css(request: Request, job_id: str, user: UserDep) -> Response:
         text[e.page] = (min(left, e.bbox[0]), max(right, e.bbox[2]))
     for fix in result.fixes:
         element = elements.get(fix.element_id)
-        if element is not None and fix.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+        if element is not None and fix.kind in REVIEW_KINDS:
             by_page.setdefault(element.page, {})[element.id] = element.bbox
     for page, boxes in sorted(by_page.items()):
         size = sizes.get(page)
@@ -969,6 +1010,19 @@ def _render_region(
             snap=True,
         )
     x0, y0, x1, y1 = element.bbox
+    if fix.kind is Kind.TABLE:
+        # The table outlined, with a little page round it snapped to whole lines: its
+        # caption above comes in whole, and no line of text is cut at an edge.
+        m = TABLE_REGION_MARGIN
+        return page_images.render_region(
+            pdf,
+            element.page,
+            zoom=TABLE_REGION_ZOOM,
+            max_side=page_images.REGION_MAX_SIDE_PX,
+            clip=(x0 - m, y0 - m, x1 + m, y1 + m),
+            box=element.bbox,
+            snap=True,
+        )
     return page_images.render_region(
         pdf,
         element.page,

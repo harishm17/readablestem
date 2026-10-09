@@ -6,6 +6,7 @@
 {% block title %}{% if errors %}Error: {% endif %}{% if panel.mode == "decision" %}{{ panel.title }}: {% endif %}Review {{ job.filename }}{% endblock %}
 {% block main_class %}wrap wrap-review{% endblock %}
 {% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">{% endblock %}
+{% from "_table_card.html" import table_split_body with context %}
 
 {% macro hidden_fields() %}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="split">
@@ -291,6 +292,7 @@
     {% if panel.group %}{{ group_body(panel) }}
     {% elif panel.item.kind == "equation" %}{{ equation_body(panel) }}
     {% elif panel.item.kind == "figure" %}{{ figure_body(panel) }}
+    {% elif panel.item.kind == "table" %}{{ table_split_body(panel) }}
     {% else %}{{ heading_body(panel) }}{% endif %}
 
     {% if panel.item and (panel.checks or panel.reason_code) %}

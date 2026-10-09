@@ -87,13 +87,13 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/status?v=` | owner | Status fragment for htmx polling (204 while unchanged) |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
-| GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation or figure |
-| GET `/jobs/{id}/review?item=&page=&accepted=1` | owner | Review screen: one decision at a time beside its page (below) |
+| GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
+| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table |
 | GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind, with bulk accept |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond two renders in progress for one person, 503 when the instance's two render slots stay busy |
-| GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure; 429 and 503 as for pages |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to |
+| GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`); with `equations`, `figures`, `tables` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` (the job's `result_version` the page was made from) refuses a form from a stale tab |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
@@ -293,8 +293,14 @@ Code: `web/routes/split.py` (the review screen, page images, marks), `web/queue.
 decisions, numbered, in order), `web/compare.py` (what differs in an equation, crop
 geometry), `web/page_images.py` and `web/pdf_probe.py` (rendering in a child process),
 `web/routes/review.py` (the decision POST and the list view), `web/review.py` (rules:
-order, eligibility, validation), `web/messages.py` (what each code means). Tests:
+order, eligibility, validation, table edits, the stale-tab guard), `web/table_card.py`
+and `templates/_table_card.html` (the table card), `web/messages.py` (what each code
+means). Tests:
 `tests/test_web_review_split.py` (the screen, deciding, older results),
+`tests/test_web_review_tables.py` (the table card in every tier, its decisions and
+edits, the stale-tab guard) and `tests/test_web_review_tables_browser.py` (axe at 1280
+and 320 px in every state of the card, a wide table scrolling in its own box, keyboard
+order, a cell changed from the keyboard, no JavaScript; `browser` marker),
 `tests/test_web_page_images.py` (routes, ownership, retention, headers, a failing child),
 `tests/test_web_compare_queue.py`, `tests/test_web_marks.py` (where the marks go),
 `tests/test_web_review_split_browser.py` (axe at 1440 and 390 px, also on a dense page
@@ -373,6 +379,7 @@ the results".
   group decision acts on every heading of the group, decided or not, and leaves alone
   the ones already that way).
 - *Single heading*: its band of the page, text and level, a level select.
+- *Table* (below, "The table card").
 
 "Details for this item" (folded) keeps the confidence, every failed check with its
 sentence and code. Previous and next decision links close the card. After Accept, Save
@@ -455,6 +462,92 @@ item is still in the list view.
 Results stored before review tiers load as before (`default_review`), each waiting heading
 then its own decision.
 
+**The table card** (`web/table_card.py`, `templates/_table_card.html`). Tables are a
+review group like the others (equations, figures, tables, headings), so a table kept as
+an image is a decision the screen shows and the job can be done. The card has:
+
+- the table in the PDF (`/regions/{id}.png`: the box layout found, outlined, with a
+  little page round it snapped to whole lines like a heading's band, so the caption
+  above it comes in whole) and, under it, the proposal as the student would get it:
+  `pipeline.table_html.render_table`, the output's own serialiser (cell text escaped,
+  maths cells as MathML rebuilt from an allowlisted tree), in its own named, focusable
+  box that scrolls sideways when the table is wider than the card. Its cells keep whole
+  words, and every cell has a rule round it, so a cell spanning the wrong rows or
+  columns shows. Its label says whether the document has it now ("Proposal, as students
+  would get it", "Rebuilt, as students get it", "Proposal (the document has the image
+  instead)");
+- **What the checks found**: the step's failed checks as sentences from
+  `web/messages.py`, and any structural problem of the proposal's grid
+  (`core.types.grid_problems`, in plain English: `web.review.GRID_PROBLEM_SENTENCES`)
+  that no check already reported. The codes stay in "Details for this item";
+- **Change the table** (folded): "Cell to change", a list of every cell ("Row 4,
+  columns 2 to 3: v = d / t") with **Change this cell**, a GET that comes back with that
+  cell's form open and its field focused (`?item=<id>&cell=r3c1`); and **Headers**, two
+  boxes, "The first row is a header" and "The first column is a header", with **Save
+  headers**;
+- **The grid read from the PDF** (folded), when layout built one (`Element.table`) that
+  has no structural problem and differs from the proposal: the grid, and **Use this grid
+  instead**;
+- **Accept** and **Reject** ("Reject keeps the image of the table, marked “not
+  converted”."). A table kept as an image (`table_not_rebuilt`, no proposal) has **Use
+  the grid read from the PDF**, when there is one (shown in the proposal's place, "Read
+  from the PDF's own text and lines, without a model"), and **Keep the image**, which
+  rejects it: the document keeps the flagged image with its "not converted" note.
+
+Every change to a table goes through the same route as other decisions (`change` is
+`cell`, `headers` or `use_local`), is stored as `edited` with a `ReviewEdit` and
+re-renders the HTML. After one the reviewer stays on the table, which is shown as it is
+now, with "Go on to decision N" when it was the last change; Accept and Reject move on
+as for other kinds. The rules (`web.review`, "tables"):
+
+- *Headers.* Ticking a box makes the first row's cells column headers (`header_rows`
+  1), or the first column's body cells row headers (`header_cols` 1); unticking makes
+  them data cells again (a full-width section heading stays one). A model may mark the
+  first column's cells without the count; the box is then ticked. The same boxes as
+  before are refused ("The headers are already like that").
+- *A cell.* Its text is cleaned as alt text is (invisible format characters removed,
+  whitespace collapsed), at most 1,000 characters, and escaped when written; a maths
+  cell's LaTeX goes through what an equation edit does (`web.review.checked_latex`:
+  `clean_latex`, `check_latex`, `safe_latex_to_mathml` inline, `check_mathml`), and its
+  plain text stays as the serialiser's fallback. Text typed into an empty cell of the
+  header row or column makes it a header. The same text again is refused.
+- *Structure.* An edit that would give the grid a structural problem it did not have is
+  refused with what it would break ("The headers were not saved. The headers would
+  cover the whole table, leaving no row or column for data."): the first row of a
+  one-row table, a header row whose cell spans into the body. A problem the proposal
+  already had is left for the reviewer to judge and does not block a cell.
+- *The grid read from the PDF* replaces the proposal with a copy of `Element.table`; the
+  fix keeps its reason (`table_not_rebuilt`), so ops still counts why it was asked, but
+  the card and the list no longer show it: the table is converted now.
+
+After a table edit the fix's checks are the ones the review ran, as after an equation
+edit: a maths cell's LaTeX and MathML checks, and the table step's own checks of the
+table as it is now (`web.review.table_checks`, which runs
+`pipeline.table_step.table_checks(grid, element)`: structure and headers, agreement
+with the grid read from the PDF, the cells' words, the maths cells). So a finding stays
+on the card until the cell is put right, and a failed one is a warning on the change
+("1 check gives a warning"), never a refusal. Until the table step has that function
+there are none. Nothing about a table
+is logged but codes: the `review` event gets `change=cell|headers|use_local`.
+
+With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
+the cell list. In the list view a table card shows its crop, the proposal (or the grid
+read from the PDF) and Accept, Reject or Keep the image, Use the grid read from the PDF;
+headers and cells are changed on the review screen ("open it on the review screen").
+
+**Stale tabs.** Every review write moves `jobs.result_version` on, in the same
+transaction, with the job row locked (`web.review.guard_result_version`, called by every
+write path in `routes/review.py`: one fix, a heading group, bulk accept). The table
+card's forms send the version their page was made from (`version`, read from
+`JobView.result_version`); one made before another tab or window changed the review is
+refused with a 422 and nothing saved: "Your change was not saved: this item was changed
+in another tab or window after this page was opened, and what you see now is the latest
+version." The page that says so is the latest version, and offers **Reload table 1**.
+A form without the field (older pages, scripts) is not checked. Without it a cell
+changed by its place in the grid could land on another cell once a tab elsewhere had
+changed the table. The other cards will send it too (the review-screen UX work), with
+the same helper.
+
 **Accept never drops an edit.** Accept and Save edit share a form; Accept keeps the
 proposal and never used the fields, so a correction typed and then accepted out of habit
 was lost without a word. Accept with the LaTeX, the alt text, "Decorative" or the level
@@ -483,8 +576,8 @@ the list's next card.
 **Order.** Only meaning-level problems ask for a decision (docs/design/beta-architecture.md
 "Review tiers"), so the page has three sections:
 
-1. **Needs your decision (N)**: equations, then figures, then headings (a mistake there
-   costs a student most), each with the fixes still waiting (needs review, failed and not
+1. **Needs your decision (N)**: equations, then figures, then tables, then headings (a
+   mistake there costs a student most), each with the fixes still waiting (needs review, failed and not
    converted alike) in page and reading order. N counts decisions: a group of repeated
    headings is one.
 2. **Optional checks (M)**: fixes accepted automatically with a note (`Fix.review ==
@@ -599,7 +692,7 @@ no failed error-level check and, for a heading, a level the output writes as it 
 Failed and not-converted fixes, and fixes the reviewer already decided, are never
 touched. The threshold compares the whole percentage the page
 shows (0.795 is shown as 80%, so it is "at or above 80%"). Bulk accept posts to the same
-route as a single decision, with the group (`equations`, `figures`, `headings`) in
+route as a single decision, with the group (`equations`, `figures`, `tables`, `headings`) in
 place of the element id (element ids look like `p3-e12`, so the two cannot collide).
 That keeps one CSRF- and ownership-checked way to change a review, and the POST-route
 list in `tests/test_web_auth.py` unchanged. It is one transaction: one `ReviewEdit` per

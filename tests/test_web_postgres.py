@@ -425,3 +425,37 @@ def test_erasure_and_course_deletion_on_postgres(factory):
         assert session.scalar(select(db.Course.id)) is None
         assert session.scalars(notation).all() == []
         assert session.get(db.User, gone_user) is None and session.get(db.User, kept_user)
+
+
+def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory):
+    """The review routes lock the job row (`owned_job(..., lock=True)`), then check and
+    move `result_version` on (`web.review.guard_result_version`) in one transaction: of
+    20 tabs made from version 0 and writing at once, exactly one write is applied."""
+    from a11y_stem.web.deps import CurrentUser
+    from a11y_stem.web.review import StaleReview, guard_result_version
+    from a11y_stem.web.routes.jobs import owned_job
+
+    [job_id] = queue_jobs(factory, 1)
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, job_id)
+        assert job is not None and job.result_version == 0
+        user = CurrentUser(id=job.user_id, email="x@example.org", name=None, is_admin=False)
+    outcomes: list[str] = []
+    lock = threading.Lock()
+
+    def write() -> None:
+        try:
+            with db.session_scope(factory) as session:
+                job = owned_job(session, job_id, user, lock=True)
+                job.result_version = guard_result_version(job.result_version, "0", "actions")
+            outcome = "saved"
+        except StaleReview:
+            outcome = "stale"
+        with lock:
+            outcomes.append(outcome)
+
+    run_threads(20, write)
+    assert sorted(outcomes) == ["saved"] + ["stale"] * 19
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, job_id)
+        assert job is not None and job.result_version == 1
