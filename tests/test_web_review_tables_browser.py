@@ -224,7 +224,7 @@ def test_the_keyboard_reaches_everything_in_reading_order(site, browser, job, ja
     context, page = open_page(browser, site, javascript=javascript)
     page.goto(f"{site.base}/jobs/{job}/review")
     page.locator("#decision-title").focus()
-    seen = tab_until(page, "button:Reject")
+    seen = tab_until(page, "button:Keep as image")
     stops = [s for s in seen if not s.startswith("a:Decision") and s != "a:"]
     assert stops[:6] == [
         "a:Show on the page",
@@ -232,7 +232,7 @@ def test_the_keyboard_reaches_everything_in_reading_order(site, browser, job, ja
         "summary:Change the table",
         "summary:The grid read from the PDF",
         "button:Accept",
-        "button:Reject",
+        "button:Keep as image",
     ], seen
     # Open "Change the table" from the keyboard: the cell list, then the header boxes.
     page.locator("#decision-title").focus()
