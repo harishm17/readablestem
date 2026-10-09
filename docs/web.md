@@ -1,8 +1,9 @@
 # Web app
 
-The hosted beta: an instructor signs in with Google, uploads a PDF, watches it convert,
-reviews the uncertain fixes and downloads one accessible HTML file. One FastAPI process
-serves the pages and runs the background worker (ADR 0004).
+The hosted beta: an instructor signs in with Google or a university Microsoft account,
+uploads a PDF, watches it convert, reviews the uncertain fixes and downloads one
+accessible HTML file. One FastAPI process serves the pages and runs the background worker
+(ADR 0004).
 
 Code: `src/a11y_stem/web/`. Tests: `tests/test_web_*.py`.
 
@@ -49,10 +50,10 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DATABASE_URL` | SQLite locally, Postgres (`postgresql+psycopg://...`) in production |
 | `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
-| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment) |
+| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment). See "Sign-in, sessions and CSRF" |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table). Both on by default |
-| `BASE_URL` | Builds the OAuth redirect URI, `${BASE_URL}/auth/callback` |
+| `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft) |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
@@ -79,6 +80,8 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; 403 page if not allowlisted or email not verified |
+| POST `/login/microsoft` | anyone | Redirects to Microsoft (CSRF-checked form); 503 when Microsoft sign-in is not set up |
+| GET `/auth/microsoft/callback` | Microsoft | Finishes sign-in; 403 page if the organisation is not set up for the beta or the person is not allowlisted, 400 for any token that fails a check. With `admin_consent` (an IT admin back from the approval link, deploy.md step 3b): a thank-you notice on `/login`, nothing else |
 | GET, POST `/dev-login` | dev/test only | Any email, no password; the allowlist still applies |
 | POST `/logout` | signed in | Clears the session |
 | GET `/app` | signed in | Upload form and the user's documents |
@@ -109,7 +112,50 @@ else, admins included, so job ids cannot be probed and admins never see document
   `https://accounts.google.com/.well-known/openid-configuration` and scope
   `openid email profile`. In the Google Cloud console, add
   `${BASE_URL}/auth/callback` as an authorised redirect URI. The ID token's nonce is
-  checked by Authlib; we also require `email_verified`.
+  checked by Authlib; we also require `email_verified`. Access is by verified email, as
+  before; the Google account (issuer `https://accounts.google.com`, its `sub`) is also
+  recorded as an identity, on the first sign-in after this release.
+- **Microsoft (Entra ID)**, when `MS_CLIENT_ID`, `MS_CLIENT_SECRET` and
+  `MS_ALLOWED_TENANTS` are all set (`web/microsoft.py`). The sign-in page and the landing
+  page then offer "Sign in with your university account (Microsoft)" first and "Sign in
+  with Google" second (the secondary button style); without them, Google only, as
+  before. One multi-tenant app
+  registration (deploy.md, step 3b) at the authority
+  `https://login.microsoftonline.com/organizations/v2.0` (work and school accounts),
+  scope `openid profile email`, the authorisation code flow with state, nonce and PKCE
+  (S256), the client secret sent in the token request's body, and `prompt=select_account`
+  so someone signed in to Microsoft with the wrong account can pick another. Redirect URI:
+  `${BASE_URL}/auth/microsoft/callback` (query response mode: the session cookie is
+  SameSite=Lax, so a form-post answer would arrive without it).
+  The discovery document's issuer is a template
+  (`https://login.microsoftonline.com/{tenantid}/v2.0`) that no token matches as written,
+  so we check the ID token ourselves instead of Authlib: an RS256 signature by the
+  Microsoft key named by `kid` (the keys are fetched again, once, for an unknown `kid`,
+  since Microsoft rotates them), `aud` equal to our client id, `tid` a directory id with
+  `iss` exactly `https://login.microsoftonline.com/{tid}/v2.0` (and matching the key's
+  own issuer template), the nonce this browser's sign-in started with, `exp`, `nbf` and
+  `iat` with two minutes of clock skew, and finally `tid` in `MS_ALLOWED_TENANTS`. A
+  token from another directory gets "Your organisation is not set up for this beta",
+  with the contact address and the directory id to pass on; a token that fails any other
+  check gets "Sign-in did not finish". The logs get the reason code only
+  (`login_refused` or `login_failed` with `reason`, `provider`), never a claim.
+- **Identities and nOAuth** (`web/identities.py`, table `auth_identities`, unique on
+  provider, issuer and subject). An email claim is only as good as the directory that
+  issued it, and anyone can create a directory and put any address in it ("nOAuth"). So
+  a Microsoft account is recognised by its identity: issuer (which names the tenant) and
+  `sub`, with `tid` kept as `tenant`. The address in the token (the `email` claim,
+  unless the optional claim `xms_edov` says its domain owner is not verified; else
+  `preferred_username`, the sign-in name) is read only from allowed tenants, and used
+  once: on the first sign-in, the identity is linked to the user with that address only
+  if they are on the allowlist. Afterwards the identity alone decides, so a changed
+  address, or one that is now someone else's, does not move it. Removal from the
+  allowlist still ends access. Nothing is stored for people who are refused.
+  Why `sub` and not `oid`: OpenID Connect promises that `iss` and `sub` together are a
+  stable identifier that is never reassigned (Core 1.0, section 5.7), the same rule as
+  for Google; and Microsoft's `sub` is pairwise per app registration, so a token minted
+  for another app never matches. If the app registration is ever replaced (a new client
+  id), every `sub` changes and people link again by email on their next sign-in, under
+  the same rules.
 - **Allowlist.** `users.is_allowed`, managed with `a11y-stem users allow|deny|list` or on
   `/admin`. It is checked on every request, so removing someone ends their access at
   once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
@@ -117,7 +163,8 @@ else, admins included, so job ids cannot be probed and admins never see document
 - **Sessions.** Starlette `SessionMiddleware`: a signed cookie `a11y_stem_session`,
   HttpOnly, SameSite=Lax, 7 days, Secure in production. The session is cleared and a new
   CSRF token issued at sign-in. It holds the user id, the user's session version, the
-  CSRF token, one-time notices (never document content) and Authlib's sign-in state.
+  CSRF token, one-time notices (never document content) and Authlib's sign-in state (the
+  state, the nonce and, for Microsoft, the PKCE verifier; each works once).
 - **Signing out.** The cookie is signed, not stored, so clearing it in one browser
   would leave any copy of it valid for its 7 days. Signing out therefore bumps
   `users.session_version`, and a session signed in with an older version no longer
@@ -645,7 +692,7 @@ Every response (`web/security.py`):
 ```
 Content-Security-Policy: default-src 'self'; img-src 'self' data:; style-src 'self';
   script-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none';
-  form-action 'self' https://accounts.google.com
+  form-action 'self' https://accounts.google.com https://login.microsoftonline.com
 X-Content-Type-Options: nosniff
 Referrer-Policy: same-origin
 X-Frame-Options: DENY
@@ -655,6 +702,10 @@ Cache-Control: no-store            (everything except /static/; page images and
                                     marks.css: private, no-store)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
+
+`form-action` names Google's and Microsoft's sign-in hosts because the sign-in buttons
+are forms whose answer redirects there, and browsers check `form-action` on that
+redirect too.
 
 Request bodies are capped at 1 MiB while they stream in (`RequestSizeLimitMiddleware`),
 before any form is parsed: Starlette's multipart parser has no limit on file parts, and
@@ -733,7 +784,10 @@ white text on the numbered discs at least 4.5:1.
   checks none reach the logs.
 - File names, emails and document content are not written to logs or error codes; the
   file name is shown only to its owner and deleted with the job.
-- Not-allowlisted sign-ins are not stored.
+- Not-allowlisted sign-ins, and Microsoft sign-ins from directories that are not set
+  up, are not stored. For allowlisted people the sign-in identity (provider, issuer,
+  subject id and, for Microsoft, the directory id) is kept with the account and erased
+  with it.
 
 ## Database and migrations
 
@@ -767,7 +821,9 @@ a user id is added without it.
 |---|---|
 | `uv run pytest tests/test_web_*.py` | Offline web tests (SQLite) plus the Postgres ones when a server is available |
 | `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check |
+| `uv run pytest tests/test_web_auth_microsoft.py` | Microsoft sign-in against a fake identity platform (`tests/fixtures/web/oidc.py`: keys made and tokens signed in the test, served to Authlib through an httpx mock transport): every ID-token check, tenants, linking, identities, sessions |
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
+| `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
