@@ -109,6 +109,7 @@ from a11y_stem.web.review import (
     heading_places,
     is_group_key,
     is_stale,
+    item_labels,
     item_numbers,
     kind_for_slug,
     needs_attention,
@@ -306,7 +307,9 @@ def stale_notice(
     fix = result.fix_for(target) if not is_group_key(target) else None
     now = ""
     if fix is not None and fix.kind in NOUNS:
-        label = f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
+        label = item_labels(result).get(
+            fix.element_id, f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
+        )
         element = next((e for e in result.elements if e.id == target), None)
         now = f"{label} is now: {status_words(fix, element).lower()}."
     kept = any((value or "").strip() for value in (typed or {}).values())
@@ -483,7 +486,9 @@ def _item(
     job_id: str,
     crop_ids: set[str],
     place: HeadingPlace | None = None,
+    label: str | None = None,
 ) -> ReviewItem:
+    """`label`: the item's name (`web.review.item_labels`), else kind and `number`."""
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
@@ -507,7 +512,7 @@ def _item(
     return ReviewItem(
         element_id=fix.element_id,
         kind=fix.kind.value,
-        label=f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
+        label=label or f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
         page=(element.page + 1) if element else 0,
         status=fix.status.value,
         status_label=status_words(fix, element),
@@ -791,6 +796,7 @@ def _page(
     view, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
+    labels = item_labels(result)
     fix_groups = group_fixes(result)
     places = heading_places(result)
     items = {
@@ -801,6 +807,7 @@ def _page(
             view.id,
             crop_ids,
             places.get(f.element_id),
+            labels.get(f.element_id),
         )
         for g in fix_groups
         for f in (*g.pending, *g.optional, *g.done)

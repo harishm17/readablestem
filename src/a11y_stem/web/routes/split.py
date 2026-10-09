@@ -79,6 +79,7 @@ from a11y_stem.web.review import (
     FieldError,
     ReviewInvalid,
     heading_places,
+    item_labels,
     item_numbers,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
@@ -263,8 +264,9 @@ def review_url(
     return url + (f"#{anchor}" if anchor else "")
 
 
-def _label(fix: Fix, numbers: dict[str, int]) -> str:
-    return f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {numbers.get(fix.element_id, 0)}"
+def _label(fix: Fix, labels: dict[str, str]) -> str:
+    """The item's name (`web.review.item_labels`)."""
+    return labels.get(fix.element_id) or KIND_LABELS.get(fix.kind, fix.kind.value.title())
 
 
 def _page_count(view: JobView, result: DocumentResult) -> int:
@@ -404,6 +406,7 @@ class SplitBuilder:
         self.show_accepted = show_accepted
         self.elements = {e.id: e for e in self.result.elements}
         self.numbers = item_numbers(self.result)
+        self.labels = item_labels(self.result)
         self.places = heading_places(self.result)
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
@@ -421,6 +424,7 @@ class SplitBuilder:
                 self.job_id,
                 self.crop_ids,
                 self.places.get(fix.element_id),
+                self.labels.get(fix.element_id),
             )
         return self.items[fix.element_id]
 
@@ -619,7 +623,7 @@ class SplitBuilder:
             if tier == "accepted" and not (self.show_accepted or is_current):
                 hidden += 1
                 continue
-            label = _label(fix, self.numbers)
+            label = _label(fix, self.labels)
             decision = decision_of.get(fix.element_id)
             key = decision.key if decision is not None and decision.open else fix.element_id
             href = self.url(item=key, page=number, anchor="decision-title")
@@ -726,7 +730,7 @@ class SplitBuilder:
         page = self.page_of(fix)
         item = self.item(fix)
         return OptionalLine(
-            label=_label(fix, self.numbers) + (f", page {page}" if page else ""),
+            label=_label(fix, self.labels) + (f", page {page}" if page else ""),
             note=note,
             href=href,
             what=item.preview,
@@ -807,7 +811,7 @@ def headline(open_count: int, total: int, optional: int) -> str:
 
 
 def _notice(
-    flashes: list[dict[str, Any]], result: DocumentResult, numbers: dict[str, int], open_count: int
+    flashes: list[dict[str, Any]], result: DocumentResult, labels: dict[str, str], open_count: int
 ) -> str | None:
     """What the last decision did, for the status line above the next one."""
     if not flashes:
@@ -825,7 +829,7 @@ def _notice(
     elif target and not target.startswith(GROUP_FLASH):
         fix = result.fix_for(target)
         if fix is not None:
-            label = _label(fix, numbers)
+            label = _label(fix, labels)
     left = (
         "All decisions made."
         if open_count == 0
@@ -871,7 +875,7 @@ def split_page(
     open_count = sum(d.open for d in builder.queue)
     optional = builder.optional_lines()
     flashes = pop_flash(request)
-    notice = _notice(flashes, builder.result, builder.numbers, open_count)
+    notice = _notice(flashes, builder.result, builder.labels, open_count)
     target = _flash_target(flashes)
     context: dict[str, Any] = {
         "job": builder.view,

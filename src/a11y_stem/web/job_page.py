@@ -698,16 +698,13 @@ class NoticeLists:
         return len(self.not_handled) + len(self.worth_checking)
 
 
-def _line(notice: Notice, fixes: dict[str, Fix], numbers: dict[str, int]) -> NoticeLine:
-    from a11y_stem.web.views import KIND_LABELS
-
+def _line(notice: Notice, fixes: dict[str, Fix], labels: dict[str, str]) -> NoticeLine:
     fix = fixes.get(notice.element_id or "")
     decision: Literal["open", "made"] | None = None
     label = ""
     if fix is not None and fix.review == "required" and notice.code in DECISION_NOTICES:
         decision = "open" if fix.pending else "made"
-        kind = KIND_LABELS.get(fix.kind, fix.kind.value.title())
-        label = f"{kind} {numbers[fix.element_id]}" if fix.element_id in numbers else kind
+        label = labels.get(fix.element_id, "")
     where = f"Page {notice.page + 1}" if notice.page is not None else "The whole document"
     return NoticeLine(where, explain_notice(notice).text, notice.code, notice.count,
                       notice.element_id, decision, label)  # fmt: skip
@@ -715,13 +712,13 @@ def _line(notice: Notice, fixes: dict[str, Fix], numbers: dict[str, int]) -> Not
 
 def notice_lists(result: DocumentResult) -> NoticeLists:
     """The notices as the job page lists them now (see `pipeline.notices.current`)."""
-    from a11y_stem.web.review import item_numbers
+    from a11y_stem.web.review import item_labels
 
     fixes = _first_fixes(result)
-    numbers = item_numbers(result)
+    labels = item_labels(result)
     lists = NoticeLists()
     for notice in notice_rules.current(result):
-        line = _line(notice, fixes, numbers)
+        line = _line(notice, fixes, labels)
         if notice_rules.section(notice) == "worth_checking":
             lists.worth_checking.append(line)
         else:

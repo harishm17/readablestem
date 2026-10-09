@@ -268,6 +268,38 @@ def item_numbers(result: DocumentResult) -> dict[str, int]:
     return numbers
 
 
+# "Table 4" (or "Table 2.1") at the start of a table's caption, as printed.
+_PRINTED_TABLE_NUMBER = re.compile(r"\s*table\s+(\d+(?:[.\-]\d+)*[a-z]?)\b", re.IGNORECASE)
+
+
+def item_labels(result: DocumentResult) -> dict[str, str]:
+    """element_id -> the item's name in messages ("Equation 3", "Table 4"). Numbers count
+    within a kind (`item_numbers`), except that tables carry the number their captions
+    print when every table has a "Table N" caption and no two share one: a table the
+    detector missed would otherwise shift every number, and the card titled "Table 3"
+    would show the caption "Table 4"."""
+    from a11y_stem.web.views import KIND_LABELS
+
+    numbers = item_numbers(result)
+    labels: dict[str, str] = {}
+    for fix in result.fixes:
+        if fix.element_id in numbers and fix.element_id not in labels:
+            kind = KIND_LABELS.get(fix.kind, fix.kind.value.title())
+            labels[fix.element_id] = f"{kind} {numbers[fix.element_id]}"
+    captions = {e.id: e.caption for e in result.elements if e.kind is Kind.TABLE}
+    printed: dict[str, str] = {}
+    for fix in result.fixes:
+        if fix.kind is not Kind.TABLE or fix.element_id in printed:
+            continue
+        found = _PRINTED_TABLE_NUMBER.match(captions.get(fix.element_id) or "")
+        if found is None:
+            return labels  # one without: ordinals for all, so no two names clash
+        printed[fix.element_id] = found.group(1)
+    if len(set(printed.values())) == len(printed):
+        labels.update({eid: f"Table {number}" for eid, number in printed.items()})
+    return labels
+
+
 def next_to_review(result: DocumentResult, element_id: str) -> str | None:
     """The first decision still waiting after `element_id` in review order, wrapping
     round to the first one; None when nothing is left. A group of headings is one

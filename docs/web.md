@@ -1112,7 +1112,10 @@ the list's next card.
 
 A table of contents at the top links to each section and kind group with its counts.
 Every fix is numbered within its kind in reading order ("Equation 3"), so a number stays
-the same while the list reorders.
+the same while the list reorders. Tables carry the number their captions print instead
+("Table 4", `web.review.item_labels`) when every table has a "Table N" caption of its own,
+so a table the detector missed does not make the card titled "Table 3" show the caption
+"Table 4"; otherwise all keep their ordinals, so no two names clash.
 
 **Heading groups.** Repeated headings with weak evidence (the same label and style two or
 more times, `pipeline/heading_step.py`) share a `Fix.group_key` and are one card: "“Teacher

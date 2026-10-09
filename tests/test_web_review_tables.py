@@ -923,3 +923,32 @@ def test_a_table_decided_outside_the_queue_is_listed_under_your_decisions(tables
     assert start >= 0, "no Your decisions block"
     decided = page[start : page.find("</details>", start)]
     assert "p2-e1" in decided
+
+
+def test_tables_are_named_by_their_printed_numbers_when_every_one_has_its_own():
+    """tables.pdf: a missed table shifted the ordinals, so the card titled "Table 3" showed
+    the caption "Table 4". Tables carry their printed numbers when each has a "Table N"
+    caption of its own; otherwise all keep their ordinals, so no two names clash."""
+    from a11y_stem.web.review import item_labels
+
+    def result(captions: list[str | None]) -> DocumentResult:
+        elements = [
+            Element(id=f"p1-e{i}", kind=Kind.TABLE, page=0, bbox=(0, 0, 1, 1), order=i,
+                    caption=caption)
+            for i, caption in enumerate(captions)
+        ]  # fmt: skip
+        fixes = [
+            Fix(element_id=e.id, kind=Kind.TABLE, status=Status.FAILED, reason="table_not_rebuilt")
+            for e in elements
+        ]
+        return DocumentResult(pipeline_version="test", elements=elements, fixes=fixes,
+                              stats=DocumentStats(pages=1, cost_usd=0, latency_ms=0,
+                                                  model_calls=0))  # fmt: skip
+
+    printed = item_labels(result(["Table 2: Speeds.", "Table 4: Specific heat by phase."]))
+    assert printed == {"p1-e0": "Table 2", "p1-e1": "Table 4"}
+    assert item_labels(result(["Table 2.1 A.", None])) == {"p1-e0": "Table 1", "p1-e1": "Table 2"}
+    assert item_labels(result(["Table 1 A.", "Table 1 (continued)."])) == {
+        "p1-e0": "Table 1",
+        "p1-e1": "Table 2",
+    }
