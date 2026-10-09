@@ -220,8 +220,8 @@ text layer with those of the MathML, as multisets per class (order is not compar
 |---|---|
 | minus | U+2212, ⁻ ₋ ➖; ASCII `-`, the hyphens U+2010 and U+2011, the en dash, the small and fullwidth hyphen-minus when they act as a minus (below) |
 | plus, plus-minus, minus-plus | `+` (and its super/subscript, small, fullwidth and heavy forms); `±`; `∓` |
-| relations | `=` (and its forms, plus ≐ ≔ ≜ ≝ ... which TeX may print as a mark over `=`), `≠` (TeX's negation slash over `=` composes to it), `<`, `>`, `≤ ⩽ ≦`, `≥ ⩾ ≧`, `≪`, `≫`, `≮ ≯ ≰ ≱`, `≈`, `≉`, `∼` and ASCII `~`, `≁`, `≃`, `≅`, `≡`, `≢`, `∝` |
-| arrows | `→ ⟶ ↦ ⟼`, `← ⟵ ↤`, `↔ ⟷`, `⇒ ⟹`, `⇐ ⟸`, `⇔ ⟺`; TeX's long arrows printed as a minus or `=` joined to a short arrow (`−→`, `=⇒`, `⇐⇒`) and ASCII digraphs in typed text (`->`, `=>`, `<=>`; `>=` and `<=` are `≥`, `≤`) count as one arrow or relation. The gold set uses `→` only, as a vector accent |
+| relations | `=` (and its forms, plus ≐ ≔ ≜ ≝ ... which TeX may print as a mark over `=`), `≠` (TeX's negation slash over `=` composes to it), `<`, `>`, `≤ ⩽ ≦`, `≥ ⩾ ≧`, `≪`, `≫`, `≮ ≯ ≰ ≱`, `≈`, `≉`, `∼` and ASCII `~`, `≁`, `≃`, `≅`, `≡`, `≢`, `∝`. Relations TeX stacks from two glyphs count as one: `\cong` prints as `∼=` (Computer Modern, lmodern, mathptmx, fourier) and folds to `≅`; `\models` prints as `\|=`, which cannot be told from Chromium's `\|𝑥\|= 1` (no space before a relation), so an `=` straight after `\|` is uncertain |
+| arrows | `→ ⟶ ↦ ⟼`, `← ⟵ ↤`, `↔ ⟷`, `⇒ ⟹`, `⇐ ⟸`, `⇔ ⟺`. TeX draws long and extensible arrows as a shaft of minus or `=` glyphs glued to a head (`\longrightarrow` `−→`, `\Longrightarrow` `=⇒`, `\overrightarrow{AB}` `−−→ AB`, `\longleftarrow` `←−`): the head is an arrow and the glued run is uncertain (below). Two heads joined by a shaft (`⇐⇒`, `←→`) are one two-way arrow, and newtx's `\mapsto` (`↦→`) is one `↦`. ASCII digraphs in typed text (`->`, `=>`, `<=>`; `>=` and `<=` are `≥`, `≤`; `+/-` and `-/+` are `±`, `∓`) are folded the same way on both sides: in the text layer, in `<mtext>` and across adjacent `<mo>` (a symbol-by-symbol transcription writes `<mo>&gt;</mo><mo>=</mo>`). The gold set uses `→` only, as a vector accent |
 | products | `×` `⨯` and `·` `⋅` `∙`: compared only for a dot product read as a cross product (below) |
 
 **Certain or uncertain.** Each side counts each class as an interval [certain, certain +
@@ -230,18 +230,35 @@ certainly has and the transcription lacks is always caught; an ambiguous glyph o
 widens an interval, so it can never make a flag on its own.
 
 - Text layer: a hyphen or en dash directly between two letters or digits
-  (`time-dependent`, `1–3`, TeX's `1--3`) may be a word hyphen or a range, so it is
-  uncertain; anywhere else it is a minus (`a = -9.8` typed as plain text, Word's
-  ` – ` with spaces). Figure dash, em dash and horizontal bar are uncertain (Chromium
-  prints `\overline` as U+2015). A glyph the PDF cannot name (private use, U+FFFD: old
-  Symbol and MT Extra fonts put operators there, CMEX brace pieces come out there too)
-  may be any sign: it raises every upper bound by one.
+  (`time-dependent`, `1–3`, TeX's `1--3`, `C-14`) may be a word hyphen or a range, so it
+  is uncertain; anywhere else it is a minus (`a = -9.8` typed as plain text, Word's
+  ` – ` with spaces). Except a single hyphen with a digit after it and a digit or a
+  single lowercase letter before it: typed maths without an equation editor flattens
+  `10<sup>-19</sup>` to `10-19` and `m s<sup>-2</sup>` to `m s-2`, so that is a minus.
+  Figure dash, em dash and horizontal bar are uncertain (Chromium prints `\overline` as
+  U+2015). A run of minus or `=` glyphs glued to an arrow head is one uncertain minus
+  (or `=`): a shaft, or a real sign touching the head (`OB −−→ OA` is a minus and an
+  arrow over `OA`, `x ←−1` is `x \gets -1`). One exception: a single U+2212 touching a
+  `→` that its letter follows at once, after an operator, an opening bracket or nothing
+  (`= −→𝑥`), is Chromium's minus before a vector arrow, so it is certain. A glyph the
+  PDF cannot name (private use, U+FFFD: old Symbol and MT Extra fonts put operators
+  there) may be any sign: it raises every upper bound by one. Except the pieces of
+  extensible braces, brackets, parentheses, integrals and radicals that pdfTeX writes at
+  Adobe's private-use code points (U+F8E5-U+F8FE; a cases brace is five of them): no
+  sign, and the two arrow extenders among them widen the arrow classes only. A relation
+  directly beside a private-use glyph may have a negation slash over it (KaTeX prints
+  `\neq` as `=` under its `\not` glyph, U+E020), so it counts as that relation or its
+  negation.
 - MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain, including a
   minus inside `<mn>` and an ASCII hyphen in `<mo>` (latex2mathml writes `±`, `⩽`,
   `⟹` and, for `\sim`, an ASCII `~` as `<mi>`). An accent (the `<mo>` script of `<mover>`/`<munder>`:
   `\vec`'s arrow, `\tilde`'s `~`) is uncertain: Chromium prints it as a standalone `→`,
-  TeX as a combining accent or not at all. In `<mtext>` a hyphen between letters or
-  digits is skipped (`\text{time-dependent}`); any other sign there is uncertain.
+  TeX as a combining accent or not at all. The bar of `\overline` and `\underline`
+  (U+2015 in an accent) is no sign at all: TeX draws a rule. A relation after
+  latex2mathml's `\not` (a zero-width slash) is that relation or its negation: TeX
+  composes the two into `≠`, Chromium prints them apart. In `<mtext>` a hyphen between
+  letters or digits is skipped (`\text{time-dependent}`); any other sign there is
+  uncertain.
 
 **Left out, and why.**
 
@@ -249,12 +266,18 @@ widens an interval, so it can never make a flag on its own.
   juxtaposition are the same multiplication for numbers and scalars, the text layer
   cannot show juxtaposition at all, and units in text mode (`\text{N·m}`) put a dot on
   one side only, so notes would be noise and would buy main-model calls for nothing.
-  The exception is a vector product: when the text layer shows a `×` or `·` with a bold
-  letter on both sides (skipping spaces and brackets), a `×` that became a `·` (or the
-  reverse) is meaning-level (`𝐯 = 𝛚 × 𝐫` read as `\mathbf{v} = \boldsymbol{\omega}
-  \cdot \mathbf{r}`). A dropped sign between vectors is not flagged: it may be a scalar
-  times a vector. An ASCII letter `x` is never a times sign (it is a letter, so the
-  symbol check sees it).
+  The exception is a vector product: when the text layer shows a `×` or `·` with a
+  vector on both sides (skipping spaces and brackets, and a unary minus after the sign),
+  a `×` that became a `·` (or the reverse) is meaning-level (`𝐯 = 𝛚 × 𝐫` read as
+  `\mathbf{v} = \boldsymbol{\omega} \cdot \mathbf{r}`, `𝑊= →𝐹· →𝑑` read as
+  `W = \vec{F} \times \vec{d}`). A vector is a bold letter or a letter with a vector
+  arrow next to it, a space between at most: Chromium's standalone `→` (before the
+  letter, or after it for some letters: `𝜔→×`) or TeX's combining U+20D7 (before the
+  letter in every font measured: `=⃗F ·⃗d`). A mapping arrow is a `→` too, so after the
+  sign a letter with a `→` after it counts only when no operand follows the arrow
+  (`𝑔:𝑋→𝑌× 𝑍→𝑊` is no vector product). A dropped sign between vectors is not flagged:
+  it may be a scalar times a vector. An ASCII letter `x` is never a times sign (it is a
+  letter, so the symbol check sees it).
 - Division: `/`, `÷` and a fraction bar are the same operation, and fraction bars are
   drawn lines that never appear as text, so `a/b` and `\frac{a}{b}` cannot be compared.
 - Brackets, bars and fences (out of scope), primes, accents other than arrows,
@@ -294,13 +317,48 @@ arrow the transcription drops (a vector read as a scalar, like a lost bold) fail
 check, and so does an arrow vector written in bold instead (`\mathbf{s}` for `→𝑠`):
 the prompt asks for `\vec` for arrows, so a person confirms the notation. The one arrow
 vector in the recorded answers (gold 2.2 eq-008) was written `\vec{s}`. TeX prints the
-accent as a combining arrow, which is not a token.
+accent as a combining arrow, which is not a token (it only marks a vector operand of a
+product).
+
+**Review of the check (2026-10-08).** A review printed equations with Tectonic (Computer
+Modern, lmodern, newtx, mathptmx, unicode-math, fourier, libertinus, stix2), Chromium,
+KaTeX and LibreOffice, and found right answers flagged (a real minus touching an arrow
+head deleted, `\cong`, `\models`, newtx's `\mapsto`, KaTeX's `\neq`, typed `>=` written
+symbol by symbol, `+/-` as `\pm`) and wrong answers accepted (a minus before a Chromium
+vector arrow, a dropped minus hidden by `\overline`'s bar, `10-19` read as `10^{19}`, an
+added sign hidden by brace pieces, a dot product of arrow vectors read as a cross
+product). On the review's 429 right answers the check now flags 6 (57 before); none of
+the 6 is a sign the check reads wrongly (three are inline maths inside a hyphenated word,
+`non-𝑥`, where layout puts the word hyphen in the equation; two are typed lines layout
+cuts short, which `symbol_mismatch` flags too; one is `\not\approx`, which validation
+refuses). Wrong answers caught: 51/52 (43 before). Arrow-vector products (25 equations,
+the same 8 TeX setups and Chromium, × and · swapped one at a time): 111/180 caught (0
+before), and 0 of 90 swaps of a scalar product next to an arrow flagged. Each fix has a
+regression test in `tests/test_sign_check.py`, among them the LaTeX fixture
+`vectors_relations.tex` (arrows over points, `\gets -1`, `\cong`, `\models`, `\vec`
+products). Real replay after the fixes: still 0 flags on the 636 answers.
 
 **Limits.** Counts, not positions: a minus moved to another term (`x_f - x_0` read as
-`x_0 - x_f`, or `e^{-x}y` read as `e^{x}(-y)`) keeps every count. An ASCII hyphen
-between two letters is ambiguous, so in a text layer that writes a minus that way
-(plain typed maths, `x-y`) a dropped minus is missed. Signs inside `\text{}` only
-widen ranges.
+`x_0 - x_f`, or `e^{-x}y` read as `e^{x}(-y)`) keeps every count, and in an equation
+with a vector product a × that became a · anywhere counts as the swap. Signs inside
+`\text{}` only widen ranges. Missed on purpose, because the text layer cannot tell:
+
+- An ASCII hyphen between two letters (`x-y`, and the flattened exponent `e-kt` of
+  `e<sup>-kt</sup>`) has the shape of a label's hyphen (`k-e`, `x-axis`), so a dropped
+  minus there is missed. Counting it as a minus when a single letter stands on either
+  side would catch `e-kt`, but on 84 plausible transcriptions of 12 equations with
+  hyphenated labels (`C-14`, `U-235`, `p-value`, `2-D`) it added 21 flags, 16 on answers
+  the symbol check passes; the digit rule above adds 2, both on answers the symbol check
+  flags already.
+- A minus touching a TeX arrow head (`OB −−→ OA` read as `\overrightarrow{OB}
+  \overrightarrow{OA}`, `x ←−1` read as `x \gets 1`): the glued run may be the shaft.
+- U+FFFD stays any sign: Tectonic writes brace pieces there, but newtx writes `\cong`
+  and vector accents there too, so an added sign in a Tectonic cases equation is missed.
+- KaTeX's `\neq` is `=` under a slash glyph, so `=` and `≠` cannot be told apart there.
+- Vector products the text layer does not show as one: newtx's arrow (U+FFFD), the arrow
+  of a vector that starts a TeX equation (lost from the text layer), a vector with a
+  subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline maths
+  that layout cuts at the dot.
 
 ## Validators and codes
 
@@ -465,8 +523,9 @@ decorative rules were added; the prompt versions have changed since.
 
 - The cross-check needs a text layer; scanned PDFs get no cross-check.
 - The sign check compares counts, not positions: a minus moved to another term keeps
-  every count, and a minus typed as an ASCII hyphen between two letters is ambiguous
-  ("Sign and relation check").
+  every count. A minus typed as an ASCII hyphen between two letters (`x-y`, a flattened
+  `e-kt`) and a minus touching a TeX arrow head are ambiguous, so dropping them is missed
+  ("Sign and relation check", Limits).
 - Speech is a reviewer aid, not a screen reader: it does not do function application
   ("f open parenthesis x close parenthesis"), and it reads `\cdot` as "times".
 - The command allowlist is curated; a legitimate command outside it (for example

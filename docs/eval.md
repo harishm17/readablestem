@@ -610,6 +610,15 @@ dropped minus 45/45, minus to plus 45/45, `=` to `<`, `≤` or `≈` 146/146 eac
 products (the handout's `𝛚 × 𝐫`), never scientific notation (`1.1 × 10²`), as the policy
 says.
 
+A review of the check printed its own equations with Tectonic in 8 maths font setups,
+Chromium, KaTeX and LibreOffice (docs/steps.md "Review of the check"): on its 429 right
+answers the check flagged 57 before the fixes and 6 after, and caught 51 of 52 wrong
+answers (43 before); a dot product of arrow vectors read as a cross product is caught
+in 111 of 180 swaps (0 before). The replay above, re-run after the fixes, is unchanged:
+636 answers, the check ran on 364, 0 `sign_mismatch`, so no new required decision on
+real answers. The same synthetic errors on the 88 real text layers are caught as
+before (`×` to `·` still 2/13: the one real arrow vector, `→𝑠`, is in no product).
+
 The same review found a false `symbol_mismatch` the eval items could not show: pdfTeX
 writes `\Delta` as U+2206 INCREMENT, which is not a letter, so every correct `\Delta`
 from a LaTeX PDF needed a decision. It now counts as `Δ` (no recorded answer changes:
