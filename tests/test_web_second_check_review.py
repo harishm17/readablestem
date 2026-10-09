@@ -122,7 +122,7 @@ def pages(tmp_path):
             env.converter.output = output(second=second, small=small)
             job_id = job_id_from(upload(client, make_pdf(1)))
             assert env.run_worker() == job_id
-            review = client.get(f"/jobs/{job_id}/review")
+            review = client.get(f"/jobs/{job_id}/review/list")
             job = client.get(f"/jobs/{job_id}")
             assert review.status_code == job.status_code == 200
             return " ".join(review.text.split()), " ".join(job.text.split())
@@ -161,8 +161,8 @@ def test_the_lead_does_not_call_the_second_check_note_small(pages):
     assert NOTHING_TO_DO in card(review, "p1-e2") and WORTH_A_LOOK not in card(review, "p1-e2")
     # The intro says the same before the reader gets to the section.
     assert (
-        "So are figures where a second automated check found a possible mismatch between "
-        "the alt text and the image. Those are worth a look"
+        "Figures where a second automated check found a possible mismatch between the alt "
+        "text and the image are among the optional checks. Those are worth a look"
     ) in review
     assert "Needs your decision (1)" in review  # still optional: never a decision
     # The line at the top, read first and announced after a decision, says so too.
@@ -227,3 +227,27 @@ def test_second_check_note_is_only_an_unreviewed_optional_flag():
         update={"checks": [Check(name="figure.second_check", passed=True, severity="warning")]}
     )
     assert not triage.second_check_note(passed)
+
+
+def test_split_view_lists_the_second_check_note_as_worth_a_look(tmp_path):
+    """The Split View's folded list of optional checks gives each one short line; the
+    second check's comes first even when the figure has a small note too."""
+    both = flagged_figure("p1-e1")
+    both.checks.insert(
+        0, Check(name="alt.length", passed=False, severity="warning", code="too_long")
+    )
+    out = output(second=1, small=1)
+    out.result.fixes[1] = both
+    env = WebEnv(tmp_path)
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.converter.output = out
+        job_id = job_id_from(upload(client, make_pdf(1)))
+        assert env.run_worker() == job_id
+        page = client.get(f"/jobs/{job_id}/review")
+        assert page.status_code == 200
+        text = " ".join(page.text.split())
+    worth = "Worth a look: a second automated check doubts the alt text."
+    assert text.count(worth) == 1
+    assert "The alt text is long." in text  # the other figure's note is unchanged
