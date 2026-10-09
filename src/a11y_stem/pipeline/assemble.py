@@ -873,6 +873,24 @@ figcaption { margin-top: 0.5em; }
 _AUTHORED_TAG = re.compile(
     r'(<[a-z][a-z0-9]*\b[^<>]*\bclass="(?:[^"]*\s)?' + AUTHORED_CLASS + r'(?:\s[^"]*)?")'
 )
+# ... and the tool's English words that carry no class: the fixed alt text of an original
+# kept as an image, and a chart data table's caption ("Data read from Figure 2.11; the
+# values are approximate", `figure_details.table_caption`; its id ends in "-data").
+_FIXED_ALT_IMG = re.compile(
+    r'(<img\b[^<>]*\balt="(?:'
+    + "|".join(
+        map(
+            re.escape,
+            (
+                EQUATION_NOT_CONVERTED_ALT,
+                FIGURE_NOT_DESCRIBED_ALT,
+                assemble_tables.TABLE_NOT_CONVERTED_ALT,
+            ),
+        )
+    )
+    + r')")'
+)
+_DATA_TABLE_CAPTION = re.compile(r'(<caption id="[^"<>]*-data-caption")')
 
 
 def _authored_in_english(part: str, lang: str) -> str:
@@ -880,7 +898,9 @@ def _authored_in_english(part: str, lang: str) -> str:
     English; unchanged (byte for byte) when it is."""
     if _clean_lang(lang).split("-", 1)[0].lower() == "en":
         return part
-    return _AUTHORED_TAG.sub(r'\1 lang="en"', part)
+    for pattern in (_AUTHORED_TAG, _FIXED_ALT_IMG, _DATA_TABLE_CAPTION):
+        part = pattern.sub(r'\1 lang="en"', part)
+    return part
 
 
 def render_html(

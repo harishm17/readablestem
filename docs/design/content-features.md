@@ -294,9 +294,13 @@ ran after the last merge. The four feature flags stay **off by default**.
 - **`long_description_missing`** follows the figures work's rule
   (`figure_step.long_description_missing`: described with the long prompt), so the job
   page no longer guesses whether long descriptions were on.
-- **The tool's own English words** (flag notes, labels, the student note) say
-  `lang="en"` in a document in another language (WCAG 3.1.2); English documents are
-  unchanged byte for byte.
+- **The tool's own English words** (flag notes, labels, the student note, the fixed alt
+  text of an original kept as an image, a chart data table's caption, a maths header's
+  reading) say `lang="en"` in a document in another language (WCAG 3.1.2); English
+  documents are unchanged byte for byte. Not covered: the scroll boxes' English
+  `aria-label` ("Equation 2.9", "Table"; a `lang` there would apply to the table's cells
+  too), and the model's alt text and long descriptions (neither figure prompt names an
+  output language).
 - **Every sign-in ends in one place** (`auth._signed_in`): back to the page asked for
   (ux-b) and one `signed_in` usage event (ux-a), for Google, Microsoft and dev sign-in.
 - **The job page's finish line** links the posting help ("How to post it in your
