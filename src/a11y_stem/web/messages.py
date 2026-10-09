@@ -188,6 +188,16 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "site, but it should work on its own.",
     ("html.wording", "banned_wording"): "The document text promises more than this tool can "
     "back up (for example that it meets a legal standard).",
+    # Tables in the output HTML (pipeline.html_checks, tables-step block)
+    ("html.table_headers", "table_no_headers"): "A data table in the document has no header "
+    "cells, so screen readers cannot say what its values mean.",
+    ("html.table_header_scope", "th_without_scope"): "A header cell in a table does not say "
+    "whether it labels a row or a column.",
+    ("html.table_header_text", "empty_th"): "A header cell in a table is empty.",
+    ("html.table_caption", "table_caption_missing"): "A table's caption (Table N) sits in the "
+    "text beside it instead of being the table's own caption.",
+    ("html.table_layout", "layout_table"): "A table in the document is used only to lay out "
+    "text, but tables should hold data that is read across rows and columns.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
     ("axe", "axe_error"): "The automatic accessibility check (axe-core) could not run on the "
