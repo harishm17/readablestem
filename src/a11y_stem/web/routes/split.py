@@ -769,7 +769,7 @@ class SplitBuilder:
                 for f in self.result.fixes
                 if f.decided_by_reviewer
                 and f.element_id not in seen
-                and f.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}
+                and f.kind in REVIEW_KINDS
             ),
             key=lambda f: rank.get(f.element_id, far),
         )

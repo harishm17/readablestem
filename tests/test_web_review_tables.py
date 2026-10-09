@@ -913,3 +913,13 @@ def test_the_card_makes_a_grid_with_flattened_maths_a_second_choice():
     cell = next(c for c in card.cells if c.ref == "r1c1")
     assert (cell.maths, cell.flat, cell.value) == (True, flat, "")
     assert next(c for c in card.cells if c.ref == "r1c0").flat == ""
+
+
+def test_a_table_decided_outside_the_queue_is_listed_under_your_decisions(tables):
+    # The optional-note table p2-e1 (accepted with a note): the reviewer keeps the image.
+    assert post(tables, "p2-e1", action="reject").status_code == 303
+    page = screen(tables)
+    start = page.find('id="decided-summary"')
+    assert start >= 0, "no Your decisions block"
+    decided = page[start : page.find("</details>", start)]
+    assert "p2-e1" in decided
