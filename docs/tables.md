@@ -204,8 +204,20 @@ position (a stand-in for tables-detect). Spend: $0.045 in all.
 - Five of the cases are offline fixtures (`tests/fixtures/tables/`, the LaTeX ones). With
   one letter or digit of each accepted answer changed, every table goes to review.
 
-TODO for the integrator: once tables-detect has merged, run the step on the LaTeX table
-fixture with its real local grid (`a11y-stem convert` with `FEATURE_TABLES=true`, a small
+The smoke test can be run again (opt-in, `live_model`, each test capped at $0.10):
+
+```
+uv run --env-file .env pytest -m live_model tests/test_tables_live.py -s
+```
+
+`test_live_drawn_table` draws a small ruled table with PyMuPDF (signed values, a squared
+unit) and fills its local grid from the page's words by position; on 2026-10-09 it was
+ACCEPTED on gpt-6-luna alone for $0.0005. `test_live_latex_fixture_tables` rebuilds every
+TABLE element layout finds in `tests/fixtures/layout/latex` with its real local grid; it
+is skipped until a fixture has a table.
+
+TODO for the integrator: once tables-detect has merged with its LaTeX table fixture, run
+`tests/test_tables_live.py` (or `a11y-stem convert` with `FEATURE_TABLES=true` and a small
 `--max-usd`) and compare with the results above.
 
 ### Known limits
@@ -230,3 +242,4 @@ fixture with its real local grid (`a11y-stem convert` with `FEATURE_TABLES=true`
 | `tests/test_steps_table.py` | every route and tier with recorded JSON answers (`FakeVisionClient`), the bijection (misread, dropped, duplicated, invented, moved, signs, symbols, case, spacing), grid agreement, maths cells (MathML, symbols, signs, style, invalid LaTeX), the header policy, placement, the local-grid fallback, budget, the request (no table words, fenced context), model HTML and script in cells escaped, the recorded real answers and a misread in each, a conversion with the flag on, axe on every shape (`browser`) |
 | `tests/test_assemble_tables.py` | the scroll box and tab stop, the width estimate, the caption kept, the HTML table rules, axe and 320 px reflow in Chromium (`browser`) |
 | `tests/test_table_html.py` | the serialiser (contracts work) |
+| `tests/test_tables_live.py` | the smoke test with the real models (`live_model`, opt-in; above) |
