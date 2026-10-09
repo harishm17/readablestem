@@ -16,7 +16,7 @@ import pymupdf
 import pytest
 
 from a11y_stem.core.types import Element, Kind, Status, inline_marker
-from a11y_stem.pipeline import layout
+from a11y_stem.pipeline import layout, table_model
 from a11y_stem.pipeline.heading_step import heading_fixes
 from a11y_stem.pipeline.layout import (
     REASON_NUMBERED,
@@ -129,10 +129,15 @@ def table_page(page: pymupdf.Page) -> None:
 
 def test_numeric_table_cells_are_not_headings():
     # Since pipeline 0.4.0 both tables are TABLE elements (pipeline/tables.py): their
-    # cells leave the paragraph flow and none of them can become a heading.
+    # cells leave the paragraph flow and none of them can become a heading. Without the
+    # SLANet-plus file (CI) the unruled table is not claimed, and its cells still are not
+    # headings.
     layout_ = analyze(one_page(table_page))
     assert not [e for e in layout_.elements if e.kind == Kind.HEADING]
     assert layout_.title is None
+    if not table_model.model_path().is_file():
+        assert Kind.TABLE in {e.kind for e in layout_.elements}
+        return
     assert [e.kind for e in layout_.elements] == [Kind.PARAGRAPH, Kind.TABLE, Kind.TABLE]
     cells = {c.text for e in layout_.elements if e.table for c in e.table.cells}
     assert {"0.0", "2.0", "2 kg", "12 Metres"} <= cells

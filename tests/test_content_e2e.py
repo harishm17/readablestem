@@ -132,12 +132,6 @@ def converted(name: str) -> ConversionOutput:
         )
 
 
-@pytest.fixture(autouse=True)
-def _no_table_model(monkeypatch, tmp_path):
-    """CI has no SLANet-plus file; the detector then uses the drawn or PyMuPDF grid."""
-    monkeypatch.setenv("TABLE_MODEL_DIR", str(tmp_path))
-
-
 @pytest.mark.parametrize("name", FIXTURES)
 def test_every_fixture_converts_with_every_feature_on(name):
     output = converted(name)
