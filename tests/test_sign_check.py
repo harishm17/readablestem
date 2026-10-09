@@ -41,7 +41,7 @@ PNG = b"\x89PNG equation crop"
 SETTINGS = make_settings()
 
 # Chromium-style text layers (math italic letters, U+2212 minus).
-IT = {ch: unicodedata.lookup(f"MATHEMATICAL ITALIC SMALL {ch.upper()}") for ch in "abcdegtxyv"}
+IT = {ch: unicodedata.lookup(f"MATHEMATICAL ITALIC SMALL {ch.upper()}") for ch in "abcdegtvwxy"}
 IT_N = "\U0001d441"  # italic capital N
 IT_LAMBDA = "\U0001d706"
 MINUS = "−"
@@ -200,6 +200,87 @@ def test_a_vector_arrow_chromium_prints_must_stay_an_arrow():
     assert differs(layer, r"\mathbf{x}") == (signs.RIGHT_ARROW,)
     # TeX prints the accent as a combining arrow, which is no token: nothing to compare.
     assert differs(f"{IT['x']}\u20d7", r"\vec{x}") is None
+
+
+# ------------------------------------------------------------------ arrows built from pieces
+# Review 2026-10-08: TeX draws long and extensible arrows as a shaft of minus glyphs glued
+# to a head, and a real minus can touch the same head. Deleting every minus glued to an
+# arrow deleted real ones, so a correct answer needed a decision. Text layers below are
+# what layout reads from Tectonic (Computer Modern), Chromium and KaTeX printouts.
+
+GLUED_TO_AN_ARROW = [
+    pytest.param(
+        "−−→ AB = −−→ OB −−→ OA",
+        r"\overrightarrow{AB} = \overrightarrow{OB} - \overrightarrow{OA}",
+        id="tex-overrightarrow-difference",
+    ),
+    pytest.param(
+        "a = −→ OA −−−→ OB",
+        r"\vec{a} = \overrightarrow{OA} - \overrightarrow{OB}",
+        id="tex-overrightarrow-after-equals",
+    ),
+    pytest.param(
+        "−−→ AB = −−−→ BA", r"\overrightarrow{AB} = -\overrightarrow{BA}", id="tex-negated-arrow"
+    ),
+    pytest.param(
+        "←−− AB = −−−→ AB", r"\overleftarrow{AB} = -\overrightarrow{AB}", id="tex-overleftarrow"
+    ),
+    pytest.param("x ←−1", r"x \gets -1", id="tex-gets-minus-one"),
+    pytest.param("y ←−y", r"y \leftarrow -y", id="tex-leftarrow-minus"),
+    pytest.param(f"{IT['x']}←−1", r"x \gets -1", id="chromium-gets-minus-one"),
+    pytest.param(f"{IT['y']}←−{IT['y']}", r"y \leftarrow -y", id="chromium-leftarrow-minus"),
+    pytest.param("y ←−x", r"y \longleftarrow x", id="tex-longleftarrow"),
+    pytest.param("x f−→y g←−z", r"x \xrightarrow{f} y \xleftarrow{g} z", id="tex-xrightarrow"),
+    pytest.param("x −→−∞", r"x \longrightarrow -\infty", id="tex-long-arrow-then-minus"),
+    pytest.param("x > 0 =⇒−x < 0", r"x > 0 \implies -x < 0", id="tex-implies-then-minus"),
+    pytest.param("p ⇐= q", r"p \impliedby q", id="tex-impliedby"),
+    # Chromium: \vec's arrow is a standalone → before its letter, touching a unary minus.
+    pytest.param(
+        f"−→{IT['v']}+ →{IT['w']}= →0", r"-\vec{v} + \vec{w} = \vec{0}", id="chromium-minus-vec"
+    ),
+    pytest.param("→𝑄= −→𝑥", r"\vec{Q} = -\vec{x}", id="chromium-equals-minus-vec"),
+    pytest.param("→𝑏× ( −→𝑎)", r"\vec{b}\times(-\vec{a})", id="chromium-bracket-minus-vec"),
+]
+
+
+@pytest.mark.parametrize(("text_layer", "latex"), GLUED_TO_AN_ARROW)
+def test_a_real_minus_glued_to_an_arrow_is_not_lost(text_layer, latex):
+    assert differs(text_layer, latex) == ()
+
+
+def test_a_minus_glued_to_a_tex_arrow_shaft_is_uncertain():
+    # "OB −−→ OA" may be a minus and an arrow over OA, or a longer arrow: no flag either
+    # way, so a dropped minus there is missed (counts cannot tell; see docs/steps.md).
+    layer = "−−→ AB = −−→ OB −−→ OA"
+    assert differs(layer, r"\overrightarrow{AB} = \overrightarrow{OB} \overrightarrow{OA}") == ()
+    assert differs("x ←−1", r"x \gets 1") == ()
+    # A relation that changes is still caught.
+    assert differs(layer, r"\overrightarrow{AB} \ne \overrightarrow{OB} - \overrightarrow{OA}")
+
+
+def test_a_dropped_minus_before_a_chromium_vector_arrow_is_caught():
+    # Chromium's vector arrow is followed by its letter at once; a minus touching it after
+    # "=", "(" or at the start is a real minus (a long arrow sits between two operands).
+    assert differs("→𝑄= −→𝑥", r"\vec{Q} = \vec{x}") == (signs.MINUS,)
+    assert differs("→𝑏× ( −→𝑎)", r"\vec{b}\times\vec{a}") == (signs.MINUS,)
+    assert differs(f"−→{IT['v']}+ →{IT['w']}= →0", r"\vec{v} + \vec{w} = \vec{0}") == (signs.MINUS,)
+
+
+def test_a_cheap_answer_with_a_minus_before_a_vector_arrow_is_accepted():
+    # Review 2026-10-08: the right cheap answer used to be flagged, so it escalated and a
+    # main answer that dropped the minus was accepted. Now the right one is accepted as it is.
+    element = equation_element(display="inline", text="→𝑄= −→𝑎")
+    client = by_model(cheap=out(r"\vec{Q} = -\vec{a}", 0.99), main=out(r"\vec{Q} = \vec{a}"))
+    fix = run(client, element)
+    assert [r.model for r in client.requests] == [CHEAP_MODEL]
+    assert fix.status is Status.ACCEPTED and fix.review == "none"
+    assert fix.equation is not None and fix.equation.latex == r"\vec{Q} = -\vec{a}"
+    # The wrong cheap answer escalates, and the right main answer wins.
+    client = by_model(cheap=out(r"\vec{Q} = \vec{a}", 0.99), main=out(r"\vec{Q} = -\vec{a}"))
+    fix = run(client, element)
+    assert [r.model for r in client.requests] == [CHEAP_MODEL, MAIN_MODEL]
+    assert fix.equation is not None and fix.equation.latex == r"\vec{Q} = -\vec{a}"
+    assert fix.status is Status.ACCEPTED and fix.review == "none"
 
 
 def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
@@ -577,6 +658,12 @@ PAGE_CASES = [
         r"v(t) = -g t \quad \text{(time-dependent)}",
         r"v(t) = g t \quad \text{(time-dependent)}",
     ),
+    # A unary minus touching the vector arrow Chromium prints before the letter ("−→𝑥").
+    ("block", r"\vec{Q} = -\vec{x}", r"\vec{Q} = \vec{x}"),
+    ("block", r"\vec{b} \times (-\vec{a})", r"\vec{b} \times \vec{a}"),
+    ("block", r"-\vec{v} + \vec{w} = \vec{0}", r"\vec{v} + \vec{w} = \vec{0}"),
+    # A left arrow touching a minus ("𝑥←−1"): uncertain, so only the right answer is pinned.
+    ("block", r"y \gets -1", None),
 ]
 
 

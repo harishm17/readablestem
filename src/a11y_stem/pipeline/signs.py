@@ -17,9 +17,12 @@ Tokens, by class (typographic variants of one symbol fold into one class, `_SIGN
   ∼ (and ASCII ~), ≁, ≃, ≅, ≡, ≢, ∝;
 - arrows: → (⟶, ↦, ⟼), ← (⟵, ↤), ↔ (⟷), ⇒ (⟹), ⇐ (⟸), ⇔ (⟺). The gold set uses →
   only, as a vector accent; limits ("x → 0") and implications use the others. TeX
-  builds long arrows from a minus or = and a short arrow (\\longrightarrow prints as
-  "−→", \\Longrightarrow as "=⇒", \\iff as "⇐⇒"), so those runs count as one arrow,
-  and so do ASCII digraphs in typed text ("->", "=>", "<=>"; ">=" and "<=" are ≥, ≤).
+  builds long arrows from a shaft of minus or = glyphs glued to a short arrow head
+  (\\longrightarrow prints as "−→", \\Longrightarrow as "=⇒", \\overrightarrow{AB} as
+  "−−→ AB", \\longleftarrow as "←−"); a real minus can touch the same head ("OB −−→ OA",
+  "x ←−1" for x \\gets -1), so the head is an arrow and the glued run is uncertain (below).
+  Two heads joined by a shaft ("⇐⇒", "←→") are one two-way arrow, and ASCII digraphs in
+  typed text ("->", "=>", "<=>"; ">=" and "<=" are ≥, ≤) are one arrow or relation.
   Any other arrow (↪, ⇌, ↑) may stand for any arrow class;
 - × and · (⋅ ∙): only to catch a dot product read as a cross product (below).
 
@@ -45,8 +48,12 @@ create a flag on its own:
 - PDF: a hyphen or en dash directly between two letters or digits ("time-dependent",
   "1–3") may be a word hyphen or a range, so it is uncertain; anywhere else it is a
   minus. The figure dash, em dash and horizontal bar (Chromium prints \\overline as
-  U+2015) are uncertain. A glyph the PDF cannot name (private use, U+FFFD; old Symbol
-  and MT Extra fonts put operators there) may be any sign: it widens every class;
+  U+2015) are uncertain. A run of minus or = glyphs glued to an arrow head is one
+  uncertain minus (or equals): a shaft, or a real sign touching the head. One exception:
+  a single U+2212 touching a → that its letter follows at once, after an operator, an
+  opening bracket or nothing ("= −→𝑥"), is Chromium's minus before a vector arrow, so it
+  is certain. A glyph the PDF cannot name (private use, U+FFFD; old Symbol and MT Extra
+  fonts put operators there) may be any sign: it widens every class;
 - MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain (a leading
   minus inside `<mn>` included; latex2mathml writes ± and ∼ as `<mi>`). An accent (the
   `<mo>` script of `<mover>`/`<munder>`: \\vec's arrow, \\tilde's ~) is uncertain:
@@ -176,10 +183,20 @@ _ASCII_DIGRAPHS = (
     ("<=", "≤"),
     (">=", "≥"),
 )
-# TeX's long arrows: a minus or = run joined to a short arrow, then two-headed pairs.
-_LONG_RIGHT = re.compile("[\N{MINUS SIGN}=-]+(?=[→⇒↦])")
-_LONG_LEFT = re.compile("(?<=[←⇐])[\N{MINUS SIGN}=-]+")
-_BOTH_WAYS = (("←→", "↔"), ("⇐⇒", "⇔"))
+# TeX draws long and extensible arrows as a shaft of minus or = glyphs glued to a short
+# arrow head (\longrightarrow "−→", \Longrightarrow "=⇒", \overrightarrow{AB} "−−→ AB",
+# \longleftarrow "←−"). A real minus can touch the same head ("OB −−→ OA" is a minus and
+# an arrow over OA, "x ←−1" is x \gets -1), so a glued run is one uncertain minus (or
+# equals) and the head counts as an arrow. Two heads joined by a shaft are one arrow.
+_SHAFT = re.escape("\N{MINUS SIGN}" + "".join(sorted(_ANY_DASH)))
+_RIGHT_HEADS = "→⇒↦"
+_LEFT_HEADS = "←⇐"
+_GLUED = re.compile(
+    f"[{_SHAFT}]+(?=[{_RIGHT_HEADS}])|(?<=[{_LEFT_HEADS}])[{_SHAFT}]+"
+    f"|=+(?=[{_RIGHT_HEADS}])|(?<=[{_LEFT_HEADS}])=+"
+)
+_BOTH_WAYS = ((re.compile(f"←[{_SHAFT}]*→"), "↔"), (re.compile("⇐=*⇒"), "⇔"))
+_OPENING = frozenset("([{⟨")
 # Skipped when looking for the operands of a product: spaces and brackets.
 _BRACKETS = frozenset("()[]{}|‖∥⟨⟩")
 _MATH_TOKENS = frozenset({"mi", "mo", "mn"})
@@ -249,24 +266,53 @@ def _operand(text: str, index: int, step: int) -> str:
 def _join_arrows(text: str) -> str:
     for typed, arrow in _ASCII_DIGRAPHS:
         text = text.replace(typed, arrow)
-    text = _LONG_LEFT.sub("", _LONG_RIGHT.sub("", text))
-    for pair, joined in _BOTH_WAYS:
-        text = text.replace(pair, joined)
+    for pattern, joined in _BOTH_WAYS:
+        text = pattern.sub(joined, text)
     return text
+
+
+def _minus_before_vector_arrow(text: str, start: int, end: int) -> bool:
+    """A minus that touches a vector arrow, not a long arrow's shaft.
+
+    Chromium prints \\vec's arrow as a standalone → directly before its letter, and the
+    minus in front may touch it ("= −→𝑥", "( −→𝑎"). One U+2212 glued to a → that a letter
+    follows at once, after an operator, an opening bracket or nothing, is that minus: a
+    long arrow sits between two operands ("x −→ 0"), and TeX's \\overrightarrow leaves a
+    space before its letters ("−−→ AB")."""
+    if end - start != 1 or text[start] != "\N{MINUS SIGN}":
+        return False
+    if text[end] != "→" or end + 1 >= len(text) or not text[end + 1].isalpha():
+        return False
+    i = start - 1
+    while i >= 0 and text[i].isspace():
+        i -= 1
+    return i < 0 or text[i] in _OPENING or text[i] in _SIGNS
 
 
 def layer_signs(text_layer: str) -> SignTokens:
     """Sign tokens of a PDF text layer (see the module docstring for what is uncertain)."""
     text = _join_arrows(unicodedata.normalize("NFC", text_layer))
     out = SignTokens()
+    glued: set[int] = set()  # positions in a long arrow's shaft, counted here
+    for match in _GLUED.finditer(text):
+        start, end = match.span()
+        glued.update(range(start, end))
+        if text[start] == "=":
+            out.uncertain[EQUALS] += 1
+        elif _minus_before_vector_arrow(text, start, end):
+            out.certain[MINUS] += 1
+        else:
+            out.uncertain[MINUS] += 1
     for start, end in _dash_runs(text):
+        if start in glued:
+            continue
         loose = any(ch in _LOOSE_DASHES for ch in text[start:end])
         if loose or _inside_word(text, start, end):
             out.uncertain[MINUS] += 1
         else:
             out.certain[MINUS] += 1
     for index, ch in enumerate(text):
-        if ch in _ANY_DASH:
+        if ch in _ANY_DASH or index in glued:
             continue
         cls = _SIGNS.get(ch)
         if cls is not None:
