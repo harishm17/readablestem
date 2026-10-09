@@ -12,12 +12,12 @@ Two equation facts say what the text layer, the only thing a screen reader gets 
 untagged PDF, loses:
 
 - `equations_flattened`: equations with 2-D structure (a fraction, a root, a power or
-  other script, limits above and below, rows and columns, a mark over a letter). The
-  text layer is one line of characters, so all of that is gone ("v 2 over" for
-  v squared). Structure is read from the converted MathML when there is one
-  (`structure_parts`), else from layout's own evidence (a fraction bar or radical it
-  drew, script-size characters). A script the text layer does keep, as a Unicode
-  superscript or subscript character ("x²"), does not count.
+  other script, limits above and below, the rows and columns of a matrix or cases, a
+  mark over a letter). The text layer is one line of characters, so all of that is
+  gone ("v 2 over" for v squared). Structure is read from the converted MathML when
+  there is one (`structure_parts`), else from layout's own evidence (a fraction bar or
+  radical it drew, script-size characters). A script the text layer does keep, as a
+  Unicode superscript or subscript character ("x²"), does not count.
 - `bold_maths_letters`: letters in equations drawn in a bold font but stored as plain
   characters (TeX's bold d is the letter "d" in CMBX). The text layer drops the bold, so
   a vector reads as a scalar. A PDF that stores the styled letter itself (Chromium's
@@ -80,12 +80,38 @@ def _token_text(node: XmlElement) -> str:
     return "".join(node.itertext()).strip()
 
 
+_TOKENS = frozenset({"mi", "mn", "mo", "mtext", "ms"})
+# A cell that starts with one of these continues the row before it ("= 250 m/s").
+_RELATIONS = frozenset("=<>≤≥≠≈≡∝→⇒⇔\u223c")  # U+223C tilde operator
+
+
+def _first_token(node: XmlElement) -> XmlElement | None:
+    for child in node.iter():
+        if _local(child.tag) in _TOKENS and _token_text(child):
+            return child
+    return None
+
+
+def _aligned(table: XmlElement) -> bool:
+    """A derivation set out in rows ("v = Δd/Δt", "= 250 m/s"): some cell starts with a
+    relation. Its rows are lines of the text layer too, so they are not lost, unlike the
+    rows and columns of a matrix or the cases of a definition."""
+    for cell in table.iter():
+        if _local(cell.tag) != "mtd":
+            continue
+        token = _first_token(cell)
+        if token is not None and _local(token.tag) == "mo" and _token_text(token) in _RELATIONS:
+            return True
+    return False
+
+
 def structure_parts(mathml: str) -> list[str]:
     """What 2-D structure this MathML has, as codes in `STRUCTURE_PARTS` order (each
     once): "fraction", "root", "power" (a number raised), "superscript" (anything else
     raised, primes excepted), "subscript", "limits" (above or below an operator),
-    "rows" (a table: matrices, cases, aligned rows) and "accent" (a mark over a letter:
-    a vector arrow, a hat). Empty for linear maths or MathML that does not parse."""
+    "rows" (a matrix or cases; not an aligned derivation, `_aligned`) and "accent" (a
+    mark over a letter: a vector arrow, a hat). Empty for linear maths or MathML that
+    does not parse."""
     if not mathml or len(mathml) > _MAX_MATHML_CHARS:
         return []
     try:
@@ -117,7 +143,7 @@ def structure_parts(mathml: str) -> list[str]:
             found.add("limits")
         elif name == "mover":
             found.add("accent")
-        elif name == "mtable":
+        elif name == "mtable" and not _aligned(node):
             found.add("rows")
     return [part for part in STRUCTURE_PARTS if part in found]
 
@@ -260,6 +286,8 @@ def _from_pdf(
             try:
                 page = doc[number]
                 images += _pictures(page)
+                # Link annotations of any kind: the same count as the text work's
+                # `text_pass.link_count`, which takes this line's place once merged.
                 links += len(page.get_links())
                 bold += sum(_bold_plain_letters(page, e) for e in by_page.get(number, ()))
             except Exception as exc:  # one unreadable page leaves the others counted

@@ -108,6 +108,19 @@ def math(body: str) -> str:
         ("<msqrt><mi>x</mi></msqrt>", ["root"]),
         ("<munderover><mo>∑</mo><mi>i</mi><mi>n</mi></munderover>", ["limits"]),
         ("<mtable><mtr><mtd><mn>1</mn></mtd></mtr></mtable>", ["rows"]),
+        # An aligned derivation: its rows are lines of the text layer, only the fraction
+        # inside is lost.
+        (
+            "<mtable><mtr><mtd><mi>v</mi></mtd><mtd><mo>=</mo></mtd><mtd><mfrac><mi>d</mi>"
+            "<mi>t</mi></mfrac></mtd></mtr><mtr><mtd></mtd><mtd><mrow><mo>=</mo></mrow></mtd>"
+            "<mtd><mn>2</mn></mtd></mtr></mtable>",
+            ["fraction"],
+        ),
+        (
+            "<mtable><mtr><mtd><mi>x</mi></mtd><mtd><mi>x</mi><mo>&gt;</mo><mn>0</mn></mtd>"
+            "</mtr></mtable>",
+            ["rows"],  # cases: a relation inside a cell, not starting one
+        ),
         ("<mover><mi>v</mi><mo>→</mo></mover>", ["accent"]),
         ("<mfrac><msqrt><mi>x</mi></msqrt><mn>2</mn></mfrac>", ["fraction", "root"]),
     ],
