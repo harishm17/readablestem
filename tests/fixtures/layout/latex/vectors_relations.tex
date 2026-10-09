@@ -1,0 +1,54 @@
+% Layout fixture: geometry and mechanics notes whose signs TeX draws from pieces: arrows
+% over points (\overrightarrow, a shaft of minus glyphs glued to a head), a left arrow
+% next to a minus, \cong (a tilde over an equals sign) and \models (a bar and an equals
+% sign), and vector products written with \vec. Used by tests/test_sign_check.py.
+% Written for a11y-stem's tests; no third-party text.
+\documentclass[11pt]{article}
+% Computer Modern text fonts (CMR, CMBX), as pdfLaTeX writes them; XeTeX defaults to Latin Modern.
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1in]{geometry}
+\pagestyle{empty}
+
+\begin{document}
+
+\section*{Vectors between points}
+
+The displacement from $A$ to $B$ is the difference of the two position vectors
+measured from the origin,
+\[
+  \overrightarrow{AB} = \overrightarrow{OB} - \overrightarrow{OA}.
+\]
+Reversing the order of the points reverses the vector:
+\[
+  \overrightarrow{AB} = -\overrightarrow{BA}.
+\]
+Two triangles with equal sides are congruent, which we write
+\[
+  \triangle ABC \cong \triangle DEF.
+\]
+
+\section*{Updates and logic}
+
+A loop that counts down starts with the assignment
+\[
+  x \gets -1
+\]
+and a premise set that entails a formula is written
+\[
+  \Gamma \models \varphi.
+\]
+
+\section*{Work and torque}
+
+The work done by a constant force over a displacement is a dot product,
+\[
+  W = \vec{F} \cdot \vec{d},
+\]
+while the torque about the origin is a cross product,
+\[
+  \vec{\tau} = \vec{r} \times \vec{F}.
+\]
+
+\end{document}

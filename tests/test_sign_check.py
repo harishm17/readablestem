@@ -283,6 +283,40 @@ def test_a_cheap_answer_with_a_minus_before_a_vector_arrow_is_accepted():
     assert fix.status is Status.ACCEPTED and fix.review == "none"
 
 
+# Review 2026-10-08: relations TeX stacks from two glyphs come out as two signs.
+STACKED = [
+    # \cong is ∼ over = in Computer Modern, lmodern, mathptmx and fourier.
+    pytest.param("△ABC ∼= △DEF", r"\triangle ABC \cong \triangle DEF", id="cong-triangles"),
+    pytest.param("a ∼= b (mod 5)", r"a \cong b \pmod 5", id="cong-mod"),
+    # \models is | and = (Computer Modern, lmodern, newtx, mathptmx, fourier).
+    pytest.param("Γ |= φ", r"\Gamma \models \varphi", id="models"),
+    pytest.param("Γ |= 𝜑", r"\Gamma \models \varphi", id="models-newtx"),
+    # newtx: \mapsto is its bar glyph (↦) and an arrow.
+    pytest.param("𝑥↦→−𝑥", r"x \mapsto -x", id="mapsto-newtx"),
+    # Chromium writes no space before a relation: "|𝑥|=" is a bar and an equals sign.
+    pytest.param(f"|{IT['x']}|= 1", r"|x| = 1", id="chromium-abs-equals"),
+]
+
+
+@pytest.mark.parametrize(("text_layer", "latex"), STACKED)
+def test_a_stacked_relation_is_one_relation(text_layer, latex):
+    assert differs(text_layer, latex) == ()
+
+
+def test_a_stacked_relation_read_as_another_relation_is_caught():
+    assert differs("△ABC ∼= △DEF", r"\triangle ABC \sim \triangle DEF") == (
+        signs.CONGRUENT,
+        signs.SIMILAR,
+    )
+    assert differs("△ABC ∼= △DEF", r"\triangle ABC = \triangle DEF") == (
+        signs.CONGRUENT,
+        signs.EQUALS,
+    )
+    assert differs("𝑥↦→−𝑥", r"x \mapsto x") == (signs.MINUS,)
+    # An = after a bar is uncertain, but a different relation there is still a gain.
+    assert differs(f"|{IT['x']}|= 1", r"|x| < 1") == (signs.LESS,)
+
+
 def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
     # Only a swap of × and · is meaning-level: a missing sign may be juxtaposition
     # (a scalar times a vector), which the text layer cannot tell apart.
@@ -599,6 +633,40 @@ def test_latex_pdfs_cmsy_signs(name, text, right, wrong):
     assert differs(element.text, right) == ()
     wrong_signs = differs(element.text, wrong)
     assert wrong_signs, wrong
+
+
+# Signs TeX draws from pieces (vectors_relations.tex): arrows over points, a left arrow
+# touching a minus, \cong and \models, and \vec products. (text layer, right, a sign error
+# the check still catches)
+PIECES_CASES = [
+    (
+        "−−→ AB = −−→ OB −−→ OA.",
+        r"\overrightarrow{AB} = \overrightarrow{OB} - \overrightarrow{OA}.",
+        r"\overrightarrow{AB} = \overrightarrow{OB} + \overrightarrow{OA}.",
+    ),
+    (
+        "−−→ AB = −−−→ BA.",
+        r"\overrightarrow{AB} = -\overrightarrow{BA}.",
+        r"\overrightarrow{AB} \neq -\overrightarrow{BA}.",
+    ),
+    (
+        "△ABC ∼= △DEF.",
+        r"\triangle ABC \cong \triangle DEF.",
+        r"\triangle ABC \sim \triangle DEF.",
+    ),
+    ("x ←−1", r"x \gets -1", r"x \to -1"),
+    ("Γ |= φ.", r"\Gamma \models \varphi.", r"\Gamma \leq \varphi."),
+    ("W =⃗F ·⃗d,", r"W = \vec{F} \cdot \vec{d},", r"W = \vec{F} - \vec{d},"),
+    ("τ =⃗r ×⃗F.", r"\vec{\tau} = \vec{r} \times \vec{F}.", r"\vec{\tau} = -\vec{r} \times \vec{F}."),
+]
+
+
+@pytest.mark.parametrize(("text", "right", "wrong"), PIECES_CASES)
+def test_latex_pdf_signs_drawn_from_pieces(text, right, wrong):
+    element = equation(layout_of(LATEX / "vectors_relations.pdf"), text)
+    assert equation_step.text_layer_symbols_differ(element.text, mathml(right)) is False
+    assert differs(element.text, right) == ()
+    assert differs(element.text, wrong), wrong
 
 
 def test_latex_pdf_sign_error_through_the_step():

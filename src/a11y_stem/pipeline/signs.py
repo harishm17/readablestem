@@ -23,6 +23,9 @@ Tokens, by class (typographic variants of one symbol fold into one class, `_SIGN
   "x ←−1" for x \\gets -1), so the head is an arrow and the glued run is uncertain (below).
   Two heads joined by a shaft ("⇐⇒", "←→") are one two-way arrow, and ASCII digraphs in
   typed text ("->", "=>", "<=>"; ">=" and "<=" are ≥, ≤) are one arrow or relation.
+  Other relations TeX stacks from two glyphs are one relation too: \\cong prints as "∼="
+  (≅), newtx's \\mapsto as "↦→" (↦); \\models prints as "|=", which cannot be told from
+  Chromium's "|𝑥|= 1", so an = straight after "|" is uncertain.
   Any other arrow (↪, ⇌, ↑) may stand for any arrow class;
 - × and · (⋅ ∙): only to catch a dot product read as a cross product (below).
 
@@ -195,7 +198,15 @@ _GLUED = re.compile(
     f"[{_SHAFT}]+(?=[{_RIGHT_HEADS}])|(?<=[{_LEFT_HEADS}])[{_SHAFT}]+"
     f"|=+(?=[{_RIGHT_HEADS}])|(?<=[{_LEFT_HEADS}])=+"
 )
-_BOTH_WAYS = ((re.compile(f"←[{_SHAFT}]*→"), "↔"), (re.compile("⇐=*⇒"), "⇔"))
+# Relations TeX stacks from two glyphs, which the text layer gives one after the other:
+# two arrow heads joined by a shaft ("⇐⇒" for \iff, "←→"), \cong as ∼ over = ("∼="), and
+# newtx's \mapsto as its bar and an arrow ("↦→", "↦−→" for \longmapsto).
+_COMPOSITES = (
+    (re.compile(f"←[{_SHAFT}]*→"), "↔"),
+    (re.compile("⇐=*⇒"), "⇔"),
+    (re.compile(f"↦[{_SHAFT}]*→"), "↦"),
+    (re.compile("\N{TILDE OPERATOR}="), "≅"),
+)
 _OPENING = frozenset("([{⟨")
 # Skipped when looking for the operands of a product: spaces and brackets.
 _BRACKETS = frozenset("()[]{}|‖∥⟨⟩")
@@ -266,9 +277,17 @@ def _operand(text: str, index: int, step: int) -> str:
 def _join_arrows(text: str) -> str:
     for typed, arrow in _ASCII_DIGRAPHS:
         text = text.replace(typed, arrow)
-    for pattern, joined in _BOTH_WAYS:
+    for pattern, joined in _COMPOSITES:
         text = pattern.sub(joined, text)
     return text
+
+
+def _uncertain_relation(text: str, index: int, cls: str) -> bool:
+    """A relation glyph that may be part of another relation.
+
+    An = straight after "|": TeX prints \\models as "|=", while Chromium writes "|𝑥|= 1"
+    with no space before a relation, so "|=" cannot simply be folded."""
+    return cls == EQUALS and index > 0 and text[index - 1] == "|"
 
 
 def _minus_before_vector_arrow(text: str, start: int, end: int) -> bool:
@@ -316,7 +335,10 @@ def layer_signs(text_layer: str) -> SignTokens:
             continue
         cls = _SIGNS.get(ch)
         if cls is not None:
-            out.certain[cls] += 1
+            if _uncertain_relation(text, index, cls):
+                out.uncertain[cls] += 1
+            else:
+                out.certain[cls] += 1
             if cls in PRODUCTS and all(
                 _bold_letter(_operand(text, index, step)) for step in (-1, 1)
             ):
