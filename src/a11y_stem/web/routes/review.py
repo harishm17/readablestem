@@ -25,11 +25,12 @@ Layout (see `web.review` for the rules), in three sections:
    worth a look instead of calling it small.
 3. "Accepted or decided": everything else, folded away.
 
-A decision is one transaction: lock the job row, refuse a form made from an older
-version of the result (`web.review.guard_result_version`: another tab changed it), apply
-the decision to the stored result (`web.review`), store a `ReviewEdit` per changed fix,
-re-render the output HTML once with the pipeline's assembler, move the job's
-`result_version` on, save. If any step fails nothing changes. Without JavaScript
+A decision is one transaction: lock the job row, apply the decision to the stored result
+(`web.review`), store a `ReviewEdit` per changed fix, re-render the output HTML once with
+the pipeline's assembler, count the write (`jobs.result_version`), save. If any step
+fails nothing changes. Every form carries the version its page was drawn at (`version`):
+one drawn before the last write (a tab left open while the document was changed in
+another) is refused with a 409 and the decision as it is now. Without JavaScript
 each button is a normal form POST that redirects to the next decision still waiting
 (`#item-<id>`, or `#group-card-<key>` for a heading group), where a notice links back to
 the one just changed.
@@ -78,9 +79,12 @@ from a11y_stem.web.review import (
     ACCEPT_ALL_KINDS,
     BULK_DEFAULT_THRESHOLD,
     BULK_THRESHOLDS,
+    GROUP_SLUGS,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
+    UNDO_ACTION,
+    WRITE_KEY,
     BulkRequest,
     FieldError,
     FixGroup,
@@ -88,29 +92,30 @@ from a11y_stem.web.review import (
     HeadingPlace,
     ReviewChange,
     ReviewInvalid,
-    StaleReview,
+    ReviewStale,
     apply_bulk_accept,
     apply_group,
     apply_review,
     at_or_above,
     bulk_eligible,
-    bulk_field_id,
+    bump_result_version,
     can_accept,
-    field_id,
     group_anchor,
     group_fixes,
-    guard_result_version,
     heading_level_written,
     heading_moved,
     heading_places,
     is_group_key,
+    is_stale,
     item_numbers,
     kind_for_slug,
     needs_attention,
     next_to_review,
     parse_bulk,
     rerender_html,
+    restorable,
     review_anchor,
+    undo_last,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
 from a11y_stem.web.table_card import TableCard, table_card
@@ -128,8 +133,98 @@ router = APIRouter()
 DONE_MESSAGES = {
     "accept": "Accepted.",
     "edit": "Your edit passed the required checks and was saved.",
-    "reject": "Rejected. The original from the PDF is kept in the document.",
+    "reject": "The original from the PDF is kept in the document.",
 }
+EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
+ANYWAY_DONE = "Your edit was saved as you wrote it, although it differs from the PDF."
+
+
+@dataclass(frozen=True)
+class RejectWords:
+    """ "Reject" named for what it does to this kind of item (UX review MF14): the
+    button, the line under it, the notice after it and the item's state after it."""
+
+    button: str
+    consequence: str
+    done: str
+    state: str
+
+
+REJECT_WORDS = {
+    Kind.EQUATION: RejectWords(
+        "Keep as image",
+        "Students see a picture of the original; screen readers say only “Equation not converted”.",
+        "Kept as an image of the original. Screen readers will say “Equation not converted”.",
+        "Kept as an image by you",
+    ),
+    # A table's image is kept, marked "not converted" (when there was no proposal, there
+    # is nothing else to keep).
+    Kind.TABLE: RejectWords(
+        "Keep as image",
+        "Students see a picture of the table, marked “not converted”; screen readers get no "
+        "table to read.",
+        "The image of the table is kept in the document, marked “not converted”.",
+        "Kept as an image by you",
+    ),
+    Kind.FIGURE: RejectWords(
+        "Keep without a description",
+        "The figure stays as it is in the PDF, marked “Needs a description”; screen readers "
+        "get no description of it.",
+        "Kept without a description, marked “Needs a description”.",
+        "Left without a description by you",
+    ),
+}
+BOLD_TEXT_WORDS = RejectWords(
+    "Make bold text",
+    "It stays in the text, in bold, but is no longer a heading in the outline.",
+    "Made bold text, not a heading.",
+    "Made bold text by you",
+)
+PLAIN_TEXT_WORDS = RejectWords(
+    "Make plain text",
+    "It stays in the text, but is no longer a heading in the outline.",
+    "Made plain text, not a heading.",
+    "Made plain text by you",
+)
+OTHER_WORDS = RejectWords(
+    "Keep the original",
+    "The original from the PDF stays in the document, marked for a later look.",
+    DONE_MESSAGES["reject"],
+    "Original kept by you",
+)
+
+
+def reject_words(kind: Kind, element: Element | None) -> RejectWords:
+    """What rejecting does here. A heading becomes a paragraph, bold when its line is
+    bold in the PDF (as `assemble` writes it)."""
+    if kind is Kind.HEADING:
+        return BOLD_TEXT_WORDS if element is not None and element.bold else PLAIN_TEXT_WORDS
+    return REJECT_WORDS.get(kind, OTHER_WORDS)
+
+
+def status_words(fix: Fix, element: Element | None) -> str:
+    """The item's state in words, a reviewer's "Reject" named for what it did."""
+    if fix.status is Status.REJECTED:
+        return reject_words(fix.kind, element).state
+    return fix_status_label(fix)
+
+
+def done_message(change: ReviewChange, element: Element | None) -> str:
+    """What the notice after one decision says (content-free: it lives in the session)."""
+    if change.action == "reject":
+        return reject_words(change.fix.kind, element).done
+    if change.anyway:
+        return ANYWAY_DONE
+    message = DONE_MESSAGES.get(change.action, "Done.")
+    if change.note:  # what a table edit changed ("Row 2, column 3 changed.")
+        message = f"{change.note} {message}"
+    if change.warnings:
+        n = len(change.warnings)
+        message += f" {n} {'check gives a warning' if n == 1 else 'checks give warnings'}: "
+        message += "see the notes on it."
+    return message
+
+
 # A flash whose target starts with this belongs to a group (a bulk action), not to one fix.
 GROUP_FLASH = "group:"
 # ... and this one to a heading group's card (a group decision).
@@ -139,11 +234,6 @@ NOUNS = {
     Kind.FIGURE: ("figure", "figures"),
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
-}
-# Keeping a table's image is not "rejecting" anything the reviewer saw as a proposal when
-# there was none, so it says what the document now has.
-TABLE_DONE_MESSAGES = {
-    "reject": "The image of the table is kept in the document, marked “not converted”.",
 }
 
 
@@ -165,6 +255,44 @@ class Notice:
     message: str
     label: str | None = None  # the fix it is about, e.g. "Equation 3 on page 2"
     href: str | None = None  # link to that fix
+    element_id: str = ""  # that fix's id (app.js forgets a draft of it kept in this tab)
+
+
+STALE_TITLE = "Your choice was not saved"
+STALE_MESSAGE = (
+    "This document was changed in another tab or window after this page was opened. It is "
+    "shown below as it is now: check it, then choose again."
+)
+
+
+@dataclass
+class StaleNotice:
+    """A refused write from an out-of-date page (`web.review.is_stale`)."""
+
+    title: str
+    message: str
+    now: str  # what the item is now ("Equation 1 is now: accepted by you."), or ""
+    href: str  # the page as it is now, by GET (reloading the POST would only re-send it)
+
+
+def stale_notice(
+    result: DocumentResult, numbers: dict[str, int], target: str, href: str
+) -> StaleNotice:
+    fix = result.fix_for(target) if not is_group_key(target) else None
+    now = ""
+    if fix is not None and fix.kind in NOUNS:
+        label = f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
+        element = next((e for e in result.elements if e.id == target), None)
+        now = f"{label} is now: {status_words(fix, element).lower()}."
+    return StaleNotice(STALE_TITLE, STALE_MESSAGE, now, href)
+
+
+def _stale_anchor(result: DocumentResult, target: str) -> str:
+    if is_group_key(target):
+        return group_anchor(target)
+    if kind_for_slug(target) is not None:
+        return f"group-{target}"
+    return review_anchor(result, target)
 
 
 @dataclass
@@ -205,14 +333,24 @@ class ReviewItem:
     edited: bool = False
     # Tables: the proposal as the student would get it, and what can be changed.
     table: TableCard | None = None
-    # The form was refused because another tab changed the item (offer a reload).
-    stale: bool = False
     # Figures with long descriptions on: the proposal's long description, and its chart
     # data table as HTML (`table_html`, captioned like the student file's) with the id
     # prefix its caption id starts with. None when the figure has none.
     long_description: str | None = None
     data_table: Markup | None = None
     data_table_id: str | None = None
+    # An edit refused only because it differs from the PDF where that changes the
+    # meaning: the form offers "Use my edit anyway".
+    override: bool = False
+    # "Reject" named for what it does here (`reject_words`).
+    reject: RejectWords = OTHER_WORDS
+    by_you: bool = False  # accepted, edited or rejected by the reviewer
+    # What the item is, in a few words, for lists that name it (UX review MF15): the
+    # heading's text or the start of the alt text. Equations show `mathml` instead.
+    preview: str = ""
+    # What a screen reader gets from the PDF for an equation: its text layer ("" when
+    # the PDF has none). Shown only to the job's owner, on the review screens.
+    text_layer: str = ""
 
     @property
     def open(self) -> bool:
@@ -345,7 +483,7 @@ def _item(
         label=f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
         page=(element.page + 1) if element else 0,
         status=fix.status.value,
-        status_label=fix_status_label(fix),
+        status_label=status_words(fix, element),
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c, note=optional) for c in fix.failed_checks],
@@ -370,6 +508,12 @@ def _item(
         second_check=triage.second_check_note(fix),
         table=table,
         **details,
+        reject=reject_words(fix.kind, element),
+        by_you=fix.decided_by_reviewer,
+        preview=_preview(fix, element),
+        text_layer=(element.text or "").strip()
+        if element is not None and fix.kind is Kind.EQUATION
+        else "",
     )
 
 
@@ -399,6 +543,25 @@ def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
         shown["data_table"] = Markup(table_html.render_table(grid, id_prefix=table_id))
         shown["data_table_id"] = table_id
     return shown
+
+
+PREVIEW_CHARS = 60  # of an alt text, in a list line
+
+
+def _preview(fix: Fix, element: Element | None) -> str:
+    """A few words that say which item this is: a heading's text, the start of the alt
+    text. Shown only on the owner's review screens (document content)."""
+    if fix.kind is Kind.HEADING:
+        text = fix.heading.text if fix.heading is not None else (element.text if element else "")
+        return " ".join((text or "").split())
+    if fix.kind is Kind.FIGURE and fix.figure is not None:
+        if fix.figure.decorative:
+            return ""
+        alt = " ".join(fix.figure.alt.split())
+        if len(alt) <= PREVIEW_CHARS:
+            return alt
+        return alt[:PREVIEW_CHARS].rsplit(" ", 1)[0] + "…"
+    return ""
 
 
 def _check_view(check: Check, *, note: bool = False) -> CheckView:
@@ -495,6 +658,14 @@ def _group(
 def _load(
     request: Request, job_id: str, user: CurrentUser
 ) -> tuple[JobView, DocumentResult, set[str]]:
+    view, result, crop_ids, _ = _load_versioned(request, job_id, user)
+    return view, result, crop_ids
+
+
+def _load_versioned(
+    request: Request, job_id: str, user: CurrentUser
+) -> tuple[JobView, DocumentResult, set[str], int]:
+    """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
     with session_scope(get_ctx(request).factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
@@ -505,7 +676,8 @@ def _load(
                 select(Blob.element_id).where(Blob.job_id == job.id, Blob.kind == "crop")
             ).all()
         )
-    return view, result, {c for c in crop_ids if c}
+        version = job.result_version or 0
+    return view, result, {c for c in crop_ids if c}, version
 
 
 def _place_flashes(
@@ -543,7 +715,7 @@ def _place_flashes(
             continue
         changed.changed.append(message)
         where = f" on page {changed.page}" if changed.page else ""  # 0: element missing
-        notice = Notice(message, changed.label + where, f"#item-{target}")
+        notice = Notice(message, changed.label + where, f"#item-{target}", target)
         landing = next_to_review(result, changed.element_id)
         landing_fix = result.fix_for(landing) if landing else None
         if landing_fix is not None and landing_fix.group_key in cards:
@@ -575,7 +747,7 @@ def _apply_invalid(
     item = items.get(target)
     if item is not None:
         item.values.update(exc.values)
-        item.stale = isinstance(exc, StaleReview)
+        item.override = exc.override
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
 
@@ -586,9 +758,10 @@ def _page(
     user: CurrentUser,
     *,
     invalid: tuple[str, ReviewInvalid] | None = None,
+    stale: str | None = None,
     status_code: int = 200,
 ) -> Response:
-    view, result, crop_ids = _load(request, job_id, user)
+    view, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     fix_groups = group_fixes(result)
@@ -634,6 +807,11 @@ def _page(
         "remaining": sum(len(g.units) for g in fix_groups),
         "remaining_by_kind": [decisions_label(g.units, g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
+        "result_version": version,
+        "undo": bool(top) and undo_offer(request, view.id, user, version),
+        "stale": None
+        if stale is None
+        else stale_notice(result, numbers, stale, list_url(view.id, _stale_anchor(result, stale))),
         # No `active` nav item: this page is not "My documents" itself, so the link
         # must not be announced as the current page (aria-current="page").
     }
@@ -686,6 +864,34 @@ def _invalid_page(
     return split_page(request, job_id, user, item=target, invalid=(target, exc), status_code=422)
 
 
+def _stale_page(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    view: str,
+    target: str,
+    values: dict[str, str] | None = None,
+) -> Response:
+    """A write from an out-of-date page: nothing applied; the view the form was on, as it
+    is now, says so (409). What the reviewer typed stays in the field, so choosing again
+    is one click."""
+    log_event(logger, "review_stale", job_id=job_id)
+    kept = ReviewInvalid([], values)
+    if view == LIST_VIEW:
+        return _page(request, job_id, user, invalid=(target, kept), stale=target, status_code=409)
+    from a11y_stem.web.routes.split import split_page
+
+    return split_page(
+        request, job_id, user, item=target, invalid=(target, kept), stale=True, status_code=409
+    )
+
+
+def _refuse_stale(job: Job, version: str) -> None:
+    """Raise ReviewStale when the form was drawn before the job's last review write."""
+    if is_stale(job.result_version, version):
+        raise ReviewStale()
+
+
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
 def review_action(
     request: Request,
@@ -706,10 +912,10 @@ def review_action(
     cell: Annotated[str | None, Form()] = None,
     header_row: Annotated[str | None, Form()] = None,
     header_col: Annotated[str | None, Form()] = None,
-    version: Annotated[str | None, Form()] = None,
     # Figures with long descriptions on (web.review `_edited_details`).
     long_description: Annotated[str | None, Form()] = None,
     remove_data_table: Annotated[str | None, Form()] = None,
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
     "tables", "headings"), a bulk accept in that group; when it is a heading group's key
@@ -724,7 +930,7 @@ def review_action(
     edit says what it changes (`change`: "cell" with `row`, `col` and `cell`, "headers"
     with the `header_row` and `header_col` boxes, or "use_local"). `version` is the
     job's `result_version` the form was made from: a form made before another tab
-    changed the review is refused (`web.review.guard_result_version`).
+    changed the review is refused with a 409 (`web.review.is_stale`).
     """
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
@@ -753,27 +959,30 @@ def review_action(
         "remove_data_table": remove_data_table,
     }
     form = {name: value for name, value in sent.items() if value is not None}
+    # "Use my edit anyway": an edit the reviewer chose to use although it differs from
+    # the PDF's text where that changes the meaning (web.edit_check).
+    anyway = action == EDIT_ANYWAY
+    action = "edit" if anyway else action
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
-            next_version = guard_result_version(
-                job.result_version, version, field_id("actions", element_id)
-            )
+            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
-            change_made = apply_review(result, element_id, action, form)
+            change_made = apply_review(result, element_id, action, form, anyway=anyway)
             job.html = rerender_html(result, _crops(session, job.id))
             job.result_json = result.model_dump(mode="json", exclude={"html"})
-            job.result_version = next_version
-            session.add(_review_edit(job.id, user, change_made))
+            written = bump_result_version(job)
+            session.add(_review_edit(job.id, user, change_made, written))
             _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, element_id, _typed(form))
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
-        event = "review_stale" if isinstance(exc, StaleReview) else "review_invalid"
-        log_event(logger, event, job_id=job_id, action=logged_action)
+        log_event(logger, "review_invalid", job_id=job_id, action=logged_action)
         return _invalid_page(request, job_id, user, view, element_id, exc)
     log_event(
         logger,
@@ -784,17 +993,11 @@ def review_action(
         status=STATUS_FOR_ACTION[action].value,
         # A table edit's kind (a fixed code: anything else was refused).
         change=change if change in TABLE_CHANGES and action == "edit" else None,
+        anyway=change_made.anyway,
     )
     table = change_made.fix.kind is Kind.TABLE
-    message = DONE_MESSAGES[action]
-    if table:
-        message = TABLE_DONE_MESSAGES.get(action, message)
-    if change_made.note:
-        message = f"{change_made.note} {message}"
-    if change_made.warnings:
-        n = len(change_made.warnings)
-        message += f" {n} {'check gives a warning' if n == 1 else 'checks give warnings'}: "
-        message += "see the notes on it."
+    element = next((e for e in result.elements if e.id == element_id), None)
+    message = done_message(change_made, element)
     message += _moved_message(change_made.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
@@ -830,25 +1033,25 @@ def _group_action(
     level: str,
     view: str,
     every: bool = False,
-    version: str | None = None,
+    version: str = "",
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
-            next_version = guard_result_version(
-                job.result_version, version, field_id("group-actions", group_key)
-            )
+            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
-                job.result_version = next_version
-                session.add_all(_review_edit(job.id, user, c) for c in outcome.changes)
+                written = bump_result_version(job)
+                session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
                 _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, group_key)
     except ReviewInvalid as exc:
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
         log_event(logger, "review_invalid", job_id=job_id, action=f"group_{logged_action}")
@@ -923,23 +1126,25 @@ def _bulk_action(
     action: str,
     min_confidence: str,
     view: str,
-    version: str | None = None,
+    version: str = "",
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
             # Ownership first: someone else's job is a 404 whatever the form says.
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            _refuse_stale(job, version)
             bulk = parse_bulk(slug, action, min_confidence)
-            next_version = guard_result_version(job.result_version, version, bulk_field_id(slug))
             result = DocumentResult.model_validate(job.result_json or {})
             changes = apply_bulk_accept(result, bulk)
             if changes:  # nothing left to accept: no write, no re-render (idempotent)
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
-                job.result_version = next_version
-                session.add_all(_review_edit(job.id, user, c) for c in changes)
+                written = bump_result_version(job)
+                session.add_all(_review_edit(job.id, user, c, written) for c in changes)
                 _decision_events(request, session, user, job, result, "bulk", len(changes))
+    except ReviewStale:
+        return _stale_page(request, job_id, user, LIST_VIEW, slug)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="bulk")
         return _page(request, job_id, user, invalid=(slug, exc), status_code=422)
@@ -1009,12 +1214,127 @@ def _decision_events(
     )
 
 
-def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange) -> ReviewEdit:
+def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange, version: int) -> ReviewEdit:
+    """One fix's change. Its `after` snapshot also records the review version the write
+    made (`web.review.WRITE_KEY`): the edits of the last write are the ones Undo puts
+    back."""
     return ReviewEdit(
         job_id=job_id,
         user_id=user.id,
         element_id=change.fix.element_id,
         action=change.action,
         before=change.before,
-        after=change.after,
+        after=change.after | {WRITE_KEY: version},
     )
+
+
+# Fields typed into a form, kept when it is refused as stale (a table's cell reopens with
+# them: `split._apply_invalid`).
+TYPED_FIELDS = frozenset(
+    {"latex", "alt", "decorative", "level", "row", "col", "cell", "long_description"}
+)
+
+
+def _typed(form: dict[str, str]) -> dict[str, str]:
+    """The fields of a refused form, to show again as they were typed."""
+    return {k: v for k, v in form.items() if k in TYPED_FIELDS}
+
+
+# --------------------------------------------------------------------------- undo
+
+
+def last_write(session: Session, job_id: str, version: int) -> list[ReviewEdit]:
+    """The ReviewEdits of the job's last review write (the one that made `version`), in
+    the order they were made. Empty when that write left none that says so (it was made
+    before writes were numbered)."""
+    edits = session.scalars(
+        select(ReviewEdit)
+        .where(ReviewEdit.job_id == job_id)
+        .order_by(ReviewEdit.created_at, ReviewEdit.id)
+    ).all()
+    return [e for e in edits if isinstance(e.after, dict) and e.after.get(WRITE_KEY) == version]
+
+
+def can_undo(edits: list[ReviewEdit]) -> bool:
+    """Undo is offered for the last write when it was a decision (not an Undo itself)
+    and every fix it changed can be put back."""
+    return bool(edits) and all(e.action != UNDO_ACTION and restorable(e.before) for e in edits)
+
+
+def undo_offer(request: Request, job_id: str, user: CurrentUser, version: int) -> bool:
+    """Whether the notice after a decision offers Undo (one small query)."""
+    with session_scope(get_ctx(request).factory) as session:
+        owned_job(session, job_id, user)
+        return can_undo(last_write(session, job_id, version))
+
+
+UNDO_PENDING = "Undone. {it} waiting for your decision again."
+UNDO_BACK = "Undone. {it} back as {was}."
+
+
+@router.post("/jobs/{job_id}/undo", dependencies=[Depends(require_csrf)])
+def undo(
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    version: Annotated[str, Form()] = "",
+    view: Annotated[str, Form()] = "",
+) -> Response:
+    """Undo the job's last review write: every fix it changed goes back to what its
+    ReviewEdit's `before` recorded, the HTML is rendered again, and the undo is a write
+    of its own (counted, and recorded as "undo" ReviewEdits). Only from a page drawn
+    after that write (`version` must be the job's): Undo means "what I just did", never
+    something another tab did since."""
+    view = LIST_VIEW if view == LIST_VIEW else "split"
+    try:
+        with session_scope(get_ctx(request).factory) as session:
+            job = owned_job(session, job_id, user, lock=True)
+            require_done(job)
+            if not version.strip():
+                raise ReviewStale()
+            _refuse_stale(job, version)
+            edits = last_write(session, job.id, job.result_version or 0)
+            if not can_undo(edits):
+                raise LookupError("nothing to undo")
+            result = DocumentResult.model_validate(job.result_json or {})
+            changes = undo_last(result, [(e.element_id, e.before or {}) for e in edits])
+            job.html = rerender_html(result, _crops(session, job.id))
+            job.result_json = result.model_dump(mode="json", exclude={"html"})
+            written = bump_result_version(job)
+            session.add_all(_review_edit(job.id, user, c, written) for c in changes)
+    except ReviewStale:
+        log_event(logger, "review_stale", job_id=job_id)
+        flash(request, "Nothing was undone: this document changed after this page was opened.")
+        return _back(job_id, view)
+    except LookupError:
+        flash(request, "There is nothing to undo here.")
+        return _back(job_id, view)
+    log_event(logger, "review_undo", job_id=job_id, changed=len(changes))
+    fixes = [c.fix for c in changes]
+    many = len(fixes) > 1
+    words = {"it": "They are" if many else "It is", "was": "they were" if many else "it was"}
+    message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
+    keys = {f.group_key for f in fixes}
+    if len(fixes) == 1:
+        target, flashed = fixes[0].element_id, fixes[0].element_id
+    elif len(keys) == 1 and None not in keys:
+        target = str(next(iter(keys)))
+        flashed = HEADING_GROUP_FLASH + target
+    else:  # a bulk accept
+        slug = GROUP_SLUGS.get(fixes[0].kind, "")
+        target, flashed = slug, GROUP_FLASH + slug
+    flash(request, message, element_id=flashed)
+    if view == LIST_VIEW:
+        return RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+    from a11y_stem.web.routes.split import review_url
+
+    item = target if target and kind_for_slug(target) is None else None
+    return RedirectResponse(review_url(job_id, item=item), status_code=303)
+
+
+def _back(job_id: str, view: str) -> Response:
+    if view == LIST_VIEW:
+        return RedirectResponse(list_url(job_id, "review-progress"), status_code=303)
+    from a11y_stem.web.routes.split import review_url
+
+    return RedirectResponse(review_url(job_id), status_code=303)

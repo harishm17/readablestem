@@ -428,11 +428,12 @@ def test_erasure_and_course_deletion_on_postgres(factory):
 
 
 def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory):
-    """The review routes lock the job row (`owned_job(..., lock=True)`), then check and
-    move `result_version` on (`web.review.guard_result_version`) in one transaction: of
-    20 tabs made from version 0 and writing at once, exactly one write is applied."""
+    """The review routes lock the job row (`owned_job(..., lock=True)`), then check the
+    form's version (`web.review.is_stale`) and count the write (`bump_result_version`) in
+    one transaction: of 20 tabs made from version 0 and writing at once, exactly one write
+    is applied."""
     from a11y_stem.web.deps import CurrentUser
-    from a11y_stem.web.review import StaleReview, guard_result_version
+    from a11y_stem.web.review import ReviewStale, bump_result_version, is_stale
     from a11y_stem.web.routes.jobs import owned_job
 
     [job_id] = queue_jobs(factory, 1)
@@ -447,9 +448,11 @@ def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory)
         try:
             with db.session_scope(factory) as session:
                 job = owned_job(session, job_id, user, lock=True)
-                job.result_version = guard_result_version(job.result_version, "0", "actions")
+                if is_stale(job.result_version, "0"):
+                    raise ReviewStale()
+                bump_result_version(job)
             outcome = "saved"
-        except StaleReview:
+        except ReviewStale:
             outcome = "stale"
         with lock:
             outcomes.append(outcome)

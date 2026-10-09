@@ -114,16 +114,21 @@ def test_next_to_review_goes_forward_then_wraps_round():
 
 def test_page_lists_decisions_by_kind_then_the_decided_ones(rich):
     page = page_of(rich)
-    decided = ["p2-e3", "p3-e4", "p3-e5", "p1-e0"]  # equations, figures, headings
-    assert cards(page) == [*EQUATIONS_PENDING, *FIGURES_PENDING, *HEADINGS_PENDING, *decided]
+    # The reviewer's own decisions (edited, rejected), then what was accepted for them;
+    # each by kind (equations, figures, headings).
+    mine, accepted = ["p3-e4", "p3-e5"], ["p2-e3", "p1-e0"]
+    expected = [*EQUATIONS_PENDING, *FIGURES_PENDING, *HEADINGS_PENDING, *mine, *accepted]
+    assert cards(page) == expected
     for slug, ids in (
         ("equations", EQUATIONS_PENDING),
         ("figures", FIGURES_PENDING),
         ("headings", HEADINGS_PENDING),
     ):
         assert re.findall(r'<article id="fix-([\w-]+)"', group(page, slug)) == ids
-    folded = page[page.index('id="decided"') :].split('<details class="done-group">', 1)[1]
-    assert re.findall(r'<article id="fix-([\w-]+)"', folded) == decided
+    yours = page[page.index('id="decided"') : page.index('id="accepted"')]
+    assert re.findall(r'<article id="fix-([\w-]+)"', yours) == mine
+    folded = page[page.index('id="accepted"') :].split('<details class="done-group">', 1)[1]
+    assert re.findall(r'<article id="fix-([\w-]+)"', folded) == accepted
 
 
 def test_labels_stay_the_same_after_a_decision(rich):
@@ -188,7 +193,9 @@ def test_after_a_decision_the_reviewer_lands_on_the_next_fix_waiting(rich):
     location = post(rich, "p3-e3", action="reject").headers["location"]
     assert location == f"/jobs/{rich.job_id}/review/list#item-p2-e1"  # last one: wraps round
     landing = card(page_of(rich), "p2-e1")
-    assert '<a href="#item-p3-e3">Heading 5 on page 3</a>: Rejected.' in landing
+    assert '<a href="#item-p3-e3">Heading 5 on page 3</a>: Made plain text, not a heading.' in (
+        landing
+    )
 
 
 def test_landing_item_is_focusable_and_its_notice_comes_first(rich):
@@ -337,11 +344,13 @@ def test_accept_by_confidence(rich):
 
 def test_bulk_never_overrides_a_reviewers_decision(rich):
     post(rich, "p1-e3", action="reject")
-    # Level 2: after the rejected h2, level 3 would skip a level and is refused.
-    assert post(rich, "p2-e0", action="edit", level="2").status_code == 303
+    # Its proposed level 2 fits after the rejected h2. (Saving it as an edit at the level
+    # it already has would change nothing, and is refused as a no-op.)
+    assert post(rich, "p2-e0", action="edit", level="2").status_code == 422
+    assert post(rich, "p2-e0", action="accept").status_code == 303
     post(rich, "headings", action="accept_all")
     after = statuses(rich)
-    assert (after["p1-e3"], after["p2-e0"], after["p3-e3"]) == ("rejected", "edited", "accepted")
+    assert (after["p1-e3"], after["p2-e0"], after["p3-e3"]) == ("rejected", "accepted", "accepted")
     assert "Accepted 1 heading." in page_of(rich)
 
 

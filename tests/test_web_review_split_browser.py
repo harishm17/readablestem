@@ -311,7 +311,7 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     assert page.get_by_role("link", name="Download the accessible HTML").is_visible()
     assert page.locator(".page-scroll .box-required").count() == 0
     # The optional checks still open without scripts.
-    page.locator(".optional-box summary").click()
+    page.locator("#optional-summary").click()
     page.get_by_role("link", name="Equation 2, page 1").click()
     assert page.locator("#decision-title").inner_text().startswith("Optional check")
     context.close()

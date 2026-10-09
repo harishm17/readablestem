@@ -572,11 +572,11 @@ def set_language(
         except ValueError:
             raise refused from None
         crops = _crops(session, job.id)
-        from a11y_stem.web.review import rerender_html
+        from a11y_stem.web.review import bump_result_version, rerender_html
 
         job.html = rerender_html(result, crops, checked_on=last_decision(session, job))
         job.result_json = result.model_dump(mode="json", exclude={"html"})
-        job.result_version = (job.result_version or 0) + 1
+        bump_result_version(job)  # review forms open in other tabs are now stale
     log_event(logger, "language_set", job_id=job_id)
     flash(
         request,

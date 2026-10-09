@@ -14,12 +14,6 @@
 {% if err %}<p class="error-message" id="{{ prefix }}-error-{{ item.element_id }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
 {% endmacro %}
 
-{# After a form made before another tab changed the review: the page below is already
-   the latest version; the link loads it afresh. #}
-{% macro stale_line(item, href) %}
-{% if item.stale %}<p class="stale-line"><a href="{{ href }}">Reload {{ item.label|lower }}</a> to start again from the latest version.</p>{% endif %}
-{% endmacro %}
-
 {% macro table_box(html, label) %}
 {# Scrolls sideways inside its own box when wider than the card: a named tab stop, so it
    can be scrolled from the keyboard. Cells keep whole words. #}
@@ -137,7 +131,6 @@
 {% endif %}
 
 {{ table_error(item, "actions") }}
-{{ stale_line(item, here) }}
 <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
   {% if t.proposal %}
   {% if item.can_accept %}
@@ -148,7 +141,7 @@
   {% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
     {{ table_fields("split") }}
-    <button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">Reject<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
   </form>
   {% else %}
   {% if t.local %}
@@ -159,11 +152,11 @@
   {% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
     {{ table_fields("split") }}
-    <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.local else 'button' }}" aria-describedby="reject-note-{{ eid }}">Keep the image<span class="visually-hidden"> of {{ name }}</span></button>
+    <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.local else 'button' }}" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
   </form>
   {% endif %}
 </div>
-<p class="hint decide-note" id="reject-note-{{ eid }}">{% if t.proposal %}Reject keeps the image of the table, marked “not converted”.{% else %}The image stays in the document, marked “not converted”: screen readers cannot read its cells.{% endif %}</p>
+<p class="hint decide-note" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.button }}: {{ item.reject.consequence }}{% else %}The image stays in the document, marked “not converted”: screen readers cannot read its cells.{% endif %}</p>
 {% if p.continue_href %}<p class="table-continue"><a href="{{ p.continue_href }}">{{ p.continue_label }}</a></p>{% endif %}
 {% endmacro %}
 
@@ -197,7 +190,6 @@
 {% set name = item.label|lower %}
 <div class="review-form">
   {{ table_error(item, "actions") }}
-  {{ stale_line(item, "/jobs/" ~ job.id ~ "/review/list#item-" ~ eid) }}
   <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
     {% if t.proposal and item.can_accept %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
@@ -213,9 +205,9 @@
     {% endif %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("list") }}
-      <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or t.local else 'button' }}">{% if t.proposal %}Reject<span class="visually-hidden"> {{ name }}</span>{% else %}Keep the image<span class="visually-hidden"> of {{ name }}</span>{% endif %}</button>
+      <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or t.local else 'button' }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
     </form>
   </div>
-  <p class="hint">{% if t.proposal %}Reject keeps the image of the table, marked “not converted”. To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% else %}Keeping the image leaves it in the document, marked “not converted”.{% endif %}</p>
+  <p class="hint">{% if t.proposal %}{{ item.reject.button }}: {{ item.reject.consequence }} To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% else %}{{ item.reject.button }}: {{ item.reject.consequence }}{% endif %}</p>
 </div>
 {% endmacro %}

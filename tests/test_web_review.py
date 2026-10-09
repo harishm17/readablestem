@@ -12,7 +12,7 @@ packages and are monkeypatched with small deterministic fakes here.
 from __future__ import annotations
 
 import re
-from html import escape
+from html import escape, unescape
 
 import pytest
 from sqlalchemy import func, select
@@ -306,23 +306,32 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
 
 def test_buttons_name_the_fix_they_act_on(web):
     figure = card(review_page(web), "p1-e4")
-    assert 'Reject<span class="visually-hidden"> figure 1</span>' in figure
+    # "Reject" is named for what it does, with what that means under it.
+    assert 'Keep without a description<span class="visually-hidden"> (figure 1)</span>' in figure
+    assert "marked “Needs a description”; screen readers get no description of it." in figure
     assert 'Accept<span class="visually-hidden"> figure 1</span>' in figure
     assert 'Save edit<span class="visually-hidden"> to figure 1</span>' in figure
 
 
 def test_decided_fixes_are_folded_away(web):
     page = review_page(web)
-    decided = page[page.index('id="decided"') :]
-    assert '<details class="done-group">' in decided  # closed: no "open" attribute
+    # The reviewer's own decisions apart from what was accepted for them.
+    mine = page[page.index('id="decided"') : page.index('id="accepted"')]
+    assert '<h2 id="decided-title">Your decisions (0)</h2>' in mine
+    assert "You have not decided anything yet." in mine
+    accepted = page[page.index('id="accepted"') :]
+    assert '<h2 id="accepted-title">Accepted automatically (2)</h2>' in accepted
+    assert '<details class="done-group">' in accepted  # closed: no "open" attribute
+    assert "<summary>Show the 2 items accepted for you</summary>" in accepted
+    # Each line names its item (no confidence percentage).
     assert (
-        "<summary>2 fixes accepted automatically or already decided (accepted, edited or "
-        "rejected)</summary>" in decided
+        '<summary id="fix-title-p1-e0">Heading 1 “SECRET-HEADING Kinematics”, page 1: '
+        "Accepted automatically</summary>" in accepted
     )
-    assert (
-        '<summary id="fix-title-p1-e0">Heading 1, page 1: Accepted automatically, '
-        "confidence High (100%)"
-        "</summary>" in decided
+    assert re.search(
+        r'<summary id="fix-title-p1-e2">Equation 1 <span class="item-math"><math [^>]*>.*'
+        r"</math></span>, page 1: Accepted automatically</summary>",
+        accepted,
     )
 
 
@@ -336,7 +345,8 @@ def test_page_has_a_table_of_contents_with_counts(web):
     )
     assert '<a href="#group-figures">Figures</a>: 1 needs review, 0 accepted or decided' in toc
     assert '<a href="#optional-checks">Optional checks</a>: 0' in toc
-    assert '<a href="#decided">Accepted or decided</a>: 2' in toc
+    assert '<a href="#decided">Your decisions</a>: 0' in toc
+    assert '<a href="#accepted">Accepted automatically</a>: 2' in toc
     assert (
         '<h3 id="group-equations-title">Equations <span class="group-count">(2 decisions)'
         "</span></h3>" in page
@@ -378,7 +388,8 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     assert job.html is not None and "p1-e3:accepted" in job.html
     assert "crops=3" in job.html  # the stored crops are passed to the assembler
     page = review_page(web)
-    assert cards(page) == ["p1-e5", "p1-e4", "p1-e2", "p1-e3", "p1-e0"]
+    # The reviewer's decisions come before what was accepted for them.
+    assert cards(page) == ["p1-e5", "p1-e4", "p1-e3", "p1-e2", "p1-e0"]
     # The notice sits where the redirect lands, linked back to the fix that changed.
     landing = card(page, "p1-e5")
     assert '<a href="#item-p1-e3">Equation 2 on page 1</a>: Accepted.' in landing
@@ -400,7 +411,8 @@ def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#review-progress"
     page = review_page(web)
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
-    assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Rejected.' in progress
+    # "Reject" is named for what it does, and so is its notice.
+    assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Kept without a description' in progress
     assert "Nothing left that needs your decision." in progress
 
 
@@ -413,10 +425,14 @@ def test_saving_an_equation_edit_validates_and_stores_it(web):
     assert fix.equation.latex == "x^2 + 1"
     assert fix.equation.mathml == '<math display="block"><mi>x^2 + 1</mi></math>'
     assert fix.equation.speech == "spoken form" and fix.equation.display == "block"
+    # The checks a proposal gets (web.edit_check): this equation has no text in the PDF,
+    # so there are no text-layer checks.
     assert [c.name for c in fix.checks] == [
         "latex.allowed_commands",
         "latex.plain_text_arguments",
+        "latex.converts",
         "mathml.well_formed",
+        "speech.generated",
     ]
     assert edits(web)[0].after["equation"]["latex"] == "x^2 + 1"
 
@@ -438,11 +454,12 @@ def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
     assert response.status_code == 422
     assert "<title>Error: All items as a list" in response.text
     assert '<a href="#latex-p1-e3">' in response.text  # error summary links to the field
-    # Explained in words, with the code in brackets for a bug report.
-    assert "The LaTeX was not saved. The LaTeX uses a command that is not on the list" in (
-        response.text
+    # Explained in words that name the problem; the code is for the Details, not here.
+    assert (
+        "Your LaTeX was not saved. \\bad is not a command this tool supports: check for a "
+        "typo, or write it another way." in unescape(response.text)
     )
-    assert "(latex.allowed_commands: unknown_command)" in response.text
+    assert "(latex.allowed_commands: unknown_command)" not in response.text
     assert "\\bad{y}</textarea>" in response.text  # the reviewer's input is kept
     assert 'aria-invalid="true"' in response.text
     assert result(web) == before and edits(web) == []
@@ -460,7 +477,7 @@ def test_an_invalid_edit_to_a_decided_fix_opens_it_so_the_error_link_works(web):
 def test_latex_that_cannot_become_mathml_is_not_saved(web):
     response = post(web, "p1-e3", action="edit", latex="\\fail")
     assert response.status_code == 422
-    assert "could not be converted to MathML" in response.text
+    assert "It could not be turned into an equation" in response.text
     assert edits(web) == []
 
 
@@ -492,7 +509,8 @@ def test_figure_alt_text_failing_a_check_is_not_saved(web):
     response = post(web, "p1-e4", action="edit", alt="Image of a graph")
     assert response.status_code == 422
     assert '<a href="#alt-p1-e4">' in response.text
-    assert "The alt text was not saved. The alt text starts with words like" in response.text
+    assert "Your alt text was not saved. The alt text starts with words like" in response.text
+    assert "(alt.no_redundant_prefix" not in response.text  # codes are for the Details only
     assert "Image of a graph</textarea>" in response.text
     assert "(this text has 16)" in response.text  # counts the reviewer's input
     assert edits(web) == []

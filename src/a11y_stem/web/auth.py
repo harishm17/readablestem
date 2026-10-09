@@ -8,6 +8,8 @@
 - Sessions are signed cookies (Starlette SessionMiddleware, 7 days, SameSite=Lax, Secure
   in production) and are rotated at sign-in. Every state-changing POST carries a
   per-session CSRF token (`deps.require_csrf`). Sign-out is a POST for the same reason.
+- Signing in goes back to the page (or the review decision) the session ended on, when
+  there was one (`web.return_to`), else to `/app`.
 - `/dev-login` (any email, no password; the allowlist still applies) exists only when
   DEV_LOGIN_ENABLED is set and ENV is dev or test.
 """
@@ -37,6 +39,7 @@ from a11y_stem.web.deps import (
     start_session,
 )
 from a11y_stem.web.logsafe import log_event
+from a11y_stem.web.return_to import take_return
 
 logger = logging.getLogger(__name__)
 
@@ -155,10 +158,11 @@ def finish_login(request: Request, email: str, name: str | None) -> Response:
         log_event(logger, "login_refused", reason="not_allowlisted")
         return render(request, "not_allowed.html", {"email": email}, status_code=403)
     user_id, version = found
+    target = take_return(request)  # before the session is rotated (web.return_to)
     start_session(request, user_id, version)
     log_event(logger, "login", user_id=user_id)
     events.record(ctx.factory, ctx.settings, user_id, events.SIGNED_IN)  # usage event
-    return RedirectResponse("/app", status_code=303)
+    return RedirectResponse(target, status_code=303)
 
 
 # --------------------------------------------------------------------------- routes

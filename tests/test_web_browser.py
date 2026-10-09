@@ -335,11 +335,11 @@ def test_everything_works_without_javascript(site, browser):
     assert page.locator("#results-heading").is_visible()
     assert page.locator('meta[http-equiv="refresh"]').count() == 0
     page.get_by_role("link", name=re.compile(r"^Review \d+ decisions?$")).click()
-    page.get_by_role("button", name="Reject equation 2").click()
-    assert "Rejected" in page.locator("#decision-notice").inner_text()
+    page.get_by_role("button", name="Keep as image (equation 2)").click()
+    assert "Kept as an image" in page.locator("#decision-notice").inner_text()
     page.get_by_role("link", name="All items as a list").click()
-    page.locator("#fix-p1-e4").get_by_role("button", name="Reject").click()
-    assert "Rejected" in page.locator("#review-progress").inner_text()
+    page.locator("#fix-p1-e4").get_by_role("button", name="Keep without a description").click()
+    assert "Kept without a description" in page.locator("#review-progress").inner_text()
     context.close()
 
 

@@ -1,0 +1,20 @@
+{# The live check of an equation edit (routes/split.py `live_check`, swapped in by htmx
+   while the reviewer types): the edit as it would look, roughly how it is read aloud,
+   and what the checks found, in the words Save edit would use. The one-line status goes
+   into the field's polite live region (out of band), so a screen reader hears a short
+   sentence, not the whole list. #}
+{% if not check.unchanged and not check.empty %}
+{% if mathml %}
+<p class="cmp-label">Your edit</p>
+<div class="cmp-row" tabindex="0" role="group" aria-label="Your edit of {{ label|lower }}"><div class="cmp-math cmp-math-plain">{{ mathml }}</div></div>
+{% if check.speech %}<p class="speech"><span class="speech-label">Read aloud roughly as:</span> “{{ check.speech }}”</p>{% endif %}
+{% endif %}
+{% if check.blocking or check.meaning or check.notes %}
+<ul class="live-results">
+  {% for line in check.blocking %}<li><strong>Cannot be used yet:</strong> {{ line }}</li>{% endfor %}
+  {% for line in check.meaning %}<li><strong>Differs from the PDF:</strong> {{ line }}</li>{% endfor %}
+  {% for line in check.notes %}<li><strong>Note:</strong> {{ line }}</li>{% endfor %}
+</ul>
+{% endif %}
+{% endif %}
+<p id="live-status-{{ eid }}" hx-swap-oob="innerHTML">{{ status }}</p>

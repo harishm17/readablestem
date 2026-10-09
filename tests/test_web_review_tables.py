@@ -42,17 +42,15 @@ from a11y_stem.web.db import ReviewEdit, session_scope
 from a11y_stem.web.messages import CHECK_MESSAGES
 from a11y_stem.web.review import (
     NO_TABLE_TO_ACCEPT,
-    STALE_MESSAGE,
     ReviewInvalid,
-    StaleReview,
     apply_review,
     first_col_is_header,
     first_row_is_header,
-    guard_result_version,
     usable_local_grid,
     with_header_col,
     with_header_row,
 )
+from a11y_stem.web.routes.review import STALE_MESSAGE, STALE_TITLE
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
 from fixtures.web.table_doc import (
     MATHS_LATEX,
@@ -214,10 +212,10 @@ def test_the_card_shows_the_image_and_the_table_as_the_student_gets_it(tables):
     local = section(body, "<summary>The grid read from the PDF</summary>", "</details>")
     assert render_table(table_1_local(), id_prefix="tl-p1-e1", math_display="inline") in local
     assert 'name="change" value="use_local"' in local and "Use this grid instead" in local
-    # Accept and Reject, Reject saying what it keeps.
+    # Accept and Keep as image (Reject, named for what it does), saying what it keeps.
     assert re.search(r'value="accept" class="button" data-role="accept">Accept<', body)
-    assert re.search(r'value="reject" class="button-secondary"[^>]*>Reject<', body)
-    assert "Reject keeps the image of the table, marked “not converted”." in body
+    assert re.search(r'value="reject" class="button-secondary"[^>]*>Keep as image<', body)
+    assert "Keep as image: Students see a picture of the table, marked “not converted”" in body
     # Every form that changes something carries the job's version and the view.
     forms = post_forms(body)
     assert len(forms) == 4  # headers, use this grid, accept, reject
@@ -257,7 +255,7 @@ def test_a_table_kept_as_an_image_offers_the_grid_read_from_the_pdf(tables):
     assert "Grid read from the PDF" in body
     assert render_table(grid_of(TABLE_2), id_prefix="tl-p1-e3", math_display="inline") in body
     assert re.search(r'class="button">Use the grid read from the PDF<', body)
-    assert re.search(r'value="reject" class="button-secondary"[^>]*>Keep the image<', body)
+    assert re.search(r'value="reject" class="button-secondary"[^>]*>Keep as image<', body)
     assert "Change the table" not in body  # nothing to change until a grid is chosen
     assert 'value="accept"' not in body
     assert "The image stays in the document, marked “not converted”" in body
@@ -267,7 +265,7 @@ def test_a_table_without_a_grid_can_only_keep_its_image(tables):
     body = panel(screen(tables, "?item=p2-e0"))
     assert "Decision 3 of 3" in body
     assert "No rebuilt table: the document shows the image of the table" in body
-    assert re.search(r'value="reject" class="button"[^>]*>Keep the image<', body)
+    assert re.search(r'value="reject" class="button"[^>]*>Keep as image<', body)
     assert "use_local" not in body and 'value="accept"' not in body
 
 
@@ -336,7 +334,7 @@ def test_reject_keeps_the_image_of_the_table(tables):
     assert "This table is shown as an image of the original" in flagged
     # Decided, it can be opened again: Accept brings the rebuilt table back.
     body = panel(screen(tables, "?item=p1-e1"))
-    assert "Decided: Rejected: original kept" in body
+    assert "Decided: Kept as an image by you" in body
     assert "Proposal (the document has the image instead)" in body
     assert 'value="accept"' in body
 
@@ -559,8 +557,9 @@ def test_no_document_text_reaches_the_logs(tables, caplog):
 
 def test_a_form_from_before_another_tab_changed_the_table_is_refused(tables):
     """Tab A shows table 1; tab B makes the first row a header; tab A then changes a cell
-    by its place in the grid it showed. Refused: nothing saved, and the page says why,
-    shows the table as it is now and offers to reload."""
+    by its place in the grid it showed. Refused with the review screens' one stale-tab
+    guard (409, `web.review.is_stale`): nothing saved, the page says why, shows the table
+    as it is now with the cell's form open again on what was typed, and offers a reload."""
     assert (
         post(tables, "p1-e1", action="edit", change="headers", header_row="on").status_code == 303
     )
@@ -570,20 +569,19 @@ def test_a_form_from_before_another_tab_changed_the_table_is_refused(tables):
         tables, "p1-e1", sent_version="0", action="edit", change="cell", row="1", col="1",
         cell="12",
     )  # fmt: skip
-    assert response.status_code == 422
-    page = response.text
-    summary = section(page, 'class="error-summary"', "</div>")
-    assert f'<a href="#actions-p1-e1">{STALE_MESSAGE}</a>' in unescape(summary)
-    body = panel(page)
-    assert 'id="actions-error-p1-e1"' in body
-    assert f'<a href="/jobs/{tables.job_id}/review?item=p1-e1">Reload table 1</a>' in body
+    assert response.status_code == 409
+    page = unescape(response.text)
+    assert STALE_TITLE in page and STALE_MESSAGE in page
+    assert "Reload this page</a>" in page
+    body = panel(response.text)
     assert '<input type="hidden" name="version" value="1">' in body  # the page is current
     assert '<thead><tr><th scope="col">Object</th>' in body
+    assert 'value="12"' in body or ">12</textarea>" in body  # what was typed is kept
     assert stored(tables) == before and version(tables) == 1
     assert len(edits(tables)) == 1
-    # Accept and Reject from the old page are refused the same way.
+    # Accept and Keep as image from the old page are refused the same way.
     for action in ("accept", "reject"):
-        assert post(tables, "p1-e1", sent_version="0", action=action).status_code == 422
+        assert post(tables, "p1-e1", sent_version="0", action=action).status_code == 409
     assert fix_of(tables, "p1-e1").status is Status.EDITED
 
 
@@ -614,30 +612,17 @@ def test_every_review_write_moves_the_version_on(tables):
               "action": "accept_confident", "min_confidence": "60", "view": "list",
               "version": "1"},
     )  # fmt: skip
-    assert stale.status_code == 422 and 'href="#min-confidence-tables"' in stale.text
+    assert stale.status_code == 409 and STALE_TITLE in unescape(stale.text)
 
 
 def test_the_stale_guard_on_the_list_view(tables):
     post(tables, "p2-e0", action="reject")
     response = post(tables, "p1-e3", sent_version="0", action="edit", change="use_local",
                     view="list")  # fmt: skip
-    assert response.status_code == 422
+    assert response.status_code == 409
     assert STALE_MESSAGE in unescape(response.text)
-    href = f"/jobs/{tables.job_id}/review/list#item-p1-e3"
-    assert f'<a href="{href}">Reload table 2</a>' in response.text
+    assert "Table 2 is now: " in unescape(response.text)
     assert fix_of(tables, "p1-e3").status is Status.FAILED
-
-
-def test_guard_result_version():
-    assert guard_result_version(0, None, "actions-p1-e1") == 1
-    assert guard_result_version(None, "0", "actions-p1-e1") == 1  # a row from before
-    assert guard_result_version(4, " 4 ", "actions-p1-e1") == 5
-    for sent in ("3", "5", "", "x"):
-        with pytest.raises(StaleReview) as caught:
-            guard_result_version(4, sent, "actions-p1-e1")
-        assert isinstance(caught.value, ReviewInvalid)
-        (error,) = caught.value.errors
-        assert (error.field_id, error.message) == ("actions-p1-e1", STALE_MESSAGE)
 
 
 # --------------------------------------------------------------------------- list view
@@ -657,10 +642,10 @@ def test_the_list_view_lists_tables_like_other_kinds(tables):
         first
     )
     second = section(group, 'id="item-p1-e3"', "</article>")
-    assert "Use the grid read from the PDF" in second and "Keep the image" in second
+    assert "Use the grid read from the PDF" in second and "Keep as image" in second
     assert "Why it was not converted:" in second
     third = section(group, 'id="item-p2-e0"', "</article>")
-    assert "Keep the image" in third and "use_local" not in third
+    assert "Keep as image" in third and "use_local" not in third
     for form in post_forms(group):
         assert 'name="view" value="list"' in form
     # A decision there comes back to the list's next table.

@@ -294,7 +294,7 @@ def test_the_table_decisions_can_be_made_without_javascript(site, browser, job):
     page.wait_for_url(f"{url}?item=p1-e3")  # stays on the table it changed
     assert "Decided: Edited by you" in page.locator("#decision").inner_text()
     page.get_by_role("link", name="Go on to decision 3").click()
-    page.get_by_role("button", name="Keep the image of table 3").click()
+    page.get_by_role("button", name="Keep as image (table 3)").click()
     page.wait_for_url(url)
     assert page.locator("#decision-title").inner_text() == "All decisions made"
     context.close()

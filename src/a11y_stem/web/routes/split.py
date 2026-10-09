@@ -19,9 +19,11 @@ decision first):
   ("Show accepted"). Each mark is a link to its item.
 
 Everything is a link or a form, so it works without JavaScript (`static/app.js` only
-adds keyboard shortcuts, scrolls the page image to the item and makes "Save edit" the
-main button once a field is changed). The full list of every item is still at
-`/jobs/{id}/review/list`.
+adds keyboard shortcuts, scrolls the page image to the item, makes "Save edit" the main
+button once a field is changed and keeps a draft of what is typed in this browser tab;
+htmx checks LaTeX while it is typed, `live_check`). Every form carries the review
+version its page was drawn at, so a form from an out-of-date tab is refused, not applied
+(`routes/review.py`). The full list of every item is still at `/jobs/{id}/review/list`.
 
 Mark positions come from a stylesheet made per job (`/jobs/{id}/review/marks.css`:
 element ids and percentages only), because the CSP allows no inline styles.
@@ -31,11 +33,12 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
+from markupsafe import Markup
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
@@ -60,18 +63,21 @@ from a11y_stem.web.deps import (
     CurrentUser,
     PageError,
     UserDep,
+    current_user,
     get_ctx,
     pop_flash,
     render,
+    require_csrf,
 )
+from a11y_stem.web.edit_check import EditCheck, check_equation_edit
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.mathml import try_sanitize_mathml
 from a11y_stem.web.messages import explain_check, explain_reason
 from a11y_stem.web.review import (
     GROUP_KINDS,
+    MAX_LATEX_CHARS,
     FieldError,
     ReviewInvalid,
-    StaleReview,
     heading_places,
     item_numbers,
 )
@@ -85,7 +91,11 @@ from a11y_stem.web.routes.review import (
     _heading_group,
     _item,
     _load,
+    _load_versioned,
+    stale_notice,
+    undo_offer,
 )
+from a11y_stem.web.speech_diff import SpokenDiff, spoken_diff
 from a11y_stem.web.views import KIND_LABELS, JobView
 
 logger = logging.getLogger(__name__)
@@ -176,9 +186,14 @@ class StepLink:
 
 @dataclass
 class OptionalLine:
+    """One item in a folded list ("Optional checks", "Your decisions"), named by what it
+    is as well as its number (UX review MF15)."""
+
     label: str  # "Equation 7, page 3"
-    note: str
+    note: str  # the note, or what the reviewer decided
     href: str
+    what: str = ""  # a heading's text, the start of the alt text
+    mathml: Markup | None = None  # an equation, small
 
 
 @dataclass
@@ -197,6 +212,9 @@ class Panel:
     reason_code: str | None = None
     compare: EquationCompare | None = None
     compare_size: tuple[float, float] | None = None  # crop size in CSS px (aspect ratio)
+    # The proposal's reading and the PDF text's, the symbols that differ marked; only
+    # when the checks found a difference (`web.speech_diff`).
+    spoken: SpokenDiff | None = None
     # A decision whose proposal changes the meaning: the fix comes first (the suggested
     # one-click fix, else the edit box, open), and Accept is the secondary "Accept anyway".
     changes_meaning: bool = False
@@ -381,7 +399,7 @@ class SplitBuilder:
     ) -> None:
         self.request = request
         self.user = user
-        self.view, self.result, self.crop_ids = _load(request, job_id, user)
+        self.view, self.result, self.crop_ids, self.version = _load_versioned(request, job_id, user)
         self.job_id = self.view.id
         self.show_accepted = show_accepted
         self.elements = {e.id: e for e in self.result.elements}
@@ -522,6 +540,8 @@ class SplitBuilder:
             item.mathml = try_sanitize_mathml(
                 fix.equation.mathml if fix.equation else None, flag=compare.proposal_marks
             )
+            if compare.rows:
+                panel.spoken = spoken_diff(item.speech, item.text_layer)
             clip = context_clip(element, size)
             panel.compare_size = (
                 round((clip[2] - clip[0]) * COMPARE_PX_PER_PT, 1),
@@ -693,15 +713,69 @@ class SplitBuilder:
         )
         out = []
         for fix in notes:
-            page = self.page_of(fix)
-            label = _label(fix, self.numbers) + (f", page {page}" if page else "")
             href = self.url(item=fix.element_id, anchor="decision-title")
             compare = (
                 compare_equation(self.elements.get(fix.element_id), fix)
                 if fix.kind is Kind.EQUATION
                 else None
             )
-            out.append(OptionalLine(label, _first_note(fix, compare), href))
+            out.append(self._line(fix, _first_note(fix, compare), href))
+        return out
+
+    def _line(self, fix: Fix, note: str, href: str) -> OptionalLine:
+        page = self.page_of(fix)
+        item = self.item(fix)
+        return OptionalLine(
+            label=_label(fix, self.numbers) + (f", page {page}" if page else ""),
+            note=note,
+            href=href,
+            what=item.preview,
+            mathml=try_sanitize_mathml(fix.equation.mathml if fix.equation else None),
+        )
+
+    def decided_lines(self) -> list[OptionalLine]:
+        """What the reviewer decided, apart from what was accepted for them (UX review
+        MF14): each decision of the queue the reviewer made, then any other item they
+        changed (an optional check edited, say), in page and reading order."""
+        out: list[OptionalLine] = []
+        seen: set[str] = set()
+        for decision in self.queue:
+            mine = [f for f in decision.fixes if f.decided_by_reviewer]
+            if decision.open or not mine:
+                continue
+            seen.update(f.element_id for f in decision.fixes)
+            href = self.decision_url(decision)
+            if decision.is_group:
+                lead = decision.fixes[0]
+                text = lead.heading.text if lead.heading else ""
+                kept = sum(f.status in KEPT for f in decision.fixes)
+                bold = sum(f.status is Status.REJECTED for f in decision.fixes)
+                out.append(
+                    OptionalLine(
+                        label=f"Repeated heading, {len(decision.fixes)} times",
+                        note=_group_state(kept, bold, len(decision.fixes)),
+                        href=href,
+                        what=text,
+                    )
+                )
+                continue
+            fix = decision.fixes[0]
+            out.append(self._line(fix, self.item(fix).status_label + ".", href))
+        far = (1 << 30, 1 << 30)
+        rank = {e.id: (e.page, e.order) for e in self.result.elements}
+        others = sorted(
+            (
+                f
+                for f in self.result.fixes
+                if f.decided_by_reviewer
+                and f.element_id not in seen
+                and f.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}
+            ),
+            key=lambda f: rank.get(f.element_id, far),
+        )
+        for fix in others:
+            href = self.url(item=fix.element_id, anchor="decision-title")
+            out.append(self._line(fix, self.item(fix).status_label + ".", href))
         return out
 
 
@@ -771,6 +845,7 @@ def split_page(
     page: str = "",
     show_accepted: bool = False,
     invalid: tuple[str, ReviewInvalid] | None = None,
+    stale: bool = False,
     status_code: int = 200,
     cell: str = "",
 ) -> Response:
@@ -799,6 +874,7 @@ def split_page(
     optional = builder.optional_lines()
     flashes = pop_flash(request)
     notice = _notice(flashes, builder.result, builder.numbers, open_count)
+    target = _flash_target(flashes)
     context: dict[str, Any] = {
         "job": builder.view,
         "panel": panel,
@@ -819,6 +895,17 @@ def split_page(
         "show_accepted": show_accepted,
         "list_url": f"/jobs/{builder.job_id}/review/list",
         "max_steps": MAX_STEPS,
+        "result_version": builder.version,
+        "stale": stale_notice(
+            builder.result, builder.numbers, item, review_url(builder.job_id, item=item)
+        )
+        if stale
+        else None,
+        "decided_lines": builder.decided_lines(),
+        # Undo, in the notice after a decision: only for the write this page shows.
+        "undo": bool(notice) and undo_offer(request, builder.job_id, user, builder.version),
+        # The item the last decision saved (app.js forgets a kept draft of it).
+        "saved_target": target if ELEMENT_ID.match(target) else "",
     }
     # Course notation (notation memory): the card's lines, and "remember for this course"
     # after a decision that settled a styled letter.
@@ -828,6 +915,16 @@ def split_page(
     context |= review_context(request, builder.job_id, user, builder.result, shown, flashes)
     context["remember_item"] = panel.decision_key or shown
     return render(request, "review_split.html", context, status_code=status_code)
+
+
+def _flash_target(flashes: list[dict[str, Any]]) -> str:
+    """The element id the last notice is about ("" for a group or none)."""
+    if not flashes:
+        return ""
+    target = flashes[-1].get("element_id")
+    if not isinstance(target, str) or target.startswith((GROUP_FLASH, HEADING_GROUP_FLASH)):
+        return ""
+    return target
 
 
 def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
@@ -840,7 +937,7 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
     if item is not None and item.element_id == target:
         item.edited = any(item.values.get(k, "") != v for k, v in exc.values.items())
         item.values.update(exc.values)
-        item.stale = isinstance(exc, StaleReview)
+        item.override = exc.override
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
         if item.table is not None and "row" in exc.values:
@@ -869,6 +966,65 @@ def review_screen(
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "split")
     return response
+
+
+def live_status(check: EditCheck) -> str:
+    """The one sentence the live check puts in the field's polite live region."""
+    if check.unchanged:
+        return ""
+    if check.empty:
+        return "Type the LaTeX for this equation."
+    if check.blocking:
+        return "Your LaTeX cannot be saved yet. " + _problems(len(check.blocking))
+    if check.meaning:
+        return "Your LaTeX differs from the PDF where it changes the meaning. " + _problems(
+            len(check.meaning)
+        )
+    if check.notes:
+        notes = "1 small note" if len(check.notes) == 1 else f"{len(check.notes)} small notes"
+        return f"Your LaTeX can be saved, with {notes} below."
+    if check.has_text_layer:
+        return "Your LaTeX can be saved: it matches the PDF's own text."
+    return "Your LaTeX can be saved. The PDF has no text here to compare it with."
+
+
+def _problems(n: int) -> str:
+    return "The problem is listed below." if n == 1 else f"The {n} problems are listed below."
+
+
+@router.post("/jobs/{job_id}/review/{element_id}/check", dependencies=[Depends(require_csrf)])
+def live_check(
+    request: Request, job_id: str, element_id: str, latex: Annotated[str, Form()] = ""
+) -> Response:
+    """The checks Save edit would run, on the LaTeX being typed (htmx, debounced): an HTML
+    fragment, nothing stored and nothing logged but the request line. Signed out (the
+    session ended in another tab), it answers 204 and changes nothing on the page, so
+    the background request never takes the reviewer away from what they are typing."""
+    user = current_user(request)
+    if user is None:
+        return Response(status_code=204)
+    if not ELEMENT_ID.match(element_id):
+        raise PageError(404, *NOT_FOUND)
+    _, result, _ = _load(request, job_id, user)
+    fix = result.fix_for(element_id)
+    if fix is None or fix.kind is not Kind.EQUATION:
+        raise PageError(404, *NOT_FOUND)
+    element = next((e for e in result.elements if e.id == element_id), None)
+    typed = latex.strip()
+    if len(typed) > MAX_LATEX_CHARS:
+        check = EditCheck(latex=typed, mathml=None, speech="", checks=[], display="block")
+        check.blocking = [f"Keep the LaTeX under {MAX_LATEX_CHARS} characters."]
+    else:
+        check = check_equation_edit(element, fix, typed)
+    context = {
+        "check": check,
+        "eid": element_id,
+        "label": f"Equation {item_numbers(result).get(element_id, 0)}",
+        "mathml": try_sanitize_mathml(check.mathml),
+        "status": live_status(check),
+    }
+    # Not `render`: that would take the session's one-time notices with it.
+    return get_ctx(request).templates.TemplateResponse(request, "_edit_check.html", context)
 
 
 def _pct(value: float, whole: float) -> str:

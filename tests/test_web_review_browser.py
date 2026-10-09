@@ -26,6 +26,12 @@ from collections.abc import Iterator
 import pytest
 
 from a11y_stem.core.types import ConversionOutput
+from a11y_stem.web.routes.review import (
+    BOLD_TEXT_WORDS,
+    OTHER_WORDS,
+    PLAIN_TEXT_WORDS,
+    REJECT_WORDS,
+)
 from a11y_stem.web.views import FIX_STATUS_LABELS, REVIEWER_ACCEPTED_LABEL
 from fixtures.web.support import ALICE, WebEnv, make_pdf
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
@@ -41,8 +47,9 @@ sync_api = pytest.importorskip("playwright.sync_api")
 LONG_NAME = "Physics_Unit_2_Kinematics_Lecture_Notes_With_Worked_Examples_Fall_2026_FINAL_v3.pdf"
 NARROW = {"width": 320, "height": 640}
 WIDE = {"width": 1280, "height": 900}
-# "Needs review", "Rejected: original kept", ..., "Accepted by you"
-STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL}
+# "Needs review", "Kept as an image by you", ..., "Accepted by you"
+REJECTED = [*REJECT_WORDS.values(), BOLD_TEXT_WORDS, PLAIN_TEXT_WORDS, OTHER_WORDS]
+STATUS_WORDS = {*FIX_STATUS_LABELS.values(), REVIEWER_ACCEPTED_LABEL, *(w.state for w in REJECTED)}
 
 
 def wide_equation() -> str:
@@ -149,7 +156,7 @@ def walk_states(page, site, job: str, check) -> None:
     assert "Your edit passed the required checks" in page.locator("#review-progress").inner_text()
     check("just edited")
 
-    page.get_by_role("button", name="Reject figure 1", exact=True).click()
+    page.get_by_role("button", name="Keep without a description (figure 1)", exact=True).click()
     page.wait_for_url(f"{url}#item-*")
     check("just rejected")
 
@@ -303,12 +310,21 @@ def test_every_button_names_the_fix_or_group_it_acts_on(site, browser, job):
     context.close()
     duplicates = [name for name, n in Counter(names).items() if n > 1]
     assert not duplicates, duplicates
+    # "Reject" is named for what it does (UX review MF14), with the item it acts on.
+    rejects = {
+        "equation 1": "Keep as image",
+        "equation 2": "Keep as image",
+        "figure 1": "Keep without a description",
+    }
     for item in ("equation 1", "equation 2", "figure 1", "heading 2", "heading 5"):
-        assert f"Save edit to {item}" in names and f"Reject {item}" in names
+        reject = rejects.get(item, r"Make (bold|plain) text")
+        assert f"Save edit to {item}" in names
+        assert [n for n in names if re.fullmatch(rf"{reject} \({item}\)", n)], (item, names)
     assert "Accept equation 1" in names
     assert "Accept equation 2" not in names  # failed: nothing to accept
     assert {"Accept all 3 remaining headings", "Accept these equations"} <= set(names)
     assert not {"Accept", "Reject", "Save edit"} & set(names)  # never a bare verb
+    assert not [n for n in names if n.startswith("Reject")]
 
 
 def test_every_control_has_a_visible_label(site, browser, job):
@@ -379,6 +395,8 @@ def test_bulk_accept_and_decisions_work_without_javascript(site, browser, job):
     group = page.locator("#group-headings")
     assert "Accepted 3 headings." in group.inner_text()
     assert group.get_by_role("button", name=re.compile("^Accept all")).count() == 0
-    page.locator("#fix-p3-e1").get_by_role("button", name="Reject figure 2").click()
+    page.locator("#fix-p3-e1").get_by_role(
+        "button", name="Keep without a description (figure 2)"
+    ).click()
     assert page.url == f"{url}#item-p3-e2"
     context.close()

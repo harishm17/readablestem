@@ -99,7 +99,9 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond two renders in progress for one person, 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`); with `equations`, `figures`, `tables` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` (the job's `result_version` the page was made from) refuses a form from a stale tab |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`); with `equations`, `figures`, `tables` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
+| POST `/jobs/{id}/review/{element_id}/check` | owner | The checks Save edit would run, on the LaTeX being typed (htmx, after a 0.6 s pause): an HTML fragment, nothing stored; 204 when signed out |
+| POST `/jobs/{id}/undo` | owner | Undo the job's last review write, from the page that write drew (its `version` must be the job's) |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
 | GET, POST `/jobs/{id}/feedback` | owner | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
@@ -573,10 +575,13 @@ From top to bottom:
 Code: `web/routes/split.py` (the review screen, page images, marks), `web/queue.py` (the
 decisions, numbered, in order), `web/compare.py` (what differs in an equation, crop
 geometry), `web/page_images.py` and `web/pdf_probe.py` (rendering in a child process),
-`web/routes/review.py` (the decision POST and the list view), `web/review.py` (rules:
-order, eligibility, validation, table edits, the stale-tab guard), `web/table_card.py`
+`web/routes/review.py` (the decision POST, Undo and the list view), `web/review.py` (rules:
+order, eligibility, validation, table edits, the review version), `web/edit_check.py` (an
+edit checked like a proposal), `web/speech_diff.py` (where the readings differ),
+`web/return_to.py` (back to the decision after signing in again), `web/table_card.py`
 and `templates/_table_card.html` (the table card), `web/messages.py` (what each code
-means). Tests:
+means). Tests: `tests/test_web_review_ux.py` and
+`tests/test_web_review_ux_browser.py` (the fixes from the UX review: below),
 `tests/test_web_review_split.py` (the screen, deciding, older results),
 `tests/test_web_review_tables.py` (the table card in every tier, its decisions and
 edits, the stale-tab guard) and `tests/test_web_review_tables_browser.py` (axe at 1280
@@ -635,16 +640,29 @@ the results".
   The proposal is drawn in Latin Modern Math (served from `static/vendor/fonts`, see
   its README), the OpenType math font of the family LaTeX PDFs are set in: in the
   browser's default math font a plain omega is as heavy as a bold Computer Modern one.
-  Accept and Reject, with "Edit the LaTeX" folded (open when there is no proposal or an
-  error). When the proposal *changes the meaning* (a "Yes" in the table), the fix comes
-  first: a one-click **Use bold ω** (`compare.suggest_fix`: the proposal's LaTeX with
+  Under them, two readings: "Read aloud roughly as: …" (the proposal's speech text) and
+  "From your PDF a screen reader gets: …" (the PDF's own text layer, `Element.text`:
+  what a screen reader reads from the PDF as it is; "nothing here" when the PDF has no
+  text for the equation). Like everything on the review screen, it is shown only to the
+  document's owner. When the checks found a difference, the PDF's text gets a reading of
+  its own, made by the same speech rules, and the words where the two readings differ
+  are marked in both (`web.speech_diff`; UX review BW12): "**omega**" against "**bold
+  omega**", with a line that says what the marks are. Only symbols are compared (letters
+  with their style, numbers, signs and relations), never the words that carry structure
+  ("to the power", "the fraction … over"), which the flat text layer cannot have; a
+  style the text layer cannot carry is never marked, and multiplication and division
+  style are left out as the checks leave them out. The marks are `<mark>` (bold,
+  underlined, the decision tint), so they do not rest on colour.
+  Accept and **Keep as image**, with "Edit the LaTeX" folded (open when there is no
+  proposal or an error). When the proposal *changes the meaning* (a "Yes" in the
+  table), the fix comes first: a one-click **Use bold ω** (`compare.suggest_fix`: the proposal's LaTeX with
   only that letter's style changed, `\boldsymbol` for Greek, `\mathbf` for an upright
   Latin letter, `\mathbb`/`\mathcal`/`\mathfrak` for a lost letter style, or the bold
   taken off; posted as an edit, so it goes through the same checks, and offered only
   when those checks pass and the same comparison then finds no meaning-level
   difference), the edit box open, and Accept as the secondary **Accept anyway**.
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
-  Accept, Save edit and Reject. With long descriptions on (docs/steps.md), a chart's
+  Accept, Save edit and **Keep without a description**. With long descriptions on (docs/steps.md), a chart's
   data table comes right under the image, as students will get it (`table_html`, in a
   box that scrolls sideways and takes focus, captioned "Data read from Figure 1; the
   values are approximate" when its values were read from the image, which is why such
@@ -674,18 +692,131 @@ the results".
   for all of them ("Change all 11: Keep as headings at level 3"; `scope=all`, so the
   group decision acts on every heading of the group, decided or not, and leaves alone
   the ones already that way).
-- *Single heading*: its band of the page, text and level, a level select.
+- *Single heading*: its band of the page, text and level, a level select, Accept and
+  **Make bold text** (or **Make plain text**, when the line is not bold in the PDF).
 - *Table* (below, "The table card").
+
+**"Reject" is named for what it does** (UX review MF14), per kind
+(`routes/review.py reject_words`): "Keep as image" for an equation, "Keep without a
+description" for a figure, "Keep as image" for a table, "Make bold text" or "Make plain text" for a heading, "Keep the
+original" otherwise. A line under the buttons, tied to the button by
+`aria-describedby`, says what that means for students ("Keep as image: Students see a
+picture of the original; screen readers say only “Equation not converted”."), and the
+notice after it and the item's state say the same in other words ("Kept as an image by
+you"). The action posted is still `reject`; stored results, ops counts and the output
+are unchanged.
 
 "Details for this item" (folded) keeps the confidence, every failed check with its
 sentence and code. Previous and next decision links close the card. After Accept, Save
-edit or Reject the form redirects (303) to the next decision still open after this one
-(`queue.next_open`, wrapping round), or to the done state: "All decisions made" with
-**Download the accessible HTML**. There the decision's heading takes focus (`autofocus`
-on the `tabindex="-1"` heading, which works without JavaScript; no URL fragment, which
-would cancel autofocus) and is described by a status line above it: "Equation 1:
-Accepted. 2 decisions left." A refused edit comes back on the same decision (422) with the
-error summary and the field open.
+edit or the "Reject" button the form redirects (303) to the next decision still open
+after this one (`queue.next_open`, wrapping round), or to the done state: "All decisions
+made" with **Download the accessible HTML**. There the decision's heading takes focus
+(`autofocus` on the `tabindex="-1"` heading, which works without JavaScript; no URL
+fragment, which would cancel autofocus) and is described by a status line above it:
+"Equation 1: Accepted. 2 decisions left." The page title starts with the position
+("Decision 2 of 3: Review …"). A refused edit comes back on the same decision (422) with
+the error summary and the field open.
+
+**Undo** (MF14). The status line after a decision has an **Undo** button (one Shift+Tab
+from the heading that took focus). It puts back every fix the job's last review write
+changed, from the `before` snapshot its `ReviewEdit` stored (status, proposal, checks and
+`reviewed`; `web.review.undo_last`), re-renders the HTML once and is a write of its own
+(counted, recorded as `undo` ReviewEdits), then lands on the item again ("Undone. It is
+waiting for your decision again."). It undoes only "what I just did": the form carries
+the version that write made, so a decision made since (in another tab) refuses it
+("Nothing was undone: this document changed after this page was opened."), and an undo is
+never offered for an undo. Edits stored before snapshots held the checks cannot be
+undone, so Undo is not offered for them. The list view offers "Undo the last decision" the
+same way.
+
+**Your decisions apart** (MF14) **and lines that name their item** (MF15). Below the
+optional checks, "Your decisions (N)" (folded) lists what the reviewer decided, in the
+queue's order, then any other item they changed: "Equation 1, page 1 *ω* Edited by you.",
+"Repeated heading, 3 times “Teacher Support” All 3 were made bold text." Each line of
+both folded lists says what the item is, not only its number: a heading's words, the
+start of the alt text (60 characters), or the equation itself, small (re-serialised
+MathML). The list view splits "Accepted or decided" the same way into "Your decisions"
+and "Accepted automatically", and its folded summary lines name the item too.
+
+**Edits are checked like proposals** (MF3; `web/edit_check.py`). Save edit used to run
+only the LaTeX and MathML checks, so "bold ω" typed as words (read "b o l d omega"), or a
+plain ω where the PDF has a bold one, was saved without a word and the warning that asked
+for the decision went away. Now an edit gets what the equation step runs on a proposal:
+the same cleaning, the LaTeX validators, the conversion, the MathML checks, the spoken
+version, and the cross-checks against the PDF's own text (letters, digits and Greek
+letters; letter styles, such as a vector's bold; signs and relations), with the step's
+check names and codes. What fails is said in plain words, in three kinds:
+
+- *cannot be used* (an error-level check: an unknown command, unbalanced braces, LaTeX
+  that does not convert): never saved; the message names the problem without codes
+  ("Your LaTeX was not saved. It has one more { than }: add the missing }.", "\omegaa is
+  not a command this tool supports");
+- *differs from the PDF where that changes the meaning* (the codes that make a proposal a
+  required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`,
+  `sign_mismatch`): not used. The card says what differs, in the compare table's words
+  ("The ω is bold in the PDF (a vector) but plain in your edit."), and offers **Use my
+  edit anyway** (the PDF's text is sometimes wrong). Choosing it saves the edit with the
+  failed checks kept on the fix, and its `ReviewEdit` records `"anyway": true`;
+- *small notes* (a cosmetic style, no spoken version): saved, and listed.
+
+Saving the LaTeX, alt text or level the item already has is refused too ("Nothing
+changed. Choose Accept to keep it as it is, or change the LaTeX first."), so it is never
+recorded or counted as a correction. (Saving a rejected item's proposal unchanged puts it
+back, as before.)
+
+With JavaScript, the LaTeX is checked while it is typed: htmx posts it to
+`/jobs/{id}/review/{element_id}/check` after a 0.6 s pause (`hx-sync` drops a request
+overtaken by the next), and the server answers with a fragment (`_edit_check.html`): the
+edit as it would look, roughly how it is read aloud, and the same three kinds of finding.
+One short sentence goes into the field's polite live region ("Your LaTeX differs from the
+PDF where it changes the meaning. The problem is listed below."), which also describes
+the field, so a screen reader hears the state, not the whole list. The route stores and
+logs nothing but the request line; signed out it answers 204 and leaves the page alone.
+Save edit runs the same function, so the two never disagree.
+
+**Stale tabs** (MF12). Every review write (a decision, a group or bulk decision, Undo)
+counts itself on the job, inside its transaction after the row is locked
+(`web.review.bump_result_version`, `jobs.result_version`), and every review form, in both
+views, carries the number its page was drawn at (`version`). A form drawn before the last
+write (a tab left open while the document was changed in another one) is refused with a
+409, nothing applied: the decision is shown as it is now, with "Your choice was not
+saved. This document was changed in another tab or window after this page was opened. …
+Equation 1 is now: accepted by you." and a **Reload this page** link (by GET; reloading
+the POST would only send it again). What was typed stays in the field. The notice takes
+focus, like the error summary. A form without the field (a page from before this release,
+a script) is not refused: the guard is for tabs, not a lock.
+
+**When the session ends** (MF19; `web/return_to.py`). A session ends when the reviewer
+signs out on another device (that ends every session of the account) and after 7 days.
+A decision posted then used to give "This form has expired" or a bare 401, and sign-in
+always went to My documents. Now:
+
+- a page asked for while signed out is remembered, and signing in goes back to it
+  (`auth.finish_login`), so a deep link to a decision survives sign-in;
+- a decision (or Undo) posted while signed out answers "Please sign in again. Your session
+  ended, so this was not saved. … Sign in again to come back to the same decision.", with
+  the sign-in buttons on the page; signing in lands on that decision. When the cookie
+  itself expired (its CSRF token with it) the page is the same, not "This form has
+  expired". A form whose token is from before the reviewer signed in again (in another
+  tab) says the form has expired and links **Back to the decision**;
+- with JavaScript, what is typed into a decision's fields is kept as a draft in this
+  tab's `sessionStorage`, under the form's address (ids only), and put back when that
+  decision is shown again, with a line under the field ("What you typed before is back
+  here. It is not saved yet.") that the field's description includes. The sign-in page
+  for that form says the text is kept. A draft never leaves the browser and is gone when
+  the tab is closed; it is forgotten when the decision is saved, when the page is drawn
+  with that text anyway, and on Sign out in that tab.
+
+Only pages of this app are remembered (`/app`, `/admin`, a job's page, review screen,
+list view or HTML, with a query of ids and numbers; one pattern), so it is not an open
+redirect: `//elsewhere.example`, images, stylesheets and anything else are neither
+remembered nor followed. It lives in the signed session cookie, which signing in clears.
+The server never sends typed text back on these pages.
+
+**Keyboard** (BW11). "Skip to the decision" is the second Tab stop (after "Skip to main
+content"); it moves focus to the decision's heading, and from there the first control of
+the decision is at most three Tab stops on (five from the top of the page). Focus after a
+decision, an error and a refused stale write is described above.
 
 **Optional checks (M)**, folded, below the decision: each a link ("Equation 2, page 1")
 and a short note ("A letter's style differs slightly; the meaning is the same."; for a
@@ -784,17 +915,18 @@ an image is a decision the screen shows and the job can be done. The card has:
 - **The grid read from the PDF** (folded), when layout built one (`Element.table`) that
   has no structural problem and differs from the proposal: the grid, and **Use this grid
   instead**;
-- **Accept** and **Reject** ("Reject keeps the image of the table, marked “not
-  converted”."). A table kept as an image (`table_not_rebuilt`, no proposal) has **Use
-  the grid read from the PDF**, when there is one (shown in the proposal's place, "Read
-  from the PDF's own text and lines, without a model"), and **Keep the image**, which
-  rejects it: the document keeps the flagged image with its "not converted" note.
+- **Accept** and **Keep as image** (Reject, named for what it does: "Students see a
+  picture of the table, marked “not converted”; screen readers get no table to read.").
+  A table kept as an image (`table_not_rebuilt`, no proposal) has **Use the grid read
+  from the PDF**, when there is one (shown in the proposal's place, "Read from the PDF's
+  own text and lines, without a model"), and **Keep as image**, which rejects it: the
+  document keeps the flagged image with its "not converted" note.
 
 Every change to a table goes through the same route as other decisions (`change` is
 `cell`, `headers` or `use_local`), is stored as `edited` with a `ReviewEdit` and
 re-renders the HTML. After one the reviewer stays on the table, which is shown as it is
-now, with "Go on to decision N" when it was the last change; Accept and Reject move on
-as for other kinds. The rules (`web.review`, "tables"):
+now, with "Go on to decision N" when it was the last change; Accept and Keep as image
+move on as for other kinds. The rules (`web.review`, "tables"):
 
 - *Headers.* Ticking a box makes the first row's cells column headers (`header_rows`
   1), or the first column's body cells row headers (`header_cols` 1); unticking makes
@@ -822,27 +954,19 @@ table as it is now (`web.review.table_checks`, which runs
 `pipeline.table_step.table_checks(grid, element)`: structure and headers, agreement
 with the grid read from the PDF, the cells' words, the maths cells). So a finding stays
 on the card until the cell is put right, and a failed one is a warning on the change
-("1 check gives a warning"), never a refusal. Until the table step has that function
-there are none. Nothing about a table
-is logged but codes: the `review` event gets `change=cell|headers|use_local`.
+("1 check gives a warning"), never a refusal. Nothing about a table is logged but
+codes: the `review` event gets `change=cell|headers|use_local`.
 
 With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
 the cell list. In the list view a table card shows its crop, the proposal (or the grid
-read from the PDF) and Accept, Reject or Keep the image, Use the grid read from the PDF;
+read from the PDF) and Accept, Keep as image, Use the grid read from the PDF;
 headers and cells are changed on the review screen ("open it on the review screen").
 
-**Stale tabs.** Every review write moves `jobs.result_version` on, in the same
-transaction, with the job row locked (`web.review.guard_result_version`, called by every
-write path in `routes/review.py`: one fix, a heading group, bulk accept). The table
-card's forms send the version their page was made from (`version`, read from
-`JobView.result_version`); one made before another tab or window changed the review is
-refused with a 422 and nothing saved: "Your change was not saved: this item was changed
-in another tab or window after this page was opened, and what you see now is the latest
-version." The page that says so is the latest version, and offers **Reload table 1**.
-A form without the field (older pages, scripts) is not checked. Without it a cell
-changed by its place in the grid could land on another cell once a tab elsewhere had
-changed the table. The other cards will send it too (the review-screen UX work), with
-the same helper.
+**Stale tabs.** The table card's forms carry the review version like every other form
+("Stale tabs" above, one guard: `web.review.is_stale` and `bump_result_version`). A
+stale table form gets the same 409 page; a cell being changed opens again with what was
+typed. Without the guard a cell changed by its place in the grid could land on another
+cell once a tab elsewhere had changed the table.
 
 **Accept never drops an edit.** Accept and Save edit share a form; Accept keeps the
 proposal and never used the fields, so a correction typed and then accepted out of habit
@@ -852,16 +976,17 @@ edit to use your change, or undo it to accept the proposal."), the change kept i
 field and Save edit made the main button; nothing is saved. Fields the form did not send
 are not compared (both views).
 
-**JavaScript** (`static/app.js`) only enhances: it scrolls the page region so the
-selected mark is in its visible box, working inside the region only (stacked, the region
-starts below the window, and a window term used to scroll it to its end; side by side it
-also moves the window when the mark is near the foot of a page, never so far that the
-decision's heading leaves the window), asks once more after 1.5 s for an image that was
-refused for a moment and only then says the page image could not be shown, makes "Save
-edit" the main button once a field of the decision is changed, and offers keyboard
-shortcuts: N next decision, P previous, A accept, E go to the edit field. They are off
-until turned on ("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys
-with Ctrl, Alt or Meta, and never act while focus is in a field.
+**JavaScript** (`static/app.js`, and htmx for the live check) only enhances: it scrolls
+the page region so the selected mark is in its visible box, working inside the region
+only (stacked, the region starts below the window, and a window term used to scroll it
+to its end; side by side it also moves the window when the mark is near the foot of a
+page, never so far that the decision's heading leaves the window), asks once more after
+1.5 s for an image that was refused for a moment and only then says the page image could
+not be shown, makes "Save edit" the main button once a field of the decision is changed,
+keeps a draft of what is typed in this tab (above), and offers keyboard shortcuts: N next
+decision, P previous, A accept, E go to the edit field. They are off until turned on
+("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys with Ctrl, Alt
+or Meta, and never act while focus is in a field.
 
 ### The list view (`/jobs/{id}/review/list`)
 
@@ -891,7 +1016,10 @@ the list's next card.
    and their card says "Optional check (worth a look; it does not hold up the document)"
    instead of "nothing to do unless you disagree" (`core.triage.second_check_note`;
    tests in `tests/test_web_second_check_review.py`).
-3. **Accepted or decided**: everything else, folded.
+3. **Your decisions** and **Accepted automatically**: everything else, folded, what the
+   reviewer decided apart from what was accepted for them (UX review MF14). Each folded
+   summary line names its item: "Heading 2 “Displacement Problems”, page 1: Accepted
+   automatically", an equation shown small.
 
 A table of contents at the top links to each section and kind group with its counts.
 Every fix is numbered within its kind in reading order ("Equation 3"), so a number stays
@@ -930,17 +1058,20 @@ decision. A group decision posts to the same route as a single one, with the gro
   and the current count written out (no JavaScript), and a "decorative" box; for
   headings, the text and a level select;
 - "Save edit", "Accept" (only when the proposal passed every error-level check) and
-  "Reject" buttons whose accessible names include the fix ("Reject figure 2").
+  the "Reject" button named for what it does, as on the review screen, each with an
+  accessible name that includes the fix ("Keep without a description (figure 2)").
 
-A decision is one transaction: lock the job row, apply the decision (`web/review.py`),
-clean and validate edits the way model output is (`equation_step.clean_latex`, then
-`pipeline.validate`'s `check_latex`, `safe_latex_to_mathml`, `check_mathml`; alt text
-through `validate.clean_alt`, then `check_alt`), store a `ReviewEdit`, set the fix status
-(`accepted`, `edited`, `rejected`) and `Fix.reviewed` in `result_json`, re-render the
-job's HTML with `pipeline.assemble.render_html` and re-run its static checks
-(`result_json.html_checks`, listed on the job page). A failed check re-shows the page
-(422) with the reviewer's input as typed and an error summary linked to the field;
-nothing is saved.
+A decision is one transaction: lock the job row, refuse a form from an out-of-date page
+(the stale-tab guard above), apply the decision (`web/review.py`), clean and check edits
+the way model output is (LaTeX through `web.edit_check`, the equation step's own checks
+against the PDF included; alt text through `validate.clean_alt`, then `check_alt`), store
+a `ReviewEdit` (its `after` snapshot also records the review version the write made, so
+Undo can find the write's edits), set the fix status (`accepted`, `edited`, `rejected`)
+and `Fix.reviewed` in `result_json`, re-render the job's HTML with
+`pipeline.assemble.render_html`, re-run its static checks (`result_json.html_checks`,
+listed on the job page) and count the write (`jobs.result_version`). A failed check
+re-shows the page (422) with the reviewer's input as typed and an error summary linked to
+the field; nothing is saved.
 
 - **Accept by a reviewer.** It keeps the status `accepted` (the proposal is used as it
   is) and sets `Fix.reviewed`, so the job page counts it under "Reviewed by you", not
@@ -1061,8 +1192,8 @@ README) and configured to need no `eval`, inject no `<style>` and keep no histor
 Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
-enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts;
-see "Review screen"). The review screen's per-job geometry comes as
+enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts,
+drafts kept in the tab; see "Review screen"). The review screen's per-job geometry comes as
 a stylesheet from our origin (`marks.css`), not as inline styles.
 
 ## Accessibility of the app itself
@@ -1110,7 +1241,12 @@ review screen at 1440 and 390 CSS px, checks 320 CSS px reflow with and without 
 spacing, measures every mark (at least 24 x 24 CSS px), completes a whole review with
 JavaScript off, checks that focus lands on the next decision's heading after each
 decision, that shortcuts are opt-in and never fire while typing, and that the marks keep
-their colours in forced-colours mode.
+their colours in forced-colours mode. `test_web_review_ux_browser.py` does the same at
+1280 and 320 CSS px for the states the UX review fixes added (the readings marked, the
+live check, "Use my edit anyway", the notice with Undo, your decisions, a stale write
+refused, the page after the session ended, a draft put back) and checks the keyboard
+flow: the first control of the decision within five Tab stops, Undo one Shift+Tab from
+the heading that takes focus after a decision.
 
 Contrast of the review screen's own colours (`tests/test_web_review_split.py` computes
 them from `app.css`): mark outlines on the white page image at least 3:1 (decision
@@ -1171,6 +1307,7 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
 | `uv run pytest -m browser tests/test_web_job_page_browser.py` | Chromium: the job page in each state (axe at 1280 and 320 px, reflow with text spacing, htmx steps outside the live region, draft and language without JavaScript, the one-click download) |
 | `uv run pytest -m browser tests/test_web_ux_browser.py` | Chromium: My documents, the posting help, the questions after a download, the deleted-document page and the usage tables (axe at 1280 and 320 px, reflow with text spacing, no-JS), local times, the upload check, the list refreshing with focus kept |
+| `uv run pytest -m browser tests/test_web_review_ux_browser.py` | Chromium: the UX review fixes (axe at 1280 and 320 px in each new state, reflow, keyboard flow, the live check, stale tab, Undo and "Use my edit anyway" without JavaScript, drafts kept across a session ending) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

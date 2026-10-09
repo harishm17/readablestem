@@ -211,7 +211,8 @@ def test_page_puts_decisions_first_then_optional_checks_then_the_rest(tri):
     page = page_of(tri)
     assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page
     assert '<h2 id="optional-checks-title">Optional checks (2)</h2>' in page
-    assert '<h2 id="decided-title">Accepted or decided (2)</h2>' in page
+    assert '<h2 id="decided-title">Your decisions (0)</h2>' in page
+    assert '<h2 id="accepted-title">Accepted automatically (2)</h2>' in page
     # The equation decision, the group card (its headings folded inside), then the
     # optional checks, then the accepted ones.
     assert cards(page) == ["p2-e2", *MEMBERS, "p1-e2", "p2-e1", "p3-e1", "p1-e0"]
@@ -245,7 +246,12 @@ def test_optional_checks_are_folded_and_say_what_the_note_is(tri):
     assert "<summary>Show the 2 optional checks</summary>" in optional
     summary = re.search(r'<summary id="fix-title-p1-e2">(.*?)</summary>', optional, re.S)
     assert summary is not None
-    assert summary.group(1).startswith("Equation 1, page 1: A letter&#39;s style differs")
+    # It names its item: the equation itself, small, then the page and the note.
+    assert re.match(
+        r'Equation 1 <span class="item-math"><math [^>]*>.*</math></span>, page 1: '
+        r"A letter&#39;s style differs",
+        summary.group(1),
+    )
     assert "<strong>Note:</strong> A letter&#39;s style differs from the PDF only" in optional
     assert "Optional check (nothing to do unless you disagree):" in optional
     # Still editable: save or reject, no Accept (it is accepted already).
@@ -327,7 +333,7 @@ def test_deciding_one_heading_of_a_group_leaves_the_rest_as_a_group(tri):
     card = group_card(page)
     # Working through them one by one: their cards stay unfolded, with a link back.
     assert '<details class="done-group group-members" open>' in card
-    assert "Heading 3 on page 2: Rejected." in card
+    assert "Heading 3 on page 2: Made bold text, not a heading." in card
     assert "appears 3 times as a bold line in the body text size (2 still waiting)." in card
     assert "Apply to all 2" in card and "Make all 2 bold text" in card
     assert '<h2 id="needs-decision-title">Needs your decision (2)</h2>' in page

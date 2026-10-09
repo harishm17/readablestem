@@ -85,7 +85,7 @@ def test_the_card_shows_the_table_the_description_and_why_it_asks(card):
     assert '<input type="checkbox" id="datatable-p1-e6" name="remove_data_table"' in body
     assert "Remove the data table" in body
     assert "were read from the image, not from text in the PDF" in text_of(body)
-    assert "Accept" in body and "Reject" in body
+    assert "Accept" in body and "Keep without a description" in body  # Reject, named
 
 
 def test_a_figure_without_them_shows_neither(tmp_path):

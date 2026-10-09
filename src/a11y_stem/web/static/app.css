@@ -559,6 +559,32 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .page-frame .box:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); z-index: 2; }
 .page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 2px; z-index: 2; }
 
+/* Review screen fixes from the UX review (ux-b): Undo in the notice after a decision, the
+   live check of an edit, the two readings with the symbols that differ marked, lists
+   that name their items, a draft put back after signing in again. Existing colours only. */
+.decision-notice { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+.decision-notice p { margin: 0; }
+.undo-form { margin: 0; }
+.undo-form .link-button { min-height: 24px; min-width: 24px; font-weight: 600; }
+.live-status { margin: 0.35rem 0 0; font-size: 0.95rem; }
+.live-check:empty { display: none; }
+.live-check { margin-top: 0.4rem; padding: 0.5rem 0.7rem; background: var(--panel); border-radius: var(--radius); }
+.live-check .cmp-label { margin-top: 0; }
+.live-results { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.kept-draft { margin: 0.35rem 0 0; padding: 0.35rem 0.6rem; border-left: 4px solid var(--accent); background: var(--panel); }
+mark.said-diff {
+  background: var(--tint-required); color: var(--text); font-weight: 700; padding: 0 0.1em; border-radius: 2px;
+  text-decoration: underline 2px var(--mark-required); text-underline-offset: 0.2em;
+}
+.text-layer { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; color: var(--text); }
+.said-key { font-size: 0.9rem; margin: 0.25rem 0 0; }
+.item-math {
+  display: inline-block; max-width: 100%; overflow: hidden; vertical-align: middle; white-space: nowrap;
+  font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math;
+}
+.item-math math { display: inline; display: inline math; font-size: 1.05em; }
+.decided-box { margin-top: 0.75rem; }
+
 @media (forced-colors: active) {
   /* The legend keys show what the marks look like, and the marks keep their colours. */
   .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
@@ -623,7 +649,6 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .table-fieldset { border: 0; padding: 0; margin: 0 0 0.6rem; min-width: 0; }
 .table-fieldset legend { font-weight: 600; padding: 0; margin-bottom: 0.25rem; }
 .table-fieldset .checkbox-field { margin: 0.35rem 0; }
-.stale-line { margin: 0 0 0.5rem; }
 .table-continue { margin: 0.75rem 0 0; font-weight: 600; }
 /* ===================================================================== ux-a
    Pages outside the review screen and the job page: My documents as a to-do list, the
