@@ -51,6 +51,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
 | Figure | `<figure><img alt="..."><figcaption>` | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
+| Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables") | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
 A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assembly:
 
@@ -72,6 +73,24 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
+
+## Tables
+
+`pipeline/table_html.py` (`render_table`) writes every data table: the rebuilt tables
+and, later, the data tables of charts. It follows the W3C WAI tables tutorial:
+`<caption>` only when the PDF had a "Table N" caption, the header rows in `<thead>`,
+`<th scope="col">` (`"colgroup"` with `<colgroup>` elements for a spanning header in the
+first row), `<th scope="row">`, a body split into one `<tbody>` per section with
+`scope="rowgroup"` on a full-width section heading, and `headers`/`id` only when scope
+cannot say which headers apply (a row header after data cells, a column header below the
+header rows, or nested column headers whose spans cross). Cell text and captions are
+escaped; a maths cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
+broken grid (`core.types.grid_problems`) still renders as a rectangular table.
+
+`pipeline/assemble_tables.py` wraps a rebuilt table in a box that scrolls sideways on a
+narrow screen and takes focus (named by the caption, else "Table"), and keeps the image of
+any table that was not rebuilt. Table CSS is added only to documents with a rebuilt
+table, so other documents are byte-for-byte what 0.3.0 wrote.
 
 ## Lists
 
@@ -187,8 +206,9 @@ The assembler replaces each marker with the equation's MathML, or with the flagg
 
 ## MathML is rebuilt, never pasted
 
-MathML in the output is re-serialised by `assemble.sanitize_mathml`, never inserted as a
-string (rule 2 of the architecture doc):
+MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also importable as
+`assemble.sanitize_mathml`; tables use the same function), never inserted as a string
+(rule 2 of the architecture doc):
 
 1. Parse with `defusedxml` (no DTDs, entities or external references). A parse error means
    "not converted".

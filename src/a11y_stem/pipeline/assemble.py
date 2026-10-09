@@ -18,14 +18,21 @@ What the output looks like and why is in docs/output.md. In short:
 Security (rule 2 of docs/design/beta-architecture.md): all document and model text is
 escaped with `html.escape`. MathML is never pasted as a string: `sanitize_mathml` parses
 it with defusedxml and re-serialises an allowlisted tree of presentation elements and
-attributes. Text this module writes itself carries the `AUTHORED_CLASS` class so the
-wording check in `html_checks` can tell it apart from the instructor's text.
+attributes (both live in `safe_html`, shared with `table_html`). Text this module writes
+itself carries the `AUTHORED_CLASS` class so the wording check in `html_checks` can tell
+it apart from the instructor's text.
+
+Extension points (docs/design/content-features.md): TABLE elements are written by
+`assemble_tables.render_table_element`, and inline text (with its markers, and later its
+links, colours and language) by `inline_text.render_inline_text`, so features that change
+those land in their own modules. CSS a feature needs is added only to documents that use
+it (`_Renderer.add_style`), so documents without those features are written exactly as
+before.
 """
 
 from __future__ import annotations
 
 import base64
-import html
 import re
 from collections import Counter
 from dataclasses import dataclass, field
@@ -38,11 +45,18 @@ import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
 from a11y_stem import __version__
-from a11y_stem.core.types import INLINE_MARKER, Element, Fix, Kind, Status
-
-Display = Literal["block", "inline"]
-
-MATHML_NS = "http://www.w3.org/1998/Math/MathML"
+from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
+from a11y_stem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, Status
+from a11y_stem.pipeline import assemble_tables, inline_text
+from a11y_stem.pipeline.safe_html import MATHML_ATTRIBUTES as MATHML_ATTRIBUTES
+from a11y_stem.pipeline.safe_html import MATHML_ELEMENTS as MATHML_ELEMENTS
+from a11y_stem.pipeline.safe_html import MATHML_NS as MATHML_NS
+from a11y_stem.pipeline.safe_html import MATHML_UNWRAP as MATHML_UNWRAP
+from a11y_stem.pipeline.safe_html import MAX_MATHML_DEPTH as MAX_MATHML_DEPTH
+from a11y_stem.pipeline.safe_html import MAX_MATHML_NODES as MAX_MATHML_NODES
+from a11y_stem.pipeline.safe_html import Display, sanitize_mathml
+from a11y_stem.pipeline.safe_html import escape_text as _escape
+from a11y_stem.pipeline.safe_html import split_tag as _split_tag
 
 # Class on every element whose text this module wrote (notes, labels, the about section).
 AUTHORED_CLASS = "a11y-stem"
@@ -61,7 +75,7 @@ EQUATION_NOTE = (
 FIGURE_NOTE = "This figure has no text description yet. Review it before publishing."
 
 # Fix statuses whose proposal is not used: the original stays, flagged.
-NOT_CONVERTED = frozenset({Status.ABSTAINED, Status.FAILED, Status.REJECTED})
+NOT_CONVERTED = KEPT_ORIGINAL_STATUSES
 
 ABOUT_ID = "about-conversion"
 ABOUT_TITLE_ID = "about-conversion-title"
@@ -70,6 +84,7 @@ KIND_LABELS = {
     Kind.HEADING: "Headings",
     Kind.EQUATION: "Equations",
     Kind.FIGURE: "Figures",
+    Kind.TABLE: "Tables",
     Kind.PARAGRAPH: "Paragraphs",
 }
 STATUS_LABELS = {
@@ -84,21 +99,8 @@ STATUS_LABELS = {
 # the pipeline's automatic acceptance, after it.
 REVIEWER_ACCEPTED_LABEL = "accepted by a reviewer"
 
-_MARKER_OPEN, _MARKER_CLOSE = INLINE_MARKER.split("{id}")
-# One inline-equation marker (`core.types.inline_marker`); group 1 is the element id.
-# Ids never contain spaces, so maths written with these brackets ("⟦a, b⟧") is not one.
-# `run` uses the same pattern for the context text it sends to models.
-INLINE_MARKER_RE = re.compile(
-    re.escape(_MARKER_OPEN)
-    + r"([^\s"
-    + re.escape(_MARKER_OPEN + _MARKER_CLOSE)
-    + r"]{1,64})"
-    + re.escape(_MARKER_CLOSE)
-)
 # BCP 47-ish: "en", "en-US", "zh-Hant-TW". Anything else falls back to "en".
 _LANG = re.compile(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*")
-# C0 controls other than tab/newline/carriage return are HTML parse errors.
-_CONTROL = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
 _REASON = re.compile(r"[a-z0-9_]{1,64}")
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 # An ordered list marker as layout reports it: "3.", "b)", "(iv)".
@@ -107,122 +109,6 @@ _ORDERED_MARKER = re.compile(
 )
 _ROMAN = {"i": 1, "v": 5, "x": 10, "l": 50, "c": 100}
 _PT_TO_CSS_PX = 96 / 72  # a PDF point is 1/72 in; a CSS pixel is 1/96 in
-
-
-# --------------------------------------------------------------------------- MathML
-
-# Presentation MathML kept in the output: MathML Core plus `menclose` (latex2mathml uses
-# it for \boxed and \cancel). Any other element makes the whole equation unusable, so it
-# is shown as the original image instead of as maths with a silent hole in it.
-MATHML_ELEMENTS = frozenset(
-    {
-        "math", "mrow", "mi", "mn", "mo", "mtext", "ms", "mspace", "msub", "msup",
-        "msubsup", "munder", "mover", "munderover", "mmultiscripts", "mprescripts", "none",
-        "mfrac", "msqrt", "mroot", "mstyle", "merror", "mpadded", "mphantom", "mtable",
-        "mtr", "mtd", "menclose",
-    }
-)  # fmt: skip
-# Wrappers replaced by their first child, which is what a browser shows anyway:
-# `semantics` (the rest are annotations) and `maction` (the rest are alternatives).
-MATHML_UNWRAP = frozenset({"semantics", "maction"})
-# Layout attributes only. No href, event handlers, style, class, id or colour.
-MATHML_ATTRIBUTES = frozenset(
-    {
-        "mathvariant", "displaystyle", "scriptlevel", "dir", "form", "fence", "separator",
-        "lspace", "rspace", "stretchy", "symmetric", "maxsize", "minsize", "largeop",
-        "movablelimits", "accent", "accentunder", "linethickness", "width", "height",
-        "depth", "voffset", "notation", "columnalign", "rowalign", "columnspan", "rowspan",
-        "columnlines", "rowlines", "columnspacing", "rowspacing", "frame", "framespacing",
-        "align", "linebreak", "lquote", "rquote",
-    }
-)  # fmt: skip
-_ATTR_VALUE = re.compile(r"[A-Za-z0-9 .%+\-]{0,64}")
-MAX_MATHML_DEPTH = 64
-MAX_MATHML_NODES = 5000
-
-
-class _Unusable(Exception):
-    """MathML that cannot be shown faithfully (unknown element, too deep, too big)."""
-
-
-def _split_tag(tag: str) -> tuple[str, str]:
-    """ElementTree tag "{ns}name" -> (ns, name)."""
-    if tag.startswith("{"):
-        ns, _, name = tag[1:].partition("}")
-        return ns, name
-    return "", tag
-
-
-@dataclass
-class _MathWriter:
-    nodes: int = 0
-    has_text: bool = False
-
-    def text(self, value: str | None) -> str:
-        if not value:
-            return ""
-        if value.strip():
-            self.has_text = True
-        return _escape(value)
-
-    def element(self, node: XmlElement, depth: int) -> str:
-        self.nodes += 1
-        if depth > MAX_MATHML_DEPTH or self.nodes > MAX_MATHML_NODES:
-            raise _Unusable("too deep or too large")
-        if not isinstance(node.tag, str):  # comment or processing instruction
-            return ""
-        ns, name = _split_tag(node.tag)
-        if ns not in ("", MATHML_NS):
-            raise _Unusable("foreign namespace")
-        if name in MATHML_UNWRAP:
-            first = next(iter(node), None)
-            return "" if first is None else self.element(first, depth + 1)
-        if name not in MATHML_ELEMENTS or name == "math":
-            raise _Unusable("element not allowed")
-        return f"<{name}{_attributes(node)}>{self.children(node, depth)}</{name}>"
-
-    def children(self, node: XmlElement, depth: int) -> str:
-        parts = [self.text(node.text)]
-        for child in node:
-            parts.append(self.element(child, depth + 1))
-            parts.append(self.text(child.tail))
-        return "".join(parts)
-
-
-def _attributes(node: XmlElement) -> str:
-    kept = []
-    for key, value in sorted(node.attrib.items()):
-        if key in MATHML_ATTRIBUTES and _ATTR_VALUE.fullmatch(value):
-            kept.append(f' {key}="{_escape(value)}"')
-    return "".join(kept)
-
-
-def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = None) -> str | None:
-    """Re-serialise MathML from an allowlisted tree, or None if it cannot be shown.
-
-    The input comes from a converter fed by model output, or from a reviewer's edit, so
-    it is untrusted. It is parsed with defusedxml (no DTDs, entities or external
-    references), and only allowlisted presentation elements and attributes are written
-    back, with all text escaped. Unknown attributes are dropped; an unknown element
-    rejects the whole equation (the caller then shows the original image). `display`
-    is forced to where the equation is placed; `element_id` becomes the root id.
-    """
-    try:
-        root = SafeET.fromstring(mathml, forbid_dtd=True)
-    except (ParseError, DefusedXmlException, ValueError):
-        return None
-    ns, name = _split_tag(root.tag)
-    if name != "math" or ns not in ("", MATHML_NS):
-        return None
-    writer = _MathWriter()
-    try:
-        inner = writer.children(root, depth=1)
-    except (_Unusable, RecursionError):
-        return None
-    if not writer.has_text:  # nothing a screen reader could speak
-        return None
-    id_attr = f' id="{_escape(element_id)}"' if element_id else ""
-    return f'<math display="{display}"{id_attr}>{inner}</math>'
 
 
 # --------------------------------------------------------------------------- width
@@ -302,10 +188,6 @@ def estimate_width_em(mathml: str) -> float:
 
 
 # --------------------------------------------------------------------------- helpers
-
-
-def _escape(text: str) -> str:
-    return html.escape(_CONTROL.sub("", text), quote=True)
 
 
 def _clean_lang(lang: str) -> str:
@@ -559,6 +441,13 @@ class _Renderer:
     placed: set[str] = field(default_factory=set)  # equations rendered inside text
     flagged: set[str] = field(default_factory=set)  # ids shown as originals
     outline: Outline = field(default_factory=Outline)
+    # CSS a feature added for this document (`add_style`), by name.
+    styles: dict[str, str] = field(default_factory=dict)
+
+    def add_style(self, name: str, css: str) -> None:
+        """Add CSS to this document's stylesheet, once per name. Features add their CSS
+        only when a document uses them, so other documents are written as before."""
+        self.styles.setdefault(name, css)
 
     # ----- ids and text
 
@@ -575,18 +464,20 @@ class _Renderer:
         claimed = self.claim_id(element_id)
         return f' id="{_escape(claimed)}"' if claimed else ""
 
-    def rich(self, text: str) -> str:
-        """Escaped text with inline-equation markers replaced by maths (or a flag)."""
-        out, pos = [], 0
-        for match in INLINE_MARKER_RE.finditer(text):
-            equation = self.equations.get(match.group(1))
-            if equation is None:
-                continue  # not one of ours: leave the characters as text
-            out.append(_escape(text[pos : match.start()]))
-            out.append(self.inline_equation(equation))
-            pos = match.end()
-        out.append(_escape(text[pos:]))
-        return "".join(out)
+    def rich(self, text: str, element: Element | None = None) -> str:
+        """Escaped text with inline-equation markers replaced by maths (or a flag).
+
+        `element` is given when `text` is that element's stored text, so its links and
+        colour runs can apply (`inline_text.render_inline_text`)."""
+        if element is not None and text != element.text:
+            element = None
+        return inline_text.render_inline_text(
+            text, element=element, equation=self.marker_html, add_style=self.add_style
+        )
+
+    def marker_html(self, element_id: str) -> str | None:
+        equation = self.equations.get(element_id)
+        return None if equation is None else self.inline_equation(equation)
 
     def heading_parts(self, element: Element) -> tuple[int | None, str]:
         return heading_parts(element, self.fixes.get(element.id))
@@ -643,12 +534,15 @@ class _Renderer:
             return "" if element.id in self.placed else self.block_equation(element)
         if element.kind is Kind.FIGURE:
             return self.figure(element)
+        if element.kind is Kind.TABLE:
+            return assemble_tables.render_table_element(element, self.fixes.get(element.id), self)
         return ""
 
     def paragraph(self, element: Element, text: str) -> str:
         if not text.strip():
             return ""
-        return f"<p{self.id_attr(element.id)}>{self.rich(text)}</p>"
+        attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
+        return f"<p{attrs}>{self.rich(text, element)}</p>"
 
     def lists(self, items: list[Element], inside: dict[str, list[Element]] | None = None) -> str:
         """Consecutive list items as nested lists.
@@ -701,8 +595,9 @@ class _Renderer:
                 if style.printed
                 else ""
             )
-            text = self.rich(item.text or "")
-            lis.append(f"<li{self.id_attr(item.id)}>{marker}{text}{inner}</li>")
+            text = self.rich(item.text or "", item)
+            item_attrs = self.id_attr(item.id) + inline_text.passage_attrs(item)
+            lis.append(f"<li{item_attrs}>{marker}{text}{inner}</li>")
         return f"<{style.tag}{attrs}>{''.join(lis)}</{style.tag}>"
 
     def heading(self, element: Element) -> str:
@@ -712,10 +607,12 @@ class _Renderer:
             if element.bold and fix is not None and fix.status is Status.REJECTED and text.strip():
                 # A reviewer said this bold line is a label, not a heading ("Make them
                 # bold text"): it stays bold, as in the PDF.
-                return f"<p{self.id_attr(element.id)}><strong>{self.rich(text)}</strong></p>"
+                attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
+                return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
         level = self.outline.write(level)
-        return f"<h{level}{self.id_attr(element.id)}>{self.rich(text)}</h{level}>"
+        attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
+        return f"<h{level}{attrs}>{self.rich(text, element)}</h{level}>"
 
     def converted_mathml(
         self, element: Element, display: Display, *, with_id: bool
@@ -948,10 +845,11 @@ def render_html(
     `fixes` are matched to elements by id (the first fix for an id wins, as in
     `DocumentResult.fix_for`; later duplicates are ignored, also in the counts). `crops` maps
     element ids to PNG bytes; they are embedded as data: URIs only where an image is
-    shown (figures, and equations that were not converted). `source_note` is plain text
-    for the about section, e.g. an OpenStax attribution. `notice` is plain text shown
-    first in `<main>` as a labelled note, for something every reader must see before
-    the content (the CLI marks offline test runs, whose answers are placeholders).
+    shown (figures, tables kept as images, and equations that were not converted).
+    `source_note` is plain text for the about section, e.g. an OpenStax attribution.
+    `notice` is plain text shown first in `<main>` as a labelled note, for something
+    every reader must see before the content (the CLI marks offline test runs, whose
+    answers are placeholders).
     """
     ordered = sorted(elements, key=lambda e: e.order)
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
@@ -962,6 +860,8 @@ def render_html(
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = renderer.render_all(ordered)
     about = _about_section(list(first_fix.values()), len(renderer.flagged), source_note)
+    # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
+    style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     return "\n".join(
         [
             "<!doctype html>",
@@ -971,7 +871,7 @@ def render_html(
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="a11y-stem {_escape(__version__)}">',
             f"<title>{_escape(_clean_title(title))}</title>",
-            f"<style>\n{STYLE}</style>",
+            f"<style>\n{style}</style>",
             "</head>",
             "<body>",
             "<main>",
