@@ -113,7 +113,10 @@ def test_the_worker_stores_what_review_would_render(site):
 
 def test_an_inline_equation_edited_in_review_stays_in_its_paragraph(site):
     before = site.job(site.job_id).html or ""
-    response = review(site, "p1-e9", action="edit", latex="v = 2 t")
+    # LaTeX that differs from the PDF's own text (this test is about where the output
+    # puts it), so it is saved only with "Use my edit anyway" (web.edit_check).
+    assert review(site, "p1-e9", action="edit", latex="v = 2 t").status_code == 422
+    response = review(site, "p1-e9", action="edit_anyway", latex="v = 2 t")
     assert response.status_code == 303, response.text[:300]
     after = site.job(site.job_id).html or ""
     edited = paragraph(after, "p1-e8")
