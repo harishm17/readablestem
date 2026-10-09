@@ -12,13 +12,15 @@ test_web_review*.py; axe, reflow and keyboard in test_web_review_split_browser.p
 from __future__ import annotations
 
 import re
+from collections import Counter
 from html import unescape
 
 import pytest
+from sqlalchemy import select
 
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.web import page_images
-from a11y_stem.web.db import Job, session_scope
+from a11y_stem.web.db import Job, ReviewEdit, session_scope
 from a11y_stem.web.routes.split import headline
 from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
@@ -128,9 +130,17 @@ def test_the_first_decision_is_the_equation_with_a_same_size_compare(split):
     assert "<caption>What differs</caption>" in table
     row = text_of(section(table, "<tbody>", "</tbody>"))
     assert row == "𝛚 style bold plain Yes"
-    # Accept first, Reject beside it; editing is folded until wanted.
-    assert re.search(r'name="action" value="accept" class="button" data-role="accept">Accept', body)
-    assert '<details class="edit-box">' in body and "Edit the LaTeX" in body
+    # It changes the meaning, so the fix comes first: one button that makes the omega bold
+    # (posted as an edit, its own form), the edit box open, and Accept only "anyway".
+    suggest = section(body, '<form method="post"', "</form>")
+    assert 'class="suggest"' in suggest
+    assert 'name="action" value="edit"' in suggest
+    assert 'name="latex" value="\\boldsymbol{\\omega}"' in suggest
+    assert re.search(r'class="button" data-role="suggest"[^>]*>Use bold ω<', suggest)
+    assert '<details class="edit-box" open>' in body and "Edit the LaTeX" in body
+    assert re.search(
+        r'value="accept" class="button-secondary" data-role="accept">Accept anyway<', body
+    )
     assert 'name="view" value="split"' in body
 
 
@@ -232,6 +242,42 @@ def test_optional_checks_are_folded_and_open_on_their_own(split):
     assert 'value="accept"' not in body  # already accepted; edit or reject only
 
 
+def test_a_style_the_pdf_text_cannot_show_is_not_called_a_difference(tmp_path):
+    """The LaTeX handout's R^n: a double-struck R from an MSBM font is a plain "R" in the
+    text layer. Neither the optional list nor the card may say the PDF has a plain R."""
+    from a11y_stem.core.types import EquationFix
+    from a11y_stem.pipeline.validate import safe_latex_to_mathml
+
+    output = review_output()
+    reals = r"\mathbb{R}^{n}"
+    for element in output.result.elements:
+        if element.id == "p1-e5":
+            element.text, element.regular_letters = "Rn", "n"
+    fix = output.result.fix_for("p1-e5")
+    assert fix is not None
+    fix.equation = EquationFix(latex=reals, mathml=safe_latex_to_mathml(reals, "block"), speech="")
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        page = screen(env)
+        optional = text_of(section(page, '<ul class="optional-list">', "</ul>"))
+        assert optional == (
+            "Equation 2, page 1 The proposal has a double-struck \u211d, a style the PDF's text "
+            "cannot show."
+        )
+        body = panel(screen(env, "?item=p1-e5"))
+        assert (
+            "The proposal has a double-struck \u211d. The PDF's text cannot show that style, so "
+            "check it in the image." in text_of(body)
+        )
+        assert "What differs" not in body and "plain" not in text_of(body)
+
+
 # --------------------------------------------------------------------------- deciding
 
 
@@ -279,8 +325,100 @@ def test_every_decision_then_done(split):
     assert "Decided: Edited by you" in decided
     group = panel(screen(split, f"?item={GROUP}"))
     assert "Decided: Rejected: original kept" in group
-    assert "Every heading of this group has been decided." in group
+    assert "All 3 were made bold text." in group
+    # The other choice is offered again, for all of them; the one made is not.
+    assert "Change all 3:" in text_of(group)
+    assert 'name="scope" value="all"' in group
+    assert ">Keep as headings at level 2<" in group
     assert "Make bold text" not in group
+
+
+def test_a_decided_group_can_be_decided_again_for_all_its_headings(split):
+    assert post(split, GROUP, action="reject").status_code == 303
+    assert {f.status.value for f in stored(split).fixes if f.group_key == GROUP} == {"rejected"}
+    # Without scope=all a group decision only acts on headings still waiting: none.
+    post(split, GROUP, action="accept")
+    assert {f.status.value for f in stored(split).fixes if f.group_key == GROUP} == {"rejected"}
+    response = post(split, GROUP, action="accept", scope="all")
+    assert response.status_code == 303
+    statuses = {f.element_id: f.status.value for f in stored(split).fixes if f.group_key == GROUP}
+    assert statuses == {"p1-e3": "accepted", "p1-e7": "accepted", "p2-e0": "accepted"}
+    page = split.browser.get(response.headers["location"]).text
+    assert "Repeated heading “Teacher Support”: Changed 3 back to headings." in (text_of(page))
+    group = panel(screen(split, f"?item={GROUP}"))
+    assert "All 3 are kept as headings." in group
+    assert ">Make bold text<" in group and "Keep as headings" not in group
+    # And back again: every heading changes, one ReviewEdit each.
+    assert post(split, GROUP, action="reject", scope="all").status_code == 303
+    statuses = {f.element_id: f.status.value for f in stored(split).fixes if f.group_key == GROUP}
+    assert set(statuses.values()) == {"rejected"}
+    with session_scope(split.ctx.factory) as session:
+        actions = Counter(session.scalars(select(ReviewEdit.action)).all())
+    assert actions == {"reject": 6, "accept": 3}
+
+
+def test_accept_with_a_changed_field_is_refused_and_keeps_the_change(split):
+    """Accept and Save edit share a form; Accept never reads the fields. A correction
+    typed and then accepted out of habit must not be dropped without a word."""
+    response = post(split, "p1-e2", action="accept", latex=r"\boldsymbol{\omega}")
+    assert response.status_code == 422
+    page = response.text
+    assert '<a href="#latex-p1-e2">' in page  # the error summary points at the field
+    body = panel(page)
+    assert (
+        "You changed the LaTeX. Choose Save edit to use your change, or undo it to accept "
+        "the proposal." in text_of(body)
+    )
+    assert r"\boldsymbol{\omega}</textarea>" in body  # the change is still there
+    assert '<details class="edit-box" open>' in body
+    assert 'class="decide-form is-edited"' in body  # Save edit is the main button now
+    fix = stored(split).fix_for("p1-e2")
+    assert (fix.status.value, fix.equation.latex) == ("needs_review", r"\omega")  # nothing saved
+    # Save edit with the same field does what the reviewer meant.
+    assert post(split, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}").status_code == 303
+    fix = stored(split).fix_for("p1-e2")
+    assert (fix.status.value, fix.equation.latex) == ("edited", r"\boldsymbol{\omega}")
+
+
+def test_accept_with_the_fields_as_shown_accepts(split):
+    # A textarea sends CRLF line breaks and may gain blanks: still the same LaTeX.
+    response = post(split, "p1-e2", action="accept", latex="\\omega\r\n")
+    assert response.status_code == 303
+    assert stored(split).fix_for("p1-e2").status.value == "accepted"
+    alt = "A car on a road between a house and a school."
+    assert post(split, "p1-e6", action="accept", alt=alt).status_code == 303
+    assert stored(split).fix_for("p1-e6").status.value == "accepted"
+
+
+@pytest.mark.parametrize(
+    ("target", "fields", "message", "field"),
+    [
+        ("p1-e6", {"alt": "A red ball."}, "You changed the alt text.", "alt-p1-e6"),
+        (
+            "p1-e6",
+            {"alt": "A car on a road between a house and a school.", "decorative": "on"},
+            "You changed “Decorative”.",
+            "decorative-p1-e6",
+        ),
+        ("p1-e3", {"level": "3"}, "You changed the level.", "level-p1-e3"),
+    ],
+)
+def test_accept_refuses_a_changed_alt_text_decorative_box_or_level(
+    split, target, fields, message, field
+):
+    response = post(split, target, action="accept", **fields)
+    assert response.status_code == 422
+    assert message in text_of(response.text)
+    assert f'<a href="#{field}">' in response.text
+    assert stored(split).fix_for(target).status.value == "needs_review"
+
+
+def test_the_list_view_refuses_accept_with_a_changed_field_too(split):
+    response = post(split, "p1-e2", action="accept", latex="x", view="list")
+    assert response.status_code == 422
+    assert "You changed the LaTeX." in response.text
+    assert 'name="view" value="list"' in response.text  # back on the list view
+    assert stored(split).fix_for("p1-e2").status.value == "needs_review"
 
 
 def test_a_refused_edit_comes_back_on_the_review_screen(split):

@@ -181,6 +181,9 @@ class ReviewItem:
     errors: dict[str, str] = field(default_factory=dict)  # field prefix -> message
     notices: list[Notice] = field(default_factory=list)  # changes elsewhere, shown above
     changed: list[str] = field(default_factory=list)  # changes to this fix, shown inside
+    # The form comes back with the reviewer's own change in a field (a refused Accept or
+    # edit): "Save edit" is then the main button.
+    edited: bool = False
 
     @property
     def open(self) -> bool:
@@ -618,20 +621,24 @@ def review_action(
     element_id: str,
     user: UserDep,
     action: Annotated[str, Form()] = "",
-    latex: Annotated[str, Form()] = "",
-    alt: Annotated[str, Form()] = "",
-    decorative: Annotated[str, Form()] = "",
-    level: Annotated[str, Form()] = "",
+    latex: Annotated[str | None, Form()] = None,
+    alt: Annotated[str | None, Form()] = None,
+    decorative: Annotated[str | None, Form()] = None,
+    level: Annotated[str | None, Form()] = None,
     min_confidence: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
+    scope: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
     "headings"), a bulk accept in that group; when it is a heading group's key
-    ("hg-p1-e7"), one decision for every heading of that group still waiting.
+    ("hg-p1-e7"), one decision for every heading of that group still waiting (with
+    `scope=all`, for every heading of the group: a decided group decided again).
 
     Element ids look like "p3-e12", so neither a kind nor a group key can be one.
     Sharing the route keeps a single CSRF-checked, ownership-checked way to change a
-    review. `view` says which view the form was on (module docstring).
+    review. `view` says which view the form was on (module docstring). The fields are
+    passed on only when the form sent them: Accept refuses a changed one
+    (`web.review.apply_review`), and a field that was not sent was not changed.
     """
     if not ELEMENT_ID.match(element_id):
         raise PageError(404, *NOT_FOUND)
@@ -639,8 +646,10 @@ def review_action(
     if kind_for_slug(element_id) is not None:
         return _bulk_action(request, job_id, element_id, user, action, min_confidence, view)
     if is_group_key(element_id):
-        return _group_action(request, job_id, element_id, user, action, level, view)
-    form = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
+        every = scope == "all"
+        return _group_action(request, job_id, element_id, user, action, level or "", view, every)
+    sent = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
+    form = {name: value for name, value in sent.items() if value is not None}
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
@@ -698,13 +707,14 @@ def _group_action(
     action: str,
     level: str,
     view: str,
+    every: bool = False,
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
             result = DocumentResult.model_validate(job.result_json or {})
-            outcome = apply_group(result, group_key, action, {"level": level})
+            outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
@@ -724,7 +734,7 @@ def _group_action(
         changed=len(outcome.changes),
         left=len(outcome.left),
     )
-    message = _group_message(action, level, outcome)
+    message = _group_message(action, level, outcome, every=every)
     flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
     if view != LIST_VIEW:
         if outcome.left:
@@ -744,13 +754,31 @@ def _group_action(
     return RedirectResponse(list_url(job_id, anchor), status_code=303)
 
 
-def _group_message(action: str, level: str, outcome: GroupOutcome) -> str:
+# A decided group decided again ("Change all 11" on the review screen).
+GROUP_REDONE = {
+    "accept": "Changed {n} back to headings.",
+    "edit": "Set {n} to level {level}.",
+    "reject": "Made {n} bold text instead of headings.",
+}
+
+
+def _group_message(action: str, level: str, outcome: GroupOutcome, *, every: bool = False) -> str:
     n = len(outcome.changes)
     if not n:
+        if every:
+            return "Nothing changed: these headings were already like that."
         return "Nothing changed: none of these headings were waiting for a decision."
-    headings = counted(n, Kind.HEADING)
-    message = GROUP_DONE.get(action, "Done.").format(n=headings, level=level)
-    if outcome.left:
+    if every:  # after "Repeated heading “Teacher Support”: " (the notice's label)
+        message = GROUP_REDONE.get(action, "Done.").format(n=n, level=level)
+    else:
+        message = GROUP_DONE.get(action, "Done.").format(n=counted(n, Kind.HEADING), level=level)
+    if outcome.left and every:
+        left = counted(len(outcome.left), Kind.HEADING)
+        message += (
+            f" {left} {'was' if len(outcome.left) == 1 else 'were'} left as before: the "
+            "document would show them at another level."
+        )
+    elif outcome.left:
         left = counted(len(outcome.left), Kind.HEADING)
         message += (
             f" {left} {'was' if len(outcome.left) == 1 else 'were'} left: the document "

@@ -116,8 +116,10 @@
     <textarea id="alt-{{ eid }}" name="alt" rows="3" maxlength="1000" class="prose-input"
               aria-describedby="alt-hint-{{ eid }}{% if err %} alt-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("alt", "") }}</textarea>
   </div>
-  <div class="field checkbox-field">
-    <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on"{% if item.values.get("decorative") %} checked{% endif %}>
+  {% set err = item.errors.get("decorative") %}
+  <div class="field checkbox-field{% if err %} field-error{% endif %}">
+    {% if err %}<p class="error-message" id="decorative-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+    <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on"{% if item.values.get("decorative") %} checked{% endif %}{% if err %} aria-describedby="decorative-error-{{ eid }}" aria-invalid="true"{% endif %}>
     <label for="decorative-{{ eid }}">Decorative: it adds nothing a reader needs, so it gets no alt text</label>
   </div>
   {% elif item.kind == "heading" %}

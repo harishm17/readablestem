@@ -23,11 +23,14 @@ from a11y_stem.web.compare import (
     compare_equation,
     compare_geometry,
     context_clip,
+    suggest_fix,
 )
 from a11y_stem.web.mathml import sanitize_mathml
 
 BOLD_D, BOLD_ZERO = "\U0001d41d", "\U0001d7ce"  # MATHEMATICAL BOLD SMALL D, DIGIT ZERO
 ITALIC_V, ITALIC_D, ITALIC_T = "\U0001d463", "\U0001d451", "\U0001d461"  # math italic
+BOLD_V, BOLD_X, BOLD_Y = "\U0001d42f", "\U0001d431", "\U0001d432"  # MATHEMATICAL BOLD SMALL
+DOUBLE_R = "\u211d"  # DOUBLE-STRUCK CAPITAL R, the reals
 
 
 def equation(text: str | None, latex: str, *, regular: str | None = None, display="inline"):
@@ -97,6 +100,71 @@ def test_matching_equations_and_missing_text_layers_have_no_rows():
     assert compare_equation(element, fix).rows == []
     fix.equation = None
     assert compare_equation(element, fix).rows == []
+
+
+def test_a_style_the_text_layer_cannot_show_is_not_a_difference():
+    """A double-struck R from an MSBM font is a plain "R" in the PDF's text layer, so a
+    proposal with \\mathbb{R} differs from the text layer only in a style the text layer
+    cannot carry: the screen must not say the PDF has a plain R (its image shows it
+    double-struck)."""
+    for text, latex in (
+        ("Rn", r"\mathbb{R}^{n}"),
+        (f"{BOLD_V} ∈Rn", r"\mathbf{v} \in \mathbb{R}^{n}"),
+    ):
+        c = compare_equation(*equation(text, latex, regular="n"))
+        assert not [r for r in c.rows if r.what == "Style"], text
+        assert c.unseen == [f"double-struck {DOUBLE_R}"]
+        assert c.summary == (
+            f"The proposal has a double-struck {DOUBLE_R}. The PDF's text cannot show that "
+            "style, so check it in the image."
+        )
+        assert "R" not in c.pdf_marks and "R" not in c.proposal_marks  # nothing outlined
+    # A letter known to come from a regular text font really is plain there: a row.
+    c = compare_equation(*equation("Rn", r"\mathbb{R}^{n}", regular="Rn"))
+    assert [(r.symbol, r.pdf, r.proposal) for r in c.rows] == [("R", "plain", "double-struck")]
+    assert c.unseen == []
+
+
+@pytest.mark.parametrize(
+    ("text", "latex", "regular", "label", "fixed"),
+    [
+        ("𝛚", r"\omega", None, "Use bold ω", r"\boldsymbol{\omega}"),
+        (f"{BOLD_V} = 3", r"v = 3", None, "Use bold v", r"\mathbf{v} = 3"),
+        (f"{BOLD_V} = {BOLD_V}0", r"v = v_0", None, "Use bold v", r"\mathbf{v} = \mathbf{v}_0"),
+        (f"{ITALIC_V} = 3", r"\mathbf{v} = 3", None, "Use plain v", "v = 3"),
+        (DOUBLE_R, "R", None, "Use double-struck R", r"\mathbb{R}"),
+    ],
+)
+def test_a_meaning_level_style_difference_gets_a_one_click_fix(text, latex, regular, label, fixed):
+    element, fix = equation(text, latex, regular=regular)
+    c = compare_equation(element, fix)
+    assert c.meaning
+    suggestion = suggest_fix(element, fix, c)
+    assert suggestion is not None
+    assert (suggestion.label, suggestion.latex) == (label, fixed)
+    # What it saves compares clean: no meaning-level difference left.
+    after = Fix(
+        element_id=fix.element_id,
+        kind=Kind.EQUATION,
+        status=Status.NEEDS_REVIEW,
+        equation=EquationFix(latex=fixed, mathml=safe_latex_to_mathml(fixed, "inline"), speech=""),
+    )
+    assert not compare_equation(element, after).meaning
+
+
+@pytest.mark.parametrize(
+    ("text", "latex"),
+    [
+        ("g = 9.80", r"g = 9.30"),  # a symbol, not a style: no rewrite can be sure
+        (f"{BOLD_V} + v", r"v + v"),  # bold in one place, plain in another: which one?
+        (f"{BOLD_D}0", r"\mathbf{d}_0"),  # cosmetic only
+        ("𝛚", r"\text{ω}"),  # the letter is only inside words: nothing to wrap
+        (f"{BOLD_X} = {BOLD_Y} \u2212 z", r"x = y + z"),  # more than one difference that matters
+    ],
+)
+def test_no_one_click_fix_unless_it_is_one_style_and_it_checks_out(text, latex):
+    element, fix = equation(text, latex)
+    assert suggest_fix(element, fix, compare_equation(element, fix)) is None
 
 
 def test_flagged_tokens_are_marked_in_the_proposal_only_by_our_own_class():

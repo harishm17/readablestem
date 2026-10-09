@@ -36,17 +36,19 @@ from fastapi import APIRouter, Request
 from fastapi.responses import Response
 from sqlalchemy import select
 
-from a11y_stem.core.types import DocumentResult, Fix, Kind
+from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
 from a11y_stem.web import page_images, queue
 from a11y_stem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
     EquationCompare,
+    Suggestion,
     band_clip,
     compare_equation,
     compare_geometry,
     context_clip,
+    suggest_fix,
 )
 from a11y_stem.web.db import Blob, session_scope
 from a11y_stem.web.deps import (
@@ -178,6 +180,10 @@ class Panel:
     reason_code: str | None = None
     compare: EquationCompare | None = None
     compare_size: tuple[float, float] | None = None  # crop size in CSS px (aspect ratio)
+    # A decision whose proposal changes the meaning: the fix comes first (the suggested
+    # one-click fix, else the edit box, open), and Accept is the secondary "Accept anyway".
+    changes_meaning: bool = False
+    suggestion: Suggestion | None = None
     region_url: str | None = None  # the item with the page around it
     region_alt: str = ""
     show_on_page: str | None = None
@@ -188,6 +194,11 @@ class Panel:
     decision_key: str | None = None
     confidence: str = ""
     group_pages: list[PageLink] = field(default_factory=list)
+    # A decided heading group: what was decided, and which of the two choices would
+    # change something if made again for all of them ("Change all 11").
+    group_state: str = ""
+    redo_keep: bool = False
+    redo_bold: bool = False
     back_href: str | None = None  # an item outside the queue: back to the decision at hand
     back_label: str = ""
 
@@ -260,9 +271,18 @@ def _tier(fix: Fix) -> str:
     return "accepted"
 
 
-def _first_note(fix: Fix) -> str:
+def _first_note(fix: Fix, compare: EquationCompare | None = None) -> str:
     for check in fix.failed_checks:
         code = check.code or check.name
+        if (
+            code == "style_cosmetic"
+            and compare is not None
+            and compare.unseen
+            and not any(row.what == "Style" for row in compare.rows)
+        ):
+            # Not a difference: a style the PDF's text cannot carry (web.compare).
+            shown = ", ".join(compare.unseen)
+            return f"The proposal has a {shown}, a style the PDF's text cannot show."
         if code in SHORT_NOTES:
             return SHORT_NOTES[code]
         return explain_check(check).text
@@ -428,6 +448,9 @@ class SplitBuilder:
         if fix.kind is Kind.EQUATION and element is not None:
             compare = compare_equation(element, fix)
             panel.compare = compare
+            if fix.pending and compare.meaning:
+                panel.changes_meaning = True
+                panel.suggestion = suggest_fix(element, fix, compare)
             item.mathml = try_sanitize_mathml(
                 fix.equation.mathml if fix.equation else None, flag=compare.proposal_marks
             )
@@ -453,6 +476,11 @@ class SplitBuilder:
         group = _heading_group(self.result, members, self.items, self.elements, self.places)
         if not decision.open:
             group.members, group.keep = [], 0
+            kept = sum(f.status in KEPT for f in decision.fixes)
+            bold = sum(f.status is Status.REJECTED for f in decision.fixes)
+            panel.group_state = _group_state(kept, bold, len(decision.fixes))
+            panel.redo_keep = kept < len(decision.fixes)
+            panel.redo_bold = bold < len(decision.fixes)
         panel.group = group
         lead = decision.lead
         page = self.page_of(lead)
@@ -584,8 +612,25 @@ class SplitBuilder:
             page = self.page_of(fix)
             label = _label(fix, self.numbers) + (f", page {page}" if page else "")
             href = self.url(item=fix.element_id, anchor="decision-title")
-            out.append(OptionalLine(label, _first_note(fix), href))
+            compare = (
+                compare_equation(self.elements.get(fix.element_id), fix)
+                if fix.kind is Kind.EQUATION
+                else None
+            )
+            out.append(OptionalLine(label, _first_note(fix, compare), href))
         return out
+
+
+KEPT = frozenset({Status.ACCEPTED, Status.EDITED})  # a heading written as a heading
+
+
+def _group_state(kept: int, bold: int, size: int) -> str:
+    """What a decided heading group's headings are now, in one sentence."""
+    if kept == size:
+        return f"{'Both' if size == 2 else f'All {size}'} are kept as headings."
+    if bold == size:
+        return f"{'Both' if size == 2 else f'All {size}'} were made bold text."
+    return f"{kept} kept as headings, {bold} made bold text."
 
 
 def headline(open_count: int, total: int, optional: int) -> str:
@@ -699,6 +744,7 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
         return
     item = panel.item
     if item is not None and item.element_id == target:
+        item.edited = any(item.values.get(k, "") != v for k, v in exc.values.items())
         item.values.update(exc.values)
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message

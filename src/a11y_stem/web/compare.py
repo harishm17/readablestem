@@ -15,18 +15,21 @@ and the size the proposal must be drawn at to match it.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 from collections import Counter
 from dataclasses import dataclass, field
+from functools import cache
 
 from defusedxml import ElementTree as SafeET
 
-from a11y_stem.core.mathchars import styled_char
+from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.types import Element, Fix, Kind
 
 # The step's own comparison rules, imported rather than copied so the screen and the
 # step always agree (and pipeline/equation_step.py needs no change for the screen).
 from a11y_stem.pipeline.equation_step import (
+    LETTER_STYLES,
     _layer_letters,
     _letter_verdict,
     _LetterStyles,
@@ -61,19 +64,29 @@ class DiffRow:
     pdf: str  # "bold", "2 times", "not there"
     proposal: str
     meaning: bool  # True: it changes what a student reads
+    letter: str = ""  # a style row's letter, unstyled ("ω" for a bold 𝛚)
 
 
 @dataclass
 class EquationCompare:
     rows: list[DiffRow] = field(default_factory=list)
     same: list[str] = field(default_factory=list)  # "d (bold)": compared, no difference
+    # Letters the proposal gives a style the PDF's text layer cannot show ("double-struck"
+    # and the letter in it: a double-struck R from an MSBM font is a plain "R" there). Not
+    # a difference: only the image can tell.
+    unseen: list[str] = field(default_factory=list)
     pdf_marks: set[str] = field(default_factory=set)  # characters to outline on the crop
     proposal_marks: set[str] = field(default_factory=set)  # ... in the proposed MathML
     summary: str | None = None  # the one sentence that says what to look at
 
     @property
     def has_text_layer(self) -> bool:
-        return bool(self.rows or self.same)
+        return bool(self.rows or self.same or self.unseen)
+
+    @property
+    def meaning(self) -> bool:
+        """A difference that changes what a student reads."""
+        return any(row.meaning for row in self.rows)
 
 
 def _fold(ch: str) -> str:
@@ -157,9 +170,20 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
             if pdf[letter].bold or pdf[letter].other:
                 out.same.append(f"{letter} ({pdf_style})")
             continue
+        if verdict == "cosmetic" and _unseen_style(pdf[letter], got[letter]):
+            style = sorted(got[letter].styles)[0]
+            out.unseen.append(f"{style} {styled_char(letter, style)}")
+            sentences.append(
+                (
+                    3,
+                    f"The proposal has a {out.unseen[-1]}. The PDF's text cannot show "
+                    "that style, so check it in the image.",
+                )
+            )
+            continue
         meaning = verdict == "meaning"
         out.rows.append(
-            DiffRow("Style", _shown(letter, pdf_style), pdf_style, proposal_style, meaning)
+            DiffRow("Style", _shown(letter, pdf_style), pdf_style, proposal_style, meaning, letter)
         )
         out.pdf_marks.add(letter)
         out.proposal_marks.add(letter)
@@ -200,6 +224,22 @@ def compare_equation(element: Element | None, fix: Fix) -> EquationCompare:
     return out
 
 
+def _unseen_style(pdf: _LetterStyles, got: _MathLetters) -> bool:
+    """The only difference is a letter style the text layer cannot carry: the PDF shows
+    the letter plain (not known to come from a regular font, which would make it really
+    plain), the proposal gives it a double-struck, script or fraktur style and no bold.
+    The equation step calls this cosmetic (`_letter_verdict`); the screen must not call
+    it a difference either, since the image above may well show the same style."""
+    return (
+        not pdf.bold
+        and not pdf.other
+        and not pdf.known_plain
+        and bool(got.styles)
+        and got.styles <= LETTER_STYLES
+        and not (got.var_bold + got.other_bold)
+    )
+
+
 def _listed(symbols: list[str]) -> str:
     unique = list(dict.fromkeys(symbols))
     return unique[0] if len(unique) == 1 else ", ".join(unique[:-1]) + " and " + unique[-1]
@@ -207,6 +247,160 @@ def _listed(symbols: list[str]) -> str:
 
 def _signs_word(n: int, sign: str) -> str:
     return f"{n} {sign} sign{'' if n == 1 else 's'}" if n else f"no {sign} sign"
+
+
+# --------------------------------------------------------------------------- suggestion
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    """A one-click fix for a style difference that changes the meaning: the proposal's
+    LaTeX with only that letter's style changed to the PDF's ("Use bold ω")."""
+
+    label: str  # the button: "Use bold ω"
+    latex: str  # posted as an edit, so it goes through the same checks as a typed one
+
+
+# A brace group after these is left alone: words (\text{avg}), or letters already given a
+# style (a bold one is not a plain one to make bold).
+_PROTECTING = frozenset(
+    {
+        *("text", "textrm", "textit", "textbf", "textsf", "texttt", "mbox", "operatorname"),
+        *("mathrm", "mathit", "mathsf", "mathtt", "mathbf", "boldsymbol", "bm", "pmb"),
+        *("mathbb", "mathcal", "mathscr", "mathfrak"),
+    }
+)
+_BOLD_WRAPPERS = ("mathbf", "boldsymbol", "bm")
+_STYLE_WRAPPERS = {"double-struck": "mathbb", "script": "mathcal", "fraktur": "mathfrak"}
+_TOKEN = re.compile(r"\\[A-Za-z]+|\\.|[{}]|\s+|[^\\{}\s]", re.S)
+
+
+@cache
+def _command_char(command: str) -> str:
+    """The character a symbol command stands for (\\omega -> ω), else ""."""
+    from latex2mathml.symbols_parser import convert_symbol
+
+    code = convert_symbol(command)
+    try:
+        return chr(int(code, 16)) if code else ""
+    except ValueError:
+        return ""
+
+
+def _is_letter(token: str, letter: str) -> bool:
+    if token.startswith("\\"):
+        return len(token) > 2 and base_char(_command_char(token)) == letter
+    return token == letter
+
+
+def _wrap_letters(latex: str, letter: str, wrapper: str) -> str | None:
+    """`latex` with every occurrence of `letter` outside a protected group (`_PROTECTING`)
+    wrapped in `\\wrapper{...}`; None when there is none to wrap."""
+    tokens = _TOKEN.findall(latex)
+    out: list[str] = []
+    depth_protected: list[bool] = []  # one per open brace: is it a protected group?
+    protect_next = False  # the token after a protecting command (its argument)
+    wrapped = 0
+    for token in tokens:
+        protected = any(depth_protected)
+        if token == "{":
+            depth_protected.append(protect_next)
+            protect_next = False
+            out.append(token)
+            continue
+        if token == "}":
+            if depth_protected:
+                depth_protected.pop()
+            out.append(token)
+            continue
+        if token.isspace():
+            out.append(token)
+            continue
+        if token.startswith("\\") and token[1:] in _PROTECTING:
+            protect_next = True
+            out.append(token)
+            continue
+        if protect_next:  # \mathbf v: an argument without braces
+            protect_next = False
+            out.append(token)
+            continue
+        if not protected and _is_letter(token, letter):
+            out.append(f"\\{wrapper}{{{token}}}")
+            wrapped += 1
+            continue
+        out.append(token)
+    return "".join(out) if wrapped else None
+
+
+def _unwrap_bold(latex: str, letter: str) -> str | None:
+    """`latex` with `\\mathbf{x}`, `\\boldsymbol{x}` and `\\bm{x}` around exactly `letter`
+    made plain; None when there is none."""
+    pattern = re.compile(r"\\(?:" + "|".join(_BOLD_WRAPPERS) + r")\s*\{\s*(\\[A-Za-z]+|.)\s*\}")
+    count = 0
+
+    def plain(match: re.Match[str]) -> str:
+        nonlocal count
+        if not _is_letter(match.group(1), letter):
+            return match.group(0)
+        count += 1
+        return match.group(1)
+
+    out = pattern.sub(plain, latex)
+    return out if count else None
+
+
+def _candidate(element: Element, fix: Fix, row: DiffRow) -> tuple[str, str] | None:
+    """(style word, LaTeX) that would give `row.letter` the PDF's style."""
+    assert fix.equation is not None
+    latex, letter = fix.equation.latex, row.letter
+    if row.pdf == "bold" and row.proposal == "plain":
+        # Upright bold for a Latin letter the PDF has upright (\mathbf{v}); otherwise, and
+        # always for Greek (which \mathbf leaves plain in LaTeX), \boldsymbol.
+        variants = {char_variant(ch) for ch in element.text or "" if base_char(ch) == letter}
+        upright = letter.isascii() and variants == {"bold"}
+        wrapped = _wrap_letters(latex, letter, "mathbf" if upright else "boldsymbol")
+        return ("bold", wrapped) if wrapped else None
+    if row.pdf == "plain" and row.proposal == "bold":
+        unwrapped = _unwrap_bold(latex, letter)
+        return ("plain", unwrapped) if unwrapped else None
+    if row.pdf in _STYLE_WRAPPERS and row.proposal == "plain" and letter.isascii():
+        wrapped = _wrap_letters(latex, letter, _STYLE_WRAPPERS[row.pdf])
+        return (row.pdf, wrapped) if wrapped else None
+    return None
+
+
+def suggest_fix(element: Element | None, fix: Fix, compare: EquationCompare) -> Suggestion | None:
+    """The one-click fix for a proposal whose only meaning-level difference is one letter's
+    style, or None. It is offered only when the changed LaTeX passes the same checks a
+    typed edit must pass and the same comparison then finds no meaning-level difference
+    (so a rewrite that does not do what its label says is never offered)."""
+    from a11y_stem.pipeline import validate
+
+    if element is None or fix.equation is None:
+        return None
+    meaning = [row for row in compare.rows if row.meaning]
+    if len(meaning) != 1 or meaning[0].what != "Style" or not meaning[0].letter:
+        return None
+    found = _candidate(element, fix, meaning[0])
+    if found is None:
+        return None
+    style, latex = found
+    if len(latex) > validate.MAX_LATEX_CHARS:
+        return None
+    if any(not c.passed and c.severity == "error" for c in validate.check_latex(latex)):
+        return None
+    try:
+        mathml = validate.safe_latex_to_mathml(latex, fix.equation.display)
+    except ValueError:
+        return None
+    if any(not c.passed and c.severity == "error" for c in validate.check_mathml(mathml)):
+        return None
+    changed = fix.model_copy(
+        update={"equation": fix.equation.model_copy(update={"latex": latex, "mathml": mathml})}
+    )
+    if compare_equation(element, changed).meaning:
+        return None
+    return Suggestion(f"Use {style} {meaning[0].letter}", latex)
 
 
 # --------------------------------------------------------------------------- regions
