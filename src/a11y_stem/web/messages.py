@@ -151,6 +151,15 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "site, but it should work on its own.",
     ("html.wording", "banned_wording"): "The document text promises more than this tool can "
     "back up (for example that it meets a legal standard).",
+    # Links, language and colour in the output HTML (pipeline.html_checks, text work)
+    ("html.link_text", "empty_link"): "A link in the document has no text, so screen "
+    "readers cannot say where it goes.",
+    ("html.link_href", "unsafe_link"): "A link in the document is not a web or email address "
+    "or a place in the document itself.",
+    ("html.lang_tags", "invalid_lang"): "A language marked in the document is not a valid "
+    "language code.",
+    ("html.text_contrast", "low_contrast"): "Some coloured text is too light to read easily "
+    "on the white background.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
     ("axe", "axe_error"): "The automatic accessibility check (axe-core) could not run on the "

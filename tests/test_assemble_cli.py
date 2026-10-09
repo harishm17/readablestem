@@ -166,7 +166,7 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
         "Elements:    4 (1 headings, 1 paragraphs, 0 list items, 2 equations, 0 figures)",
         "Model calls: 2",
         "(fake client, nothing billed)",
-        "Checks:      static 11/11 passed",
+        "Checks:      static 15/15 passed",
         f"wrote {out}",
         f"wrote {report}",
     ):
