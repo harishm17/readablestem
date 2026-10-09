@@ -12,7 +12,10 @@ What the output looks like and why is in docs/output.md. In short:
 - Anything not converted (ABSTAINED, FAILED, REJECTED, or MathML the sanitiser refused)
   keeps the original crop as an image with a fixed alt text and a visible note, marked
   with a border *and* a text label, never by colour alone.
-- A closing "About this conversion" section with counts by kind and status, and an
+- A short note for students after `<main>` ("About this version", a `<footer>`): what
+  the file is, that some parts have not been checked by the instructor yet or the date
+  the instructor made the last decision (`checked_on`), and to tell the instructor about
+  anything hard to read. No counts: those are for the instructor, on the job page. An
   optional `notice` at the top (e.g. "offline test run": placeholders, not conversions).
 
 Security (rule 2 of docs/design/beta-architecture.md): all document and model text is
@@ -34,8 +37,8 @@ from __future__ import annotations
 
 import base64
 import re
-from collections import Counter
 from dataclasses import dataclass, field
+from datetime import date
 from itertools import pairwise
 from typing import Literal
 from xml.etree.ElementTree import Element as XmlElement
@@ -64,10 +67,25 @@ AUTHORED_CLASS = "a11y-stem"
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
+# The student note (`_about_section`). It speaks to students: what this file is and who
+# to tell about problems. TODO(Harish): confirm this wording, and whether to name the
+# screen readers that read MathML aloud (NVDA with MathCAT, JAWS, VoiceOver).
+ABOUT_TITLE = "About this version"
 ABOUT_WORDING = (
-    "This file was produced with a11y-stem, which assists with accessibility; "
-    "review it before publishing."
+    "This is a web version of a PDF from your course, made with a11y-stem, a tool that "
+    "assists with accessibility."
 )
+MATHS_NOTE = "Its equations are written so that screen readers can read them aloud."
+NOT_CHECKED_YET = (
+    "Some parts were made by the tool and have not been checked by your instructor yet."
+)
+CHECKED = "Your instructor checked the parts the tool was unsure about"
+FLAGGED_NOTE = (
+    "Some parts could not be converted. They are shown as pictures of the original, "
+    "marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your "
+    "instructor for a version you can read."
+)
+CONTACT = "If something is hard to read or looks wrong, tell your instructor."
 EQUATION_NOTE = (
     "This equation is shown as an image of the original, so screen readers cannot read "
     "it. Review it before publishing."
@@ -80,24 +98,6 @@ NOT_CONVERTED = KEPT_ORIGINAL_STATUSES
 ABOUT_ID = "about-conversion"
 ABOUT_TITLE_ID = "about-conversion-title"
 
-KIND_LABELS = {
-    Kind.HEADING: "Headings",
-    Kind.EQUATION: "Equations",
-    Kind.FIGURE: "Figures",
-    Kind.TABLE: "Tables",
-    Kind.PARAGRAPH: "Paragraphs",
-}
-STATUS_LABELS = {
-    Status.ACCEPTED: "accepted",
-    Status.NEEDS_REVIEW: "needs review",
-    Status.EDITED: "edited by a reviewer",
-    Status.ABSTAINED: "not converted (model unsure)",
-    Status.FAILED: "not converted (error or spending limit)",
-    Status.REJECTED: "rejected by a reviewer",
-}
-# A reviewer's Accept keeps Status.ACCEPTED (`Fix.reviewed` is set); counted apart from
-# the pipeline's automatic acceptance, after it.
-REVIEWER_ACCEPTED_LABEL = "accepted by a reviewer"
 
 # BCP 47-ish: "en", "en-US", "zh-Hant-TW". Anything else falls back to "en".
 _LANG = re.compile(r"[A-Za-z]{2,8}(?:-[A-Za-z0-9]{1,8})*")
@@ -742,48 +742,41 @@ def _notice(text: str | None) -> str | None:
     )
 
 
-def _status_label(fix: Fix) -> str:
-    return REVIEWER_ACCEPTED_LABEL if fix.accepted_by_reviewer else STATUS_LABELS[fix.status]
+def long_date(day: date) -> str:
+    """The date as "9 October 2026", read the same on either side of the Atlantic."""
+    return f"{day.day} {day:%B %Y}"
 
 
-# Order of the per-status counts in the about section.
-_LABEL_ORDER = [STATUS_LABELS[Status.ACCEPTED], REVIEWER_ACCEPTED_LABEL] + [
-    STATUS_LABELS[s] for s in Status if s is not Status.ACCEPTED
-]
+def _review_line(fixes: list[Fix], checked_on: date | None) -> str:
+    """Whether the instructor has checked what the tool asked about. Nothing when the
+    tool asked nothing and nobody changed anything; "not checked yet" while a decision
+    is open; once every decision is made, "checked", with the date when it is known."""
+    asked = any(f.review == "required" or f.decided_by_reviewer for f in fixes)
+    if not asked:
+        return ""
+    if any(f.pending for f in fixes):
+        return f"<p>{NOT_CHECKED_YET}</p>\n"
+    when = f" on {long_date(checked_on)}" if checked_on is not None else ""
+    return f"<p>{CHECKED}{when}.</p>\n"
 
 
-def _about_section(fixes: list[Fix], flagged: int, source_note: str | None) -> str:
-    counts = Counter((fix.kind, _status_label(fix)) for fix in fixes)
-    items = []
-    for kind, label in KIND_LABELS.items():
-        total = sum(n for (k, _), n in counts.items() if k is kind)
-        if not total:
-            continue
-        parts = [
-            f"{counts[(kind, status)]} {status}"
-            for status in _LABEL_ORDER
-            if counts[(kind, status)]
-        ]
-        items.append(f"<li>{label} ({total}): {', '.join(parts)}</li>")
-    summary = (
-        f"<ul>{''.join(items)}</ul>"
-        if items
-        else "<p>No headings, equations or figures were found.</p>"
-    )
-    flagged_note = (
-        f"<p>{flagged} item{'s' if flagged != 1 else ''} could not be converted. "
-        "They keep the original (an image of the page where one is available), "
-        "outlined and labelled &ldquo;Not converted&rdquo; or "
-        "&ldquo;Needs a description&rdquo;.</p>"
-        if flagged
-        else ""
-    )
-    source = f"<p>{_escape(source_note)}</p>" if source_note and source_note.strip() else ""
+def _about_section(
+    fixes: list[Fix], flagged: int, source_note: str | None, checked_on: date | None = None
+) -> str:
+    """The note for students at the end of the file (MF7 of the UX review): what this
+    is, whether the instructor has checked it, who to tell about problems. It is written
+    for the people who read the file, so it has no counts and no review vocabulary
+    ("needs review", "rejected"): the instructor's numbers are on the job page."""
+    maths = any(f.kind is Kind.EQUATION and f.status not in NOT_CONVERTED for f in fixes)
+    what = f"{ABOUT_WORDING} {MATHS_NOTE}" if maths else ABOUT_WORDING
+    flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
+    source = f"<p>{_escape(source_note)}</p>\n" if source_note and source_note.strip() else ""
     return (
-        f'<section id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
+        f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
-        f'<h2 id="{ABOUT_TITLE_ID}">About this conversion</h2>\n'
-        f"<p>{ABOUT_WORDING}</p>\n{summary}\n{flagged_note}{source}\n</section>"
+        f'<h2 id="{ABOUT_TITLE_ID}">{ABOUT_TITLE}</h2>\n'
+        f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
+        f"<p>{CONTACT}</p>\n{source}</footer>"
     )
 
 
@@ -824,7 +817,9 @@ figcaption { margin-top: 0.5em; }
 .flag-note { margin: 0.75em 0 0; }
 .flag-label { font-weight: 700; }
 .original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.about { border-top: 2px solid #1b1b1b; margin-top: 3em; padding-top: 0.5em; }
+.about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
+  border-top: 2px solid #1b1b1b; }
+@media (min-width: 44rem) { .about { margin: 0 auto; } }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
 """
@@ -839,6 +834,7 @@ def render_html(
     crops: dict[str, bytes],
     source_note: str | None = None,
     notice: str | None = None,
+    checked_on: date | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -849,7 +845,9 @@ def render_html(
     `source_note` is plain text for the about section, e.g. an OpenStax attribution.
     `notice` is plain text shown first in `<main>` as a labelled note, for something
     every reader must see before the content (the CLI marks offline test runs, whose
-    answers are placeholders).
+    answers are placeholders). `checked_on` is the day the instructor made the last
+    review decision: the student note gives it once no decision is open (the review
+    screen passes it when it re-renders the file; the pipeline never does).
     """
     ordered = sorted(elements, key=lambda e: e.order)
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
@@ -859,7 +857,7 @@ def render_html(
     renderer = _Renderer(fixes=first_fix, crops=crops, equations=equations)
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = renderer.render_all(ordered)
-    about = _about_section(list(first_fix.values()), len(renderer.flagged), source_note)
+    about = _about_section(list(first_fix.values()), len(renderer.flagged), source_note, checked_on)
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     return "\n".join(
@@ -877,8 +875,8 @@ def render_html(
             "<main>",
             *([note] if (note := _notice(notice)) else []),
             *body,
-            about,
             "</main>",
+            about,
             "</body>",
             "</html>",
             "",

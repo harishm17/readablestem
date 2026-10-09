@@ -78,7 +78,9 @@ class FakePipeline:
     def mathml_to_speech(self, mathml: str) -> str:
         return "spoken form"
 
-    def render_html(self, *, title, lang, elements, fixes, crops, source_note=None) -> str:
+    def render_html(
+        self, *, title, lang, elements, fixes, crops, source_note=None, checked_on=None
+    ) -> str:
         if self.render_raises is not None:
             raise self.render_raises
         self.rendered.append(fixes)

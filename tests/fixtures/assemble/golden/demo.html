@@ -42,7 +42,9 @@ figcaption { margin-top: 0.5em; }
 .flag-note { margin: 0.75em 0 0; }
 .flag-label { font-weight: 700; }
 .original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.about { border-top: 2px solid #1b1b1b; margin-top: 3em; padding-top: 0.5em; }
+.about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
+  border-top: 2px solid #1b1b1b; }
+@media (min-width: 44rem) { .about { margin: 0 auto; } }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
 </style>
@@ -164,12 +166,12 @@ figcaption { margin-top: 0.5em; }
 <p id="p13-e9">Access for free at openstax.org.</p>
 <p id="p13-e10">Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
 <p id="p13-e11">a11y-stem is not affiliated with or endorsed by OpenStax.</p>
-<section id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
-<h2 id="about-conversion-title">About this conversion</h2>
-<p>This file was produced with a11y-stem, which assists with accessibility; review it before publishing.</p>
-<ul><li>Headings (36): 20 accepted, 16 needs review</li><li>Equations (19): 17 accepted, 2 needs review</li><li>Figures (7): 7 accepted</li></ul>
-
-</section>
 </main>
+<footer id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
+<h2 id="about-conversion-title">About this version</h2>
+<p>This is a web version of a PDF from your course, made with a11y-stem, a tool that assists with accessibility. Its equations are written so that screen readers can read them aloud.</p>
+<p>Some parts were made by the tool and have not been checked by your instructor yet.</p>
+<p>If something is hard to read or looks wrong, tell your instructor.</p>
+</footer>
 </body>
 </html>
