@@ -15,6 +15,7 @@ from a11y_stem.core.types import (
     FigureFix,
     Fix,
     Kind,
+    ModelCall,
     Notice,
     Status,
 )
@@ -26,9 +27,15 @@ def el(eid: str, kind: Kind, page: int, order: int) -> Element:
     return Element(id=eid, kind=kind, page=page, bbox=(0, 0, 1, 1), order=order)
 
 
-def figure(eid: str, figure_type="chart", status=Status.ACCEPTED, **kw) -> Fix:
+# Described with long descriptions on: the figure step's long prompt made the proposal
+# (`figure_step.long_description_missing` reads it from the calls).
+LONG_CALL = ModelCall(step="figure", model="m", prompt_version="figure_long-0000")
+
+
+def figure(eid: str, figure_type="chart", status=Status.ACCEPTED, long=True, **kw) -> Fix:
     return Fix(element_id=eid, kind=Kind.FIGURE, status=status, confidence=0.9,
-               figure=FigureFix(figure_type=figure_type, alt="A rising line.", **kw))  # fmt: skip
+               figure=FigureFix(figure_type=figure_type, alt="A rising line.", **kw),
+               calls=[LONG_CALL] if long else [])  # fmt: skip
 
 
 def failed(eid: str, kind: Kind, reason: str) -> Fix:
@@ -162,7 +169,8 @@ def test_current_notices_follow_the_fixes_as_they_are_now():
 
 
 def test_current_notices_of_a_result_without_any_are_empty():
-    assert notices.current(result([figure("p1-e1")], [])) == []
+    """A chart described with long descriptions off has nothing to report."""
+    assert notices.current(result([figure("p1-e1", long=False)], [])) == []
 
 
 def test_notices_never_change_the_decision_count():

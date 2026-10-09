@@ -46,7 +46,6 @@ LONG_DESCRIPTION_MISSING = "long_description_missing"
 # replaced by `current`.
 DERIVED_CODES = frozenset({TABLE_NOT_REBUILT, SCANNED_PAGE, COLOUR_ONLY, LONG_DESCRIPTION_MISSING})
 # Figures that need more than short alt text (W3C "complex images").
-COMPLEX_FIGURES = frozenset({"chart", "diagram"})
 # Where a notice is listed on the job page.
 Section = Literal["not_handled", "worth_checking"]
 
@@ -64,12 +63,11 @@ def _not_rebuilt(fix: Fix) -> bool:
 
 
 def _missing_long_description(fix: Fix) -> bool:
-    figure = fix.figure
-    if fix.kind is not Kind.FIGURE or figure is None or figure.decorative:
-        return False
-    if figure.figure_type not in COMPLEX_FIGURES:
-        return False
-    return not (figure.long_description or "").strip()
+    """A chart or diagram described with the long-description prompt but left without
+    one: the figures work's own rule (`figure_step.long_description_missing`)."""
+    from a11y_stem.pipeline import figure_step
+
+    return fix.kind is Kind.FIGURE and figure_step.long_description_missing(fix)
 
 
 def from_fixes(
@@ -143,13 +141,9 @@ def current(result: DocumentResult) -> list[Notice]:
     again from the fixes as they are (after review decisions), merged with the stored
     notices of every other code, in page and reading order.
 
-    Whether the run wrote long descriptions is not stored; a stored
-    `long_description_missing` notice, or any figure with a long description, says it
-    did (without either, there is nothing to report either way).
+    Whether a figure was described with long descriptions on is in its own model calls
+    (the long prompt's version), so the notice follows the fix as it is now.
     """
-    long_descriptions = any(n.code == LONG_DESCRIPTION_MISSING for n in result.notices) or any(
-        f.figure is not None and f.figure.long_description for f in result.fixes
-    )
-    derived = from_fixes(result.elements, result.fixes, long_descriptions=long_descriptions)
+    derived = from_fixes(result.elements, result.fixes, long_descriptions=True)
     kept = [n for n in result.notices if n.code not in DERIVED_CODES]
     return ordered(merge(derived, kept), result.elements)
