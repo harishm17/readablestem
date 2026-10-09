@@ -517,10 +517,17 @@ as for other kinds. The rules (`web.review`, "tables"):
   one-row table, a header row whose cell spans into the body. A problem the proposal
   already had is left for the reviewer to judge and does not block a cell.
 - *The grid read from the PDF* replaces the proposal with a copy of `Element.table`; the
-  fix keeps its reason (`table_not_rebuilt`), so ops still counts why it was asked.
+  fix keeps its reason (`table_not_rebuilt`), so ops still counts why it was asked, but
+  the card and the list no longer show it: the table is converted now.
 
-After a table edit the fix's checks are the ones the review ran (a maths cell's LaTeX
-and MathML checks; none for headers), as after an equation edit. Nothing about a table
+After a table edit the fix's checks are the ones the review ran, as after an equation
+edit: a maths cell's LaTeX and MathML checks, and the table step's own checks of the
+table as it is now (`web.review.table_checks`, which runs
+`pipeline.table_step.table_checks(grid, element)`: structure and headers, agreement
+with the grid read from the PDF, the cells' words, the maths cells). So a finding stays
+on the card until the cell is put right, and a failed one is a warning on the change
+("1 check gives a warning"), never a refusal. Until the table step has that function
+there are none. Nothing about a table
 is logged but codes: the `review` event gets `change=cell|headers|use_local`.
 
 With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at

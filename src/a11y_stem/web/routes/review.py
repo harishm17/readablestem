@@ -325,6 +325,10 @@ def _item(
         # The select offers the level the document shows, not one it would move.
         suggested = place.suggested if place is not None else None
         values["level"] = str(suggested or fix.heading.level)
+    table = table_card(fix, element) if fix.kind is Kind.TABLE else None
+    # A table the reviewer gave a grid (the one read from the PDF) is converted now: the
+    # pipeline's reason stays stored, but no longer says why it is not.
+    reason = fix.reason if table is None or not table.in_document else None
     return ReviewItem(
         element_id=fix.element_id,
         kind=fix.kind.value,
@@ -335,7 +339,7 @@ def _item(
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c, note=optional) for c in fix.failed_checks],
-        reason=explain_reason(fix.reason) if fix.reason else None,
+        reason=explain_reason(reason) if reason else None,
         crop_url=f"/jobs/{job_id}/crops/{fix.element_id}.png"
         if fix.element_id in crop_ids
         else None,
@@ -354,7 +358,7 @@ def _item(
         values=values,
         optional=optional,
         second_check=triage.second_check_note(fix),
-        table=table_card(fix, element) if fix.kind is Kind.TABLE else None,
+        table=table,
     )
 
 

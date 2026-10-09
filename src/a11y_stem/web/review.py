@@ -942,8 +942,9 @@ def edit_table(
             message = "There is no grid read from the PDF that could be used for this table."
             raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
         fix.table = TableFix(grid=grid.model_copy(deep=True))
-        fix.checks = []
-        return [], "The table now uses the grid read from the PDF."
+        fix.checks = table_checks(fix.table.grid, element)
+        failed = [c for c in fix.checks if not c.passed]
+        return failed, "The table now uses the grid read from the PDF."
     if fix.table is None:
         message = (
             "There is no rebuilt table to change. Use the grid read from the PDF, if there "
@@ -951,10 +952,29 @@ def edit_table(
         )
         raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
     if change == "headers":
-        return _edit_headers(fix, fix.table.grid, form)
+        return _edit_headers(fix, fix.table.grid, element, form)
     if change == "cell":
-        return _edit_cell(fix, fix.table.grid, form)
+        return _edit_cell(fix, fix.table.grid, element, form)
     raise ReviewInvalid([FieldError(field_id("actions", eid), "Choose what to change.")])
+
+
+def table_checks(grid: TableGrid, element: Element | None) -> list[Check]:
+    """The table step's own checks of a grid against the PDF, run again after a change, so
+    the card shows what is still wrong with the table as it is now (a cell put right
+    clears its finding; one still wrong keeps it).
+
+    They are `pipeline.table_step.table_checks(grid, element)` (the grid's structure and
+    headers, agreement with the grid read from the PDF, the cells' words, the maths
+    cells), pure functions of the stored grid and element. Until the table step has
+    them, and for a table whose element is gone, there are none; structural problems are
+    refused by the edit itself either way (`_refuse_new_problems`)."""
+    from a11y_stem.pipeline import table_step
+
+    # Looked up by name: the table step and this screen were built side by side.
+    run_checks = getattr(table_step, "table_checks", None)
+    if run_checks is None or element is None:
+        return []
+    return list(run_checks(grid, element))
 
 
 def _refuse_new_problems(
@@ -969,7 +989,9 @@ def _refuse_new_problems(
         raise ReviewInvalid([FieldError(fid, message)], values)
 
 
-def _edit_headers(fix: Fix, grid: TableGrid, form: Mapping[str, str]) -> tuple[list[Check], str]:
+def _edit_headers(
+    fix: Fix, grid: TableGrid, element: Element | None, form: Mapping[str, str]
+) -> tuple[list[Check], str]:
     fid = field_id("header-row", fix.element_id)
     row = form.get("header_row") in {"on", "true", "1"}
     col = form.get("header_col") in {"on", "true", "1"}
@@ -980,13 +1002,15 @@ def _edit_headers(fix: Fix, grid: TableGrid, form: Mapping[str, str]) -> tuple[l
     edited = with_header_col(with_header_row(grid, row), col)
     _refuse_new_problems(grid, edited, fid, "The headers were", values)
     fix.table = TableFix(grid=edited)
-    fix.checks = []
+    fix.checks = table_checks(edited, element)
     first_row = "The first row is a header" if row else "The first row is not a header"
     first_col = "the first column is a header" if col else "the first column is not a header"
-    return [], f"{first_row}, and {first_col}."
+    return [c for c in fix.checks if not c.passed], f"{first_row}, and {first_col}."
 
 
-def _edit_cell(fix: Fix, grid: TableGrid, form: Mapping[str, str]) -> tuple[list[Check], str]:
+def _edit_cell(
+    fix: Fix, grid: TableGrid, element: Element | None, form: Mapping[str, str]
+) -> tuple[list[Check], str]:
     from a11y_stem.pipeline import validate
 
     eid = fix.element_id
@@ -1032,8 +1056,8 @@ def _edit_cell(fix: Fix, grid: TableGrid, form: Mapping[str, str]) -> tuple[list
     after = grid.model_copy(update={"cells": cells})
     _refuse_new_problems(grid, after, fid, "The cell was", values)
     fix.table = TableFix(grid=after)
-    fix.checks = checks
-    return [c for c in checks if not c.passed], f"{cell_label(cell)} changed."
+    fix.checks = checks + table_checks(after, element)
+    return [c for c in fix.checks if not c.passed], f"{cell_label(cell)} changed."
 
 
 # --------------------------------------------------------------------------- stale tabs

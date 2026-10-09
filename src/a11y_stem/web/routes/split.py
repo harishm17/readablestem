@@ -538,8 +538,11 @@ class SplitBuilder:
                 panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
                 panel.region_alt = f"{item.label} in the PDF, outlined, with the lines around it."
             # The card lists every finding itself; the line above it says only why there
-            # is no rebuilt table, or that the model was not sure enough.
-            if fix.reason or not (fix.failed_checks or (item.table and item.table.problems)):
+            # is no rebuilt table (not once the reviewer gave it one: the grid read from
+            # the PDF), or that the model was not sure enough.
+            rebuilt = item.table is not None and item.table.in_document
+            listed = fix.failed_checks or (item.table and item.table.problems)
+            if (fix.reason and not rebuilt) or not (fix.reason or listed):
                 panel.why = _why(fix, None)
             return
         panel.why = _why(fix, panel.compare)

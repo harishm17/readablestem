@@ -22,6 +22,7 @@ import pytest
 from sqlalchemy import select
 
 from a11y_stem.core.types import (
+    Check,
     DocumentResult,
     DocumentStats,
     Element,
@@ -34,9 +35,11 @@ from a11y_stem.core.types import (
     grid_problems,
 )
 from a11y_stem.observability.logging import FIELDS_ATTR
+from a11y_stem.pipeline import table_step
 from a11y_stem.pipeline.table_html import render_table
 from a11y_stem.web import queue
 from a11y_stem.web.db import ReviewEdit, session_scope
+from a11y_stem.web.messages import UNKNOWN_CHECK_MESSAGE
 from a11y_stem.web.review import (
     NO_TABLE_TO_ACCEPT,
     STALE_MESSAGE,
@@ -351,6 +354,8 @@ def test_use_the_grid_read_from_the_pdf_stays_on_the_table(tables):
     body = panel(page)
     assert "Decided: Edited by you" in body
     assert "Rebuilt, as students get it" in body
+    # The line that said the table is kept as an image no longer applies.
+    assert 'class="why"' not in body and "kept as an image" not in body
     # Decided and still open to change; the way on is one link.
     assert "Change the table" in body
     onward = f'href="/jobs/{tables.job_id}/review?item=p2-e0#decision-title">Go on to decision 3<'
@@ -471,9 +476,43 @@ def test_a_maths_cell_goes_through_the_latex_checks(tables):
     assert cell.mathml is not None and "<mi>x</mi>" in cell.mathml
     assert cell.text == "v = d / t"  # the plain text the serialiser falls back on
     fix = fix_of(tables, "p1-e1")
-    assert fix.checks and all(c.passed for c in fix.checks)  # the LaTeX and MathML checks
-    assert {c.name.split(".")[0] for c in fix.checks} == {"latex", "mathml"}
+    own = [c for c in fix.checks if c.name.split(".")[0] in {"latex", "mathml"}]
+    assert own and all(c.passed for c in own)  # the LaTeX and MathML checks
     assert MATHS_LATEX not in panel(screen(tables, "?item=p1-e1&cell=r3c1"))
+
+
+def test_every_change_runs_the_table_checks_again(tables, monkeypatch):
+    """A change re-runs the table step's checks on the table as it is now
+    (`web.review.table_checks`): a finding stays until the cell is put right."""
+    seen: list[tuple[str, int]] = []
+
+    def fake_checks(grid: TableGrid, element: Element) -> list[Check]:
+        seen.append((element.id, len(grid.cells)))
+        cell = next((c for c in grid.cells if (c.row, c.col) == (1, 1)), None)
+        wrong = element.id == "p1-e1" and (cell is None or cell.text != "10")
+        code = "text_mismatch" if wrong else None
+        return [Check(name="table.cell_text", passed=not wrong, severity="warning", code=code)]
+
+    monkeypatch.setattr(table_step, "table_checks", fake_checks, raising=False)
+    page = follow(tables, post(tables, "p1-e1", action="edit", change="cell", row="1", col="1",
+                               cell="11"))  # fmt: skip
+    assert "Row 2, column 2 changed." in page
+    assert "1 check gives a warning: see the notes on it." in page
+    findings = section(panel(page), 'class="explained table-findings"', "</div>")
+    assert UNKNOWN_CHECK_MESSAGE in findings
+    # Still wrong after a change of headers.
+    post(tables, "p1-e1", action="edit", change="headers", header_row="on")
+    assert [c.code for c in fix_of(tables, "p1-e1").failed_checks] == ["text_mismatch"]
+    # Put right: the finding goes.
+    page = follow(tables, post(tables, "p1-e1", action="edit", change="cell", row="1", col="1",
+                               cell="10"))  # fmt: skip
+    assert "check gives a warning" not in page
+    assert "table-findings" not in panel(page)
+    assert fix_of(tables, "p1-e1").failed_checks == []
+    # The grid read from the PDF is checked too.
+    post(tables, "p1-e3", action="edit", change="use_local")
+    assert seen == [("p1-e1", 11), ("p1-e1", 11), ("p1-e1", 11), ("p1-e3", 6)]
+    assert [c.passed for c in fix_of(tables, "p1-e3").checks] == [True]
 
 
 def test_a_cell_that_is_not_there_is_refused_on_the_list(tables):
@@ -618,6 +657,7 @@ def test_the_list_view_lists_tables_like_other_kinds(tables):
     )
     second = section(group, 'id="item-p1-e3"', "</article>")
     assert "Use the grid read from the PDF" in second and "Keep the image" in second
+    assert "Why it was not converted:" in second
     third = section(group, 'id="item-p2-e0"', "</article>")
     assert "Keep the image" in third and "use_local" not in third
     for form in post_forms(group):
@@ -626,6 +666,9 @@ def test_the_list_view_lists_tables_like_other_kinds(tables):
     response = post(tables, "p1-e3", action="edit", change="use_local", view="list")
     assert response.headers["location"] == f"/jobs/{tables.job_id}/review/list#item-p2-e0"
     assert "Table 2 on page 1" in follow(tables, response)
+    # Converted now: the reason it was not is no longer shown.
+    decided = section(listing(tables), 'id="item-p1-e3"', "</article>")
+    assert "Why it was not converted:" not in decided and "Proposed table" in decided
 
 
 # --------------------------------------------------------------------------- older results
