@@ -71,9 +71,22 @@
     if (!region || !mark) return;
     var r = region.getBoundingClientRect();
     var m = mark.getBoundingClientRect();
-    if (m.top >= r.top && m.bottom <= r.bottom && m.left >= r.left && m.right <= r.right) return;
-    region.scrollTop += m.top - r.top - region.clientHeight / 3;
+    var visibleBottom = Math.min(r.bottom, window.innerHeight);
+    if (m.top >= r.top && m.bottom <= visibleBottom && m.left >= r.left && m.right <= r.right) {
+      return;
+    }
+    region.scrollTop += m.top - r.top - (visibleBottom - r.top) / 3;
     region.scrollLeft += m.left - r.left - region.clientWidth / 3;
+    // Side by side (wide screens), the page pane starts below the header, so a mark near
+    // the bottom of a page can stay below the window. Move the window just enough, and
+    // never so far that the decision's heading leaves the top of the window.
+    var heading = document.getElementById("decision-title");
+    var side = window.getComputedStyle(region.closest(".page-area")).position === "sticky";
+    m = mark.getBoundingClientRect();
+    if (side && heading && m.bottom > window.innerHeight) {
+      var room = heading.getBoundingClientRect().top - 8;
+      window.scrollBy(0, Math.min(m.bottom - window.innerHeight + 24, Math.max(room, 0)));
+    }
   }
 
   function watchPageImage() {
