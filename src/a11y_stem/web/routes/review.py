@@ -27,7 +27,10 @@ Layout (see `web.review` for the rules), in three sections:
 
 A decision is one transaction: lock the job row, apply the decision to the stored result
 (`web.review`), store a `ReviewEdit` per changed fix, re-render the output HTML once with
-the pipeline's assembler, save. If any step fails nothing changes. Without JavaScript
+the pipeline's assembler, count the write (`jobs.result_version`), save. If any step
+fails nothing changes. Every form carries the version its page was drawn at (`version`):
+one drawn before the last write (a tab left open while the document was changed in
+another) is refused with a 409 and the decision as it is now. Without JavaScript
 each button is a normal form POST that redirects to the next decision still waiting
 (`#item-<id>`, or `#group-card-<key>` for a heading group), where a notice links back to
 the one just changed.
@@ -49,7 +52,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web.db import Blob, ReviewEdit, session_scope
+from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
 from a11y_stem.web.deps import (
     ELEMENT_ID,
     CurrentUser,
@@ -77,6 +80,7 @@ from a11y_stem.web.review import (
     BULK_THRESHOLDS,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
+    WRITE_KEY,
     BulkRequest,
     FieldError,
     FixGroup,
@@ -84,11 +88,13 @@ from a11y_stem.web.review import (
     HeadingPlace,
     ReviewChange,
     ReviewInvalid,
+    ReviewStale,
     apply_bulk_accept,
     apply_group,
     apply_review,
     at_or_above,
     bulk_eligible,
+    bump_result_version,
     can_accept,
     group_anchor,
     group_fixes,
@@ -96,6 +102,7 @@ from a11y_stem.web.review import (
     heading_moved,
     heading_places,
     is_group_key,
+    is_stale,
     item_numbers,
     kind_for_slug,
     needs_attention,
@@ -150,6 +157,42 @@ class Notice:
     message: str
     label: str | None = None  # the fix it is about, e.g. "Equation 3 on page 2"
     href: str | None = None  # link to that fix
+
+
+STALE_TITLE = "Your choice was not saved"
+STALE_MESSAGE = (
+    "This document was changed in another tab or window after this page was opened. It is "
+    "shown below as it is now: check it, then choose again."
+)
+
+
+@dataclass
+class StaleNotice:
+    """A refused write from an out-of-date page (`web.review.is_stale`)."""
+
+    title: str
+    message: str
+    now: str  # what the item is now ("Equation 1 is now: accepted by you."), or ""
+    href: str  # the page as it is now, by GET (reloading the POST would only re-send it)
+
+
+def stale_notice(
+    result: DocumentResult, numbers: dict[str, int], target: str, href: str
+) -> StaleNotice:
+    fix = result.fix_for(target) if not is_group_key(target) else None
+    now = ""
+    if fix is not None and fix.kind in NOUNS:
+        label = f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
+        now = f"{label} is now: {fix_status_label(fix).lower()}."
+    return StaleNotice(STALE_TITLE, STALE_MESSAGE, now, href)
+
+
+def _stale_anchor(result: DocumentResult, target: str) -> str:
+    if is_group_key(target):
+        return group_anchor(target)
+    if kind_for_slug(target) is not None:
+        return f"group-{target}"
+    return review_anchor(result, target)
 
 
 @dataclass
@@ -433,6 +476,14 @@ def _group(
 def _load(
     request: Request, job_id: str, user: CurrentUser
 ) -> tuple[JobView, DocumentResult, set[str]]:
+    view, result, crop_ids, _ = _load_versioned(request, job_id, user)
+    return view, result, crop_ids
+
+
+def _load_versioned(
+    request: Request, job_id: str, user: CurrentUser
+) -> tuple[JobView, DocumentResult, set[str], int]:
+    """`_load`, and the job's review version: what the page's forms carry (stale guard)."""
     with session_scope(get_ctx(request).factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
@@ -443,7 +494,8 @@ def _load(
                 select(Blob.element_id).where(Blob.job_id == job.id, Blob.kind == "crop")
             ).all()
         )
-    return view, result, {c for c in crop_ids if c}
+        version = job.result_version or 0
+    return view, result, {c for c in crop_ids if c}, version
 
 
 def _place_flashes(
@@ -523,9 +575,10 @@ def _page(
     user: CurrentUser,
     *,
     invalid: tuple[str, ReviewInvalid] | None = None,
+    stale: str | None = None,
     status_code: int = 200,
 ) -> Response:
-    view, result, crop_ids = _load(request, job_id, user)
+    view, result, crop_ids, version = _load_versioned(request, job_id, user)
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     fix_groups = group_fixes(result)
@@ -571,6 +624,10 @@ def _page(
         "remaining": sum(len(g.units) for g in fix_groups),
         "remaining_by_kind": [decisions_label(g.units, g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
+        "result_version": version,
+        "stale": None
+        if stale is None
+        else stale_notice(result, numbers, stale, list_url(view.id, _stale_anchor(result, stale))),
         # No `active` nav item: this page is not "My documents" itself, so the link
         # must not be announced as the current page (aria-current="page").
     }
@@ -620,6 +677,34 @@ def _invalid_page(
     return split_page(request, job_id, user, item=target, invalid=(target, exc), status_code=422)
 
 
+def _stale_page(
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    view: str,
+    target: str,
+    values: dict[str, str] | None = None,
+) -> Response:
+    """A write from an out-of-date page: nothing applied; the view the form was on, as it
+    is now, says so (409). What the reviewer typed stays in the field, so choosing again
+    is one click."""
+    log_event(logger, "review_stale", job_id=job_id)
+    kept = ReviewInvalid([], values)
+    if view == LIST_VIEW:
+        return _page(request, job_id, user, invalid=(target, kept), stale=target, status_code=409)
+    from a11y_stem.web.routes.split import split_page
+
+    return split_page(
+        request, job_id, user, item=target, invalid=(target, kept), stale=True, status_code=409
+    )
+
+
+def _refuse_stale(job: Job, version: str) -> None:
+    """Raise ReviewStale when the form was drawn before the job's last review write."""
+    if is_stale(job.result_version, version):
+        raise ReviewStale()
+
+
 @router.post("/jobs/{job_id}/review/{element_id}", dependencies=[Depends(require_csrf)])
 def review_action(
     request: Request,
@@ -634,6 +719,7 @@ def review_action(
     min_confidence: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
     scope: Annotated[str, Form()] = "",
+    version: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
     "headings"), a bulk accept in that group; when it is a heading group's key
@@ -650,23 +736,31 @@ def review_action(
         raise PageError(404, *NOT_FOUND)
     view = LIST_VIEW if view == LIST_VIEW else "split"
     if kind_for_slug(element_id) is not None:
-        return _bulk_action(request, job_id, element_id, user, action, min_confidence, view)
+        return _bulk_action(
+            request, job_id, element_id, user, action, min_confidence, view, version
+        )
     if is_group_key(element_id):
         every = scope == "all"
-        return _group_action(request, job_id, element_id, user, action, level or "", view, every)
+        return _group_action(
+            request, job_id, element_id, user, action, level or "", view, every, version
+        )
     sent = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
     form = {name: value for name, value in sent.items() if value is not None}
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
             change = apply_review(result, element_id, action, form)
             job.html = rerender_html(result, _crops(session, job.id))
             job.result_json = result.model_dump(mode="json", exclude={"html"})
-            session.add(_review_edit(job.id, user, change))
+            written = bump_result_version(job)
+            session.add(_review_edit(job.id, user, change, written))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, element_id, _typed(form))
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
@@ -714,19 +808,24 @@ def _group_action(
     level: str,
     view: str,
     every: bool = False,
+    version: str = "",
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
-                session.add_all(_review_edit(job.id, user, c) for c in outcome.changes)
+                written = bump_result_version(job)
+                session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, group_key)
     except ReviewInvalid as exc:
         logged_action = action if action in STATUS_FOR_ACTION else "unknown"
         log_event(logger, "review_invalid", job_id=job_id, action=f"group_{logged_action}")
@@ -801,19 +900,24 @@ def _bulk_action(
     action: str,
     min_confidence: str,
     view: str,
+    version: str = "",
 ) -> Response:
     try:
         with session_scope(get_ctx(request).factory) as session:
             # Ownership first: someone else's job is a 404 whatever the form says.
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
+            _refuse_stale(job, version)
             bulk = parse_bulk(slug, action, min_confidence)
             result = DocumentResult.model_validate(job.result_json or {})
             changes = apply_bulk_accept(result, bulk)
             if changes:  # nothing left to accept: no write, no re-render (idempotent)
                 job.html = rerender_html(result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
-                session.add_all(_review_edit(job.id, user, c) for c in changes)
+                written = bump_result_version(job)
+                session.add_all(_review_edit(job.id, user, c, written) for c in changes)
+    except ReviewStale:
+        return _stale_page(request, job_id, user, LIST_VIEW, slug)
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="bulk")
         return _page(request, job_id, user, invalid=(slug, exc), status_code=422)
@@ -861,12 +965,20 @@ def _crops(session: Session, job_id: str) -> dict[str, bytes]:
     return {b.element_id: b.content for b in blobs if b.element_id}
 
 
-def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange) -> ReviewEdit:
+def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange, version: int) -> ReviewEdit:
+    """One fix's change. Its `after` snapshot also records the review version the write
+    made (`web.review.WRITE_KEY`): the edits of the last write are the ones Undo puts
+    back."""
     return ReviewEdit(
         job_id=job_id,
         user_id=user.id,
         element_id=change.fix.element_id,
         action=change.action,
         before=change.before,
-        after=change.after,
+        after=change.after | {WRITE_KEY: version},
     )
+
+
+def _typed(form: dict[str, str]) -> dict[str, str]:
+    """The fields of a refused form, to show again as they were typed."""
+    return {k: v for k, v in form.items() if k in {"latex", "alt", "decorative", "level"}}

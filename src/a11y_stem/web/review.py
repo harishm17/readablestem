@@ -36,6 +36,11 @@ Decisions, not fixes, are what a reviewer makes: repeated headings that share a
 `Fix.group_key` (`pipeline.heading_step`) are one decision. `apply_group` keeps them all
 as headings, gives them all one level, or makes them all bold text, in one transaction.
 
+Every review write counts itself on the job (`bump_result_version`, `jobs.result_version`),
+and every decision form carries the number its page was drawn at: a form from a page that
+is out of date (a tab left open while the document was changed in another one) is refused
+(`is_stale`) instead of silently overwriting the newer decision.
+
 Validators, speech and the HTML assembler are looked up on their modules at call time,
 so tests (and other work packages' stubs) can be swapped in with monkeypatch.
 """
@@ -47,7 +52,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import (
@@ -63,6 +68,9 @@ from a11y_stem.core.types import (
     Status,
 )
 from a11y_stem.web.messages import confidence_percent, explain_check
+
+if TYPE_CHECKING:
+    from a11y_stem.web.db import Job
 
 logger = logging.getLogger(__name__)
 
@@ -104,6 +112,37 @@ class ReviewInvalid(Exception):
         super().__init__("review input rejected")
         self.errors = errors
         self.values = values or {}  # the reviewer's input, re-shown in the form
+        # The edit was refused only because it differs from the PDF where that changes the
+        # meaning: the form offers "Use my edit anyway" (`apply_review(..., anyway=True)`).
+        self.override = False
+
+
+class ReviewStale(Exception):
+    """The form was drawn before the job's last review write (another tab or window):
+    nothing is applied (`is_stale`)."""
+
+
+# --------------------------------------------------------------------------- versions
+
+_VERSION = re.compile(r"[0-9]{1,9}")  # ASCII digits only, like _LEVEL
+
+
+def bump_result_version(job: Job) -> int:
+    """Count one more review write on the job (`jobs.result_version`) and return the new
+    number. Called inside the write's transaction, after the job row was locked, so two
+    writes never share a number; the forms of the page drawn after it carry it."""
+    job.result_version = (job.result_version or 0) + 1
+    return job.result_version
+
+
+def is_stale(current: int | None, sent: str) -> bool:
+    """A form drawn at another version than the job's now. A form without the field (a
+    page opened before the guard existed, a script) is not stale: the guard is there for
+    tabs left open, not as a lock."""
+    sent = sent.strip()
+    if not sent:
+        return False
+    return not _VERSION.fullmatch(sent) or int(sent) != (current or 0)
 
 
 @dataclass
@@ -252,9 +291,19 @@ def can_accept(fix: Fix) -> bool:
     return has_proposal(fix) and not _blocking(fix.checks)
 
 
+SNAPSHOT_FIELDS = frozenset(
+    {"status", "equation", "figure", "heading", "table", "checks", "reviewed"}
+)
+# Beside the fields, a ReviewEdit's `after` holds the review version its write made (a
+# number), so the edits of one write can be found again (`undo_last`).
+WRITE_KEY = "write"
+
+
 def snapshot(fix: Fix) -> dict[str, Any]:
-    """What a ReviewEdit stores as before/after (deleted with the job)."""
-    return fix.model_dump(mode="json", include={"status", "equation", "figure", "heading"})
+    """What a ReviewEdit stores as before/after (deleted with the job): everything a
+    decision can change, so `undo_last` can put it back. Snapshots stored before the
+    checks and `reviewed` were in them cannot be undone."""
+    return fix.model_dump(mode="json", include=set(SNAPSHOT_FIELDS))
 
 
 def field_id(prefix: str, element_id: str) -> str:

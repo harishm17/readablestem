@@ -81,6 +81,8 @@ from a11y_stem.web.routes.review import (
     _heading_group,
     _item,
     _load,
+    _load_versioned,
+    stale_notice,
 )
 from a11y_stem.web.views import KIND_LABELS, JobView
 
@@ -369,7 +371,7 @@ class SplitBuilder:
     ) -> None:
         self.request = request
         self.user = user
-        self.view, self.result, self.crop_ids = _load(request, job_id, user)
+        self.view, self.result, self.crop_ids, self.version = _load_versioned(request, job_id, user)
         self.job_id = self.view.id
         self.show_accepted = show_accepted
         self.elements = {e.id: e for e in self.result.elements}
@@ -746,6 +748,7 @@ def split_page(
     page: str = "",
     show_accepted: bool = False,
     invalid: tuple[str, ReviewInvalid] | None = None,
+    stale: bool = False,
     status_code: int = 200,
 ) -> Response:
     builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted)
@@ -791,6 +794,12 @@ def split_page(
         "show_accepted": show_accepted,
         "list_url": f"/jobs/{builder.job_id}/review/list",
         "max_steps": MAX_STEPS,
+        "result_version": builder.version,
+        "stale": stale_notice(
+            builder.result, builder.numbers, item, review_url(builder.job_id, item=item)
+        )
+        if stale
+        else None,
     }
     return render(request, "review_split.html", context, status_code=status_code)
 

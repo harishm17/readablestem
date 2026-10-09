@@ -7,8 +7,10 @@
 {% block main_class %}wrap wrap-review{% endblock %}
 {% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">{% endblock %}
 
+{# Every decision form: the CSRF token, the view to come back to, and the review version
+   the page was drawn at (a form from an out-of-date tab is refused, not applied). #}
 {% macro hidden_fields() %}
-<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="split">
+<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="split"><input type="hidden" name="version" value="{{ result_version }}">
 {%- endmacro %}
 
 {% macro error_line(item, prefix) %}
@@ -271,6 +273,7 @@
   </div>
 </div>
 {% include "_error_summary.html" %}
+{% include "_stale_notice.html" %}
 
 <div class="split">
   <section class="decision-area panel-{{ panel.mode }}" id="decision" aria-labelledby="decision-title">
