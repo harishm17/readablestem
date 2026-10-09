@@ -62,7 +62,7 @@ from typing import Any, Protocol
 from a11y_stem.config import Settings
 from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
-from a11y_stem.core.types import Check, Element, Fix, Kind, ModelCall, Status
+from a11y_stem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
 from a11y_stem.eval import judge as judge_mod
 from a11y_stem.eval import verifier_metrics as vm
 from a11y_stem.eval.equations import (
@@ -74,7 +74,16 @@ from a11y_stem.eval.equations import (
 )
 from a11y_stem.eval.gold_scoring import iter_gold_records
 from a11y_stem.models.base import VisionClient
-from a11y_stem.pipeline import equation_step, figure_step, heading_step, html_checks, layout, run
+from a11y_stem.pipeline import (
+    equation_step,
+    figure_details,
+    figure_step,
+    heading_step,
+    html_checks,
+    layout,
+    run,
+)
+from a11y_stem.pipeline import options as run_options
 
 SCHEMA_VERSION = 1
 TASKS = ("equations", "headings", "figures", "document")
@@ -1057,7 +1066,7 @@ def figure_metrics(items: Sequence[dict]) -> dict:
     passes = sum(bool(i["judge_pass"]) for i in measured)
     by_type: Counter[str] = Counter(str(i["figure_type"]) for i in items if i["has_proposal"])
     failed: Counter[str] = Counter(code for i in items for code in i["failed_checks"])
-    return {
+    metrics = {
         "proposal_rate": rate(i["has_proposal"] for i in items),
         "check_pass_rate": rate(i["checks_passed"] for i in items),
         "failed_check_codes": dict(sorted(failed.items())),
@@ -1078,6 +1087,9 @@ def figure_metrics(items: Sequence[dict]) -> dict:
         "decorative_rate": rate(bool(i["decorative"]) for i in items if i["has_proposal"]),
         "second_check": vm.figure_metrics(items),
     }
+    if any(i.get("long_descriptions") for i in items):
+        metrics["long_descriptions"] = long_description_metrics(items)
+    return metrics
 
 
 def _figure_image(record: dict) -> dict:
@@ -1091,15 +1103,20 @@ def _figure_inputs(media: EvalMedia, units: list[dict]) -> list[bytes]:
 def _eval_figures(
     cfg: EvalConfig, units: list[dict], pngs: list[bytes]
 ) -> tuple[list[dict], str | None]:
+    # The options the app would use (FEATURE_LONG_DESCRIPTIONS): with long descriptions
+    # on, the step sends its long prompt and the long-description judge grades the
+    # extra output too.
+    options = ConversionOptions.from_settings(cfg.settings)
     items = []
     for index, (record, png) in enumerate(zip(units, pngs, strict=True)):
         image = _figure_image(record)
         caption = record.get("caption")
         element = _element(Kind.FIGURE, index, png, caption=caption)
         try:
-            fix = figure_step.describe(
-                element, png, client=cfg.client, settings=cfg.settings, context_text=caption
-            )
+            with run_options.using(options):
+                fix = figure_step.describe(
+                    element, png, client=cfg.client, settings=cfg.settings, context_text=caption
+                )
             stopped = budget_reason(fix)
             if stopped:
                 return items, stopped
@@ -1114,10 +1131,105 @@ def _eval_figures(
                     settings=cfg.settings,
                     image=png,
                 )
+            long_judgement = None
+            proposal = fix.figure
+            if options.long_descriptions and proposal and figure_details.has_details(proposal):
+                long_judgement = judge_mod.judge_long(
+                    proposal.long_description,
+                    proposal.data_table,
+                    reference,
+                    caption,
+                    client=cfg.client,
+                    settings=cfg.settings,
+                    image=png,
+                )
         except BudgetExceeded as exc:
             return items, f"budget_{exc.scope}"
-        items.append(figure_item(record, fix, judgement))
+        item = figure_item(record, fix, judgement)
+        if options.long_descriptions:
+            item |= long_description_fields(fix, long_judgement)
+        items.append(item)
     return items, None
+
+
+# Long descriptions (FEATURE_LONG_DESCRIPTIONS; docs/eval.md "Long descriptions").
+
+
+def long_description_fields(fix: Fix, judgement: judge_mod.LongJudgement | None) -> dict:
+    """Per-item fields of a figure described with long descriptions on."""
+    figure = fix.figure
+    verdict = judgement.verdict if judgement is not None else None
+    failed = {c.code for c in fix.failed_checks}
+    if judgement is None:
+        outcome = "not_judged"  # nothing to grade: no long description and no table
+    else:
+        outcome = "judged" if verdict is not None else f"judge_{judgement.call.outcome}"
+    table = figure.data_table if figure is not None else None
+    return {
+        "long_descriptions": True,
+        "long_description": figure.long_description if figure is not None else None,
+        "long_unsure": "long_description_unsure" in failed,
+        "data_table": judge_mod.table_text(table) if table is not None else None,
+        "data_table_rows": table.rows - table.header_rows if table is not None else 0,
+        "data_values_from_text": figure.data_values_from_text if figure is not None else None,
+        "values_from_image": "values_from_image" in failed,
+        "colour_only": bool(figure is not None and figure.colour_only),
+        "review": fix.review,
+        "long_judge_outcome": outcome,
+        "long_pass": verdict.passed if verdict is not None else None,
+        "long_accurate": verdict.accurate if verdict is not None else None,
+        "long_complete": verdict.complete if verdict is not None else None,
+        "long_invented_values": verdict.invented_values if verdict is not None else None,
+        "long_score": verdict.score if verdict is not None else None,
+        "table_values_ok": verdict.table_values_ok if verdict is not None else None,
+        "table_wrong_values": verdict.table_wrong_values if verdict is not None else None,
+        "long_judge_cost_usd": judgement.call.cost_usd if judgement is not None else 0.0,
+        "long_judge_prompt_version": judgement.call.prompt_version if judgement else None,
+    }
+
+
+def long_description_metrics(items: Sequence[dict]) -> dict:
+    """What the long prompt adds, over the figures described with it.
+
+    Pass rates are over judged long descriptions (a figure with only a table has no
+    description to grade); table accuracy over judged tables. `required_decisions` is
+    the figures left needing a decision, `required_for_values` those whose data table
+    was read from the image (the review load the option adds).
+    """
+    on = [i for i in items if i.get("long_descriptions")]
+    proposals = [i for i in on if i["has_proposal"]]
+    complex_figures = [i for i in proposals if i["figure_type"] in figure_step.COMPLEX_FIGURE_TYPES]
+    described = [i for i in proposals if i["long_description"]]
+    graded = [i for i in described if i["long_judge_outcome"] == "judged"]
+    tables = [i for i in proposals if i["data_table"]]
+    tables_graded = [i for i in tables if i["table_values_ok"] is not None]
+    passes = sum(bool(i["long_pass"]) for i in graded)
+    return {
+        "figures": len(on),
+        "described": len(described),
+        "described_rate": rate(bool(i["long_description"]) for i in proposals),
+        "complex_figures": len(complex_figures),
+        "complex_described_rate": rate(bool(i["long_description"]) for i in complex_figures),
+        "mean_chars": mean(len(i["long_description"]) for i in described),
+        "judged": len(graded),
+        "judge_errors": sum(i["long_judge_outcome"].startswith("judge_") for i in on),
+        "pass_rate": _safe_div(passes, len(graded)),
+        "pass_rate_ci95": wilson_interval(passes, len(graded)),
+        "accurate_rate": rate(bool(i["long_accurate"]) for i in graded),
+        "complete_rate": rate(bool(i["long_complete"]) for i in graded),
+        "invented_values_rate": rate(bool(i["long_invented_values"]) for i in graded),
+        "mean_score": mean(i["long_score"] for i in graded),
+        "unsure": sum(bool(i["long_unsure"]) for i in on),
+        "data_tables": len(tables),
+        "data_tables_judged": len(tables_graded),
+        "table_values_ok_rate": rate(bool(i["table_values_ok"]) for i in tables_graded),
+        "table_wrong_values": sum(i["table_wrong_values"] or 0 for i in tables_graded),
+        "values_from_text": sum(i["data_values_from_text"] is True for i in tables),
+        "colour_only": sum(bool(i["colour_only"]) for i in on),
+        "required_decisions": sum(i["review"] == "required" for i in on),
+        "required_for_values": sum(bool(i["values_from_image"]) for i in on),
+        "judge_usd": sum(i["long_judge_cost_usd"] for i in on),
+    }
 
 
 # ======================================================================== document
@@ -1552,6 +1664,8 @@ def _prompt_versions(task: str, items: Sequence[dict]) -> dict[str, str]:
             seen[step].add(version)
         if item.get("judge_prompt_version"):
             seen["judge"].add(item["judge_prompt_version"])
+        if item.get("long_judge_prompt_version"):
+            seen["judge_long"].add(item["long_judge_prompt_version"])
     versions = dict(STEP_PROMPTS[task])
     versions.update({step: ",".join(sorted(v)) for step, v in seen.items()})
     if task == "figures" and "judge" not in versions:
@@ -1581,12 +1695,15 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
     # also reported on its own so the added cost is visible.
     verifier_cost = sum(i.get("verifier_cost_usd", 0.0) for i in items)
     step_cost = sum(i.get("cost_usd", 0.0) for i in items) + verifier_cost
-    judge_cost = sum(i.get("judge_cost_usd", 0.0) for i in items)
+    judge_cost = sum(
+        i.get("judge_cost_usd", 0.0) + i.get("long_judge_cost_usd", 0.0) for i in items
+    )
     n = len(items)
     unit = COST_UNITS.get(task, "page")
     calls = sum(i.get("model_calls", 0) for i in items)
     if task == "figures":
         calls += sum(1 for i in items if i.get("judge_prompt_version"))
+        calls += sum(1 for i in items if i.get("long_judge_prompt_version"))
     out = {
         "total_usd": step_cost + judge_cost,
         "pipeline_usd": step_cost,
@@ -1717,6 +1834,15 @@ HEADLINE = {
 }  # fmt: skip
 
 
+LONG_HEADLINE = [
+    "described", "described_rate", "complex_described_rate", "mean_chars", "judged",
+    "pass_rate", "pass_rate_ci95", "accurate_rate", "complete_rate", "invented_values_rate",
+    "mean_score", "unsure", "data_tables", "table_values_ok_rate", "table_wrong_values",
+    "values_from_text", "colour_only", "required_decisions", "required_for_values",
+    "judge_errors",
+]  # fmt: skip
+
+
 def _review_rows(task: str, load: dict) -> list[tuple[str, Any]]:
     """The headline review-load numbers of one report (`*_review_load`)."""
     if task == "equations":
@@ -1832,6 +1958,10 @@ def format_markdown(report: dict) -> str:
     if "second_check" in metrics:
         lines += ["", "### Second automated check (Decisions API)", ""]
         lines += _table(["metric", "value"], _second_check_rows(report["task"], metrics))
+    if "long_descriptions" in metrics:
+        lines += ["", "### Long descriptions (FEATURE_LONG_DESCRIPTIONS on)", ""]
+        long = metrics["long_descriptions"]
+        lines += _table(["metric", "value"], ((k, long[k]) for k in LONG_HEADLINE))
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]
         lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())
