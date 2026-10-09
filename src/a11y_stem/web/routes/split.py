@@ -34,9 +34,10 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
 from fastapi.responses import Response
+from pydantic import TypeAdapter
 from sqlalchemy import select
 
-from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
+from a11y_stem.core.types import DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
 from a11y_stem.web import marks, page_images, queue
 from a11y_stem.web.compare import (
@@ -239,34 +240,74 @@ def _page_count(view: JobView, result: DocumentResult) -> int:
     return max(1, *pages)
 
 
-def _upload(request: Request, job_id: str, user: CurrentUser) -> tuple[bytes, int]:
-    """The job's own upload and its page count; 404 for someone else's job, a deleted one
-    or one past its retention time (`owned_job`)."""
+def _owned_page_count(request: Request, job_id: str, user: CurrentUser) -> int:
+    """The job's page count, without loading its upload; 404 for someone else's job, a
+    deleted one or one past its retention time (`owned_job`)."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = owned_job(session, job_id, user)
+        require_done(job)
+        return job.page_count
+
+
+def _upload(request: Request, job_id: str, user: CurrentUser) -> bytes:
+    """The job's own upload (404 as `_owned_page_count`). Loaded only while a render slot is
+    held (`page_images.render_slot`), so waiting requests hold no copy of it."""
     with session_scope(get_ctx(request).factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
         pdf = session.scalar(
             select(Blob.content).where(Blob.job_id == job.id, Blob.kind == "upload")
         )
-        pages = job.page_count
     if pdf is None:
         raise PageError(404, *NOT_FOUND)
-    return pdf, pages
+    return pdf
+
+
+SIZES = TypeAdapter(dict[int, tuple[float, float]])
 
 
 def resolve_page_sizes(
-    request: Request, job_id: str, user: CurrentUser, result: DocumentResult
+    request: Request,
+    job_id: str,
+    user: CurrentUser,
+    result: DocumentResult,
+    *,
+    slot_held: bool = False,
 ) -> dict[int, tuple[float, float]]:
-    """The result's page sizes; for a result stored before it recorded them, the PDF's
-    own (one child process, nothing stored). Empty when neither is available: the page
-    is then shown without marks."""
+    """The result's page sizes. A result stored before it recorded them gets the PDF's
+    own (one child process) and keeps them: they are stored in the job's result the
+    first time, so the next view, its marks.css and its images start no child for them.
+    Empty when neither is available (no slot free, the child failed): the page is then
+    shown without marks. `slot_held`: the caller already holds a render slot."""
     if result.page_sizes:
         return result.page_sizes
     try:
-        return page_images.page_sizes(_upload(request, job_id, user)[0])
+        if slot_held:
+            sizes = page_images.page_sizes(_upload(request, job_id, user))
+        else:
+            with page_images.render_slot(user.id):
+                sizes = page_images.page_sizes(_upload(request, job_id, user))
     except page_images.RenderFailed as exc:
         log_event(logger, "page_sizes_failed", job_id=job_id, code=exc.code)
         return {}
+    _store_page_sizes(request, job_id, user, sizes)
+    result.page_sizes = sizes
+    return sizes
+
+
+def _store_page_sizes(
+    request: Request, job_id: str, user: CurrentUser, sizes: dict[int, tuple[float, float]]
+) -> None:
+    """Add the page sizes to a stored result that has none (only that key changes, so
+    a result stored before still loads as it did, with its sizes now)."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = owned_job(session, job_id, user, lock=True)
+        data = dict(job.result_json or {})
+        if data.get("page_sizes"):
+            return  # stored meanwhile by another request
+        data["page_sizes"] = SIZES.dump_python(sizes, mode="json")
+        job.result_json = data
+    log_event(logger, "page_sizes_stored", job_id=job_id, pages=len(sizes))
 
 
 def _tier(fix: Fix) -> str:
@@ -847,18 +888,23 @@ def _png(png: bytes) -> Response:
 
 def _render_failed(job_id: str, exc: page_images.RenderFailed, what: str) -> Response:
     log_event(logger, "page_image_failed", job_id=job_id, what=what, code=exc.code)
+    if isinstance(exc, page_images.RenderLimited):  # this user's own burst: slow down
+        headers = IMAGE_HEADERS | {"Retry-After": "2"}
+        return Response("Too many images at once.", status_code=429, headers=headers)
     headers = IMAGE_HEADERS | {"Retry-After": "5"}
     return Response("The image could not be made.", status_code=503, headers=headers)
 
 
 @router.get("/jobs/{job_id}/pages/{number}.png")
 def page_image(request: Request, job_id: str, number: str, user: UserDep) -> Response:
-    """One page of the job's own upload, rendered now, never stored."""
-    pdf, page_count = _upload(request, job_id, user)
+    """One page of the job's own upload, rendered now, never stored. The render slot is
+    taken before the upload is loaded (`page_images.render_slot`)."""
+    page_count = _owned_page_count(request, job_id, user)
     if not number.isdigit() or not 1 <= int(number) <= max(page_count, 1):
         raise PageError(404, *NOT_FOUND)
     try:
-        return _png(page_images.render_page(pdf, int(number) - 1))
+        with page_images.render_slot(user.id):
+            return _png(page_images.render_page(_upload(request, job_id, user), int(number) - 1))
     except page_images.RenderFailed as exc:
         return _render_failed(job_id, exc, "page")
 
@@ -874,44 +920,49 @@ def region_image(request: Request, job_id: str, element_id: str, user: UserDep) 
     fix = result.fix_for(element_id)
     if element is None or fix is None:
         raise PageError(404, *NOT_FOUND)
-    pdf, _ = _upload(request, job_id, user)
-    # The same sizes as marks.css, so the crop and the proposal under it line up.
-    size = resolve_page_sizes(request, job_id, user, result).get(element.page)
     try:
-        if fix.kind is Kind.EQUATION:
-            clip = context_clip(element, size)
-            geometry: CompareGeometry = compare_geometry(
-                element, clip, max_side_px=page_images.REGION_MAX_SIDE_PX
-            )
-            marks = compare_equation(element, fix).pdf_marks
-            png = page_images.render_region(
-                pdf,
-                element.page,
-                zoom=geometry.zoom,
-                max_side=page_images.REGION_MAX_SIDE_PX,
-                clip=clip,
-                mark=element.bbox,
-                chars=marks,
-            )
-        elif fix.kind is Kind.HEADING:
-            png = page_images.render_region(
-                pdf,
-                element.page,
-                zoom=HEADING_REGION_ZOOM,
-                max_side=page_images.REGION_MAX_SIDE_PX,
-                clip=band_clip(element, size),
-                box=element.bbox,
-                snap=True,
-            )
-        else:
-            x0, y0, x1, y1 = element.bbox
-            png = page_images.render_region(
-                pdf,
-                element.page,
-                zoom=FIGURE_REGION_ZOOM,
-                max_side=page_images.REGION_MAX_SIDE_PX,
-                clip=(x0 - 4, y0 - 4, x1 + 4, y1 + 4),
-            )
+        with page_images.render_slot(user.id):
+            # The same sizes as marks.css, so the crop and the proposal under it line up.
+            sizes = resolve_page_sizes(request, job_id, user, result, slot_held=True)
+            pdf = _upload(request, job_id, user)
+            png = _render_region(pdf, element, fix, sizes.get(element.page))
     except page_images.RenderFailed as exc:
         return _render_failed(job_id, exc, fix.kind.value)
     return _png(png)
+
+
+def _render_region(
+    pdf: bytes, element: Element, fix: Fix, size: tuple[float, float] | None
+) -> bytes:
+    if fix.kind is Kind.EQUATION:
+        clip = context_clip(element, size)
+        geometry: CompareGeometry = compare_geometry(
+            element, clip, max_side_px=page_images.REGION_MAX_SIDE_PX
+        )
+        return page_images.render_region(
+            pdf,
+            element.page,
+            zoom=geometry.zoom,
+            max_side=page_images.REGION_MAX_SIDE_PX,
+            clip=clip,
+            mark=element.bbox,
+            chars=compare_equation(element, fix).pdf_marks,
+        )
+    if fix.kind is Kind.HEADING:
+        return page_images.render_region(
+            pdf,
+            element.page,
+            zoom=HEADING_REGION_ZOOM,
+            max_side=page_images.REGION_MAX_SIDE_PX,
+            clip=band_clip(element, size),
+            box=element.bbox,
+            snap=True,
+        )
+    x0, y0, x1, y1 = element.bbox
+    return page_images.render_region(
+        pdf,
+        element.page,
+        zoom=FIGURE_REGION_ZOOM,
+        max_side=page_images.REGION_MAX_SIDE_PX,
+        clip=(x0 - 4, y0 - 4, x1 + 4, y1 + 4),
+    )

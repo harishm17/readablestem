@@ -54,9 +54,11 @@
  * - scrolls the page image, inside its own region, so the selected item's mark is in
  *   the region's visible box (side by side, also the window, only as far as keeps the
  *   decision's heading in view; stacked, never the window);
- * - says so when a page image cannot be loaded;
+ * - asks once more for an image that could not be made (a render refused for a moment),
+ *   then says so when the page image still cannot be loaded;
  * - makes "Save edit" the main button once a field of the decision is changed, so an
- *   edit is less likely to be dropped by pressing Accept out of habit;
+ *   edit is less likely to be dropped by pressing Accept out of habit (the server
+ *   refuses Accept with a changed field in any case);
  * - offers keyboard shortcuts (N, P, A, E). They are off until the reviewer turns them
  *   on (WCAG 2.1.4: single-key shortcuts must be possible to turn off; speech input can
  *   type letters by accident), and never act while focus is in a field.
@@ -98,15 +100,34 @@
     }
   }
 
-  function watchPageImage() {
-    var image = document.querySelector(".page-image");
-    var note = document.querySelector(".page-failed");
-    if (!image || !note) return;
+  // A render can be refused for a moment (each person has two at a time, and the
+  // instance two children): ask once more after a pause, then say it failed.
+  var RETRY_MS = 1500;
+
+  function retryOnce(image, gaveUp) {
+    var tried = false;
     function failed() {
-      note.hidden = false;
+      if (tried) {
+        if (gaveUp) gaveUp();
+        return;
+      }
+      tried = true;
+      window.setTimeout(function () {
+        var src = image.getAttribute("src");
+        image.removeAttribute("src");
+        image.setAttribute("src", src);
+      }, RETRY_MS);
     }
-    if (image.complete && image.naturalWidth === 0) failed();
-    else image.addEventListener("error", failed);
+    image.addEventListener("error", failed);
+    if (image.complete && image.naturalWidth === 0 && image.getAttribute("src")) failed();
+  }
+
+  function watchImages() {
+    var note = document.querySelector(".page-failed");
+    document.querySelectorAll(".page-image, .region-image, .cmp-image").forEach(function (image) {
+      var isPage = image.classList.contains("page-image");
+      retryOnce(image, isPage && note ? function () { note.hidden = false; } : null);
+    });
   }
 
   function watchEdits() {
@@ -176,7 +197,7 @@
 
   if (!document.querySelector(".split")) return;
   bringMarkIntoView();
-  watchPageImage();
+  watchImages();
   watchEdits();
   shortcuts();
 })();

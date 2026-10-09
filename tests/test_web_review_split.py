@@ -556,6 +556,32 @@ def test_results_stored_before_page_sizes_and_tiers_still_load(split):
     assert "#box-p1-e2{left:" in css
 
 
+def test_page_sizes_asked_of_the_pdf_once_are_kept(split, monkeypatch):
+    """A result stored before page sizes gets them from the PDF (a child process). They
+    are stored in the result the first time, so the review page, its marks.css and its
+    region images do not each start a child for them again."""
+    _make_old(split)
+    calls = []
+    real = page_images.page_sizes
+
+    def counted(pdf):
+        calls.append(1)
+        return real(pdf)
+
+    monkeypatch.setattr(page_images, "page_sizes", counted)
+    screen(split)
+    assert len(calls) == 1
+    stored_json = split.job(split.job_id).result_json
+    assert stored_json["page_sizes"] == {"0": [612.0, 792.0], "1": [612.0, 792.0]}
+    # Only that key was added: the old fixes are as they were (no tiers written).
+    assert all("review" not in fix for fix in stored_json["fixes"])
+    screen(split)
+    assert split.browser.get(f"/jobs/{split.job_id}/review/marks.css").status_code == 200
+    assert split.browser.get(f"/jobs/{split.job_id}/regions/p1-e2.png").status_code == 200
+    assert len(calls) == 1
+    assert "5 things need your decision." in screen(split)  # still loads as before
+
+
 def test_without_page_sizes_a_failed_probe_leaves_the_decisions_usable(split, monkeypatch):
     _make_old(split)
 

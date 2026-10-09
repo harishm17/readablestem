@@ -407,6 +407,37 @@ def test_a_dense_page_with_accepted_shown_keeps_every_target_whole(
     context.close()
 
 
+def test_a_refused_image_is_asked_for_once_more_then_explained(site, browser, job):
+    """Renders are capped per person (429 beyond two at a time): app.js asks once more
+    after a pause, and only then says the page image could not be shown."""
+    context, page = open_page(browser, site)
+    calls: list[str] = []
+
+    def once(route):
+        calls.append(route.request.url)
+        if len(calls) == 1:
+            route.fulfill(status=429, body="Too many images at once.")
+        else:
+            route.continue_()
+
+    page.route("**/pages/1.png", once)
+    page.goto(f"{site.base}/jobs/{job}/review")
+    page.wait_for_function("document.querySelector('.page-image').naturalWidth > 0")
+    assert len(calls) == 2
+    assert page.locator(".page-failed").is_hidden()
+    page.unroute("**/pages/1.png")
+
+    refused: list[str] = []
+    page.route(
+        "**/pages/1.png",
+        lambda route: (refused.append(route.request.url), route.fulfill(status=429, body="")),
+    )
+    page.goto(f"{site.base}/jobs/{job}/review")
+    page.locator(".page-failed").wait_for(state="visible", timeout=8000)
+    assert len(refused) == 2
+    context.close()
+
+
 def test_keyboard_shortcuts_are_opt_in_and_never_fire_while_typing(site, browser, job):
     context, page = open_page(browser, site)
     url = f"{site.base}/jobs/{job}/review"

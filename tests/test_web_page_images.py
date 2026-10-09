@@ -5,16 +5,17 @@ upload probe's child process, never stored.
   `/jobs/{id}/review/marks.css`): owner only (404 for anyone else, admins included), 404
   once the job is past its retention time or deleted, `Cache-Control: private, no-store`,
   a 503 (and a content-free log line) when the child fails, and the review screen still
-  works when it does;
+  works when it does; a render slot is taken before the upload is loaded, and one user's
+  burst is refused at once (429) beyond two renders in progress;
 - the child (`web.pdf_probe render | sizes`): sizes, caps, the outline of a flagged
-  symbol, and a clean failure on bad input.
+  symbol, a heading's band snapped to whole lines and words, and a clean failure on bad
+  input.
 """
 
 from __future__ import annotations
 
 import logging
 import struct
-import threading
 from datetime import timedelta
 
 import pymupdf
@@ -154,16 +155,70 @@ def test_a_failed_render_is_a_503_and_the_review_screen_still_works(web, monkeyp
     assert not [word for word in CONTENT if word in logged]
 
 
+def _user_id(env, email: str) -> str:
+    from sqlalchemy import select
+
+    from a11y_stem.web.db import User
+
+    with session_scope(env.ctx.factory) as session:
+        user_id = session.scalar(select(User.id).where(User.email == email))
+    assert user_id is not None
+    return user_id
+
+
 def test_a_busy_instance_answers_503_instead_of_queueing_renders(web, monkeypatch):
-    monkeypatch.setattr(page_images, "_SLOTS", threading.BoundedSemaphore(1))
-    monkeypatch.setattr(page_images, "SLOT_WAIT_S", 0.01)
-    page_images._SLOTS.acquire()  # another render holds the only slot
-    try:
+    gate = page_images.RenderGate(total=1, per_user=2, wait_s=0.01)
+    monkeypatch.setattr(page_images, "GATE", gate)
+    with gate.slot("someone-else"):  # another render holds the only slot
         response = web.browser.get(f"/jobs/{web.job_id}/pages/1.png")
-    finally:
-        page_images._SLOTS.release()
     assert response.status_code == 503
+    assert response.headers["retry-after"] == "5"
     assert web.browser.get(f"/jobs/{web.job_id}/pages/1.png").status_code == 200
+
+
+def test_one_user_cannot_tie_up_the_renders_and_waits_hold_no_pdf(web, monkeypatch):
+    """A burst of image requests from one signed-in user: beyond two renders in
+    progress each is refused at once (429), before the upload is loaded, so no thread
+    waits holding a copy of the PDF. Someone else is not held up."""
+    from a11y_stem.web.routes import split
+
+    gate = page_images.RenderGate(total=4, per_user=2, wait_s=5.0)
+    monkeypatch.setattr(page_images, "GATE", gate)
+    loads = []
+    real_upload = split._upload
+
+    def counted_upload(*args, **kwargs):
+        loads.append(1)
+        return real_upload(*args, **kwargs)
+
+    monkeypatch.setattr(split, "_upload", counted_upload)
+    alice = _user_id(web, ALICE)
+    with gate.slot(alice), gate.slot(alice):  # two of hers are rendering
+        for url in urls(web)[:5]:
+            response = web.browser.get(url)
+            assert response.status_code == 429, url
+            assert response.headers["retry-after"] == "2"
+            assert response.headers["cache-control"] == "private, no-store"
+        assert loads == []  # refused before loading the upload
+        bob = web.client()
+        login(bob, BOB)
+        own = job_id_from(upload(bob, review_pdf()))
+        web.run_worker()
+        assert bob.get(f"/jobs/{own}/pages/1.png").status_code == 200
+    assert web.browser.get(f"/jobs/{web.job_id}/pages/1.png").status_code == 200
+
+
+def test_the_gate_counts_each_user_and_frees_slots_on_errors():
+    gate = page_images.RenderGate(total=3, per_user=2, wait_s=0.01)
+    with gate.slot("a"), gate.slot("a"):
+        with pytest.raises(page_images.RenderLimited), gate.slot("a"):
+            pass
+        with gate.slot("b"), pytest.raises(page_images.RenderBusy), gate.slot("c"):
+            pass
+    with pytest.raises(ValueError), gate.slot("a"):
+        raise ValueError("a failed render")
+    with gate.slot("a"), gate.slot("a"), gate.slot("b"):
+        pass  # every slot came back
 
 
 def test_nothing_is_stored_for_the_images(web):
