@@ -235,6 +235,26 @@ def test_a_correct_edit_passes_the_same_checks_as_a_proposal(ux):
     assert "anyway" not in edits(ux)[0].after
 
 
+def test_the_one_click_fix_is_offered_only_when_save_edit_takes_it(ux, monkeypatch):
+    from a11y_stem.web import compare, edit_check
+
+    result = stored(ux)
+    element = next(e for e in result.elements if e.id == "p1-e2")
+    fix = result.fix_for("p1-e2")
+    found = compare.compare_equation(element, fix)
+    suggestion = compare.suggest_fix(element, fix, found)
+    assert suggestion is not None and suggestion.latex == r"\boldsymbol{\omega}"
+    real = edit_check.check_equation_edit
+
+    def differs(*args):
+        checked = real(*args)
+        checked.meaning = ["The PDF has 8 where your edit has 3."]
+        return checked
+
+    monkeypatch.setattr(edit_check, "check_equation_edit", differs)
+    assert compare.suggest_fix(element, fix, found) is None
+
+
 def test_saving_an_unchanged_edit_changes_nothing(ux):
     response = post(ux, "p1-e2", action="edit", latex="  \\omega ", version="0")
     assert response.status_code == 422

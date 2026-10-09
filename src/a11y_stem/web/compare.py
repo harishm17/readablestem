@@ -394,7 +394,9 @@ def suggest_fix(element: Element | None, fix: Fix, compare: EquationCompare) -> 
     """The one-click fix for a proposal whose only meaning-level difference is one letter's
     style, or None. It is offered only when the changed LaTeX passes the same checks a
     typed edit must pass and the same comparison then finds no meaning-level difference
-    (so a rewrite that does not do what its label says is never offered)."""
+    (so a rewrite that does not do what its label says is never offered), and when Save
+    edit would take it as it is (`web.edit_check` finds nothing that changes the meaning,
+    so the button never ends in "Use my edit anyway")."""
     from a11y_stem.pipeline import validate
 
     if element is None or fix.equation is None:
@@ -420,6 +422,11 @@ def suggest_fix(element: Element | None, fix: Fix, compare: EquationCompare) -> 
         update={"equation": fix.equation.model_copy(update={"latex": latex, "mathml": mathml})}
     )
     if compare_equation(element, changed).meaning:
+        return None
+    from a11y_stem.web.edit_check import check_equation_edit
+
+    checked = check_equation_edit(element, fix, latex)
+    if checked.mathml is None or checked.meaning or checked.unchanged:
         return None
     return Suggestion(f"Use {style} {meaning[0].letter}", latex)
 
