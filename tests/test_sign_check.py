@@ -340,6 +340,40 @@ def test_latex2mathml_not_is_the_relation_or_its_negation():
     assert differs("a < b", r"a \not= b") == (signs.LESS,)
 
 
+# Review 2026-10-08: relations typed as ASCII (a LibreOffice PDF of a typed handout) were
+# folded in the text layer only, so a symbol-by-symbol transcription was flagged, and
+# "+/-" was not folded, so the normalised \pm was flagged.
+TYPED = [
+    ("x >= 0", [r"x \geq 0", r"x >= 0"]),
+    ("y <= 5", [r"y \leq 5", r"y <= 5"]),
+    ("t -> 0", [r"t \to 0", r"t -> 0"]),
+    ("p => q", [r"p \Rightarrow q", r"p => q"]),
+    ("x>=-1", [r"x \geq -1", r"x >= -1"]),
+    ("x<-1", [r"x < -1"]),
+    ("L = 5.0 +/- 0.2 m", [r"L = 5.0 \pm 0.2\ \text{m}", r"L = 5.0 +/- 0.2\ \text{m}"]),
+    ("a -/+ b", [r"a \mp b", r"a -/+ b"]),
+    ("if x >= 0", [r"\text{if } x \geq 0", r"\text{if x >= 0}"]),
+]
+
+
+@pytest.mark.parametrize(
+    ("text_layer", "latex"),
+    [pytest.param(text, latex, id=latex) for text, answers in TYPED for latex in answers],
+)
+def test_typed_ascii_relations_fold_the_same_on_both_sides(text_layer, latex):
+    assert differs(text_layer, latex) == ()
+
+
+def test_typed_ascii_relations_still_catch_a_changed_sign():
+    assert differs("x >= 0", r"x > 0") == (signs.GREATER, signs.GREATER_EQUAL)
+    assert differs("x >= 0", r"x >= -0") == (signs.MINUS,)
+    assert differs("L = 5.0 +/- 0.2 m", r"L = 5.0 + 0.2\ \text{m}") == (
+        signs.PLUS,
+        signs.PLUS_MINUS,
+    )
+    assert differs("x<-1", r"x <= -1") == (signs.LESS, signs.LESS_EQUAL)
+
+
 def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
     # Only a swap of × and · is meaning-level: a missing sign may be juxtaposition
     # (a scalar times a vector), which the text layer cannot tell apart.

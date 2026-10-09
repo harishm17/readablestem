@@ -22,7 +22,9 @@ Tokens, by class (typographic variants of one symbol fold into one class, `_SIGN
   "−−→ AB", \\longleftarrow as "←−"); a real minus can touch the same head ("OB −−→ OA",
   "x ←−1" for x \\gets -1), so the head is an arrow and the glued run is uncertain (below).
   Two heads joined by a shaft ("⇐⇒", "←→") are one two-way arrow, and ASCII digraphs in
-  typed text ("->", "=>", "<=>"; ">=" and "<=" are ≥, ≤) are one arrow or relation.
+  typed text ("->", "=>", "<=>"; ">=" and "<=" are ≥, ≤; "+/-" and "-/+" are ±, ∓) are
+  one arrow, relation or sign, folded the same way on both sides (in the MathML across
+  adjacent `<mo>`, as a symbol-by-symbol transcription writes them, and in `<mtext>`).
   Other relations TeX stacks from two glyphs are one relation too: \\cong prints as "∼="
   (≅), newtx's \\mapsto as "↦→" (↦); \\models prints as "|=", which cannot be told from
   Chromium's "|𝑥|= 1", so an = straight after "|" is uncertain.
@@ -179,9 +181,13 @@ _DASHES = frozenset(
 _LOOSE_DASHES = frozenset("\N{FIGURE DASH}\N{EM DASH}\N{HORIZONTAL BAR}")
 _ANY_DASH = _DASHES | _LOOSE_DASHES
 _DASH_RUN = re.compile("[" + re.escape("".join(sorted(_ANY_DASH))) + "]+")
-# Arrows and relations typed as plain ASCII ("x -> 0", "x >= 1"), longest first. "<-"
-# alone stays as it is: "x<-1" is "x < -1".
+# Arrows, relations and ± typed as plain ASCII ("x -> 0", "x >= 1", "5.0 +/- 0.2"),
+# longest first, folded the same way in the text layer, in `<mtext>` and across adjacent
+# `<mo>` (a transcription symbol by symbol is `<mo>&gt;</mo><mo>=</mo>`). "<-" alone
+# stays as it is: "x<-1" is "x < -1".
 _ASCII_DIGRAPHS = (
+    ("+/-", "±"),
+    ("-/+", "∓"),
     ("<=>", "⇔"),
     ("<->", "↔"),
     ("==>", "⇒"),
@@ -289,9 +295,15 @@ def _operand(text: str, index: int, step: int) -> str:
     return text[i] if 0 <= i < len(text) else ""
 
 
+def _typed_signs(text: str) -> str:
+    """ASCII digraphs folded into the sign they stand for."""
+    for typed, sign in _ASCII_DIGRAPHS:
+        text = text.replace(typed, sign)
+    return text
+
+
 def _join_arrows(text: str) -> str:
-    for typed, arrow in _ASCII_DIGRAPHS:
-        text = text.replace(typed, arrow)
+    text = _typed_signs(text)
     for pattern, joined in _COMPOSITES:
         text = pattern.sub(joined, text)
     return text
@@ -415,7 +427,7 @@ def _count_math(text: str, out: SignTokens, *, accent: bool, negated: bool = Fal
 
 def _count_text(text: str, out: SignTokens) -> None:
     """`<mtext>`: word hyphens and ranges are skipped, any other sign is uncertain."""
-    text = unicodedata.normalize("NFC", text)
+    text = _typed_signs(unicodedata.normalize("NFC", text))
     for start, end in _dash_runs(text):
         if not _inside_word(text, start, end):
             out.uncertain[MINUS] += 1
@@ -442,13 +454,30 @@ def mathml_signs(mathml: str) -> SignTokens:
             return
         under_over = tag in _UNDER_OVER
         negate = False
+        run: list[str] = []  # adjacent <mo> children, counted together (`_ASCII_DIGRAPHS`)
+
+        def flush() -> None:
+            nonlocal negate
+            if run:
+                typed = _typed_signs("".join(run).replace("\N{MINUS SIGN}", "-"))
+                _count_math(typed, out, accent=False, negated=negate)
+                run.clear()
+                negate = False
+
         for index, child in enumerate(elem):
             if _negation_slash(child):
+                flush()
                 negate = True
                 continue
-            script_mo = under_over and index > 0 and child.tag.rsplit("}", 1)[-1] == "mo"
+            child_tag = child.tag.rsplit("}", 1)[-1]
+            script_mo = under_over and index > 0 and child_tag == "mo"
+            if child_tag == "mo" and not script_mo:
+                run.append(child.text or "")
+                continue
+            flush()
             walk(child, script_mo, negate)
             negate = False
+        flush()
 
     walk(DET.fromstring(mathml, forbid_dtd=True), False, False)
     return out
