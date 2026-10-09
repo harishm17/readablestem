@@ -119,6 +119,12 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "description), so check before hiding it from screen readers.",
     ("figure.second_check", "second_check_mismatch"): "A second automated check found a "
     "possible mismatch between the alt text and the image; worth a look.",
+    # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)
+    ("figure.data_values", "values_from_image"): "The values in the data table were read "
+    "from the image, not from text in the PDF, so check them against the figure or "
+    "remove the table.",
+    ("figure.long_description", "long_description_unsure"): "Part of the figure was hard "
+    "to read, so the longer description may be wrong in places; worth a look.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",
