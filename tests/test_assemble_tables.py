@@ -22,7 +22,7 @@ from a11y_stem.core.types import (
     inline_marker,
 )
 from a11y_stem.pipeline import assemble, assemble_tables, html_checks, inline_text, safe_html
-from a11y_stem.pipeline.assemble import STYLE, render_html
+from a11y_stem.pipeline.assemble import FLAGGED_NOTE, STYLE, render_html
 from a11y_stem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
 from a11y_stem.pipeline.html_checks import static_checks
 
@@ -79,7 +79,7 @@ def test_a_rebuilt_table_is_a_named_scrollable_table():
     ) in html
     assert '<th scope="col">Time (s)</th>' in html
     assert all(c.passed for c in static_checks(html)), static_checks(html)
-    assert "<li>Tables (1): 1 accepted</li>" in html
+    assert FLAGGED_NOTE not in html  # the student note: nothing shown as an image
 
 
 def test_a_table_without_a_caption_is_named_table():
@@ -122,7 +122,7 @@ def test_a_table_not_rebuilt_keeps_its_image_flagged():
     assert f'<span class="flag-label">Not converted.</span> {TABLE_NOTE}' in html
     assert "<table>" not in html and TABLE_CSS not in html
     assert all(c.passed for c in static_checks(html))
-    assert "1 item could not be converted" in html
+    assert FLAGGED_NOTE in html  # the student note says some parts are pictures
 
 
 @pytest.mark.parametrize(
