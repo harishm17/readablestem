@@ -1,0 +1,19 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<h1>{{ title }}</h1>
+<p>You signed in with a Microsoft work or school account from an organisation that is not
+  part of this beta yet.</p>
+{% if contact_email %}
+<p>Ask us to add it: email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a> and
+  include your organisation's directory id, <code>{{ tenant }}</code>.</p>
+{% endif %}
+{% if google_login %}
+<p>If your invitation was sent to a Google account, you can
+  <a href="/login">sign in with Google</a> instead.</p>
+{% endif %}
+<p>We did not keep anything about this sign-in.</p>
+<ul class="actions">
+  <li><a href="/">Go to the home page</a></li>
+</ul>
+{% endblock %}

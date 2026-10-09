@@ -38,7 +38,9 @@ APP_CSP = "; ".join(
         "object-src 'none'",
         "base-uri 'none'",
         "frame-ancestors 'none'",
-        "form-action 'self' https://accounts.google.com",
+        # The sign-in buttons are forms whose answer redirects to Google or Microsoft, and
+        # browsers apply form-action to that redirect too.
+        "form-action 'self' https://accounts.google.com https://login.microsoftonline.com",
     ]
 )
 

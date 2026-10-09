@@ -1,12 +1,18 @@
+{% if microsoft_login %}
+<form method="post" action="/login/microsoft" class="signin-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <button type="submit" class="button">Sign in with your university account (Microsoft)</button>
+</form>
+{% endif %}
 {% if google_login %}
 <form method="post" action="/login" class="signin-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-  <button type="submit" class="button">Sign in with Google</button>
+  <button type="submit" class="{{ 'button-secondary' if microsoft_login else 'button' }}">Sign in with Google</button>
 </form>
 {% endif %}
 {% if dev_login %}
 <p><a href="/dev-login">Development sign-in</a> (this server runs in development mode).</p>
 {% endif %}
-{% if not google_login and not dev_login %}
+{% if not google_login and not microsoft_login and not dev_login %}
 <p>Sign-in is not configured on this server yet.</p>
 {% endif %}

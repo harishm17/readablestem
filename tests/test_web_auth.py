@@ -301,6 +301,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/jobs/{job_id}/undo",
         "/login",
+        "/login/microsoft",
         "/logout",
     ]
     for path in posts:

@@ -45,7 +45,7 @@ class AppContext:
     converter: Converter
     client_factory: ClientFactory
     guard: DbSpendGuard
-    oauth: Any | None = None  # Authlib registry when Google sign-in is configured
+    oauth: Any | None = None  # Authlib registry when Google or Microsoft sign-in is set up
     worker: Worker | None = None
     # Below this much headroom under the daily cap, new uploads are turned away and the
     # worker claims nothing: not even the largest single model call would fit
@@ -59,6 +59,10 @@ class AppContext:
     @property
     def dev_login_enabled(self) -> bool:
         return self.settings.dev_login_enabled and self.settings.env in {"dev", "test"}
+
+    def sign_in_client(self, name: str) -> Any | None:
+        """The Authlib client "google" or "microsoft", or None when it is not set up."""
+        return None if self.oauth is None else self.oauth.create_client(name)
 
 
 def get_ctx(request: Request) -> AppContext:
@@ -216,7 +220,8 @@ def render(
         "source_url": ctx.settings.source_url,
         "contact_email": ctx.settings.contact_email,
         "feedback_url": ctx.settings.feedback_url,  # the footer's Feedback link
-        "google_login": ctx.oauth is not None,
+        "google_login": ctx.sign_in_client("google") is not None,
+        "microsoft_login": ctx.sign_in_client("microsoft") is not None,
         "dev_login": ctx.dev_login_enabled,
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,

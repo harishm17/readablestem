@@ -274,7 +274,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await run_in_threadpool(prepare_database, engine, settings)
         await run_in_threadpool(seed_admins, factory, settings.admin_email_list)
-        if settings.env == "prod" and (blockers := launch_blockers()):
+        if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
         if settings.run_worker:
