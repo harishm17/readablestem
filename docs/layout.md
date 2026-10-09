@@ -467,6 +467,12 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   editor) is found inside paragraphs only through the relation rule; `d/t` alone is not.
 - **A display equation line with words** (`x = 1 if y > 0`) becomes a short paragraph with
   inline maths, not one display equation.
+- **A CFF maths font in a Chromium print.** Chromium embeds a CFF (OpenType) maths font such
+  as Latin Modern Math as unnamed Type3 glyphs, so the font name gives no maths signal. A
+  display line such as `v(t) = −gt (time-dependent)` then reads as prose with inline maths
+  and is merged into the paragraphs around it. A TrueType maths font that names itself
+  (Noto Sans Math) is read correctly. Pinned by the strict xfail
+  `tests/test_sign_check.py::test_a_display_equation_in_a_type3_maths_font_stays_display`.
 - **A wrapped sentence whose last line is only maths** is read as a display equation when
   that line is indented or set off by extra space; at the paragraph's margin and line
   pitch it is inline.

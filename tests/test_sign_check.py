@@ -14,6 +14,7 @@ as a standalone arrow and \\overline as U+2015.
 
 from __future__ import annotations
 
+import base64
 import json
 import unicodedata
 from functools import cache
@@ -971,7 +972,15 @@ PAGE_CASES = [
 ]
 
 
-def _page_html() -> str:
+# The fonts eval/render.py names (fonts-noto-core on Debian/Ubuntu; CI installs it).
+MATH_CSS = 'math { font-family: "Noto Sans Math", "STIX Two Math", "Latin Modern Math", math; }'
+VENDORED_MATH_FONT = (
+    Path(__file__).resolve().parents[1]
+    / "src/a11y_stem/web/static/vendor/fonts/latinmodern-math.otf"
+)
+
+
+def _page_html(math_css: str = MATH_CSS) -> str:
     parts = []
     for i, (display, latex, _) in enumerate(PAGE_CASES):
         math = mathml(latex, display)
@@ -984,8 +993,8 @@ def _page_html() -> str:
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Signs</title><style>'
         'body { font-family: "Liberation Serif", "DejaVu Serif", serif; font-size: 12pt; }'
-        'math { font-family: "Noto Sans Math", "STIX Two Math", "Latin Modern Math", math; }'
-        'math[display="block"] { margin: 6pt 0; }'
+        + math_css
+        + 'math[display="block"] { margin: 6pt 0; }'
         "</style></head><body><h1>Signs and relations</h1>" + "".join(parts) + "</body></html>"
     )
 
@@ -1009,6 +1018,32 @@ def test_a_chromium_printed_course_page():
     decay = next(e for e in equations if _symbol_bag(e.text or "") == _symbol_bag("NN0eλt"))
     fix = run(by_model(main=out(r"N = N_0 e^{\lambda t}")), decay)
     assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
+
+
+@pytest.mark.browser
+@pytest.mark.xfail(
+    strict=True,
+    reason="known layout gap: Chromium embeds a CFF maths font as unnamed Type3 glyphs, "
+    "so a display equation with a text note is read as prose and merged into the "
+    "paragraphs around it",
+)
+def test_a_display_equation_in_a_type3_maths_font_stays_display():
+    # The same page with the maths in the vendored Latin Modern Math (CFF, so Type3 in
+    # Chromium's PDF): v(t) = -g t (time-dependent) should stay one display equation, as
+    # it does with a TrueType maths font that names itself.
+    from a11y_stem.eval.render import ChromiumRenderer
+
+    font = base64.b64encode(VENDORED_MATH_FONT.read_bytes()).decode("ascii")
+    css = (
+        f'@font-face {{ font-family: "Vendored Math"; src: url(data:font/otf;base64,{font}); }}'
+        'math { font-family: "Vendored Math", math; }'
+    )
+    with ChromiumRenderer() as renderer:
+        pdf = renderer.pdf(_page_html(css))
+    equations = [e for e in analyze(pdf).elements if e.kind == Kind.EQUATION]
+    expected = equation_step._mathml_symbols(mathml(PAGE_CASES[8][1], "block"))
+    found = [e for e in equations if _symbol_bag(e.text or "") == expected]
+    assert len(found) == 1 and found[0].display == "block"
 
 
 # Typed maths without an equation editor, as an HTML or word-processor export has it: an
