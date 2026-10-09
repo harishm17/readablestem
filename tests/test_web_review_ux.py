@@ -9,6 +9,9 @@ optional note on equation p1-e5. The browser side (axe, reflow, focus, no JavaSc
 the live check and the kept draft) is in test_web_review_ux_browser.py.
 """
 
+# Bold and double-struck maths letters and the multiplication sign are the point here.
+# ruff: noqa: RUF001
+
 from __future__ import annotations
 
 import re
@@ -364,3 +367,228 @@ def test_the_live_check_logs_no_content(ux, caplog, capsys):
     live(ux, r"\SECRETLATEX{x} + \omega")
     assert "SECRETLATEX" not in caplog.text
     assert "SECRETLATEX" not in capsys.readouterr().out
+
+
+# --------------------------------------------------------------------------- MF14
+
+
+def undo(env, version: str, **extra):
+    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"), "version": version}
+    return env.browser.post(f"/jobs/{env.job_id}/undo", data=data | extra)
+
+
+def test_reject_is_named_for_what_it_does(ux):
+    equation = panel(screen(ux))
+    assert re.search(r'data-role="reject"[^>]*>Keep as image<span', equation)
+    assert (
+        "Keep as image: Students see a picture of the original; screen readers say only "
+        "“Equation not converted”." in text_of(equation)
+    )
+    heading = panel(screen(ux, "?item=p1-e0"))  # a bold heading, accepted
+    assert re.search(r'data-role="reject"[^>]*>Make bold text<span', heading)
+    assert ">Reject<" not in equation + heading
+    response = post(ux, "p1-e2", action="reject", version="0")
+    page = ux.browser.get(response.headers["location"]).text
+    assert (
+        "Equation 1: Kept as an image of the original. Screen readers will say “Equation not "
+        "converted”. 2 decisions left." in text_of(page)
+    )
+    assert "Decided: Kept as an image by you" in panel(screen(ux, "?item=p1-e2"))
+
+
+def test_undo_puts_the_last_decision_back(ux):
+    response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
+    page = ux.browser.get(response.headers["location"]).text
+    notice = section(page, '<div class="decision-notice"', "</div>")
+    assert f'action="/jobs/{ux.job_id}/undo"' in notice
+    assert 'name="version" value="1"' in notice
+    assert '>Undo<span class="visually-hidden"> this decision</span>' in notice
+    response = undo(ux, "1")
+    assert response.status_code == 303
+    assert response.headers["location"] == f"/jobs/{ux.job_id}/review?item=p1-e2"
+    fix = stored(ux).fix_for("p1-e2")
+    assert fix.status.value == "needs_review" and fix.equation.latex == r"\omega"
+    assert not fix.reviewed
+    assert [c.code for c in fix.checks if not c.passed] == ["style_mismatch"]  # as before
+    assert version_of(ux) == 2
+    assert [e.action for e in edits(ux)] == ["edit", "undo"]
+    back = ux.browser.get(response.headers["location"]).text
+    assert "Equation 1: Undone. It is waiting for your decision again. 3 decisions left." in (
+        text_of(back)
+    )
+    heading = re.search(r'<h2 id="decision-title"[^>]*>', back).group(0)
+    assert "autofocus" in heading  # focus is back on the decision
+    assert "/undo" not in section(back, '<div class="decision-notice"', "</div>")  # no undo of undo
+    # The output is the one from before the decision, re-rendered.
+    assert "bold omega" not in (ux.job(ux.job_id).html or "")
+
+
+def test_undo_a_group_decision_and_a_stale_or_empty_undo(ux):
+    assert post(ux, GROUP, action="reject", version="0").status_code == 303
+    assert undo(ux, "0").status_code == 303  # a page from before that decision: refused
+    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"rejected"}
+    page = screen(ux)
+    assert "Nothing was undone: this document changed after this page was opened." in page
+    response = undo(ux, "1")
+    assert response.headers["location"] == f"/jobs/{ux.job_id}/review?item={GROUP}"
+    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"needs_review"}
+    back = ux.browser.get(response.headers["location"]).text
+    assert "Repeated heading “Teacher Support”: Undone. They are waiting for your decision" in (
+        text_of(back)
+    )
+    # Undoing again would undo the undo: not offered, and refused.
+    undo(ux, "2")
+    assert {f.status.value for f in stored(ux).fixes if f.group_key == GROUP} == {"needs_review"}
+    assert "There is nothing to undo here." in screen(ux)
+    assert undo(ux, "").status_code == 303 and version_of(ux) == 2  # no version: refused
+
+
+def test_undo_in_the_list_view(ux):
+    response = post(ux, "p1-e6", action="accept", version="0", view="list")
+    page = ux.browser.get(response.headers["location"]).text
+    assert "Undo the last decision" in page
+    response = undo(ux, "1", view="list")
+    assert response.headers["location"] == f"/jobs/{ux.job_id}/review/list#item-p1-e6"
+    assert stored(ux).fix_for("p1-e6").status.value == "needs_review"
+
+
+def test_your_decisions_are_listed_apart_from_the_automatic_ones(ux):
+    assert "Your decisions" not in screen(ux)  # nothing decided yet
+    post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
+    post(ux, GROUP, action="reject", version="1")
+    page = screen(ux)
+    box = section(page, '<details class="optional-box decided-box">', "</details>")
+    assert '<summary id="decided-summary">Your decisions (2)</summary>' in box
+    lines = [text_of(li) for li in re.findall(r"<li>.*?</li>", box, re.S)]
+    assert lines == [
+        "Equation 1, page 1 ω Edited by you.",  # bold by its mathvariant
+        "Repeated heading, 3 times “Teacher Support” All 3 were made bold text.",
+    ]
+    assert f'href="/jobs/{ux.job_id}/review?item={GROUP}#decision-title"' in box
+    assert 'aria-labelledby="optional-summary decided-summary"' in page
+
+
+def test_a_heading_group_of_two_appears_twice(tmp_path):
+    output = review_output()
+    for fix in output.result.fixes:
+        if fix.element_id == "p2-e0":
+            fix.group_key = fix.group_size = None
+        elif fix.group_key == GROUP:
+            fix.group_size = 2
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        body = panel(screen(env, f"?item={GROUP}"))
+        assert "“Teacher Support” appears twice as a bold line in the body text size." in body
+
+
+def test_the_skip_link_goes_straight_to_the_decision(ux):
+    page = screen(ux)
+    links = re.findall(r'<a class="skip-link" href="([^"]+)">([^<]+)</a>', page)
+    assert links == [("#main", "Skip to main content"), ("#decision-title", "Skip to the decision")]
+    assert 'id="decision-title" tabindex="-1"' in page
+
+
+# --------------------------------------------------------------------------- BW12, the text layer
+
+
+def spoken(env, element_id: str, speech: str) -> None:
+    """Give a stored proposal the reading the pipeline would (the fixture stores its
+    LaTeX there)."""
+    with session_scope(env.ctx.factory) as session:
+        job = session.get(Job, env.job_id)
+        assert job is not None and job.result_json is not None
+        data = dict(job.result_json)
+        data["fixes"] = [
+            fix | {"equation": fix["equation"] | {"speech": speech}}
+            if fix["element_id"] == element_id
+            else fix
+            for fix in data["fixes"]
+        ]
+        job.result_json = data
+
+
+def test_the_card_says_what_a_screen_reader_gets_from_the_pdf(ux):
+    spoken(ux, "p1-e2", "omega")
+    body = panel(screen(ux))
+    # The proposal's reading, and the PDF's text with its reading; the symbol that
+    # differs is marked in both.
+    assert (
+        '<span class="speech-label">Read aloud roughly as:</span> “<mark class="said-diff">'
+        "omega</mark>”" in body
+    )
+    assert (
+        '<span class="speech-label">From your PDF a screen reader gets:</span> “<span '
+        'class="text-layer">𝛚</span>”, roughly “<mark class="said-diff">bold omega</mark>”' in body
+    )
+    assert "Marked: the words where the two readings differ." in body
+    # Nothing differs in an accepted equation: no reading of the PDF, nothing marked.
+    other = panel(screen(ux, "?item=p2-e2"))
+    assert 'From your PDF a screen reader gets:</span> “<span class="text-layer">v = d / t' in (
+        other
+    )
+    assert "said-diff" not in other and "roughly “" not in other.split("screen reader gets")[1]
+
+
+def test_an_equation_without_text_in_the_pdf_says_so(tmp_path):
+    output = review_output()
+    for element in output.result.elements:
+        if element.id == "p1-e2":
+            element.text = None
+    env = WebEnv(tmp_path)
+    env.converter.output = output
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        body = panel(screen(env))
+        assert (
+            "From your PDF a screen reader gets nothing here: the PDF has no text for this "
+            "equation." in text_of(body)
+        )
+        listing = env.browser.get(f"/jobs/{env.job_id}/review/list").text
+        assert "the PDF has no text for this equation." in listing
+
+
+@pytest.mark.parametrize(
+    ("said", "text_layer", "marked", "pdf_marked"),
+    [
+        ("omega", "𝛚", ["omega"], ["bold omega"]),
+        ("a equals omega times bold r", "a = 𝛚 × 𝐫", ["omega"], ["bold omega"]),
+        ("e to the power lambda t end power", "e−λt", [], ["minus"]),
+        ("x squared plus 3", "x2 + 8", ["3"], ["8"]),
+        ("capital R to the power n", "ℝn", ["capital R"], ["double-struck capital R"]),
+    ],
+)
+def test_the_readings_mark_only_the_symbols_that_differ(said, text_layer, marked, pdf_marked):
+    from a11y_stem.web.speech_diff import spoken_diff
+
+    diff = spoken_diff(said, text_layer)
+    assert diff is not None
+    assert [s.text for s in diff.said if s.differs] == marked
+    assert [s.text for s in diff.pdf_said if s.differs] == pdf_marked
+
+
+@pytest.mark.parametrize(
+    ("said", "text_layer"),
+    [
+        ("x squared plus y squared equals r squared", "x2 + y2 = r2"),  # flat superscripts
+        ("sine theta", "sin θ"),  # a function name
+        ("v equals d divided by t", "v = d / t"),
+        ("the fraction a plus b over c end fraction", "a + b c"),  # structure words
+        ("double-struck capital R to the power n", "Rn"),  # a style the PDF cannot carry
+        ("omega", ""),
+        ("", "𝛚"),
+    ],
+)
+def test_structure_and_unseen_styles_are_never_marked(said, text_layer):
+    from a11y_stem.web.speech_diff import spoken_diff
+
+    assert spoken_diff(said, text_layer) is None

@@ -78,6 +78,9 @@
     <p>No proposal: type the LaTeX below, or reject to keep the image.</p>
     {% endif %}
     {% if item.speech %}<p><strong>Read aloud roughly as:</strong> {{ item.speech }}</p>{% endif %}
+    {# What a screen reader gets from the PDF itself: its text layer (owner only). #}
+    {% if item.text_layer %}<p><strong>From your PDF a screen reader gets:</strong> “<span class="text-layer">{{ item.text_layer }}</span>”</p>
+    {% else %}<p><strong>From your PDF a screen reader gets</strong> nothing here: the PDF has no text for this equation.</p>{% endif %}
     {% elif item.kind == "figure" %}
     <p class="part-label">Proposed alt text</p>
     {% if item.decorative %}
@@ -153,8 +156,9 @@
     {% if item.can_accept %}
     <button type="submit" name="action" value="accept" class="button-secondary">Accept<span class="visually-hidden"> {{ name }}</span></button>
     {% endif %}
-    <button type="submit" name="action" value="reject" class="button-secondary">Reject<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" name="action" value="reject" class="button-secondary" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
   </div>
+  <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>
 </form>
 {% endmacro %}
 
@@ -254,7 +258,8 @@
 {% macro folded_item(item, with_notes) %}
 <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
   <details class="done-item"{% if item.open %} open{% endif %}>
-    <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.page %}, page {{ item.page }}{% endif %}: {% if with_notes %}{{ item.notes }}{% else %}{{ item.status_label }}, confidence {{ item.confidence_label }}{% endif %}</summary>
+    {# The summary names the item (its words, or the equation itself), not only its number. #}
+    <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.mathml %} <span class="item-math">{{ item.mathml }}</span>{% elif item.preview %} “{{ item.preview }}”{% endif %}{% if item.page %}, page {{ item.page }}{% endif %}: {% if with_notes %}{{ item.notes }}{% else %}{{ item.status_label }}{% endif %}</summary>
     <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
       {{ card_body(item) }}
     </article>
@@ -270,6 +275,12 @@
 
 <div id="review-progress" class="review-progress" tabindex="-1">
   {% for notice in notices %}{{ notice_box(notice) }}{% endfor %}
+  {% if undo %}
+  <form method="post" action="/jobs/{{ job.id }}/undo" class="undo-form">
+    {{ hidden_fields() }}
+    <button type="submit" class="link-button" data-role="undo">Undo the last decision</button>
+  </form>
+  {% endif %}
   <p>{% if remaining %}<strong>{{ remaining }} {{ "decision is" if remaining == 1 else "decisions are" }} still needed:</strong>
     {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}{% if optional and second_checks %}
     {{ counted(optional|length, "optional check", "optional checks") }} {{ "does" if optional|length == 1 else "do" }} not hold anything up, but {% if second_checks == optional|length %}{{ "it is" if second_checks == 1 else "they are" }}{% else %}{{ second_checks }} of them {{ "is" if second_checks == 1 else "are" }}{% endif %} worth a look.{% elif optional %}
@@ -299,7 +310,8 @@
         {% endfor %}
       </ul>{% endif %}</li>
     <li><a href="#optional-checks">Optional checks</a>: {{ optional|length }}</li>
-    <li><a href="#decided">Accepted or decided</a>: {{ done|length }}</li>
+    <li><a href="#decided">Your decisions</a>: {{ done|selectattr("by_you")|list|length }}</li>
+    <li><a href="#accepted">Accepted automatically</a>: {{ done|rejectattr("by_you")|list|length }}</li>
   </ul>
 </nav>
 
@@ -365,17 +377,34 @@
   {% endif %}
 </section>
 
+{# Your decisions apart from what was accepted for you (UX review MF14). #}
+{% set mine = done|selectattr("by_you")|list %}
+{% set auto = done|rejectattr("by_you")|list %}
 <section id="decided" class="review-section" aria-labelledby="decided-title" tabindex="-1">
-  <h2 id="decided-title">Accepted or decided ({{ done|length }})</h2>
-  {% if done %}
-  <details class="done-group"{% if done_open %} open{% endif %}>
-    <summary>{{ counted(done|length, "fix", "fixes") }} accepted automatically or already decided (accepted, edited or rejected)</summary>
+  <h2 id="decided-title">Your decisions ({{ mine|length }})</h2>
+  {% if mine %}
+  <details class="done-group"{% if mine|selectattr("open")|list %} open{% endif %}>
+    <summary>Show the {{ counted(mine|length, "item", "items") }} you decided</summary>
     <ol class="fix-list done-list">
-      {% for item in done %}{{ folded_item(item, false) }}{% endfor %}
+      {% for item in mine %}{{ folded_item(item, false) }}{% endfor %}
     </ol>
   </details>
   {% else %}
-  <p>Nothing has been accepted or decided yet.</p>
+  <p>You have not decided anything yet.</p>
+  {% endif %}
+</section>
+
+<section id="accepted" class="review-section" aria-labelledby="accepted-title" tabindex="-1">
+  <h2 id="accepted-title">Accepted automatically ({{ auto|length }})</h2>
+  {% if auto %}
+  <details class="done-group"{% if auto|selectattr("open")|list %} open{% endif %}>
+    <summary>Show the {{ counted(auto|length, "item", "items") }} accepted for you</summary>
+    <ol class="fix-list done-list">
+      {% for item in auto %}{{ folded_item(item, false) }}{% endfor %}
+    </ol>
+  </details>
+  {% else %}
+  <p>Nothing was accepted automatically.</p>
   {% endif %}
 </section>
 {% endif %}

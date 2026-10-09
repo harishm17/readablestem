@@ -853,6 +853,42 @@ def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[Revi
     return changes
 
 
+# --------------------------------------------------------------------------- undo
+
+UNDO_ACTION = "undo"  # ReviewEdit.action of an undo (a write of its own)
+
+
+def restorable(before: object) -> bool:
+    """A `before` snapshot `undo_last` can put back: it has every field a decision can
+    change (snapshots stored before the checks were in them do not)."""
+    return isinstance(before, Mapping) and before.keys() >= SNAPSHOT_FIELDS
+
+
+def undo_last(
+    result: DocumentResult, edits: list[tuple[str, Mapping[str, Any]]]
+) -> list[ReviewChange]:
+    """Put back, in place, what one write changed: `edits` are its ReviewEdits as
+    (element id, before snapshot). One ReviewChange per fix (action "undo"). Raises
+    LookupError when a fix is gone or a snapshot cannot be put back; nothing is changed
+    then (the route's transaction is rolled back)."""
+    changes: list[ReviewChange] = []
+    for element_id, before in edits:
+        fix = result.fix_for(element_id)
+        if fix is None or not restorable(before):
+            raise LookupError(element_id)
+        current = snapshot(fix)
+        merged = fix.model_dump(mode="json") | {name: before[name] for name in SNAPSHOT_FIELDS}
+        restored = Fix.model_validate(merged)
+        for name in SNAPSHOT_FIELDS:
+            setattr(fix, name, getattr(restored, name))
+        changes.append(
+            ReviewChange(fix=fix, action=UNDO_ACTION, before=current, after=snapshot(fix))
+        )
+    if changes:
+        _recount(result)
+    return changes
+
+
 # --------------------------------------------------------------------------- output
 
 

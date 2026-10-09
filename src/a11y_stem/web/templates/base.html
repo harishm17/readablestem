@@ -12,6 +12,8 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to main content</a>
+  {# A page can add its own skip links here (the review screen: "Skip to the decision"). #}
+  {% block skip_links %}{% endblock %}
   {% set active = active|default("") %}
   <header class="site-header">
     <div class="{{ self.main_class() }} header-row">

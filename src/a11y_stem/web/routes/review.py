@@ -78,8 +78,10 @@ from a11y_stem.web.review import (
     ACCEPT_ALL_KINDS,
     BULK_DEFAULT_THRESHOLD,
     BULK_THRESHOLDS,
+    GROUP_SLUGS,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
+    UNDO_ACTION,
     WRITE_KEY,
     BulkRequest,
     FieldError,
@@ -109,7 +111,9 @@ from a11y_stem.web.review import (
     next_to_review,
     parse_bulk,
     rerender_html,
+    restorable,
     review_anchor,
+    undo_last,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
 from a11y_stem.web.views import (
@@ -128,21 +132,75 @@ DONE_MESSAGES = {
     "edit": "Your edit passed the required checks and was saved.",
     "reject": "The original from the PDF is kept in the document.",
 }
-# "Reject" is named for what it does, so its notice says that too.
-REJECT_DONE = {
-    Kind.EQUATION: "Kept as an image of the original. Screen readers will say “Equation not "
-    "converted”.",
-    Kind.FIGURE: "Kept without a description, marked “Needs a description”.",
-    Kind.HEADING: "Made ordinary text, not a heading.",
-}
 EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
 ANYWAY_DONE = "Your edit was saved as you wrote it, although it differs from the PDF."
 
 
-def done_message(change: ReviewChange) -> str:
+@dataclass(frozen=True)
+class RejectWords:
+    """ "Reject" named for what it does to this kind of item (UX review MF14): the
+    button, the line under it, the notice after it and the item's state after it."""
+
+    button: str
+    consequence: str
+    done: str
+    state: str
+
+
+REJECT_WORDS = {
+    Kind.EQUATION: RejectWords(
+        "Keep as image",
+        "Students see a picture of the original; screen readers say only “Equation not converted”.",
+        "Kept as an image of the original. Screen readers will say “Equation not converted”.",
+        "Kept as an image by you",
+    ),
+    Kind.FIGURE: RejectWords(
+        "Keep without a description",
+        "The figure stays as it is in the PDF, marked “Needs a description”; screen readers "
+        "get no description of it.",
+        "Kept without a description, marked “Needs a description”.",
+        "Left without a description by you",
+    ),
+}
+BOLD_TEXT_WORDS = RejectWords(
+    "Make bold text",
+    "It stays in the text, in bold, but is no longer a heading in the outline.",
+    "Made bold text, not a heading.",
+    "Made bold text by you",
+)
+PLAIN_TEXT_WORDS = RejectWords(
+    "Make plain text",
+    "It stays in the text, but is no longer a heading in the outline.",
+    "Made plain text, not a heading.",
+    "Made plain text by you",
+)
+OTHER_WORDS = RejectWords(
+    "Keep the original",
+    "The original from the PDF stays in the document, marked for a later look.",
+    DONE_MESSAGES["reject"],
+    "Original kept by you",
+)
+
+
+def reject_words(kind: Kind, element: Element | None) -> RejectWords:
+    """What rejecting does here. A heading becomes a paragraph, bold when its line is
+    bold in the PDF (as `assemble` writes it)."""
+    if kind is Kind.HEADING:
+        return BOLD_TEXT_WORDS if element is not None and element.bold else PLAIN_TEXT_WORDS
+    return REJECT_WORDS.get(kind, OTHER_WORDS)
+
+
+def status_words(fix: Fix, element: Element | None) -> str:
+    """The item's state in words, a reviewer's "Reject" named for what it did."""
+    if fix.status is Status.REJECTED:
+        return reject_words(fix.kind, element).state
+    return fix_status_label(fix)
+
+
+def done_message(change: ReviewChange, element: Element | None) -> str:
     """What the notice after one decision says (content-free: it lives in the session)."""
     if change.action == "reject":
-        return REJECT_DONE.get(change.fix.kind, DONE_MESSAGES["reject"])
+        return reject_words(change.fix.kind, element).done
     if change.anyway:
         return ANYWAY_DONE
     message = DONE_MESSAGES.get(change.action, "Done.")
@@ -208,7 +266,8 @@ def stale_notice(
     now = ""
     if fix is not None and fix.kind in NOUNS:
         label = f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
-        now = f"{label} is now: {fix_status_label(fix).lower()}."
+        element = next((e for e in result.elements if e.id == target), None)
+        now = f"{label} is now: {status_words(fix, element).lower()}."
     return StaleNotice(STALE_TITLE, STALE_MESSAGE, now, href)
 
 
@@ -259,6 +318,15 @@ class ReviewItem:
     # An edit refused only because it differs from the PDF where that changes the
     # meaning: the form offers "Use my edit anyway".
     override: bool = False
+    # "Reject" named for what it does here (`reject_words`).
+    reject: RejectWords = OTHER_WORDS
+    by_you: bool = False  # accepted, edited or rejected by the reviewer
+    # What the item is, in a few words, for lists that name it (UX review MF15): the
+    # heading's text or the start of the alt text. Equations show `mathml` instead.
+    preview: str = ""
+    # What a screen reader gets from the PDF for an equation: its text layer ("" when
+    # the PDF has none). Shown only to the job's owner, on the review screens.
+    text_layer: str = ""
 
     @property
     def open(self) -> bool:
@@ -384,7 +452,7 @@ def _item(
         label=f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {number}",
         page=(element.page + 1) if element else 0,
         status=fix.status.value,
-        status_label=fix_status_label(fix),
+        status_label=status_words(fix, element),
         pending=needs_attention(fix.status),
         confidence_label=confidence_label(fix.confidence),
         checks=[_check_view(c, note=optional) for c in fix.failed_checks],
@@ -407,7 +475,32 @@ def _item(
         values=values,
         optional=optional,
         second_check=triage.second_check_note(fix),
+        reject=reject_words(fix.kind, element),
+        by_you=fix.decided_by_reviewer,
+        preview=_preview(fix, element),
+        text_layer=(element.text or "").strip()
+        if element is not None and fix.kind is Kind.EQUATION
+        else "",
     )
+
+
+PREVIEW_CHARS = 60  # of an alt text, in a list line
+
+
+def _preview(fix: Fix, element: Element | None) -> str:
+    """A few words that say which item this is: a heading's text, the start of the alt
+    text. Shown only on the owner's review screens (document content)."""
+    if fix.kind is Kind.HEADING:
+        text = fix.heading.text if fix.heading is not None else (element.text if element else "")
+        return " ".join((text or "").split())
+    if fix.kind is Kind.FIGURE and fix.figure is not None:
+        if fix.figure.decorative:
+            return ""
+        alt = " ".join(fix.figure.alt.split())
+        if len(alt) <= PREVIEW_CHARS:
+            return alt
+        return alt[:PREVIEW_CHARS].rsplit(" ", 1)[0] + "…"
+    return ""
 
 
 def _check_view(check: Check, *, note: bool = False) -> CheckView:
@@ -654,6 +747,7 @@ def _page(
         "remaining_by_kind": [decisions_label(g.units, g.kind) for g in fix_groups if g.pending],
         "alt_guideline": ALT_WARN_CHARS,
         "result_version": version,
+        "undo": bool(top) and undo_offer(request, view.id, user, version),
         "stale": None
         if stale is None
         else stale_notice(result, numbers, stale, list_url(view.id, _stale_anchor(result, stale))),
@@ -808,7 +902,8 @@ def review_action(
         status=STATUS_FOR_ACTION[action].value,
         anyway=change.anyway,
     )
-    message = done_message(change)
+    element = next((e for e in result.elements if e.id == element_id), None)
+    message = done_message(change, element)
     message += _moved_message(change.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
@@ -1012,3 +1107,103 @@ def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange, version: 
 def _typed(form: dict[str, str]) -> dict[str, str]:
     """The fields of a refused form, to show again as they were typed."""
     return {k: v for k, v in form.items() if k in {"latex", "alt", "decorative", "level"}}
+
+
+# --------------------------------------------------------------------------- undo
+
+
+def last_write(session: Session, job_id: str, version: int) -> list[ReviewEdit]:
+    """The ReviewEdits of the job's last review write (the one that made `version`), in
+    the order they were made. Empty when that write left none that says so (it was made
+    before writes were numbered)."""
+    edits = session.scalars(
+        select(ReviewEdit)
+        .where(ReviewEdit.job_id == job_id)
+        .order_by(ReviewEdit.created_at, ReviewEdit.id)
+    ).all()
+    return [e for e in edits if isinstance(e.after, dict) and e.after.get(WRITE_KEY) == version]
+
+
+def can_undo(edits: list[ReviewEdit]) -> bool:
+    """Undo is offered for the last write when it was a decision (not an Undo itself)
+    and every fix it changed can be put back."""
+    return bool(edits) and all(e.action != UNDO_ACTION and restorable(e.before) for e in edits)
+
+
+def undo_offer(request: Request, job_id: str, user: CurrentUser, version: int) -> bool:
+    """Whether the notice after a decision offers Undo (one small query)."""
+    with session_scope(get_ctx(request).factory) as session:
+        owned_job(session, job_id, user)
+        return can_undo(last_write(session, job_id, version))
+
+
+UNDO_PENDING = "Undone. {it} waiting for your decision again."
+UNDO_BACK = "Undone. {it} back as {was}."
+
+
+@router.post("/jobs/{job_id}/undo", dependencies=[Depends(require_csrf)])
+def undo(
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    version: Annotated[str, Form()] = "",
+    view: Annotated[str, Form()] = "",
+) -> Response:
+    """Undo the job's last review write: every fix it changed goes back to what its
+    ReviewEdit's `before` recorded, the HTML is rendered again, and the undo is a write
+    of its own (counted, and recorded as "undo" ReviewEdits). Only from a page drawn
+    after that write (`version` must be the job's): Undo means "what I just did", never
+    something another tab did since."""
+    view = LIST_VIEW if view == LIST_VIEW else "split"
+    try:
+        with session_scope(get_ctx(request).factory) as session:
+            job = owned_job(session, job_id, user, lock=True)
+            require_done(job)
+            if not version.strip():
+                raise ReviewStale()
+            _refuse_stale(job, version)
+            edits = last_write(session, job.id, job.result_version or 0)
+            if not can_undo(edits):
+                raise LookupError("nothing to undo")
+            result = DocumentResult.model_validate(job.result_json or {})
+            changes = undo_last(result, [(e.element_id, e.before or {}) for e in edits])
+            job.html = rerender_html(result, _crops(session, job.id))
+            job.result_json = result.model_dump(mode="json", exclude={"html"})
+            written = bump_result_version(job)
+            session.add_all(_review_edit(job.id, user, c, written) for c in changes)
+    except ReviewStale:
+        log_event(logger, "review_stale", job_id=job_id)
+        flash(request, "Nothing was undone: this document changed after this page was opened.")
+        return _back(job_id, view)
+    except LookupError:
+        flash(request, "There is nothing to undo here.")
+        return _back(job_id, view)
+    log_event(logger, "review_undo", job_id=job_id, changed=len(changes))
+    fixes = [c.fix for c in changes]
+    many = len(fixes) > 1
+    words = {"it": "They are" if many else "It is", "was": "they were" if many else "it was"}
+    message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
+    keys = {f.group_key for f in fixes}
+    if len(fixes) == 1:
+        target, flashed = fixes[0].element_id, fixes[0].element_id
+    elif len(keys) == 1 and None not in keys:
+        target = str(next(iter(keys)))
+        flashed = HEADING_GROUP_FLASH + target
+    else:  # a bulk accept
+        slug = GROUP_SLUGS.get(fixes[0].kind, "")
+        target, flashed = slug, GROUP_FLASH + slug
+    flash(request, message, element_id=flashed)
+    if view == LIST_VIEW:
+        return RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
+    from a11y_stem.web.routes.split import review_url
+
+    item = target if target and kind_for_slug(target) is None else None
+    return RedirectResponse(review_url(job_id, item=item), status_code=303)
+
+
+def _back(job_id: str, view: str) -> Response:
+    if view == LIST_VIEW:
+        return RedirectResponse(list_url(job_id, "review-progress"), status_code=303)
+    from a11y_stem.web.routes.split import review_url
+
+    return RedirectResponse(review_url(job_id), status_code=303)

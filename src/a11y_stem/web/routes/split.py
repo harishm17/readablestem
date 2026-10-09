@@ -34,6 +34,7 @@ from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
+from markupsafe import Markup
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
@@ -87,7 +88,9 @@ from a11y_stem.web.routes.review import (
     _load,
     _load_versioned,
     stale_notice,
+    undo_offer,
 )
+from a11y_stem.web.speech_diff import SpokenDiff, spoken_diff
 from a11y_stem.web.views import KIND_LABELS, JobView
 
 logger = logging.getLogger(__name__)
@@ -174,9 +177,14 @@ class StepLink:
 
 @dataclass
 class OptionalLine:
+    """One item in a folded list ("Optional checks", "Your decisions"), named by what it
+    is as well as its number (UX review MF15)."""
+
     label: str  # "Equation 7, page 3"
-    note: str
+    note: str  # the note, or what the reviewer decided
     href: str
+    what: str = ""  # a heading's text, the start of the alt text
+    mathml: Markup | None = None  # an equation, small
 
 
 @dataclass
@@ -195,6 +203,9 @@ class Panel:
     reason_code: str | None = None
     compare: EquationCompare | None = None
     compare_size: tuple[float, float] | None = None  # crop size in CSS px (aspect ratio)
+    # The proposal's reading and the PDF text's, the symbols that differ marked; only
+    # when the checks found a difference (`web.speech_diff`).
+    spoken: SpokenDiff | None = None
     # A decision whose proposal changes the meaning: the fix comes first (the suggested
     # one-click fix, else the edit box, open), and Accept is the secondary "Accept anyway".
     changes_meaning: bool = False
@@ -511,6 +522,8 @@ class SplitBuilder:
             item.mathml = try_sanitize_mathml(
                 fix.equation.mathml if fix.equation else None, flag=compare.proposal_marks
             )
+            if compare.rows:
+                panel.spoken = spoken_diff(item.speech, item.text_layer)
             clip = context_clip(element, size)
             panel.compare_size = (
                 round((clip[2] - clip[0]) * COMPARE_PX_PER_PT, 1),
@@ -674,15 +687,69 @@ class SplitBuilder:
         )
         out = []
         for fix in notes:
-            page = self.page_of(fix)
-            label = _label(fix, self.numbers) + (f", page {page}" if page else "")
             href = self.url(item=fix.element_id, anchor="decision-title")
             compare = (
                 compare_equation(self.elements.get(fix.element_id), fix)
                 if fix.kind is Kind.EQUATION
                 else None
             )
-            out.append(OptionalLine(label, _first_note(fix, compare), href))
+            out.append(self._line(fix, _first_note(fix, compare), href))
+        return out
+
+    def _line(self, fix: Fix, note: str, href: str) -> OptionalLine:
+        page = self.page_of(fix)
+        item = self.item(fix)
+        return OptionalLine(
+            label=_label(fix, self.numbers) + (f", page {page}" if page else ""),
+            note=note,
+            href=href,
+            what=item.preview,
+            mathml=try_sanitize_mathml(fix.equation.mathml if fix.equation else None),
+        )
+
+    def decided_lines(self) -> list[OptionalLine]:
+        """What the reviewer decided, apart from what was accepted for them (UX review
+        MF14): each decision of the queue the reviewer made, then any other item they
+        changed (an optional check edited, say), in page and reading order."""
+        out: list[OptionalLine] = []
+        seen: set[str] = set()
+        for decision in self.queue:
+            mine = [f for f in decision.fixes if f.decided_by_reviewer]
+            if decision.open or not mine:
+                continue
+            seen.update(f.element_id for f in decision.fixes)
+            href = self.decision_url(decision)
+            if decision.is_group:
+                lead = decision.fixes[0]
+                text = lead.heading.text if lead.heading else ""
+                kept = sum(f.status in KEPT for f in decision.fixes)
+                bold = sum(f.status is Status.REJECTED for f in decision.fixes)
+                out.append(
+                    OptionalLine(
+                        label=f"Repeated heading, {len(decision.fixes)} times",
+                        note=_group_state(kept, bold, len(decision.fixes)),
+                        href=href,
+                        what=text,
+                    )
+                )
+                continue
+            fix = decision.fixes[0]
+            out.append(self._line(fix, self.item(fix).status_label + ".", href))
+        far = (1 << 30, 1 << 30)
+        rank = {e.id: (e.page, e.order) for e in self.result.elements}
+        others = sorted(
+            (
+                f
+                for f in self.result.fixes
+                if f.decided_by_reviewer
+                and f.element_id not in seen
+                and f.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}
+            ),
+            key=lambda f: rank.get(f.element_id, far),
+        )
+        for fix in others:
+            href = self.url(item=fix.element_id, anchor="decision-title")
+            out.append(self._line(fix, self.item(fix).status_label + ".", href))
         return out
 
 
@@ -778,6 +845,7 @@ def split_page(
     optional = builder.optional_lines()
     flashes = pop_flash(request)
     notice = _notice(flashes, builder.result, builder.numbers, open_count)
+    target = _flash_target(flashes)
     context: dict[str, Any] = {
         "job": builder.view,
         "panel": panel,
@@ -804,8 +872,23 @@ def split_page(
         )
         if stale
         else None,
+        "decided_lines": builder.decided_lines(),
+        # Undo, in the notice after a decision: only for the write this page shows.
+        "undo": bool(notice) and undo_offer(request, builder.job_id, user, builder.version),
+        # The item the last decision saved (app.js forgets a kept draft of it).
+        "saved_target": target if ELEMENT_ID.match(target) else "",
     }
     return render(request, "review_split.html", context, status_code=status_code)
+
+
+def _flash_target(flashes: list[dict[str, Any]]) -> str:
+    """The element id the last notice is about ("" for a group or none)."""
+    if not flashes:
+        return ""
+    target = flashes[-1].get("element_id")
+    if not isinstance(target, str) or target.startswith((GROUP_FLASH, HEADING_GROUP_FLASH)):
+        return ""
+    return target
 
 
 def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
