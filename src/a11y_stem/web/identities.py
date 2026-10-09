@@ -13,6 +13,8 @@ sign-in, under the same rules as the first time.
   with the same address only when that user is on the allowlist (the token's tenant was
   already checked: `web/microsoft.py`); after that the address in the token no longer
   matters, so a changed or reused address cannot move the identity to someone else.
+  It does not stop a second identity with that user's address, from an allowed tenant,
+  from being linked to the same user as well (docs/web.md "Identities and nOAuth").
 - **Google** still signs in by verified email, as before: its identity is only recorded,
   on the first sign-in after this release, and changes nobody's access.
 - Nothing is recorded for people who are not on the allowlist.

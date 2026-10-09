@@ -176,7 +176,14 @@ yours to see". It is a 404 either way. The
   for Google; and Microsoft's `sub` is pairwise per app registration, so a token minted
   for another app never matches. If the app registration is ever replaced (a new client
   id), every `sub` changes and people link again by email on their next sign-in, under
-  the same rules.
+  the same rules. What the binding does not protect: an account that is already linked.
+  A second Microsoft identity from an allowed tenant whose address is that user's (a
+  reassigned or re-created university address, or a `mail` an administrator of an
+  allowed directory set) is linked to the same user too, the way the re-registration
+  case needs; Google sign-in gives access by verified address alone in the same way.
+  Refusing it (`login_refused reason=identity_conflict`, with an admin command to unlink
+  an identity after a re-registration) is a decision for Harish, not taken here.
+  TODO(Harish).
 - **Allowlist.** `users.is_allowed`, managed with `a11y-stem users allow|deny|list` or on
   `/admin`. It is checked on every request, so removing someone ends their access at
   once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
