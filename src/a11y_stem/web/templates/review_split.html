@@ -135,7 +135,7 @@
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
   {{ hidden_fields() }}
   {% set err = item.errors.get("latex") %}
-  <details class="edit-box"{% if err or anyway or not item.values.get("latex") %} open{% endif %}>
+  <details class="edit-box"{% if err or anyway or not item.values.get("latex") or (stale and stale.kept) %} open{% endif %}>
     <summary>Edit the LaTeX</summary>
     <div class="field{% if err %} field-error{% endif %}">
       <label for="latex-{{ eid }}">LaTeX for {{ item.label|lower }}</label>

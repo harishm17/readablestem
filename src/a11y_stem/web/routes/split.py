@@ -895,7 +895,11 @@ def split_page(
         "max_steps": MAX_STEPS,
         "result_version": builder.version,
         "stale": stale_notice(
-            builder.result, builder.numbers, item, review_url(builder.job_id, item=item)
+            builder.result,
+            builder.numbers,
+            item,
+            review_url(builder.job_id, item=item),
+            invalid[1].values if invalid is not None else None,
         )
         if stale
         else None,

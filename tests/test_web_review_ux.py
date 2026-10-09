@@ -152,6 +152,9 @@ def test_a_refused_stale_edit_keeps_what_was_typed(ux):
     response = post(ux, "p1-e2", action="edit", latex=r"\boldsymbol{\omega}", version="0")
     assert response.status_code == 409
     assert r"\boldsymbol{\omega}</textarea>" in panel(response.text)
+    # ... in an open edit box, and the notice says it is there.
+    assert '<details class="edit-box" open>' in panel(response.text)
+    assert "What you typed is kept below." in response.text
     assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
     # Choosing again from the refreshed page works.
     assert (

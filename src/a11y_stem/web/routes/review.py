@@ -39,6 +39,7 @@ the one just changed.
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 
@@ -289,10 +290,18 @@ class StaleNotice:
     message: str
     now: str  # what the item is now ("Equation 1 is now: accepted by you."), or ""
     href: str  # the page as it is now, by GET (reloading the POST would only re-send it)
+    kept: bool = False  # what was typed is back in its field (which is then open)
+
+
+STALE_KEPT = "What you typed is kept below."
 
 
 def stale_notice(
-    result: DocumentResult, numbers: dict[str, int], target: str, href: str
+    result: DocumentResult,
+    numbers: dict[str, int],
+    target: str,
+    href: str,
+    typed: Mapping[str, str] | None = None,
 ) -> StaleNotice:
     fix = result.fix_for(target) if not is_group_key(target) else None
     now = ""
@@ -300,7 +309,9 @@ def stale_notice(
         label = f"{KIND_LABELS[fix.kind]} {numbers.get(fix.element_id, 0)}"
         element = next((e for e in result.elements if e.id == target), None)
         now = f"{label} is now: {status_words(fix, element).lower()}."
-    return StaleNotice(STALE_TITLE, STALE_MESSAGE, now, href)
+    kept = any((value or "").strip() for value in (typed or {}).values())
+    message = f"{STALE_MESSAGE} {STALE_KEPT}" if kept else STALE_MESSAGE
+    return StaleNotice(STALE_TITLE, message, now, href, kept)
 
 
 def _stale_anchor(result: DocumentResult, target: str) -> str:
