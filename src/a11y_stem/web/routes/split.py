@@ -40,7 +40,7 @@ from sqlalchemy import select
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import marks, page_images, queue
+from a11y_stem.web import events, marks, page_images, queue
 from a11y_stem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
@@ -816,7 +816,11 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
 def review_screen(
     request: Request, job_id: str, user: UserDep, item: str = "", page: str = "", accepted: str = ""
 ) -> Response:
-    return split_page(request, job_id, user, item=item, page=page, show_accepted=accepted == "1")
+    shown = accepted == "1"
+    response = split_page(request, job_id, user, item=item, page=page, show_accepted=shown)
+    ctx = get_ctx(request)  # usage event (web/events.py)
+    events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "split")
+    return response
 
 
 def _pct(value: float, whole: float) -> str:

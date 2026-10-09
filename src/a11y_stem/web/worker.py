@@ -78,6 +78,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
 from a11y_stem.core.types import ConversionOutput, DocumentResult
+from a11y_stem.web import events
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.logsafe import log_event, log_exception
@@ -799,7 +800,9 @@ class Worker:
         claim = self.claim()
         if claim is None:
             return None
-        self.process(claim)
+        outcome = self.process(claim)
+        if outcome in {JobStatus.DONE, JobStatus.FAILED}:  # usage event (web/events.py)
+            events.record_finished(self.factory, self.settings, claim.job_id)
         return claim.job_id
 
     def purge_backstop(self) -> int | None:

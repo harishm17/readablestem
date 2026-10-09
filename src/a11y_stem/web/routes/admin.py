@@ -1,7 +1,9 @@
-"""Admin page: allowlist, today's spend against the cap, queue depth, aggregate counts.
+"""Admin page: allowlist, today's spend against the cap, queue depth, aggregate counts,
+usage counts.
 
 Shows no document content: no filenames, no results, only emails of people on the
-allowlist (which admins manage) and numbers.
+allowlist (which admins manage) and numbers. Usage is shown per pseudonymous person (the
+start of their random id), never next to an email.
 """
 
 from __future__ import annotations
@@ -14,6 +16,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 
+from a11y_stem.web import events
 from a11y_stem.web.auth import normalise_email, set_allowed
 from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import ErrorAggregate, Job, JobStatus, User, session_scope
@@ -31,6 +34,7 @@ router = APIRouter()
 
 AGGREGATE_DAYS = 14
 AGGREGATE_ROWS = 200
+USAGE_DAYS = 28  # four weeks: the return-visit measure of the beta
 
 
 def admin_context(request: Request) -> dict[str, Any]:
@@ -60,7 +64,13 @@ def admin_context(request: Request) -> dict[str, Any]:
             .order_by(ErrorAggregate.day.desc(), ErrorAggregate.step, ErrorAggregate.category)
             .limit(AGGREGATE_ROWS)
         ).all()
+        # Usage events (web/events.py): counts per day and per pseudonymous person.
+        usage = events.usage(session, days=USAGE_DAYS)
     return {
+        "usage": usage,
+        "usage_columns": {"day": events.DAY_COLUMNS, "person": events.PERSON_COLUMNS},
+        "events_on": ctx.settings.events_enabled,
+        "event_days": events.EVENT_RETENTION_DAYS,
         "users": users,
         "spend": ctx.guard.snapshot(),
         "queue": {status.value: counts.get(status.value, 0) for status in JobStatus},

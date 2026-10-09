@@ -25,6 +25,7 @@ from sqlalchemy import select, update
 from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.config import Settings
+from a11y_stem.web import events
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.deps import (
@@ -156,6 +157,7 @@ def finish_login(request: Request, email: str, name: str | None) -> Response:
     user_id, version = found
     start_session(request, user_id, version)
     log_event(logger, "login", user_id=user_id)
+    events.record(ctx.factory, ctx.settings, user_id, events.SIGNED_IN)  # usage event
     return RedirectResponse("/app", status_code=303)
 
 
