@@ -84,9 +84,10 @@ from a11y_stem.web.logsafe import log_event, log_exception
 from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
 
 if TYPE_CHECKING:
+    from a11y_stem.core.types import ConversionOptions
     from a11y_stem.models.base import VisionClient
     from a11y_stem.observability.tracing import Tracer
-    from a11y_stem.pipeline.run import ProgressFn
+    from a11y_stem.pipeline.run import ProgressFn, StageProgressFn
 
 logger = logging.getLogger(__name__)
 
@@ -119,8 +120,8 @@ SCANNED_PAGES = "scanned_pages"
 class Converter(Protocol):
     """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments.
 
-    `tracer` is passed only when tracing is on, so a fake without that argument works in
-    every other case.
+    The optional arguments (`tracer`, `options`, `stage_progress`) are passed only when
+    set (`Worker._converter_kwargs`), so a fake without them works in every other case.
     """
 
     def __call__(
@@ -132,6 +133,8 @@ class Converter(Protocol):
         client: VisionClient,
         progress: ProgressFn | None = None,
         tracer: Tracer | None = None,
+        options: ConversionOptions | None = None,
+        stage_progress: StageProgressFn | None = None,
     ) -> ConversionOutput: ...
 
 
@@ -559,6 +562,23 @@ class Worker:
 
         return progress
 
+    def _converter_kwargs(self, attempt: _Attempt) -> dict[str, Any]:
+        """The converter's optional arguments, each passed only when set (`Converter`).
+
+        Content features add theirs here (docs/design/content-features.md), each in its
+        own block: `options` (the job's course notation; with none, `convert_pdf` uses
+        the settings' feature flags) and `stage_progress` (live progress by stage).
+        """
+        kwargs: dict[str, Any] = {}
+        if self.tracer is not None:
+            kwargs["tracer"] = self.tracer
+
+        # options: the notation work loads the job's course notation here.
+
+        # stage_progress: the job-page work stores ProgressEvents on the job here.
+
+        return kwargs
+
     def _start_conversion(self, attempt: _Attempt, pdf: bytes) -> tuple[threading.Thread, _Run]:
         run = _Run()
 
@@ -566,18 +586,13 @@ class Worker:
             try:
                 client = self.client_factory(self.settings, attempt.budget)
                 progress = self._progress(attempt)
-                if self.tracer is None:
-                    run.output = self.converter(
-                        pdf, settings=self.settings, client=client, progress=progress
-                    )
-                else:
-                    run.output = self.converter(
-                        pdf,
-                        settings=self.settings,
-                        client=client,
-                        progress=progress,
-                        tracer=self.tracer,
-                    )
+                run.output = self.converter(
+                    pdf,
+                    settings=self.settings,
+                    client=client,
+                    progress=progress,
+                    **self._converter_kwargs(attempt),
+                )
             except Exception as exc:  # handed to the worker thread
                 run.error = exc
 
