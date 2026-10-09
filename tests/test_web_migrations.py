@@ -144,3 +144,82 @@ def test_a_database_behind_this_release_is_refused(tmp_path, monkeypatch):
     with pytest.raises(ConfigError, match="behind"):
         require_migrated(engine)
     engine.dispose()
+
+
+# --------------------------------------------------------------------------- content features
+
+CONTENT_REVISION = "fa3662c01396"
+BEFORE_CONTENT = "eb74844c4a9d"
+CONTENT_TABLES = {"courses", "notation_entries", "events", "auth_identities"}
+NEW_JOB_COLUMNS = {"course_id", "progress_json", "result_version"}
+INSERT_JOB = (
+    "INSERT INTO jobs (id, user_id, status, filename, page_count, pages_done, "
+    "opt_in_retention, retain_until, created_at, attempts, cost_usd, model_calls, "
+    "aggregated) VALUES (:id, 'u1', 'done', 'f.pdf', 1, 1, false, '2026-10-10 00:00:00', "
+    "'2026-10-09 00:00:00', 1, 0.0, 0, false)"
+)
+INSERT_USER = (
+    "INSERT INTO users (id, email, is_allowed, is_admin, created_at) "
+    "VALUES ('u1', 'a@example.org', true, false, '2026-10-08 00:00:00')"
+)
+
+
+def migrate(url: str, revision: str, *, down: bool = False) -> None:
+    config = alembic_config(url)
+    config.attributes["configure_logger"] = False
+    (command.downgrade if down else command.upgrade)(config, revision)
+
+
+def test_the_content_migration_is_the_head():
+    assert migration_heads() == {CONTENT_REVISION}
+    script = ScriptDirectory.from_config(alembic_config())
+    revision = script.get_revision(CONTENT_REVISION)
+    assert revision is not None and revision.down_revision == BEFORE_CONTENT
+
+
+def test_the_content_migration_downgrades_and_upgrades_again(tmp_path):
+    url = f"sqlite:///{tmp_path}/content.db"
+    upgrade(url)
+    migrate(url, BEFORE_CONTENT, down=True)
+    engine = create_engine(url)
+    try:
+        names = set(inspect(engine).get_table_names())
+        assert not names & CONTENT_TABLES and "jobs" in names
+        assert not {c["name"] for c in inspect(engine).get_columns("jobs")} & NEW_JOB_COLUMNS
+        referred = [fk["referred_table"] for fk in inspect(engine).get_foreign_keys("jobs")]
+        assert referred == ["users"]
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_jobs_survive_the_content_migration_and_old_inserts_still_work(tmp_path):
+    """Upgrading keeps existing jobs (result_version 0, no course); after it, an older
+    release inserting a job without the new columns (a traffic rollback) still gets a
+    valid row."""
+    url = f"sqlite:///{tmp_path}/rollback-content.db"
+    migrate(url, BEFORE_CONTENT)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_JOB), {"id": "j2"})
+            found = conn.execute(
+                text("SELECT id, result_version, course_id, progress_json FROM jobs ORDER BY id")
+            ).all()
+        assert [tuple(row) for row in found] == [("j1", 0, None, None), ("j2", 0, None, None)]
+    finally:
+        engine.dispose()
