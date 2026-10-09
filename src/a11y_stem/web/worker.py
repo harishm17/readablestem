@@ -66,6 +66,7 @@ image. Nothing from the document is logged.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 import threading
@@ -238,6 +239,16 @@ def db_safe(value: Any) -> Any:
     if isinstance(value, list):
         return [db_safe(v) for v in value]
     return value
+
+
+def _accepts(function: Callable[..., Any], name: str) -> bool:
+    """Whether `function` takes the keyword argument `name` (or any keyword). A callable
+    whose signature cannot be read is assumed to take it."""
+    try:
+        parameters = inspect.signature(function).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters)
 
 
 class JobCancelled(BudgetExceeded):
@@ -585,8 +596,10 @@ class Worker:
 
         # options: the notation work loads the job's course notation here.
 
-        # stage_progress: live progress by stage, stored on the job row for its page.
-        kwargs["stage_progress"] = self._stage_progress(attempt)
+        # stage_progress: live progress by stage, stored on the job row for its page
+        # (only to a converter that takes it: older fakes and scripts do not).
+        if _accepts(self.converter, "stage_progress"):
+            kwargs["stage_progress"] = self._stage_progress(attempt)
 
         return kwargs
 

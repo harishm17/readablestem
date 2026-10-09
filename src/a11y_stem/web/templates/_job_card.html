@@ -1,0 +1,63 @@
+{# The before/after card (Beta 1 of the feature review): what a screen-reader user gets
+   from the PDF and from the HTML, measured (pipeline/source_facts.py) and counted
+   (web/job_page.py `before_after`). Specific about what is lost, never a score. The
+   equation text from the PDF is document content: it is shown to the owner here and is
+   never logged. #}
+{% set card = pg.card %}
+<section aria-labelledby="changed-heading">
+  <h2 id="changed-heading">What changed for a screen-reader user</h2>
+  {# On a narrow screen the table scrolls inside its box (a data table may: WCAG 1.4.10),
+     so the box can take focus and be scrolled with the keyboard. #}
+  <div class="table-scroll" role="region" aria-labelledby="compare-caption" tabindex="0">
+    <table>
+      <caption id="compare-caption" class="visually-hidden">Your PDF and the HTML file, compared</caption>
+      <thead>
+        <tr>
+          <th scope="col">Can a screen-reader user …</th>
+          <th scope="col">In your PDF</th>
+          <th scope="col">In the HTML</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for row in card.rows %}
+        <tr>
+          <th scope="row">… {{ row.question }}?</th>
+          <td>{{ row.pdf }}</td>
+          <td>{{ row.html }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <p class="hint">How we know: we read your PDF's tags, language, title and bookmarks and its
+    text layer, which is what a screen reader gets from a PDF without tags (a PDF reader may
+    put it in a different order), and counted what the HTML file contains. The counts say
+    what is there, not whether each part is right: that is what your decisions are for.</p>
+  {% if card.examples %}
+  <h3 id="hear-heading">Hear the difference</h3>
+  <p>Some of your equations, written out the way a screen reader is given them. Screen
+    readers word them a little differently, but they can only say the structure the file
+    gives them.</p>
+  <ul class="fix-list" aria-labelledby="hear-heading">
+    {% for example in card.examples %}
+    <li class="fix-card">
+      <h4>{{ example.title }}</h4>
+      <figure class="crop">
+        <img src="/jobs/{{ job.id }}/crops/{{ example.element_id }}.png" alt="The equation as printed in your PDF">
+      </figure>
+      <div class="fix-body">
+        <div>
+          <p><strong>From your PDF a screen reader gets:</strong></p>
+          <p>“{{ example.pdf_reading }}”</p>
+          <p>{{ example.lost }}</p>
+        </div>
+        <div>
+          <p><strong>In the HTML:</strong></p>
+          <p>“{{ example.html_reading }}”</p>
+        </div>
+      </div>
+    </li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+</section>

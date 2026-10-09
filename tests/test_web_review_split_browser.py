@@ -291,7 +291,7 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     context, page = open_page(browser, site, viewport=PHONE, javascript=False)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(f"{site.base}/jobs/{job}")
-    page.get_by_role("link", name=re.compile("^Review fixes")).click()
+    page.get_by_role("link", name=re.compile(r"^Review \d+ decisions?$")).click()
     assert page.locator("#decision-title").inner_text().startswith("Decision 1 of 3")
     # Decision 1: the omega must be bold; the suggested fix is one button.
     page.get_by_role("button", name="Use bold ω in equation 1").click()

@@ -1,22 +1,20 @@
-{# `outcome` (web/outcome.py) replaces the plain status when a finished job is incomplete
-   (a spend cap stopped it, scanned pages), a failed job has its own explanation, or a
-   queued job waits for tomorrow's budget. #}
-{% set outcome = outcome|default(none) %}
+{# The status box, inside the page's polite live region (job.html). `headline`
+   (web/job_page.py) says what is left to do; it changes per step, not per element, so
+   a screen reader hears each step once. Polled by htmx (204 while unchanged). #}
 {# Only in the htmx fragment: htmx moves a top-level <title> into the document title, so
    the tab title follows the status ("Converting: notes.pdf") as the box does. #}
 {% if page_title|default("") %}<title>{{ page_title }} | a11y-stem</title>
 {% endif %}
+{% set counts = job.summary.counts if job.summary else none %}
 <div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
-  <p><span class="status-badge status-{{ job.status }}">{{ outcome.label if outcome else job.status_label }}</span>
-    {{ outcome.message if outcome else job.status_detail }}</p>
-  {% if results_link|default(false) %}
-  {# Only in the polled fragment: the full page shows the results itself. #}
-  <p><a href="/jobs/{{ job.id }}">{{ "Show the results" if job.status == "done" else "Show why it stopped" }}</a></p>
+  <p><span class="status-badge status-{{ headline.badge }}">{{ headline.label }}</span>
+    {{ headline.message }}</p>
+  {% if counts and counts.decisions and headline.state != "decisions" %}
+  <p>{{ counts.decisions }} {{ "decision needs" if counts.decisions == 1 else "decisions need" }} you before you share it.</p>
   {% endif %}
-  {% if job.status == "running" and job.page_count %}
-  <p class="progress-row">
-    <label for="job-progress">Pages converted</label>
-    <progress id="job-progress" max="{{ job.page_count }}" value="{{ job.pages_done }}">{{ job.pages_done }} of {{ job.page_count }}</progress>
-  </p>
+  {% if results_link|default(false) %}
+  {# Only in the polled fragment: the full page shows the results itself. From here the
+     first decision is one click away (MF17). #}
+  <p>{% if counts and counts.decisions %}<a href="/jobs/{{ job.id }}/review">Start the review</a> or {% endif %}<a href="/jobs/{{ job.id }}">{{ "show the results" if counts and counts.decisions else ("Show the results" if job.status == "done" else "Show why it stopped") }}</a></p>
   {% endif %}
 </div>

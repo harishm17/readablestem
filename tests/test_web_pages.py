@@ -249,9 +249,10 @@ def test_job_page_works_without_javascript(pages):
     assert 'role="status"' in queued
     done = pages["/jobs/{id}"]
     assert "noscript" not in done
-    # Results are plain links: no JavaScript needed to download or review.
-    assert re.search(r'href="/jobs/[0-9a-f]{32}/download"', done)
-    assert re.search(r'href="/jobs/[0-9a-f]{32}/review"', done)
+    # Results are plain links: no JavaScript needed to review or download (a draft,
+    # while decisions are open, asks first on a page of its own).
+    assert re.search(r'href="/jobs/[0-9a-f]{32}/draft"', done)
+    assert re.search(r'href="/jobs/[0-9a-f]{32}/review(\?item=[^"]*)?"', done)
 
 
 def test_status_is_never_shown_by_colour_alone(pages):

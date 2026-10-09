@@ -2,21 +2,29 @@
 
 Every /jobs/* route loads the job through `owned_job`, which answers 404 for a job that
 does not exist *or* belongs to someone else, so job ids cannot be probed.
+
+The job page (`job_page`, docs/web.md "The job page") shows an honest headline, live
+progress by step, the before/after card, what the file does not handle, the finish line
+and the document language (`web.job_page`). Its routes: the status fragment and the list
+of steps, each polled by htmx on its own; a page that asks before a draft is downloaded
+while decisions are open; and the language control's POST.
 """
 
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from a11y_stem.core.types import DocumentResult
+from a11y_stem.web import job_page as page_rules
 from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import (
@@ -44,7 +52,7 @@ from a11y_stem.web.uploads import (
     max_upload_bytes,
     read_upload_form,
 )
-from a11y_stem.web.views import JobView, job_view
+from a11y_stem.web.views import JobView, job_view, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -268,11 +276,12 @@ def _store_upload(
 def load_job_status(
     request: Request, job_id: str, user: CurrentUser
 ) -> tuple[JobView, JobOutcome | None]:
-    """The job's view model plus its outcome (`web.outcome`), from one read."""
+    """The job's view model (with the job page's data) plus its outcome (`web.outcome`),
+    from one read."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
-        view = job_view(session, job, with_summary=True)
+        view = job_view(session, job, with_page=True)
         status, error_code, result_json = str(job.status), job.error_code, job.result_json
     budget_closed = status == JobStatus.QUEUED and ctx.guard.cap_reached(ctx.min_headroom_usd)
     outcome = job_outcome(
@@ -288,7 +297,9 @@ def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
     """What `_job_status.html` needs. `status_version` changes whenever the fragment
     would look different, outcome included (htmx polling answers 204 until then)."""
     version = f"{job.version}-{outcome.code}" if outcome is not None else job.version
-    return {"job": job, "outcome": outcome, "status_version": version}
+    counts = job.summary.counts if job.summary is not None else None
+    headline = page_rules.headline(job.status, job.status_detail, outcome, counts)
+    return {"job": job, "outcome": outcome, "status_version": version, "headline": headline}
 
 
 @router.get("/jobs/{job_id}")
@@ -316,14 +327,93 @@ def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Res
     status region already announces the change and the link is one step away.
     """
     job, outcome = load_job_status(request, job_id, user)
-    context = status_context(job, outcome) | {"results_link": job.finished}
+    context = status_context(job, outcome)
     if v and v == context["status_version"]:
         return Response(status_code=204)
+    context["results_link"] = job.finished
     if request.headers.get("HX-Request") == "true":
         # htmx sets document.title from a top-level <title> in the fragment.
-        label = outcome.label if outcome is not None else job.status_label
-        context["page_title"] = f"{label}: {job.filename}"
+        headline: page_rules.Headline = context["headline"]
+        context["page_title"] = f"{headline.label}: {job.filename}"
     return render(request, "_job_status.html", context)
+
+
+@router.get("/jobs/{job_id}/progress")
+def job_progress(request: Request, job_id: str, user: UserDep, v: str = "") -> Response:
+    """The list of steps with their counts, polled by htmx outside the status box's live
+    region (so a screen reader is not told every element). 204 while unchanged; once the
+    job has finished, an empty fragment that stops polling."""
+    job, _ = load_job_status(request, job_id, user)
+    if v and v == job.progress_version:
+        return Response(status_code=204)
+    return render(request, "_job_progress.html", {"job": job})
+
+
+# --------------------------------------------------------------------------- draft
+
+
+@router.get("/jobs/{job_id}/draft")
+def draft(request: Request, job_id: str, user: UserDep) -> Response:
+    """Asked before a download while decisions are open: what students would get, with
+    the review as the main way on (MF9). With none open, the job page's finish line."""
+    job, _ = load_job_status(request, job_id, user)
+    if job.status != JobStatus.DONE or job.page is None:
+        raise PageError(409, "Not ready yet", "This document has not finished converting.",
+                        context={"job_id": job_id})  # fmt: skip
+    decisions = job.page.counts.decisions
+    if not decisions:
+        return RedirectResponse(f"/jobs/{job_id}#ready", status_code=303)
+    item = f"?item={job.page.first_open}" if job.page.first_open else ""
+    context = {
+        "job": job,
+        "decisions": decisions,
+        "draft": job.page.draft,
+        "review_url": f"/jobs/{job_id}/review{item}",
+    }
+    return render(request, "job_draft.html", context)
+
+
+# --------------------------------------------------------------------------- language
+
+
+@router.post("/jobs/{job_id}/language", dependencies=[Depends(require_csrf)])
+def set_language(
+    request: Request, job_id: str, user: UserDep, lang: Annotated[str, Form()] = ""
+) -> Response:
+    """The instructor confirms or changes the document language (lang_source "user"):
+    the stored result changes, the notices that asked for it are answered, and the HTML
+    file is made again with the new language. Only a language the control offers, or the
+    one the document already has, is taken."""
+    with session_scope(get_ctx(request).factory) as session:
+        job = owned_job(session, job_id, user, lock=True)
+        require_done(job)
+        result = DocumentResult.model_validate(job.result_json or {})
+        if lang not in page_rules.LANGUAGES and lang != result.lang:
+            raise PageError(
+                400,
+                "Language not changed",
+                "Choose the language from the list on the document's page.",
+                context={"job_id": job_id},
+            )
+        page_rules.set_language(result, lang)
+        crops = _crops(session, job.id)
+        from a11y_stem.web.review import rerender_html
+
+        job.html = rerender_html(result, crops, checked_on=last_decision(session, job))
+        job.result_json = result.model_dump(mode="json", exclude={"html"})
+        job.result_version = (job.result_version or 0) + 1
+    log_event(logger, "language_set", job_id=job_id)
+    flash(
+        request,
+        f"The language is now {page_rules.language_name(lang)}. The HTML file was made again "
+        "with it.",
+    )
+    return RedirectResponse(f"/jobs/{job_id}#language-heading", status_code=303)
+
+
+def _crops(session: Session, job_id: str) -> dict[str, bytes]:
+    blobs = session.scalars(select(Blob).where(Blob.job_id == job_id, Blob.kind == "crop"))
+    return {b.element_id: b.content for b in blobs if b.element_id}
 
 
 # --------------------------------------------------------------------------- results
