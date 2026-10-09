@@ -87,6 +87,25 @@ def test_labels_bold_words_capitals_and_letters_without_evidence_stay_text():
     assert [(e.kind, e.text) for e in on] == [(e.kind, e.text) for e in off]
 
 
+def test_run_in_part_labels_beside_bold_vectors_stay_text():
+    # A document whose bold a and b are vectors: "a." and "b." starting the parts of a
+    # question in the middle of a paragraph are labels, not vectors.
+    pdf = html_pdf(
+        "<p>The vectors <b>a</b> and <b>b</b> are added: so <b>b</b> = 2 here.</p>"
+        "<p>Answer both parts of the question. <b>a.</b> Find the magnitude of the sum. "
+        "<b>b.</b> Find the angle between them.</p>"
+    )
+    elements = analyze(pdf)
+    assert [e.parent_id for e in bold_letters_of(elements)] == ["p1-e0", "p1-e0"]
+    assert any(
+        text.endswith(
+            "Answer both parts of the question. a. Find the magnitude of the sum. b. Find the "
+            "angle between them."
+        )
+        for text in text_blocks(elements)
+    )
+
+
 def test_with_the_feature_off_nothing_changes():
     pdf = html_pdf(VECTORS)
     off = analyze(pdf, on=False)

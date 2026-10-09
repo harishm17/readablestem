@@ -1968,9 +1968,12 @@ def _bold_letter_runs(
             continue
         before = chars[ink[pos - 1]].c if pos else state.before
         after = chars[ink[pos + 1]].c if pos + 1 < len(ink) else ""
+        then = chars[ink[pos + 2]].c if pos + 2 < len(ink) else ""
         opening = state.first and pos == 0
         if (before in "([" and after in ")]") or (opening and after in _LABEL_AFTER):
             continue  # a label
+        if after in ".)" and (not then or then.isupper()) and (not before or before in ".!?:"):
+            continue  # a run-in label after a sentence: "... question. a. Find the sum."
         key = styled_char(c.c, "bold")
         in_course = key in state.course
         if c.c.isupper() and (opening or not before or before in _SENTENCE_END) and not in_course:

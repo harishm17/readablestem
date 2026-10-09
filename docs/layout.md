@@ -383,7 +383,9 @@ Two functions in `layout.py`, nothing else in the page flow changes:
    - any other bold Latin letter that stands alone (its token, split at spaces, is the
      letter and punctuation only) is a candidate, except: a bold word in the token on
      either side (a bold phrase such as "Part A", a bold sentence); a label ("(b)"
-     anywhere, "a)", "A." or "b:" starting the paragraph); a capital starting a sentence
+     anywhere, "a)", "A." or "b:" starting the paragraph, and "a." or "b)" after the end
+     of a sentence with a capital after it, as the parts of a question run on in one
+     paragraph: "... the question. a. Find the sum. b. Find the angle."); a capital starting a sentence
      (the paragraph's first letter or after `. ! ? :`), because "A" is also the article,
      unless the course lists it. A candidate the course lists (`NotationEntry.canonical`)
      keeps the evidence `course notation`.
@@ -416,7 +418,9 @@ handout, 10 letters were kept by the same bold letter in its displayed maths and
 by its maths font; on OpenStax, 7 by the document's maths and 2 by a bold letter nearby.
 With a course notation listing bold d, v, a, x and s, the same 9 are found, each by the
 course. Not covered: PDFs whose font does not mark bold (no candidate is seen at all
-there), and bold letters in captions.
+there), and bold letters in captions. A bold answer letter in a document whose same bold
+letter is a vector elsewhere ("The correct answer to question 3 is **b**") is still made
+maths by the document's evidence; the equation step's own tiers then decide it.
 
 
 
