@@ -1,5 +1,5 @@
-"""Public pages: landing, demo, privacy, terms, known limits, status, and the health
-check."""
+"""Public pages: landing, demo, privacy, terms, known limits, posting help, status, and
+the health check."""
 
 from __future__ import annotations
 
@@ -10,8 +10,10 @@ from fastapi.responses import FileResponse, JSONResponse, Response
 from sqlalchemy import func, select
 
 from a11y_stem.web.database import ping
-from a11y_stem.web.db import Job, JobStatus, session_scope
+from a11y_stem.web.db import Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import get_ctx, render
+from a11y_stem.web.events import EVENT_RETENTION_DAYS
+from a11y_stem.web.quota import next_day_start
 from a11y_stem.web.security import VIEW_CSP
 
 router = APIRouter()
@@ -43,9 +45,16 @@ def demo(request: Request) -> Response:
 
 @router.get("/privacy")
 def privacy(request: Request) -> Response:
-    # The page names Langfuse only when traces are actually sent there.
-    tracing = get_ctx(request).tracer is not None
-    return render(request, "privacy.html", {"active": "privacy", "tracing": tracing})
+    # The page names Langfuse only when traces are actually sent there, and usage events
+    # only when they are recorded.
+    ctx = get_ctx(request)
+    context = {
+        "active": "privacy",
+        "tracing": ctx.tracer is not None,
+        "events_on": ctx.settings.events_enabled,
+        "event_days": EVENT_RETENTION_DAYS,
+    }
+    return render(request, "privacy.html", context)
 
 
 @router.get("/terms")
@@ -56,6 +65,13 @@ def terms(request: Request) -> Response:
 @router.get("/limits")
 def limits(request: Request) -> Response:
     return render(request, "limits.html", {"active": "limits"})
+
+
+@router.get("/help/posting")
+def posting_help(request: Request) -> Response:
+    """How to put the file in front of students (UX review MF11): upload it and link it,
+    never paste it into an LMS page. Public, so an accessibility office can read it."""
+    return render(request, "help_posting.html", {"active": "posting"})
 
 
 @router.get("/status")
@@ -73,6 +89,7 @@ def status(request: Request) -> Response:
         "conversions_open": None,
         "waiting": None,
         "converting": None,
+        "next_reset": next_day_start(utcnow()),
     }
     if database_ok:
         with session_scope(ctx.factory) as session:
