@@ -269,3 +269,335 @@ progress { width: 16rem; height: 1.1rem; }
 .done-list { margin: 0.5rem 0 0 1rem; }
 .done-item { border-bottom: 1px solid var(--rule); }
 .done-item > .fix-card { margin-top: 0.5rem; }
+
+/* ===================================================================== review screen
+   One decision at a time beside the page it is on (templates/review_split.html).
+   Marks on the page image: the position of each comes from /jobs/{id}/review/marks.css
+   (the CSP allows no inline styles). Every mark is a link of at least 24 x 24 CSS px
+   (WCAG 2.5.8), and status is in its number, shape and text, never its colour alone:
+   a decision is a numbered disc and a solid frame, an optional check a "Note" label and
+   a dashed frame, an accepted item a tick and a dotted frame (shown on request). The
+   marks keep their own colours in forced-colors mode: they sit on the page image, which
+   stays white whatever the theme, and system colours could make them white on white. */
+
+:root {
+  --desk: #e7e9ee;
+  --mark-required: #7a4b00;   /* 7.4:1 on white; tag text white on it 7.4:1 */
+  --mark-optional: #4b5a75;   /* 7.0:1 on white */
+  --mark-accepted: #1d6b35;   /* 6.5:1 on white */
+  --mark-current: #1a4fa0;    /* 7.9:1 on white */
+  --tint-required: #fdf3e1;
+  --tint-current: #e8eefa;
+}
+
+.wrap-review { max-width: 100rem; }
+.review-head {
+  display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between;
+  gap: 0.75rem 2rem; padding: 1rem 0 0.75rem; border-bottom: 1px solid var(--rule);
+}
+.review-title { flex: 1 1 26rem; min-width: 0; }
+.review-head h1 { font-size: 1.6rem; margin: 0; }
+.review-file { font-weight: 400; font-size: 1.05rem; color: var(--muted); margin-left: 0.35rem; }
+.review-lede { font-size: 1.1rem; margin: 0.35rem 0 0; max-width: 46rem; }
+.review-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1.5rem; }
+.review-links { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1.25rem; }
+
+/* Decisions as numbered steps: made (filled, ticked), current (ringed), waiting (outlined). */
+.steps { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.75rem; }
+.steps ol { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.step {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 2rem; height: 2rem; padding: 0 0.4rem; border-radius: 1rem;
+  border: 2px solid var(--mark-required); color: var(--mark-required); background: var(--bg);
+  font-weight: 700; font-size: 0.95rem; text-decoration: none;
+}
+.step:visited { color: var(--mark-required); }
+.step-done, .step-done:visited { background: var(--ok); border-color: var(--ok); color: #fff; }
+.step-done::after { content: "\2713"; font-size: 0.8rem; margin-left: 0.15rem; }
+.step-current { box-shadow: 0 0 0 3px var(--bg), 0 0 0 5px var(--mark-current); }
+.steps-count { margin: 0; color: var(--muted); font-size: 0.95rem; }
+.steps-bar { width: 12rem; height: 0.8rem; accent-color: var(--ok); }
+
+/* Layout: decision first in the DOM; on a wide screen the page sits on the left. */
+.split { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; margin-top: 1.25rem; }
+@media (min-width: 64rem) {
+  .split {
+    grid-template-columns: minmax(0, 1.12fr) minmax(24rem, 1fr);
+    grid-template-areas: "page decision" "page optional";
+    grid-template-rows: auto 1fr;
+    align-items: start;
+  }
+  .decision-area { grid-area: decision; }
+  .optional-area { grid-area: optional; }
+  .page-area {
+    grid-area: page; position: sticky; top: 0.5rem;
+    max-height: calc(100vh - 1rem); display: flex; flex-direction: column;
+  }
+  .page-scroll { flex: 1 1 auto; min-height: 14rem; }
+}
+/* Short windows (400% zoom on a laptop): nothing sticks, so nothing hides content. */
+@media (min-width: 64rem) and (max-height: 32rem) {
+  .page-area { position: static; max-height: none; }
+}
+
+/* The decision */
+.decision-area {
+  background: var(--bg); border: 1px solid var(--rule); border-radius: 10px;
+  padding: 1.1rem 1.4rem 1.25rem; box-shadow: 0 1px 2px rgb(0 0 0 / 0.05);
+  overflow-wrap: anywhere;
+}
+.panel-decision { border-top: 5px solid var(--mark-required); }
+.panel-done { border-top: 5px solid var(--ok); }
+.panel-item { border-top: 5px solid var(--mark-optional); }
+.decision-notice {
+  margin: 0 0 0.9rem; padding: 0.5rem 0.8rem; border-left: 5px solid var(--ok);
+  background: #eef6f0; border-radius: 0 var(--radius) var(--radius) 0;
+}
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.4rem 1rem; }
+.panel-head h2 { margin: 0; font-size: 1.45rem; }
+.panel-head h2:focus { outline: none; }
+.panel-head h2:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+.panel-sub { display: block; font-size: 1rem; font-weight: 400; color: var(--muted); margin-top: 0.2rem; }
+.pill {
+  display: inline-block; margin: 0; padding: 0.05rem 0.7rem; border: 2px solid; border-radius: 999px;
+  font-weight: 600; font-size: 0.9rem; white-space: nowrap;
+}
+.pill-required { color: var(--mark-required); border-color: var(--mark-required); background: var(--tint-required); }
+.pill-done { color: var(--ok); border-color: var(--ok); background: #eef6f0; }
+.pill-optional { color: var(--mark-optional); border-color: var(--mark-optional); background: var(--panel); }
+.why { font-size: 1.1rem; margin: 0.9rem 0 0.25rem; }
+.on-page { margin: 0 0 0.9rem; font-size: 0.95rem; }
+
+/* Same-size compare: the PDF crop and the proposal share one scale. The frame is a
+   size container; marks.css gives each equation its natural width and the proposal's
+   font size and left edge in cqw (percent of the crop's width). */
+.compare { background: var(--panel); border-radius: 8px; padding: 0.7rem 0.9rem 0.8rem; margin: 0.5rem 0 0.9rem; }
+.compare .part-label { font-size: 1rem; margin: 0 0 0.5rem; }
+.cmp-frame { container-type: inline-size; width: 100%; }
+.cmp-label { margin: 0.35rem 0 0.15rem; font-size: 0.85rem; font-weight: 600; color: var(--muted); }
+.cmp-image { display: block; width: 100%; height: auto; background: #fff; border: 1px solid var(--rule); border-radius: 4px; }
+.cmp-row { background: #fff; border: 1px solid var(--rule); border-radius: 4px; overflow-x: auto; padding: 0.15em 0; }
+/* The proposal is drawn in the family LaTeX PDFs are set in (Computer Modern; Latin
+   Modern Math is its OpenType math font, served from here: static/vendor/fonts, GUST
+   Font License), so a bold letter next to a plain one looks as it does in the crop
+   above. The browser's default math font (Noto Sans Math on Linux) draws a plain omega
+   as heavy as a bold Computer Modern one. Only downloaded when an equation is shown. */
+@font-face {
+  font-family: "Latin Modern Math";
+  src: local("Latin Modern Math"), local("LatinModernMath-Regular"),
+       url("/static/vendor/fonts/latinmodern-math.otf") format("opentype");
+  font-display: swap;
+}
+.cmp-math { white-space: nowrap; font-size: 1.6rem; line-height: 1.3; }
+.cmp-math-plain { padding: 0.25rem 0.5rem; }
+.cmp-math math { font-size: inherit; font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }
+.cmp-math .flagged { outline: max(2px, 0.07em) solid var(--danger); outline-offset: 0.06em; border-radius: 0.08em; }
+.cmp-none { margin: 0; padding: 0.5rem; background: #fff; border: 1px dashed var(--border); }
+.speech { margin: 0.5rem 0 0; color: var(--muted); }
+.speech-label { font-weight: 600; }
+
+.diff-wrap { position: relative; }
+.diff-table { width: 100%; margin: 0.25rem 0 0.5rem; font-size: 0.95rem; }
+.diff-table caption { text-align: left; font-weight: 700; padding-bottom: 0.25rem; }
+.diff-table th, .diff-table td { padding: 0.35rem 0.5rem; overflow-wrap: anywhere; }
+.diff-symbol { font-size: 1.25rem; font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; }
+.diff-what { color: var(--muted); font-weight: 400; font-size: 0.85rem; }
+.diff-meaning td:last-child strong { color: var(--danger); }
+.same-line { color: var(--ok); margin: 0 0 0.75rem; font-size: 0.95rem; }
+
+/* The suggested fix for a difference that changes the meaning: one button, first. */
+.suggest { margin: 1rem 0 0.75rem; }
+.suggest .button { min-width: 7rem; min-height: 2.75rem; font-weight: 600; }
+.suggest .hint { margin: 0.35rem 0 0; }
+code.latex { overflow-wrap: anywhere; }
+.unseen-line { color: var(--muted); margin: 0 0 0.75rem; font-size: 0.95rem; }
+.group-state { font-weight: 600; margin: 0.25rem 0 0; }
+.redo-lead { margin: 0.9rem 0 0; }
+.redo-lead + .decide-row { margin-top: 0.4rem; }
+.region-image { display: block; max-width: 100%; height: auto; margin: 0.5rem 0 0.75rem; border: 1px solid var(--rule); border-radius: 4px; background: #fff; }
+.figure-view { margin: 0.5rem 0 0.75rem; }
+.figure-view img { display: block; max-width: 100%; max-height: 22rem; height: auto; border: 1px solid var(--rule); background: #fff; }
+.figure-view figcaption { margin-top: 0.35rem; color: var(--muted); }
+.cap-label { font-weight: 600; }
+.facts { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin: 0 0 0.75rem; }
+.facts dt { color: var(--muted); font-size: 0.9rem; }
+.facts dd { margin: 0; font-weight: 600; }
+.heading-text { font-size: 1.1rem; }
+.group-question { font-size: 1.15rem; margin: 0.9rem 0 0.25rem; }
+.group-pages { margin: 0 0 0.9rem; }
+.aside-link { font-size: 0.95rem; }
+
+/* The form: Accept and Reject on one row, the edit box folded until it is needed. */
+.decide-form textarea { width: 100%; }
+.decide-form .field { margin-bottom: 0.75rem; }
+.field-inline .inline-controls { display: flex; flex-wrap: wrap; gap: 0.5rem; align-items: center; }
+.decide-row { display: flex; flex-wrap: wrap; gap: 0.6rem; margin: 1rem 0 0.25rem; }
+.decide-row:focus { outline: none; }
+.decide-row .button, .decide-row .button-secondary { min-width: 7rem; min-height: 2.75rem; font-weight: 600; }
+.decide-note { font-size: 0.9rem; margin: 0.25rem 0 0; }
+.edit-box { margin: 0.5rem 0 0; border: 1px solid var(--rule); border-radius: var(--radius); padding: 0 0.9rem; }
+.edit-box[open] { padding-bottom: 0.9rem; }
+.edit-box > summary { cursor: pointer; padding: 0.55rem 0; font-weight: 600; color: var(--link); }
+/* With JavaScript, a changed field makes Save edit the main button (app.js). */
+.is-edited [data-role="save"] { background: var(--accent); color: #fff; }
+.is-edited [data-role="accept"] { background: var(--bg); color: var(--accent); }
+.tech { margin-top: 1rem; font-size: 0.95rem; }
+.tech > summary { cursor: pointer; color: var(--muted); padding: 0.25rem 0; }
+.decision-nav { display: flex; flex-wrap: wrap; gap: 0.5rem 1.5rem; margin-top: 1.1rem; padding-top: 0.8rem; border-top: 1px solid var(--rule); }
+.decision-nav a[rel="next"] { margin-left: auto; }
+.done-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem 1.5rem; }
+.shortcuts { margin-top: 1rem; font-size: 0.9rem; }
+.shortcuts > summary { cursor: pointer; color: var(--muted); }
+.keys { display: grid; grid-template-columns: auto 1fr; gap: 0.2rem 0.75rem; margin: 0.5rem 0; }
+.keys div { display: contents; }
+.keys dd { margin: 0; }
+kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 0 0.35rem; background: var(--bg); }
+
+/* Optional checks */
+.optional-area { overflow-wrap: anywhere; }
+.optional-box { background: var(--panel); border-radius: 10px; padding: 0.2rem 1.2rem; }
+.optional-box[open] { padding-bottom: 0.9rem; }
+.optional-box > summary { cursor: pointer; padding: 0.65rem 0; font-weight: 700; font-size: 1.05rem; }
+.optional-list { list-style: none; margin: 0; padding: 0; }
+.optional-list li { padding: 0.4rem 0; border-top: 1px solid var(--rule); }
+.optional-note { display: block; color: var(--muted); font-size: 0.95rem; }
+.optional-none { color: var(--muted); margin: 0; }
+
+/* The page */
+.page-area { background: var(--desk); border-radius: 10px; padding: 0.75rem 0.9rem 0.9rem; min-width: 0; }
+.page-area:focus { outline: none; }
+.page-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+.page-head h2 { margin: 0; font-size: 1.2rem; }
+.page-of { font-weight: 400; color: var(--muted); }
+.page-step { margin: 0; display: flex; gap: 1rem; font-size: 0.95rem; }
+.page-list ol { list-style: none; margin: 0.6rem 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.3rem; }
+.page-chip {
+  display: inline-flex; align-items: center; gap: 0.35rem; min-width: 2.25rem; min-height: 2rem;
+  padding: 0 0.5rem; justify-content: center; border: 1px solid #b9bdc6; border-radius: 6px;
+  background: var(--bg); color: var(--text); text-decoration: none; font-size: 0.9rem;
+}
+.page-chip:visited { color: var(--text); }
+.page-chip:hover { border-color: var(--accent); }
+.page-chip[aria-current="page"] { border: 2px solid var(--mark-current); font-weight: 700; }
+.chip-count { background: var(--mark-required); color: #fff; border-radius: 999px; padding: 0 0.45rem; font-size: 0.78rem; font-weight: 700; white-space: nowrap; }
+.page-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.35rem 1rem; margin: 0.6rem 0; font-size: 0.9rem; }
+.toggle-accepted { margin-left: auto; }
+.legend { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; color: var(--text); }
+.legend li { display: inline-flex; align-items: center; gap: 0.35rem; }
+.key {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 1.4rem; height: 1.4rem;
+  padding: 0 0.3rem; font-weight: 700; font-size: 0.75rem; line-height: 1;
+}
+.key-required { background: var(--mark-required); color: #fff; border-radius: 0.7rem; }
+.key-optional { background: var(--bg); min-width: 1.9rem; border: 1.5px dashed var(--mark-optional); border-radius: 3px; }
+.key-repeat { background: var(--bg); color: var(--mark-required); border: 2px solid var(--mark-required); border-radius: 0.7rem; }
+.key-accepted { background: var(--bg); min-width: 1.9rem; color: var(--mark-accepted); border: 1.5px dotted var(--mark-accepted); border-radius: 3px; }
+.page-scroll {
+  position: relative; overflow: auto; border-radius: 4px; background: var(--desk);
+  max-height: 80vh; overscroll-behavior: contain;
+}
+.page-scroll:focus-visible { outline-offset: -3px; }
+/* At least 36rem wide at every window width (about 1 CSS px per point for a Letter page):
+   web.marks sizes the clickable areas for that (MIN_PAGE_PX). Narrower, the page
+   scrolls inside its region. */
+.page-frame { position: relative; margin: 0 auto; min-width: 36rem; background: #fff; box-shadow: 0 1px 4px rgb(0 0 0 / 0.25); forced-color-adjust: none; }
+.page-image { display: block; width: 100%; height: auto; }
+.page-note { margin: 0.5rem 0 0; font-size: 0.95rem; }
+.page-failed:not([hidden]) { display: block; }
+
+/* A mark is a link (the clickable area: at least 24 x 24 CSS px, overlapping no other
+   mark; web.marks places it) with a frame inside that hugs the item. The link itself is
+   invisible; clicks on the frame and the tag go to it. */
+.box {
+  position: absolute; display: block; min-width: 24px; min-height: 24px;
+  border-radius: 4px; text-decoration: none; color: inherit;
+}
+/* marks.css gives each mark its frame inside the link (--fl, --ft, --fw, --fh) and, for an
+   equation in a line of text, its number's place in the page margin (--tag-left). */
+.box-frame {
+  position: absolute; display: block; border-radius: 3px; pointer-events: none;
+  left: var(--fl, 0%); top: var(--ft, 0%); width: var(--fw, 100%); height: var(--fh, 100%);
+}
+.box-required .box-frame { border: 2.5px solid var(--mark-required); box-shadow: 0 0 0 1.5px #fff, inset 0 0 0 1px #fff; background: rgb(253 243 225 / 0.18); }
+/* A heading group's heading on a page other than the one its decision counts on: the
+   same number, outlined instead of filled, and a thinner frame. */
+.box-repeat .box-frame { border: 2px solid var(--mark-required); box-shadow: 0 0 0 1px #fff; }
+.box-optional .box-frame { border: 1.5px dashed var(--mark-optional); box-shadow: 0 0 0 1px #fff; }
+.box-accepted .box-frame { border: 1.5px dotted var(--mark-accepted); box-shadow: 0 0 0 1px #fff; }
+.box.is-current { z-index: 1; }
+.box.is-current .box-frame { border: 2.5px solid var(--mark-current); box-shadow: 0 0 0 2px #fff, 0 0 0 5px rgb(26 79 160 / 0.25); background: rgb(232 238 250 / 0.15); }
+.box:hover .box-frame { border-style: solid; }
+/* The number sits just outside the frame on the left (in the margin, for a heading), or
+   in the page margin on the same line for an equation in a line of text. */
+.box-tag {
+  position: absolute; pointer-events: none;
+  right: var(--tag-right, calc(100% - var(--fl, 0%) + 4px)); left: var(--tag-left, auto);
+  top: calc(var(--ft, 0%) + var(--fh, 100%) / 2 - 11px);
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 22px; height: 22px; padding: 0 5px; border-radius: 11px;
+  font: 700 12.5px/1 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; white-space: nowrap;
+  box-shadow: 0 0 0 1.5px #fff;
+}
+.box-required .box-tag { background: var(--mark-required); color: #fff; }
+.box-repeat .box-tag { background: #fff; color: var(--mark-required); border: 2px solid var(--mark-required); }
+/* Optional checks and accepted items stay quiet: the frame's shape (dashed, dotted; the
+   legend says which is which) with its label ("Note", a tick) only while it is pointed
+   at, focused or selected, so it never covers the words around it at rest. Its link
+   name always says what it is. */
+.box-optional .box-tag, .box-accepted .box-tag {
+  display: none; right: auto;
+  left: var(--tag-left, calc(var(--fl, 0%) - 4px)); top: var(--label-top, calc(var(--ft, 0%) - 21px));
+  min-width: 0; height: 18px; padding: 0 5px; border-radius: 3px; background: #fff; font-size: 11px;
+}
+.box-optional .box-tag { color: var(--mark-optional); border: 1px dashed var(--mark-optional); }
+.box-accepted .box-tag { color: var(--mark-accepted); border: 1px dotted var(--mark-accepted); font-size: 12px; }
+.box-optional:hover .box-tag, .box-optional:focus-visible .box-tag, .box-optional.is-current .box-tag,
+.box-accepted:hover .box-tag, .box-accepted:focus-visible .box-tag, .box-accepted.is-current .box-tag { display: inline-flex; }
+.box.is-current .box-tag { background: var(--mark-current); color: #fff; border: 0; }
+/* Focus: after the status rules, so a focused mark always shows the focus ring. */
+.page-frame .box:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); z-index: 2; }
+.page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 2px; z-index: 2; }
+
+@media (forced-colors: active) {
+  /* The legend keys show what the marks look like, and the marks keep their colours. */
+  .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
+  .step, .page-chip, .pill { border: 2px solid CanvasText; }
+  .step-current, .page-chip[aria-current="page"] { outline: 3px solid Highlight; outline-offset: 2px; }
+  .cmp-math .flagged { outline-color: Highlight; }
+  .decision-notice { border: 2px solid CanvasText; }
+}
+
+/* Below the two-column layout the page keeps a legible size (about 1 CSS px per point)
+   and scrolls inside its own region; "Show on the page" (and app.js) scroll it to the
+   mark. The page itself never scrolls sideways. */
+@media (max-width: 63.99rem) {
+  .page-scroll { max-height: 75vh; }
+}
+
+/* "What differs" on a phone: one row per symbol, each value with its column's name, so
+   no word is broken mid-word to fit four columns. */
+@media (max-width: 30rem) {
+  .diff-table thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .diff-table, .diff-table caption, .diff-table tbody, .diff-table tr, .diff-table th,
+  .diff-table td { display: block; }
+  .diff-table tr { padding: 0.35rem 0; border-bottom: 1px solid var(--rule); }
+  .diff-table th, .diff-table td { border: 0; padding: 0.05rem 0; overflow-wrap: normal; }
+  .diff-table td::before { content: attr(data-label) ": "; color: var(--muted); }
+}
+
+@media (max-width: 40rem) {
+  /* A heading's band is half a page wide: on a phone, keep its start (where the heading
+     is) at a readable size and let the right-hand end go. */
+  .region-image {
+    width: 100%; height: 7.5rem; object-fit: cover; object-position: left center;
+    -webkit-mask-image: linear-gradient(to right, #000 78%, transparent);
+    mask-image: linear-gradient(to right, #000 78%, transparent);
+  }
+  .review-head h1 { font-size: 1.35rem; }
+  .decision-area { padding: 0.9rem 0.9rem 1rem; }
+  .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; }
+  .page-area { padding: 0.6rem; }
+}

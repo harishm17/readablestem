@@ -9,6 +9,8 @@ is pasted into the page as a string (architecture rule 2).
 
 from __future__ import annotations
 
+import unicodedata
+from collections.abc import Collection
 from html import escape
 from xml.etree.ElementTree import Element
 
@@ -43,6 +45,10 @@ DROPPED_ELEMENTS = frozenset({"annotation-xml"})
 MAX_INPUT_CHARS = 200_000
 MAX_DEPTH = 64
 
+# Token elements: the review screen can outline the ones that hold a flagged symbol.
+TOKENS = frozenset({"mi", "mn", "mo", "mtext", "ms"})
+FLAGGED_CLASS = "flagged"
+
 
 class UnsafeMathML(ValueError):
     """The MathML could not be parsed or holds something we will not render."""
@@ -52,7 +58,11 @@ def _local(name: str) -> str:
     return name.rsplit("}", 1)[-1]
 
 
-def _write(node: Element, out: list[str], depth: int) -> None:
+def _fold(text: str) -> str:
+    return unicodedata.normalize("NFKC", text).casefold()
+
+
+def _write(node: Element, out: list[str], depth: int, flag: frozenset[str] = frozenset()) -> None:
     if depth > MAX_DEPTH:
         raise UnsafeMathML("too deep")
     tag = _local(node.tag)
@@ -65,20 +75,27 @@ def _write(node: Element, out: list[str], depth: int) -> None:
             attrs.append(f' {local}="{escape(value, quote=True)}"')
     if tag == "math":
         attrs.insert(0, f' xmlns="{MATHML_NS}"')
+    if flag and tag in TOKENS and any(ch in flag for ch in _fold(node.text or "")):
+        # Our own fixed class, never anything from the input.
+        attrs.append(f' class="{FLAGGED_CLASS}"')
     out.append(f"<{tag}{''.join(attrs)}>")
     if node.text:
         out.append(escape(node.text, quote=False))
     if tag != "annotation":  # annotation holds text only (e.g. the LaTeX source)
         for child in node:
             if _local(child.tag) not in DROPPED_ELEMENTS:
-                _write(child, out, depth + 1)
+                _write(child, out, depth + 1, flag)
             if child.tail:
                 out.append(escape(child.tail, quote=False))
     out.append(f"</{tag}>")
 
 
-def sanitize_mathml(mathml: str) -> Markup:
-    """Allowlisted, re-serialised MathML, safe to place in a page. Raises UnsafeMathML."""
+def sanitize_mathml(mathml: str, *, flag: Collection[str] = ()) -> Markup:
+    """Allowlisted, re-serialised MathML, safe to place in a page. Raises UnsafeMathML.
+
+    Tokens holding one of the `flag` characters (compared as NFKC, case-folded: a bold
+    "𝛚" and a plain "ω" alike) get `class="flagged"`, so the review screen can outline
+    the symbol a check is about."""
     if not mathml or len(mathml) > MAX_INPUT_CHARS:
         raise UnsafeMathML("empty or too long")
     try:
@@ -88,15 +105,15 @@ def sanitize_mathml(mathml: str) -> Markup:
     if _local(root.tag) != "math":
         raise UnsafeMathML("root is not <math>")
     out: list[str] = []
-    _write(root, out, 0)
+    _write(root, out, 0, frozenset(_fold(c) for c in flag))
     return Markup("".join(out))  # every piece above was escaped or is a fixed literal
 
 
-def try_sanitize_mathml(mathml: str | None) -> Markup | None:
+def try_sanitize_mathml(mathml: str | None, *, flag: Collection[str] = ()) -> Markup | None:
     """`sanitize_mathml`, or None when there is nothing safe to show."""
     if not mathml:
         return None
     try:
-        return sanitize_mathml(mathml)
+        return sanitize_mathml(mathml, flag=flag)
     except UnsafeMathML:
         return None

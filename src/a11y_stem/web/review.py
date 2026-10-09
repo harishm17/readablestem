@@ -4,7 +4,9 @@ The web route owns the transaction; this module owns the rules:
 
 - accept: only a fix with a proposal that passed every error-level check (an abstained
   fix has nothing to accept, and an invalid proposal must be edited, which re-validates
-  it; the reviewer can also keep the original by rejecting it),
+  it; the reviewer can also keep the original by rejecting it), and never with a field
+  of the form changed from the proposal (the change would be dropped silently: the
+  reviewer is asked to Save edit it or undo it),
 - edit: the reviewer's LaTeX / alt text / heading level goes through the same cleaning
   and deterministic validators as model output (`equation_step.clean_latex`,
   `validate.clean_alt`, `pipeline.validate`) before it is stored; error-level failures
@@ -287,6 +289,8 @@ def apply_review(
         raise ReviewInvalid([FieldError(field_id("actions", element_id), message)])
     if action == "accept" and fix.heading is not None:
         _refuse_moved_level(result, element_id, fix.heading.level, then="then Save edit")
+    if action == "accept":
+        _refuse_unsaved_change(fix, form)
     # Only a heading decision can move other headings: the outline before it, to compare.
     places = heading_places(result) if fix.kind is Kind.HEADING else {}
     if action == "edit":
@@ -302,6 +306,46 @@ def apply_review(
         warnings=warnings,
         moved=_moved_by(places, heading_places(result), element_id) if places else [],
     )
+
+
+UNSAVED = "Choose Save edit to use your change, or {undo} to accept the proposal."
+
+
+def _same_text(typed: str, stored: str) -> bool:
+    """A textarea sends its line breaks as CRLF, and may gain blanks at either end."""
+    return typed.replace("\r\n", "\n").strip() == stored.replace("\r\n", "\n").strip()
+
+
+def _refuse_unsaved_change(fix: Fix, form: Mapping[str, str]) -> None:
+    """Raise ReviewInvalid when Accept comes with a field changed from the proposal.
+
+    Accept and Save edit share one form, so the fields always come with Accept; Accept
+    keeps the proposal and never reads them. A reviewer who typed a correction and then
+    pressed Accept out of habit would lose it without a word (and with it the fix the
+    screen asked for), so that is refused with the change kept in the field. Only fields
+    the form sent are compared: a POST without them (the list view's tests, scripts)
+    accepts as before. Raises nothing for an unchanged form."""
+    eid = fix.element_id
+    if fix.equation is not None and "latex" in form:
+        typed = form["latex"]
+        if not _same_text(typed, fix.equation.latex):
+            message = "You changed the LaTeX. " + UNSAVED.format(undo="undo it")
+            raise ReviewInvalid([FieldError(field_id("latex", eid), message)], {"latex": typed})
+    if fix.figure is not None and "alt" in form:
+        from a11y_stem.pipeline import validate
+
+        alt = validate.clean_alt(form["alt"])
+        decorative = form.get("decorative") in {"on", "true", "1"}
+        values = {"alt": alt, "decorative": "on" if decorative else ""}
+        if decorative != fix.figure.decorative:
+            message = "You changed “Decorative”. " + UNSAVED.format(undo="change it back")
+            raise ReviewInvalid([FieldError(field_id("decorative", eid), message)], values)
+        if not decorative and alt != validate.clean_alt(fix.figure.alt):
+            message = "You changed the alt text. " + UNSAVED.format(undo="undo it")
+            raise ReviewInvalid([FieldError(field_id("alt", eid), message)], values)
+    if fix.heading is not None and "level" in form and form["level"] != str(fix.heading.level):
+        message = "You changed the level. " + UNSAVED.format(undo="set it back")
+        raise ReviewInvalid([FieldError(field_id("level", eid), message)], {"level": form["level"]})
 
 
 def _moved_by(
@@ -575,7 +619,12 @@ class GroupOutcome:
 
 
 def apply_group(
-    result: DocumentResult, group_key: str, action: str, form: Mapping[str, str]
+    result: DocumentResult,
+    group_key: str,
+    action: str,
+    form: Mapping[str, str],
+    *,
+    every: bool = False,
 ) -> GroupOutcome:
     """One decision for every heading of a group still waiting, in reading order:
 
@@ -585,9 +634,14 @@ def apply_group(
       the output would move that level for any of them;
     - reject: make each plain bold text (not a heading).
 
+    With `every`, the decision is made again for every heading of the group, decided or
+    not (the review screen's "Change all 11" on a decided group): a heading already in
+    that state is left as it is, and one the output would move is left as it was
+    (`left`).
+
     Raises LookupError for an unknown group and ReviewInvalid for a bad level.
     """
-    members = pending_members(result, group_key)
+    members = group_members(result, group_key) if every else pending_members(result, group_key)
     if not group_members(result, group_key):
         raise LookupError(group_key)
     fid = field_id("group-level", group_key)
@@ -603,6 +657,8 @@ def apply_group(
     left: list[Fix] = []
     for fix in members:
         before = snapshot(fix)
+        if every and _already(fix, action, level):
+            continue
         if action == "accept":
             if not can_accept(fix) or fix.heading is None:
                 left.append(fix)
@@ -630,6 +686,19 @@ def apply_group(
     if changes:
         _recount(result)
     return GroupOutcome(changes, left)
+
+
+def _already(fix: Fix, action: str, level: int | None) -> bool:
+    """The heading is already where this group decision would put it."""
+    if action == "reject":
+        return fix.status is Status.REJECTED
+    if action == "accept":
+        return fix.status in {Status.ACCEPTED, Status.EDITED}  # a heading, at a level
+    return (
+        fix.status in {Status.ACCEPTED, Status.EDITED}
+        and fix.heading is not None
+        and fix.heading.level == level
+    )
 
 
 # --------------------------------------------------------------------------- bulk

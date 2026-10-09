@@ -60,11 +60,11 @@
     <div><dt>Model cost</dt><dd>{{ job.cost_usd|usd }}</dd></div>
   </dl>
   {% if s.decisions %}
-  {# One link per kind, straight to that group on the review screen. A group of
+  {# One link per kind, straight to its first decision on the review screen. A group of
      repeated headings is one decision. #}
   <p id="review-breakdown">{{ s.decisions }} {{ "needs" if s.decisions == 1 else "need" }} your decision:
     {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("heading", "headings")] if s.review_by_kind.get(kind) %}
-    <a href="/jobs/{{ job.id }}/review#group-{{ many }}">{{ s.review_labels.get(kind, s.review_by_kind[kind] ~ " " ~ many) }}</a>{{ "." if loop.last else "," }}
+    <a href="/jobs/{{ job.id }}/review{% if s.review_first.get(kind) %}?item={{ s.review_first[kind] }}{% endif %}">{{ s.review_labels.get(kind, s.review_by_kind[kind] ~ " " ~ many) }}</a>{{ "." if loop.last else "," }}
     {% endfor %}
   </p>
   {% endif %}

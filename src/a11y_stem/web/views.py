@@ -106,6 +106,9 @@ class ResultSummary:
     decisions: int = 0
     review_by_kind: dict[str, int] = field(default_factory=dict)
     review_labels: dict[str, str] = field(default_factory=dict)  # "1 group of headings"
+    # Per kind, the first decision still open in the review screen's order (an element id
+    # or a heading group's key), for links straight to it.
+    review_first: dict[str, str] = field(default_factory=dict)
     # Accepted automatically with an optional note nobody has looked at: never counted
     # toward "done".
     optional: int = 0
@@ -207,12 +210,23 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
             for kind in DECISION_NOUNS
             if any(u[0].kind is kind for u in waiting)
         },
+        review_first=_first_open_by_kind(result),
         optional=sum(f.optional_note for f in result.fixes),
         second_check=sum(triage.second_check_note(f) for f in result.fixes),
         list_items=sum(e.kind is Kind.LIST_ITEM for e in result.elements),
         checks_run=len(result.html_checks),
         failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],
     )
+
+
+def _first_open_by_kind(result: DocumentResult) -> dict[str, str]:
+    from a11y_stem.web import queue
+
+    first: dict[str, str] = {}
+    for decision in queue.decisions(result):
+        if decision.open:
+            first.setdefault(decision.kind.value, decision.key)
+    return first
 
 
 def queue_ahead(session: Session, job: Job) -> int:

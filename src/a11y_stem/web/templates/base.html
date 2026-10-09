@@ -14,7 +14,7 @@
   <a class="skip-link" href="#main">Skip to main content</a>
   {% set active = active|default("") %}
   <header class="site-header">
-    <div class="wrap header-row">
+    <div class="{{ self.main_class() }} header-row">
       <a class="brand" href="/">a11y-stem</a>
       <nav aria-label="Main">
         <ul class="nav-list">
@@ -42,7 +42,7 @@
     </div>
   </header>
 
-  <main id="main" class="wrap" tabindex="-1">
+  <main id="main" class="{% block main_class %}wrap{% endblock %}" tabindex="-1">
     {# A live region present at page load is not announced, so the first one-time notice
        (after a POST-redirect, e.g. "deleted") takes focus instead. #}
     {% for item in flash if not item.element_id %}
@@ -52,7 +52,7 @@
   </main>
 
   <footer class="site-footer">
-    <div class="wrap">
+    <div class="{{ self.main_class() }}">
       <nav aria-label="Footer">
         <ul class="nav-list">
           <li><a href="/privacy"{% if active == "privacy" %} aria-current="page"{% endif %}>Privacy</a></li>

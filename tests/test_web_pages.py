@@ -297,6 +297,22 @@ def test_vendored_htmx_matches_its_pinned_hashes():
     assert sri in readme
 
 
+def test_vendored_math_font_is_the_unmodified_release_with_its_licence():
+    """Latin Modern Math draws the proposal in the review screen's same-size compare.
+    It is the CTAN release, unmodified (the GUST Font License asks derived fonts to be
+    renamed), with its licence, manifest and readme beside it."""
+    fonts = WEB / "static" / "vendor" / "fonts"
+    data = (fonts / "latinmodern-math.otf").read_bytes()
+    readme = (WEB / "static" / "vendor" / "README.md").read_text(encoding="utf-8")
+    assert hashlib.sha256(data).hexdigest() in readme
+    licence = (fonts / "GUST-FONT-LICENSE.txt").read_text(encoding="utf-8")
+    assert "LaTeX Project Public License" in licence
+    assert "latinmodern-math.otf" in (fonts / "MANIFEST-Latin-Modern-Math.txt").read_text()
+    css = (WEB / "static" / "app.css").read_text(encoding="utf-8")
+    assert 'url("/static/vendor/fonts/latinmodern-math.otf") format("opentype")' in css
+    assert '.cmp-math math { font-size: inherit; font-family: "Latin Modern Math"' in css
+
+
 def test_htmx_is_configured_for_the_strict_csp():
     base = (TEMPLATES / "base.html").read_text(encoding="utf-8")
     for setting in (

@@ -118,18 +118,26 @@ def result(env) -> DocumentResult:
     return DocumentResult.model_validate(env.job(env.job_id).result_json)
 
 
+def settled(env) -> DocumentResult:
+    """The stored result once the review screen has been shown. The fake result has no
+    page sizes (like one stored before they existed), and the first view of the review
+    screen stores them; a "nothing changed" comparison starts from there."""
+    env.browser.get(f"/jobs/{env.job_id}/review")
+    return result(env)
+
+
 def edits(env) -> list[ReviewEdit]:
     with session_scope(env.ctx.factory) as session:
         return list(session.scalars(select(ReviewEdit).order_by(ReviewEdit.created_at)))
 
 
 def post(env, element_id: str, **fields):
-    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review")} | fields
+    data = {"csrf_token": token(env.browser, f"/jobs/{env.job_id}/review"), "view": "list"} | fields
     return env.browser.post(f"/jobs/{env.job_id}/review/{element_id}", data=data)
 
 
 def review_page(env) -> str:
-    response = env.browser.get(f"/jobs/{env.job_id}/review")
+    response = env.browser.get(f"/jobs/{env.job_id}/review/list")
     assert response.status_code == 200
     return response.text
 
@@ -342,8 +350,10 @@ def test_job_page_breaks_down_what_needs_review_by_kind(web):
     ]
     # Not converted counts too: it needs a decision (write it, or keep the original).
     assert "3 need your decision:" in breakdown
-    assert f'<a href="/jobs/{web.job_id}/review#group-equations">2 equations</a>,' in breakdown
-    assert f'<a href="/jobs/{web.job_id}/review#group-figures">1 figure</a>.' in breakdown
+    # Each kind links to its first decision on the review screen.
+    base = f"/jobs/{web.job_id}/review"
+    assert f'<a href="{base}?item=p1-e3">2 equations</a>,' in breakdown
+    assert f'<a href="{base}?item=p1-e4">1 figure</a>.' in breakdown
     assert "heading" not in breakdown  # none need a decision
 
 
@@ -354,7 +364,7 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 303
     # Next fix still waiting after equation 2 is the abstained equation 3.
-    assert response.headers["location"] == f"/jobs/{web.job_id}/review#item-p1-e5"
+    assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#item-p1-e5"
     after = result(web)
     fix = after.fix_for("p1-e3")
     assert fix is not None and fix.status.value == "accepted"
@@ -385,7 +395,7 @@ def test_when_nothing_is_left_the_reviewer_lands_on_the_progress_summary(web):
     post(web, "p1-e3", action="accept")
     post(web, "p1-e5", action="reject")
     response = post(web, "p1-e4", action="reject")
-    assert response.headers["location"] == f"/jobs/{web.job_id}/review#review-progress"
+    assert response.headers["location"] == f"/jobs/{web.job_id}/review/list#review-progress"
     page = review_page(web)
     progress = page[page.index('id="review-progress"') : page.index('class="review-toc"')]
     assert '<a href="#item-p1-e4">Figure 1 on page 1</a>: Rejected.' in progress
@@ -421,10 +431,10 @@ def test_an_edit_with_warnings_is_saved_and_the_warning_explained(web):
 
 
 def test_an_equation_edit_that_fails_a_check_is_not_saved(web):
-    before = result(web)
+    before = settled(web)
     response = post(web, "p1-e3", action="edit", latex="\\bad{y}")
     assert response.status_code == 422
-    assert "<title>Error: Review fixes" in response.text
+    assert "<title>Error: All items as a list" in response.text
     assert '<a href="#latex-p1-e3">' in response.text  # error summary links to the field
     # Explained in words, with the code in brackets for a bug report.
     assert "The LaTeX was not saved. The LaTeX uses a command that is not on the list" in (
@@ -559,7 +569,7 @@ def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
 
 
 def test_a_failed_rerender_changes_nothing(web):
-    before = result(web)
+    before = settled(web)
     web.pipeline.render_raises = RuntimeError("SECRET-DOC-TEXT assembler bug")
     response = post(web, "p1-e3", action="accept")
     assert response.status_code == 500
