@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="a11y-stem 0.1.0">
+<title>2.3 Position vs. Time Graphs</title>
+<style>
+:root { color-scheme: light; }
+body { margin: 0; background: #ffffff; color: #1b1b1b;
+  font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
+p { margin: 0 0 1em; }
+img { max-width: 100%; height: auto; }
+.equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
+  overflow-x: auto; overflow-y: hidden; }
+.equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
+  overflow-x: auto; overflow-y: hidden; }
+.equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
+.equation-labelled > math { flex: 1 0 auto; }
+.equation-label { flex: none; margin-left: auto; }
+math { font-size: 1.1em; }
+math[display="block"] { margin: 0 auto; }
+ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
+li > ul, li > ol { margin: 0.25em 0 0; }
+.printed-markers { list-style: none; }
+.printed-markers > li { text-indent: -1.75em; padding-left: 1.75em; }
+.printed-markers > li > * { text-indent: 0; }
+.list-marker { display: inline-block; min-width: 1.5em; text-indent: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; }
+figure { margin: 1.5em 0; }
+figure img { display: block; }
+figcaption { margin-top: 0.5em; }
+.flagged { border: 3px dashed #8a3c00; border-radius: 4px; padding: 0.75rem; margin: 1.5em 0; }
+.notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
+.flagged figure { margin: 0; }
+.flagged > img { display: block; margin: 0 auto; }
+.flagged-inline { border: 2px dashed #8a3c00; padding: 0 0.2em; }
+.flagged-inline img { vertical-align: middle; }
+.flag-note { margin: 0.75em 0 0; }
+.flag-label { font-weight: 700; }
+.original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.about { border-top: 2px solid #1b1b1b; margin-top: 3em; padding-top: 0.5em; }
+:focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
+@media print { .flagged { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1 id="p1-e0">2.3 Position vs. Time Graphs</h1>
+<h2 id="p1-e1">Section Learning Objectives</h2>
+<p id="p1-e2">By the end of this section, you will be able to do the following:</p>
+<ul><li id="p1-e3">Explain the meaning of slope in position vs. time graphs</li><li id="p1-e4">Solve problems using position vs. time graphs</li></ul>
+<h2 id="p1-e5">Teacher Support</h2>
+<h3 id="p1-e6">Teacher Support</h3>
+<p id="p1-e7">The learning objectives in this section will help your students master the following standards:</p>
+<ul><li id="p1-e8">(4) Science concepts. The student knows and applies the laws governing motion in a variety of situations. The student is expected to:<ul><li id="p1-e9">(A) generate and interpret graphs and charts describing different types of motion, including the use of real-time technology such as motion detectors or photogates.</li></ul></li></ul>
+<h2 id="p1-e10">Section Key Terms</h2>
+<p id="p1-e11">dependent variable independent variable tangent</p>
+<h2 id="p1-e12">Teacher Support</h2>
+<h3 id="p1-e13">Teacher Support</h3>
+<p id="p1-e14">[BL][OL] Describe a scenario, for example, in which you launch a water rocket into the air. It goes up 150 ft, stops, and then falls back to the earth. Have the students assess the situation. Where would they put their zero? What is the positive direction, and what is the negative direction? Have a student draw a picture of the scenario on the board. Then draw a position vs. time graph describing the motion. Have students help you complete the graph. Is the line straight? Is it curved? Does it change direction? What can they tell by looking at the graph?</p>
+<p id="p1-e15">[AL] Once the students have looked at and analyzed the graph, see if they can describe different scenarios in which the lines would be straight instead of curved? Where the lines would be discontinuous?</p>
+<h2 id="p1-e16">Graphing Position as a Function of Time</h2>
+<p id="p1-e17">A graph, like a picture, is worth a thousand words. Graphs not only contain numerical information, they also reveal relationships between physical quantities. In this section, we will investigate kinematics by analyzing graphs of position over time.</p>
+<p id="p2-e0">Graphs in this text have perpendicular axes, one horizontal and the other vertical. When two physical quantities are plotted against each other, the horizontal axis is usually considered the independent variable, and the vertical axis is the dependent variable. In algebra, you would have referred to the horizontal axis as the x-axis and the vertical axis as the y-axis. As in Figure 2.10, a straight-line graph has the general form <math display="inline" id="p2-e1"><mrow><mi>y</mi><mo>=</mo><mi>m</mi><mi>x</mi><mo>+</mo><mi>b</mi></mrow></math>.</p>
+<p id="p2-e2">Here m is the slope, defined as the rise divided by the run (as seen in the figure) of the straight line. The letter b is the y-intercept which is the point at which the line crosses the vertical, y-axis. In terms of a physical situation in the real world, these quantities will take on a specific significance, as we will see below. (Figure 2.10.)</p>
+<figure id="p2-e3"><p>Graph of y versus x: the line rises to the right, crossing the y-axis at positive b. Its slope m equals rise over run, or delta y over delta x.</p><figcaption>Figure 2.10 The diagram shows a straight-line graph. The equation for the straight line is y equals mx + b.</figcaption></figure>
+<p id="p2-e4">In physics, time is usually the independent variable. Other quantities, such as displacement, are said to depend upon it. A graph of position versus time, therefore, would have position on the vertical axis (dependent variable) and time on the horizontal axis (independent variable). In this case, to what would the slope and y-intercept refer? Let’s look back at our original example when studying distance and displacement.</p>
+<p id="p2-e5">The drive to school was 5 km from home. Let’s assume it took 10 minutes to make the drive and that your parent was driving at a constant velocity the whole time. The position versus time graph for this section of the trip would look like that shown in Figure 2.11.</p>
+<figure id="p3-e0"><p>Line graph of position (km) versus time (min): position increases steadily from 0 km at 0 minutes to 5 km at 10 minutes.</p><figcaption>Figure 2.11 A graph of position versus time for the drive to school is shown. What would the graph look like if we added the return trip?</figcaption></figure>
+<p id="p3-e1">As we said before, <math display="inline" id="p3-e2"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub><mo>=</mo><mn>0</mn></mrow></math> because we call home our O and start calculating from there. In Figure 2.11, the line starts at <math display="inline" id="p3-e3"><mrow><mi>𝐝</mi><mo>=</mo><mn>0</mn></mrow></math>, as well. This is the b in our equation for a straight line. Our initial position in a position versus time graph is always the place where the graph crosses the x-axis at <math display="inline" id="p3-e4"><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow></math>. What is the slope? The rise is the change in position, (i.e., displacement) and the run is the change in time. This relationship can also be written</p>
+<div class="equation equation-labelled" id="p3-e5"><math display="block"><mrow><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>.</mo></mrow></math><span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.4</span></div>
+<p id="p3-e6">This relationship was how we defined average velocity. Therefore, the slope in a d versus t graph, is the average velocity.</p>
+<h2 id="p3-e7">Tips For Success</h2>
+<p id="p3-e8">Sometimes, as is the case where we graph both the trip to school and the return trip, the behavior of the graph looks different during different time intervals. If the graph looks like a series of straight lines, then you can calculate the average velocity for each time interval by looking at the slope. If you then want to calculate the average velocity for the entire trip, you can do a weighted average.</p>
+<p id="p3-e9">Let’s look at another example. Figure 2.12 shows a graph of position versus time for a jet-powered car on a very flat dry lake bed in Nevada.</p>
+<figure id="p4-e0"><p>Line graph of position (m) versus time (s), rising linearly from 400 m at 0 s. Slope equals average velocity, delta d divided by delta t.</p><figcaption>Figure 2.12 The diagram shows a graph of position versus time for a jet-powered car on the Bonneville Salt Flats.</figcaption></figure>
+<p id="p4-e1">Using the relationship between dependent and independent variables, we see that the slope in the graph in Figure 2.12 is average velocity, <math display="inline" id="p4-e2"><mrow><msub><mi>𝐯</mi><mrow><mtext>avg</mtext></mrow></msub></mrow></math> and the intercept is displacement at time zero—that is, <math display="inline" id="p4-e3"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>. Substituting these symbols into <math display="inline" id="p4-e4"><mrow><mi>y</mi><mo>=</mo><mi>m</mi><mi>x</mi><mo>+</mo><mi>b</mi></mrow></math> gives</p>
+<div class="equation equation-labelled" id="p4-e5"><math display="block"><mrow><mi>𝐝</mi><mo>=</mo><mi>v</mi><mi>t</mi><mo>+</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math><span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.5</span></div>
+<p id="p4-e6">or</p>
+<div class="equation equation-labelled" id="p4-e7"><math display="block"><mrow><mi>𝐝</mi><mo>=</mo><msub><mi>𝐝</mi><mn>0</mn></msub><mo>+</mo><mi>v</mi><mi>t</mi><mo>.</mo></mrow></math><span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.6</span></div>
+<p id="p4-e8">Thus a graph of position versus time gives a general relationship among displacement, velocity, and time, as well as giving detailed numerical information about a specific situation. From the figure we can see that the car has a position of 400 m at <math display="inline" id="p4-e9"><mrow><mi>t</mi><mo>=</mo><mn>0</mn><mtext> </mtext><mtext>s</mtext></mrow></math>, 650 m at <math display="inline" id="p4-e10"><mrow><mi>t</mi><mo>=</mo><mn>1.0</mn><mtext> </mtext><mtext>s</mtext></mrow></math>, and so on. And we can learn about the object’s velocity, as well.</p>
+<h2 id="p5-e0">Teacher Support</h2>
+<h3 id="p5-e1">Teacher Support</h3>
+<h2 id="p5-e2">Teacher Demonstration</h2>
+<p id="p5-e3">Help students learn what different graphs of displacement vs. time look like.</p>
+<p id="p5-e4">[Visual] Set up a meter stick.</p>
+<ol><li id="p5-e5">If you can find a remote control car, have one student record times as you send the car forward along the stick, then backwards, then forward again with a constant velocity.</li><li id="p5-e6">Take the recorded times and the change in position and put them together.</li><li id="p5-e7">Get the students to coach you to draw a position vs. time graph.</li></ol>
+<p id="p5-e8">Each leg of the journey should be a straight line with a different slope. The parts where the car was going forward should have a positive slope. The part where it is going backwards would have a negative slope.</p>
+<p id="p5-e9">[OL] Ask if the place that they take as zero affects the graph.</p>
+<p id="p5-e10">[AL] Is it realistic to draw any position graph that starts at rest without some curve in it? Why might we be able to neglect the curve in some scenarios?</p>
+<p id="p5-e11">[All] Discuss what can be uncovered from this graph. Students should be able to read the net displacement, but they can also use the graph to determine the total distance traveled. Then ask how the speed or velocity is reflected in this graph. Direct students in seeing that the steepness of the line (slope) is a measure of the speed and that the direction of the slope is the direction of the motion.</p>
+<p id="p5-e12">[AL] Some students might recognize that a curve in the line represents a sort of slope of the slope, a preview of acceleration which they will learn about in the next chapter.</p>
+<h2 id="p6-e0">Snap Lab</h2>
+<h3 id="p6-e1">Graphing Motion</h3>
+<p id="p6-e2">In this activity, you will release a ball down a ramp and graph the ball’s displacement vs. time.</p>
+<ul><li id="p6-e3">Choose an open location with lots of space to spread out so there is less chance for tripping or falling due to rolling balls.</li><li id="p6-e4">1 ball</li><li id="p6-e5">1 board</li><li id="p6-e6">2 or 3 books</li><li id="p6-e7">1 stopwatch</li><li id="p6-e8">1 tape measure</li><li id="p6-e9">6 pieces of masking tape</li><li id="p6-e10">1 piece of graph paper</li><li id="p6-e11">1 pencil</li></ul>
+<h3 id="p6-e12">Procedure</h3>
+<ol><li id="p6-e13">Build a ramp by placing one end of the board on top of the stack of books. Adjust location, as necessary, until there is no obstacle along the straight line path from the bottom of the ramp until at least the next 3 m.</li><li id="p6-e14">Mark distances of 0.5 m, 1.0 m, 1.5 m, 2.0 m, 2.5 m, and 3.0 m from the bottom of the ramp. Write the distances on the tape.</li><li id="p6-e15">Have one person take the role of the experimenter. This person will release the ball from the top of the ramp. If the ball does not reach the 3.0 m mark, then increase the incline of the ramp by adding another book. Repeat this Step as necessary.</li><li id="p6-e16">Have the experimenter release the ball. Have a second person, the timer, begin timing the trial once the ball reaches the bottom of the ramp and stop the timing once the ball reaches 0.5 m. Have a third person, the recorder, record the time in a data table.</li><li id="p6-e17">Repeat Step 4, stopping the times at the distances of 1.0 m, 1.5 m, 2.0 m, 2.5 m, and 3.0 m from the bottom of the ramp.</li><li id="p6-e18">Use your measurements of time and the displacement to make a position vs. time graph of the ball’s motion.</li><li id="p6-e19">Repeat Steps 4 through 6, with different people taking on the roles of experimenter, timer, and recorder. Do you get the same measurement values regardless of who releases the ball, measures the time, or records the result? Discuss possible causes of discrepancies, if any.</li></ol>
+<p id="p6-e20">True or False: The average speed of the ball will be less than the average velocity of the ball.</p>
+<ol type="a"><li id="p6-e21">True</li><li id="p6-e22">False</li></ol>
+<h2 id="p7-e0">Teacher Support</h2>
+<h3 id="p7-e1">Teacher Support</h3>
+<p id="p7-e2">[BL][OL] Emphasize that the motion in this lab is the motion of the ball as it rolls along the floor. Ask students where there zero should be.</p>
+<p id="p7-e3">[AL] Ask students what the graph would look like if they began timing at the top versus the bottom of the ramp. Why would the graph look different? What might account for the difference?</p>
+<p id="p7-e4">[BL][OL] Have the students compare the graphs made with different individuals taking on different roles. Ask them to determine and compare average speeds for each interval. What were the absolute differences in speeds, and what were the percent differences? Do the differences appear to be random, or are there systematic differences? Why might there be systematic differences between the two sets of measurements with different individuals in each role?</p>
+<p id="p7-e5">[BL][OL] Have the students compare the graphs made with different individuals taking on different roles. Ask them to determine and compare average speeds for each interval. What were the absolute differences in speeds, and what were the percent differences? Do the differences appear to be random, or are there systematic differences? Why might there be systematic differences between the two sets of measurements with different individuals in each role?</p>
+<h3 id="p7-e6">Solving Problems Using Position vs. Time Graphs</h3>
+<p id="p7-e7">So how do we use graphs to solve for things we want to know like velocity?</p>
+<h2 id="p8-e0">Worked Example</h2>
+<h3 id="p8-e1">Using Position–Time Graph to Calculate Average Velocity: Jet Car</h3>
+<p id="p8-e2">Find the average velocity of the car whose position is graphed in Figure 1.13.</p>
+<h2 id="p8-e3">Strategy</h2>
+<p id="p8-e4">The slope of a graph of d vs. t is average velocity, since slope equals rise over run.</p>
+<div class="equation equation-labelled" id="p8-e5"><math display="block"><mrow><mtext>slope</mtext><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>𝐯</mi></mrow></math><span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.7</span></div>
+<p id="p8-e6">Since the slope is constant here, any two points on the graph can be used to find the slope.</p>
+<h3 id="p8-e7">Solution</h3>
+<ol><li id="p8-e8">Choose two points on the line. In this case, we choose the points labeled on the graph: (6.4 s, 2000 m) and (0.50 s, 525 m). (Note, however, that you could choose any two points.)</li><li id="p8-e9">Substitute the d and t values of the chosen points into the equation. Remember in calculating change <math display="inline" id="p8-e10"><mrow><mo stretchy="false">(</mo><mi>Δ</mi><mo stretchy="false">)</mo></mrow></math> we always use final value minus initial value.</li></ol>
+<div class="equation equation-labelled" id="p8-e11"><math display="block"><mrow><mtable><mtr><mtd columnalign="right"><mi>𝐯</mi></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></mtd></mtr><mtr><mtd columnalign="right"></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><mfrac><mrow><mn>2000</mn><mtext> </mtext><mtext>m</mtext><mo>−</mo><mn>525</mn><mtext> </mtext><mtext>m</mtext></mrow><mrow><mn>6.4</mn><mtext> </mtext><mtext>s</mtext><mo>−</mo><mn>0.50</mn><mtext> </mtext><mtext>s</mtext></mrow></mfrac><mo>,</mo></mtd></mtr><mtr><mtd columnalign="right"></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><mn>250</mn><mtext> </mtext><mtext>m/s</mtext></mtd></mtr></mtable></mrow></math><span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.8</span></div>
+<h3 id="p8-e12">Discussion</h3>
+<p id="p8-e13">This is an impressively high land speed (900 km/h, or about 560 mi/h): much greater than the typical highway speed limit of 27 m/s or 96 km/h, but considerably shy of the record of 343 m/s or 1,234 km/h, set in 1997.</p>
+<h2 id="p8-e14">Teacher Support</h2>
+<h3 id="p8-e15">Teacher Support</h3>
+<p id="p8-e16">If the graph of position is a straight line, then the only thing students need to know to calculate the average velocity is the slope of the line, rise/run. They can use whichever points on the line are most convenient.</p>
+<p id="p9-e0">But what if the graph of the position is more complicated than a straight line? What if the object speeds up or turns around and goes backward? Can we figure out anything about its velocity from a graph of that kind of motion? Let’s take another look at the jet-powered car. The graph in Figure 2.13 shows its motion as it is getting up to speed after starting at rest. Time starts at zero for this motion (as if measured with a stopwatch), and the displacement and velocity are initially 200 m and 15 m/s, respectively.</p>
+<figure id="p9-e1"><p>Position (m) versus time (s) graph curves upward to about 2,900 m at 30 s; the tangent at Q is steeper than at P.</p><figcaption>Figure 2.13 The diagram shows a graph of the position of a jet-powered car during the time span when it is speeding up. The slope of a distance versus time graph is velocity. This is shown at two points. Instantaneous velocity at any point is the slope of the tangent at that point.</figcaption></figure>
+<figure id="p9-e2"><p>A long, low jet-powered car points right on a paved track, with a dense exhaust plume trailing to the left.</p><figcaption>Figure 2.14 A U.S. Air Force jet car speeds down a track. (Matt Trostle, Flickr)</figcaption></figure>
+<p id="p10-e0">The graph of position versus time in Figure 2.13 is a curve rather than a straight line. The slope of the curve becomes steeper as time progresses, showing that the velocity is increasing over time. The slope at any point on a position-versus-time graph is the instantaneous velocity at that point. It is found by drawing a straight line tangent to the curve at the point of interest and taking the slope of this straight line. Tangent lines are shown for two points in Figure 2.13. The average velocity is the net displacement divided by the time traveled.</p>
+<h2 id="p10-e1">Worked Example</h2>
+<h3 id="p10-e2">Using Position–Time Graph to Calculate Average Velocity: Jet Car, Take Two</h3>
+<p id="p10-e3">Calculate the instantaneous velocity of the jet car at a time of 25 s by finding the slope of the tangent line at point Q in Figure 2.13.</p>
+<h2 id="p10-e4">Strategy</h2>
+<p id="p10-e5">The slope of a curve at a point is equal to the slope of a straight line tangent to the curve at that point.</p>
+<h3 id="p10-e6">Solution</h3>
+<ol><li id="p10-e7">Find the tangent line to the curve at <math display="inline" id="p10-e8"><mrow><mi>t</mi><mo>=</mo><mn>25</mn><mtext> </mtext><mtext>s</mtext></mrow></math>.</li><li id="p10-e9">Determine the endpoints of the tangent. These correspond to a position of 1,300 m at time 19 s and a position of 3120 m at time 32 s.</li><li id="p10-e10">Plug these endpoints into the equation to solve for the slope, v.</li></ol>
+<div class="equation equation-labelled" id="p10-e11" tabindex="0" role="group" aria-label="Equation 2.9"><math display="block"><mrow><mtable><mtr><mtd columnalign="right"><mtext>slope</mtext></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><msub><mi>v</mi><mi>Q</mi></msub><mo>=</mo><mfrac><mrow><mi>Δ</mi><msub><mi>d</mi><mi>Q</mi></msub></mrow><mrow><mi>Δ</mi><msub><mi>t</mi><mi>Q</mi></msub></mrow></mfrac></mtd></mtr><mtr><mtd columnalign="right"></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><mfrac><mrow><mo stretchy="false">(</mo><mn>3120</mn><mo>−</mo><mn>1300</mn><mo stretchy="false">)</mo><mtext> </mtext><mtext>m</mtext></mrow><mrow><mo stretchy="false">(</mo><mn>32</mn><mo>−</mo><mn>19</mn><mo stretchy="false">)</mo><mtext> </mtext><mtext>s</mtext></mrow></mfrac></mtd></mtr><mtr><mtd columnalign="right"></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><mfrac><mrow><mn>1820</mn><mtext> </mtext><mtext>m</mtext></mrow><mrow><mn>13</mn><mtext> </mtext><mtext>s</mtext></mrow></mfrac></mtd></mtr><mtr><mtd columnalign="right"></mtd><mtd columnalign="center"><mo>=</mo></mtd><mtd columnalign="left"><mn>140</mn><mtext> </mtext><mtext>m/s</mtext></mtd></mtr></mtable></mrow></math><span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.9</span></div>
+<h3 id="p10-e12">Discussion</h3>
+<p id="p10-e13">The entire graph of v versus t can be obtained in this fashion.</p>
+<h2 id="p11-e0">Teacher Support</h2>
+<h3 id="p11-e1">Teacher Support</h3>
+<p id="p11-e2">A curved line is a more complicated example. Define tangent as a line that touches a curve at only one point. Show that as a straight line changes its angle next to a curve, it actually hits the curve multiple times at the base, but only one line will never touch at all. This line forms a right angle to the radius of curvature, but at this level, they can just kind of eyeball it. The slope of this line gives the instantaneous velocity. The most useful part of this line is that students can tell when the velocity is increasing, decreasing, positive, negative, and zero.</p>
+<p id="p11-e3">[AL] You could find the instantaneous velocity at each point along the graph and if you graphed each of those points, you would have a graph of the velocity.</p>
+<h2 id="p11-e4">Practice Problems</h2>
+<p id="p11-e5">16. Calculate the average velocity of the object shown in the graph below over the whole time interval.</p>
+<figure id="p11-e6"><p>Line graph of position (m) versus time (s): position rises steadily from about 2.5 m at 0 s to 19 m at 70 s.</p></figure>
+<ol type="a"><li id="p11-e7">0.25 m/s</li><li id="p11-e8">0.31 m/s</li><li id="p11-e9">3.2 m/s</li><li id="p11-e10">4.00 m/s</li></ol>
+<p id="p12-e0">17 . True or False: By taking the slope of the curve in the graph you can verify that the velocity of the jet car is <math display="inline" id="p12-e1"><mrow><mn>125</mn><mtext> </mtext><mtext>m/s</mtext></mrow></math> at <math display="inline" id="p12-e2"><mrow><mi>t</mi><mo>=</mo><mn>20</mn><mtext> </mtext><mtext>s</mtext></mrow></math>.</p>
+<figure id="p12-e3"><p>Line graph of position (m) versus time (s): position rises from about 200 m to 2900 m over 30 s, with increasing slope and velocity.</p></figure>
+<ol type="a"><li id="p12-e4">True</li><li id="p12-e5">False</li></ol>
+<h2 id="p12-e6">Check Your Understanding</h2>
+<p id="p12-e7">18. Which of the following information about motion can be determined by looking at a position vs. time graph that is a straight line?</p>
+<ol type="a"><li id="p12-e8">frame of reference</li><li id="p12-e9">average acceleration</li><li id="p12-e10">velocity</li><li id="p12-e11">direction of force applied</li></ol>
+<p id="p13-e0">19 . True or False: The position vs time graph of an object that is speeding up is a straight line.</p>
+<ol type="a"><li id="p13-e1">True</li><li id="p13-e2">False</li></ol>
+<h2 id="p13-e3">Teacher Support</h2>
+<h3 id="p13-e4">Teacher Support</h3>
+<p id="p13-e5">Use the Check Your Understanding questions to assess students’ achievement of the section’s learning objectives. If students are struggling with a specific objective, the Check Your Understanding will help identify direct students to the relevant content.</p>
+<p id="p13-e6">“2.3 Position vs. Time Graphs” from Physics by Paul Peter Urone, Roger Hinrichs, OpenStax.</p>
+<p id="p13-e7">Licensed under Creative Commons Attribution License (CC BY 4.0). http://creativecommons.org/licenses/by/4.0/</p>
+<p id="p13-e8">Original page: https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs</p>
+<p id="p13-e9">Access for free at openstax.org.</p>
+<p id="p13-e10">Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+<p id="p13-e11">a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+<section id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
+<h2 id="about-conversion-title">About this conversion</h2>
+<p>This file was produced with a11y-stem, which assists with accessibility; review it before publishing.</p>
+<ul><li>Headings (36): 20 accepted, 16 needs review</li><li>Equations (19): 17 accepted, 2 needs review</li><li>Figures (7): 7 accepted</li></ul>
+
+</section>
+</main>
+</body>
+</html>
