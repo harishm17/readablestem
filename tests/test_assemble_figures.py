@@ -113,9 +113,22 @@ def test_values_printed_in_the_pdf_are_not_called_approximate():
     assert ">Data shown in Figure 2.3</caption>" in block
 
 
-def test_without_a_figure_number_the_summary_still_names_the_figure():
-    html = render(figure_fix(long_description=LONG), figure_element(caption=None))
-    assert '<summary class="a11y-stem">Description of the figure</summary>' in html
+def test_without_a_figure_number_the_summary_names_the_figure_by_its_alt_text():
+    # Two unnumbered figures must not both be "Description of the figure" in a screen
+    # reader's list of controls (WCAG 2.4.6): the start of the alt text tells them apart.
+    fix = figure_fix(long_description=LONG)
+    assert fix.figure is not None
+    words = fix.figure.alt.split()
+    html = render(fix, figure_element(caption=None))
+    start = html.index('<summary class="a11y-stem">Description of the figure \u201c')
+    summary = html[start : html.index("</summary>", start)]
+    assert " ".join(words[:3]) in summary
+    from a11y_stem.pipeline import figure_details
+
+    short = fix.figure.model_copy(update={"alt": "A cart."})
+    assert figure_details.figure_name(short, None) == "the figure \u201cA cart\u201d"
+    assert figure_details.figure_name(short.model_copy(update={"alt": ""}), None) == "the figure"
+    assert figure_details.figure_name(short, "Figure 2.3 A cart.") == "Figure 2.3"
 
 
 def test_model_text_in_the_description_is_escaped():

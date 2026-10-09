@@ -181,16 +181,36 @@ def figure_label(caption: str | None) -> str | None:
     return f"Figure {match.group(1)}" if match else None
 
 
+# An unnumbered figure is named by the start of its alt text, at most this many words.
+NAME_WORDS = 8
+
+
+def figure_name(figure: FigureFix, caption: str | None) -> str:
+    """Which figure: "Figure 2.3" from its caption; for an unnumbered one the start of
+    its alt text ("the figure \u201cLine graph of the position of a car\u2026\u201d"), so
+    two unnumbered figures' summaries differ in a screen reader's list of controls
+    (WCAG 2.4.6); "the figure" without either."""
+    label = figure_label(caption)
+    if label:
+        return label
+    words = (figure.alt or "").split()
+    if not words:
+        return "the figure"
+    start = " ".join(words[:NAME_WORDS]).rstrip(".,;:")
+    more = "\u2026" if len(words) > NAME_WORDS else ""
+    return f"the figure \u201c{start}{more}\u201d"
+
+
 def summary_text(figure: FigureFix, caption: str | None) -> str:
     """The `<summary>` of the details after a figure: says what is inside and which
     figure it belongs to ("Description of Figure 2.3")."""
-    name = figure_label(caption) or "the figure"
+    name = figure_name(figure, caption)
     return f"Description of {name}" if paragraphs(figure.long_description) else f"Data for {name}"
 
 
 def table_caption(figure: FigureFix, caption: str | None) -> str:
     """The data table's caption: says when the values were read from the image."""
-    name = figure_label(caption) or "the figure"
+    name = figure_name(figure, caption)
     if figure.data_values_from_text:
         return f"Data shown in {name}"
     return f"Data read from {name}; the values are approximate"

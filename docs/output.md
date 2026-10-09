@@ -143,8 +143,12 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
   be the figure's first or last child, and a long description inside the figcaption
   would become the figure's accessible name, read in full on entering it.
 - The summary names the figure from its caption ("Description of Figure 2.3", "Data for
-  Figure 2.3" when there is only a table, "the figure" without a number), so it makes
-  sense out of context in a screen reader's list of controls. It works without scripts.
+  Figure 2.3" when there is only a table); a figure without a number is named by the
+  first eight words of its alt text ("Description of the figure “Line graph of the
+  position of a car…”"), and only one without either is "the figure". So
+  several unnumbered figures' summaries still differ in a screen reader's list of
+  controls. The data table's caption names the figure the same way. It works without
+  scripts.
 - Each line of the long description is a `<p>`; everything the model wrote is escaped.
 - The data table goes through `table_html.render_table` like a rebuilt table, in a box
   that scrolls sideways and takes focus, named by its caption. The caption is the tool's
