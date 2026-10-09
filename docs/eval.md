@@ -747,7 +747,7 @@ an image still counts as found. A step that raises becomes a FAILED fix
 | `teds_structure` (`_found`) | the same with cell text ignored |
 | `teds_with_headers` (`_found`) | the same, with a header cell (and its direction) a different tag from a data cell |
 | `headers.column`, `headers.row` | precision, recall and F1 of header cells as (row, column, scope, text), micro-averaged over found tables; `exact`: share of gold tables with such headers whose header texts (a multiset) equal gold's; a missed table is not exact |
-| `column_header_exact` | `headers.column.exact`: the headline header number (OpenStax marks only column headers, so row headers proposed for an identifying first column are a convention gap, counted apart as `row_headers_where_gold_has_none`) |
+| `column_header_exact` | `headers.column.exact`: the headline header number (OpenStax marks only column headers, so row headers proposed for an identifying first column are a convention gap, counted apart as `row_headers_where_gold_has_none`). `headers.share_found_without_headers`: found tables given no header cell at all |
 | `header_exact` | table-bench's: all header texts equal gold's |
 | `data_vs_layout` | `accuracy_on_negatives`: layout tables no data-table prediction matched; `data_called_layout`: missed data tables a layout-table prediction covers |
 | `maths` | per gold maths cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |

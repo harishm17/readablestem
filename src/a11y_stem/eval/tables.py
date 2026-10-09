@@ -894,6 +894,7 @@ def summarize(rows: Sequence[dict], false: Sequence[dict], *, boot: bool = True)
     headers["header_exact_ci95"] = ci("header_exact", with_headers)
     headers["gold_tables_without_headers"] = sum(1 for r in rows if not r["gold_has_headers"])
     headers["found_tables_without_headers"] = sum(1 for r in found if not r["pred_has_headers"])
+    headers["share_found_without_headers"] = _div(headers["found_tables_without_headers"], tp)
     headers["row_headers_where_gold_has_none"] = sum(
         1 for r in found if r["pred_row_headers"] and not r["gold_has_row_headers"]
     )
@@ -1765,7 +1766,8 @@ def format_markdown(report: dict) -> str:
     )
     lines.append(
         f"Gold data tables without headers: {h['gold_tables_without_headers']}; found tables "
-        f"given row headers where gold has none: {h['row_headers_where_gold_has_none']}."
+        f"given no header: {h['found_tables_without_headers']}; found tables given row "
+        f"headers where gold has none: {h['row_headers_where_gold_has_none']}."
     )
     dl, maths, fid = m["data_vs_layout"], m["maths"], m["text_fidelity"]
     lines += ["", "### Data vs layout, maths cells, text fidelity", ""]

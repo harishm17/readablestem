@@ -168,6 +168,16 @@ def test_header_metrics_split_columns_and_rows_and_report_the_row_header_gap():
     assert s["headers"]["column"]["exact"] == 1.0
     assert s["headers"]["row"]["exact"] == 0.0 and s["headers"]["row"]["recall"] == 0.0
     assert s["header_exact"] == 0.0  # all header texts: "Mass" missing
+    assert s["headers"]["share_found_without_headers"] == 0.0
+
+
+def test_found_tables_given_no_header_are_counted():
+    no_headers = [T.Cell(c.row, c.col, text=c.text) for c in SAME]
+    rows, false, _ = T.score_documents(
+        [gold("g", GOLD), gold("h", GOLD, page=1)], [pred(no_headers), pred(SAME, page=1)]
+    )
+    h = T.summarize(rows, false, boot=False)["headers"]
+    assert h["found_tables_without_headers"] == 1 and h["share_found_without_headers"] == 0.5
 
 
 def test_row_headers_on_a_table_whose_gold_has_none_are_counted_apart():
