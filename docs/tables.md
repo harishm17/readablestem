@@ -112,13 +112,14 @@ All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
 | `table.source` | `local_grid` | no model answer was usable: the proposal is the local grid | required |
 
 **The cell-text bijection.** The words compared are numbers (with a minus sign glued to
-them unless a letter or digit comes just before, so "1-3" is a range and "C-14" a
-hyphen), runs of letters, and symbols that carry meaning in a cell (`/ × · * % ‰ + ± ∓ = ≠
-< > ≤ ≥ ≈ ~ ° √ ∞ ∝`): m/s is not "m s", and 5 % is not 5. Text is NFKC normalised
-(ligatures, full-width forms, superscript digits), invisible format characters dropped,
-dashes and minus signs folded into one, pdfTeX's U+2206 into Δ; case is kept (mW is not
-MW); brackets, quotes, commas and full stops are not compared. The non-maths cells of the
-answer, as a multiset, must equal the PDF's words:
+them at the start, or after a space, an opening bracket, a colon, a semicolon, a comma or
+one of the symbols below, so "10 × -5" and "(3,-5)" keep their signs while "1-3" is a
+range and "C-14" a hyphen), runs of letters, and symbols that carry meaning in a cell
+(`/ × · * % ‰ + ± ∓ = ≠ < > ≤ ≥ ≈ ~ ° √ ∞ ∝`): m/s is not "m s", and 5 % is not 5. Text
+is NFKC normalised (ligatures, full-width forms, superscript digits), invisible format
+characters dropped, dashes and minus signs folded into one, pdfTeX's U+2206 into Δ; case
+is kept (mW is not MW); brackets, quotes, commas and full stops are not compared. The
+non-maths cells of the answer, as a multiset, must equal the PDF's words:
 
 - with a local grid of the same size, **row by row**: each answer row against the local
   row with the same number, leaving out the local cells where the answer has maths (the

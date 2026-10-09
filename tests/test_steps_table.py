@@ -670,6 +670,7 @@ def test_the_schema_is_strict():
         ("\u22129.8 and \u20133", ["-9.8", "and", "-3"]),
         ("1\u20133", ["1", "3"]),  # a range, not a minus
         ("10\u00d7\u22125 and (-2)", ["10", "\u00d7", "-5", "and", "-2"]),  # signs
+        ("(3,\u22125); -1", ["3", "-5", "-1"]),  # a point's sign after a comma
         ("C-14", ["C", "14"]),
         ("1,000.5 kg.", ["1,000.5", "kg"]),
         ("\ufb01eld", ["field"]),  # ligature

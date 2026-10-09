@@ -259,12 +259,13 @@ _SYMBOLS = (
     "\N{GREATER-THAN OR EQUAL TO}\N{ALMOST EQUAL TO}\N{DEGREE SIGN}\N{SQUARE ROOT}"
     "\N{INFINITY}\N{PROPORTIONAL TO}"
 )
-# What the bijection compares: a number (a minus sign glued to it when nothing but a
-# space, an opening bracket, a colon or one of the symbols above comes before, so "a-5"
-# and "1-3" keep their hyphen apart while "10 times -5" keeps its sign), a run of letters, or
-# one of the symbols. Letters and digits split ("9.8m" is "9.8" and "m"); brackets,
-# quotes, commas, full stops and hyphens are not compared.
-_SIGN_AFTER = r"\s(\[{:;" + re.escape(_SYMBOLS)
+# What the bijection compares: a number (a minus sign glued to it at the start, or when a
+# space, an opening bracket, a colon, a semicolon, a comma or one of the symbols above
+# comes just before, so "a-5" and "1-3" keep their hyphen apart while "10 times -5" and
+# the point "(3,-5)" keep their sign), a run of letters, or one of the symbols. Letters
+# and digits split ("9.8m" is "9.8" and "m"); brackets, quotes, commas, full stops and
+# hyphens are not compared.
+_SIGN_AFTER = r"\s(\[{:;," + re.escape(_SYMBOLS)
 _WORD = re.compile(rf"(?:(?<![^{_SIGN_AFTER}])-)?\d+(?:[.,]\d+)*|[^\W\d_]+|[{re.escape(_SYMBOLS)}]")
 # A hyphen that breaks a word at the end of a line ("tempera- ture").
 _LINE_BREAK_HYPHEN = re.compile(r"(?<=[^\W\d_])-\s+(?=[^\W\d_])")
