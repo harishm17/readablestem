@@ -555,7 +555,12 @@ language (`text_pass.set_document_language`, source "user").
 Detection (`pipeline/language.py`) classifies words only: inline equations, numbers,
 single letters (mostly variables), symbols, styled maths letters and code-like tokens
 (anything with a digit, an underscore or a bracket in it) are left out. The document
-needs at least 100 letters of such prose and a probability of 0.90. A paragraph or list
+needs at least 100 letters of such prose and a probability of 0.90; a language other
+than English needs at least 250 letters and 0.99, and Latin and the constructed
+languages (Esperanto, Volapük) are never taken from detection alone: py3langid reads a
+one-page list of English terms (reagents, element names, species) as Latin at 0.99,
+and a wrong document language puts the whole file in the wrong voice, while the
+default only asks for a check. A paragraph or list
 item gets `Element.lang` when it has at least 40 characters of prose, at least 60 % of
 its tokens are words, and the detector gives another language than the document's with
 a probability of at least 0.98. Headings are never marked. Tried on about 230 pages of

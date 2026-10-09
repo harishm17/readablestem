@@ -34,6 +34,16 @@ DEFAULT_LANG = "en"
 # The whole document: at least this many letters of prose, and this probability.
 MIN_DOCUMENT_LETTERS = 100
 MIN_DOCUMENT_CONFIDENCE = 0.90
+# ... and for any language but the default, more prose and a near-certain answer: a
+# one-page list of English terms (reagents, species, element names) reads to the
+# detector as Latin at 0.99, and a wrong document language makes a screen reader read
+# the whole file in the wrong voice, while the default only asks for a check
+# (`lang_assumed`) the instructor confirms on the job page.
+MIN_OTHER_DOCUMENT_LETTERS = 250
+MIN_OTHER_DOCUMENT_CONFIDENCE = 0.99
+# Never a whole document's language from detection alone (a PDF's /Lang or the
+# instructor can still say so): Latin, and the constructed languages py3langid knows.
+NOT_DOCUMENT_LANGUAGES = frozenset({"la", "eo", "vo"})
 # One paragraph or list item in another language than the document: at least this many
 # characters of prose, mostly words, and a near-certain answer (a wrong passage language
 # makes a screen reader read English with a French voice, so this errs towards none).
@@ -87,7 +97,8 @@ def detect(words: str) -> tuple[str, float] | None:
 
 def document_language(texts: Iterable[str]) -> str | None:
     """The language of the document's body text, or None when unsure (too little prose,
-    or no language probable enough)."""
+    or no language probable enough; for a language other than English, a stricter bar,
+    and never Latin or a constructed language)."""
     sample: list[str] = []
     size = 0
     for text in texts:
@@ -98,12 +109,20 @@ def document_language(texts: Iterable[str]) -> str | None:
             if size >= MAX_SAMPLE_CHARS:
                 break
     joined = " ".join(sample)
-    if sum(c.isalpha() for c in joined) < MIN_DOCUMENT_LETTERS:
+    letters = sum(c.isalpha() for c in joined)
+    if letters < MIN_DOCUMENT_LETTERS:
         return None
     found = detect(joined)
     if found is None or found[1] < MIN_DOCUMENT_CONFIDENCE:
         return None
-    return found[0]
+    code, probability = found
+    if primary(code) != DEFAULT_LANG and (
+        code in NOT_DOCUMENT_LANGUAGES
+        or letters < MIN_OTHER_DOCUMENT_LETTERS
+        or probability < MIN_OTHER_DOCUMENT_CONFIDENCE
+    ):
+        return None
+    return code
 
 
 def passage_language(text: str, document_lang: str) -> str | None:
