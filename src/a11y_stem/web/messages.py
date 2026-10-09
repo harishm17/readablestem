@@ -119,6 +119,43 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "description), so check before hiding it from screen readers.",
     ("figure.second_check", "second_check_mismatch"): "A second automated check found a "
     "possible mismatch between the alt text and the image; worth a look.",
+    # Tables (pipeline.table_step)
+    ("table.grid", "grid_invalid"): "The rebuilt table's cells overlap, leave gaps or reach "
+    "outside the table, so check its rows and columns against the image.",
+    ("table.headers", "header_problem"): "The header cells look wrong (a header below the "
+    "data, a data cell among the headers, or a header that runs into the data), so check "
+    "which cells are headers.",
+    ("table.headers", "no_headers"): "No cell is marked as a header, so screen readers cannot "
+    "say what each value means: mark the header row or column.",
+    ("table.grid_agreement", "grid_size_differs"): "The model and the PDF's own layout found "
+    "a different number of rows or columns, so check that no row or column is missing, "
+    "split or merged.",
+    ("table.grid_agreement", "spans_differ"): "The model and the PDF's own layout disagree on "
+    "which cells are merged across rows or columns, so check the merged cells.",
+    ("table.cell_text", "text_mismatch"): "A word or number in the rebuilt table differs from "
+    "the text stored in the PDF (missing, added twice or changed), so compare the cells with "
+    "the image.",
+    ("table.cell_text", "row_mismatch"): "Every word and number is there, but one sits in a "
+    "different row than in the PDF, so check the rows against the image.",
+    ("table.cell_text", "whitespace_differs"): "The cells match the text stored in the PDF "
+    "once spacing is ignored, so this was accepted as it is.",
+    ("table.cell_text", "no_pdf_text"): "The PDF stores no text for this table to compare "
+    "the cells with, so check every value against the image.",
+    ("table.math", "invalid_latex"): "The maths in a cell could not be converted, so that "
+    "cell shows plain text instead: check it against the image.",
+    ("table.math_symbols", "symbol_mismatch"): "A letter, digit or Greek letter in a maths "
+    "cell differs from the text stored in the PDF, so compare that cell with the image "
+    "symbol by symbol.",
+    ("table.math_signs", "sign_mismatch"): "A sign or relation in a maths cell differs from "
+    "the PDF (a minus missing or added, ± read as +, = and ≈ mixed up), so check the signs "
+    "in the maths cells.",
+    ("table.math_style", "style_mismatch"): "A style that carries meaning differs from the "
+    "PDF in a maths cell (a bold vector read as a plain letter, or the other way round), so "
+    "check those letters.",
+    ("table.math_style", "style_cosmetic"): "A letter's style in a maths cell differs from "
+    "the PDF only where it does not change the meaning, so this was accepted as it is.",
+    ("table.source", "local_grid"): "No model could read this table, so this is the grid "
+    "built from the PDF's own text with the first row as headers: check it against the image.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",
@@ -189,6 +226,10 @@ REASON_MESSAGES: dict[str, str] = {
     # Table step (pipeline.table_step)
     "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
     "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
+    "not_data_table": "The model judged that this is not a table of data (for example text "
+    "set out in boxes), so the image is kept: rebuild it as a table yourself if it is one.",
+    "invalid_table": "The model's answer could not be made into a table, so the image is "
+    "kept: rebuild it as a table yourself or keep the image.",
     # Orchestrator (pipeline.run)
     "internal_error": "Something went wrong while this item was processed, so the original "
     "is kept, but you can still fill it in yourself.",
