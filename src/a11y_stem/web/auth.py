@@ -36,6 +36,7 @@ from a11y_stem.web.db import Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.deps import (
     PageError,
     current_user,
+    flash,
     get_ctx,
     render,
     require_csrf,
@@ -308,6 +309,8 @@ async def microsoft_callback(request: Request) -> Response:
     client = ctx.sign_in_client(MICROSOFT)
     if client is None:
         raise PageError(404, "Page not found", "There is nothing at this address.")
+    if request.query_params.get("admin_consent"):
+        return _back_from_admin_consent(request)
     from authlib.integrations.starlette_client import OAuthError
 
     try:
@@ -334,6 +337,24 @@ async def microsoft_callback(request: Request) -> Response:
         log_exception(logger, "login_failed", exc, reason="provider_error", provider=MICROSOFT)
         raise PageError(400, "Sign-in did not finish", MS_DID_NOT_FINISH) from None
     return await run_in_threadpool(finish_microsoft_login, request, account)
+
+
+def _back_from_admin_consent(request: Request) -> Response:
+    """A university's IT admin coming back from the admin consent link (deploy.md, step
+    3b): Microsoft sends them to the same callback, with `admin_consent` and no code. Not a
+    sign-in; the `tenant` Microsoft adds decides nothing (anyone can type the URL), so
+    the page only thanks them, or says the approval did not finish."""
+    approved = not request.query_params.get("error")
+    log_event(logger, "ms_admin_consent_returned", approved=approved)
+    flash(
+        request,
+        "Thank you. Microsoft has sent you back from the approval step. Once your "
+        "organisation is set up for this beta, people there can sign in with their "
+        "university account."
+        if approved
+        else "Microsoft did not finish the approval. You can open the approval link again.",
+    )
+    return RedirectResponse("/login", status_code=303)
 
 
 def _require_dev_login(request: Request) -> None:

@@ -402,6 +402,24 @@ def test_an_error_from_microsoft_shows_a_retry_page(ms, caplog):
     assert "AADSTS" not in caplog.text
 
 
+def test_an_it_admin_back_from_the_approval_link_is_thanked_not_signed_in(ms):
+    approved = ms.browser.get(
+        f"/auth/microsoft/callback?admin_consent=True&tenant={OTHER_TENANT}&scope=openid"
+    )
+    assert approved.status_code == 303 and approved.headers["location"] == "/login"
+    page = ms.browser.get("/login").text
+    assert "Microsoft has sent you back from the approval step" in page
+    assert OTHER_TENANT not in page and not signed_in(ms.browser)
+    declined = ms.browser.get(
+        "/auth/microsoft/callback?admin_consent=True&error=consent_required"
+        "&error_description=AADSTS65004"
+    )
+    assert declined.headers["location"] == "/login"
+    page = ms.browser.get("/login").text
+    assert "did not finish the approval" in page and "AADSTS" not in page
+    assert identities(ms) == [] and ms.fake.fetched == []  # nothing asked of Microsoft
+
+
 def test_a_refused_code_shows_a_retry_page(ms, caplog):
     caplog.set_level(logging.INFO)
     ms.allow(ALICE)
