@@ -120,11 +120,11 @@ class ReviewLoad:
         }
 
 
-REVIEWABLE_KINDS = frozenset({Kind.EQUATION, Kind.FIGURE, Kind.HEADING})
+REVIEWABLE_KINDS = frozenset({Kind.EQUATION, Kind.FIGURE, Kind.HEADING, Kind.TABLE})
 
 
 def review_load(fixes: Sequence[Fix]) -> ReviewLoad:
-    """The pipeline's tiers for these fixes (equations, figures and headings only)."""
+    """The pipeline's tiers for these fixes (equations, figures, headings and tables)."""
     load = ReviewLoad()
     reviewable = [f for f in fixes if f.kind in REVIEWABLE_KINDS]
     required = [f for f in reviewable if f.review == "required"]

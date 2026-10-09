@@ -49,6 +49,7 @@ def fix_status_label(fix: Fix) -> str:
 KIND_LABELS = {
     Kind.EQUATION: "Equation",
     Kind.FIGURE: "Figure",
+    Kind.TABLE: "Table",
     Kind.HEADING: "Heading",
     Kind.PARAGRAPH: "Paragraph",
     Kind.LIST_ITEM: "List item",
