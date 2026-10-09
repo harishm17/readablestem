@@ -220,3 +220,18 @@ def test_parts_from_mathml_give_the_same_keys(parts, key):
 )
 def test_parts_that_are_not_one_symbol_have_no_key(parts):
     assert canonical_from_parts(*parts) is None
+
+
+@pytest.mark.parametrize(
+    "spelling",
+    ["\\hat{\\imath}", "\\hat{i}", "i hat", "\u0131\u0302", "$\\hat\\imath$"],
+)
+def test_the_unit_vector_i_hat_has_one_key_with_or_without_the_dot(spelling):
+    # LaTeX's standard \hat{\imath} (a dotless i under the hat) is i-hat too.
+    assert canonical_symbol(spelling) == "î"
+
+
+def test_a_dotless_i_or_j_from_mathml_is_the_letter():
+    assert canonical_from_parts("\u0131", None, "hat") == "\u00ee"
+    assert canonical_from_parts("ȷ", None, "hat") == "ĵ"
+    assert canonical_symbol("\\vec{\\jmath}") == canonical_symbol("\\vec{j}")

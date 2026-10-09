@@ -231,9 +231,17 @@ def _key(symbol: _Symbol) -> str | None:
     return key if len(key) <= MAX_SYMBOL_CHARS else None
 
 
+# The dotless i and j a hat or arrow sits on (\hat{\imath}: the unit vector i-hat) are
+# the letters i and j, as the equation step's symbol check reads them.
+_DOTLESS = {"\u0131": "i", "\u0237": "j"}
+_DOTLESS_COMMANDS = {"imath": "i", "jmath": "j"}
+
+
 def _letter(ch: str) -> str | None:
-    """`ch` as a plain base: an ASCII letter or digit, or a Greek letter (symbol variants
-    and the micro sign folded to the letter); None for anything else."""
+    """`ch` as a plain base: an ASCII letter or digit, a dotless i or j (as i, j), or a
+    Greek letter (symbol variants and the micro sign folded to the letter); None for
+    anything else."""
+    ch = _DOTLESS.get(ch, ch)
     if ch.isascii():
         return ch if ch.isalnum() else None
     folded = unicodedata.normalize("NFKC", ch)
@@ -299,7 +307,7 @@ def _latex_expr(tokens: list[str], i: int) -> tuple[_Symbol, int] | None:
             else:
                 styled = _accented(inner, _LATEX_ACCENTS[name])
             return None if styled is None else (styled, end)
-        base = _greek(name) or SYMBOLS.get(name)
+        base = _greek(name) or SYMBOLS.get(name) or _DOTLESS_COMMANDS.get(name)
         return None if base is None else (_Symbol(base), i + 1)
     if token in "{}" or token.startswith("\\"):
         return None
