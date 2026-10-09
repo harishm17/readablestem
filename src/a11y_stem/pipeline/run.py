@@ -1,8 +1,8 @@
 """The conversion pipeline end to end.
 
-convert_pdf: layout.analyze -> heading_fixes -> per page: crops (serial, calling thread)
--> equation/figure/table steps (thread pool) -> assemble.render_html ->
-html_checks.static_checks.
+convert_pdf: layout.analyze -> text_pass.apply -> heading_fixes -> per page: crops
+(serial, calling thread) -> equation/figure/table steps (thread pool) ->
+assemble.render_html -> html_checks.static_checks.
 
 Design notes:
 
@@ -46,7 +46,10 @@ Design notes:
   They decide what the steps produce; the stored result alone decides the HTML.
 - Content features (docs/design/content-features.md) hook in here: TABLE elements go to
   `table_step.rebuild` like equations and figures go to their steps; `stage_progress`
-  receives `ProgressEvent`s; notices and source facts go on the result.
+  receives `ProgressEvent`s; notices and source facts go on the result. The text pass
+  (links, cross-references, the document and passage languages, colour runs) runs once
+  after layout, before any step; it sets `lang`, `lang_source` and its own notices, and
+  never fails the conversion.
 """
 
 from __future__ import annotations
@@ -100,6 +103,7 @@ from a11y_stem.pipeline import (
     layout,
     page_kinds,
     table_step,
+    text_pass,
 )
 from a11y_stem.pipeline import options as run_options
 
@@ -473,6 +477,24 @@ def _run_step(
             latency_ms=elapsed_ms,
         )
     return _Done(element, fix, elapsed_ms)
+
+
+def _text_pass(
+    pdf_bytes: bytes,
+    elements: list[Element],
+    pages: list[int],
+    layout_lang: str,
+    options: ConversionOptions,
+    tracer: Tracer,
+) -> text_pass.TextPassResult:
+    """Links, cross-references, language and (with FEATURE_COLOUR) colour runs on the
+    elements, before any step (`text_pass.apply`; it never raises)."""
+    with _span(tracer, "text", elements=len(elements), colour=options.colour) as span:
+        text = text_pass.apply(
+            pdf_bytes, elements, pages=pages, layout_lang=layout_lang, colour=options.colour
+        )
+        _annotate(span, lang_source=text.lang_source, **text.counts())
+    return text
 
 
 def _heading_fixes(elements: list[Element], tracer: Tracer) -> list[Fix]:
@@ -884,6 +906,8 @@ def _convert(
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
             scans = _image_only_pages(pdf_bytes, page_list, elements)
             elements, scan_fixes = _with_page_images(elements, scans)
+            text = _text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer)
+            elements = text.elements
             fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
             fixes.update({f.element_id: f for f in scan_fixes})
             run = _Run(
@@ -910,7 +934,7 @@ def _convert(
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
             html = assemble.render_html(
                 title=doc.title,
-                lang=doc.lang,
+                lang=text.lang,
                 elements=elements,
                 fixes=ordered,
                 crops=run.crops,
@@ -942,13 +966,13 @@ def _convert(
     )
     # Content-free additions of the content features (docs/design/content-features.md):
     # each feature adds its notices here; the job-page work measures the source facts.
-    notices: list[Notice] = []
+    notices: list[Notice] = [*text.notices]
     source_facts: SourceFacts | None = None
     result = DocumentResult(
         pipeline_version=PIPELINE_VERSION,
         prompt_versions=_prompt_versions(ordered),
         title=doc.title,
-        lang=doc.lang,
+        lang=text.lang,
         elements=elements,
         fixes=ordered,
         stats=stats,
@@ -959,5 +983,6 @@ def _convert(
         page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
         notices=notices,
         source_facts=source_facts,
+        lang_source=text.lang_source,
     )
     return PipelineOutput(result=result, crops=run.crops, checks=checks)

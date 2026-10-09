@@ -204,6 +204,15 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "text beside it instead of being the table's own caption.",
     ("html.table_layout", "layout_table"): "A table in the document is used only to lay out "
     "text, but tables should hold data that is read across rows and columns.",
+    # Links, language and colour in the output HTML (pipeline.html_checks, text work)
+    ("html.link_text", "empty_link"): "A link in the document has no text, so screen "
+    "readers cannot say where it goes.",
+    ("html.link_href", "unsafe_link"): "A link in the document is not a web or email address "
+    "or a place in the document itself.",
+    ("html.lang_tags", "invalid_lang"): "A language marked in the document is not a valid "
+    "language code.",
+    ("html.text_contrast", "low_contrast"): "Some coloured text is too light to read easily "
+    "on the white background.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
     ("axe", "axe_error"): "The automatic accessibility check (axe-core) could not run on the "

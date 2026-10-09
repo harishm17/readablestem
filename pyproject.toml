@@ -23,6 +23,7 @@ dependencies = [
     "openai>=3.26.0",
     "pillow>=12.0",
     "psycopg[binary]>=3.3.6",
+    "py3langid>=0.4.0",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
     "pymupdf==1.28.2",

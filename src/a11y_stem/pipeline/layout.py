@@ -3635,3 +3635,43 @@ def _to_elements(pages: list[_PageBlocks], ctx: _Context) -> list[Element]:
                 )
             )
     return elements
+
+
+# ============================================================================ glyphs
+
+
+@dataclass(frozen=True, slots=True)
+class Glyph:
+    """One printed character with the colour of its span, for the text pass
+    (`pipeline.text_pass`), which finds links and coloured text by where glyphs are and
+    maps them onto `Element.text`."""
+
+    c: str
+    bbox: BBox  # display coordinates, the frame of `Element.bbox`
+    rgb: tuple[int, int, int]  # the span's fill colour, sRGB
+
+
+def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
+    """Every visible character of `page` with its span colour, in PyMuPDF's order.
+
+    The same extraction as `_page_rows` (flags, display coordinates), kept apart so
+    reading a page for layout does not change: only the text pass needs colours. Spaces
+    are left out (element text has its own), characters go through `_TEXT_MAP` like
+    element text, and fully transparent text is skipped. The caller holds `_LOCK`.
+    """
+    display = _Display.of(page)
+    glyphs: list[Glyph] = []
+    for block in page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]:
+        if block.get("type") != 0:
+            continue
+        for line in block["lines"]:
+            for span in line["spans"]:
+                if int(span.get("alpha", 255)) == 0:
+                    continue
+                colour = int(span.get("color") or 0) & 0xFFFFFF
+                rgb = ((colour >> 16) & 0xFF, (colour >> 8) & 0xFF, colour & 0xFF)
+                for ch in span["chars"]:
+                    c = ch["c"].translate(_TEXT_MAP)
+                    if c and not c.isspace():
+                        glyphs.append(Glyph(c[0], display.box(ch["bbox"]), rgb))
+    return glyphs

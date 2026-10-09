@@ -16,6 +16,14 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.math_display | math_missing_display | `<math>` with no block/inline display (warning) |
 | html.self_contained | external_resource | scripts, links, frames, or any non-data: URL |
 | html.wording | banned_wording | a compliance claim (`_BANNED`) in text the tool wrote |
+| html.link_text | empty_link | an `<a>` with no text (or img alt) in it |
+| html.link_href | unsafe_link | an `<a>` href that is not http, https, mailto or a "#id" here |
+| html.lang_tags | invalid_lang | a `lang` value that is not a well-formed BCP 47 tag |
+| html.text_contrast | low_contrast | a colour class (`tc-...`) below 4.5:1 on white |
+
+A link in the text (`<a href>`) loads nothing, so it is not an external resource; the
+link rules check it instead. The last four rules are the text work's
+(docs/output.md "Links and cross-references", "Language", "Coloured text").
 
 The wording rule (docs/design/beta-architecture.md rule 7) only reads text inside
 elements carrying `assemble.AUTHORED_CLASS` (the notes and the about section). Course
@@ -57,8 +65,11 @@ from importlib import resources
 from itertools import pairwise
 from typing import Any, Literal
 
-from a11y_stem.core.types import Check
+from a11y_stem.core.types import Check, is_safe_href
+from a11y_stem.pipeline import contrast
 from a11y_stem.pipeline.assemble import AUTHORED_CLASS
+from a11y_stem.pipeline.inline_text import COLOUR_CLASS_PREFIX
+from a11y_stem.pipeline.language import is_language_tag
 
 log = logging.getLogger(__name__)
 
@@ -76,6 +87,10 @@ LISTS = frozenset({"ul", "ol", "menu"})
 LIST_CHILDREN = frozenset({"li", "script", "template"})
 _BANNED = re.compile(r"\bcomplian(?:t|ce)\b", re.IGNORECASE)
 _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
+# A colour class rule as `inline_text.colour_css` writes it: ".tc-ff0000 { color: #ee0000; }".
+_COLOUR_RULE = re.compile(
+    rf"\.{re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}}\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
+)
 
 AXE_VERSION = "4.14.0"
 AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
@@ -115,6 +130,11 @@ class _Collector(HTMLParser):
         self._heading: tuple[int, list[str]] | None = None
         self._in_title = False
         self._in_style = False
+        # The text work's rules: each <a> as (href, its text), every lang value, the CSS.
+        self.links: list[tuple[str | None, str]] = []
+        self.langs: list[str] = []
+        self.style: list[str] = []
+        self._link: tuple[str | None, list[str]] | None = None
 
     # ----- parser callbacks
 
@@ -134,6 +154,9 @@ class _Collector(HTMLParser):
             level, parts = self._heading
             self.headings.append((level, "".join(parts)))
             self._heading = None
+        elif tag == "a" and self._link is not None:
+            self.links.append((self._link[0], "".join(self._link[1])))
+            self._link = None
         names = [name for name, _ in self._stack]
         if tag in names:  # pop to the matching start tag (closes anything left open)
             del self._stack[len(names) - 1 - names[::-1].index(tag) :]
@@ -143,8 +166,12 @@ class _Collector(HTMLParser):
             self.title.append(data)
         if self._in_style and _CSS_EXTERNAL.search(data):
             self.external += 1
+        if self._in_style:
+            self.style.append(data)
         if self._heading is not None:
             self._heading[1].append(data)
+        if self._link is not None:
+            self._link[1].append(data)
         if self._stack and self._stack[-1][1]:
             self.authored_text.append(data)
         if self._stack and self._stack[-1][0] in LISTS and data.strip():
@@ -172,6 +199,10 @@ class _Collector(HTMLParser):
             self._heading = (int(match.group(1)), [])
         if element_id := (attrs.get("id") or "").strip():
             self.ids[element_id] += 1
+        if tag == "a" and self._link is None:
+            self._link = (attrs.get("href"), [])
+        if (lang := attrs.get("lang")) is not None:
+            self.langs.append(lang)
         self._external(tag, attrs)
         if not void:
             classes = (attrs.get("class") or "").split()
@@ -184,12 +215,16 @@ class _Collector(HTMLParser):
             self.imgs_without_alt += 1
         elif self._heading is not None:
             self._heading[1].append(alt)
+        if alt is not None and self._link is not None:
+            self._link[1].append(alt)
 
     def _external(self, tag: str, attrs: dict[str, str | None]) -> None:
         if tag in EXTERNAL_ELEMENTS:
             self.external += 1
             return
-        for name in URL_ATTRIBUTES & attrs.keys():
+        # A link's href loads nothing (the link rules check it); any other URL does.
+        navigation = {"href"} if tag == "a" else set()
+        for name in (URL_ATTRIBUTES & attrs.keys()) - navigation:
             value = (attrs[name] or "").strip().lower()
             if value and not value.startswith(("data:", "#")):
                 self.external += 1
@@ -233,6 +268,8 @@ def static_checks(html: str) -> list[Check]:
         ),
         _check("html.self_contained", doc.external == 0, "external_resource"),
         _check("html.wording", not _BANNED.search(authored), "banned_wording"),
+        *_text_checks(doc),
+        # Only for documents with a <table>, so they come last.
         *_table_rules(html),
     ]
 
@@ -374,6 +411,37 @@ def _table_rules(html: str) -> list[Check]:
             severity="warning",
         ),
         _check("html.table_layout", not any(t.presentational for t in doc.tables), "layout_table"),
+    ]
+
+
+def _safe_link(href: str | None, ids: Counter[str]) -> bool:
+    """A web or email address, or "#id" of an element in this file."""
+    href = (href or "").strip()
+    if href.startswith("#"):
+        return ids[href[1:]] > 0
+    return is_safe_href(href)
+
+
+def _hex_rgb(digits: str) -> tuple[int, int, int]:
+    return int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16)
+
+
+def _text_checks(doc: _Collector) -> list[Check]:
+    """The text work's rules: links, lang values and the contrast of colour classes."""
+    readable = all(
+        contrast.contrast_ratio(_hex_rgb(m.group(1)), contrast.OUTPUT_BACKGROUND)
+        >= contrast.MIN_TEXT_CONTRAST
+        for m in _COLOUR_RULE.finditer("".join(doc.style))
+    )
+    return [
+        _check("html.link_text", all(text.strip() for _, text in doc.links), "empty_link"),
+        _check("html.link_href", all(_safe_link(h, doc.ids) for h, _ in doc.links), "unsafe_link"),
+        _check(
+            "html.lang_tags",
+            all(is_language_tag(value.strip()) for value in doc.langs if value.strip()),
+            "invalid_lang",
+        ),
+        _check("html.text_contrast", readable, "low_contrast"),
     ]
 
 

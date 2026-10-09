@@ -14,7 +14,9 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped |
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
+| `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span colour, for the text pass |
 | `heading_step.heading_fixes(elements) -> list[Fix]` | one `HeadingFix` per heading, outline repaired, with checks and confidence |
+| `text_pass.apply(pdf_bytes, elements, *, pages, layout_lang, colour) -> TextPassResult` | the elements with links, colour runs and passage languages, the document language and its source, and the pass's notices (see "The text pass") |
 
 Element conventions:
 
@@ -399,7 +401,159 @@ Modern Sans):
 
 `title` is the PDF metadata title unless it is empty, a file name (`notes.docx`) or a tool
 default (`Untitled document`, `Microsoft Word - ...`); otherwise the first level-1 heading.
-`lang` is the catalog `/Lang` when it looks like a language tag, else `en`.
+`lang` is the catalog `/Lang` when it looks like a language tag, else `en`. The text pass
+decides the document's language from there (it detects one when the PDF has none).
+
+## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
+
+After layout and before any step, `run` calls `text_pass.apply` once. It reads the PDF
+again for what layout does not keep (link annotations, `/Lang`, the colour of each
+glyph) and adds links, cross-references, colour runs and languages to the elements. It
+never changes an element's text and sends nothing to a model; URLs are never fetched. It
+never fails a conversion either: a PDF it cannot read again gives no links or colours
+(cross-references and the language still come from the text), and an error inside the
+pass leaves the elements as they were, logging only the exception type. What the output
+does with all this is in docs/output.md ("Links and cross-references", "Language",
+"Coloured text").
+
+### From the page to offsets in `Element.text`
+
+Layout does not record where each character of an element's text was printed: the text
+is cleaned, joined across lines and dehyphenated. So the pass takes the glyphs of the
+page (`layout.page_glyphs`: the same raw extraction as layout's, in display space, with
+the span's sRGB colour, spaces left out), keeps those whose centre lies inside the
+element's box (1.5 pt slack), and aligns the element's text with them
+(`text_pass.align`, `difflib.SequenceMatcher` over the characters; spaces and inline
+markers are left out of the text side). The alignment is monotonic, so a dehyphenated
+word, an extra glyph from another block inside a merged box or an inline equation's
+glyphs only leave characters unplaced; an unplaced character never starts or ends a link
+or a colour run on its own. Alignment runs only for elements a link rectangle touches,
+and (with colour on) for elements that have glyphs in a run colour; text over 20,000
+characters is not aligned.
+
+A link covers the characters whose glyph box is at least half inside its rectangle
+(`MIN_GLYPH_OVERLAP`), so a rectangle that grazes the next word does not take it. Offsets
+are into the text as stored, markers included. A link stops at an inline equation and
+starts again after it; a URL split over two lines (hyperref writes one annotation per
+line) is one link again when only spaces separate the two pieces.
+
+### Links
+
+`Page.get_links()` gives each annotation's rectangle (display space) and kind:
+
+| PDF link | Becomes |
+|---|---|
+| URI with http, https or mailto (`core.types.is_safe_href`) | `Link(kind="uri", href=...)` |
+| URI with any other scheme (ftp, javascript, file), a launch action, a link to another PDF, an action PyMuPDF cannot read | no link; the text stays; notice `link_scheme_dropped` on the element (or the page, with a count, when it covers no text) |
+| GoTo, or a named destination, on an analysed page | `Link(kind="internal", target_id=...)`: the element at the destination |
+| GoTo to a page that was not analysed, a named action ("next page"), a link to its own element | nothing, and no notice |
+
+The destination is a point: an explicit GoTo gives it in display space, a named
+destination (hyperref's) in PDF space, which is turned into display space with the
+page's transformation and rotation. The target (`target_at`) is the element whose box
+holds the point (2 pt slack), else the nearest one below it, since a PDF puts a
+destination a little above its target and hyperref puts a figure's at its caption, under
+the figure; elements above the point count double their distance, and an element in the
+point's column (6 pt slack) wins over one that is not. Only elements the assembler
+writes with their id can be targets: headings and paragraphs with text, list items,
+display equations, figures and tables. A target that is an inline equation becomes its
+paragraph.
+
+Link text that says nothing on its own ("click here", "here", "this link", "read more")
+gets the optional notice `link_text_unclear`, and so does a bare URL longer than 40
+characters with fewer than three words around it in its paragraph or list item ("Notes:
+https://..."). A URL inside a sentence or after a reference ("Smith (2024). Notes on
+kinematics. Retrieved from https://...") is not flagged: the text around it says what it
+is (WCAG 2.4.4, link purpose in context), so a reference list does not fill the job page
+with notices. The text itself is kept: it is the visible name of the link (WCAG 2.5.3),
+and only the instructor can reword it.
+
+### Cross-references
+
+In paragraphs and list items, `references` finds "Figure 2.3", "Fig. 4", "Figures 2 and
+3", "Table 1", "Equation (3)", "equation (3)", "Eq. 3", "Eqn. (4)", "Eqs. (3) and (4)"
+and "Equations (3), (4) and (5)" (lists joined by commas, "and", "or", "&", "to" or a
+dash), and a bare "(3)" not right after a letter, digit or bracket (so "f(3)" is not
+one) and not at the start of a paragraph or list item (there it numbers the paragraph:
+"(3) Measure the speed"). The targets (`crossref_targets`) are figures and tables by the number at the start
+of their caption, and display equations by every number in their `equation_label` ("(2)
+(3)" on an `align` gives both). A reference links (`kind="crossref"`) only when exactly
+one target has its number; a bare "(3)" only when an equation prints exactly "(3)"
+beside it (an equation numbered "2.4" without brackets is not named by "(2.4)"). No link
+when two targets share a number, when none has it, when it would overlap a PDF link or
+an inline equation, or at the very start of a paragraph that reads like an unattached
+caption ("Figure 2: ...").
+
+hyperref links only the number of `Figure~\ref{fig}` or `\eqref{eq}`; such a PDF link is
+widened to the whole reference ("Figure 1", "Equation (1)") so the link text says what
+it points at, keeping the PDF's own target (`widen_internal`).
+
+### Language
+
+The document's language (`DocumentResult.lang`, `lang_source`):
+
+1. the catalog `/Lang` when it is a tag whose language is a real two- or three-letter
+   code (`language.document_tag`; "x-none" and "und" do not count): source "pdf";
+2. else detected from the body text: source "detected" and the notice `lang_detected`;
+3. else "en": source "default" and the notice `lang_assumed`.
+
+Both notices are optional; the job page lets the instructor confirm or change the
+language (`text_pass.set_document_language`, source "user").
+
+Detection (`pipeline/language.py`) classifies words only: inline equations, numbers,
+single letters (mostly variables), symbols, styled maths letters and code-like tokens
+(anything with a digit, an underscore or a bracket in it) are left out. The document
+needs at least 100 letters of such prose and a probability of 0.90. A paragraph or list
+item gets `Element.lang` when it has at least 40 characters of prose, at least 60 % of
+its tokens are words, and the detector gives another language than the document's with
+a probability of at least 0.98. Headings are never marked. Tried on about 230 pages of
+English course material and reports (OpenStax pages, LaTeX notes and slides, the layout
+fixtures, accessibility reports, a Federal Register notice, an arXiv paper, a 59-page
+chapter): no passage was marked; the French quotation of the LaTeX fixture is. In an
+86-page English report with Swedish sources, two reference entries with Swedish titles
+were marked Swedish (one of them starts "Retrieved from" in English): a reference in
+another language is read in that language's voice, which is usually what a reader wants.
+
+The detector is py3langid 0.4 (BSD-3-Clause), chosen 2026-10-09 over two others:
+
+| Detector | Licence | Installed size | Short academic sentences (24) |
+|---|---|---|---|
+| py3langid 0.4 (langid.py fork, naive Bayes on byte n-grams, 97 languages) | BSD-3-Clause | 4.5 MB model, plus NumPy | 24 right |
+| lingua-py 2.2 (`lingua-language-detector`) | Apache-2.0 | about 290 MB of models | 23 right |
+| fastText lid.176 | model CC BY-SA 3.0 | 126 MB (0.9 MB compressed) | not tried: a share-alike licence on the model |
+
+The test sentences were English with maths ("Let f be continuous on [a, b]", "Office
+hours: Tuesday and Thursday, 2 to 4 pm"), French, German, Spanish, Italian, Portuguese,
+Dutch and a Latin tag. py3langid loads in about 0.3 s (once per process) and takes well
+under a millisecond per paragraph.
+
+### Colour (FEATURE_COLOUR)
+
+With the flag on, a paragraph or list item gets `Element.colour_runs`: maximal stretches
+of placed characters printed in one run colour, from the first to the last such
+character, across an inline equation when the text on both sides has the colour, minus
+any linked text (a link is written in the link colour), trimmed of spaces, and only with
+a letter, a digit or maths in them. A colour is a run colour unless:
+
+- it is the body colour: the commonest glyph colour of the analysed pages, when it reaches
+  4.5:1 on white (a light body colour is not one, so light body text is kept and made
+  darker);
+- it is near black (OKLCH lightness below 0.2, whatever its tint) or a readable grey
+  (chroma below 0.035 and 4.5:1 or more on white): it reads as body text;
+- it is near white (lightness 0.96 or more): it was printed on a dark fill the output
+  does not have, so it becomes body text.
+
+A light grey is a run (it is a contrast problem: the output darkens it); so is any real
+colour. Headings get no colour runs. Running text that names a colour ("in red", "shown
+in blue", "highlighted in yellow", "the green curve", "red arrows") on or within two
+paragraphs of coloured text on the same page gets the optional notice
+`colour_reference`. With the flag off there are no runs and no such notices.
+
+### Source facts
+
+`text_pass.link_count(doc, pages)` counts the link annotations of any kind on the given
+pages of an open PyMuPDF document (hold layout's lock): `SourceFacts.links`. The pass
+also returns the same count for the analysed pages as `TextPassResult.annotations`.
 
 ## Errors
 
@@ -583,3 +737,12 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   source; rebuild with `uv run python tests/fixtures/layout/latex/make_pdfs.py --tectonic
   PATH` (deterministic, byte-identical with the same Tectonic version; PDFs must stay
   under 300 KB).
+- The text pass: `tests/test_text_pass.py` (alignment with inline markers, link
+  rectangles, unsafe schemes, destinations, cross-reference edge cases, colour rules,
+  the language and its change, on glyphs built in the test), `tests/test_text_language.py`
+  (detection on short and maths-heavy text, tags), `tests/test_text_contrast.py`,
+  `tests/test_text_inline.py` (the HTML), and `tests/test_text_latex.py` on
+  `links_language_colour.tex` in the LaTeX fixtures folder (hyperref links, `\ref`
+  cross-references, a French quotation, coloured text) and on PDFs built in the test
+  (rotated pages, a named destination, `/Lang`); its `browser` tests run axe-core on the
+  converted file and check that a long link wraps at 320 px.
