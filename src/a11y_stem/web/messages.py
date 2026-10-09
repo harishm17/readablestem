@@ -146,6 +146,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "the cells with, so check every value against the image.",
     ("table.math", "invalid_latex"): "The maths in a cell could not be converted, so that "
     "cell shows plain text instead: check it against the image.",
+    ("table.math", "flattened_maths"): "Some cells of the grid read from the PDF hold maths "
+    "that its text gives flat (a fraction, or an accent such as a vector arrow), so the "
+    "table cannot be used as it is: write those cells as LaTeX, or keep the image.",
     ("table.math_symbols", "symbol_mismatch"): "A letter, digit or Greek letter in a maths "
     "cell differs from the text stored in the PDF, so compare that cell with the image "
     "symbol by symbol.",

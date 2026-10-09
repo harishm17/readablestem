@@ -345,9 +345,11 @@ def test_use_the_grid_read_from_the_pdf_stays_on_the_table(tables):
     page = follow(tables, response)
     notice = section(page, 'id="decision-notice"', "</p>")
     assert (
-        "Table 2: The table now uses the grid read from the PDF. Your edit passed the required "
-        "checks and was saved. 2 decisions left." in notice
+        "Table 2: The table now uses the grid read from the PDF. Its words are the PDF&#39;s "
+        "own, so the checks could not compare them with anything: check it against the "
+        "image. 2 decisions left." in notice
     )
+    assert "passed the required checks" not in notice
     assert re.search(r'<h2 id="decision-title"[^>]*autofocus', page)
     body = panel(page)
     assert "Decided: Edited by you" in body
@@ -412,10 +414,14 @@ def test_the_first_row_made_a_header_and_back(tables):
         "Object": "col", "Cart": "row", "Ball": "row", "Speed": "row",
     }  # fmt: skip
     assert '<th scope="row">Cart</th>' in panel(screen(tables, "?item=p1-e1"))
-    # Neither: back to the proposal's grid.
-    post(tables, "p1-e1", action="edit", change="headers")
-    assert grid(tables, "p1-e1") == table_1_proposal()
     assert fix_of(tables, "p1-e1").status is Status.EDITED
+    # Neither: back to the proposal's grid, which has no header cell at all, so the
+    # decision is open again (a required check fails).
+    page = follow(tables, post(tables, "p1-e1", action="edit", change="headers"))
+    assert grid(tables, "p1-e1") == table_1_proposal()
+    fix = fix_of(tables, "p1-e1")
+    assert (fix.status, fix.reviewed) == (Status.NEEDS_REVIEW, False)
+    assert "a required check still fails, so the table still waits for your decision" in page
     assert [e.action for e in edits(tables)] == ["edit", "edit", "edit"]
     assert version(tables) == 3
 
@@ -438,7 +444,9 @@ def test_a_cell_changed_is_checked_escaped_and_shown_again(tables):
     response = post(tables, "p1-e1", action="edit", change="cell", row="1", col="1", cell=typed)
     assert response.headers["location"] == f"/jobs/{tables.job_id}/review?item=p1-e1"
     page = follow(tables, response)
-    assert "Table 1: Row 2, column 2 changed. Your edit passed the required checks" in page
+    # The cell no longer matches the PDF (10): saved, and the decision stays open.
+    assert "Table 1: Row 2, column 2 changed. Saved, but a required check still fails" in page
+    assert fix_of(tables, "p1-e1").status is Status.NEEDS_REVIEW
     cell = next(c for c in grid(tables, "p1-e1").cells if (c.row, c.col) == (1, 1))
     assert cell.text == "<b>12</b> & up"
     assert "<td>&lt;b&gt;12&lt;/b&gt; &amp; up</td>" in panel(page)
@@ -850,3 +858,58 @@ def test_the_card_does_not_say_a_problem_twice():
     assert table_card(fix, result.elements[0]).problems == [
         "There is a gap in the table where no cell is."
     ]
+
+
+def test_a_cell_put_right_leaves_the_table_open_while_its_headers_are_still_wrong():
+    """One cell edit must not settle a table whose required finding remains (app review:
+    "Aluminium" changed while a header problem stood): the change is saved, the decision
+    stays open, and Accept (or Keep as image) decides it."""
+    pdf = plain([["Material", "Solid", "Liquid"], ["Aluminium", "900", "1180"]], header_rows=1)
+    pdf = with_header_row(pdf.model_copy(update={"header_rows": 0}), True)
+    misread = [c.model_copy(update={"text": "960"}) if c.text == "900" else c for c in pdf.cells]
+    # The header row's last cell is a data cell: a header problem.
+    broken = [c.model_copy(update={"header": None}) if c.text == "Liquid" else c for c in misread]
+    proposal = pdf.model_copy(update={"cells": broken, "source": "model"})
+    result = result_with(proposal, pdf)
+    form = {"change": "cell", "row": "1", "col": "1", "cell": "900"}
+    change = apply_review(result, "p1-e0", "edit", form)
+    fix = change.fix
+    assert {c.code for c in fix.failed_checks} == {"header_problem"}
+    assert (fix.status, fix.reviewed, fix.pending) == (Status.NEEDS_REVIEW, False, True)
+    assert result.stats.by_status == {"needs_review": 1}
+    # Accept is still there: the reviewer decides.
+    assert apply_review(result, "p1-e0", "accept", {}).fix.status is Status.ACCEPTED
+
+
+def test_a_cell_typed_unlike_the_pdf_leaves_the_table_open():
+    pdf = with_header_row(plain([["Group", "Count"], ["Students", "12"]]), True)
+    result = result_with(pdf.model_copy(update={"source": "model"}), pdf)
+    change = apply_review(
+        result, "p1-e0", "edit", {"change": "cell", "row": "1", "col": "0", "cell": "Seven"}
+    )
+    assert change.fix.status is Status.NEEDS_REVIEW
+    assert {c.code for c in change.fix.failed_checks} == {"text_mismatch"}
+    # Put back as printed: every check passes, and the edit decides it.
+    back = {"change": "cell", "row": "1", "col": "0", "cell": "Students"}
+    assert apply_review(result, "p1-e0", "edit", back).fix.status is Status.EDITED
+
+
+def test_the_card_makes_a_grid_with_flattened_maths_a_second_choice():
+    """The grid read from the PDF gives K = 1/2 mv^2 flat: "Use the grid read from the
+    PDF" is not the main button, and its flattened cell is edited as LaTeX, with the
+    PDF's text shown."""
+    from a11y_stem.web.table_card import table_card
+
+    flat = "K = ¹2mv²"
+    local = with_header_row(plain([["Quantity", "Definition"], ["Kinetic energy", flat]]), True)
+    result = result_with(local, local)
+    fix = result.fix_for("p1-e0")
+    assert fix is not None
+    fix.table, fix.status, fix.reason = None, Status.FAILED, "table_not_rebuilt"
+    card = table_card(fix, result.elements[0])
+    assert card.local is not None and card.local_flat
+    apply_review(result, "p1-e0", "edit", {"change": "use_local"})
+    card = table_card(fix, result.elements[0])
+    cell = next(c for c in card.cells if c.ref == "r1c1")
+    assert (cell.maths, cell.flat, cell.value) == (True, flat, "")
+    assert next(c for c in card.cells if c.ref == "r1c0").flat == ""

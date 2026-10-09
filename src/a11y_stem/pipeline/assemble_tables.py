@@ -29,6 +29,7 @@ review screen re-renders a stored result without them (web/review.py `rerender_h
 from __future__ import annotations
 
 import re
+import unicodedata
 from typing import Protocol
 
 from a11y_stem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, TableCell, TableGrid
@@ -83,11 +84,45 @@ class RenderContext(Protocol):
         ...
 
 
+# Spacing accents a text layer may give for maths accents (as tables._ACCENTS).
+_SPACING_ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
+# A superscript character with a baseline digit right after it: the numerator of a
+# stacked fraction, raised, before its denominator (K = ¹2mv² for K = ½mv²).
+_STACKED_DIGITS = re.compile("[\u00b9\u00b2\u00b3\u2070\u2074-\u2079][0-9]")
+
+
+def flattened_maths(cell: TableCell) -> bool:
+    """Does this cell of the grid read from the PDF hold maths its text gives flat, so it
+    must not be shown as it is: an accent (a vector arrow, a hat) as a combining mark or
+    a spacing accent, a stacked fraction (a raised digit before a baseline one), or a
+    raised run written "^(...)". A maths cell (`latex`) and a superscript on its own
+    ("m/s²", "10⁵") read fine. Pure: the text is all it looks at."""
+    if cell.latex is not None or not cell.text:
+        return False
+    text = cell.text
+    if "^(" in text or _STACKED_DIGITS.search(text):
+        return True
+    return any(unicodedata.category(ch) == "Mn" or ch in _SPACING_ACCENTS for ch in text)
+
+
+def flattened_cells(grid: TableGrid) -> list[TableCell]:
+    """The cells of a grid read from the PDF (source "local") that hold flattened maths;
+    none for a model's grid, whose maths cells are LaTeX."""
+    if grid.source != "local":
+        return []
+    return [c for c in grid.cells if flattened_maths(c)]
+
+
 def rebuilt_grid(fix: Fix | None) -> TableGrid | None:
-    """The grid to write as a table, or None when the image is kept."""
+    """The grid to write as a table, or None when the image is kept. A grid read from the
+    PDF with flattened maths in it is never written (`flattened_cells`): "K = 12mv2"
+    for K = ½mv² would read as something else; the image is kept until a
+    reviewer writes those cells as LaTeX."""
     if fix is None or fix.status in KEPT_ORIGINAL_STATUSES or fix.table is None:
         return None
     grid = fix.table.grid
+    if flattened_cells(grid):
+        return None
     return grid if grid.is_data and grid.cells else None
 
 
@@ -167,6 +202,8 @@ def render_table_element(element: Element, fix: Fix | None, ctx: RenderContext) 
         reason = "no_fix"
     elif fix.status in KEPT_ORIGINAL_STATUSES:
         reason = fix.reason or ""
+    elif fix.table is not None and flattened_cells(fix.table.grid):
+        reason = "flattened_maths"
     else:
         reason = "no_output"
     caption = (

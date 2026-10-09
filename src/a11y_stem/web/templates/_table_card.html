@@ -5,6 +5,8 @@
    all works without JavaScript; the forms send the job's result_version (`version`), so
    one made before another tab changed the review is refused, not applied. #}
 
+{% macro flat_hint() %}<p class="hint">Some cells hold maths that the PDF's text gives flat (a fraction, a vector arrow), so this grid cannot go into the document as it is: if you use it, write those cells as LaTeX.</p>{% endmacro %}
+
 {% macro table_fields(view) -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ job.result_version }}">
 {%- endmacro %}
@@ -53,6 +55,7 @@
   <p class="cmp-label">Grid read from the PDF</p>
   {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
   <p class="hint">Read from the PDF's own text and lines, without a model. Compare it with the image before you use it.</p>
+  {% if t.local_flat %}{{ flat_hint() }}{% endif %}
   {% else %}
   <p class="cmp-none">No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
   {% endif %}
@@ -70,7 +73,7 @@
     {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="cell"><input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
     <div class="field{% if cell_err %} field-error{% endif %}">
       <label for="cell-{{ eid }}">{{ "LaTeX in" if c.maths else "Text in" }} {{ c.position|lower }}</label>
-      <p class="hint" id="cell-hint-{{ eid }}">{% if c.maths %}This cell holds maths. Save cell checks the LaTeX as it checks an equation.{% else %}As printed in the PDF. Save cell checks it and shows the table again.{% endif %}</p>
+      <p class="hint" id="cell-hint-{{ eid }}">{% if c.flat %}This cell holds maths that the PDF's text gives flat (“{{ c.flat }}”), so it cannot be used as it is: type it as LaTeX. Save cell checks the LaTeX as it checks an equation.{% elif c.maths %}This cell holds maths. Save cell checks the LaTeX as it checks an equation.{% else %}As printed in the PDF. Save cell checks it and shows the table again.{% endif %}</p>
       {{ table_error(item, "cell") }}
       {# autofocus: the reviewer chose this cell to change it. #}
       <textarea id="cell-{{ eid }}" name="cell" rows="2"{% if not c.maths %} class="prose-input"{% else %} spellcheck="false" autocapitalize="off"{% endif %} data-edit-field autofocus
@@ -147,12 +150,12 @@
   {% if t.local %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
     {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
-    <button type="submit" class="button">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
+    <button type="submit" class="{{ 'button-secondary' if t.local_flat else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
   </form>
   {% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
     {{ table_fields("split") }}
-    <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.local else 'button' }}" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+    <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.local and not t.local_flat else 'button' }}" aria-describedby="reject-note-{{ eid }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
   </form>
   {% endif %}
 </div>
@@ -174,6 +177,7 @@
 <p class="part-label">Grid read from the PDF</p>
 {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
 <p class="hint">Read from the PDF's own text and lines, without a model. Compare it with the image before you use it.</p>
+{% if t.local_flat %}{{ flat_hint() }}{% endif %}
 {% else %}
 <p>No rebuilt table: the document shows the image of the table, marked “not converted”.</p>
 {% endif %}
@@ -200,12 +204,12 @@
     {% if t.local and not t.proposal %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("list") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
-      <button type="submit" class="button">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
+      <button type="submit" class="{{ 'button-secondary' if t.local_flat else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
     </form>
     {% endif %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("list") }}
-      <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or t.local else 'button' }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
+      <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or (t.local and not t.local_flat) else 'button' }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
     </form>
   </div>
   <p class="hint">{% if t.proposal %}{{ item.reject.button }}: {{ item.reject.consequence }} To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% else %}{{ item.reject.button }}: {{ item.reject.consequence }}{% endif %}</p>

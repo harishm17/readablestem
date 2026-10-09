@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 from markupsafe import Markup
 
 from a11y_stem.core.types import Element, Fix, TableCell, TableGrid, grid_problems
-from a11y_stem.pipeline.assemble_tables import id_prefix, rebuilt_grid
+from a11y_stem.pipeline.assemble_tables import flattened_cells, id_prefix, rebuilt_grid
 from a11y_stem.pipeline.table_html import render_table
 from a11y_stem.pipeline.table_step import STRUCTURE_PROBLEMS
 from a11y_stem.web.review import (
@@ -28,6 +28,7 @@ from a11y_stem.web.review import (
     first_col_is_header,
     first_row_is_header,
     grid_problem_sentence,
+    is_maths_cell,
     usable_local_grid,
 )
 
@@ -45,6 +46,7 @@ class CellChoice:
     label: str  # "Row 2, column 3: Speed (m/s)"
     maths: bool  # edited as LaTeX
     value: str  # its text, or its LaTeX for a maths cell
+    flat: str = ""  # the PDF's flattened text of a cell to be written as LaTeX
 
 
 @dataclass
@@ -58,6 +60,7 @@ class TableCard:
     cells: list[CellChoice] = field(default_factory=list)
     problems: list[str] = field(default_factory=list)  # structural, in plain English
     editing: CellChoice | None = None  # the cell whose form is open ("Change a cell")
+    local_flat: bool = False  # the grid read from the PDF gives maths flat: not the main action
 
     def pick(self, ref: str) -> None:
         """Open the form of the cell `ref` ("r1c2"); an unknown ref opens nothing."""
@@ -80,11 +83,12 @@ def _preview(cell: TableCell) -> str:
 def cell_choices(grid: TableGrid) -> list[CellChoice]:
     """Every cell, in reading order (row, then column)."""
     out = []
+    flat = {id(c) for c in flattened_cells(grid)}
     for cell in sorted(grid.cells, key=lambda c: (c.row, c.col)):
         if find_cell(grid, cell.row, cell.col) is not cell:
             continue  # a second cell at the same place (a broken grid): never reachable
         position = cell_label(cell)
-        maths = cell.latex is not None
+        maths = is_maths_cell(grid, cell)
         out.append(
             CellChoice(
                 ref=f"r{cell.row}c{cell.col}",
@@ -94,6 +98,7 @@ def cell_choices(grid: TableGrid) -> list[CellChoice]:
                 label=f"{position}: {_preview(cell)}",
                 maths=maths,
                 value=(cell.latex or "") if maths else cell.text,
+                flat=cell.text if id(cell) in flat else "",
             )
         )
     return out
@@ -130,6 +135,7 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
         is_data=grid.is_data if grid is not None else True,
         in_document=rebuilt_grid(fix) is not None,
         local=_rendered(local, f"tl-{eid}") if local is not None else None,
+        local_flat=local is not None and bool(flattened_cells(local)),
         header_row=grid is not None and first_row_is_header(grid),
         header_col=grid is not None and first_col_is_header(grid),
     )

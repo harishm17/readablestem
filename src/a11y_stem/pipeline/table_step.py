@@ -62,7 +62,9 @@ Checks (content-free codes; docs/tables.md):
   spacing within each cell differs ("12 345" for "12345", a word broken at the end of a
   line), it is a note (`whitespace_differs`). With no PDF words to compare:
   `no_pdf_text`;
-- `table.math`: every maths cell's LaTeX passes `validate.check_latex`,
+- `table.math` (error): in a grid read from the PDF, no cell holds maths its text gives
+  flat (`flattened_maths`: an accent, a stacked fraction; `assemble_tables.flattened_cells`);
+  every maths cell's LaTeX passes `validate.check_latex`,
   `safe_latex_to_mathml` and `check_mathml` (`invalid_latex`; that cell then shows its
   text);
 - `table.math_symbols`, `table.math_signs`, `table.math_style`: each maths cell against
@@ -117,6 +119,7 @@ from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
 from a11y_stem.pipeline import options
+from a11y_stem.pipeline.assemble_tables import flattened_cells
 
 # The equation step's comparison rules, imported rather than copied so a maths cell and
 # an equation are judged alike (as web/compare.py does for the review screen).
@@ -779,9 +782,18 @@ def structure_checks(grid: TableGrid) -> list[Check]:
     ]
 
 
+def flattened_check(grid: TableGrid) -> list[Check]:
+    """A grid read from the PDF whose cells hold maths its text gives flat (an accent, a
+    stacked fraction: `assemble_tables.flattened_cells`): an error, so it cannot be
+    accepted as it is and is not written into the document until those cells are LaTeX."""
+    if not flattened_cells(grid):
+        return []
+    return [Check(name="table.math", passed=False, severity="error", code="flattened_maths")]
+
+
 def table_checks(grid: TableGrid, element: Element) -> list[Check]:
     """Every check of a data table proposal against the PDF (see the module docstring)."""
-    checks = structure_checks(grid)
+    checks = structure_checks(grid) + flattened_check(grid)
     local = _local(element)
     if local is not None:
         agreement = grid_agreement_code(grid, local)
@@ -940,7 +952,8 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
             # are the PDF's, so only its structure is checked.
             grid = first_row_headers(local, caption=caption_of(element))
             source = Check(name="table.source", passed=False, severity="warning", code="local_grid")
-            return make(Status.NEEDS_REVIEW, grid=grid, checks=[source, *structure_checks(grid)])
+            checks = [source, *structure_checks(grid), *flattened_check(grid)]
+            return make(Status.NEEDS_REVIEW, grid=grid, checks=checks)
         if candidate.output is None:
             outcome = calls[-1].outcome if calls else "skipped"
             return make(Status.FAILED, f"model_{outcome}", checks=[])

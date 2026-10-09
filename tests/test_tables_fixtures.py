@@ -26,6 +26,7 @@ from a11y_stem.pipeline.run import convert_pdf
 LATEX = Path(__file__).parent / "fixtures" / "layout" / "latex" / "tables.pdf"
 WORD = Path(__file__).parent / "fixtures" / "tables" / "word_tables.pdf"
 MODEL_PRESENT = table_model.model_path().is_file()
+SUP1, SUP2 = "\u00b9", "\u00b2"  # superscript one and two
 
 
 @pytest.fixture(scope="module", autouse=True)
@@ -184,6 +185,65 @@ def test_a_detected_table_is_kept_as_an_image_with_a_required_decision():
     assert result.html.count(f'alt="{TABLE_NOT_CONVERTED_ALT}"') == 2
     assert "<figcaption>Table 2. Record your data here</figcaption>" in result.html
     assert "17.94" not in result.html  # the numbers are in the image, not in paragraphs
+
+
+def test_flattened_maths_in_the_grid_read_from_the_pdf_never_reaches_the_student_file():
+    """Table 5 "Mechanical quantities" (K = 1/2 mv^2, vectors): its grid read from the PDF
+    gives the maths flat. Neither the one-click "Use the grid read from the PDF" nor the
+    model-outage fallback writes it into the file; the decision stays open until the
+    flattened cells are LaTeX."""
+    from a11y_stem.pipeline import table_step
+    from a11y_stem.pipeline.assemble_tables import flattened_cells
+    from a11y_stem.web.review import apply_review, can_accept, rerender_html
+
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
+    output = convert_pdf(
+        LATEX.read_bytes(),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        client=FakeVisionClient(budget=budget),
+    )
+    result = output.result
+    element = next(e for e in result.elements if e.caption and "Mechanical" in e.caption)
+    assert element.table is not None
+    # The stacked 1/2 is visible as such, not "12" (without the SLANet-plus file the
+    # Definition column may be split in two).
+    assert any(SUP1 + "2mv" + SUP2 in c.text for c in element.table.cells)
+
+    apply_review(result, element.id, "edit", {"change": "use_local"})
+    fix = result.fix_for(element.id)
+    assert fix is not None and fix.status is Status.NEEDS_REVIEW and not can_accept(fix)
+    assert "flattened_maths" in {c.code for c in fix.failed_checks}
+    html = rerender_html(result, output.crops)
+    assert "mv" + SUP2 not in html and "12mv2" not in html
+    assert 'data-reason="flattened_maths"' in html
+
+    # The model-outage fallback is the same grid: an error check, so no Accept.
+    fallback = table_step._fix(element, table_step._Candidate(None, []), [])
+    assert fallback.status is Status.NEEDS_REVIEW and not can_accept(fallback)
+
+    # Every flattened cell written as LaTeX: the table can be used.
+    assert fix.table is not None
+    for cell in flattened_cells(fix.table.grid):
+        typed = next(
+            latex
+            for part, latex in (
+                ("2mv", r"\frac{1}{2}mv^2"),
+                ("F", r"W = \vec{F}\cdot\vec{d}"),
+                ("mv", r"\vec{p} = m\vec{v}"),
+                ("p", r"\vec{p}"),
+            )
+            if part in cell.text
+        )
+        if cell.text.startswith("K = "):
+            typed = "K = " + typed
+        form = {"change": "cell", "row": str(cell.row), "col": str(cell.col), "cell": typed}
+        apply_review(result, element.id, "edit", form)
+    fix = result.fix_for(element.id)
+    assert fix is not None and fix.table is not None
+    assert not flattened_cells(fix.table.grid)
+    assert "flattened_maths" not in {c.code for c in fix.failed_checks}
+    html = rerender_html(result, output.crops)
+    assert "<mfrac>" in html and "12mv2" not in html
 
 
 # ---------------------------------------------------------------- with the model

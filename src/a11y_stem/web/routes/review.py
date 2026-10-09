@@ -84,6 +84,7 @@ from a11y_stem.web.review import (
     STATUS_FOR_ACTION,
     TABLE_CHANGES,
     UNDO_ACTION,
+    USE_LOCAL_NOTE,
     WRITE_KEY,
     BulkRequest,
     FieldError,
@@ -135,6 +136,16 @@ DONE_MESSAGES = {
     "edit": "Your edit passed the required checks and was saved.",
     "reject": "The original from the PDF is kept in the document.",
 }
+# A table edit: the decision stays open while a required check fails (web.review
+# `table_still_open`), and the grid read from the PDF is not checked against itself.
+TABLE_OPEN = (
+    "Saved, but a required check still fails, so the table still waits for your decision: "
+    "put the rest right, Accept it as it is, or keep the image."
+)
+USE_LOCAL_DONE = (
+    "Its words are the PDF's own, so the checks could not compare them with anything: "
+    "check it against the image."
+)
 EDIT_ANYWAY = "edit_anyway"  # the action of "Use my edit anyway"
 ANYWAY_DONE = "Your edit was saved as you wrote it, although it differs from the PDF."
 
@@ -216,6 +227,11 @@ def done_message(change: ReviewChange, element: Element | None) -> str:
     if change.anyway:
         return ANYWAY_DONE
     message = DONE_MESSAGES.get(change.action, "Done.")
+    if change.action == "edit" and change.fix.kind is Kind.TABLE:
+        if change.fix.pending:
+            message = TABLE_OPEN
+        elif change.note == USE_LOCAL_NOTE:
+            message = USE_LOCAL_DONE
     if change.note:  # what a table edit changed ("Row 2, column 3 changed.")
         message = f"{change.note} {message}"
     if change.warnings:

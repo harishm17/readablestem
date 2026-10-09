@@ -388,13 +388,21 @@ def apply_review(
     # Only a heading decision can move other headings: the outline before it, to compare.
     places = heading_places(result) if fix.kind is Kind.HEADING else {}
     overridden = False
+    status = STATUS_FOR_ACTION[action]
     if action == "edit" and fix.kind is Kind.TABLE:
         warnings, note = edit_table(fix, element, form)
+        if table_still_open(warnings):
+            # A table is changed one cell or setting at a time: while a required check
+            # still fails (a header problem, a cell unlike the PDF, flattened maths), the
+            # change is saved and the decision stays open, so one edit cannot settle a
+            # table that is still wrong. Accept (or Keep as image) decides it.
+            status = Status.NEEDS_REVIEW
     elif action == "edit":
         warnings = _edit(result, fix, element, form, anyway=anyway)
         overridden = anyway and any(c.code in MEANING_CODES for c in warnings)
-    fix.status = STATUS_FOR_ACTION[action]
-    fix.reviewed = True  # a reviewer's Accept is not the pipeline's automatic one
+    fix.status = status
+    # A reviewer's Accept is not the pipeline's automatic one; an open table is undecided.
+    fix.reviewed = status not in PENDING
     _recount(result)
     after = snapshot(fix)
     if overridden:
@@ -1023,6 +1031,7 @@ def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[Revi
 
 # The changes a table edit can make (the form's `change` field).
 TABLE_CHANGES = ("cell", "headers", "use_local")
+USE_LOCAL_NOTE = "The table now uses the grid read from the PDF."
 MAX_CELL_CHARS = 1000
 NO_TABLE_TO_ACCEPT = (
     "There is no rebuilt table to accept. Use the grid read from the PDF, if there is one, "
@@ -1125,6 +1134,14 @@ def cell_label(cell: TableCell) -> str:
     return f"{rows}, {cols}".capitalize()
 
 
+def is_maths_cell(grid: TableGrid, cell: TableCell) -> bool:
+    """Edited as LaTeX: a maths cell, or a cell of the grid read from the PDF that holds
+    flattened maths (`assemble_tables.flattened_cells`)."""
+    from a11y_stem.pipeline.assemble_tables import flattened_cells
+
+    return cell.latex is not None or any(c is cell for c in flattened_cells(grid))
+
+
 def find_cell(grid: TableGrid, row: int, col: int) -> TableCell | None:
     """The cell anchored at (row, col), 0-based; the first one when a broken grid has two."""
     return next((c for c in grid.cells if c.row == row and c.col == col), None)
@@ -1149,7 +1166,7 @@ def edit_table(
         fix.table = TableFix(grid=grid.model_copy(deep=True))
         fix.checks = table_checks(fix.table.grid, element)
         failed = [c for c in fix.checks if not c.passed]
-        return failed, "The table now uses the grid read from the PDF."
+        return failed, USE_LOCAL_NOTE
     if fix.table is None:
         message = (
             "There is no rebuilt table to change. Use the grid read from the PDF, if there "
@@ -1161,6 +1178,14 @@ def edit_table(
     if change == "cell":
         return _edit_cell(fix, fix.table.grid, element, form)
     raise ReviewInvalid([FieldError(field_id("actions", eid), "Choose what to change.")])
+
+
+def table_still_open(failed: list[Check]) -> bool:
+    """After a table edit: does a required-tier check still fail (anything but the table
+    step's notes)? Then the decision stays open (`apply_review`)."""
+    from a11y_stem.pipeline import table_step
+
+    return any(c.code not in table_step.NOTE_CODES for c in failed)
 
 
 def table_checks(grid: TableGrid, element: Element | None) -> list[Check]:
@@ -1229,8 +1254,10 @@ def _edit_cell(
         raise ReviewInvalid([FieldError(field_id("cell-pick", eid), message)])
     edited = cell.model_copy()
     checks: list[Check] = []
-    if cell.latex is not None:
+    if is_maths_cell(grid, cell):
         # A maths cell: its LaTeX is checked as an equation's is, and shown in the line.
+        # A cell of the grid read from the PDF whose maths its text gives flat is one too:
+        # it is written as LaTeX (the PDF's text stays, for the checks).
         latex, mathml, checks = checked_latex(
             typed.strip(), "inline", fid, values, empty="Enter the LaTeX for this cell."
         )

@@ -972,11 +972,21 @@ an image is a decision the screen shows and the job can be done. The card has:
   A table kept as an image (`table_not_rebuilt`, no proposal) has **Use the grid read
   from the PDF**, when there is one (shown in the proposal's place, "Read from the PDF's
   own text and lines, without a model"), and **Keep as image**, which rejects it: the
-  document keeps the flagged image with its "not converted" note.
+  document keeps the flagged image with its "not converted" note. When that grid holds
+  maths its text gives flat (`assemble_tables.flattened_cells`: a vector arrow as a
+  combining mark, a stacked fraction such as "K = ¹2mv²" for K = ½mv²), Keep as image is
+  the main button, the grid's button is secondary, and a line says those cells must be
+  written as LaTeX.
 
 Every change to a table goes through the same route as other decisions (`change` is
-`cell`, `headers` or `use_local`), is stored as `edited` with a `ReviewEdit` and
-re-renders the HTML. After one the reviewer stays on the table, which is shown as it is
+`cell`, `headers` or `use_local`), is stored with a `ReviewEdit` and re-renders the
+HTML. It is `edited` (decided) only when every required-tier check of the table as it
+is now passes (`web.review.table_still_open`: any failed check but the table step's
+notes); otherwise the change is saved and the decision stays open (`needs_review`, "Saved,
+but a required check still fails, so the table still waits for your decision"), so one
+cell put right cannot settle a table whose headers are still wrong, and a cell typed
+unlike the PDF is not taken as settled. The reviewer goes on changing it, or decides
+with Accept (the proposal as it is now) or Keep as image. After one the reviewer stays on the table, which is shown as it is
 now, with "Go on to decision N" when it was the last change; Accept and Keep as image
 move on as for other kinds. The rules (`web.review`, "tables"):
 
@@ -989,8 +999,10 @@ move on as for other kinds. The rules (`web.review`, "tables"):
   whitespace collapsed), at most 1,000 characters, and escaped when written; a maths
   cell's LaTeX goes through what an equation edit does (`web.review.checked_latex`:
   `clean_latex`, `check_latex`, `safe_latex_to_mathml` inline, `check_mathml`), and its
-  plain text stays as the serialiser's fallback. Text typed into an empty cell of the
-  header row or column makes it a header. The same text again is refused.
+  plain text stays as the serialiser's fallback. A cell of the grid read from the PDF
+  whose maths its text gives flat is edited as LaTeX too (its hint quotes the flat
+  text). Text typed into an empty cell of the header row or column makes it a header.
+  The same text again is refused.
 - *Structure.* An edit that would give the grid a structural problem it did not have is
   refused with what it would break ("The headers were not saved. The headers would
   cover the whole table, leaving no row or column for data."): the first row of a
@@ -998,7 +1010,12 @@ move on as for other kinds. The rules (`web.review`, "tables"):
   already had is left for the reviewer to judge and does not block a cell.
 - *The grid read from the PDF* replaces the proposal with a copy of `Element.table`; the
   fix keeps its reason (`table_not_rebuilt`), so ops still counts why it was asked, but
-  the card and the list no longer show it: the table is converted now.
+  the card and the list no longer show it: the table is converted now. Its words are the
+  PDF's own, so the notice does not say it passed the checks ("Its words are the PDF's
+  own, so the checks could not compare them with anything: check it against the
+  image"). Flattened maths in it is the error `table.math` `flattened_maths`: it cannot
+  be accepted as it is, the decision stays open, and the document keeps the image
+  (`data-reason="flattened_maths"`) until those cells are LaTeX.
 
 After a table edit the fix's checks are the ones the review ran, as after an equation
 edit: a maths cell's LaTeX and MathML checks, and the table step's own checks of the
