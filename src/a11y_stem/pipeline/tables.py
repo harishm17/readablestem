@@ -16,12 +16,15 @@ from the text flow. Deterministic; no model calls. docs/tables.md explains the n
    aligned in columns over at least three lines. Dot leaders (a table of contents), bullet
    columns (a list) and drawings or images with no real text grid (a figure) drop it. A
    blank worksheet table that the detector cut to its header row is extended along its
-   vertical rules (`_extend`).
-3. **Structure** (`structure`): SLANet-plus (PaddlePaddle, Apache-2.0, run as RapidTable
-   does: `vendor/rapid_table.py`) on a 144 dpi crop gives rows, columns and spans. Without
-   the model file (`table_model`), PyMuPDF's own refined grid is used.
+   vertical rules (`_extend`); a "Table N" caption boxed with the table is cut off
+   (`_without_captions`).
+3. **Structure** (`_build`): rows, columns and spans from the best fitting (`misfit`) of
+   the drawn cell grid (`_ruled_slots`), SLANet-plus (PaddlePaddle, Apache-2.0, run as
+   RapidTable does: `vendor/rapid_table.py`, `structure`) on a 144 dpi crop, and
+   PyMuPDF's own refined grid. Without the model file (`table_model`) the other two
+   compete.
 4. **Fill** (`fill`): the cell text comes from the PDF's own glyphs, each word placed in the
-   cell its box overlaps most (a subscript stays in its cell), never from OCR.
+   cell its box falls in (a subscript stays in its cell), never from OCR.
 5. **Data or layout** (`is_layout_grid`): a two-column grid of prose (or one column) is
    text set out in boxes; it is not claimed and keeps the paragraph path.
 
@@ -42,6 +45,8 @@ import re
 import statistics
 import sys
 import threading
+import unicodedata
+from collections import Counter
 from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -99,12 +104,13 @@ REASON_RULED = "ruled grid"
 REASON_TEXT_GRID = "aligned text grid"
 REASON_SLANET = "SLANet-plus grid"
 REASON_PYMUPDF = "PyMuPDF grid"
+REASON_DRAWN_CELLS = "drawn cell grid"
 REASON_EXTENDED = "box extended along rules"
 REASON_CONTINUED = "continued from previous page"
 
 # Verdicts of `judge` (codes, safe to log and count).
 TABLE = "table"
-DROPPED = ("toc", "list", "labels", "figure", "no_grid", "layout_grid", "overlap")
+DROPPED = ("toc", "list", "labels", "figure", "no_grid", "overlap", "layout_grid", "no_structure")
 
 # "Table 2.3 Speeds", "TABLE 4: ...", "Tab. 1 ...", but not "Table 2 shows that ..." (as
 # layout's "Figure N" CAPTION).
@@ -114,11 +120,16 @@ TABLE_CAPTION = re.compile(
 )
 # Dot leaders of a table of contents: five dots (spaced or not), ellipses, middle dots.
 _LEADERS = re.compile(r"(?:\.\s?){5,}|\u2026{2,}|(?:[\u00b7\u2219\u22c5]\s?){5,}")
+# Spacing accents TeX and Word draw above a letter (as layout's _ACCENTS).
+_ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
 # Bullets that start a list item (as layout's _BULLET_GLYPHS, with Wingdings' U+F0A7).
 _BULLETS = frozenset(
     "\u2022\u25e6\u25aa\u25ab\u25a0\u25a1\u25cf\u25cb\u2023\u2043\u27a2\u25ba\u25b8\u25b6"
     "\u25b9\u27a4\u25c6\u25c7\uf0b7\uf0a7"
 )
+# Dots that are bullets when a space follows them (base-14 Helvetica prints U+2022 as
+# a middle dot); maths (a dot product) otherwise.
+_DOT_BULLETS = frozenset("\u00b7\u2219\u22c5")
 _PAGE_REF = re.compile(r"^(?:\d{1,4}|[ivxlcdm]{1,7})$", re.IGNORECASE)
 _NUMBER = re.compile(r"^[\s(\[]*[-+\u2212\u00b1]?\$?\d[\d,.\s]*(?:[%)\]]|[eE][-+\u2212]?\d+)?\s*$")
 _QUANTITY = re.compile(r"^[\s(\[]*[-+\u2212\u00b1]?\d")  # a value, never a column label
@@ -447,17 +458,23 @@ def propose(page: pymupdf.Page) -> list[Proposal]:
             log.info("table detection: %d PyMuPDF messages dropped", len(captured))
         if finder is None:
             return []
-        to_display = _display(page)
         proposals = []
         for table in finder.tables:
             try:
-                proposals.append(_proposal(table, to_display))
+                proposals.append(_proposal(table))
             except Exception as exc:  # a malformed grid from a damaged page
                 log.warning("table grid unreadable: %s", type(exc).__name__)
     return proposals
 
 
-def _proposal(table: Any, to_display: Callable[[Sequence[float]], BBox]) -> Proposal:
+def _proposal(table: Any) -> Proposal:
+    """A found table as a proposal. `find_tables` already gives display coordinates: on a
+    page with /Rotate it works on the turned page (measured: a 90-degree page's boxes
+    match layout's display boxes), unlike `get_text`, whose boxes layout turns itself."""
+
+    def box(r: Sequence[float]) -> BBox:
+        return float(r[0]), float(r[1]), float(r[2]), float(r[3])
+
     slots: list[Slot] = []
     placements = getattr(table, "placements", None)
     if placements:
@@ -471,15 +488,14 @@ def _proposal(table: Any, to_display: Callable[[Sequence[float]], BBox]) -> Prop
                 for dr in range(rs):
                     for dc in range(cs):
                         occupied.add((r + dr, c + dc))
-                box = to_display(cell.bbox) if cell.bbox is not None else None
-                slots.append(Slot(r, c, rs, cs, box))
+                slots.append(Slot(r, c, rs, cs, box(cell.bbox) if cell.bbox else None))
                 c += cs
     else:
         for r, row in enumerate(table.rows):
-            for c, box in enumerate(row.cells):
-                if box is not None:
-                    slots.append(Slot(r, c, 1, 1, to_display(box)))
-    return Proposal(to_display(table.bbox), slots, int(getattr(table, "header_rows", 0) or 0))
+            for c, cell_box in enumerate(row.cells):
+                if cell_box is not None:
+                    slots.append(Slot(r, c, 1, 1, box(cell_box)))
+    return Proposal(box(table.bbox), slots, int(getattr(table, "header_rows", 0) or 0))
 
 
 # ============================================================================ arbitration
@@ -584,11 +600,16 @@ class _PageView:
 
 
 def _visual_lines(pieces: list[list[GlyphLike]]) -> list[list[GlyphLike]]:
-    """Pieces that overlap vertically by half the smaller height form one visual line."""
+    """Pieces that overlap vertically by half the smaller height form one visual line.
+    Accents (TeX draws the arrow of a vector as its own glyph above the letter) go right
+    after the glyph they sit over, so a cell reads "p\u20d7 = mv\u20d7"."""
+    marks = [c for chars in pieces for c in chars if _is_mark(c)]
     boxes = []
     for chars in pieces:
-        ink = [c for c in chars if not c.blank]
-        boxes.append((min(c.y0 for c in ink), max(c.y1 for c in ink), chars))
+        kept = [c for c in chars if not _is_mark(c)]
+        ink = [c for c in kept if not c.blank]
+        if ink:
+            boxes.append((min(c.y0 for c in ink), max(c.y1 for c in ink), kept))
     boxes.sort(key=lambda b: (b[0] + b[1]) / 2)
     lines: list[list[Any]] = []  # [y0, y1, chars]
     for y0, y1, chars in boxes:
@@ -600,7 +621,44 @@ def _visual_lines(pieces: list[list[GlyphLike]]) -> list[list[GlyphLike]]:
                 line[2].extend(chars)
                 continue
         lines.append([y0, y1, list(chars)])
-    return [sorted(line[2], key=lambda c: c.x0) for line in lines]
+    out = [sorted(line[2], key=lambda c: c.x0) for line in lines]
+    for mark in marks:
+        _attach_mark(out, mark)
+    return out
+
+
+def _is_mark(ch: GlyphLike) -> bool:
+    return len(ch.c) == 1 and (unicodedata.combining(ch.c) > 0 or ch.c in _ACCENTS)
+
+
+def _attach_mark(lines: list[list[GlyphLike]], mark: GlyphLike) -> None:
+    """Insert an accent after the glyph it overlaps most, among the glyphs nearest to it
+    vertically (within its font size); drop it when it sits over nothing.
+
+    MuPDF gives TeX's combining arrow no width, at the point where it is drawn from: it
+    belongs to the glyph that starts there, else to the one that ends there."""
+    best: tuple[tuple[float, float], int, int] | None = None
+    reach = 0.6 * max(mark.size, 1.0)
+    for li, line in enumerate(lines):
+        for ci, ch in enumerate(line):
+            gap = max(0.0, ch.y0 - mark.y1, mark.y0 - ch.y1)
+            if ch.blank or gap > max(mark.size, 1.0):
+                continue
+            if mark.x1 - mark.x0 >= 0.5:
+                overlap = min(ch.x1, mark.x1) - max(ch.x0, mark.x0)
+                if overlap <= 0:
+                    continue
+                key = (gap, -overlap)
+            elif -0.5 <= ch.x0 - mark.x0 <= reach:
+                key = (gap, ch.x0 - mark.x0)
+            elif -0.5 <= mark.x0 - ch.x1 <= reach:
+                key = (gap, reach + mark.x0 - ch.x1)
+            else:
+                continue
+            if best is None or key < best[0]:
+                best = (key, li, ci)
+    if best is not None:
+        lines[best[1]].insert(best[2] + 1, mark)
 
 
 def _segments(
@@ -618,6 +676,8 @@ def _segments(
         for ch in chars:
             if ch.blank:
                 word_groups.append([])
+                if seg_groups[-1]:
+                    seg_groups[-1].append(ch)
                 continue
             if last is not None:
                 gap = ch.x0 - last.x1
@@ -634,11 +694,11 @@ def _segments(
             word_groups[-1].append(ch)
             last = ch
         words += [_Word(*_ink_box(g), "".join(c.c for c in g), index) for g in word_groups if g]
-        segs += [
-            _Seg(*_ink_box(g), _spaced(g), statistics.median(c.size for c in g), index)
-            for g in seg_groups
-            if g
-        ]
+        for group in seg_groups:
+            ink = [c for c in group if not c.blank]
+            if ink:
+                size = statistics.median(c.size for c in ink)
+                segs.append(_Seg(*_ink_box(ink), _spaced(group), size, index))
     return segs, words, crossings
 
 
@@ -651,13 +711,22 @@ def _ink_box(ink: Sequence[GlyphLike]) -> BBox:
     )
 
 
-def _spaced(ink: Sequence[GlyphLike]) -> str:
-    """Glyphs left to right, with a space where the gap is wider than a word space."""
-    out = []
-    for prev, ch in zip([None, *ink[:-1]], ink, strict=True):
-        if prev is not None and ch.x0 - prev.x1 > WORD_GAP * max(ch.size, prev.size, 1.0):
+def _spaced(chars: Sequence[GlyphLike]) -> str:
+    """Glyphs left to right, with one space for a blank glyph or a gap wider than a word
+    space."""
+    out: list[str] = []
+    prev: GlyphLike | None = None
+    space = False
+    for ch in chars:
+        if ch.blank:
+            space = prev is not None
+            continue
+        if prev is not None and (
+            space or ch.x0 - prev.x1 > WORD_GAP * max(ch.size, prev.size, 1.0)
+        ):
             out.append(" ")
         out.append(ch.c)
+        prev, space = ch, False
     return "".join(out)
 
 
@@ -839,9 +908,15 @@ def _text_grid(view: _PageView, box: BBox, column_rules: list[float]) -> _Grid:
     text_x0 = min((s.x0 for s in segs), default=box[0])
     text_x1 = max((s.x1 for s in segs), default=box[2])
     gaps = _gutters(segs, text_x1 - text_x0)
-    cuts = [(g0 + g1) / 2 for g0, g1 in gaps if text_x0 < g0 and g1 < text_x1]
-    # Drawn column rules cut wherever they are inside the box, text or not (a blank form).
-    cuts += [x for x in column_rules if box[0] + 2 < x < box[2] - 2]
+    # Drawn column rules cut wherever they are inside the box, text or not (a blank form);
+    # a white gap cuts where no rule runs through it.
+    drawn = [x for x in column_rules if box[0] + 2 < x < box[2] - 2]
+    cuts = [
+        (g0 + g1) / 2
+        for g0, g1 in gaps
+        if text_x0 < g0 and g1 < text_x1 and not any(g0 <= x <= g1 for x in drawn)
+    ]
+    cuts += drawn
     cuts.sort()
     cuts = [x for i, x in enumerate(cuts) if i == 0 or x - cuts[i - 1] > 2.0]
     columns = _assign_columns(segs, cuts)
@@ -879,7 +954,11 @@ def _bullet_list(grid: _Grid) -> bool:
     """Cells that start with a bullet: a list set in columns, not a table."""
     if not grid.segs:
         return False
-    bulleted = sum(1 for s in grid.segs if s.text[:1] in _BULLETS)
+    bulleted = sum(
+        1
+        for s in grid.segs
+        if s.text[:1] in _BULLETS or (s.text[:1] in _DOT_BULLETS and s.text[1:2] == " ")
+    )
     return bulleted >= 2 and bulleted >= 0.5 * len(grid.segs)
 
 
@@ -915,7 +994,7 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     often stops at the text, or at the header row of a blank table. Rules are evidence
     only when they do not run through the words."""
     size = _median_size(view, proposal.bbox)
-    snapped = _snap(view, proposal.bbox, size)
+    snapped = _snap(view, _without_captions(view, proposal.bbox), size)
     box = _extend(view, snapped, size)
     if box != snapped:
         box = _snap(view, box, size)
@@ -962,6 +1041,32 @@ def judge(proposal: Proposal, view: _PageView) -> Judgement:
     return verdict
 
 
+def _without_captions(view: _PageView, box: BBox) -> BBox:
+    """The box without a "Table N" caption at its top or bottom (with the caption's
+    other lines): the detector often boxes OpenStax's caption below its table. Lines with
+    a wide gap in them are table rows and end the caption."""
+    lines = _visual_lines(view.glyphs_in(box))
+    if len(lines) < 3:
+        return box
+    segs, _, _ = _segments(lines, [])
+    count = Counter(s.line for s in segs)
+    texts = ["".join(c.c for c in line).strip() for line in lines]
+    tops = [min(c.y0 for c in line if not c.blank) for line in lines]
+    bottoms = [max(c.y1 for c in line if not c.blank) for line in lines]
+    x0, y0, x1, y1 = box
+    first = next((i for i, n in sorted(count.items()) if n >= 2), None)
+    last = max((i for i, n in count.items() if n >= 2), default=None)
+    if first is None or last is None:
+        return box
+    if first > 0 and TABLE_CAPTION.match(texts[0]):
+        y0 = (bottoms[first - 1] + tops[first]) / 2
+    for i in range(last + 1, len(lines)):
+        if TABLE_CAPTION.match(texts[i]):
+            y1 = (bottoms[i - 1] + tops[i]) / 2
+            break
+    return (x0, y0, x1, y1)
+
+
 def _median_size(view: _PageView, box: BBox) -> float:
     sizes = [c.size for chars in view.glyphs_in(box) for c in chars if not c.blank]
     return statistics.median(sizes) if sizes else 10.0
@@ -994,10 +1099,12 @@ def _snap(view: _PageView, box: BBox, size: float) -> BBox:
 
 def _nearest(positions: list[float], edge: float, reach: float) -> float:
     """The edge moved out to the nearest rule within `reach` (negative: before it), and
-    on to a rule that doubles it."""
+    on to a rule that doubles it. An edge already on a rule only takes its double: the
+    next rule out is another table's (two ruled tables a line apart)."""
     step = 1.0 if reach > 0 else -1.0
+    limit = DOUBLE_RULE if any(abs(p - edge) <= 2.0 for p in positions) else abs(reach)
     outside = sorted(
-        (p for p in positions if 0 < (p - edge) * step <= abs(reach)),
+        (p for p in positions if 0 < (p - edge) * step <= limit),
         key=lambda p: (p - edge) * step,
     )
     if not outside:
@@ -1051,6 +1158,18 @@ def _stack(view: _PageView, box: BBox, size: float) -> BBox:
         return box
     left, right = min(r[1] for r in full), max(r[2] for r in full)
     reach = STACK_GAP * size
+    # A table with column rules goes on only where its column rules do: a second ruled
+    # table a few lines further down is another table.
+    columns = [
+        c[0]
+        for c in _chains(view.vsegs, (x0 - 3, x1 + 3))
+        if min(c[2], y1) - max(c[1], y0) >= 0.5 * (y1 - y0)
+    ]
+
+    def joined(top: float, bottom: float) -> bool:
+        ruled = sum(1 for x in columns if _ruled(view.vsegs, x, top, bottom))
+        return len(columns) < 2 or ruled >= 2
+
     for _ in range(64):
         below = [
             r
@@ -1060,7 +1179,7 @@ def _stack(view: _PageView, box: BBox, size: float) -> BBox:
         if not below:
             break
         grown = (x0, y0, x1, min(r[0] for r in below) + 0.5)
-        if _foreign_text(view, grown, (x0, y0, x1, y1)):
+        if not joined(y1, grown[3] - 0.5) or _foreign_text(view, grown, (x0, y0, x1, y1)):
             break
         y1 = grown[3]
     for _ in range(64):
@@ -1072,7 +1191,7 @@ def _stack(view: _PageView, box: BBox, size: float) -> BBox:
         if not above:
             break
         grown = (x0, max(r[0] for r in above) - 0.5, x1, y1)
-        if _foreign_text(view, grown, (x0, y0, x1, y1)):
+        if not joined(grown[1] + 0.5, y0) or _foreign_text(view, grown, (x0, y0, x1, y1)):
             break
         y0 = grown[1]
     return (x0, y0, x1, y1)
@@ -1236,6 +1355,37 @@ def fill(
     """The grid with the PDF's own words in its cells, or None when `slots` do not make a
     usable grid. Each word goes to the cell its box overlaps most (the nearest cell when
     it overlaps none); a cell's words are read line by line, left to right."""
+    placed = _place(slots, words)
+    if placed is None:
+        return None
+    kept, rows, cols, owners = placed
+    texts: dict[int, list[_Word]] = {}
+    for word, owner in zip(words, owners, strict=True):
+        texts.setdefault(owner, []).append(word)
+    cells = []
+    for i, slot in enumerate(kept):
+        members = sorted(texts.get(i, []), key=lambda w: (w.line, w.x0))
+        text = clean(_cell_text(members))
+        cells.append(
+            TableCell(
+                row=slot.row,
+                col=slot.col,
+                row_span=slot.row_span,
+                col_span=slot.col_span,
+                text=text,
+                bbox=_rounded(slot.bbox) if slot.bbox is not None else None,
+            )
+        )
+    grid = TableGrid(rows=rows, cols=cols, cells=cells)
+    return _with_headers(grid, header_rows)
+
+
+def _place(
+    slots: list[Slot], words: Sequence[_Word]
+) -> tuple[list[Slot], int, int, list[int]] | None:
+    """The slots made into a full grid (holes become empty cells), its size, and the index
+    of the cell each word goes to; None when the slots overlap, exceed the limits, or have
+    no boxes to place words by."""
     if not slots:
         return None
     rows = max(s.row + s.row_span for s in slots)
@@ -1260,7 +1410,6 @@ def fill(
                 kept.append(Slot(r, c))
     if len(kept) > MAX_TABLE_CELLS:
         return None
-    texts: dict[int, list[_Word]] = {}
     boxed = [(i, s.bbox) for i, s in enumerate(kept) if s.bbox is not None]
     if words and not boxed:
         return None
@@ -1271,30 +1420,52 @@ def fill(
         for r in range(s.row, s.row + s.row_span)
         for c in range(s.col, s.col + s.col_span)
     }
+    owners = []
     for word in words:
         if lattice is not None:
             xs, ys = lattice
             wx, wy = (word.x0 + word.x1) / 2, (word.y0 + word.y1) / 2
-            best = owner[(bisect.bisect(ys, wy), bisect.bisect(xs, wx))]
+            owners.append(owner[(bisect.bisect(ys, wy), bisect.bisect(xs, wx))])
         else:
-            best = max(boxed, key=lambda item: _placement(word, item[1]))[0]
-        texts.setdefault(best, []).append(word)
-    cells = []
-    for i, slot in enumerate(kept):
-        members = sorted(texts.get(i, []), key=lambda w: (w.line, w.x0))
-        text = clean(_cell_text(members))
-        cells.append(
-            TableCell(
-                row=slot.row,
-                col=slot.col,
-                row_span=slot.row_span,
-                col_span=slot.col_span,
-                text=text,
-                bbox=_rounded(slot.bbox) if slot.bbox is not None else None,
-            )
-        )
-    grid = TableGrid(rows=rows, cols=cols, cells=cells)
-    return _with_headers(grid, header_rows)
+            owners.append(max(boxed, key=lambda item: _placement(word, item[1]))[0])
+    return kept, rows, cols, owners
+
+
+def misfit(slots: list[Slot], text: _Grid) -> int | None:
+    """How badly a grid fits the text on the page: the cells-on-a-line (`_Seg`, text
+    with no wide gap) whose words it splits between cells, plus the extra ones it puts
+    side by side in one cell. 0 is a perfect fit; None when the slots make no grid.
+
+    SLANet-plus sometimes merges two columns of a booktabs table (no rules to see), and
+    PyMuPDF's grid sometimes splits a column; the glyph gaps say which one is right."""
+    placed = _place(slots, text.words)
+    if placed is None:
+        return None
+    _, _, _, owners = placed
+    by_line: dict[int, list[int]] = {}
+    for i, seg in enumerate(text.segs):
+        by_line.setdefault(seg.line, []).append(i)
+    seg_cells: dict[int, set[int]] = {}
+    for word, owner in zip(text.words, owners, strict=True):
+        seg = _seg_of(word, text.segs, by_line.get(word.line, []))
+        if seg is not None:
+            seg_cells.setdefault(seg, set()).add(owner)
+    split = sum(len(cells) - 1 for cells in seg_cells.values())
+    side_by_side: dict[tuple[int, int], int] = {}
+    for seg, cells in seg_cells.items():
+        if len(cells) == 1:
+            key = (next(iter(cells)), text.segs[seg].line)
+            side_by_side[key] = side_by_side.get(key, 0) + 1
+    return split + sum(n - 1 for n in side_by_side.values())
+
+
+def _seg_of(word: _Word, segs: Sequence[_Seg], candidates: Sequence[int]) -> int | None:
+    """The cell-on-a-line (index into `segs`, among `candidates`) a word lies in."""
+    centre = (word.x0 + word.x1) / 2
+    for i in candidates:
+        if segs[i].x0 - 0.5 <= centre <= segs[i].x1 + 0.5:
+            return i
+    return None
 
 
 def _lattice(slots: list[Slot], rows: int, cols: int) -> tuple[list[float], list[float]] | None:
@@ -1411,9 +1582,15 @@ def find(
     """The data tables of a page that passed layout's probe, in top-to-bottom order.
 
     `lines` and `paths` are what layout extracted from the page (display coordinates);
-    `clean` is layout's text cleaning, applied to every cell and caption.
+    `clean` is layout's text cleaning, applied to every cell and caption. Never raises:
+    a page whose tables cannot be worked out is read as if it had none (one content-free
+    warning), so a job is never lost to table detection.
     """
-    tables, _ = find_with_judgements(page, lines, paths, clean=clean)
+    try:
+        tables, _ = find_with_judgements(page, lines, paths, clean=clean)
+    except Exception as exc:
+        log.warning("table detection failed on a page: %s", type(exc).__name__)
+        return []
     return tables
 
 
@@ -1441,10 +1618,8 @@ def find_with_judgements(
     tables = []
     for proposal, judgement in sorted(kept, key=lambda pj: (pj[1].bbox[1], pj[1].bbox[0])):
         table = _build(page, view, proposal, judgement, clean)
-        if table is None:
-            judgement.verdict = "layout_grid"
-            continue
-        tables.append(table)
+        if table is not None:
+            tables.append(table)
     _attach_captions(view, tables, clean)
     for table in tables:
         table.lines |= _claimed_lines(view, table.bbox)
@@ -1465,56 +1640,148 @@ def _build(
     judgement: Judgement,
     clean: Callable[[str], str],
 ) -> PageTable | None:
+    """The table's grid from the best of up to three structures: the drawn cell grid
+    (`_ruled_slots`), SLANet-plus, and PyMuPDF's refined grid. The one that fits the
+    glyphs best wins (`misfit`); on a tie the drawn grid, then SLANet-plus (measured the
+    better recogniser), then PyMuPDF. None, with the judgement's verdict changed, for a
+    layout grid (`is_layout_grid`) or when no structure makes a grid."""
     box = judgement.bbox
-    _, column_rules = _rules(view, box, _median_size(view, box))
-    grid_text = _text_grid(view, box, column_rules)
-    grid: TableGrid | None = None
-    reasons = list(judgement.reasons)
-    # SLANet-plus reads the detector's own box best (measured: grown to the drawn border,
-    # a spanning header was lost); a box grown along the rules is the only one there is.
+    size = _median_size(view, box)
+    _, column_rules = _rules(view, box, size)
+    text = _text_grid(view, box, column_rules)
     extended = REASON_EXTENDED in judgement.reasons
-    crop = _crop(page, box if extended else proposal.bbox)
-    if crop is not None:
-        image, clip, zoom = crop
-        found = structure(image)
-        if found is not None:
-            slots = [
-                Slot(
-                    s.row,
-                    s.col,
-                    s.row_span,
-                    s.col_span,
-                    None
-                    if s.bbox is None
-                    else (
-                        clip[0] + s.bbox[0] / zoom,
-                        clip[1] + s.bbox[1] / zoom,
-                        clip[0] + s.bbox[2] / zoom,
-                        clip[1] + s.bbox[3] / zoom,
-                    ),
-                )
-                for s in found.slots
-            ]
-            headers = found.header_rows or _header_rows_at(slots, proposal)
-            grid = fill(slots, grid_text.words, header_rows=headers, clean=clean)
-            if grid is not None:
-                reasons.append(REASON_SLANET)
-    if grid is None:
-        slots = proposal.slots if judgement.bbox == proposal.bbox else []
-        grid = fill(slots, grid_text.words, header_rows=proposal.header_rows, clean=clean)
+    candidates: list[tuple[str, list[Slot], int]] = []
+    ruled = _ruled_slots(view, box, size)
+    if ruled is not None:
+        candidates.append((REASON_DRAWN_CELLS, ruled, _header_rows_at(ruled, proposal)))
+    found = _slanet_slots(page, box if extended else proposal.bbox)
+    if found is not None:
+        slots, header_rows = found
+        candidates.append((REASON_SLANET, slots, header_rows or _header_rows_at(slots, proposal)))
+    if not extended:  # PyMuPDF's grid stops where the detector's box did
+        candidates.append((REASON_PYMUPDF, proposal.slots, proposal.header_rows))
+    best: tuple[int, int, TableGrid, str] | None = None
+    for rank, (reason, slots, header_rows) in enumerate(candidates):
+        score = misfit(slots, text)
+        if score is None or (best is not None and (score, rank) >= best[:2]):
+            continue
+        grid = fill(slots, text.words, header_rows=header_rows, clean=clean)
         if grid is not None:
-            reasons.append(REASON_PYMUPDF)
-    if grid is None or is_layout_grid(grid):
+            best = (score, rank, grid, reason)
+    if best is None or is_layout_grid(best[2]):
+        judgement.verdict = "no_structure" if best is None else "layout_grid"
         return None
     return PageTable(
         bbox=_rounded(box),
-        grid=grid,
+        grid=best[2],
         caption=None,
         lines=set(),
         paths=set(),
-        reasons=reasons,
-        column_edges=_column_edges(grid),
+        reasons=[*judgement.reasons, best[3]],
+        column_edges=_column_edges(best[2]),
     )
+
+
+def _slanet_slots(page: pymupdf.Page, box: BBox) -> tuple[list[Slot], int] | None:
+    """SLANet-plus's cells for the region (boxes mapped back to the page) and its header
+    row count; None without the model or a usable answer.
+
+    It reads the detector's own box best (measured: grown to the drawn border, a spanning
+    header was lost), so `_build` passes that box unless the table was extended."""
+    crop = _crop(page, box)
+    if crop is None:
+        return None
+    image, clip, zoom = crop
+    found = structure(image)
+    if found is None:
+        return None
+    slots = [
+        Slot(
+            s.row,
+            s.col,
+            s.row_span,
+            s.col_span,
+            None
+            if s.bbox is None
+            else (
+                clip[0] + s.bbox[0] / zoom,
+                clip[1] + s.bbox[1] / zoom,
+                clip[0] + s.bbox[2] / zoom,
+                clip[1] + s.bbox[3] / zoom,
+            ),
+        )
+        for s in found.slots
+    ]
+    return slots, found.header_rows
+
+
+def _ruled_slots(view: _PageView, box: BBox, size: float) -> list[Slot] | None:
+    """The cells as drawn, when the table is ruled on all four sides with at least two
+    rows and two columns: the lattice of its row and column rules, with neighbouring
+    cells merged where no rule separates them (a spanning header). None otherwise, or
+    when the merges do not make rectangles."""
+    rows, cols = _rules(view, box, size)
+    ys = _distinct(rows, 0.5 * size)
+    xs = _distinct(cols, 0.5 * size)
+    reach = max(size, 3.0)
+    if len(ys) < 3 or len(xs) < 3:
+        return None
+    if abs(ys[0] - box[1]) > reach or abs(ys[-1] - box[3]) > reach:
+        return None
+    if abs(xs[0] - box[0]) > reach or abs(xs[-1] - box[2]) > reach:
+        return None
+    n_rows, n_cols = len(ys) - 1, len(xs) - 1
+    if n_rows > MAX_TABLE_ROWS or n_cols > MAX_TABLE_COLS:
+        return None
+    parent = list(range(n_rows * n_cols))
+
+    def root(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    for r in range(n_rows):
+        for c in range(n_cols):
+            here = r * n_cols + c
+            if c + 1 < n_cols and not _ruled(view.vsegs, xs[c + 1], ys[r], ys[r + 1]):
+                parent[root(here + 1)] = root(here)
+            if r + 1 < n_rows and not _ruled(view.hsegs, ys[r + 1], xs[c], xs[c + 1]):
+                parent[root(here + n_cols)] = root(here)
+    groups: dict[int, list[tuple[int, int]]] = {}
+    for r in range(n_rows):
+        for c in range(n_cols):
+            groups.setdefault(root(r * n_cols + c), []).append((r, c))
+    slots = []
+    for members in groups.values():
+        r0, r1 = min(r for r, _ in members), max(r for r, _ in members)
+        c0, c1 = min(c for _, c in members), max(c for _, c in members)
+        if len(members) != (r1 - r0 + 1) * (c1 - c0 + 1):
+            return None  # an L-shaped cell: a broken rule, not a table's spans
+        slots.append(
+            Slot(r0, c0, r1 - r0 + 1, c1 - c0 + 1, (xs[c0], ys[r0], xs[c1 + 1], ys[r1 + 1]))
+        )
+    return slots
+
+
+def _distinct(positions: Sequence[float], gap: float) -> list[float]:
+    """Sorted positions with near-duplicates (a double rule) dropped."""
+    out: list[float] = []
+    for x in sorted(positions):
+        if not out or x - out[-1] > gap:
+            out.append(x)
+    return out
+
+
+def _ruled(pieces: Sequence[tuple[float, float, float]], at: float, lo: float, hi: float) -> bool:
+    """Do rule pieces at `at` (within RULE_JOIN) cover most of [lo, hi]?"""
+    spans = sorted((max(lo, p[0]), min(hi, p[1])) for p in pieces if abs(p[2] - at) <= RULE_JOIN)
+    covered, end = 0.0, lo
+    for start, stop in spans:
+        if stop > end:
+            covered += stop - max(start, end)
+            end = stop
+    return covered >= 0.6 * (hi - lo)
 
 
 def _header_rows_at(slots: list[Slot], proposal: Proposal) -> int:
