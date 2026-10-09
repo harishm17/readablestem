@@ -178,7 +178,8 @@ def test_the_output_rerendered_after_review_passes_axe(site):
     goes through axe-core."""
     from a11y_stem.pipeline.html_checks import axe_checks
 
-    assert review(site, "p1-e9", action="edit", latex="v = 2 t").status_code == 303
+    # Differs from the PDF's own text: used only with "Use my edit anyway" (web.edit_check).
+    assert review(site, "p1-e9", action="edit_anyway", latex="v = 2 t").status_code == 303
     assert review(site, "p1-e3", action="reject").status_code == 303  # a heading
     html = site.job(site.job_id).html or ""
     checks = axe_checks(html)
