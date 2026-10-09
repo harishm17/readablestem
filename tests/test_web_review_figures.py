@@ -10,8 +10,9 @@ import re
 
 import pytest
 
-from a11y_stem.core.types import Check, ConversionOutput, FigureFix, Status
+from a11y_stem.core.types import Check, ConversionOutput, FigureFix, ModelCall, Status
 from a11y_stem.pipeline import figure_details
+from a11y_stem.pipeline.figure_step import LONG_PROMPT_VERSION
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, upload
 from test_web_review_split import panel, post, screen, stored, text_of
@@ -99,6 +100,44 @@ def test_a_figure_without_them_shows_neither(tmp_path):
         body = figure_card(env)
     assert "longdesc-" not in body and "remove_data_table" not in body
     assert "<table" not in body
+
+
+def missing_output() -> ConversionOutput:
+    """The figure as a chart described with long descriptions on, left without one (the
+    notice `long_description_missing`)."""
+    output = review_output()
+    fix = output.result.fix_for("p1-e6")
+    assert fix is not None
+    fix.figure = FigureFix(figure_type="chart", alt=ALT)
+    call = ModelCall(step="figure", model="gpt-6.1-sol", prompt_version=LONG_PROMPT_VERSION)
+    fix.calls = [call]
+    return output
+
+
+def test_a_chart_left_without_one_offers_an_empty_field_to_write_it(tmp_path):
+    env = WebEnv(tmp_path)
+    env.converter.output = missing_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        body = figure_card(env)
+        textarea = re.search(r'<textarea id="longdesc-p1-e6"[^>]*>([^<]*)</textarea>', body)
+        assert textarea and textarea.group(1) == ""
+        assert "remove_data_table" not in body and "<table" not in body
+        # Accept with the box left empty is no change; with text in it, Save edit first.
+        assert post(env, "p1-e6", action="accept", alt=ALT, long_description="").status_code == 303
+        fix = stored(env).fix_for("p1-e6")
+        assert fix is not None and fix.figure is not None
+        assert fix.figure.long_description is None
+        response = post(env, "p1-e6", action="edit", alt=ALT, long_description=LONG)
+        assert response.status_code == 303
+        fix = stored(env).fix_for("p1-e6")
+        assert fix is not None and fix.figure is not None
+        assert fix.figure.long_description == LONG
+        assert "Description of Figure 1</summary>" in download(env)
 
 
 # ---------------------------------------------------------------------- decisions

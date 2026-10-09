@@ -148,7 +148,7 @@
   {% set err = item.errors.get("longdesc") %}
   <div class="field{% if err %} field-error{% endif %}">
     <label for="longdesc-{{ eid }}">Longer description for {{ item.label|lower }}</label>
-    <p class="hint" id="longdesc-hint-{{ eid }}">Students can open it under the figure. Plain sentences: what it shows, the axes and units, the trend and the key values. Leave it empty to remove it.</p>
+    <p class="hint" id="longdesc-hint-{{ eid }}">Students can open it under the figure. Plain sentences: what it shows, the axes and units, the trend and the key values. Leave it empty for none.</p>
     {{ error_line(item, "longdesc") }}
     <textarea id="longdesc-{{ eid }}" name="long_description" rows="8" maxlength="2000" class="prose-input" data-edit-field
               aria-describedby="longdesc-hint-{{ eid }}{% if err %} longdesc-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("long_description", "") }}</textarea>

@@ -303,14 +303,15 @@ def _item(
     place = place if fix.kind is Kind.HEADING else None
     moved = place is not None and place.moved
     optional = fix.optional_note
+    details = _figure_details(fix, element)
     values: dict[str, str] = {}
     if fix.equation is not None:
         values["latex"] = fix.equation.latex
     if fix.figure is not None:
         values["alt"] = fix.figure.alt
         values["decorative"] = "on" if fix.figure.decorative else ""
-        if fix.figure.long_description is not None:
-            values["long_description"] = fix.figure.long_description
+        if details.get("long_description") is not None:
+            values["long_description"] = details["long_description"]
     if fix.heading is not None:
         # The select offers the level the document shows, not one it would move.
         suggested = place.suggested if place is not None else None
@@ -344,18 +345,26 @@ def _item(
         values=values,
         optional=optional,
         second_check=triage.second_check_note(fix),
-        **_figure_details(fix, element),
+        **details,
     )
 
 
 def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
-    """A figure's long description and data table for its card (figures work)."""
-    from a11y_stem.pipeline import assemble_tables, figure_details, table_html
+    """A figure's long description and data table for its card (figures work). The long
+    description field is offered when the figure has one or a data table, or when it is
+    a chart or diagram described with long descriptions on but left without one (the
+    notice `long_description_missing`), so the reviewer can write it; "" when empty."""
+    from a11y_stem.pipeline import assemble_tables, figure_details, figure_step, table_html
 
     figure = fix.figure
     if figure is None or figure.decorative:
         return {}
-    shown: dict[str, Any] = {"long_description": figure.long_description}
+    long_description = figure.long_description
+    if long_description is None and (
+        figure.data_table is not None or figure_step.long_description_missing(fix)
+    ):
+        long_description = ""
+    shown: dict[str, Any] = {"long_description": long_description}
     if figure.data_table is not None:
         table_id = "review-" + assemble_tables.id_prefix(fix.element_id) + "-data"
         caption = element.caption if element is not None else None
