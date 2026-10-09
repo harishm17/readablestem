@@ -17,9 +17,11 @@ decision first):
   ("Show accepted"). Each mark is a link to its item.
 
 Everything is a link or a form, so it works without JavaScript (`static/app.js` only
-adds keyboard shortcuts, scrolls the page image to the item and makes "Save edit" the
-main button once a field is changed). The full list of every item is still at
-`/jobs/{id}/review/list`.
+adds keyboard shortcuts, scrolls the page image to the item, makes "Save edit" the main
+button once a field is changed and keeps a draft of what is typed in this browser tab;
+htmx checks LaTeX while it is typed, `live_check`). Every form carries the review
+version its page was drawn at, so a form from an out-of-date tab is refused, not applied
+(`routes/review.py`). The full list of every item is still at `/jobs/{id}/review/list`.
 
 Mark positions come from a stylesheet made per job (`/jobs/{id}/review/marks.css`:
 element ids and percentages only), because the CSP allows no inline styles.

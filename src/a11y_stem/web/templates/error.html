@@ -3,10 +3,16 @@
 {% block content %}
 <h1>{{ title }}</h1>
 <p>{{ message }}</p>
-{% if status == 403 and contact_email %}
+{# A form posted after the session ended (web.return_to): sign in again, then back to it.
+   app.js shows the hint when this tab kept a draft of what was typed in that form. #}
+{% if sign_in|default(false) %}
+{% if draft_for %}<p class="hint" data-draft-for="{{ draft_for }}" hidden>What you typed is kept in this browser tab and is put back there.</p>{% endif %}
+{% include "_signin.html" %}
+{% elif status == 403 and contact_email %}
 <p>If you think this is a mistake, email <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.</p>
 {% endif %}
 <ul class="actions">
+  {% if back_href|default(none) %}<li><a href="{{ back_href }}">Back to the decision</a></li>{% endif %}
   {% if job_id %}<li><a href="/jobs/{{ job_id }}">Back to the document's status</a></li>{% endif %}
   {% if user %}<li><a href="/app">Go to my documents</a></li>{% endif %}
   <li><a href="/">Go to the home page</a></li>

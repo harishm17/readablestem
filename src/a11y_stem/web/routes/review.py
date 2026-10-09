@@ -240,6 +240,7 @@ class Notice:
     message: str
     label: str | None = None  # the fix it is about, e.g. "Equation 3 on page 2"
     href: str | None = None  # link to that fix
+    element_id: str = ""  # that fix's id (app.js forgets a draft of it kept in this tab)
 
 
 STALE_TITLE = "Your choice was not saved"
@@ -654,7 +655,7 @@ def _place_flashes(
             continue
         changed.changed.append(message)
         where = f" on page {changed.page}" if changed.page else ""  # 0: element missing
-        notice = Notice(message, changed.label + where, f"#item-{target}")
+        notice = Notice(message, changed.label + where, f"#item-{target}", target)
         landing = next_to_review(result, changed.element_id)
         landing_fix = result.fix_for(landing) if landing else None
         if landing_fix is not None and landing_fix.group_key in cards:

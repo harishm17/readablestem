@@ -592,3 +592,120 @@ def test_structure_and_unseen_styles_are_never_marked(said, text_layer):
     from a11y_stem.web.speech_diff import spoken_diff
 
     assert spoken_diff(said, text_layer) is None
+
+
+# --------------------------------------------------------------------------- MF19 session end
+
+JOB = "0123456789abcdef0123456789abcdef"
+
+
+@pytest.mark.parametrize(
+    ("path", "kept"),
+    [
+        ("/app", True),
+        ("/admin", True),
+        (f"/jobs/{JOB}", True),
+        (f"/jobs/{JOB}/review", True),
+        (f"/jobs/{JOB}/review?item=p1-e2&page=2&accepted=1", True),
+        (f"/jobs/{JOB}/review/list", True),
+        (f"/jobs/{JOB}/view", True),
+        ("//elsewhere.example/app", False),
+        ("/\\elsewhere.example", False),
+        ("https://elsewhere.example/app", False),
+        ("/app?next=//elsewhere.example", False),
+        (f"/jobs/{JOB}/review?item=%3Cscript%3E", False),
+        (f"/jobs/{JOB}/pages/1.png", False),  # an image asked for in the background
+        (f"/jobs/{JOB}/review/marks.css", False),
+        (f"/jobs/{JOB}/download", False),
+        ("/jobs/not-a-job/review", False),
+        ("/login", False),
+        ("", False),
+        (None, False),
+    ],
+)
+def test_only_pages_of_this_app_are_come_back_to(path, kept):
+    from a11y_stem.web.return_to import safe_return
+
+    assert safe_return(path) == (path if kept else None)
+
+
+def sign_out_elsewhere(env) -> None:
+    """Sign out on another device: that ends every session of the account."""
+    other = env.client()
+    login(other, ALICE)
+    assert other.post("/logout", data={"csrf_token": token(other)}).status_code == 303
+
+
+def test_signing_in_comes_back_to_the_page_asked_for(ux):
+    other = ux.client()  # another browser, signed out
+    deep = f"/jobs/{ux.job_id}/review?item=p1-e6"
+    response = other.get(deep)
+    assert (response.status_code, response.headers["location"]) == (303, "/login")
+    assert login(other, ALICE).headers["location"] == deep
+    # Once: signing in again later goes to My documents.
+    assert login(other, ALICE).headers["location"] == "/app"
+    # Nothing outside the app's pages is remembered.
+    fresh = ux.client()
+    assert fresh.get(f"/jobs/{ux.job_id}/pages/1.png").headers["location"] == "/login"
+    assert login(fresh, ALICE).headers["location"] == "/app"
+
+
+def test_a_decision_after_the_session_ended_comes_back_after_sign_in(ux):
+    csrf = token(ux.browser, f"/jobs/{ux.job_id}/review")
+    sign_out_elsewhere(ux)
+    fields = {"action": "edit", "latex": r"\boldsymbol{\omega}", "version": "0"}
+    response = ux.browser.post(
+        f"/jobs/{ux.job_id}/review/p1-e2", data={"csrf_token": csrf} | fields
+    )
+    assert response.status_code == 401
+    page = response.text
+    assert "<h1>Please sign in again</h1>" in page
+    assert "Your session ended, so this was not saved." in page
+    assert "Sign in again to come back to the same decision." in page
+    assert 'href="/dev-login"' in page  # the sign-in choices are on the page itself
+    # app.js shows this line when this tab kept a draft of that form.
+    assert f'<p class="hint" data-draft-for="/jobs/{ux.job_id}/review/p1-e2" hidden>' in page
+    assert "boldsymbol" not in page  # what was typed is never sent back by the server
+    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
+    response = login(ux.browser, ALICE)
+    assert response.headers["location"] == f"/jobs/{ux.job_id}/review?item=p1-e2"
+    assert "Decision 1 of 3" in screen(ux, "?item=p1-e2")
+
+
+def test_a_decision_after_the_cookie_expired_says_sign_in_again(ux):
+    """An expired cookie takes the CSRF token with it: the same page as above, not "This
+    form has expired"; Undo comes back to the review screen."""
+    other = ux.client()
+    response = other.post(
+        f"/jobs/{ux.job_id}/review/p1-e2", data={"csrf_token": "from-before", "action": "accept"}
+    )
+    assert response.status_code == 403
+    assert "Please sign in again" in response.text
+    assert login(other, ALICE).headers["location"] == f"/jobs/{ux.job_id}/review?item=p1-e2"
+    expired = ux.client()
+    expired.post(f"/jobs/{ux.job_id}/undo", data={"csrf_token": "from-before", "version": "1"})
+    assert login(expired, ALICE).headers["location"] == f"/jobs/{ux.job_id}/review"
+    # Other forms keep the plain message (signing in itself, say).
+    assert "This form has expired" in ux.client().post("/login", data={}).text
+
+
+def test_a_form_from_before_signing_in_again_links_back_to_its_decision(ux):
+    csrf = token(ux.browser, f"/jobs/{ux.job_id}/review")
+    login(ux.browser, ALICE)  # signed in again (in another tab): a new token
+    response = ux.browser.post(
+        f"/jobs/{ux.job_id}/review/p1-e2", data={"csrf_token": csrf, "action": "accept"}
+    )
+    assert response.status_code == 403
+    assert "This form has expired" in response.text
+    assert "Go back to the decision and choose again." in response.text
+    assert f'<a href="/jobs/{ux.job_id}/review?item=p1-e2">Back to the decision</a>' in (
+        response.text
+    )
+    assert stored(ux).fix_for("p1-e2").status.value == "needs_review"
+
+
+def test_the_list_view_names_the_saved_item_so_its_draft_is_forgotten(ux):
+    response = post(ux, "p1-e6", action="accept", version="0", view="list")
+    page = ux.browser.get(response.headers["location"]).text
+    assert f'data-saved="/jobs/{ux.job_id}/review/p1-e6"' in page
+    assert page.count("data-edit-field") >= 3  # the fields whose drafts app.js keeps

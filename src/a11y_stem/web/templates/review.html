@@ -2,7 +2,7 @@
 {% block title %}{% if errors %}Error: {% endif %}All items as a list: {{ job.filename }}{% endblock %}
 
 {% macro notice_box(notice) %}
-<div class="notice" role="status">
+<div class="notice" role="status"{% if notice.element_id %} data-saved="/jobs/{{ job.id }}/review/{{ notice.element_id }}"{% endif %}>
   <p>{% if notice.href %}<a href="{{ notice.href }}">{{ notice.label }}</a>: {% endif %}{{ notice.message }}</p>
 </div>
 {% endmacro %}
@@ -112,7 +112,7 @@
     <label for="latex-{{ eid }}">LaTeX for {{ name }}</label>
     <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Change it and choose Save edit to check it again and update the MathML.{% else %}Type the LaTeX for the equation in the image, then choose Save edit.{% endif %}</p>
     {% if err %}<p class="error-message" id="latex-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-    <textarea id="latex-{{ eid }}" name="latex" rows="3" spellcheck="false" autocapitalize="off"
+    <textarea id="latex-{{ eid }}" name="latex" rows="3" spellcheck="false" autocapitalize="off" data-edit-field
               aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
   </div>
   {% elif item.kind == "figure" %}
@@ -122,13 +122,13 @@
     <p class="hint" id="alt-hint-{{ eid }}">One or two short sentences: what the figure shows and why it matters here.
       Aim for {{ alt_guideline }} characters or fewer{% if item.values.get("alt") %} (this text has {{ item.alt_chars }}){% endif %}.</p>
     {% if err %}<p class="error-message" id="alt-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-    <textarea id="alt-{{ eid }}" name="alt" rows="3" maxlength="1000" class="prose-input"
+    <textarea id="alt-{{ eid }}" name="alt" rows="3" maxlength="1000" class="prose-input" data-edit-field
               aria-describedby="alt-hint-{{ eid }}{% if err %} alt-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("alt", "") }}</textarea>
   </div>
   {% set err = item.errors.get("decorative") %}
   <div class="field checkbox-field{% if err %} field-error{% endif %}">
     {% if err %}<p class="error-message" id="decorative-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-    <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on"{% if item.values.get("decorative") %} checked{% endif %}{% if err %} aria-describedby="decorative-error-{{ eid }}" aria-invalid="true"{% endif %}>
+    <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on" data-edit-field{% if item.values.get("decorative") %} checked{% endif %}{% if err %} aria-describedby="decorative-error-{{ eid }}" aria-invalid="true"{% endif %}>
     <label for="decorative-{{ eid }}">Decorative: it adds nothing a reader needs, so it gets no alt text</label>
   </div>
   {% elif item.kind == "heading" %}
@@ -141,7 +141,7 @@
     {% endif %}
     {% if err %}<p class="error-message" id="level-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
     {% set described = (["level-hint-" ~ eid] if item.heading_max_level else []) + (["level-error-" ~ eid] if err else []) %}
-    <select id="level-{{ eid }}" name="level"{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if err %} aria-invalid="true"{% endif %}>
+    <select id="level-{{ eid }}" name="level" data-edit-field{% if described %} aria-describedby="{{ described|join(' ') }}"{% endif %}{% if err %} aria-invalid="true"{% endif %}>
       {% for n in range(1, 7) %}
       <option value="{{ n }}"{% if item.values.get("level") == n|string %} selected{% endif %}>Level {{ n }}</option>
       {% endfor %}

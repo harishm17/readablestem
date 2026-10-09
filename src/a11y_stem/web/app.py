@@ -37,8 +37,16 @@ from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
 from a11y_stem.web.database import as_utc, prepare_database
 from a11y_stem.web.db import make_engine, make_sessionmaker
-from a11y_stem.web.deps import AppContext, CsrfFailed, LoginRequired, PageError, render
+from a11y_stem.web.deps import (
+    AppContext,
+    CsrfFailed,
+    LoginRequired,
+    PageError,
+    current_user,
+    render,
+)
 from a11y_stem.web.logsafe import log_event
+from a11y_stem.web.return_to import decision_link, remember_return, signed_out_page
 from a11y_stem.web.routes import admin, cron, jobs, pages, review, split
 from a11y_stem.web.security import (
     RequestSizeLimitMiddleware,
@@ -103,8 +111,11 @@ def make_templates() -> Jinja2Templates:
 # --------------------------------------------------------------------------- errors
 
 
-def _error_page(request: Request, status: int, title: str, message: str) -> Response:
+def _error_page(
+    request: Request, status: int, title: str, message: str, back_href: str | None = None
+) -> Response:
     context = {"title": title, "message": message, "status": status, "job_id": None}
+    context["back_href"] = back_href
     return render(request, "error.html", context, status_code=status)
 
 
@@ -126,20 +137,25 @@ def _on_login_required(request: Request, exc: Exception) -> Response:
         # A background poll after the session ended: the browser's XHR would follow a 303
         # and swap the sign-in page into the status box. Send the whole page there.
         return Response(status_code=401, headers={"HX-Redirect": "/login"})
+    # Signing in comes back to the page, or to the decision posted (web.return_to).
     if request.method in {"GET", "HEAD"}:
+        remember_return(request)
         return RedirectResponse("/login", status_code=303)
-    return _error_page(request, 401, *ERROR_TEXT[401])
+    return signed_out_page(request, status_code=401)
 
 
 def _on_csrf_failed(request: Request, exc: Exception) -> Response:
     log_event(logger, "csrf_rejected", logging.WARNING)
-    return _error_page(
-        request,
-        403,
-        "This form has expired",
-        "For your security, forms stop working when you sign in again or after a while. "
-        "Go back, reload the page and try again.",
+    back = decision_link(request)  # a review decision or Undo (web.return_to)
+    if back and current_user(request) is None:  # its session's cookie expired, token too
+        return signed_out_page(request, status_code=403)
+    message = "For your security, forms stop working when you sign in again or after a while. "
+    message += (
+        "Go back to the decision and choose again."
+        if back
+        else "Go back, reload the page and try again."
     )
+    return _error_page(request, 403, "This form has expired", message, back_href=back)
 
 
 def _on_http_error(request: Request, exc: Exception) -> Response:

@@ -201,3 +201,157 @@
   watchEdits();
   shortcuts();
 })();
+
+/* Drafts of a decision's fields (UX review MF19), on the review screen and the list view.
+ *
+ * A session can end while a reviewer is typing (signed out on another device, or after
+ * seven days): the decision posted then is refused, and what was typed was lost. Now what
+ * is typed into a decision's fields ([data-edit-field]) is kept in this tab's
+ * sessionStorage, under the form's address (ids only), and put back when that decision
+ * is shown again; signing in comes back to it (web/return_to.py). A line under the field
+ * says so, and the field's description includes it.
+ *
+ * sessionStorage belongs to this browser tab: it is never sent to the server and is gone
+ * when the tab is closed. A draft is also forgotten when the decision is saved (the
+ * notice after it names the item: data-saved), when the field shows it anyway, and when
+ * Sign out is chosen in this tab. Without JavaScript nothing is kept (the browser's Back
+ * button usually still has the text).
+ */
+(function () {
+  "use strict";
+
+  var PREFIX = "a11y-stem.draft:";
+  var store = null;
+  try {
+    store = window.sessionStorage;
+    store.getItem(PREFIX); // throws where storage is blocked
+  } catch (e) {
+    store = null;
+  }
+  if (!store) return;
+
+  function key(form) {
+    return PREFIX + form.getAttribute("action");
+  }
+
+  function valueOf(field) {
+    return field.type === "checkbox" ? (field.checked ? "on" : "") : field.value;
+  }
+
+  function defaultOf(field) {
+    if (field.type === "checkbox") return field.defaultChecked ? "on" : "";
+    if (field.tagName === "SELECT") {
+      for (var i = 0; i < field.options.length; i++) {
+        if (field.options[i].defaultSelected) return field.options[i].value;
+      }
+      return field.options.length ? field.options[0].value : "";
+    }
+    return field.defaultValue;
+  }
+
+  function fieldsOf(form) {
+    return Array.prototype.slice.call(form.querySelectorAll("[data-edit-field][name]"));
+  }
+
+  function read(form) {
+    try {
+      var draft = JSON.parse(store.getItem(key(form)) || "null");
+      return draft && typeof draft === "object" ? draft : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function save(form) {
+    var draft = {};
+    var changed = false;
+    fieldsOf(form).forEach(function (field) {
+      var value = valueOf(field);
+      if (value !== defaultOf(field)) {
+        draft[field.name] = value;
+        changed = true;
+      }
+    });
+    try {
+      if (changed) store.setItem(key(form), JSON.stringify(draft));
+      else store.removeItem(key(form));
+    } catch (e) {
+      /* storage full: the draft is not kept */
+    }
+  }
+
+  function note(field) {
+    var id = "kept-draft-" + (field.id || field.name);
+    if (document.getElementById(id)) return;
+    var line = document.createElement("p");
+    line.className = "kept-draft";
+    line.id = id;
+    line.textContent = "What you typed before is back here. It is not saved yet.";
+    var place = field.closest(".field") || field;
+    place.insertAdjacentElement("afterend", line);
+    var described = field.getAttribute("aria-describedby");
+    field.setAttribute("aria-describedby", described ? described + " " + id : id);
+  }
+
+  function restore(form) {
+    var draft = read(form);
+    if (!draft) return;
+    var restored = [];
+    fieldsOf(form).forEach(function (field) {
+      if (!Object.prototype.hasOwnProperty.call(draft, field.name)) return;
+      var value = String(draft[field.name]);
+      if (value === valueOf(field)) return;
+      if (field.type === "checkbox") field.checked = value === "on";
+      else field.value = value;
+      if (valueOf(field) === value) restored.push(field);
+    });
+    if (!restored.length) {
+      store.removeItem(key(form)); // the page shows it already: saved, or moot
+      return;
+    }
+    form.classList.add("is-edited");
+    for (var open = form.closest("details"); open; open = open.parentElement.closest("details")) {
+      open.open = true;
+    }
+    var inner = restored[0].closest("details");
+    if (inner) inner.open = true;
+    restored.forEach(function (field) {
+      note(field);
+      // As if typed: the live check (htmx) and "Save edit" as the main button follow.
+      field.dispatchEvent(new Event(field.tagName === "TEXTAREA" ? "input" : "change", { bubbles: true }));
+    });
+  }
+
+  function start() {
+    var saved = document.querySelector("[data-saved]");
+    if (saved) store.removeItem(PREFIX + saved.getAttribute("data-saved"));
+    var forms = [];
+    document.querySelectorAll("form [data-edit-field]").forEach(function (field) {
+      var form = field.form;
+      if (form && form.getAttribute("action") && forms.indexOf(form) < 0) forms.push(form);
+    });
+    forms.forEach(function (form) {
+      restore(form);
+      form.addEventListener("input", function () { save(form); });
+      form.addEventListener("change", function () { save(form); });
+    });
+    // The page for a form refused because the session ended: say the text is kept.
+    document.querySelectorAll("[data-draft-for]").forEach(function (hint) {
+      if (store.getItem(PREFIX + hint.getAttribute("data-draft-for"))) hint.hidden = false;
+    });
+    // Signing out in this tab forgets every draft (a shared computer).
+    document.querySelectorAll('form[action="/logout"]').forEach(function (form) {
+      form.addEventListener("submit", function () {
+        for (var i = store.length - 1; i >= 0; i--) {
+          var name = store.key(i);
+          if (name && name.indexOf(PREFIX) === 0) store.removeItem(name);
+        }
+      });
+    });
+  }
+
+  // After htmx has set up the page (it starts on DOMContentLoaded too, and was loaded
+  // first), so a restored LaTeX field is checked as if it had been typed.
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", start);
+  else start();
+})();
