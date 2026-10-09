@@ -16,6 +16,11 @@ usage, settle, and return the answers with a content-free outcome. Why it is bui
   question's own length. If the reservation is refused, `BudgetExceeded` propagates and
   nothing leaves the machine; a malformed request, a missing key or an unpriced model
   are raised before the reservation for the same reason.
+- The reservation holds dollars only (`count_call=False`): a request is held against
+  the job's and the daily dollar caps but is not one of the job's model calls. The
+  call cap (`MAX_MODEL_CALLS_PER_JOB`, per page `MAX_MODEL_CALLS_PER_PAGE`) was sized
+  for the steps' calls; counted there, the checks would about double a job's calls and
+  an equation-heavy document that fits today would fail its last elements.
 - `detail="high"` on every image. The endpoint's default, "auto", behaves like
   "original" on large images: about 4.8x the tokens of "high" (and it refuses images
   over 30,000 patches that "high" accepts).
@@ -227,7 +232,9 @@ class DecisionsClient:
         sdk = self._client()
         estimate = reservation_usd(model, request)
         started = time.perf_counter()
-        reservation = self._budget.reserve(estimate)  # BudgetExceeded: nothing was sent
+        # Dollars only, not a model call (see the module docstring). BudgetExceeded:
+        # nothing was sent.
+        reservation = self._budget.reserve(estimate, count_call=False)
         try:
             reply = self._exchange(sdk, model, content, questions, request.questions)
         except BaseException:

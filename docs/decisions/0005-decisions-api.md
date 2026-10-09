@@ -53,6 +53,18 @@ Rules that come with it:
   `VerifierVerdict(probabilities, reason_code)`, so the provider can be replaced.
 - Every request reserves spend first through the job's `JobBudget`; `detail="high"`
   always; none of the refused parameters are sent.
+- The checks share the job's dollar caps and the daily cap, not its model-call cap: a
+  request reserves dollars only (`JobBudget.reserve(..., count_call=False)`; in the web
+  worker the hold on the job row adds nothing to `jobs.model_calls`). The call caps
+  (`MAX_MODEL_CALLS_PER_JOB` 400, `MAX_MODEL_CALLS_PER_PAGE` 80) were sized for the
+  steps' calls, and the checks about double a job's requests (figures eval: 26 calls
+  and 13 checks; equations eval: 36 and 36), so counting them would make an
+  equation-heavy document that fits today fail its last elements with
+  `budget_job_calls` (reproduced offline: 14 problem-set pages, 62 elements failed), and
+  the equation shadow would change other elements' status. In dollars they add 2-4% of
+  a job's spend (about $0.0001 per PDF page, against `MAX_USD_PER_PAGE` $0.30), so only
+  a document that ends within that margin of its dollar cap could have its last element
+  refused because of them.
 - Fail-open: an error, a timeout, a refusal or no budget left leaves the fix exactly as
   it would be without the check; the outcome code is recorded.
 - Wording: "a second automated check found a possible mismatch" or "found no

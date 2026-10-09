@@ -381,8 +381,9 @@ class FakeVerifier:
     Answers come from `responder(check, text)` when set (text = the alt text or the
     LaTeX), else from `figure` / `equation`. `outcomes` forces a reason code per check
     (e.g. {"figure_alt": "timeout"}) to test fail-open paths. With a `budget`, every
-    check reserves the real request's worst case first (and may raise inside, turning
-    into "budget_exceeded" like the real one), then settles a fake cost. `requests`
+    check reserves the real request's worst case first, in dollars only like the real
+    client (`count_call=False`: not one of the job's model calls), and a refusal turns
+    into "budget_exceeded" like the real one; then it settles a fake cost. `requests`
     records (check, text) for assertions.
     """
 
@@ -429,7 +430,7 @@ class FakeVerifier:
         if self.budget is not None:
             estimate = reservation_usd(self.model, request)
             try:
-                reservation = self.budget.reserve(estimate)
+                reservation = self.budget.reserve(estimate, count_call=False)
             except BudgetExceeded:
                 return VerifierVerdict(check, {}, "budget_exceeded", self.model, version)
             cost = decisions_cost_usd(self.model, FAKE_INPUT_TOKENS)
@@ -446,7 +447,9 @@ class FakeVerifier:
 
 
 def make_verifier(settings: Settings, budget: JobBudget, *, fake: bool = False) -> Verifier:
-    """The verifier for one job, charging `budget` (the job's budget). `fake=True` gives
+    """The verifier for one job, charging `budget` (the job's budget) in dollars: its
+    requests are held against the job's and the daily dollar caps but are not model
+    calls, so they never use up the job's call cap (`core.budget`). `fake=True` gives
     the offline `FakeVerifier` (still charging the budget)."""
     if fake:
         return FakeVerifier(budget=budget, model=settings.decisions_model)

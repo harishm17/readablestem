@@ -6,7 +6,10 @@ fixed-order choice: "match", "cosmetic" or "meaning_changing". P(meaning_changin
 recorded on the fix (`Fix.verifications`) for the final proposal and, when the equation
 was escalated, for the cheap model's answer before escalation, and the aggregates count
 it. That is all it does: it never changes a status, a confidence, a review tier, a check
-or the escalation decision, because it runs after the fix is complete.
+or the escalation decision, because it runs after the fix is complete. Nor does it change
+other elements: its requests hold dollars only, not the job's model calls
+(`core.budget`, `count_call=False`), so it cannot use up the calls a later element or
+escalation needs.
 
 Why only a shadow: on research data (2026-10-08) the choice question caught almost every
 synthetic symbol error (signs, digits, exponents, Greek letters) that the text-layer

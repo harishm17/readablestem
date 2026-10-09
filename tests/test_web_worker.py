@@ -9,16 +9,19 @@ import threading
 import time
 from collections.abc import Callable
 from datetime import timedelta
+from pathlib import Path
 
 import pytest
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import ConversionOutput
+from a11y_stem.models import make_vision_client
 from a11y_stem.models.base import VisionRequest
 from a11y_stem.models.fake import FakeVisionClient
+from a11y_stem.models.verifier import FakeVerifier
 from a11y_stem.pipeline.layout import LayoutError
 from a11y_stem.web import worker as worker_module
 from a11y_stem.web.database import as_utc
@@ -30,6 +33,7 @@ from a11y_stem.web.worker import (
     JobCancelled,
     Worker,
     db_safe,
+    default_converter,
     error_code_for,
     job_caps,
     job_time_limit_s,
@@ -43,6 +47,7 @@ from fixtures.web.support import (
     job_id_from,
     login,
     make_pdf,
+    make_settings,
     output_with_nul,
     token,
     upload,
@@ -652,6 +657,135 @@ def test_a_job_that_used_its_whole_budget_gets_no_more(env):
     worker.converter = converter
     assert worker.run_once() == job_id
     assert seen == {"max_usd": 0.0, "refused": "job_usd"}
+
+
+# ------------------------------------------------- the second automated check and the caps
+
+
+def row_totals(env, job_id: str) -> tuple[float, int]:
+    job = env.job(job_id)
+    return round(float(job.cost_usd), 6), int(job.model_calls)
+
+
+def test_a_second_check_request_holds_dollars_on_the_job_row_but_no_model_call(env):
+    job_id = queue_job(env)
+    _, max_calls = job_caps(env.settings, 1)
+    with session_scope(env.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        job.model_calls = max_calls  # the steps have used every model call
+    seen: dict = {}
+
+    def converter(pdf_bytes, /, *, settings, client, progress=None) -> ConversionOutput:
+        budget = client.budget
+        try:
+            budget.reserve(0.001)
+        except BudgetExceeded as exc:
+            seen["model_call"] = exc.scope
+        reservation = budget.reserve(0.002, count_call=False)
+        seen["held"] = row_totals(env, job_id)
+        budget.settle(reservation, 0.001)
+        seen["settled"] = row_totals(env, job_id)
+        with session_scope(env.ctx.factory) as session:  # the day is all but spent
+            session.execute(update(SpendDay).values(spent_usd=settings.daily_spend_cap_usd))
+        try:
+            budget.reserve(0.002, count_call=False)
+        except BudgetExceeded as exc:
+            seen["daily"] = exc.scope
+        seen["released"] = row_totals(env, job_id)
+        return fake_output()
+
+    worker = env.worker()
+    worker.converter = converter
+    assert worker.run_once() == job_id
+    assert seen == {
+        "model_call": "job_calls",
+        "held": (0.002, max_calls),
+        "settled": (0.001, max_calls),
+        "daily": "daily",
+        "released": (0.001, max_calls),  # the refused hold came off, no call taken off
+    }
+
+
+LECTURE_NOTES = Path(__file__).parent / "fixtures" / "layout" / "lecture_notes.pdf"
+ALARM = {"match": 0.01, "cosmetic": 0.01, "meaning_changing": 0.98}
+
+
+def offline_client_with_accepted_figures(settings, budget):
+    """The worker's offline client (`make_vision_client(fake=True)`, with its verifier on
+    the job's budget), answering figures well enough to be accepted, so the figure check
+    runs too, and with a second check that flags every figure and every equation."""
+    client = make_vision_client(settings, budget, fake=True)
+    assert isinstance(client, FakeVisionClient)
+    client.defaults["figure"] = {
+        "figure_type": "diagram",
+        "decorative": False,
+        "alt": "A labelled diagram of the forces on a block.",
+        "confidence": 0.95,
+    }
+    if isinstance(client.verifier, FakeVerifier):
+        client.verifier.figure = {"ok": 0.1, "factual_error": 0.9}
+        client.verifier.equation = ALARM
+    return client
+
+
+def convert_on_the_worker(env, settings) -> Job:
+    job_id = queue_job(env, pdf=LECTURE_NOTES.read_bytes())
+    worker = Worker(
+        settings,
+        env.ctx.factory,
+        converter=default_converter(),
+        client_factory=offline_client_with_accepted_figures,
+    )
+    assert worker.run_once() == job_id
+    job = env.job(job_id)
+    assert job.status == "done" and job.result_json is not None
+    return job
+
+
+def test_the_checks_change_nothing_on_a_document_at_the_generator_only_call_cap(env, tmp_path):
+    # The production path: `job_caps`, `_AttemptBudget` -> `_hold_on_job` on the job row,
+    # the real pipeline and the offline client the worker builds. The call cap is set to
+    # exactly what the document's steps need. Before the fix the checks used it up and
+    # the last elements failed "budget_job_calls".
+    def caps(calls: int, checks: bool):
+        return make_settings(
+            tmp_path,
+            max_model_calls_per_job=calls,
+            max_model_calls_per_page=1000,
+            max_usd_per_page=2.0,
+            decisions_figure_verify=checks,
+            decisions_equation_shadow=checks,
+        )
+
+    needed = convert_on_the_worker(env, caps(400, checks=False)).model_calls
+    off = convert_on_the_worker(env, caps(needed, checks=False))
+    on = convert_on_the_worker(env, caps(needed, checks=True))
+
+    def outcome(job: Job) -> list[tuple]:
+        assert job.result_json is not None
+        return [
+            (
+                f["element_id"],
+                f["status"],
+                f.get("reason"),
+                f.get("confidence"),
+                [c["model"] for c in f.get("calls", [])],
+            )
+            for f in job.result_json["fixes"]
+        ]
+
+    assert outcome(on) == outcome(off)
+    assert on.html == off.html
+    assert on.model_calls == off.model_calls == needed
+    assert on.error_code is None and off.error_code is None
+    assert on.result_json is not None
+    fixes = on.result_json["fixes"]
+    assert not any((f.get("reason") or "").startswith("budget_") for f in fixes)
+    checks = [(v["check"], v["outcome"]) for f in fixes for v in f.get("verifications", [])]
+    assert ("figure_alt", "ok") in checks and ("equation_match", "ok") in checks
+    assert any(f.get("review") == "optional" for f in fixes if f["kind"] == "figure")
+    assert on.cost_usd > off.cost_usd  # the checks are paid for, in dollars
 
 
 @pytest.mark.parametrize(

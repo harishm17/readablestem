@@ -55,7 +55,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per user per UTC day (`quota_days`) |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
-| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together) |
+| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary in the cron (docs/steps.md, docs/operations.md). All on by default |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
@@ -224,7 +224,11 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
   which also checks ownership; settling replaces the hold with the actual cost. So
   `Job.cost_usd` is always current, and an attempt that dies mid-call leaves its holds
-  counted rather than handing its spend to the retry. The defaults are
+  counted rather than handing its spend to the retry. A request of the second automated
+  check (ADR 0005) holds dollars only: its UPDATE adds 0 to `model_calls` and does not
+  test the call cap, so the checks never use the calls the steps need (the call caps
+  were sized for those); they still count against `MAX_USD_PER_JOB`, the per-page
+  dollar allowance and the daily cap. The defaults are
   `pipeline.run.convert_pdf` and `models.make_vision_client`; tests pass fakes to
   `create_app`.
 - **Storing.** `result_json` (the `DocumentResult` without `html`), `html`, crops as

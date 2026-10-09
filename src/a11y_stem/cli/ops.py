@@ -210,9 +210,8 @@ def _cmd_decisions_canary(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     cases = canary.load_cases()
-    budget = JobBudget(
-        InMemorySpendGuard(cap_usd=args.max_usd), max_usd=args.max_usd, max_calls=len(cases)
-    )
+    # Dollars only: Decisions requests are not model calls (`core.budget`).
+    budget = JobBudget(InMemorySpendGuard(cap_usd=args.max_usd), max_usd=args.max_usd, max_calls=0)
     path = args.expected or canary.EXPECTED_FILE
     expected = {"cases": {}} if args.record or not path.is_file() else canary.load_expected(path)
     result = canary.run_canary(

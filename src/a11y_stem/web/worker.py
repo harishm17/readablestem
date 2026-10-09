@@ -39,7 +39,9 @@ queue is safe with several workers or instances:
   job and the totals stay under the caps; settling replaces the hold with the actual
   cost. An attempt that dies mid-call leaves its holds counted (erring on the side of
   spending less, like the daily cap), so a retry never gets more than what is left and
-  the job's totals are always current.
+  the job's totals are always current. A second-check request (ADR 0005) reserves with
+  `count_call=False`: it is held against the dollar caps but adds nothing to
+  `jobs.model_calls` and is never refused by the call cap (`core.budget`).
 - Retention backstop: once an hour the worker loop runs the purge itself
   (`ops.retention.purge_expired`, logged as `purge_done source=worker`). The hourly
   Cloud Scheduler call stays the primary path; this keeps the 24-hour deletion promise
@@ -242,25 +244,27 @@ class JobCancelled(BudgetExceeded):
 class _AttemptBudget(JobBudget):
     """`JobBudget` that also holds every reservation on the job's database row.
 
-    `hold_on_job(amount)` runs first: it adds the hold to the job's totals if the job is
-    still this attempt's and stays under its caps, else raises `JobCancelled` or
-    `BudgetExceeded`. If the in-memory or the daily cap then refuses, `release_on_job`
+    `hold_on_job(amount, calls)` runs first: it adds the hold (and `calls`, 1 for a model
+    call, 0 for a second-check request) to the job's totals if the job is still this
+    attempt's and stays under its caps, else raises `JobCancelled` or `BudgetExceeded`.
+    If the in-memory or the daily cap then refuses, `release_on_job(amount, calls)`
     takes the hold off again. `settle_on_job(delta)` replaces the hold with the actual
     cost.
     """
 
-    hold_on_job: Callable[[float], None] | None = field(default=None, repr=False)
-    release_on_job: Callable[[float], None] | None = field(default=None, repr=False)
+    hold_on_job: Callable[[float, int], None] | None = field(default=None, repr=False)
+    release_on_job: Callable[[float, int], None] | None = field(default=None, repr=False)
     settle_on_job: Callable[[float], None] | None = field(default=None, repr=False)
 
-    def reserve(self, amount_usd: float) -> Reservation:
+    def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
+        calls = 1 if count_call else 0
         if self.hold_on_job is not None:
-            self.hold_on_job(amount_usd)
+            self.hold_on_job(amount_usd, calls)
         try:
-            return super().reserve(amount_usd)
+            return super().reserve(amount_usd, count_call=count_call)
         except BaseException:
             if self.release_on_job is not None:
-                self.release_on_job(amount_usd)
+                self.release_on_job(amount_usd, calls)
             raise
 
     def settle(self, reservation: Reservation, actual_usd: float) -> None:
@@ -452,26 +456,26 @@ class Worker:
 
     # ------------------------------------------------------------------ spend on the job row
 
-    def _hold_on_job(self, attempt: _Attempt, amount_usd: float) -> None:
-        """Add one reservation to the job's totals, or raise.
+    def _hold_on_job(self, attempt: _Attempt, amount_usd: float, calls: int = 1) -> None:
+        """Add one reservation (`amount_usd`, and `calls` model calls: 1, or 0 for a
+        second-check request) to the job's totals, or raise.
 
         One conditional UPDATE: the job must still be running under this attempt, and its
         totals (every attempt's settled spend plus open holds) must stay under the job's
         caps. JobCancelled if the job is no longer ours, BudgetExceeded("job_usd" or
-        "job_calls") if a cap would be passed.
+        "job_calls") if a cap would be passed. With `calls=0` the call cap is not read.
         """
         if attempt.cancelled.is_set():
             raise JobCancelled()
+        under_caps = [Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON]
+        if calls:
+            under_caps.append(Job.model_calls + calls <= attempt.max_calls)
         with session_scope(self.factory) as session:
             won = rowcount(
                 session.execute(
                     update(Job)
-                    .where(
-                        *self._owned(attempt.claim),
-                        Job.cost_usd + amount_usd <= attempt.max_usd + _EPSILON,
-                        Job.model_calls + 1 <= attempt.max_calls,
-                    )
-                    .values(cost_usd=Job.cost_usd + amount_usd, model_calls=Job.model_calls + 1)
+                    .where(*self._owned(attempt.claim), *under_caps)
+                    .values(cost_usd=Job.cost_usd + amount_usd, model_calls=Job.model_calls + calls)
                     .execution_options(synchronize_session=False)
                 )
             )
@@ -483,7 +487,7 @@ class Worker:
         if row is None:
             self._cancel(attempt, "not_owned")
             raise JobCancelled()
-        if int(row.model_calls or 0) + 1 > attempt.max_calls:
+        if calls and int(row.model_calls or 0) + calls > attempt.max_calls:
             raise BudgetExceeded("job_calls", f"job call cap {attempt.max_calls} reached")
         raise BudgetExceeded("job_usd", f"job spend cap ${attempt.max_usd:.2f} reached")
 
@@ -523,8 +527,8 @@ class Worker:
             guard=self.guard,
             max_usd=max(0.0, max_usd - prior_usd),
             max_calls=max(0, max_calls - prior_calls),
-            hold_on_job=lambda amount: self._hold_on_job(attempt, amount),
-            release_on_job=lambda amount: self._adjust_job(attempt, -amount, -1),
+            hold_on_job=lambda amount, calls: self._hold_on_job(attempt, amount, calls),
+            release_on_job=lambda amount, calls: self._adjust_job(attempt, -amount, -calls),
             settle_on_job=lambda delta: self._adjust_job(attempt, delta, 0),
         )
         return attempt

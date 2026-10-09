@@ -93,6 +93,27 @@ def test_job_budget_caps_calls_and_dollars():
     assert exc.value.scope == "job_calls"
 
 
+def test_a_request_that_is_not_a_model_call_holds_dollars_only():
+    # The second automated check (ADR 0005): every dollar cap applies, the call cap not.
+    guard = InMemorySpendGuard(cap_usd=0.03)
+    budget = JobBudget(guard=guard, max_usd=0.05, max_calls=1)
+    budget.settle(budget.reserve(0.01), 0.01)  # the job's one model call
+    with pytest.raises(BudgetExceeded) as exc:
+        budget.reserve(0.001)
+    assert exc.value.scope == "job_calls"
+    budget.settle(budget.reserve(0.01, count_call=False), 0.01)
+    assert budget.calls == 1 and budget.spent_usd == pytest.approx(0.02)
+    assert guard.spent_usd() == pytest.approx(0.02)
+    with pytest.raises(BudgetExceeded) as exc:  # the daily cap still holds it
+        budget.reserve(0.02, count_call=False)
+    assert exc.value.scope == "daily"
+    budget.guard = InMemorySpendGuard(cap_usd=100)
+    with pytest.raises(BudgetExceeded) as exc:  # and the job's dollar cap
+        budget.reserve(0.04, count_call=False)
+    assert exc.value.scope == "job_usd"
+    assert budget.calls == 1
+
+
 def test_pricing():
     # 1M uncached input on sol = $2; 1M output = $10.
     assert cost_usd(MAIN_MODEL, 1_000_000, 0, 0) == pytest.approx(2.0)

@@ -24,9 +24,10 @@ once the answers under them move.
   insert-if-missing of the aggregate row (day, "canary", "decisions:run"), so two
   instances or two cron runs cannot both run it. Fail-open: nothing about the canary can
   fail the cron. The result is counted as "decisions:<status>" for the day.
-- Spend: every request reserves first through a `JobBudget` (`CANARY_MAX_USD`, one call
-  per case) on the caller's spend guard: the daily cap in the cron, `--max-usd` by hand.
-  About $0.001 per run.
+- Spend: every request reserves first through a `JobBudget` (`CANARY_MAX_USD`) on the
+  caller's spend guard: the daily cap in the cron, `--max-usd` by hand. Decisions
+  requests hold dollars only, not model calls (`core.budget`), so the budget allows no
+  model call at all and the dollar cap is what bounds a run. About $0.001 per run.
 """
 
 from __future__ import annotations
@@ -351,7 +352,8 @@ def maybe_run_daily(
         if not _claim_today(factory, day):
             return "not_due"
         cases = load_cases()
-        budget = JobBudget(guard=guard, max_usd=CANARY_MAX_USD, max_calls=len(cases))
+        # Dollars only: Decisions requests are not model calls, and none is made here.
+        budget = JobBudget(guard=guard, max_usd=CANARY_MAX_USD, max_calls=0)
         if decider_factory is None:
             from a11y_stem.models.decisions_client import DecisionsClient
 

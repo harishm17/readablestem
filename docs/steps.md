@@ -422,7 +422,14 @@ job's `JobBudget` before it is sent (`pricing.estimate_decisions_max_cost_usd`: 
 shared input once, images bounded by `MAX_IMAGE_TOKENS`, plus per question 160 tokens of
 hidden prompt and its own length at 0.5 tokens per character) and settles at the usage
 ($0.10 per 1M input tokens, twice that above 272K; no output charge;
-`DECISIONS_PRICES`). Always `detail="high"` (the default "auto" costs about 4.8x on large
+`DECISIONS_PRICES`). The reservation is in dollars only (`count_call=False`): the
+request counts against the job's dollar cap and the daily cap, but it is not one of the
+job's model calls (`MAX_MODEL_CALLS_PER_JOB`, `MAX_MODEL_CALLS_PER_PAGE`, which were
+sized for the steps' calls). Counted there, the checks would about double a job's calls
+and an equation-heavy document that fits today would fail its last elements with
+`budget_job_calls`, so the shadow would change other elements after all. In dollars
+they add 2-4% of a job's spend; only a document that ends within that margin of its
+dollar cap could have its last element refused because of them. Always `detail="high"` (the default "auto" costs about 4.8x on large
 images). Never `store`, `prompt_cache_key`, `temperature`, `seed`, `reasoning` or
 `service_tier` (the endpoint refuses them). One send, no retries, a 10 s timeout
 (`DECISIONS_TIMEOUT_S`). Document text (the caption, the alt text, the LaTeX) travels

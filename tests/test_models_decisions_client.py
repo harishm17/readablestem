@@ -57,10 +57,12 @@ class RecordingBudget(JobBudget):
     def __init__(self, cap: float = 1.0, max_calls: int = 100) -> None:
         super().__init__(guard=InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=max_calls)
         self.reserved: list[float] = []
+        self.counted: list[bool] = []  # count_call of each reservation granted
 
-    def reserve(self, amount_usd: float) -> Reservation:
-        reservation = super().reserve(amount_usd)
+    def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
+        reservation = super().reserve(amount_usd, count_call=count_call)
         self.reserved.append(amount_usd)
+        self.counted.append(count_call)
         return reservation
 
 
@@ -240,8 +242,17 @@ def test_reserves_first_then_settles_at_the_usage_price():
     assert result.cost_usd == pytest.approx(decisions_cost_usd("gpt-6-luna", 640))
     assert result.cost_usd == pytest.approx(640 * 0.10 / 1e6)
     assert result.cost_usd <= reserved
-    assert budget.spent_usd == pytest.approx(result.cost_usd) and budget.calls == 1
+    assert budget.spent_usd == pytest.approx(result.cost_usd)
     assert result.input_tokens == 640 and result.request_id == "req_abc123"
+
+
+def test_a_request_holds_dollars_but_never_one_of_the_job_model_calls():
+    # A job whose call cap the steps have used up still gets its checks (the dollar caps
+    # still apply), and the checks leave every call to the steps.
+    client, budget, http = make(ok(body(predicate())), budget=RecordingBudget(max_calls=0))
+    assert client.decide(request()).outcome == "ok"
+    assert len(http.sent) == 1 and budget.counted == [False] and budget.calls == 0
+    assert budget.spent_usd > 0
 
 
 def test_a_refused_reservation_sends_nothing():
@@ -288,7 +299,7 @@ def test_http_errors_are_outcomes_charged_nothing_and_never_logged_with_content(
     with caplog.at_level(logging.DEBUG, logger="a11y_stem"):
         result = client.decide(request())
     assert result.outcome == "api_error" and result.answers == {}
-    assert result.cost_usd == 0 and budget.spent_usd == 0 and budget.calls == 1
+    assert result.cost_usd == 0 and budget.spent_usd == 0 and len(budget.reserved) == 1
     assert result.request_id == "req_e1"
     assert SECRET not in caplog.text
     (line,) = [r for r in caplog.records if r.getMessage() == "decision_call"]
@@ -367,4 +378,4 @@ def test_the_client_is_safe_to_share_between_threads():
         t.start()
     for t in threads:
         t.join()
-    assert results == ["ok"] * 8 and len(http.sent) == 8 and budget.calls == 8
+    assert results == ["ok"] * 8 and len(http.sent) == 8 and len(budget.reserved) == 8

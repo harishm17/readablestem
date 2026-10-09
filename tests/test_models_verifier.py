@@ -201,7 +201,8 @@ def test_end_to_end_over_the_real_sdk():
     verdict = verifier.figure_alt(PNG, alt="Bar chart.", caption="Figure 1.")
     assert dict(verdict.probabilities) == {"ok": 0.31, "factual_error": 0.88}
     assert figure_score(verdict.probabilities) == pytest.approx(0.12)
-    assert job.calls == 1 and job.spent_usd == pytest.approx(700 * 0.10 / 1e6)
+    # Dollars only: a check is not one of the job's model calls.
+    assert job.calls == 0 and job.spent_usd == pytest.approx(700 * 0.10 / 1e6)
     assert [q["name"] for q in sent[0]["questions"]] == ["ok", "fe"]
 
 
@@ -233,7 +234,7 @@ def test_fake_verifier_answers_records_and_charges_the_budget():
     wrong = fake.figure_alt(PNG, alt="wrong", caption=None)
     assert figure_score(right.probabilities) > 0.5 > figure_score(wrong.probabilities)  # type: ignore[operator]
     assert fake.requests == [(FIGURE_CHECK, "right"), (FIGURE_CHECK, "wrong")]
-    assert job.calls == 2 and job.spent_usd == pytest.approx(right.cost_usd + wrong.cost_usd)
+    assert job.calls == 0 and job.spent_usd == pytest.approx(right.cost_usd + wrong.cost_usd)
     timed_out = FakeVerifier(outcomes={EQUATION_CHECK: "timeout"}).equation_match(PNG, latex="x")
     assert timed_out.reason_code == "timeout"
 

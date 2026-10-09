@@ -293,7 +293,7 @@ def test_the_cron_runs_the_canary_at_most_once_per_utc_day(factory):
 
     def make(settings, budget):
         assert budget.max_usd == canary.CANARY_MAX_USD
-        assert budget.max_calls == len(canary.load_cases())
+        assert budget.max_calls == 0  # Decisions requests hold dollars, not model calls
         deciders.append(Replay())
         return deciders[-1]
 

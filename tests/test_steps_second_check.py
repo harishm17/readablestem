@@ -9,7 +9,7 @@ import logging
 import pytest
 
 from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from a11y_stem.core.types import DocumentResult, Fix, Status
 from a11y_stem.models.fake import FakeVisionClient
 from a11y_stem.models.verifier import EQUATION_CHECK, FIGURE_CHECK, FakeVerifier
@@ -132,16 +132,35 @@ def test_no_answer_leaves_the_figure_exactly_as_today(outcome):
     assert (record.outcome, record.flagged, record.probabilities) == (outcome, None, {})
 
 
-def test_no_budget_left_for_the_check_is_fail_open_too():
-    job = JobBudget(InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=1)
+def test_no_dollars_left_for_the_check_is_fail_open_too():
+    job = JobBudget(InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=10)
+
+    def last_dollars(request):  # the describe call is the one that uses them up
+        job.spent_usd = job.max_usd
+        return figure_out()
+
     client = FakeVisionClient(
-        responders={"figure": lambda req: figure_out()},
-        budget=job,
-        verifier=FakeVerifier(budget=job),
+        responders={"figure": last_dollars}, budget=job, verifier=FakeVerifier(budget=job)
     )
     fix = describe(figure_element(), PNG, client=client, settings=SETTINGS)
     assert fix.status is Status.ACCEPTED and fix.review == "none"
     assert fix.verifications[0].outcome == "budget_exceeded"
+
+
+def test_the_check_needs_no_model_call_of_the_job():
+    # The describe call takes the job's last model call; the check still runs, because
+    # it holds dollars only (`count_call=False`), and the job's call count stays 1.
+    job = JobBudget(InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=1)
+    client = FakeVisionClient(
+        responders={"figure": lambda req: figure_out()},
+        budget=job,
+        verifier=scores(ok=0.1, fe=0.9),
+    )
+    assert isinstance(client.verifier, FakeVerifier)
+    client.verifier.budget = job
+    fix = describe(figure_element(), PNG, client=client, settings=SETTINGS)
+    assert fix.verifications[0].outcome == "ok" and fix.review == "optional"
+    assert job.calls == 1 and job.spent_usd == pytest.approx(fix.cost_usd)
 
 
 @pytest.mark.parametrize(
@@ -223,6 +242,36 @@ def test_shadow_answers_change_nothing_but_the_record(name):
     for record in with_shadow.verifications:
         assert record.mode == "shadow" and record.check == EQUATION_CHECK
         assert record.flagged is True  # would flag: recorded only
+
+
+@pytest.mark.parametrize("max_calls", [4, 5, 7])
+def test_shadow_requests_never_use_the_job_call_cap(max_calls):
+    # Equations transcribed one after another on one job budget, as in a conversion:
+    # with the shadow on, every equation gets exactly the status, tier and calls it gets
+    # with the shadow off, also when the steps' calls run into the cap part way.
+    def run(shadow: bool) -> tuple[list[object], int, float]:
+        job = JobBudget(InMemorySpendGuard(cap_usd=10.0), max_usd=10.0, max_calls=max_calls)
+        verifier = FakeVerifier(equation=ALARM, budget=job) if shadow else None
+        answers = {CHEAP_MODEL: eq_out(confidence=0.6), MAIN_MODEL: eq_out(r"F = m \cdot a")}
+        client = FakeVisionClient(
+            responders={"equation": lambda r: answers[r.model]}, budget=job, verifier=verifier
+        )
+        outcomes: list[object] = []
+        for _ in range(6):
+            element = equation_element(display="inline", text="F = ma")  # escalates
+            try:
+                fix = transcribe(element, PNG, client=client, settings=SETTINGS)
+            except BudgetExceeded as exc:
+                outcomes.append(f"budget_{exc.scope}")
+            else:
+                outcomes.append(fix.model_dump(exclude={"verifications"}))
+        return outcomes, job.calls, job.spent_usd
+
+    plain, plain_calls, plain_usd = run(shadow=False)
+    shadowed, shadow_calls, shadow_usd = run(shadow=True)
+    assert shadowed == plain and shadow_calls == plain_calls <= max_calls
+    assert shadow_usd > plain_usd  # the shadow is paid for, in dollars only
+    assert "budget_job_calls" in plain  # the cap was reached in every case
 
 
 def test_final_proposal_is_checked_once_on_the_main_route():

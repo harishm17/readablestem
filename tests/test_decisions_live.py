@@ -35,7 +35,8 @@ def test_the_decisions_verifier_ranks_right_above_wrong_within_its_reservation()
     images = {
         k: base64.b64decode(v) for k, v in json.loads(REQUESTS_FILE.read_text())["images"].items()
     }
-    budget = JobBudget(InMemorySpendGuard(cap_usd=0.01), max_usd=0.01, max_calls=4)
+    # No model calls allowed: Decisions requests hold dollars only.
+    budget = JobBudget(InMemorySpendGuard(cap_usd=0.01), max_usd=0.01, max_calls=0)
     verifier = DecisionsVerifier(DecisionsClient(settings, budget))
     caption = "Figure 1. Results of a class vote."
     right = verifier.figure_alt(
@@ -69,4 +70,5 @@ def test_the_decisions_verifier_ranks_right_above_wrong_within_its_reservation()
     reserved_eq = reservation_usd("gpt-6-luna", equation_request(images["e_mc2"], latex="E = mc^2"))
     assert match.cost_usd <= reserved_eq
     total = right.cost_usd + wrong.cost_usd + match.cost_usd + mismatch.cost_usd
-    assert budget.calls == 4 and budget.spent_usd == pytest.approx(total)
+    # Held in dollars only: none of the four is one of the job's model calls.
+    assert budget.calls == 0 and budget.spent_usd == pytest.approx(total)
