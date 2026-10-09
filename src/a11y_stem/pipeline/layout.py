@@ -71,7 +71,17 @@ from itertools import count, pairwise
 import pymupdf
 
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
+from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.core.types import BBox, Element, Kind, inline_marker
+from a11y_stem.pipeline import options as run_options
+from a11y_stem.pipeline.notation_memory import (
+    BOLD_LETTER_REASON,
+    EVIDENCE_COURSE,
+    EVIDENCE_DOCUMENT,
+    EVIDENCE_MATHS_FONT,
+    EVIDENCE_NEARBY,
+    bold_letter_latex,
+)
 from a11y_stem.pipeline.parse import (
     EQUATION_THRESHOLD,
     GREEK,
@@ -1866,6 +1876,157 @@ def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) 
     return []
 
 
+# ============================================================================ bold letters
+# With FEATURE_NOTATION_MEMORY on, a single bold letter in running text ("the projection
+# of a vector **b**") becomes an inline equation that the equation step fixes without a
+# model call (`pipeline.notation_memory.bold_letter_fix`). docs/layout.md "Bold letters
+# in prose" has the rules and their measured precision and recall.
+
+# What may touch a lone letter on either side: a space, the row's edge or punctuation. A
+# letter, digit, hyphen or slash next to it makes it part of a word ("x-axis", "a2").
+_LETTER_EDGES = frozenset(",.;:!?()[]'\"\u2019\u201c\u201d")
+_LABEL_AFTER = frozenset(").:")  # "a)", "A." or "b:" starting a paragraph: a label
+_SENTENCE_END = frozenset(".!?:")
+
+
+@dataclass
+class _BoldLetters:
+    """Bold-letter state while one paragraph's rows are cut into pieces."""
+
+    course: frozenset[str]  # the course's notation keys (`NotationEntry.canonical`)
+    first: bool = True  # the next row is the paragraph's first
+    before: str = ""  # the last non-blank character of the rows so far
+
+    @classmethod
+    def start(cls) -> _BoldLetters | None:
+        """None unless the conversion has the feature on (`pipeline.options`)."""
+        current = run_options.current()
+        if not current.notation_memory:
+            return None
+        return cls(frozenset(e.canonical for e in current.notation))
+
+
+def _bold_key(text: str) -> str | None:
+    """The notation key of one bold letter (bold italic folds to bold), else None."""
+    if bold_letter_latex(text) is None:
+        return None
+    return canonical_from_parts(base_char(text), char_variant(text))
+
+
+def _bold_word(chars: list[_Char], start: int, end: int) -> bool:
+    """Two bold letters in a row between `start` and `end`: a bold word."""
+    run = 0
+    for c in chars[start:end]:
+        run = run + 1 if c.bold and c.c.isalpha() else 0
+        if run >= 2:
+            return True
+    return False
+
+
+def _bold_letter_runs(
+    row: _Row, runs: list[tuple[int, int, list[str]]], state: _BoldLetters | None
+) -> list[tuple[int, int, list[str]]]:
+    """`runs` (`_inline_runs`) plus the row's lone bold letters, by character index.
+
+    A maths run that is one bold letter (a bold omega in CMMIB, a maths bold code point)
+    is marked `BOLD_LETTER_REASON` with `EVIDENCE_MATHS_FONT`. Any other bold Latin
+    letter that stands alone (a space, the row's edge or punctuation on both sides) is
+    a candidate, except: a bold word on either side (a bold phrase: "Part A", a bold
+    sentence); a label ("(b)" anywhere, "a)" or "A." starting the paragraph); a capital
+    starting a sentence ("A" is also the article), unless the course lists it. A
+    candidate the course lists keeps `EVIDENCE_COURSE`; the others wait for evidence
+    from the whole document (`_settle_bold_letters`). Unchanged when the feature is off.
+    """
+    if state is None:
+        return runs
+    chars = row.chars
+    info = _CharInfo.of(row)
+    covered: set[int] = set()
+    out: list[tuple[int, int, list[str]]] = []
+    for start, end, reasons in runs:
+        covered.update(range(start, end))
+        ink = [c for c in chars[start:end] if not c.blank]
+        if len(ink) == 1 and _bold_key(_clean(ink[0].styled)) is not None:
+            reasons = [BOLD_LETTER_REASON, EVIDENCE_MATHS_FONT]
+        out.append((start, end, reasons))
+    ink = [i for i, c in enumerate(chars) if not c.blank]
+    tokens = _tokens(row)  # (start, end) of each run of non-blank characters
+    starts = [start for start, _ in tokens]
+    for pos, i in enumerate(ink):
+        c = chars[i]
+        if i in covered or not c.bold or info.classes[i] != "L" or info.script[i]:
+            continue
+        # Its token (split at blanks and gaps) is the letter and punctuation only, and
+        # the tokens either side hold no bold word.
+        token = bisect.bisect_right(starts, i) - 1
+        start, end = tokens[token]
+        if any(chars[k].c not in _LETTER_EDGES for k in range(start, end) if k != i):
+            continue  # part of a word ("x-axis", "a2", "vectors")
+        sides = [tokens[k] for k in (token - 1, token + 1) if 0 <= k < len(tokens)]
+        if any(_bold_word(chars, start, end) for start, end in sides):
+            continue
+        before = chars[ink[pos - 1]].c if pos else state.before
+        after = chars[ink[pos + 1]].c if pos + 1 < len(ink) else ""
+        opening = state.first and pos == 0
+        if (before in "([" and after in ")]") or (opening and after in _LABEL_AFTER):
+            continue  # a label
+        key = styled_char(c.c, "bold")
+        in_course = key in state.course
+        if c.c.isupper() and (opening or not before or before in _SENTENCE_END) and not in_course:
+            continue  # a capital starting a sentence
+        out.append((i, i + 1, [BOLD_LETTER_REASON, *([EVIDENCE_COURSE] if in_course else [])]))
+    state.first = False
+    if ink:
+        state.before = chars[ink[-1]].c
+    return sorted(out)
+
+
+def _settle_bold_letters(pages: list[_PageBlocks]) -> None:
+    """Keep a waiting bold letter (`_bold_letter_runs`) as maths only with evidence:
+    the same bold letter in the document's maths (a display or inline equation,
+    `EVIDENCE_DOCUMENT`), or, for a small letter, another bold letter that is maths in
+    the same paragraph ("x or s is used instead of d", `EVIDENCE_NEARBY`). Any other
+    goes back into the text as the plain letter it was."""
+
+    def waiting(piece: str | _Inline) -> bool:
+        return isinstance(piece, _Inline) and piece.reasons == [BOLD_LETTER_REASON]
+
+    def bold_keys(text: str) -> set[str]:
+        return {key for ch in text if (key := _bold_key(ch)) is not None}
+
+    blocks = [b for page in pages for b in page.blocks]
+    if not any(waiting(p) for b in blocks if b.kind in _TEXT_BLOCKS for p in b.pieces):
+        return
+    in_maths: set[str] = set()
+    for block in blocks:
+        if block.kind == Kind.EQUATION:
+            in_maths |= bold_keys(block.text or "")
+        elif block.kind in _TEXT_BLOCKS:
+            for piece in block.pieces:
+                if isinstance(piece, _Inline) and not waiting(piece):
+                    in_maths |= bold_keys(piece.text)
+    for block in blocks:
+        if block.kind not in _TEXT_BLOCKS or not any(waiting(p) for p in block.pieces):
+            continue
+        for piece in block.pieces:
+            if isinstance(piece, _Inline) and waiting(piece) and _bold_key(piece.text) in in_maths:
+                piece.reasons = [BOLD_LETTER_REASON, EVIDENCE_DOCUMENT]
+        nearby = any(
+            isinstance(p, _Inline) and not waiting(p) and bold_keys(p.text) for p in block.pieces
+        )
+        pieces: list[str | _Inline] = []
+        for piece in block.pieces:
+            if isinstance(piece, _Inline) and waiting(piece):
+                letter = base_char(piece.text)
+                if nearby and letter.islower():
+                    piece.reasons = [BOLD_LETTER_REASON, EVIDENCE_NEARBY]
+                else:
+                    pieces.append(letter)
+                    continue
+            pieces.append(piece)
+        block.pieces = _tidy(pieces)
+
+
 # ============================================================================ lists
 
 
@@ -3184,10 +3345,11 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     if block.marker is not None and block.marker.end:
         first = rows[0]
         rows[0] = _Row(first.chars[block.marker.end :], column=first.column)
+    letters = _BoldLetters.start()
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
-        for start, end, reasons in _inline_runs(row):
+        for start, end, reasons in _bold_letter_runs(row, _inline_runs(row), letters):
             row_pieces.append("".join(c.c for c in row.chars[cursor:start]))
             chars = row.chars[start:end]
             text = _clean("".join(c.styled for c in chars))
@@ -3490,6 +3652,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins)
         for n in selected
     ]
+    _settle_bold_letters(pages)
     elements = _to_elements(pages, ctx)
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
