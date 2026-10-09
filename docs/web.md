@@ -51,7 +51,8 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
 | `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment) |
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
-| `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table). Both on by default |
+| `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
+| `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
 | `BASE_URL` | Builds the OAuth redirect URI, `${BASE_URL}/auth/callback` |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
@@ -71,17 +72,19 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 
 | Method and path | Who | What |
 |---|---|---|
-| GET `/` | anyone | What the tool does, sign-in, link to the demo |
+| GET `/` | anyone | What the tool does, why now, how long, how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
 | GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `a11y-stem ops launch-check` lists what is still unfinished on the public pages |
-| GET `/limits` | anyone | Known limits: a `TODO(Harish)` placeholder until Harish writes it |
+| GET `/limits` | anyone | Known limits: the facts that hold today and the measured accuracy, marked "Draft, to be reviewed by Harish" until he writes the copy |
+| GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make it the main version (28 CFR 35.202, the DOJ fact sheet); guidance, not legal advice |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, documents waiting and converting (numbers only; 503 when the database does not answer) |
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; 403 page if not allowlisted or email not verified |
 | GET, POST `/dev-login` | dev/test only | Any email, no password; the allowlist still applies |
 | POST `/logout` | signed in | Clears the session |
-| GET `/app` | signed in | Upload form and the user's documents |
+| GET `/app` | signed in | My documents as a to-do list (below), then the upload form |
+| GET `/app/documents?v=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged) |
 | POST `/jobs` | signed in | Upload: checks, quota, queue; 303 to `/jobs/{id}` |
 | GET `/jobs/{id}` | owner | Status and progress; results summary when done |
 | GET `/jobs/{id}/status?v=` | owner | Status fragment for htmx polling (204 while unchanged) |
@@ -94,14 +97,22 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond two renders in progress for one person, 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure; 429 and 503 as for pages |
 | POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix; with `equations`, `figures` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to |
-| GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
-| GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
+| GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
+| GET, POST `/jobs/{id}/feedback` | owner | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
+| GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
 | POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone
-else, admins included, so job ids cannot be probed and admins never see documents.
+else, admins included, so job ids cannot be probed and admins never see documents. Its
+owner, though, is told what happened to a document that is gone (UX review MF10): a job
+past its `retain_until` (not purged yet) shows "This document has been deleted. It was
+deleted automatically 24 hours after upload, as promised" (or 30 days, as chosen), and
+once the purge has removed the row, the owner's own `uploaded` event still says the id
+was theirs, so the page says it was deleted and when documents are. Anyone else gets the
+plain "There is no document at this address" page, which no longer says "or it is not
+yours to see". It is a 404 either way.
 
 ## Sign-in, sessions and CSRF
 
@@ -151,7 +162,9 @@ else, admins included, so job ids cannot be probed and admins never see document
    child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
    hang in MuPDF *while opening the file and counting pages* kills the child, not the
    server. Password-protected, unreadable or empty files and more than
-   `MAX_PAGES_PER_JOB` pages are refused (422), and so are, before any quota is spent:
+   `MAX_PAGES_PER_JOB` pages are refused (422); a file that only opens after MuPDF
+   repairs it and then has no pages (a download that did not finish) is `damaged`, not
+   "no pages"; and so are refused, before any quota is spent:
    a page larger than 5000 pt on a side (`page_too_large`; MuPDF accepts page boxes far
    past the PDF maximum, and the conversion's crash probe renders whole pages, about
    1 GB for an 18000 pt page), a PDF whose every page is a scanned image with no text
@@ -162,8 +175,93 @@ else, admins included, so job ids cannot be probed and admins never see document
    pages + n <= quota`, in the same transaction as the job insert (429 if over).
 
 Validation errors re-show the upload page with an error summary linked to the file input.
+Every message names the file and the numbers it is about ("chapter2.pdf has 59 pages;
+the limit is 30 per upload"); the file name is shown to its owner only, never logged.
+With JavaScript, `app.js` checks the chosen file's size and type as soon as it is chosen
+(the same field error, in a polite live region) and refuses to send a wrong one; while a
+good one is sent it says "Uploading notes.pdf. Keep this tab open." and a second click
+does nothing. The server checks everything again.
+
 The opt-in box "Keep my document and results for 30 days to help improve the tool" is off
-by default; it sets `retain_until` to 30 days instead of 24 hours.
+by default; it sets `retain_until` to 30 days instead of 24 hours. Its hint says what
+ticking it allows: Harish may look at the results to fix mistakes in the tool (the
+privacy notice says the same). Splitting it into "keep my work, only me" and "also let
+the developer look" (UX review MF10 part 1) is Harish's decision.
+
+When today's budget is spent, the upload form is replaced by a notice saying when
+uploads open again (the next midnight UTC, shown in the reader's time), instead of a form
+that would send the whole file to be refused (UX review MF20). The page-limit hint says
+when the count starts again too.
+
+## My documents (`web/documents.py`)
+
+`/app` is a to-do list (UX review BW5): "Needs your decisions" (finished with decisions
+still open, oldest first, with a "Review next" button to the first one's review
+screen), then "Ready to download" (newest first), then "Converting, waiting or stopped".
+A summary line counts them ("2 documents need your decisions (5 decisions in all) · 1
+ready to download · 1 converting"). Each row shows the document's title (the stored
+result's title, else the file name), the file name, pages and upload time under it, the
+status in words with its one next step (Review or Download), when it is deleted
+automatically, and a Delete link to the confirmation page. A partly converted result
+says so first ("Stopped early, 2 decisions to make"). When there are documents the list
+comes before the upload form.
+
+Only the title and the fixes are read from each stored result, through JSON paths, and
+only for finished jobs. While a document is waiting or converting, htmx polls
+`/app/documents` every 5 s; `list_version` (from the jobs' own columns) answers 204 when
+nothing changed, otherwise the whole list is swapped. Every link in it has a stable id,
+so htmx puts focus back on the same link after a swap; the list is not a live region,
+but the tab title follows it ("My documents (4 of 6 finished)"). Without JavaScript a
+"refresh the list" link does the same. Below 600 px each row is a block of labelled
+lines instead of a table row wider than the screen (the table keeps explicit ARIA roles,
+since some browsers drop a table's semantics when its display changes).
+
+Downloads are named after the title plus the start of the job id
+(`problem-set-2-kinematics-3f9a2b.html`), so two versions of a handout never overwrite
+each other (UX review MF24).
+
+## Usage events (`web/events.py`)
+
+Server-side, content-free events answer the beta's questions (did each instructor
+upload, review, download and mean to post it?) without cookies or scripts:
+`signed_in`, `uploaded` (value: pages; code: a fingerprint), `reuploaded` (the same
+file as an earlier upload of the same person; value: hours since), `finished` (code:
+`done`, `failed:<error code>`; value: seconds since upload), `review_opened` (once per
+visit of 30 minutes), `decision_made` (code: `single`, `group` or `bulk`; value: fixes
+changed), `review_completed` (the first time no decision is left open; value: seconds
+since it finished), `html_viewed` (once per visit), `downloaded` (code `open` or `done`:
+whether decisions were still open), and the two answers after a download, `will_post`
+and `minutes_saved`. Each row is a user id, a name, a job id, a code and a number
+(`events.make` refuses anything else; the column set is fixed by
+`tests/test_web_content_schema.py`). The fingerprint is an HMAC of the file's SHA-256
+under a key derived from `SESSION_SECRET`, salted with the user id and cut to 96 bits:
+it matches that person's uploads of the same bytes and nothing else, and is never the
+plain hash. A failing event is logged as `event_failed` and dropped; the action it
+records carries on. The events of a review decision are written in its transaction.
+
+`/admin` counts them per UTC day (last 28 days) and per pseudonymous person (`u-` and
+the start of the random user id, never an email). Events are deleted after 400 days by
+the hourly purge, and with their user (docs/operations.md, "Usage events").
+`EVENTS_ENABLED=false` writes nothing (and turns the questions off).
+
+## After a download (`web/feedback.py`)
+
+Under the job page's download link (`templates/_after_download.html`, one include in
+`job.html`): a link to `/help/posting`, and two optional questions, "Will you post this
+for students?" (yes, no, not sure) and "About how many minutes did this save you?" (a
+whole number up to 2000). They are in the page but hidden until the download link is
+used (`app.js`); without JavaScript they show on the next visit, once the server has
+recorded the download. Answers are stored as `will_post` and `minutes_saved` events,
+once per document (a second answer keeps the first). An error (text in the minutes box)
+shows on `/jobs/{id}/feedback` with an error summary and what was typed kept.
+
+## Times
+
+Every time in the page body is a `<time datetime="...Z">` element written by the `utc`
+template filter, saying the time in UTC ("9 Oct 2026, 23:32 UTC"); `app.js` rewrites it
+in the reader's time zone with how far away it is ("Fri, Oct 9, 6:32 PM CDT (in 23
+hours)"), also in lists swapped in by htmx. Without JavaScript the UTC text stays (UX
+review MF16). The `utc_text` filter is the plain text, for titles and attributes.
 
 ## Spend cap (`web/spend.py`)
 
@@ -669,15 +767,18 @@ forms or reading our cookies.
 The app pages have no inline scripts, styles or event handlers (a test scans the
 templates). htmx is vendored at `web/static/vendor/` (version, hashes and licence in its
 README) and configured to need no `eval`, inject no `<style>` and keep no history cache.
-Our own script, `web/static/app.js`, places error summary links (below) and adds the
-review screen's enhancements (scrolling the page image to the selected mark, opt-in
-keyboard shortcuts; see "Review screen"). The review screen's per-job geometry comes as
+Our own script, `web/static/app.js`, places error summary links (below), shows times in
+the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
+limits"), shows the questions after a download, and adds the review screen's
+enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts;
+see "Review screen"). The review screen's per-job geometry comes as
 a stylesheet from our origin (`marks.css`), not as inline styles.
 
 ## Accessibility of the app itself
 
 Server-rendered pages that work without JavaScript: htmx only polls the job status
-(every 3 s, 204 while unchanged). When the job finishes the status box, a live region,
+(every 3 s, 204 while unchanged) and the documents list while something converts (every
+5 s, focus kept; see "My documents"). When the job finishes the status box, a live region,
 says so and links to the results ("Show the results", or "Show why it stopped"); the
 page is not reloaded under the reader, which would send a screen reader back to the
 top. Without
@@ -734,6 +835,9 @@ white text on the numbered discs at least 4.5:1.
 - File names, emails and document content are not written to logs or error codes; the
   file name is shown only to its owner and deleted with the job.
 - Not-allowlisted sign-ins are not stored.
+- Usage events are content-free and pseudonymous (see "Usage events"); the privacy page
+  has one line on them (its final wording is Harish's) and admins see them per day and
+  per pseudonym only.
 
 ## Database and migrations
 
@@ -769,6 +873,7 @@ a user id is added without it.
 | `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check |
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
+| `uv run pytest -m browser tests/test_web_ux_browser.py` | Chromium: My documents, the posting help, the questions after a download, the deleted-document page and the usage tables (axe at 1280 and 320 px, reflow with text spacing, no-JS), local times, the upload check, the list refreshing with focus kept |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

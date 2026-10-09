@@ -50,12 +50,34 @@ bug, say), the job is deleted anyway and counted in `unaggregated_deleted`. A no
 value there means some counts are missing; it never means a document was kept.
 
 What survives deletion: users and the allowlist, the daily spend and quota counters, the
-content-free aggregates below, and database backups. A backup holds every document that
-existed when it ran, so a deleted document stays in the backups taken before its
-deletion until they are dropped. The deploy keeps one daily backup and no
-point-in-time-recovery logs, so that is up to about a day after the purge
+content-free aggregates below, the usage events (next section), and database backups. A
+backup holds every document that existed when it ran, so a deleted document stays in the
+backups taken before its deletion until they are dropped. The deploy keeps one daily
+backup and no point-in-time-recovery logs, so that is up to about a day after the purge
 ([deploy.md](deploy.md), "Backups and deleted documents"); the privacy page has to say so
 (or backups have to be off).
+
+### Usage events
+
+`events` (`web/events.py`, docs/web.md "Usage events") holds content-free, pseudonymous
+usage events: a user id, an event name, a job id, a category code and a number. They
+outlive the jobs they mention on purpose (the beta's measures span weeks, and the
+deleted-document page uses them to tell an owner what happened), but not for ever:
+
+- **400 days** (`web.events.EVENT_RETENTION_DAYS`). The same hourly purge, after the jobs,
+  deletes every event older than that (`ops.retention.purge_old_events`, one DELETE on
+  the indexed `created_at`) and logs the number as `events_deleted` in `purge_done`.
+  Why 400: a whole academic year and the first weeks of the next, so a course taught
+  again can be compared with its first run and the four-week return rate measured all
+  year. Changing it means changing the privacy page, which names the number.
+- **With the user.** `a11y-stem users delete` (`ops.retention.erase_user`) deletes all of
+  a person's events at once.
+- **Off.** `EVENTS_ENABLED=false` writes no new events (and turns the two questions after
+  a download off); events already kept follow the rules above.
+
+The upload fingerprint in `uploaded` events is keyed with `SESSION_SECRET`: rotating the
+secret makes the next upload of a file look new (a missed `reuploaded`, nothing else).
+`/admin` shows the counts per day and per pseudonymous person.
 
 ## Error aggregates
 
