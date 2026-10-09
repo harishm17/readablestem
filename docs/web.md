@@ -119,15 +119,14 @@ else, admins included, so job ids cannot be probed and admins never see document
   `MS_ALLOWED_TENANTS` are all set (`web/microsoft.py`). The sign-in page and the landing
   page then offer "Sign in with your university account (Microsoft)" first and "Sign in
   with Google" second (the secondary button style); without them, Google only, as
-  before. One multi-tenant app
-  registration (deploy.md, step 3b) at the authority
+  before. One multi-tenant app registration (deploy.md, step 3b) at the authority
   `https://login.microsoftonline.com/organizations/v2.0` (work and school accounts),
   scope `openid profile email`, the authorisation code flow with state, nonce and PKCE
   (S256), the client secret sent in the token request's body, and `prompt=select_account`
   so someone signed in to Microsoft with the wrong account can pick another. Redirect URI:
   `${BASE_URL}/auth/microsoft/callback` (query response mode: the session cookie is
-  SameSite=Lax, so a form-post answer would arrive without it).
-  The discovery document's issuer is a template
+  SameSite=Lax, so a form-post answer would arrive without it). The discovery
+  document's issuer is a template
   (`https://login.microsoftonline.com/{tenantid}/v2.0`) that no token matches as written,
   so we check the ID token ourselves instead of Authlib: an RS256 signature by the
   Microsoft key named by `kid` (the keys are fetched again, once, for an unknown `kid`,
@@ -820,7 +819,7 @@ a user id is added without it.
 | Command | What runs |
 |---|---|
 | `uv run pytest tests/test_web_*.py` | Offline web tests (SQLite) plus the Postgres ones when a server is available |
-| `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check |
+| `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check, first sign-ins of one identity under 20 threads (`tests/test_web_auth_postgres.py`) |
 | `uv run pytest tests/test_web_auth_microsoft.py` | Microsoft sign-in against a fake identity platform (`tests/fixtures/web/oidc.py`: keys made and tokens signed in the test, served to Authlib through an httpx mock transport): every ID-token check, tenants, linking, identities, sessions |
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
