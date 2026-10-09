@@ -94,6 +94,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
+import defusedxml.ElementTree as DET
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from a11y_stem.config import Settings
@@ -120,6 +121,7 @@ from a11y_stem.pipeline import options
 # The equation step's comparison rules, imported rather than copied so a maths cell and
 # an equation are judged alike (as web/compare.py does for the review screen).
 from a11y_stem.pipeline.equation_step import (
+    _DOTLESS,
     TEXT_LAYER_MISMATCH_BELOW,
     _mathml_symbols,
     _symbol_bag,
@@ -670,6 +672,61 @@ class _MathsVerdict:
     style: str | None = None  # "meaning" or "cosmetic" (the worst seen)
 
 
+# MathML layouts whose digits a text layer may run together or reorder (a fraction's
+# numerator and denominator, a root's index, scripts above and below): numbers are not
+# compared one by one there.
+_STACKED = frozenset({"mfrac", "msqrt", "mroot", "msubsup", "munder", "mover", "munderover"})
+_NUMBER = re.compile(r"\d+(?:\.\d+)*")
+# An en dash between digits in a cell the model wrote as maths is a minus sign whose
+# raise the text layer lost (the gold print's 10^-18 reads "10", an en dash, "18"), not a
+# range.
+_DIGIT_DASH = re.compile(r"(?<=\d)\u2013(?=\d)")
+
+
+def _mathml_tags(mathml: str) -> tuple[set[str], str]:
+    root = DET.fromstring(mathml, forbid_dtd=True)
+    tags = {element.tag.rsplit("}", 1)[-1] for element in root.iter()}
+    return tags, " ".join(root.itertext())
+
+
+def _cased(text: str) -> Counter[str]:
+    """Letters with their case (math italic glyphs as ASCII; dotless i and j as i, j)."""
+    folded = unicodedata.normalize("NFKC", text).translate(_DOTLESS)
+    return Counter(ch for ch in folded if ch.isalpha() and unicodedata.category(ch) != "Lm")
+
+
+def maths_numbers_or_case_differ(layer: str, mathml: str) -> bool:
+    """Stricter than the equation step's case-folded bag of letters and digits, for a
+    maths cell (a value with its unit): the letters with their case (5 mW is not 5 MW),
+    and, unless the MathML stacks digits (a fraction, a root, scripts above and below),
+    the numbers as written (6.67 is not 66.7; 10^-31 is not 10^-13)."""
+    try:
+        tags, text = _mathml_tags(mathml)
+    except DET.ParseError:
+        return False
+    if _cased(layer) != _cased(text):
+        return True
+    if tags & _STACKED:
+        return False
+    return not _numbers_agree(_NUMBER.findall(_folded(layer)), _NUMBER.findall(_folded(text)))
+
+
+def _numbers_agree(layer: list[str], maths: list[str]) -> bool:
+    """The same numbers, in any order; or, in order, each PDF number the MathML's next
+    numbers run together (a text layer that flattened an exponent: "1024" for 10^{24})."""
+    if Counter(layer) == Counter(maths):
+        return True
+    at = 0
+    for number in layer:
+        joined = ""
+        while at < len(maths) and len(joined) < len(number):
+            joined += maths[at]
+            at += 1
+        if joined != number:
+            return False
+    return at == len(maths)
+
+
 def maths_verdict(grid: TableGrid, local: TableGrid) -> _MathsVerdict:
     """Each maths cell against the text of the local cells in its place (the equation
     step's rules: `text_layer_symbols_differ`, `compare_signs` when the letters mostly
@@ -691,10 +748,11 @@ def maths_verdict(grid: TableGrid, local: TableGrid) -> _MathsVerdict:
                 verdict.symbols = True
             continue
         verdict.compared += 1
+        differ = differ or maths_numbers_or_case_differ(layer, cell.mathml)
         verdict.symbols = verdict.symbols or differ
         similarity = text_layer_similarity(layer, cell.mathml)
         if similarity is None or similarity >= TEXT_LAYER_MISMATCH_BELOW:
-            signs = compare_signs(layer, cell.mathml)
+            signs = compare_signs(_DIGIT_DASH.sub("\N{MINUS SIGN}", layer), cell.mathml)
             verdict.signs = verdict.signs or (signs is not None and signs.mismatch)
         style = text_layer_style(layer, cell.mathml)
         if style == "meaning" or (style == "cosmetic" and verdict.style is None):

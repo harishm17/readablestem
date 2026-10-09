@@ -365,6 +365,47 @@ def test_a_maths_cell_becomes_mathml_and_is_checked_against_its_pdf_glyphs():
     assert {"table.math", "table.math_symbols", "table.math_signs"} <= {c.name for c in fix.checks}
 
 
+@pytest.mark.parametrize(
+    ("printed", "latex"),
+    [
+        ("6.67\u00d710\u207b\u00b9\u00b9", r"66.7\times 10^{-11}"),  # the decimal point moved
+        ("9.11\u00d710\u207b\u00b3\u00b9", r"9.11\times 10^{-13}"),  # exponent digits swapped
+        ("5 mW", r"5\,\mathrm{MW}"),  # the case of a unit prefix
+    ],
+)
+def test_a_maths_cell_keeps_its_numbers_and_the_case_of_its_letters(printed, latex):
+    pdf = [["Quantity", "Value"], ["G", printed]]
+    wrong = maths_table(latex, label="G")
+    fix = run(by_model(cheap=wrong, main=wrong), element(local(pdf)))
+    assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"symbol_mismatch"})
+
+
+@pytest.mark.parametrize(
+    ("printed", "latex"),
+    [
+        ("6.67\u00d710\u207b\u00b9\u00b9", r"6.67\times 10^{-11}"),
+        ("6.67\u00d710\u221211", r"6.67\times 10^{-11}"),  # the raise lost in the PDF
+        ("(1024 Mass kg)", r"\text{Mass}\ (10^{24}\ \text{kg})"),  # run together, reordered
+        ("5 mW", r"5\,\mathrm{mW}"),
+    ],
+)
+def test_a_maths_cell_read_right_is_accepted(printed, latex):
+    pdf = [["Quantity", "Value"], ["G", printed]]
+    fix = run(by_model(cheap=maths_table(latex, label="G")), element(local(pdf)))
+    assert (fix.status, codes(fix)) == (Status.ACCEPTED, set())
+
+
+def test_an_en_dash_between_digits_in_a_maths_cell_is_a_minus_sign():
+    # The gold print of physics 1.3 writes 10^-18 with a raised en dash, which the text
+    # layer gives flat: the model's maths without the minus sign is not accepted.
+    pdf = [["Quantity", "Value"], ["G", "10\u201318"]]
+    wrong = maths_table("10^{18}", label="G")
+    fix = run(by_model(cheap=wrong, main=wrong), element(local(pdf)))
+    assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"sign_mismatch"})
+    right = run(by_model(cheap=maths_table("10^{-18}", label="G")), element(local(pdf)))
+    assert right.status is Status.ACCEPTED
+
+
 def test_latex_that_is_only_text_is_a_plain_cell():
     pdf = [["Quantity", "Value"], ["g", "5.2 m/s"]]
     plain = maths_table(r"5.2\ \text{m/s}", "5.2 m/s")

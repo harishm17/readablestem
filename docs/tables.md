@@ -331,8 +331,8 @@ All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
 | `table.cell_text` | `whitespace_differs` | each cell equal to the PDF cell in its place once spacing is ignored ("12 345" and "12345", "tempera- ture") | optional note |
 | `table.cell_text` | `no_pdf_text` | no PDF words to compare (no local grid with text, no element text) | required |
 | `table.math` | `invalid_latex` | a maths cell's LaTeX fails a validator (error severity; the cell shows its text) | required |
-| `table.math_symbols` | `symbol_mismatch` | a maths cell's letters, digits or Greek letters differ from the PDF glyphs in its place | required |
-| `table.math_signs` | `sign_mismatch` | a sign or relation in a maths cell differs (the equation step's `compare_signs`) | required |
+| `table.math_symbols` | `symbol_mismatch` | a maths cell's letters, digits or Greek letters differ from the PDF glyphs in its place; unlike an equation, with their case (5 mW is not 5 MW) and, unless the MathML stacks digits (a fraction, a root, scripts above and below), its numbers as written (6.67 is not 66.7, 10^-31 is not 10^-13; a text layer that runs a flattened exponent into its base, "1024" for 10^{24}, still agrees) | required |
+| `table.math_signs` | `sign_mismatch` | a sign or relation in a maths cell differs (the equation step's `compare_signs`; an en dash between digits in the PDF cell counts as a minus sign, the raise of 10^-18 lost) | required |
 | `table.math_style` | `style_mismatch` / `style_cosmetic` | a meaning-level letter style (a bold vector read as plain) / a cosmetic one | required / optional note |
 | `table.source` | `local_grid` | no model answer was usable: the proposal is the local grid | required |
 | `table.row_headers` | `row_headers_dropped` | the model marked a column after data cells as row headers that are not labels, so the row headers to its left were dropped too | optional note |
@@ -458,9 +458,11 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 
 ### Known limits
 
-- A maths cell is compared as a bag of letters and digits (as an equation is): digits
-  in the wrong order inside one maths cell are missed. Plain numbers are text cells
-  (LaTeX without commands or scripts is treated as text), so the word check covers them.
+- A maths cell is compared as a bag of letters (with their case) and of numbers: two
+  whole numbers swapped inside one maths cell are missed, and so are digits in a
+  fraction or a root (only their bag is compared, as for an equation). Plain numbers
+  are text cells (LaTeX without commands or scripts is treated as text), so the word
+  check covers them.
 - The checks are only as good as the local grid: a grid that splits a wrapped cell into
   two rows, or misses a merged cell, sends a correct answer to review.
 - A text layer that differs from the print (small caps given as lower case, a ligature
