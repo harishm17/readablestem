@@ -36,6 +36,9 @@ table are placed right after the figure, folded, for students who want the detai
 
 ## Alt text rules
 
+Write the alt text so it stands on its own, as if there were no longer description: many
+students only hear the alt text.
+
 1. At most 150 characters: one or two plain sentences. Convey what a student needs from
    the figure, not every visual detail.
 2. Charts and graphs: name the chart type, the variables on the axes, and the main trend
@@ -74,7 +77,8 @@ figures, and when you cannot read the figure.
    as a screen reader can speak them ("5 m/s", "delta t", "x squared").
 4. Do not start with "Image of", "This image shows" or "The figure shows"; start with
    what it is ("Line graph of ...").
-5. Do not copy the caption or the alt text; the reader has heard both.
+5. Do not copy the caption or the alt text; the reader has heard both. Do not mention
+   the data table: it is shown separately, and a reviewer may remove it.
 
 ## Data table rules
 
