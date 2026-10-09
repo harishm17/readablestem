@@ -396,6 +396,57 @@ def test_latex_pdf_overline_with_a_dropped_minus():
     assert differs(element.text, dropped) == (signs.MINUS,)
 
 
+# Review 2026-10-08: typed maths without an equation editor (Word, Google Docs, HTML
+# superscripts) has an ASCII hyphen for a minus, flattened against its exponent's digits.
+TYPED_EXPONENTS = [
+    # (text layer as layout reads it, right, the sign dropped)
+    (
+        "q = 1.6 × 10-19 C",
+        r"q = 1.6 \times 10^{-19}\ \text{C}",
+        r"q = 1.6 \times 10^{19}\ \text{C}",
+    ),
+    (
+        "λ = 5.0×10-7 m",
+        r"\lambda = 5.0 \times 10^{-7}\ \text{m}",
+        r"\lambda = 5.0 \times 10^{7}\ \text{m}",
+    ),
+    ("g = 9.8 m s-2", r"g = 9.8\ \text{m s}^{-2}", r"g = 9.8\ \text{m s}^{2}"),
+    ("q = 1.6e-19 C", r"q = 1.6e{-19}\ \text{C}", r"q = 1.6e{19}\ \text{C}"),
+]
+
+
+@pytest.mark.parametrize(("text_layer", "right", "wrong"), TYPED_EXPONENTS)
+def test_a_typed_negative_exponent_is_a_minus(text_layer, right, wrong):
+    assert differs(text_layer, right) == ()
+    assert differs(text_layer, wrong) == (signs.MINUS,)
+
+
+# Hyphens in labels and typed ranges: a transcription that keeps the hyphen in \text, writes
+# it as a minus, or drops it from a label is not flagged.
+HYPHENATED_LABELS = [
+    ("NC-14 = N0e−λt", r"N_{\text{C-14}} = N_0 e^{-\lambda t}"),
+    ("NC-14 = N0e−λt", r"N_{^{14}\text{C}} = N_0 e^{-\lambda t}"),
+    ("mU-235 = 235.04 u", r"m_{\text{U}235} = 235.04\ \text{u}"),
+    ("Ek-e = 1 2mv2", r"E_{ke} = \frac{1}{2} m v^2"),
+    ("2-D: x2 + y2 = r2", r"\text{2D: } x^2 + y^2 = r^2"),
+    ("𝑝-value = 0.03", r"p \text{ value} = 0.03"),
+    ("𝑏= y-intercept = 4", r"b = \text{y intercept} = 4"),
+    ("t = 1-3 s", r"t = 1\text{-}3\ \text{s}"),
+    ("t = 1-3 s", r"t = 1\text{--}3\ \text{s}"),
+    ("t = 1-3 s", r"t = 1-3\ \text{s}"),
+]
+
+
+@pytest.mark.parametrize(("text_layer", "latex"), HYPHENATED_LABELS)
+def test_a_hyphen_in_a_label_or_a_range_is_not_a_minus(text_layer, latex):
+    assert differs(text_layer, latex) == ()
+
+
+def test_a_typed_exponent_between_letters_is_still_ambiguous():
+    # Known gap (docs/steps.md "Limits"): "e-kt" has the shape of a label ("k-e").
+    assert differs("N = N0e-kt", r"N = N_0 e^{kt}") == ()
+
+
 def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
     # Only a swap of × and · is meaning-level: a missing sign may be juxtaposition
     # (a scalar times a vector), which the text layer cannot tell apart.
@@ -852,3 +903,50 @@ def test_a_chromium_printed_course_page():
     decay = next(e for e in equations if _symbol_bag(e.text or "") == _symbol_bag("NN0eλt"))
     fix = run(by_model(main=out(r"N = N_0 e^{\lambda t}")), decay)
     assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
+
+
+# Typed maths without an equation editor, as an HTML or word-processor export has it: an
+# ASCII hyphen for a minus, exponents as <sup>. (HTML line, right, sign dropped or None)
+TYPED_LINES = [
+    (
+        "<i>q</i> = 1.6 × 10<sup>-19</sup> C",
+        r"q = 1.6 \times 10^{-19}\ \text{C}",
+        r"q = 1.6 \times 10^{19}\ \text{C}",
+    ),
+    (
+        "<i>λ</i> = 5.0×10<sup>-7</sup> m",
+        r"\lambda = 5.0 \times 10^{-7}\ \text{m}",
+        r"\lambda = 5.0 \times 10^{7}\ \text{m}",
+    ),
+    ("<i>y</i> = <i>x</i><sup>2</sup>-4", r"y = x^2 - 4", r"y = x^2 4"),
+    ("<i>F</i> = -<i>k</i><i>x</i>", r"F = -kx", r"F = kx"),
+    # Known gap: a hyphen between letters ("e-kt") may be a label's, so it is uncertain.
+    ("<i>N</i> = <i>N</i><sub>0</sub><i>e</i><sup>-<i>kt</i></sup>", r"N = N_0 e^{-kt}", None),
+]
+
+
+@pytest.mark.browser
+def test_typed_superscripts_printed_by_chromium():
+    from a11y_stem.eval.render import ChromiumRenderer
+
+    body = "".join(
+        f"<p>Paragraph {i} of ordinary prose about the motion of a body.</p>"
+        f'<p style="text-align:center">{line}</p>'
+        for i, (line, _, _) in enumerate(TYPED_LINES)
+    )
+    html = (
+        '<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Typed</title>'
+        '<style>body { font-family: "Liberation Serif", serif; font-size: 12pt; }</style>'
+        f"</head><body><h1>Notes</h1>{body}</body></html>"
+    )
+    with ChromiumRenderer() as renderer:
+        pdf = renderer.pdf(html)
+    equations = [e for e in analyze(pdf).elements if e.kind == Kind.EQUATION]
+    for _, right, wrong in TYPED_LINES:
+        expected = equation_step._mathml_symbols(mathml(right))
+        found = [e for e in equations if _symbol_bag(e.text or "") == expected]
+        assert len(found) == 1, (right, [e.text for e in equations])
+        (element,) = found
+        assert differs(element.text, right) == (), (element.text, right)
+        if wrong is not None:
+            assert differs(element.text, wrong) == (signs.MINUS,), (element.text, wrong)

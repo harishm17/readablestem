@@ -51,8 +51,11 @@ certainly has is always caught, and an ambiguous glyph can widen a range but nev
 create a flag on its own:
 
 - PDF: a hyphen or en dash directly between two letters or digits ("time-dependent",
-  "1–3") may be a word hyphen or a range, so it is uncertain; anywhere else it is a
-  minus. The figure dash, em dash and horizontal bar (Chromium prints \\overline as
+  "1–3", "C-14") may be a word hyphen or a range, so it is uncertain; anywhere else it
+  is a minus. Except a single hyphen with a digit after it and a digit or a single
+  lowercase letter before it: typed maths flattens 10<sup>-19</sup> to "10-19" and
+  m s<sup>-2</sup> to "m s-2", so that is a minus. The figure dash, em dash and
+  horizontal bar (Chromium prints \\overline as
   U+2015) are uncertain. A run of minus or = glyphs glued to an arrow head is one
   uncertain minus (or equals): a shaft, or a real sign touching the head. One exception:
   a single U+2212 touching a → that its letter follows at once, after an operator, an
@@ -178,6 +181,8 @@ _SIGNS: dict[str, str] = _classes(
 _DASHES = frozenset(
     "-\N{HYPHEN}\N{NON-BREAKING HYPHEN}\N{EN DASH}\N{SMALL HYPHEN-MINUS}\N{FULLWIDTH HYPHEN-MINUS}"
 )
+# The hyphens of `_DASHES` (not the en dash, which typesetters use for ranges).
+_HYPHENS = _DASHES - {"\N{EN DASH}"}
 # Maybe a minus, maybe a rule or punctuation (Chromium prints \overline as a bar).
 _LOOSE_DASHES = frozenset("\N{FIGURE DASH}\N{EM DASH}\N{HORIZONTAL BAR}")
 _ANY_DASH = _DASHES | _LOOSE_DASHES
@@ -283,6 +288,35 @@ def _inside_word(text: str, start: int, end: int) -> bool:
     return start > 0 and end < len(text) and text[start - 1].isalnum() and text[end].isalnum()
 
 
+def _letter_run(text: str, index: int, step: int) -> int:
+    """How many letters in a row from `index` going back (step -1) or forward (+1)."""
+    count = 0
+    while 0 <= index < len(text) and text[index].isalpha():
+        count += 1
+        index += step
+    return count
+
+
+def _hyphen_minus(text: str, start: int, end: int) -> bool:
+    """A single hyphen inside a word (`_inside_word`) that reads as a minus.
+
+    Typed maths without an equation editor (Word, Google Docs, HTML superscripts) has an
+    ASCII hyphen for a minus, and the text layer flattens exponents: 10<sup>-19</sup> is
+    "10-19", m s<sup>-2</sup> is "m s-2", 1.6e-19 stays as it is. A hyphen with a digit
+    after it and a digit or a single lowercase letter before it is that minus. Labels
+    keep theirs as a word hyphen ("C-14", "U-235", "2-D", "k-e", "x-axis", "p-value"):
+    a label written without it (`^{14}\\text{C}`, `E_{ke}`) is not a sign error, and
+    letters alone cannot tell "e-kt" (e^{-kt}) from "k-e". An en dash ("1–3") and TeX's
+    "--" stay ranges; a single hyphen between digits ("1-3") counts as a minus, and in
+    `<mtext>` it is uncertain, so `1\\text{-}3` and `1\\text{--}3` match it."""
+    if end - start != 1 or text[start] not in _HYPHENS:
+        return False
+    left, right = text[start - 1], text[end]
+    if not right.isdigit():
+        return False
+    return left.isdigit() or (left.islower() and _letter_run(text, start - 1, -1) == 1)
+
+
 def _bold_letter(ch: str) -> bool:
     return ch.isalpha() and STYLE_GROUPS.get(char_variant(ch) or "") == "bold"
 
@@ -367,7 +401,7 @@ def layer_signs(text_layer: str) -> SignTokens:
         if start in glued:
             continue
         loose = any(ch in _LOOSE_DASHES for ch in text[start:end])
-        if loose or _inside_word(text, start, end):
+        if loose or (_inside_word(text, start, end) and not _hyphen_minus(text, start, end)):
             out.uncertain[MINUS] += 1
         else:
             out.certain[MINUS] += 1
@@ -431,10 +465,11 @@ def _count_math(text: str, out: SignTokens, *, accent: bool, negated: bool = Fal
 
 
 def _count_text(text: str, out: SignTokens) -> None:
-    """`<mtext>`: word hyphens and ranges are skipped, any other sign is uncertain."""
+    """`<mtext>`: word hyphens and ranges are skipped, any other sign is uncertain (a
+    hyphen the text layer would read as a minus, as in "\\text{1-3}", included)."""
     text = _typed_signs(unicodedata.normalize("NFC", text))
     for start, end in _dash_runs(text):
-        if not _inside_word(text, start, end):
+        if not _inside_word(text, start, end) or _hyphen_minus(text, start, end):
             out.uncertain[MINUS] += 1
     for ch in text:
         if ch in _SIGNS:
