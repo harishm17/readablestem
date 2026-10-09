@@ -30,8 +30,11 @@ stylesheet is inline. The file opens offline, can be pasted into an LMS page or 
 and opening it never sends a request anywhere. `html_checks.static_checks` fails the
 `external_resource` rule if that ever changes.
 
-- `lang` comes from the PDF (`/Lang`, else `en`). Anything that is not a language tag
-  falls back to `en`, so a crafted PDF cannot inject attributes.
+- `lang` is `DocumentResult.lang`: the PDF's `/Lang`, else the language detected from the
+  text, else `en` (see "Language"). Anything that is not a language tag falls back to
+  `en`, so a crafted PDF cannot inject attributes.
+- Links (`<a href>`, see "Links and cross-references") load nothing: following one is
+  the reader's choice, and opening the file still sends no request.
 - `<title>` is the PDF title or the first level-1 heading, else "Converted document".
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
@@ -204,6 +207,107 @@ The assembler replaces each marker with the equation's MathML, or with the flagg
 - A marker with no matching equation is left as text. That only happens if layout has a
   bug, and leaving it visible makes the bug easy to spot.
 
+All running text (paragraphs, list items, headings, captions) goes through
+`inline_text.render_inline_text`, which places the equations and, for an element's own
+stored text, writes its links and colour runs. Text without either is written exactly
+as before pipeline 0.4.0.
+
+## Links and cross-references
+
+The text pass (docs/layout.md "The text pass") puts `Element.links` on paragraphs, list
+items and headings; offsets are into the stored text, markers included.
+
+```html
+<p id="p1-e1">The <a href="https://example.org/physics/syllabus">course syllabus</a> lists
+  the reading, and questions go to <a href="mailto:instructor@example.edu">the instructor
+  by email</a>.</p>
+<p id="p1-e10">Eliminating <math display="inline">...</math> between
+  <a href="#p1-e7">Eqs. (1)</a> and <a href="#p1-e9">(2)</a> gives ...
+  <a href="#p1-e12">Figure 1</a> shows the cart.</p>
+...
+<figure id="p1-e12"><img ...><figcaption>Figure 1: A cart on a ramp.</figcaption></figure>
+```
+
+- **Web and email links** ("uri") keep the PDF's visible text as the link text, never an
+  `aria-label` in its place (WCAG 2.5.3, label in name), and are written only while
+  `href` is http, https or mailto (`core.types.is_safe_href`, checked again when the
+  file is written). Any other PDF link (ftp, a file, a program, javascript) is not
+  written; its text stays, and the job page lists the notice `link_scheme_dropped`.
+- **Links inside the document** ("internal": a PDF link to a place in it; "crossref":
+  "Figure 2.3", "Eq. (3)", "Table 1" in the text) point at `#` + the target element's id.
+  Figures, tables, display equations, headings, paragraphs and list items already carry
+  their ids, so nothing new is written at the target.
+- A link never wraps an inline equation: a wide one is a tab stop of its own, and a tab
+  stop cannot sit inside a link (axe `nested-interactive`). A link across an equation is
+  written in two pieces around it.
+- A span that starts or ends inside a marker, reaches past the text, or overlaps an
+  earlier link is skipped, so a stored result edited by hand cannot break the markup.
+- Links keep the browser's link style (colour and underline), so they are not told apart
+  by colour alone. A long URL as link text wraps (`overflow-wrap: break-word` on
+  `<main>`), so the page still reflows at 320 px.
+- Link text that does not say where it goes ("click here", a long bare URL) is kept as
+  printed, with the optional notice `link_text_unclear`: only the instructor can reword
+  it.
+
+## Language
+
+`<html lang>` is the document's language. A paragraph or list item that the text pass
+found confidently in another language carries its own (`Element.lang`), written by
+`inline_text.passage_attrs` on its block:
+
+```html
+<html lang="en">
+...
+<p id="p1-e15" lang="fr">La vitesse moyenne est le quotient du déplacement par la durée
+  du trajet, et elle s’exprime en mètres par seconde.</p>
+```
+
+A screen reader switches voice for that paragraph (WCAG 3.1.2), and MathCAT speaks maths
+in the page's language. Where the document language came from is
+`DocumentResult.lang_source`: "pdf" (`/Lang`), "detected" (from the body text, notice
+`lang_detected`), "default" ("en" because nothing else was found, notice `lang_assumed`)
+or "user". The job page shows the language and lets the instructor change it: the route
+calls `text_pass.set_document_language(result, tag)` (a BCP 47 tag such as "fr" or
+"pt-BR", or an English name such as "French"; ValueError otherwise), which sets the
+language and source "user", drops the two notices and works out the passages again
+against the new language, then re-renders the file with `web.review.rerender_html` and
+stores both, as after a review decision.
+
+Text the tool itself writes (the notes, "Equation" before an equation number, the about
+section) is English whatever the document's language.
+
+## Coloured text (FEATURE_COLOUR)
+
+With the flag on, text printed in a colour other than the body's keeps a colour in the
+output (`Element.colour_runs`; which colours count is in docs/layout.md "Colour"). Each
+printed colour gets one class, `tc-` and its hex digits, and one CSS rule added only to
+documents that have it:
+
+```html
+<style>
+...
+.tc-d2d2d2 { color: #767676; }
+.tc-ff0000 { color: #ee0000; }
+</style>
+...
+<p id="p1-e17">In these notes, <span class="tc-ff0000">the vectors are printed in
+  red</span> and scalars in black. <span class="tc-d2d2d2">A light grey hint follows
+  each problem.</span></p>
+```
+
+The rule's colour reaches 4.5:1 on the white background (WCAG 1.4.3): a colour that
+already does is kept exactly; any other is made darker, keeping its hue, in OKLCH
+(`pipeline.contrast.with_contrast`: lightness lowered until the contrast is reached,
+chroma lowered only as far as sRGB needs). So pure red becomes `#ee0000`, light grey
+`#767676`, yellow a dark yellow. The output has no dark mode, so there is no second
+rule. Colour spans sit inside links and may wrap maths (which takes the colour); linked
+text itself keeps the link colour.
+
+Colour alone tells a screen reader nothing, so text that refers to colour near coloured
+text ("shown in red") gets the optional notice `colour_reference`: the instructor may want
+to add a cue that does not depend on seeing it. With the flag off, coloured text is
+written in the body colour, as in pipeline 0.3.0.
+
 ## MathML is rebuilt, never pasted
 
 MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also importable as
@@ -286,7 +390,9 @@ About 35 lines of inline CSS:
   readers still read it);
 - a visible `:focus-visible` outline and a print rule that keeps flagged boxes together.
 
-There is no dark mode yet.
+There is no dark mode yet. Documents with coloured text (FEATURE_COLOUR) get one rule
+per printed colour (see "Coloured text"); documents with rebuilt tables get the table
+rules.
 
 ## Checks
 
@@ -303,8 +409,12 @@ There is no dark mode yet.
 | `html.unique_ids` | `duplicate_id` |
 | `html.list_structure` | `list_structure` (an `<li>` outside `<ul>`/`<ol>`, or an element other than `<li>` or text directly in one; axe's `list` and `listitem` rules) |
 | `html.math_display` | `math_missing_display` (warning) |
-| `html.self_contained` | `external_resource` |
+| `html.self_contained` | `external_resource` (a link's `href` is not a resource; the link rules check it) |
 | `html.wording` | `banned_wording` |
+| `html.link_text` | `empty_link` (an `<a>` with no text or img alt in it) |
+| `html.link_href` | `unsafe_link` (an `href` that is not http, https, mailto, or `#` and an id in the file) |
+| `html.lang_tags` | `invalid_lang` (a `lang` value that is not a well-formed BCP 47 tag) |
+| `html.text_contrast` | `low_contrast` (a `tc-` colour class below 4.5:1 on white) |
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/a11y_stem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
@@ -325,7 +435,10 @@ and fast, so anyone holding only the HTML can recompute them.
 
 `pipeline/run.py`:
 
-1. `layout.analyze` (raises `LayoutError` for unreadable, encrypted or too-long PDFs).
+1. `layout.analyze` (raises `LayoutError` for unreadable, encrypted or too-long PDFs),
+   then `text_pass.apply`: links, cross-references, the document and passage languages,
+   and with FEATURE_COLOUR the colour runs (docs/layout.md "The text pass"). It sets
+   `lang`, `lang_source` and its notices on the result, and never fails the run.
 2. `heading_step.heading_fixes` on all elements. If it raises, every heading becomes
    FAILED `internal_error` and renders as a paragraph.
 3. Page by page, on the calling thread (PyMuPDF is not thread-safe): crop each equation
@@ -362,7 +475,7 @@ the summed time inside that page's steps (pages overlap in the pool, so per-page
 would mislead). `prompt_versions` are the versions the calls actually used, else the
 step modules' `PROMPT_VERSION`.
 
-Tracer spans (`document`, `headings`, `page`, `step`, `model_call`, `assemble`) carry ids,
+Tracer spans (`document`, `text`, `headings`, `page`, `step`, `model_call`, `assemble`) carry ids,
 pages, models, token counts, costs, statuses and reason codes only. Results are added with
 the span handle's `set(**attrs)` (WP6; `update` is accepted too) as scalars: counts per
 status are flat keys such as `fixes_accepted`, and a budget stop is `reason`. Each model
@@ -397,7 +510,7 @@ Fixes:
 Model calls: 2
 Cost:        $0.0044 (fake client, nothing billed)
 Time:        0.0 s
-Checks:      static 11/11 passed
+Checks:      static 15/15 passed
              axe-core no violations
 wrote /tmp/wp4-demo/notes.html
 wrote /tmp/wp4-demo/notes.json
@@ -431,3 +544,13 @@ TODO(Harish): turn these into the public known-limits copy.
   alt text.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
+- A PDF link over an image or a drawing (not over text) is not kept; neither is a link
+  in a figure's caption. A link whose rectangle covers only part of a word links that
+  part.
+- Link text is kept as printed, also when it says nothing on its own ("click here"):
+  only the instructor can reword it (the job page lists it as worth checking).
+- Language detection needs about 20 words of prose; a short handout of mostly maths is
+  assumed to be English unless the PDF says otherwise. A passage is marked only when it
+  is a whole paragraph or list item in another language (a quoted phrase inside an
+  English sentence is not).
+- Colour inside figures stays in the image; colour in headings is not kept.
