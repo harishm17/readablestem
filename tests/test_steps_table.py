@@ -881,7 +881,13 @@ def test_a_conversion_with_tables_on_writes_the_rebuilt_table(monkeypatch):
 # --------------------------------------------------------------------------- recorded answers
 
 
-RECORDED = sorted(p.stem for p in FIXTURES.glob("*.json"))
+# Recorded model answers only: the folder also holds other fixtures (table-bench's
+# excerpt for the tables evaluation, the Word export).
+RECORDED = sorted(
+    p.stem
+    for p in FIXTURES.glob("*.json")
+    if "answers" in json.loads(p.read_text(encoding="utf-8"))
+)
 
 
 def test_there_are_recorded_answers():
