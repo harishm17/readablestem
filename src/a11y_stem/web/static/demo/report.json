@@ -13,14 +13,15 @@
       "Paul Peter Urone",
       "Roger Hinrichs"
     ],
-    "pipeline_version": "0.3.0",
+    "pipeline_version": "0.4.0",
     "budget_not_attempted": 0
   },
   "result": {
-    "pipeline_version": "0.3.0",
+    "pipeline_version": "0.4.0",
     "prompt_versions": {
       "equation": "equation-df0e12f1",
-      "figure": "figure-ac51f42d"
+      "figure": "figure-ac51f42d",
+      "table": "table-b3769ce7"
     },
     "title": "2.3 Position vs. Time Graphs",
     "lang": "en",
@@ -53,7 +54,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e1",
@@ -82,7 +87,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e2",
@@ -107,7 +116,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e3",
@@ -132,7 +145,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e4",
@@ -157,7 +174,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e5",
@@ -186,7 +207,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e6",
@@ -214,7 +239,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e7",
@@ -239,7 +268,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e8",
@@ -264,7 +297,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e9",
@@ -289,7 +326,11 @@
         "list_ordered": false,
         "list_level": 2,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e10",
@@ -318,7 +359,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e11",
@@ -343,7 +388,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e12",
@@ -372,7 +421,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e13",
@@ -400,7 +453,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e14",
@@ -425,7 +482,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e15",
@@ -450,7 +511,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e16",
@@ -479,7 +544,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p1-e17",
@@ -504,7 +573,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p2-e0",
@@ -529,7 +602,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 378,
+            "end": 389,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p2-e3"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p2-e1",
@@ -556,7 +641,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "bmxy"
+        "regular_letters": "bmxy",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p2-e2",
@@ -581,7 +670,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 335,
+            "end": 346,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p2-e3"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p2-e3",
@@ -608,7 +709,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": "Figure 2.10 The diagram shows a straight-line graph. The equation for the straight line is y equals mx + b.",
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p2-e4",
@@ -633,7 +738,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p2-e5",
@@ -658,7 +767,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 252,
+            "end": 263,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p3-e0"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e0",
@@ -685,7 +806,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": "Figure 2.11 A graph of position versus time for the drive to school is shown. What would the graph look like if we added the return trip?",
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e1",
@@ -710,7 +835,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 91,
+            "end": 102,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p3-e0"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e2",
@@ -737,7 +874,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e3",
@@ -764,7 +905,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e4",
@@ -791,7 +936,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "t"
+        "regular_letters": "t",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e5",
@@ -823,7 +972,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "tΔ"
+        "regular_letters": "tΔ",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e6",
@@ -848,7 +1001,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e7",
@@ -877,7 +1034,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e8",
@@ -902,7 +1063,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p3-e9",
@@ -927,7 +1092,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 31,
+            "end": 42,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p4-e0"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e0",
@@ -954,7 +1131,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": "Figure 2.12 The diagram shows a graph of position versus time for a jet-powered car on the Bonneville Salt Flats.",
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e1",
@@ -979,7 +1160,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 106,
+            "end": 117,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p4-e0"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e2",
@@ -1006,7 +1199,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "agv"
+        "regular_letters": "agv",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e3",
@@ -1033,7 +1230,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e4",
@@ -1060,7 +1261,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "bmxy"
+        "regular_letters": "bmxy",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e5",
@@ -1092,7 +1297,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "t"
+        "regular_letters": "t",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e6",
@@ -1117,7 +1326,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e7",
@@ -1149,7 +1362,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "t"
+        "regular_letters": "t",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e8",
@@ -1174,7 +1391,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e9",
@@ -1201,7 +1422,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "st"
+        "regular_letters": "st",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p4-e10",
@@ -1228,7 +1453,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "st"
+        "regular_letters": "st",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e0",
@@ -1257,7 +1486,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e1",
@@ -1285,7 +1518,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e2",
@@ -1314,7 +1551,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e3",
@@ -1339,7 +1580,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e4",
@@ -1364,7 +1609,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e5",
@@ -1389,7 +1638,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e6",
@@ -1414,7 +1667,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e7",
@@ -1439,7 +1696,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e8",
@@ -1464,7 +1725,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e9",
@@ -1489,7 +1754,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e10",
@@ -1514,7 +1783,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e11",
@@ -1539,7 +1812,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p5-e12",
@@ -1564,7 +1841,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e0",
@@ -1593,7 +1874,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e1",
@@ -1621,7 +1906,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e2",
@@ -1646,7 +1935,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e3",
@@ -1671,7 +1964,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e4",
@@ -1696,7 +1993,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e5",
@@ -1721,7 +2022,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e6",
@@ -1746,7 +2051,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e7",
@@ -1771,7 +2080,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e8",
@@ -1796,7 +2109,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e9",
@@ -1821,7 +2138,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e10",
@@ -1846,7 +2167,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e11",
@@ -1871,7 +2196,11 @@
         "list_ordered": false,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e12",
@@ -1899,7 +2228,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e13",
@@ -1924,7 +2257,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e14",
@@ -1949,7 +2286,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e15",
@@ -1974,7 +2315,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e16",
@@ -1999,7 +2344,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e17",
@@ -2024,7 +2373,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e18",
@@ -2049,7 +2402,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e19",
@@ -2074,7 +2431,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e20",
@@ -2099,7 +2460,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e21",
@@ -2124,7 +2489,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p6-e22",
@@ -2149,7 +2518,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e0",
@@ -2178,7 +2551,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e1",
@@ -2206,7 +2583,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e2",
@@ -2231,7 +2612,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e3",
@@ -2256,7 +2641,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e4",
@@ -2281,7 +2670,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e5",
@@ -2306,7 +2699,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e6",
@@ -2334,7 +2731,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p7-e7",
@@ -2359,7 +2760,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e0",
@@ -2388,7 +2793,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e1",
@@ -2416,7 +2825,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e2",
@@ -2441,7 +2854,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e3",
@@ -2470,7 +2887,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e4",
@@ -2495,7 +2916,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e5",
@@ -2528,7 +2953,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "elopstΔ"
+        "regular_letters": "elopstΔ",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e6",
@@ -2553,7 +2982,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e7",
@@ -2581,7 +3014,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e8",
@@ -2606,7 +3043,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e9",
@@ -2631,7 +3072,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e10",
@@ -2658,7 +3103,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "Δ"
+        "regular_letters": "Δ",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e11",
@@ -2691,7 +3140,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "mstΔ"
+        "regular_letters": "mstΔ",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e12",
@@ -2719,7 +3172,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e13",
@@ -2744,7 +3201,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e14",
@@ -2773,7 +3234,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e15",
@@ -2801,7 +3266,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p8-e16",
@@ -2826,7 +3295,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p9-e0",
@@ -2851,7 +3324,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 288,
+            "end": 299,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p9-e1"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p9-e1",
@@ -2878,7 +3363,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": "Figure 2.13 The diagram shows a graph of the position of a jet-powered car during the time span when it is speeding up. The slope of a distance versus time graph is velocity. This is shown at two points. Instantaneous velocity at any point is the slope of the tangent at that point.",
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p9-e2",
@@ -2905,7 +3394,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": "Figure 2.14 A U.S. Air Force jet car speeds down a track. (Matt Trostle, Flickr)",
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e0",
@@ -2930,7 +3423,26 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 37,
+            "end": 48,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p9-e1"
+          },
+          {
+            "start": 470,
+            "end": 481,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p9-e1"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e1",
@@ -2959,7 +3471,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e2",
@@ -2987,7 +3503,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e3",
@@ -3012,7 +3532,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 125,
+            "end": 136,
+            "kind": "crossref",
+            "href": null,
+            "target_id": "p9-e1"
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e4",
@@ -3041,7 +3573,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e5",
@@ -3066,7 +3602,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e6",
@@ -3094,7 +3634,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e7",
@@ -3119,7 +3663,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e8",
@@ -3146,7 +3694,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "st"
+        "regular_letters": "st",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e9",
@@ -3171,7 +3723,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e10",
@@ -3196,7 +3752,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e11",
@@ -3229,7 +3789,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "QdelmopstvΔ"
+        "regular_letters": "QdelmopstvΔ",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e12",
@@ -3257,7 +3821,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p10-e13",
@@ -3282,7 +3850,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e0",
@@ -3311,7 +3883,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e1",
@@ -3339,7 +3915,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e2",
@@ -3364,7 +3944,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e3",
@@ -3389,7 +3973,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e4",
@@ -3418,7 +4006,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e5",
@@ -3443,7 +4035,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e6",
@@ -3470,7 +4066,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e7",
@@ -3495,7 +4095,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e8",
@@ -3520,7 +4124,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e9",
@@ -3545,7 +4153,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p11-e10",
@@ -3570,7 +4182,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e0",
@@ -3595,7 +4211,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e1",
@@ -3622,7 +4242,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "ms"
+        "regular_letters": "ms",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e2",
@@ -3649,7 +4273,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": "st"
+        "regular_letters": "st",
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e3",
@@ -3676,7 +4304,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e4",
@@ -3701,7 +4333,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e5",
@@ -3726,7 +4362,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e6",
@@ -3755,7 +4395,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e7",
@@ -3780,7 +4424,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e8",
@@ -3805,7 +4453,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e9",
@@ -3830,7 +4482,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e10",
@@ -3855,7 +4511,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p12-e11",
@@ -3880,7 +4540,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e0",
@@ -3905,7 +4569,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e1",
@@ -3930,7 +4598,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e2",
@@ -3955,7 +4627,11 @@
         "list_ordered": true,
         "list_level": 1,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e3",
@@ -3984,7 +4660,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e4",
@@ -4012,7 +4692,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e5",
@@ -4037,7 +4721,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e6",
@@ -4062,7 +4750,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e7",
@@ -4087,7 +4779,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 65,
+            "end": 108,
+            "kind": "uri",
+            "href": "http://creativecommons.org/licenses/by/4.0/",
+            "target_id": null
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e8",
@@ -4112,7 +4816,19 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [
+          {
+            "start": 15,
+            "end": 83,
+            "kind": "uri",
+            "href": "https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs",
+            "target_id": null
+          }
+        ],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e9",
@@ -4137,7 +4853,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e10",
@@ -4162,7 +4882,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       },
       {
         "id": "p13-e11",
@@ -4187,7 +4911,11 @@
         "list_ordered": null,
         "list_level": null,
         "caption": null,
-        "regular_letters": null
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
       }
     ],
     "fixes": [
@@ -4202,6 +4930,7 @@
           "level": 1,
           "text": "2.3 Position vs. Time Graphs"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4253,6 +4982,7 @@
           "level": 2,
           "text": "Section Learning Objectives"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4304,6 +5034,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4355,6 +5086,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4406,6 +5138,7 @@
           "level": 2,
           "text": "Section Key Terms"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4457,6 +5190,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4508,6 +5242,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4559,6 +5294,7 @@
           "level": 2,
           "text": "Graphing Position as a Function of Time"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -4612,6 +5348,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -4770,11 +5507,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1296,
-            "cached_input_tokens": 1293,
-            "output_tokens": 29,
-            "reasoning_tokens": 0,
-            "cost_usd": 2.773e-05,
-            "latency_ms": 1790,
+            "cached_input_tokens": 0,
+            "output_tokens": 53,
+            "reasoning_tokens": 22,
+            "cost_usd": 0.0001561,
+            "latency_ms": 3101,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -4801,7 +5538,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 308,
             "cost_usd": 3.08e-05,
-            "latency_ms": 173
+            "latency_ms": 290
           }
         ]
       },
@@ -4814,9 +5551,14 @@
         "figure": {
           "figure_type": "chart",
           "alt": "Graph of y versus x: the line rises with positive slope m, equal to rise divided by run, and crosses the y-axis at positive intercept b.",
-          "decorative": false
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -4879,11 +5621,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1810,
-            "cached_input_tokens": 1807,
+            "cached_input_tokens": 0,
             "output_tokens": 58,
             "reasoning_tokens": 0,
-            "cost_usd": 0.0007667,
-            "latency_ms": 3200,
+            "cost_usd": 0.0042,
+            "latency_ms": 4316,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -4909,7 +5651,7 @@
             "version": "figure_alt-16a00e69",
             "input_tokens": 1251,
             "cost_usd": 0.0001251,
-            "latency_ms": 169
+            "latency_ms": 216
           }
         ]
       },
@@ -4921,10 +5663,15 @@
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (km) versus time (min): position rises linearly from 0 km at 0 minutes to 5 km at 10 minutes.",
-          "decorative": false
+          "alt": "Line graph of position (km) versus time (min): position rises steadily from 0 km at 0 minutes to 5 km at 10 minutes.",
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -4987,11 +5734,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1905,
-            "cached_input_tokens": 1902,
-            "output_tokens": 60,
+            "cached_input_tokens": 0,
+            "output_tokens": 59,
             "reasoning_tokens": 0,
-            "cost_usd": 0.0007962000000000001,
-            "latency_ms": 2761,
+            "cost_usd": 0.0044,
+            "latency_ms": 3929,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5009,15 +5756,15 @@
             "mode": "note",
             "outcome": "ok",
             "probabilities": {
-              "ok": 0.99,
+              "ok": 0.94,
               "factual_error": 0.0
             },
             "flagged": false,
             "model": "gpt-6-luna",
             "version": "figure_alt-16a00e69",
-            "input_tokens": 1335,
-            "cost_usd": 0.0001335,
-            "latency_ms": 201
+            "input_tokens": 1334,
+            "cost_usd": 0.00013340000000000002,
+            "latency_ms": 198
           }
         ]
       },
@@ -5025,7 +5772,7 @@
         "element_id": "p3-e2",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.99,
         "equation": {
           "latex": "\\mathbf{d}_0 = 0",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub><mo>=</mo><mn>0</mn></mrow></math>",
@@ -5034,6 +5781,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -5192,11 +5940,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1303,
-            "cached_input_tokens": 1300,
-            "output_tokens": 60,
-            "reasoning_tokens": 28,
-            "cost_usd": 4.3299999999999995e-05,
-            "latency_ms": 2169,
+            "cached_input_tokens": 1157,
+            "output_tokens": 72,
+            "reasoning_tokens": 40,
+            "cost_usd": 6.217e-05,
+            "latency_ms": 3094,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5206,11 +5954,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1303,
-            "cached_input_tokens": 1300,
-            "output_tokens": 69,
-            "reasoning_tokens": 34,
-            "cost_usd": 0.000826,
-            "latency_ms": 3440,
+            "cached_input_tokens": 0,
+            "output_tokens": 64,
+            "reasoning_tokens": 29,
+            "cost_usd": 0.003246,
+            "latency_ms": 2823,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5237,7 +5985,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 305,
             "cost_usd": 3.05e-05,
-            "latency_ms": 101
+            "latency_ms": 163
           },
           {
             "check": "equation_match",
@@ -5254,7 +6002,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 308,
             "cost_usd": 3.08e-05,
-            "latency_ms": 110
+            "latency_ms": 109
           }
         ]
       },
@@ -5271,6 +6019,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -5429,11 +6178,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1330,
-            "cached_input_tokens": 1327,
-            "output_tokens": 203,
-            "reasoning_tokens": 171,
-            "cost_usd": 0.00011507,
-            "latency_ms": 3869,
+            "cached_input_tokens": 1157,
+            "output_tokens": 239,
+            "reasoning_tokens": 207,
+            "cost_usd": 0.00014837000000000002,
+            "latency_ms": 3764,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5460,7 +6209,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 305,
             "cost_usd": 3.05e-05,
-            "latency_ms": 262
+            "latency_ms": 195
           }
         ]
       },
@@ -5477,6 +6226,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -5635,11 +6385,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1329,
-            "cached_input_tokens": 1326,
-            "output_tokens": 57,
-            "reasoning_tokens": 28,
-            "cost_usd": 4.206e-05,
-            "latency_ms": 2142,
+            "cached_input_tokens": 1157,
+            "output_tokens": 56,
+            "reasoning_tokens": 27,
+            "cost_usd": 5.6769999999999993e-05,
+            "latency_ms": 1607,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5666,7 +6416,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 298,
             "cost_usd": 2.98e-05,
-            "latency_ms": 135
+            "latency_ms": 156
           }
         ]
       },
@@ -5674,7 +6424,7 @@
         "element_id": "p3-e5",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.94,
+        "confidence": 0.96,
         "equation": {
           "latex": "\\frac{\\Delta \\mathbf{d}}{\\Delta t}.",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>.</mo></mrow></math>",
@@ -5683,6 +6433,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -5835,11 +6586,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1320,
-            "cached_input_tokens": 1317,
-            "output_tokens": 110,
-            "reasoning_tokens": 69,
-            "cost_usd": 0.0012377,
-            "latency_ms": 4740,
+            "cached_input_tokens": 1157,
+            "output_tokens": 123,
+            "reasoning_tokens": 82,
+            "cost_usd": 0.0016717000000000001,
+            "latency_ms": 4320,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5866,7 +6617,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 311,
             "cost_usd": 3.1100000000000004e-05,
-            "latency_ms": 348
+            "latency_ms": 180
           }
         ]
       },
@@ -5881,6 +6632,7 @@
           "level": 2,
           "text": "Tips For Success"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -5925,14 +6677,19 @@
         "element_id": "p4-e0",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.98,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): position rises linearly from 400 m at time zero; slope is average velocity, delta d over delta t.",
-          "decorative": false
+          "alt": "Line graph of position (m) versus time (s): position starts at 400 m and rises linearly; slope gives a constant velocity of 250 m/s.",
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -5984,9 +6741,9 @@
           },
           {
             "name": "figure.second_check",
-            "passed": true,
+            "passed": false,
             "severity": "warning",
-            "code": null
+            "code": "second_check_mismatch"
           }
         ],
         "calls": [
@@ -5995,11 +6752,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1749,
-            "cached_input_tokens": 1746,
-            "output_tokens": 220,
-            "reasoning_tokens": 156,
-            "cost_usd": 0.0023806,
-            "latency_ms": 7628,
+            "cached_input_tokens": 0,
+            "output_tokens": 261,
+            "reasoning_tokens": 198,
+            "cost_usd": 0.006108,
+            "latency_ms": 7205,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6007,7 +6764,7 @@
         ],
         "reason": null,
         "reviewed": false,
-        "review": "none",
+        "review": "optional",
         "group_key": null,
         "group_size": null,
         "verifications": [
@@ -6017,15 +6774,15 @@
             "mode": "note",
             "outcome": "ok",
             "probabilities": {
-              "ok": 0.67,
-              "factual_error": 0.0
+              "ok": 0.47,
+              "factual_error": 0.03
             },
-            "flagged": false,
+            "flagged": true,
             "model": "gpt-6-luna",
             "version": "figure_alt-16a00e69",
-            "input_tokens": 1239,
-            "cost_usd": 0.0001239,
-            "latency_ms": 268
+            "input_tokens": 1238,
+            "cost_usd": 0.0001238,
+            "latency_ms": 312
           }
         ]
       },
@@ -6033,7 +6790,7 @@
         "element_id": "p4-e2",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.94,
         "equation": {
           "latex": "\\mathbf{v}_{\\text{avg}}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐯</mi><mrow><mtext>avg</mtext></mrow></msub></mrow></math>",
@@ -6042,6 +6799,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -6194,11 +6952,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1279,
-            "cached_input_tokens": 1276,
-            "output_tokens": 109,
-            "reasoning_tokens": 73,
-            "cost_usd": 6.756e-05,
-            "latency_ms": 1966,
+            "cached_input_tokens": 1157,
+            "output_tokens": 156,
+            "reasoning_tokens": 120,
+            "cost_usd": 0.00010177000000000001,
+            "latency_ms": 2736,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6225,7 +6983,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 306,
             "cost_usd": 3.06e-05,
-            "latency_ms": 155
+            "latency_ms": 183
           }
         ]
       },
@@ -6233,7 +6991,7 @@
         "element_id": "p4-e3",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.96,
+        "confidence": 0.97,
         "equation": {
           "latex": "\\mathbf{d}_0",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>",
@@ -6242,6 +7000,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -6394,11 +7153,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1279,
-            "cached_input_tokens": 1276,
-            "output_tokens": 85,
-            "reasoning_tokens": 53,
-            "cost_usd": 5.556e-05,
-            "latency_ms": 1524,
+            "cached_input_tokens": 1157,
+            "output_tokens": 94,
+            "reasoning_tokens": 62,
+            "cost_usd": 7.077000000000002e-05,
+            "latency_ms": 1935,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6425,7 +7184,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 303,
             "cost_usd": 3.03e-05,
-            "latency_ms": 164
+            "latency_ms": 152
           }
         ]
       },
@@ -6435,13 +7194,14 @@
         "status": "accepted",
         "confidence": 0.99,
         "equation": {
-          "latex": "y=mx+b",
+          "latex": "y = mx + b",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>y</mi><mo>=</mo><mi>m</mi><mi>x</mi><mo>+</mo><mi>b</mi></mrow></math>",
           "speech": "y equals m x plus b",
           "display": "inline"
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -6600,11 +7360,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1287,
-            "cached_input_tokens": 1284,
-            "output_tokens": 61,
-            "reasoning_tokens": 31,
-            "cost_usd": 4.364e-05,
-            "latency_ms": 1896,
+            "cached_input_tokens": 1157,
+            "output_tokens": 54,
+            "reasoning_tokens": 23,
+            "cost_usd": 5.157e-05,
+            "latency_ms": 1416,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6622,32 +7382,33 @@
             "mode": "shadow",
             "outcome": "ok",
             "probabilities": {
-              "match": 0.97,
-              "cosmetic": 0.02,
-              "meaning_changing": 0.01
+              "match": 0.99,
+              "cosmetic": 0.01,
+              "meaning_changing": 0.0
             },
             "flagged": false,
             "model": "gpt-6-luna",
             "version": "equation_match-45fc775c",
-            "input_tokens": 307,
-            "cost_usd": 3.07e-05,
-            "latency_ms": 156
+            "input_tokens": 308,
+            "cost_usd": 3.08e-05,
+            "latency_ms": 177
           }
         ]
       },
       {
         "element_id": "p4-e5",
         "kind": "equation",
-        "status": "accepted",
-        "confidence": 0.86,
+        "status": "needs_review",
+        "confidence": 0.528,
         "equation": {
-          "latex": "\\mathbf{d} = \\mathbf{v}t + \\mathbf{d}_0",
-          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>𝐝</mi><mo>=</mo><mi>𝐯</mi><mi>t</mi><mo>+</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>",
-          "speech": "bold d equals bold v t plus bold d sub 0",
+          "latex": "\\mathbf{d} = vt + \\mathbf{d}_0",
+          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>𝐝</mi><mo>=</mo><mi>v</mi><mi>t</mi><mo>+</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>",
+          "speech": "bold d equals v t plus bold d sub 0",
           "display": "block"
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -6789,9 +7550,9 @@
           },
           {
             "name": "equation.text_layer_style",
-            "passed": true,
+            "passed": false,
             "severity": "warning",
-            "code": null
+            "code": "style_mismatch"
           },
           {
             "name": "equation.text_layer_signs",
@@ -6806,11 +7567,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1292,
-            "cached_input_tokens": 1289,
-            "output_tokens": 355,
-            "reasoning_tokens": 310,
-            "cost_usd": 0.0036849,
-            "latency_ms": 9733,
+            "cached_input_tokens": 1157,
+            "output_tokens": 314,
+            "reasoning_tokens": 274,
+            "cost_usd": 0.0035256999999999997,
+            "latency_ms": 8468,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6818,7 +7579,7 @@
         ],
         "reason": null,
         "reviewed": false,
-        "review": "none",
+        "review": "required",
         "group_key": null,
         "group_size": null,
         "verifications": [
@@ -6828,16 +7589,16 @@
             "mode": "shadow",
             "outcome": "ok",
             "probabilities": {
-              "match": 0.68,
-              "cosmetic": 0.08,
-              "meaning_changing": 0.24
+              "match": 0.48,
+              "cosmetic": 0.1,
+              "meaning_changing": 0.42
             },
             "flagged": true,
             "model": "gpt-6-luna",
             "version": "equation_match-45fc775c",
-            "input_tokens": 322,
-            "cost_usd": 3.2200000000000003e-05,
-            "latency_ms": 162
+            "input_tokens": 317,
+            "cost_usd": 3.1700000000000005e-05,
+            "latency_ms": 182
           }
         ]
       },
@@ -6845,7 +7606,7 @@
         "element_id": "p4-e7",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.96,
+        "confidence": 0.88,
         "equation": {
           "latex": "\\mathbf{d} = \\mathbf{d}_0 + \\mathbf{v}t.",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>𝐝</mi><mo>=</mo><msub><mi>𝐝</mi><mn>0</mn></msub><mo>+</mo><mi>𝐯</mi><mi>t</mi><mo>.</mo></mrow></math>",
@@ -6854,6 +7615,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -7012,11 +7774,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1303,
-            "cached_input_tokens": 1300,
-            "output_tokens": 137,
-            "reasoning_tokens": 92,
-            "cost_usd": 0.001506,
-            "latency_ms": 3838,
+            "cached_input_tokens": 1157,
+            "output_tokens": 280,
+            "reasoning_tokens": 235,
+            "cost_usd": 0.0032077,
+            "latency_ms": 8122,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7043,7 +7805,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 324,
             "cost_usd": 3.24e-05,
-            "latency_ms": 174
+            "latency_ms": 156
           }
         ]
       },
@@ -7060,6 +7822,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -7218,11 +7981,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1301,
-            "cached_input_tokens": 1298,
-            "output_tokens": 76,
-            "reasoning_tokens": 41,
-            "cost_usd": 5.1280000000000004e-05,
-            "latency_ms": 1202,
+            "cached_input_tokens": 1157,
+            "output_tokens": 72,
+            "reasoning_tokens": 37,
+            "cost_usd": 6.197e-05,
+            "latency_ms": 2000,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7249,7 +8012,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 307,
             "cost_usd": 3.07e-05,
-            "latency_ms": 223
+            "latency_ms": 165
           }
         ]
       },
@@ -7266,6 +8029,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -7424,11 +8188,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1303,
-            "cached_input_tokens": 1300,
-            "output_tokens": 75,
-            "reasoning_tokens": 38,
-            "cost_usd": 5.0799999999999995e-05,
-            "latency_ms": 1486,
+            "cached_input_tokens": 1157,
+            "output_tokens": 78,
+            "reasoning_tokens": 41,
+            "cost_usd": 6.517e-05,
+            "latency_ms": 1994,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7455,7 +8219,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 311,
             "cost_usd": 3.1100000000000004e-05,
-            "latency_ms": 111
+            "latency_ms": 107
           }
         ]
       },
@@ -7470,6 +8234,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7521,6 +8286,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7572,6 +8338,7 @@
           "level": 2,
           "text": "Teacher Demonstration"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7623,6 +8390,7 @@
           "level": 2,
           "text": "Snap Lab"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7674,6 +8442,7 @@
           "level": 3,
           "text": "Graphing Motion"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7725,6 +8494,7 @@
           "level": 3,
           "text": "Procedure"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7776,6 +8546,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7827,6 +8598,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7878,6 +8650,7 @@
           "level": 3,
           "text": "Solving Problems Using Position vs. Time Graphs"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7929,6 +8702,7 @@
           "level": 2,
           "text": "Worked Example"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -7980,6 +8754,7 @@
           "level": 3,
           "text": "Using Position–Time Graph to Calculate Average Velocity: Jet Car"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -8031,6 +8806,7 @@
           "level": 2,
           "text": "Strategy"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -8075,7 +8851,7 @@
         "element_id": "p8-e5",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.96,
         "equation": {
           "latex": "\\text{slope} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\mathbf{v}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mtext>slope</mtext><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>𝐯</mi></mrow></math>",
@@ -8084,6 +8860,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -8242,11 +9019,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1287,
-            "cached_input_tokens": 1284,
-            "output_tokens": 105,
-            "reasoning_tokens": 52,
-            "cost_usd": 0.0011844000000000002,
-            "latency_ms": 3616,
+            "cached_input_tokens": 1157,
+            "output_tokens": 135,
+            "reasoning_tokens": 82,
+            "cost_usd": 0.0017257000000000002,
+            "latency_ms": 4849,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -8273,7 +9050,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 338,
             "cost_usd": 3.38e-05,
-            "latency_ms": 154
+            "latency_ms": 144
           }
         ]
       },
@@ -8288,6 +9065,7 @@
           "level": 3,
           "text": "Solution"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -8341,6 +9119,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -8493,11 +9272,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1253,
-            "cached_input_tokens": 1250,
-            "output_tokens": 86,
-            "reasoning_tokens": 56,
-            "cost_usd": 5.5799999999999994e-05,
-            "latency_ms": 1840,
+            "cached_input_tokens": 1157,
+            "output_tokens": 88,
+            "reasoning_tokens": 58,
+            "cost_usd": 6.517e-05,
+            "latency_ms": 2210,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -8524,7 +9303,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 299,
             "cost_usd": 2.9900000000000002e-05,
-            "latency_ms": 109
+            "latency_ms": 147
           }
         ]
       },
@@ -8532,7 +9311,7 @@
         "element_id": "p8-e11",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.88,
+        "confidence": 0.9,
         "equation": {
           "latex": "\\begin{array}{rcl} \\mathbf{v} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ & = & \\frac{2000\\ \\text{m} - 525\\ \\text{m}}{6.4\\ \\text{s} - 0.50\\ \\text{s}}, \\\\ & = & 250\\ \\text{m/s} \\end{array}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mtable><mtr><mtd columnalign=\"right\"><mi>𝐯</mi></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mn>2000</mn><mtext> </mtext><mtext>m</mtext><mo>−</mo><mn>525</mn><mtext> </mtext><mtext>m</mtext></mrow><mrow><mn>6.4</mn><mtext> </mtext><mtext>s</mtext><mo>−</mo><mn>0.50</mn><mtext> </mtext><mtext>s</mtext></mrow></mfrac><mo>,</mo></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mn>250</mn><mtext> </mtext><mtext>m/s</mtext></mtd></mtr></mtable></mrow></math>",
@@ -8541,6 +9320,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -8699,11 +9479,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1314,
-            "cached_input_tokens": 1311,
-            "output_tokens": 400,
-            "reasoning_tokens": 278,
-            "cost_usd": 0.0041371,
-            "latency_ms": 10981,
+            "cached_input_tokens": 1157,
+            "output_tokens": 325,
+            "reasoning_tokens": 203,
+            "cost_usd": 0.0036796999999999997,
+            "latency_ms": 8464,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -8730,7 +9510,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 432,
             "cost_usd": 4.32e-05,
-            "latency_ms": 137
+            "latency_ms": 109
           }
         ]
       },
@@ -8745,6 +9525,7 @@
           "level": 3,
           "text": "Discussion"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -8796,6 +9577,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -8847,6 +9629,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -8895,10 +9678,15 @@
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): rises from 200 m at 0 s to 2,900 m at 30 s, with a steeper tangent at Q than at P.",
-          "decorative": false
+          "alt": "Position (m) versus time (s) graph: position curves upward to about 2,900 m at 30 s; the tangent at Q is steeper than at P.",
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -8961,11 +9749,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1856,
-            "cached_input_tokens": 1853,
-            "output_tokens": 211,
-            "reasoning_tokens": 139,
-            "cost_usd": 0.0023013,
-            "latency_ms": 5285,
+            "cached_input_tokens": 0,
+            "output_tokens": 217,
+            "reasoning_tokens": 151,
+            "cost_usd": 0.005882,
+            "latency_ms": 6578,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -8983,15 +9771,15 @@
             "mode": "note",
             "outcome": "ok",
             "probabilities": {
-              "ok": 0.64,
+              "ok": 0.75,
               "factual_error": 0.0
             },
             "flagged": false,
             "model": "gpt-6-luna",
             "version": "figure_alt-16a00e69",
-            "input_tokens": 1306,
-            "cost_usd": 0.0001306,
-            "latency_ms": 208
+            "input_tokens": 1300,
+            "cost_usd": 0.00013,
+            "latency_ms": 293
           }
         ]
       },
@@ -8999,14 +9787,19 @@
         "element_id": "p9-e2",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.97,
         "equation": null,
         "figure": {
           "figure_type": "photo",
-          "alt": "A long, low jet-powered car points right on a paved track, trailing a large plume of exhaust to the left.",
-          "decorative": false
+          "alt": "A long, low jet-powered car points right on a paved track, trailing a thick plume of exhaust to the left.",
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -9069,11 +9862,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1848,
-            "cached_input_tokens": 1845,
+            "cached_input_tokens": 0,
             "output_tokens": 51,
             "reasoning_tokens": 0,
-            "cost_usd": 0.0007005,
-            "latency_ms": 3234,
+            "cost_usd": 0.004206,
+            "latency_ms": 3518,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9091,7 +9884,7 @@
             "mode": "note",
             "outcome": "ok",
             "probabilities": {
-              "ok": 0.97,
+              "ok": 0.98,
               "factual_error": 0.0
             },
             "flagged": false,
@@ -9099,7 +9892,7 @@
             "version": "figure_alt-16a00e69",
             "input_tokens": 1274,
             "cost_usd": 0.0001274,
-            "latency_ms": 426
+            "latency_ms": 301
           }
         ]
       },
@@ -9114,6 +9907,7 @@
           "level": 2,
           "text": "Worked Example"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9165,6 +9959,7 @@
           "level": 3,
           "text": "Using Position–Time Graph to Calculate Average Velocity: Jet Car, Take Two"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9216,6 +10011,7 @@
           "level": 2,
           "text": "Strategy"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9267,6 +10063,7 @@
           "level": 3,
           "text": "Solution"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9320,6 +10117,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -9478,11 +10276,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1238,
-            "cached_input_tokens": 1235,
-            "output_tokens": 77,
-            "reasoning_tokens": 42,
-            "cost_usd": 5.1149999999999996e-05,
-            "latency_ms": 1275,
+            "cached_input_tokens": 1157,
+            "output_tokens": 72,
+            "reasoning_tokens": 37,
+            "cost_usd": 5.567e-05,
+            "latency_ms": 1534,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9509,7 +10307,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 309,
             "cost_usd": 3.09e-05,
-            "latency_ms": 116
+            "latency_ms": 151
           }
         ]
       },
@@ -9526,6 +10324,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -9684,11 +10483,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1328,
-            "cached_input_tokens": 1325,
+            "cached_input_tokens": 1157,
             "output_tokens": 225,
             "reasoning_tokens": 90,
-            "cost_usd": 0.0023885,
-            "latency_ms": 4926,
+            "cost_usd": 0.0027077,
+            "latency_ms": 5274,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9715,7 +10514,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 469,
             "cost_usd": 4.690000000000001e-05,
-            "latency_ms": 222
+            "latency_ms": 324
           }
         ]
       },
@@ -9730,6 +10529,7 @@
           "level": 3,
           "text": "Discussion"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9781,6 +10581,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9832,6 +10633,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9883,6 +10685,7 @@
           "level": 2,
           "text": "Practice Problems"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -9927,14 +10730,19 @@
         "element_id": "p11-e6",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.97,
+        "confidence": 0.96,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): position increases steadily from about 2.5 m at 0 s to 19 m at 70 s.",
-          "decorative": false
+          "alt": "Line graph of position (m) versus time (s): position rises linearly from about 2.5 m at 0 s to 19 m at 70 s.",
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -9997,11 +10805,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1604,
-            "cached_input_tokens": 1601,
-            "output_tokens": 101,
-            "reasoning_tokens": 37,
-            "cost_usd": 0.0011760999999999998,
-            "latency_ms": 3241,
+            "cached_input_tokens": 0,
+            "output_tokens": 63,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.003838,
+            "latency_ms": 3506,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10025,9 +10833,9 @@
             "flagged": false,
             "model": "gpt-6-luna",
             "version": "figure_alt-16a00e69",
-            "input_tokens": 1172,
-            "cost_usd": 0.0001172,
-            "latency_ms": 195
+            "input_tokens": 1173,
+            "cost_usd": 0.0001173,
+            "latency_ms": 186
           }
         ]
       },
@@ -10035,7 +10843,7 @@
         "element_id": "p12-e1",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.97,
+        "confidence": 0.98,
         "equation": {
           "latex": "125\\ \\text{m/s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mn>125</mn><mtext> </mtext><mtext>m/s</mtext></mrow></math>",
@@ -10044,6 +10852,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -10196,11 +11005,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1262,
-            "cached_input_tokens": 1259,
-            "output_tokens": 107,
-            "reasoning_tokens": 73,
-            "cost_usd": 6.639e-05,
-            "latency_ms": 2636,
+            "cached_input_tokens": 1157,
+            "output_tokens": 113,
+            "reasoning_tokens": 79,
+            "cost_usd": 7.856999999999999e-05,
+            "latency_ms": 1899,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10227,7 +11036,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 308,
             "cost_usd": 3.08e-05,
-            "latency_ms": 124
+            "latency_ms": 111
           }
         ]
       },
@@ -10235,7 +11044,7 @@
         "element_id": "p12-e2",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.97,
         "equation": {
           "latex": "t = 20\\ \\text{s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>t</mi><mo>=</mo><mn>20</mn><mtext> </mtext><mtext>s</mtext></mrow></math>",
@@ -10244,6 +11053,7 @@
         },
         "figure": null,
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "latex.not_empty",
@@ -10402,11 +11212,11 @@
             "model": "gpt-6-luna",
             "prompt_version": "equation-df0e12f1",
             "input_tokens": 1262,
-            "cached_input_tokens": 1259,
-            "output_tokens": 150,
-            "reasoning_tokens": 115,
-            "cost_usd": 8.789e-05,
-            "latency_ms": 2158,
+            "cached_input_tokens": 1157,
+            "output_tokens": 117,
+            "reasoning_tokens": 82,
+            "cost_usd": 8.057e-05,
+            "latency_ms": 1959,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10433,7 +11243,7 @@
             "version": "equation_match-45fc775c",
             "input_tokens": 309,
             "cost_usd": 3.09e-05,
-            "latency_ms": 108
+            "latency_ms": 155
           }
         ]
       },
@@ -10441,14 +11251,19 @@
         "element_id": "p12-e3",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.98,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): position rises from about 200 m to 2900 m over 30 s, with increasing slope and velocity.",
-          "decorative": false
+          "alt": "Line graph of position (m) versus time (s): position rises from about 200 m at 0 s to 2900 m at 30 s, with increasing slope and velocity.",
+          "decorative": false,
+          "long_description": null,
+          "data_table": null,
+          "data_values_from_text": null,
+          "colour_only": false
         },
         "heading": null,
+        "table": null,
         "checks": [
           {
             "name": "alt.not_empty",
@@ -10511,11 +11326,11 @@
             "model": "gpt-6.1-sol",
             "prompt_version": "figure-ac51f42d",
             "input_tokens": 1796,
-            "cached_input_tokens": 1793,
-            "output_tokens": 62,
+            "cached_input_tokens": 0,
+            "output_tokens": 66,
             "reasoning_tokens": 0,
-            "cost_usd": 0.0008053,
-            "latency_ms": 4220,
+            "cost_usd": 0.004252,
+            "latency_ms": 3012,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10533,15 +11348,15 @@
             "mode": "note",
             "outcome": "ok",
             "probabilities": {
-              "ok": 0.91,
+              "ok": 0.92,
               "factual_error": 0.0
             },
             "flagged": false,
             "model": "gpt-6-luna",
             "version": "figure_alt-16a00e69",
-            "input_tokens": 1322,
-            "cost_usd": 0.00013220000000000001,
-            "latency_ms": 225
+            "input_tokens": 1326,
+            "cost_usd": 0.0001326,
+            "latency_ms": 259
           }
         ]
       },
@@ -10556,6 +11371,7 @@
           "level": 2,
           "text": "Check Your Understanding"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -10607,6 +11423,7 @@
           "level": 2,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -10658,6 +11475,7 @@
           "level": 3,
           "text": "Teacher Support"
         },
+        "table": null,
         "checks": [
           {
             "name": "heading.outline",
@@ -10701,8 +11519,8 @@
     ],
     "stats": {
       "pages": 13,
-      "cost_usd": 0.02618733,
-      "latency_ms": 28450,
+      "cost_usd": 0.05524194,
+      "latency_ms": 32113,
       "model_calls": 27,
       "by_kind": {
         "heading": 36,
@@ -10710,15 +11528,15 @@
         "figure": 7
       },
       "by_status": {
-        "accepted": 51,
-        "needs_review": 11
+        "accepted": 50,
+        "needs_review": 12
       },
       "by_review": {
-        "none": 46,
-        "required": 11,
-        "optional": 5
+        "none": 44,
+        "required": 12,
+        "optional": 6
       },
-      "required_decisions": 3,
+      "required_decisions": 4,
       "per_page": [
         {
           "page": 0,
@@ -10731,22 +11549,22 @@
           "page": 1,
           "elements": 6,
           "fixes": 2,
-          "cost_usd": 0.00095033,
-          "latency_ms": 5854
+          "cost_usd": 0.004512,
+          "latency_ms": 8414
         },
         {
           "page": 2,
           "elements": 10,
           "fixes": 6,
-          "cost_usd": 0.00334653,
-          "latency_ms": 20740
+          "cost_usd": 0.00987111,
+          "latency_ms": 20979
         },
         {
           "page": 3,
           "elements": 11,
           "fixes": 8,
-          "cost_usd": 0.00818224,
-          "latency_ms": 30693
+          "cost_usd": 0.01353405,
+          "latency_ms": 35320
         },
         {
           "page": 4,
@@ -10773,36 +11591,36 @@
           "page": 7,
           "elements": 17,
           "fixes": 10,
-          "cost_usd": 0.0054842,
-          "latency_ms": 16841
+          "cost_usd": 0.00557747,
+          "latency_ms": 15929
         },
         {
           "page": 8,
           "elements": 3,
           "fixes": 2,
-          "cost_usd": 0.0032598,
-          "latency_ms": 9159
+          "cost_usd": 0.0103454,
+          "latency_ms": 10697
         },
         {
           "page": 9,
           "elements": 14,
           "fixes": 7,
-          "cost_usd": 0.00251745,
-          "latency_ms": 6543
+          "cost_usd": 0.00284117,
+          "latency_ms": 7289
         },
         {
           "page": 10,
           "elements": 11,
           "fixes": 4,
-          "cost_usd": 0.0012933,
-          "latency_ms": 3436
+          "cost_usd": 0.0039553,
+          "latency_ms": 3693
         },
         {
           "page": 11,
           "elements": 12,
           "fixes": 4,
-          "cost_usd": 0.00115348,
-          "latency_ms": 9473
+          "cost_usd": 0.00460544,
+          "latency_ms": 7399
         },
         {
           "page": 12,
@@ -10881,6 +11699,30 @@
         "passed": true,
         "severity": "error",
         "code": null
+      },
+      {
+        "name": "html.link_text",
+        "passed": true,
+        "severity": "error",
+        "code": null
+      },
+      {
+        "name": "html.link_href",
+        "passed": true,
+        "severity": "error",
+        "code": null
+      },
+      {
+        "name": "html.lang_tags",
+        "passed": true,
+        "severity": "error",
+        "code": null
+      },
+      {
+        "name": "html.text_contrast",
+        "passed": true,
+        "severity": "error",
+        "code": null
       }
     ],
     "page_sizes": {
@@ -10936,6 +11778,36 @@
         612.0,
         792.0
       ]
-    }
+    },
+    "notices": [
+      {
+        "code": "lang_detected",
+        "page": null,
+        "element_id": null,
+        "count": 1,
+        "review": "optional"
+      },
+      {
+        "code": "link_text_unclear",
+        "page": 12,
+        "element_id": "p13-e8",
+        "count": 1,
+        "review": "optional"
+      }
+    ],
+    "source_facts": {
+      "tagged": false,
+      "has_lang": false,
+      "has_title": true,
+      "bookmarks": 0,
+      "images": 7,
+      "images_with_alt": null,
+      "equations": 19,
+      "equations_flattened": 9,
+      "bold_maths_letters": 4,
+      "links": 2,
+      "tables": 0
+    },
+    "lang_source": "detected"
   }
 }
