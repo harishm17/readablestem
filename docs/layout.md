@@ -347,6 +347,58 @@ Modern Sans):
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
 
+### Bold letters in prose
+
+Only with `FEATURE_NOTATION_MEMORY` on (the run's `ConversionOptions.notation_memory`);
+with it off nothing here runs and the output is as before. A single bold letter in
+running text ("the projection of **b** onto **a**") is a vector the text would otherwise
+give as a plain letter, heard as the article "a" (UX review MF2). Layout makes it an
+inline equation, and the equation step fixes it without a model call
+(docs/steps.md "Course notation").
+
+Two functions in `layout.py`, nothing else in the page flow changes:
+
+1. `_bold_letter_runs`, per paragraph row, beside the inline maths runs:
+   - a maths run that is one bold letter (a bold omega in CMMIB, a maths bold code point)
+     is marked `bold letter in prose` with the evidence `maths font`;
+   - any other bold Latin letter that stands alone (its token, split at spaces, is the
+     letter and punctuation only) is a candidate, except: a bold word in the token on
+     either side (a bold phrase such as "Part A", a bold sentence); a label ("(b)"
+     anywhere, "a)", "A." or "b:" starting the paragraph); a capital starting a sentence
+     (the paragraph's first letter or after `. ! ? :`), because "A" is also the article,
+     unless the course lists it. A candidate the course lists (`NotationEntry.canonical`)
+     keeps the evidence `course notation`.
+2. `_settle_bold_letters`, once for the whole document, keeps a waiting candidate only
+   with evidence: the same bold letter in the document's maths (a display or inline
+   equation: `bold in the document's maths`), or, for a small letter, another bold letter
+   that is maths in the same paragraph (`maths in the paragraph`). Any other candidate
+   goes back into the text as the plain letter it was.
+
+Running text is paragraphs and list items (the blocks that may hold inline maths), so a
+bold letter in a heading or a caption is never touched; bold words and labels are left
+alone, not raised as notes. The evidence is the element's last reason (content-free,
+like every reason).
+
+Measured on 2026-10-09 (`uv run python -m a11y_stem.eval.bold_letters --openstax`;
+`tests/test_layout_bold_letters.py` pins the LaTeX numbers):
+
+| Documents | Bold letters in the source's prose | Found | Missed | False positives |
+|---|---|---|---|---|
+| LaTeX fixtures (6) | 11 (all in the two-column handout `linear_algebra_twocol`: 10 bold vectors r, x, a, b and a bold omega) | 11 | 0 | 0 |
+| OpenStax gold pages 2.1, 2.2, 2.3 | 9 (bold d, x, s, v) | 9 | 0 | 0 |
+
+Recall and precision are 1.0 on both. The expected letters come from the sources: a lone
+`$\mathbf{x}$` (or `\bm`, `\boldsymbol`) in the running text of a `.tex`, and a
+one-letter `<strong>` in the OpenStax XHTML outside headings and captions that is not
+continued as a formula. The other five LaTeX fixtures (`vectors_relations`,
+`calculus_notes`, `kinematics_slides`, `problem_set`, `letter_styles`) have no bold letter
+in their prose and get none (`vectors_relations` writes its vectors with `\vec`). On the
+handout, 10 letters were kept by the same bold letter in its displayed maths and the omega
+by its maths font; on OpenStax, 7 by the document's maths and 2 by a bold letter nearby.
+With a course notation listing bold d, v, a, x and s, the same 9 are found, each by the
+course. Not covered: PDFs whose font does not mark bold (no candidate is seen at all
+there), and bold letters in captions.
+
 
 
 ### Figures
