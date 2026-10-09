@@ -37,7 +37,8 @@
       <label for="pdf">PDF file</label>
       <p class="hint" id="pdf-hint">Up to {{ max_upload_mb }} MB and {{ max_pages }} pages.
         {% if pages_left is not none %}You can convert {{ pages_left }} more
-        {{ "page" if pages_left == 1 else "pages" }} today (until {{ next_reset|utc }}).{% endif %}
+        {{ "page" if pages_left == 1 else "pages" }} today; the count starts again
+        {{ next_reset|utc }}.{% endif %}
         Only upload materials you wrote or may adapt, with no student records.</p>
       {% if pdf_error %}
       <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>

@@ -301,7 +301,7 @@ def test_quota_is_per_user(web):
 def test_app_page_shows_pages_left_today(web):
     upload(web.browser, make_pdf(3))
     page = " ".join(web.browser.get("/app").text.split())
-    assert "You can convert 17 more pages today (until <time" in page
+    assert "You can convert 17 more pages today; the count starts again <time" in page
 
 
 def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):

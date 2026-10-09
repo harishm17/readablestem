@@ -6,9 +6,9 @@
 {% if answered %}
 <p>You have answered these questions for this document. Thank you.</p>
 {% else %}
-<p>Both are optional. Your answers are kept as a choice and a number, with no text, to
-  see whether the tool is worth what it asks of you. The <a href="/privacy">privacy
-  notice</a> says how long.</p>
+<p>Both are optional. We keep only your choice and the number, no text, to learn whether
+  the tool is worth your time. The <a href="/privacy">privacy notice</a> says for how
+  long.</p>
 {% with fb_job_id=job_id, fb_choices=choices, fb_values=values, fb_errors=field_errors %}
 {% include "_feedback_form.html" %}
 {% endwith %}

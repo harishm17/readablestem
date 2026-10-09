@@ -611,7 +611,14 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .documents-summary { font-size: 1.1rem; margin: 0.5rem 0 0.75rem; }
 .documents h3 { font-size: 1.1rem; margin: 1.5rem 0 0.25rem; }
 .doc-file { display: block; font-weight: 400; color: var(--muted); font-size: 0.95rem; }
+/* The same column widths in every group's table, so the groups line up. */
+.doc-table { table-layout: fixed; }
+.doc-table th:nth-child(1) { width: 44%; }
+.doc-table th:nth-child(2) { width: 26%; }
+.doc-table th:nth-child(4) { width: 5rem; }
 .doc-table .status-badge { margin: 0 0.4rem 0.2rem 0; }
+/* Days and pseudonyms are short codes: never break them to make room. */
+.usage-table tbody th { overflow-wrap: normal; white-space: nowrap; }
 .status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
 
 .upload-status { font-weight: 600; }
@@ -640,6 +647,7 @@ input[type="text"].input-short { width: 8rem; }
   .doc-table, .doc-table tbody, .doc-table tr, .doc-table th, .doc-table td { display: block; }
   .doc-table tr { padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
   .doc-table th, .doc-table td { border: 0; padding: 0.15rem 0; }
+  .doc-table th:nth-child(n) { width: auto; }
   .doc-table td[data-label]::before {
     content: attr(data-label) ": ";
     content: attr(data-label) ": " / "";

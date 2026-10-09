@@ -105,7 +105,7 @@
   <h3 id="usage-day-heading">By day (last {{ usage.days }} days, UTC)</h3>
   {% if usage.by_day %}
   <div class="table-scroll" tabindex="0" role="region" aria-labelledby="usage-day-heading">
-  <table>
+  <table class="usage-table">
     <thead>
       <tr><th scope="col">Day</th>{% for key, label in usage_columns.day %}<th scope="col" class="num">{{ label }}</th>{% endfor %}</tr>
     </thead>
@@ -122,7 +122,7 @@
   <h3 id="usage-person-heading">By person (all kept events)</h3>
   {% if usage.by_person %}
   <div class="table-scroll" tabindex="0" role="region" aria-labelledby="usage-person-heading">
-  <table>
+  <table class="usage-table">
     <thead>
       <tr><th scope="col">Person</th>{% for key, label in usage_columns.person %}<th scope="col" class="num">{{ label }}</th>{% endfor %}</tr>
     </thead>
