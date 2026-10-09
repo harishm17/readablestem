@@ -465,6 +465,26 @@ def captioned_page(page: pymupdf.Page) -> None:
     write(page, 72, 450, "Then work out the period of each trial.")
 
 
+def test_raised_glyphs_stay_exponents_in_the_cells():
+    # Text layers flatten scripts: 10^5 would read "105" and 10^-18 "10-18". The grid read
+    # from the PDF keeps them raised.
+    def fill(page):
+        write(page, 100, 140, "Table 1. Orders of magnitude")
+        grid_table(
+            page, [["Quantity", "Value", "Unit"], ["Pressure", "", "Pa"], ["Quark", "", "m"]]
+        )
+        for y, base, script in ((184, "1.01\u00d710", "5"), (204, "10", "-18")):
+            write(page, 195, y, base)
+            width = pymupdf.get_text_length(base, fontsize=BODY)
+            write(page, 195 + width + 0.5, y - 4.5, script, size=7.0)
+
+    table = next(e for e in analyze(pdf(fill)).elements if e.kind == Kind.TABLE)
+    assert table.table is not None
+    texts = {(c.row, c.col): c.text for c in table.table.cells}
+    assert (texts[(1, 1)], texts[(2, 1)]) == ("1.01\u00d710\u2075", "10\u207b\u00b9\u2078")
+    assert texts[(1, 2)] == "Pa"
+
+
 def test_layout_emits_table_elements_in_reading_order_with_their_captions():
     result = analyze(pdf(captioned_page))
     kinds = [e.kind for e in result.elements]

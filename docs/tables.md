@@ -55,8 +55,12 @@ read", step 0). No model call; the same PDF always gives the same tables.
    its box falls in (by the medians of the cells' edges, so one badly placed cell box
    does not matter). A subscript stays in its word, an accent drawn above a letter
    (TeX's vector arrow) goes right after it, and a word hyphenated across lines in a cell
-   is joined. Maths in a cell is flattened to its characters (`K = 12mv2` for
-   `K = ½mv²`); the table step's model gives LaTeX for maths cells.
+   is joined. A glyph smaller than the one before it with its baseline raised by a
+   fifth of that glyph's size is a superscript, written in superscript characters
+   (`10⁵`, `10⁻¹⁸`, `m/s²`; `^(...)` when a character has no superscript form), so a
+   flattened exponent never reads as other digits. Other maths in a cell is flattened
+   to its characters (`K = ¹2mv²` for `K = ½mv²`); the table step's model gives LaTeX
+   for maths cells.
 5. **Headers.** The top rows are column headers when SLANet-plus or PyMuPDF marks them,
    except when a header cell starts with a number ("Mass | 2 kg" is a label and its
    value) or a header cell would span into the body. Empty cells are never headers.
@@ -187,7 +191,8 @@ with `taskset -c N`). The manuals come from the public URLs in the challenge sec
 - **A sparse table** whose body has text in only one column, between two rules, has no
   grid to see and is dropped.
 - **Two tables in one box** (or a table and a plot) stay one table.
-- **Maths in cells** is flattened to characters in the local grid.
+- **Maths in cells** is flattened to characters in the local grid (only superscripts are
+  kept, as superscript characters).
 - **Without the model file**, booktabs tables with spanning headers or maths cells can
   get a column too many (PyMuPDF splits "Specific heat (J/kg K)" or "p = mv").
 - **Layout grids** (a key-terms list set as a table) keep today's paragraph path, which
@@ -334,12 +339,15 @@ All codes are content-free (`Check.name`, `Check.code`); each has a sentence in
 
 **The cell-text bijection.** The words compared are numbers (with a minus sign glued to
 them at the start, or after a space, an opening bracket, a colon, a semicolon, a comma or
-one of the symbols below, so "10 × -5" and "(3,-5)" keep their signs while "1-3" is a
-range and "C-14" a hyphen), runs of letters, and symbols that carry meaning in a cell
-(`/ × · * % ‰ + ± ∓ = ≠ < > ≤ ≥ ≈ ~ ° √ ∞ ∝`): m/s is not "m s", and 5 % is not 5. Text
-is NFKC normalised (ligatures, full-width forms, superscript digits), invisible format
-characters dropped, dashes and minus signs folded into one, pdfTeX's U+2206 into Δ; case
-is kept (mW is not MW); brackets, quotes, commas and full stops are not compared. The
+one of the symbols below, so "10 × -5", "(3,-5)" and "10^-18" keep their signs while
+"1-3" is a range and "C-14" a hyphen; U+2212 is always a minus sign, so "10−18" keeps
+it), runs of letters, and symbols that carry meaning in a cell
+(`/ × · * % ‰ + ± ∓ = ≠ < > ≤ ≥ ≈ ~ ^ ° √ ∞ ∝`): m/s is not "m s", 5 % is not 5, and
+10^5 is not 105. A run of superscript characters is first written as `^` and its plain
+form (`10⁻¹⁸` is "10^-18", as the model types it), then the text is NFKC normalised
+(ligatures, full-width forms), invisible format characters dropped, dashes folded into
+one, pdfTeX's U+2206 into Δ; case is kept (mW is not MW); brackets, quotes, commas and
+full stops are not compared. The
 non-maths cells of the answer, as a multiset, must equal the PDF's words:
 
 - with a local grid of the same size, **cell by cell**: each answer cell against the

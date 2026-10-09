@@ -85,7 +85,7 @@ def test_latex_tables_are_found_with_their_captions(latex):
 def test_a_booktabs_table_of_numbers_is_a_table_not_an_equation(latex):
     booktabs = found(latex)[0]
     assert rows(booktabs) == [
-        ["Height (m)", "Time (s)", "g (m/s2)"],
+        ["Height (m)", "Time (s)", "g (m/s\u00b2)"],  # the raised 2 kept
         ["0.50", "0.319", "9.83"],
         ["0.75", "0.391", "9.81"],
         ["1.00", "0.452", "9.79"],
@@ -151,7 +151,7 @@ def test_word_tables_are_found_with_their_captions(word):
     measured, blank = found(word)
     assert measured.caption == "Table 1. Pendulum measurements from the demonstration"
     assert blank.caption == "Table 2. Record your data here"
-    assert rows(measured)[0] == ["Length (m)", "Ten swings (s)", "Period (s)", "g (m/s2)"]
+    assert rows(measured)[0] == ["Length (m)", "Ten swings (s)", "Period (s)", "g (m/s\u00b2)"]
     assert rows(measured)[-1] == ["0.80", "17.94", "1.794", "9.81"]
     assert measured.table is not None and measured.table.header_rows == 1
     assert rows(blank)[0] == ["Trial", "Length (m)", "Ten swings (s)", "Period (s)"]

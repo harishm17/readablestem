@@ -776,12 +776,57 @@ def test_the_schema_is_strict():
         ("C-14", ["C", "14"]),
         ("1,000.5 kg.", ["1,000.5", "kg"]),
         ("\ufb01eld", ["field"]),  # ligature
-        ("10\u2075", ["105"]),  # a superscript digit is a digit (the flattening)
+        ("10\u2075", ["10", "^", "5"]),  # an exponent, not the digits 105
+        ("10^5", ["10", "^", "5"]),
+        ("10\u207b\u00b9\u2078 and 10^-18", ["10", "^", "-18", "and", "10", "^", "-18"]),
+        ("10\u221218", ["10", "-18"]),  # U+2212 is always a minus sign
         ("", []),
     ],
 )
 def test_words(text, expected):
     assert words(text) == expected
+
+
+@pytest.mark.parametrize("read", ["1.01 \u00d7 105", "1.01 \u00d7 10 5"])
+def test_an_exponent_read_as_baseline_digits_needs_review(read):
+    # The local grid keeps the raised 5 (tables._marked); the model flattened it.
+    pdf = [["Quantity", "Value (Pa)"], ["Atmospheric pressure", "1.01\u00d710\u2075"]]
+    model = answer([[head("Quantity"), head("Value (Pa)")], ["Atmospheric pressure", read]])
+    fix = run(by_model(cheap=model, main=model), element(local(pdf)))
+    assert (fix.status, codes(fix)) == (Status.NEEDS_REVIEW, {"text_mismatch"})
+    right = answer(
+        [[head("Quantity"), head("Value (Pa)")], ["Atmospheric pressure", "1.01 \u00d7 10^5"]]
+    )
+    assert run(by_model(cheap=right), element(local(pdf))).status is Status.ACCEPTED
+
+
+@pytest.mark.parametrize("read", ["< 10^18", "< 1018", "< 10 18", "< 10\u221218"])
+def test_an_exponent_that_lost_its_minus_sign_needs_review(read):
+    # 10^-18 m read as 10^18 m (or flattened): the raised minus is compared as a sign.
+    pdf = [
+        ["Object", "Size (m)"],
+        ["Proton radius", "10\u207b\u00b9\u2075"],
+        ["Quark", "< 10\u207b\u00b9\u2078"],
+    ]
+    rows = [[head("Object"), head("Size (m)")], ["Proton radius", "10^-15"], ["Quark", read]]
+    fix = run(by_model(cheap=answer(rows), main=answer(rows)), element(local(pdf)))
+    assert fix.status is Status.NEEDS_REVIEW and "text_mismatch" in codes(fix)
+    rows[2][1] = "< 10^-18"
+    assert run(by_model(cheap=answer(rows)), element(local(pdf))).status is Status.ACCEPTED
+
+
+def test_a_raised_exponent_in_a_maths_cell_keeps_its_minus_sign():
+    # The gold print's raised en dash: written as a superscript minus by the local grid.
+    pdf = [["Length (m)", "Phenomenon"], ["10\u207b\u00b9\u2078", "Present experimental limit"]]
+
+    def read(latex):
+        cells = [{"text": "10^18", "latex": latex}, "Present experimental limit"]
+        return answer([[head("Length (m)"), head("Phenomenon")], cells])
+
+    wrong = run(by_model(cheap=read("10^{18}"), main=read("10^{18}")), element(local(pdf)))
+    assert wrong.status is Status.NEEDS_REVIEW and "sign_mismatch" in codes(wrong)
+    right = run(by_model(cheap=read("10^{-18}")), element(local(pdf)))
+    assert right.status is Status.ACCEPTED
 
 
 # --------------------------------------------------------------------------- stored results

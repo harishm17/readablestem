@@ -260,36 +260,43 @@ _FOLD = str.maketrans(
         "\N{TILDE OPERATOR}": "~",
     }
 )
-# Symbols that carry meaning in a cell: m/s is not m s, and 5 % is not 5.
+# Symbols that carry meaning in a cell: m/s is not m s, 5 % is not 5, and 10^5 (an
+# exponent: "^" or superscript characters, which the local grid writes for raised
+# glyphs) is not 105.
 _SYMBOLS = (
-    "/*%+=<>~\N{MULTIPLICATION SIGN}\N{MIDDLE DOT}\N{PER MILLE SIGN}\N{PLUS-MINUS SIGN}"
+    "/*%+=<>~^\N{MULTIPLICATION SIGN}\N{MIDDLE DOT}\N{PER MILLE SIGN}\N{PLUS-MINUS SIGN}"
     "\N{MINUS-OR-PLUS SIGN}\N{NOT EQUAL TO}\N{LESS-THAN OR EQUAL TO}"
     "\N{GREATER-THAN OR EQUAL TO}\N{ALMOST EQUAL TO}\N{DEGREE SIGN}\N{SQUARE ROOT}"
     "\N{INFINITY}\N{PROPORTIONAL TO}"
 )
 # What the bijection compares: a number (a minus sign glued to it at the start, or when a
 # space, an opening bracket, a colon, a semicolon, a comma or one of the symbols above
-# comes just before, so "a-5" and "1-3" keep their hyphen apart while "10 times -5" and
-# the point "(3,-5)" keep their sign), a run of letters, or one of the symbols. Letters
-# and digits split ("9.8m" is "9.8" and "m"); brackets, quotes, commas, full stops and
-# hyphens are not compared.
+# comes just before, so "a-5" and "1-3" keep their hyphen apart while "10 times -5", the
+# point "(3,-5)" and the exponent "10^-18" keep their sign; U+2212 is always a minus
+# sign, so a flattened "10−18" keeps it too), a run of letters, or one of the symbols.
+# Letters and digits split ("9.8m" is "9.8" and "m"); brackets, quotes, commas, full
+# stops and hyphens are not compared.
 _SIGN_AFTER = r"\s(\[{:;," + re.escape(_SYMBOLS)
 _WORD = re.compile(rf"(?:(?<![^{_SIGN_AFTER}])-)?\d+(?:[.,]\d+)*|[^\W\d_]+|[{re.escape(_SYMBOLS)}]")
 # A hyphen that breaks a word at the end of a line ("tempera- ture").
 _LINE_BREAK_HYPHEN = re.compile(r"(?<=[^\W\d_])-\s+(?=[^\W\d_])")
+# Superscript characters: NFKC would make 10⁵ "105", so a run of them becomes "^"
+# and its plain form first ("10^5"), as a raised exponent typed with a caret reads.
+_SUPERSCRIPT_RUN = re.compile("[\u00b2\u00b3\u00b9\u2070\u2071\u2074-\u207f]+")
 
 
-def _folded(text: str) -> str:
-    """NFKC (ligatures, full-width forms, superscript digits become plain), invisible
-    format characters dropped, then the folds above."""
-    text = unicodedata.normalize("NFKC", text)
+def _folded(text: str, *, minus: str = "-") -> str:
+    """Superscripts marked (above), NFKC (ligatures, full-width forms), invisible format
+    characters dropped, U+2212 written as `minus`, then the folds above."""
+    text = _SUPERSCRIPT_RUN.sub(lambda m: "^" + unicodedata.normalize("NFKC", m[0]), text)
+    text = unicodedata.normalize("NFKC", text).replace("\N{MINUS SIGN}", minus)
     return "".join(ch for ch in text if unicodedata.category(ch) != "Cf").translate(_FOLD)
 
 
 def words(text: str | None) -> list[str]:
     """The words, numbers and meaningful symbols of `text` in order, as the bijection
     compares them. Case is kept (mW is not MW); spacing never matters."""
-    return _WORD.findall(_folded(text)) if text else []
+    return _WORD.findall(_folded(text, minus=" -")) if text else []
 
 
 def squeezed(text: str | None) -> str:

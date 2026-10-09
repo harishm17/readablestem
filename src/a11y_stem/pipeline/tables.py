@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import bisect
 import io
+import itertools
 import logging
 import math
 import os
@@ -97,6 +98,8 @@ THIN_IMAGE = 1.6  # an image this thin is a rule (as RULE_THICKNESS in layout)
 DOUBLE_RULE = 4.0  # two rules this close are one double rule
 COLUMN_RULE_LINES = 2.2  # x font size: a column rule is at least about two lines long
 GUTTER_PT = 3.0  # narrowest white gap between two columns of text
+SCRIPT_SIZE = 0.85  # x the line's largest glyph: smaller glyphs may be scripts (as layout)
+RAISED = 0.2  # x the full-size glyph: a smaller one with its baseline this far up is raised
 STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table may be
 
 # Reasons on a TABLE element (`Element.reasons`), content-free like layout's.
@@ -523,6 +526,84 @@ class _Word:
     y1: float
     text: str
     line: int
+    marked: str = ""  # `text` with its superscripts marked (`_marked`); cells read this
+
+    def __post_init__(self) -> None:
+        self.marked = self.marked or self.text
+
+
+# Superscript forms; a raised run with a character not here is written "^(...)".
+_SUPERSCRIPTS = {
+    **dict(
+        zip(
+            "0123456789",
+            "\u2070\u00b9\u00b2\u00b3\u2074\u2075\u2076\u2077\u2078\u2079",
+            strict=True,
+        )
+    ),
+    "+": "\u207a",
+    "-": "\u207b",
+    "\u2212": "\u207b",  # minus sign
+    "\u2013": "\u207b",  # en dash: some fonts print a raised minus as one
+    "=": "\u207c",
+    "(": "\u207d",
+    ")": "\u207e",
+    "n": "\u207f",
+    "i": "\u2071",
+}
+
+
+def _raised(chars: Sequence[GlyphLike]) -> set[int]:
+    """Indexes (into `chars`, one visual line, left to right) of the superscript glyphs:
+    smaller than the full-size glyph before them (after them at the start of the line)
+    and with their baseline above its baseline.
+
+    Text layers flatten scripts (10^5 is "105", 10^-18 is "10-18" with an en dash),
+    which would let a misread exponent pass the table step's word check, and would show a
+    wrong number in the grid read from the PDF."""
+
+    def baseline(c: GlyphLike) -> float:
+        return getattr(c, "baseline", c.y1)  # layout._Char has it; ink bottoms otherwise
+
+    def base_of(i: int) -> GlyphLike | None:
+        """The nearest full-size glyph, looking past other script glyphs."""
+        for j in itertools.chain(range(i - 1, -1, -1), range(i + 1, len(chars))):
+            other = chars[j]
+            if not other.blank and chars[i].size < SCRIPT_SIZE * other.size:
+                return other
+        return None
+
+    largest = max((c.size for c in chars if not c.blank), default=0.0)
+    raised: set[int] = set()
+    for i, c in enumerate(chars):
+        if c.blank or c.size >= SCRIPT_SIZE * largest:
+            continue
+        base = base_of(i)
+        if base is not None and baseline(c) < baseline(base) - RAISED * base.size:
+            raised.add(i)
+    return raised
+
+
+def _marked(chars: Sequence[GlyphLike], raised: Sequence[bool]) -> str:
+    """The glyphs' text with each run of superscripts in superscript characters
+    ("10⁻¹⁸"), or as "^(...)" when one has no superscript form."""
+    out: list[str] = []
+    i = 0
+    while i < len(chars):
+        if not raised[i]:
+            out.append(chars[i].c)
+            i += 1
+            continue
+        j = i
+        while j < len(chars) and raised[j]:
+            j += 1
+        run = "".join(c.c for c in chars[i:j])
+        if all(ch in _SUPERSCRIPTS for ch in run):
+            out.append("".join(_SUPERSCRIPTS[ch] for ch in run))
+        else:
+            out.append(f"^({run})" if len(run) > 1 else f"^{run}")
+        i = j
+    return "".join(out)
 
 
 @dataclass
@@ -670,6 +751,7 @@ def _segments(
     words: list[_Word] = []
     crossings = 0
     for index, chars in enumerate(lines):
+        raised = {id(chars[k]) for k in _raised(chars)}
         seg_groups: list[list[GlyphLike]] = [[]]
         word_groups: list[list[GlyphLike]] = [[]]
         last: GlyphLike | None = None
@@ -693,7 +775,16 @@ def _segments(
             seg_groups[-1].append(ch)
             word_groups[-1].append(ch)
             last = ch
-        words += [_Word(*_ink_box(g), "".join(c.c for c in g), index) for g in word_groups if g]
+        words += [
+            _Word(
+                *_ink_box(g),
+                "".join(c.c for c in g),
+                index,
+                _marked(g, [id(c) in raised for c in g]),
+            )
+            for g in word_groups
+            if g
+        ]
         for group in seg_groups:
             ink = [c for c in group if not c.blank]
             if ink:
@@ -1522,7 +1613,7 @@ def _cell_text(words: list[_Word]) -> str:
                 out = out[:-1] if word.text[:1].islower() and out[-2:-1].isalpha() else out
             else:
                 out += " "
-        out += word.text
+        out += word.marked
         last_line = word.line
     return out
 
