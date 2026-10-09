@@ -280,14 +280,32 @@ def test_uploads_in_progress_are_bounded_in_total_and_per_user(web):
 def test_daily_page_quota_returns_429_and_changes_nothing(web):
     for _ in range(4):  # quota 20 pages; 4 x 5 pages fits exactly
         assert upload(web.browser, make_pdf(5)).status_code == 303
-    response = upload(web.browser, make_pdf(1))
+    response = upload(web.browser, make_pdf(1), filename="week5.pdf")
     assert response.status_code == 429
-    assert "Daily page limit reached" in response.text
-    assert "you have 0 left today" in response.text
+    # The upload page again, naming the file; no form that can only fail (UX review MF20).
+    assert "week5.pdf has 1 page, and you have used all 20 pages" in response.text
+    assert 'href="#upload-closed"' in response.text and 'id="upload-closed"' in response.text
+    assert 'id="pdf"' not in response.text
     assert response.headers.get("retry-after")
     assert count(web, Job) == 4
     with session_scope(web.ctx.factory) as session:
         assert session.scalar(select(QuotaDay.pages)) == 20
+    page = web.browser.get("/app")
+    assert "You have converted all 20 pages you can today" in page.text
+    assert 'action="/jobs"' not in page.text
+
+
+def test_daily_page_quota_names_the_file_and_what_is_left(web):
+    for _ in range(3):  # quota 20 pages, 5 a file: 5 left
+        assert upload(web.browser, make_pdf(5)).status_code == 303
+    assert upload(web.browser, make_pdf(2)).status_code == 303  # 3 left
+    response = upload(web.browser, make_pdf(5), filename="chapter2.pdf")
+    assert response.status_code == 429
+    assert "chapter2.pdf has 5 pages, but you have 3 of today&#39;s 20 pages left" in (
+        response.text
+    )
+    assert 'href="#pdf"' in response.text and 'id="pdf"' in response.text
+    assert count(web, Job) == 4
 
 
 def test_quota_is_per_user(web):
@@ -301,7 +319,7 @@ def test_quota_is_per_user(web):
 def test_app_page_shows_pages_left_today(web):
     upload(web.browser, make_pdf(3))
     page = " ".join(web.browser.get("/app").text.split())
-    assert "You can convert 17 more pages today; the count starts again <time" in page
+    assert "You can convert 17 more pages today; the count starts again at <time" in page
 
 
 def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):

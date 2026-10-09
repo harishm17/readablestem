@@ -29,6 +29,12 @@
       has been used up. Uploads open again at {{ next_reset|utc }}. Documents already in
       the queue wait until then.</p>
   </div>
+  {% elif pages_left == 0 %}
+  {# The same for this person's daily page limit (MF20): no form that can only fail. #}
+  <div class="notice" id="upload-closed" tabindex="-1">
+    <p><strong>You have converted all {{ page_quota }} pages you can today.</strong>
+      Uploads open again at {{ next_reset|utc }}.</p>
+  </div>
   {% else %}
   <form method="post" action="/jobs" enctype="multipart/form-data" novalidate class="upload-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
@@ -37,7 +43,7 @@
       <label for="pdf">PDF file</label>
       <p class="hint" id="pdf-hint">Up to {{ max_upload_mb }} MB and {{ max_pages }} pages.
         {% if pages_left is not none %}You can convert {{ pages_left }} more
-        {{ "page" if pages_left == 1 else "pages" }} today; the count starts again
+        {{ "page" if pages_left == 1 else "pages" }} today; the count starts again at
         {{ next_reset|utc }}.{% endif %}
         Only upload materials you wrote or may adapt, with no student records.</p>
       {% if pdf_error %}

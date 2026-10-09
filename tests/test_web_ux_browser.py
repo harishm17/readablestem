@@ -16,7 +16,8 @@ import pytest
 
 import test_web_browser as shared
 from a11y_stem.core.types import Status
-from a11y_stem.web.db import Job, User, session_scope
+from a11y_stem.web.database import utc_today
+from a11y_stem.web.db import Job, QuotaDay, User, session_scope
 from fixtures.web.support import ADMIN, ALICE, BOB, fake_output, make_pdf
 from test_web_browser import (
     STRICT_IMPACTS,
@@ -243,6 +244,27 @@ def test_the_upload_form_refuses_a_wrong_file_before_sending_it(site, browser):
     button = page.get_by_role("button", name="Upload and convert")
     assert button.get_attribute("aria-disabled") == "true"
     context.close()
+
+
+@pytest.mark.parametrize("width", [1280, 320])
+def test_a_used_up_page_limit_says_when_uploads_open_again(site, browser, axe_source, width):
+    """UX review MF20: with no page left today, a notice replaces a form that could only
+    fail. Carol, so no other test's uploads are refused."""
+    carol = "carol@example.org"
+    site.allow(carol)
+    context = browser.new_context(viewport={"width": width, "height": 800}, bypass_csp=True)
+    page = context.new_page()
+    sign_in(page, site.base, carol)
+    with session_scope(site.ctx.factory) as session:
+        session.merge(QuotaDay(user_id=user_id(site, carol), day=utc_today(), pages=20))
+    page.goto(f"{site.base}/app")
+    notice = page.locator("#upload-closed")
+    assert "You have converted all 20 pages you can today." in notice.inner_text()
+    assert "Uploads open again at" in notice.inner_text()
+    assert page.locator("#pdf").count() == 0
+    violations = strict_violations(page, axe_source)
+    context.close()
+    assert not violations, describe(violations)
 
 
 # --------------------------------------------------------------------------- feedback

@@ -76,7 +76,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
 | GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `a11y-stem ops launch-check` lists what is still unfinished on the public pages |
 | GET `/limits` | anyone | Known limits: the facts that hold today and the measured accuracy, marked "Draft, to be reviewed by Harish" until he writes the copy |
-| GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make it the main version (28 CFR 35.202, the DOJ fact sheet); guidance, not legal advice |
+| GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, documents waiting and converting (numbers only; 503 when the database does not answer) |
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
@@ -172,7 +172,8 @@ yours to see". It is a 404 either way.
    (`no_content`). The child caps its own address space at 768 MB. The conversion
    itself is not isolated this way; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
-   pages + n <= quota`, in the same transaction as the job insert (429 if over).
+   pages + n <= quota`, in the same transaction as the job insert (if over: 429 and the
+   upload page again, naming the file, its pages and the pages left today).
 
 Validation errors re-show the upload page with an error summary linked to the file input.
 Every message names the file and the numbers it is about ("chapter2.pdf has 59 pages;
@@ -190,8 +191,10 @@ the developer look" (UX review MF10 part 1) is Harish's decision.
 
 When today's budget is spent, the upload form is replaced by a notice saying when
 uploads open again (the next midnight UTC, shown in the reader's time), instead of a form
-that would send the whole file to be refused (UX review MF20). The page-limit hint says
-when the count starts again too.
+that would send the whole file to be refused (UX review MF20). The same goes for a
+person's daily page limit once no page is left ("You have converted all 20 pages you can
+today. Uploads open again at ..."); before that, the hint under the file field says how
+many pages are left and when the count starts again.
 
 ## My documents (`web/documents.py`)
 

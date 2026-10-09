@@ -71,14 +71,21 @@ FRESH_COPY = (
 
 
 def upload_error_message(
-    code: str, ctx: AppContext, filename: str = "", pages: int | None = None
+    code: str,
+    ctx: AppContext,
+    filename: str = "",
+    pages: int | None = None,
+    left: int | None = None,
 ) -> str:
     """What went wrong with an upload, naming the file (and its pages) when known. The
-    file name is shown to its owner only, never logged."""
+    file name is shown to its owner only, never logged. `left`: pages left today, for
+    "page_quota"."""
     s = ctx.settings
     name = filename or "This file"
     limit = s.max_pages_per_job
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
+    if code == "page_quota":
+        return _quota_message(name, pages, left, s.per_user_daily_page_quota)
     return {
         "missing_file": "Choose a PDF file to upload.",
         "bad_form": "The upload did not arrive complete. Please try again.",
@@ -103,6 +110,32 @@ def upload_error_message(
         "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
         "chose the right file.",
     }.get(code, f"{name} cannot be converted.")
+
+
+def _quota_message(name: str, pages: int | None, left: int | None, quota: int | None) -> str:
+    """The daily page limit refused an upload (UX review MF20, MF21): the file, its
+    pages, what is left, and when the count starts again (the page under it says when
+    in the reader's own time)."""
+    has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
+    if not left:
+        return (
+            f"{has}, and you have used all {quota} pages you can convert today. Upload it "
+            "again after the count starts again at midnight UTC. Nothing was uploaded."
+        )
+    return (
+        f"{has}, but you have {left} of today's {quota} pages left. Upload a part of up "
+        f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
+        "count starts again at midnight UTC. Nothing was uploaded."
+    )
+
+
+class QuotaRefused(Exception):
+    """The upload has more pages than are left today (`_store_upload`)."""
+
+    def __init__(self, pages: int, left: int) -> None:
+        super().__init__("page_quota")
+        self.pages = pages
+        self.left = left
 
 
 def owned_job(session: Session, job_id: str, user: CurrentUser, *, lock: bool = False) -> Job:
@@ -170,6 +203,7 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     return {
         "documents": listing,
         "pages_left": left,
+        "page_quota": ctx.settings.per_user_daily_page_quota,
         "spend_closed": spend_closed,
         # Daily limits and today's budget start again then (shown in local time by app.js).
         "next_reset": next_day_start(now),
@@ -208,12 +242,19 @@ def _upload_error_page(
     status: int,
     filename: str = "",
     pages: int | None = None,
+    left: int | None = None,
+    headers: dict[str, str] | None = None,
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code)
-    errors = [{"field_id": "pdf", "message": upload_error_message(code, ctx, filename, pages)}]
-    context = app_context(ctx, user) | {"errors": errors, "field_errors": {"pdf": errors[0]}}
-    return render(request, "app.html", context, status_code=status)
+    message = upload_error_message(code, ctx, filename, pages, left)
+    context = app_context(ctx, user)
+    # With no pages left the form is replaced by a notice (app.html): the summary's link
+    # goes there instead of to a file field that is not on the page.
+    field_id = "upload-closed" if context["pages_left"] == 0 else "pdf"
+    errors = [{"field_id": field_id, "message": message}]
+    context |= {"errors": errors, "field_errors": {"pdf": errors[0]}}
+    return render(request, "app.html", context, status_code=status, headers=headers)
 
 
 @router.post("/jobs")
@@ -282,9 +323,22 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
             exc.pages,
         )
     keep = form.fields.get("keep") == "on"
-    job_id = await run_in_threadpool(
-        _store_upload, ctx, user, form.filename, form.data, pages, keep
-    )
+    try:
+        job_id = await run_in_threadpool(
+            _store_upload, ctx, user, form.filename, form.data, pages, keep
+        )
+    except QuotaRefused as exc:
+        return await run_in_threadpool(
+            _upload_error_page,
+            request,
+            user,
+            "page_quota",
+            429,
+            form.filename,
+            exc.pages,
+            left=exc.left,
+            headers={"Retry-After": "3600"},
+        )
     log_event(logger, "job_created", job_id=job_id, pages=pages, opt_in=keep)
     # Usage events (web/events.py): `uploaded`, and `reuploaded` for the same file again.
     data = form.data or b""
@@ -312,15 +366,8 @@ def _store_upload(
             left = pages_left(
                 session, user.id, quota=s.per_user_daily_page_quota, day=utc_today(now)
             )
-            log_event(logger, "upload_rejected", code="page_quota")
-            raise PageError(
-                429,
-                "Daily page limit reached",
-                f"You can convert up to {s.per_user_daily_page_quota} pages a day. This PDF has "
-                f"{pages} pages and you have {left} left today. The limit resets at midnight "
-                "UTC. Nothing was uploaded.",
-                headers={"Retry-After": "3600"},
-            )
+            # The upload page again, with the file named (`_take_upload`).
+            raise QuotaRefused(pages, left or 0)
         job = Job(
             user_id=user.id,
             status=JobStatus.QUEUED,
