@@ -6,7 +6,7 @@
 <li><strong>{{ line.where }}:</strong> {{ line.text }}{% if line.count > 1 %} ({{ line.count }} times){% endif %}
   {#- The space before each sentence is inside its block: the environment strips the
       whitespace around block tags. #}
-  {% if line.decision == "open" and line.element_id %} <a href="/jobs/{{ job_id }}/review?item={{ line.element_id }}">Decide it</a> (one of your decisions).{% elif line.decision == "made" %} You have decided it.{% endif %}
+  {% if line.decision == "open" and line.element_id %} <a href="/jobs/{{ job_id }}/review?item={{ line.element_id }}">Decide it<span class="visually-hidden">: {{ line.label }}</span></a> (one of your decisions).{% elif line.decision == "made" %} You have decided it{% if line.label %} ({{ line.label }}){% endif %}.{% endif %}
   {% if line.code in ("lang_detected", "lang_assumed") %} <a href="#language-heading">Check the language</a>.{% endif %}</li>
 {% endfor %}
 {% endmacro %}

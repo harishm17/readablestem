@@ -347,19 +347,39 @@ def test_notices_are_listed_per_page_with_their_decisions(web):
     text = page_text(not_handled)
     assert "Page 1: A footnote is kept where it falls in the text" in text and "(2 times)" in text
     assert "Page 1: A table is kept as an image of the original" in text
-    assert f'<a href="/jobs/{job_id}/review?item=p1-e9">Decide it</a> (one of your decisions).' in (
-        not_handled
+    # The link names its decision, so two tables on one page give two different links.
+    link = (
+        f'<a href="/jobs/{job_id}/review?item=p1-e9">Decide it<span class="visually-hidden">: '
+        "Table 1</span></a> (one of your decisions)."
     )
+    assert link in not_handled
     worth = section(html, "worth-checking-heading")
     assert "The whole document: The language of the document was detected" in page_text(worth)
     assert '<a href="#language-heading">Check the language</a>' in worth
     # Each sentence is a sentence: a space before the link, after the notice's own.
     assert 'right. <a href="#language-heading">Check the language</a>.' in worth
     assert re.search(
-        rf'[.)] <a href="/jobs/{job_id}/review\?item=p1-e9">Decide it</a>', not_handled
+        rf'[.)] <a href="/jobs/{job_id}/review\?item=p1-e9">Decide it<span', not_handled
     )
     # The table's decision is counted once, with the others, not again for its notice.
     assert "Need your decision 4" in page_text(section(html, "results-heading"))
+
+
+def test_a_colour_notice_does_not_link_to_a_decision_about_something_else(web):
+    # A figure telling things apart by colour alone, whose decision is about its data
+    # values: the colour line is not "Decide it" (that decision never mentions colour).
+    result = web.converter.output.result
+    figure = next(
+        f
+        for f in result.fixes
+        if f.kind is Kind.FIGURE and f.figure is not None and f.review == "required"
+    )
+    assert figure.figure is not None
+    figure.figure.colour_only = True  # the notice follows from the fix
+    job_id = convert(web)
+    worth = section(web.browser.get(f"/jobs/{job_id}").text, "worth-checking-heading")
+    assert "tells things apart by colour alone" in page_text(worth)
+    assert "Decide it" not in worth and "You have decided it" not in worth
 
 
 # --------------------------------------------------------------------------- card

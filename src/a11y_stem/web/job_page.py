@@ -675,6 +675,13 @@ class NoticeLine:
     count: int
     element_id: str | None
     decision: Literal["open", "made"] | None  # the fix that is its decision, if any
+    label: str = ""  # that decision's item ("Table 2"), so two "Decide it" links differ
+
+
+# Notices whose element's fix is the decision they describe (a table kept as an image, a
+# scanned page). Any other notice on an element with a decision (a figure telling things
+# apart by colour alone) is about something else: it gets no "Decide it".
+DECISION_NOTICES = frozenset({"table_not_rebuilt", "scanned_page"})
 
 
 @dataclass
@@ -687,22 +694,30 @@ class NoticeLists:
         return len(self.not_handled) + len(self.worth_checking)
 
 
-def _line(notice: Notice, fixes: dict[str, Fix]) -> NoticeLine:
+def _line(notice: Notice, fixes: dict[str, Fix], numbers: dict[str, int]) -> NoticeLine:
+    from a11y_stem.web.views import KIND_LABELS
+
     fix = fixes.get(notice.element_id or "")
     decision: Literal["open", "made"] | None = None
-    if fix is not None and fix.review == "required":
+    label = ""
+    if fix is not None and fix.review == "required" and notice.code in DECISION_NOTICES:
         decision = "open" if fix.pending else "made"
+        kind = KIND_LABELS.get(fix.kind, fix.kind.value.title())
+        label = f"{kind} {numbers[fix.element_id]}" if fix.element_id in numbers else kind
     where = f"Page {notice.page + 1}" if notice.page is not None else "The whole document"
     return NoticeLine(where, explain_notice(notice).text, notice.code, notice.count,
-                      notice.element_id, decision)  # fmt: skip
+                      notice.element_id, decision, label)  # fmt: skip
 
 
 def notice_lists(result: DocumentResult) -> NoticeLists:
     """The notices as the job page lists them now (see `pipeline.notices.current`)."""
+    from a11y_stem.web.review import item_numbers
+
     fixes = _first_fixes(result)
+    numbers = item_numbers(result)
     lists = NoticeLists()
     for notice in notice_rules.current(result):
-        line = _line(notice, fixes)
+        line = _line(notice, fixes, numbers)
         if notice_rules.section(notice) == "worth_checking":
             lists.worth_checking.append(line)
         else:
