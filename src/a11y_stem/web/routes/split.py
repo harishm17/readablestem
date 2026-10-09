@@ -95,7 +95,7 @@ IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
 HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
 FIGURE_REGION_ZOOM = 2.0
 TABLE_REGION_ZOOM = 2.0
-TABLE_REGION_MARGIN = 6.0  # points of page around a table's crop, so its rules show
+TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
 # The kinds the review screen shows (marks, optional checks, items): its groups.
 REVIEW_KINDS = frozenset(GROUP_KINDS)
@@ -536,7 +536,7 @@ class SplitBuilder:
         elif fix.kind is Kind.TABLE:
             if element is not None:
                 panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
-                panel.region_alt = f"{item.label} as it is in the PDF."
+                panel.region_alt = f"{item.label} in the PDF, outlined, with the lines around it."
             # The card lists every finding itself; the line above it says only why there
             # is no rebuilt table, or that the model was not sure enough.
             if fix.reason or not (fix.failed_checks or (item.table and item.table.problems)):
@@ -1008,7 +1008,8 @@ def _render_region(
         )
     x0, y0, x1, y1 = element.bbox
     if fix.kind is Kind.TABLE:
-        # The table with a little page round it, so its outer rules show.
+        # The table outlined, with a little page round it snapped to whole lines: its
+        # caption above comes in whole, and no line of text is cut at an edge.
         m = TABLE_REGION_MARGIN
         return page_images.render_region(
             pdf,
@@ -1016,6 +1017,8 @@ def _render_region(
             zoom=TABLE_REGION_ZOOM,
             max_side=page_images.REGION_MAX_SIDE_PX,
             clip=(x0 - m, y0 - m, x1 + m, y1 + m),
+            box=element.bbox,
+            snap=True,
         )
     return page_images.render_region(
         pdf,

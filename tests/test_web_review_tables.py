@@ -186,9 +186,8 @@ def test_the_card_shows_the_image_and_the_table_as_the_student_gets_it(tables):
     body = panel(screen(tables))
     assert "Decision 1 of 3" in body and "Table 1, page 1" in text_of(body)
     assert "Needs your decision" in body
-    assert f'src="/jobs/{tables.job_id}/regions/p1-e1.png" alt="Table 1 as it is in the PDF."' in (
-        body
-    )
+    region = f'src="/jobs/{tables.job_id}/regions/p1-e1.png"'
+    assert f'{region} alt="Table 1 in the PDF, outlined, with the lines around it."' in body
     # The proposal, written by the output's own serialiser: the same HTML the student gets.
     proposal = render_table(table_1_proposal(), id_prefix="tp-p1-e1", math_display="inline")
     assert proposal in body
@@ -280,6 +279,10 @@ def test_an_optional_table_and_an_accepted_one_open_as_items(tables):
     # browser tests).
     assert re.search(r'<div class="table-scroll table-view" tabindex="0" role="group"', wide)
     assert render_table(grid_of(TABLE_5, source="model"), id_prefix="tp-p2-e2") in wide
+    # The model's table is the grid read from the PDF here (only who built it differs):
+    # nothing else to offer.
+    for item in (body, wide):
+        assert "The grid read from the PDF" not in item and "use_local" not in item
 
 
 def test_choosing_a_cell_opens_its_form_with_the_text_in_it(tables):

@@ -104,11 +104,25 @@ def _rendered(grid: TableGrid, prefix: str) -> Markup:
     return Markup(render_table(grid, id_prefix=prefix, math_display="inline"))
 
 
+def _same_table(one: TableGrid, other: TableGrid) -> bool:
+    """The same table for a reader, whoever built it (`source`, the cells' boxes and
+    their order in the list aside)."""
+
+    def plain(grid: TableGrid) -> TableGrid:
+        cells = sorted(
+            (c.model_copy(update={"bbox": None}) for c in grid.cells),
+            key=lambda c: (c.row, c.col),
+        )
+        return grid.model_copy(update={"source": "local", "cells": cells})
+
+    return plain(one) == plain(other)
+
+
 def table_card(fix: Fix, element: Element | None) -> TableCard:
     eid = id_prefix(fix.element_id)
     local = usable_local_grid(element)
     grid = fix.table.grid if fix.table is not None else None
-    if local is not None and grid is not None and local == grid:
+    if local is not None and grid is not None and _same_table(local, grid):
         local = None  # the proposal is the grid read from the PDF: nothing else to offer
     card = TableCard(
         proposal=_rendered(grid, f"tp-{eid}") if grid is not None else None,

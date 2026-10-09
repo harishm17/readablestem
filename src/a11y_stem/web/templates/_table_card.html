@@ -213,7 +213,7 @@
     {% endif %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("list") }}
-      <button type="submit" name="action" value="reject" class="button-secondary">{% if t.proposal %}Reject<span class="visually-hidden"> {{ name }}</span>{% else %}Keep the image<span class="visually-hidden"> of {{ name }}</span>{% endif %}</button>
+      <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or t.local else 'button' }}">{% if t.proposal %}Reject<span class="visually-hidden"> {{ name }}</span>{% else %}Keep the image<span class="visually-hidden"> of {{ name }}</span>{% endif %}</button>
     </form>
   </div>
   <p class="hint">{% if t.proposal %}Reject keeps the image of the table, marked “not converted”. To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% else %}Keeping the image leaves it in the document, marked “not converted”.{% endif %}</p>
