@@ -85,9 +85,9 @@ router = APIRouter()
 
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
 BOX_PAD_PT = 2.5  # a mark is this much bigger than the element on every side
-HEADING_REGION_ZOOM = 3.0
-MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
+HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
 FIGURE_REGION_ZOOM = 2.0
+MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
 
 # Short notes for the folded list of optional checks (the card itself has the full
 # sentence from web.messages). Codes without one use the full sentence.
@@ -103,12 +103,6 @@ SHORT_NOTES = {
     "too_long": "The alt text is long.",
     "redundant_prefix": "The alt text starts with words like “image of”.",
 }
-
-TIER_WORDS = {
-    "required": "needs your decision",
-    "optional": "optional check",
-}
-
 
 # --------------------------------------------------------------------------- view model
 
