@@ -47,6 +47,8 @@
 
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add a symbol</h2>
+  <p>If your course writes a letter both ways, such as a bold v for velocity and a plain v
+    for speed, add both.</p>
   <form method="post" action="/courses/{{ course.id }}/entries" novalidate>
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <div class="field{% if field_errors.get('symbol') %} field-error{% endif %}">

@@ -197,13 +197,19 @@ def phrase(canonical: str, meaning: NotationMeaning | str) -> str:
 
 
 def course_bold_letters(entries: Iterable[NotationEntry]) -> frozenset[str]:
-    """Plain letters the course writes bold (without an accent): "d" for bold d."""
-    letters = set()
+    """Letters the course writes bold (without an accent): "d" for bold d. A letter the
+    course also lists plain (a plain v for speed beside a bold v for velocity) is left
+    out: then a plain one is expected too, and is no evidence of a lost bold."""
+    bold, plain = set(), set()
     for entry in entries:
         base, variant, accent = _parts(entry.canonical)
-        if accent is None and STYLE_GROUPS.get(variant or "") == "bold" and base.isalpha():
-            letters.add(base)
-    return frozenset(letters)
+        if accent is not None or not base.isalpha():
+            continue
+        if STYLE_GROUPS.get(variant or "") == "bold":
+            bold.add(base)
+        elif variant is None:
+            plain.add(base)
+    return frozenset(bold - plain)
 
 
 def readings(entries: Iterable[NotationEntry]) -> dict[str, str]:

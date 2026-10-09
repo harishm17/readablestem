@@ -119,6 +119,11 @@ def test_course_bold_letters_are_the_bold_unaccented_ones():
     assert course_bold_letters(entries) == {"d", "v", "a", "Ω"}
 
 
+def test_a_letter_the_course_also_lists_plain_is_not_expected_bold():
+    # A plain v for speed beside a bold v for velocity: a plain v is no evidence.
+    assert course_bold_letters([*COURSE, entry("v", "other")]) == {"d", "a"}
+
+
 # --------------------------------------------------------------------------- options
 
 
