@@ -52,7 +52,7 @@
 /* Review screen (review_split.html). Everything there works without this; it only:
  *
  * - scrolls the page image, inside its own region, so the selected item's mark is in
- *   view (the window itself does not move);
+ *   view (the window only as far as keeps the decision's heading in view);
  * - says so when a page image cannot be loaded;
  * - makes "Save edit" the main button once a field of the decision is changed, so an
  *   edit is less likely to be dropped by pressing Accept out of habit;

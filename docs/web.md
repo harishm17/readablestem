@@ -395,8 +395,10 @@ marks could not be placed on this page") and every item is still in the list vie
 Results stored before review tiers load as before (`default_review`), each waiting heading
 then its own decision.
 
-**JavaScript** (`static/app.js`) only enhances: it scrolls the page region (never the
-window) so the selected mark is in view, says so when a page image fails, makes "Save
+**JavaScript** (`static/app.js`) only enhances: it scrolls the page region so the
+selected mark is in view (side by side, also the window when the mark is near the foot of
+a page, never so far that the decision's heading leaves the window), says so when a page
+image fails, makes "Save
 edit" the main button once a field of the decision is changed, and offers keyboard
 shortcuts: N next decision, P previous, A accept, E go to the edit field. They are off
 until turned on ("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys
