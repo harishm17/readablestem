@@ -312,6 +312,8 @@ def test_the_posting_help_says_upload_and_link_never_paste(web):
     flat = text(page.text)
     assert "Do not paste the file into a Canvas page" in flat
     assert "open Files and upload the .html file" in flat
+    assert "Post the HTML as the main course material" in flat
+    assert "keep the PDF as a print copy" in flat
     assert "28 CFR 35.202" in flat and "guidance, not legal advice" in flat
     assert "https://www.ada.gov/resources/2024-03-08-web-rule/" in page.text
     assert 'aria-current="page">Posting in your course</a>' in page.text

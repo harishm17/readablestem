@@ -48,12 +48,12 @@ breaks it: Canvas's sanitizer keeps only http, https and relative image sources,
 `data:` image (every figure and every equation kept as an image) is dropped, and it
 removes the `<style>` block, `<main>` and `tabindex`, so the hidden "Equation" labels
 show, printed list markers double ("1. (a)") and wide equations lose their scroll box
-(checked against Canvas's sanitizer source, FEATURE-REVIEW "Beta 5"; not yet in a live
+(read from Canvas's sanitizer allowlist, FEATURE-REVIEW "Beta 5"; not yet tried in a live
 course). Moodle's HTML purifier drops `data:` images and MathML. The app's help page
 `/help/posting` (`web/templates/help_posting.html`) gives the steps for Canvas (upload to
 Files, link it where the PDF was, check it in Student View), says to make the HTML the
-main version rather than a copy next to the PDF (28 CFR 35.202 and the Justice
-Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
+main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
+Justice Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
 page links to it under the download link. TODO(Harish): try the steps in a real Canvas
 course (Canvas Lite, then UTD) and update both.
 
