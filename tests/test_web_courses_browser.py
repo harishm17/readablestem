@@ -191,9 +191,10 @@ def test_without_javascript_a_course_symbol_and_a_remembered_letter(site, browse
     remember.wait_for()
     remember.click()
     page.wait_for_url(f"{site.base}/jobs/{job_id}/review?item=*")
-    assert "Remembered for No script course: bold ω is a vector." in page.locator(
-        "#decision-notice"
-    ).inner_text()
+    assert (
+        "Remembered for No script course: bold ω is a vector."
+        in page.locator("#decision-notice").inner_text()
+    )
     page.goto(f"{site.base}/courses")
     page.get_by_role("link", name="No script course").click()
     row = page.get_by_role("row", name="bold ω")
