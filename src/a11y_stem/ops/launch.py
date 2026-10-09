@@ -45,13 +45,23 @@ def launch_blockers(
 ) -> list[str]:
     """Plain-language list of unfinished items, empty when the beta is ready to share."""
     items: list[str] = []
-    if settings is not None and settings.ms_sign_in_enabled:
-        privacy = TEMPLATES_DIR / "privacy.html"
-        if privacy.is_file() and "Microsoft" not in privacy.read_text(encoding="utf-8"):
-            items.append(
-                "web/templates/privacy.html: Microsoft sign-in is on (MS_CLIENT_ID) but the "
-                "privacy notice describes Google sign-in only"
-            )
+    privacy = TEMPLATES_DIR / "privacy.html"
+    notice = privacy.read_text(encoding="utf-8") if privacy.is_file() else None
+    if settings is not None and notice is not None:
+        # A feature that sends or keeps something new needs its words in the notice.
+        for on, word, what in (
+            (settings.ms_sign_in_enabled, "Microsoft", "Microsoft sign-in is on (MS_CLIENT_ID)"),
+            (settings.feature_tables, "rebuild tables", "FEATURE_TABLES sends tables to OpenAI"),
+            (
+                settings.feature_notation_memory,
+                "notation",
+                "FEATURE_NOTATION_MEMORY keeps courses and sends their notation",
+            ),
+        ):
+            if on and word not in notice:
+                items.append(
+                    f"web/templates/privacy.html: {what} but the privacy notice does not say so"
+                )
     for name in PUBLIC_TEMPLATES:
         path = TEMPLATES_DIR / name
         if not path.is_file():

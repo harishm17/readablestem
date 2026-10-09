@@ -53,6 +53,10 @@ def privacy(request: Request) -> Response:
         "tracing": ctx.tracer is not None,
         "events_on": ctx.settings.events_enabled,
         "event_days": EVENT_RETENTION_DAYS,
+        # What the content features send and keep, only when they are on.
+        "tables_on": ctx.settings.feature_tables,
+        "notation_on": ctx.settings.feature_notation_memory,
+        "microsoft_on": ctx.settings.ms_sign_in_enabled,
     }
     return render(request, "privacy.html", context)
 

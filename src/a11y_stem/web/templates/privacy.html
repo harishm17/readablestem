@@ -35,13 +35,20 @@
   <li>The database is backed up once a day and one backup is kept, so a deleted document
     can remain in that backup for up to about one more day before the next backup
     replaces it. Backups are only used to recover the service after a failure.</li>
+  {% if notation_on %}
+  <li>Your courses and their notation (course names, symbols, what they mean, your notes,
+    and the letters you chose to remember for a course during a review) are kept until
+    you delete them or your account; they are not deleted with your documents.</li>
+  {% endif %}
 </ul>
 
 <h2>Who else sees your documents</h2>
 <ul>
-  <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures,
-    images of those parts of the page, and a little of the nearby text, are sent to
-    OpenAI's API. OpenAI states that it does not use API data to train its models by
+  <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
+    and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
+    nearby text, are sent to OpenAI's API.{% if notation_on %} For a document you upload
+    for one of your courses, that course's notation (its symbols and what they mean) is
+    sent with the equations.{% endif %} OpenAI states that it does not use API data to train its models by
     default; see OpenAI's own API data policies for how long it keeps requests.</li>
   <li><strong>Google Cloud</strong> hosts the app and its database.</li>
   {% if tracing %}
@@ -55,10 +62,12 @@
 </ul>
 
 <h2>Your account</h2>
-<p>You sign in with Google. We receive your email address, your name, and whether Google
-  has verified the address. For people on the beta list we store the email address, name,
-  and the time of the last sign-in. If you sign in and are not on the list, nothing is
-  stored about you.</p>
+<p>You sign in with Google{% if microsoft_on %} or with Microsoft (a school or work
+  account){% endif %}. We receive your email address, your name, and whether the address
+  is verified. For people on the beta list we store the email address, name, the time of
+  the last sign-in, and the id your sign-in provider gives your account{% if microsoft_on %}
+  (for Microsoft, also your organisation's directory id){% endif %}, so we know it is you
+  next time. If you sign in and are not on the list, nothing is stored about you.</p>
 
 <h2>Cookies</h2>
 <p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.

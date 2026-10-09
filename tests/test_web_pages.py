@@ -174,6 +174,39 @@ def test_privacy_page_names_langfuse_when_tracing_is_on(tmp_path, monkeypatch):
     assert "<strong>Langfuse</strong>" in privacy and "never contain document text" in privacy
 
 
+def test_privacy_page_describes_the_content_features_that_are_on(tmp_path, pages):
+    # Off (the defaults): nothing about tables, courses or Microsoft.
+    off = " ".join(pages["/privacy"].split())
+    assert "rebuild tables" not in off and "notation" not in off and "Microsoft" not in off
+    assert "the id your sign-in provider gives your account" in off
+    env = WebEnv(tmp_path, feature_tables=True, feature_notation_memory=True)
+    with env.running() as client:
+        on = " ".join(client.get("/privacy").text.split())
+    assert "and to rebuild tables" in on
+    assert "that course's notation (its symbols and what they mean) is sent" in on
+    assert "Your courses and their notation" in on and "until you delete them" in on
+
+
+def test_launch_check_wants_tables_and_notation_in_the_privacy_notice(tmp_path, monkeypatch):
+    from a11y_stem.ops import launch
+    from fixtures.web.support import make_settings
+
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    privacy = templates / "privacy.html"
+    privacy.write_text("<p>Images of equations and figures are sent to OpenAI.</p>")
+    monkeypatch.setattr(launch, "TEMPLATES_DIR", templates)
+    on = make_settings(tmp_path, feature_tables=True, feature_notation_memory=True)
+    items = launch.launch_blockers(settings=on)
+    assert any("FEATURE_TABLES" in item for item in items)
+    assert any("FEATURE_NOTATION_MEMORY" in item for item in items)
+    assert launch.launch_blockers(settings=make_settings(tmp_path)) == [
+        item for item in launch.launch_blockers() if "privacy" in item
+    ]
+    privacy.write_text("<p>... and to rebuild tables ... the course's notation ...</p>")
+    assert not any("privacy.html" in item for item in launch.launch_blockers(settings=on))
+
+
 def test_status_page_says_whether_conversions_are_open(tmp_path):
     env = WebEnv(tmp_path)
     with env.running() as client:
