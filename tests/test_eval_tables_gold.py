@@ -19,7 +19,7 @@ from test_openstax import CC_BY, FakeFetcher
 ROOT = Path(__file__).resolve().parents[1]
 GOLD = ROOT / "data" / "gold" / "tables"
 AUTHORED = ROOT / "data" / "authored" / "tables"
-FIXTURE_PAGE = Path(__file__).parent / "fixtures" / "eval" / "page.xhtml"
+FIXTURE_PAGE = Path(__file__).parent / "fixtures" / "openstax_page.xhtml"  # two tables
 
 
 def openstax_records() -> list[dict]:
@@ -199,13 +199,11 @@ def test_each_style_prints_the_same_words():
     with render.ChromiumRenderer() as browser:
         texts = {
             style: render.pdf_text(
-                render.render_page_pdf(
-                    page_source(),
-                    images=render.ImageCache(Path("/nonexistent")),
-                    renderer=browser,
-                    table_style=style,
+                browser.pdf(
+                    render.printable_html(page_source(), lambda url: None, table_style=style)
                 )
             )
             for style in T.TABLE_STYLES
         }
     assert len({tuple(T.tokens(t)) for t in texts.values()}) == 1
+    assert {"quantity", "kilogram", "meter"} <= set(T.tokens(texts["norules"]))
