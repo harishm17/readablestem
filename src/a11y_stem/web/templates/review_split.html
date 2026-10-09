@@ -123,6 +123,11 @@
   {% endif %}
   {% if item.caption %}<figcaption><span class="cap-label">Caption in the PDF:</span> {{ item.caption }}</figcaption>{% endif %}
 </figure>
+{# Long descriptions on (figures work): the chart's data table as students will get it.
+   It scrolls sideways in its own box on a narrow screen, so it can take focus. #}
+{% if item.data_table %}
+<div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+{% endif %}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
   {{ hidden_fields() }}
   {% set err = item.errors.get("alt") %}
@@ -139,6 +144,24 @@
     <input type="checkbox" id="decorative-{{ eid }}" name="decorative" value="on" data-edit-field{% if item.values.get("decorative") %} checked{% endif %}{% if err %} aria-describedby="decorative-error-{{ eid }}" aria-invalid="true"{% endif %}>
     <label for="decorative-{{ eid }}">Decorative: it adds nothing a reader needs, so it gets no alt text</label>
   </div>
+  {% if item.long_description is not none %}
+  {% set err = item.errors.get("longdesc") %}
+  <div class="field{% if err %} field-error{% endif %}">
+    <label for="longdesc-{{ eid }}">Longer description for {{ item.label|lower }}</label>
+    <p class="hint" id="longdesc-hint-{{ eid }}">Students can open it under the figure. Plain sentences: what it shows, the axes and units, the trend and the key values. Leave it empty to remove it.</p>
+    {{ error_line(item, "longdesc") }}
+    <textarea id="longdesc-{{ eid }}" name="long_description" rows="8" maxlength="2000" class="prose-input" data-edit-field
+              aria-describedby="longdesc-hint-{{ eid }}{% if err %} longdesc-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("long_description", "") }}</textarea>
+  </div>
+  {% endif %}
+  {% if item.data_table %}
+  {% set err = item.errors.get("datatable") %}
+  <div class="field checkbox-field{% if err %} field-error{% endif %}">
+    {{ error_line(item, "datatable") }}
+    <input type="checkbox" id="datatable-{{ eid }}" name="remove_data_table" value="on" data-edit-field{% if item.values.get("remove_data_table") %} checked{% endif %}{% if err %} aria-describedby="datatable-error-{{ eid }}" aria-invalid="true"{% endif %}>
+    <label for="datatable-{{ eid }}">Remove the data table (keep the descriptions)</label>
+  </div>
+  {% endif %}
   {{ save_button(item) }}
   {{ decide_row(item, "Reject keeps the figure without a description, marked for one.") }}
 </form>

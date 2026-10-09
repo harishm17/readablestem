@@ -188,6 +188,12 @@ class ReviewItem:
     # The form comes back with the reviewer's own change in a field (a refused Accept or
     # edit): "Save edit" is then the main button.
     edited: bool = False
+    # Figures with long descriptions on: the proposal's long description, and its chart
+    # data table as HTML (`table_html`, captioned like the student file's) with the id
+    # prefix its caption id starts with. None when the figure has none.
+    long_description: str | None = None
+    data_table: Markup | None = None
+    data_table_id: str | None = None
 
     @property
     def open(self) -> bool:
@@ -303,6 +309,8 @@ def _item(
     if fix.figure is not None:
         values["alt"] = fix.figure.alt
         values["decorative"] = "on" if fix.figure.decorative else ""
+        if fix.figure.long_description is not None:
+            values["long_description"] = fix.figure.long_description
     if fix.heading is not None:
         # The select offers the level the document shows, not one it would move.
         suggested = place.suggested if place is not None else None
@@ -336,7 +344,28 @@ def _item(
         values=values,
         optional=optional,
         second_check=triage.second_check_note(fix),
+        **_figure_details(fix, element),
     )
+
+
+def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
+    """A figure's long description and data table for its card (figures work)."""
+    from a11y_stem.pipeline import assemble_tables, figure_details, table_html
+
+    figure = fix.figure
+    if figure is None or figure.decorative:
+        return {}
+    shown: dict[str, Any] = {"long_description": figure.long_description}
+    if figure.data_table is not None:
+        table_id = "review-" + assemble_tables.id_prefix(fix.element_id) + "-data"
+        caption = element.caption if element is not None else None
+        grid = figure.data_table.model_copy(
+            update={"caption": figure_details.table_caption(figure, caption)}
+        )
+        # Escaped and rebuilt by the serialiser (cell text escaped, MathML allowlisted).
+        shown["data_table"] = Markup(table_html.render_table(grid, id_prefix=table_id))
+        shown["data_table_id"] = table_id
+    return shown
 
 
 def _check_view(check: Check, *, note: bool = False) -> CheckView:
@@ -634,6 +663,9 @@ def review_action(
     min_confidence: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
     scope: Annotated[str, Form()] = "",
+    # Figures with long descriptions on (web.review `_edited_details`).
+    long_description: Annotated[str | None, Form()] = None,
+    remove_data_table: Annotated[str | None, Form()] = None,
 ) -> Response:
     """One decision on one fix; when `element_id` names a kind ("equations", "figures",
     "headings"), a bulk accept in that group; when it is a heading group's key
@@ -654,7 +686,14 @@ def review_action(
     if is_group_key(element_id):
         every = scope == "all"
         return _group_action(request, job_id, element_id, user, action, level or "", view, every)
-    sent = {"latex": latex, "alt": alt, "decorative": decorative, "level": level}
+    sent = {
+        "latex": latex,
+        "alt": alt,
+        "decorative": decorative,
+        "level": level,
+        "long_description": long_description,
+        "remove_data_table": remove_data_table,
+    }
     form = {name: value for name, value in sent.items() if value is not None}
     try:
         with session_scope(get_ctx(request).factory) as session:
