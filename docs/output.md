@@ -26,9 +26,10 @@ on it. The pipeline that feeds it is in `docs/design/beta-architecture.md`.
 ```
 
 There are no scripts and nothing is loaded from elsewhere: images are `data:` URIs and the
-stylesheet is inline. The file opens offline, can be pasted into an LMS page or emailed,
+stylesheet is inline. The file opens offline, can be uploaded to a course or emailed,
 and opening it never sends a request anywhere. `html_checks.static_checks` fails the
-`external_resource` rule if that ever changes.
+`external_resource` rule if that ever changes. It must not be pasted into an LMS page
+(see "Posting it in a course").
 
 - `lang` is `DocumentResult.lang`: the PDF's `/Lang`, else the language detected from the
   text, else `en` (see "Language"). Anything that is not a language tag falls back to
@@ -42,6 +43,22 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - An optional plain-text `notice` opens `<main>` as a labelled, outlined note ("Note:
   ..."). The CLI uses it for `--fake` runs, whose answers are placeholders: the file has
   to say so before any content, because the CLI has no review step.
+
+## Posting it in a course
+
+The file is meant to be uploaded as a file and linked, not pasted into a page. Pasting
+breaks it: Canvas's sanitizer keeps only http, https and relative image sources, so every
+`data:` image (every figure and every equation kept as an image) is dropped, and it
+removes the `<style>` block, `<main>` and `tabindex`, so the hidden "Equation" labels
+show, printed list markers double ("1. (a)") and wide equations lose their scroll box
+(read from Canvas's sanitizer allowlist, FEATURE-REVIEW "Beta 5"; not yet tried in a live
+course). Moodle's HTML purifier drops `data:` images and MathML. The app's help page
+`/help/posting` (`web/templates/help_posting.html`) gives the steps for Canvas (upload to
+Files, link it where the PDF was, check it in Student View), says to make the HTML the
+main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
+Justice Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
+page links to it under the download link. TODO(Harish): try the steps in a real Canvas
+course (Canvas Lite, then UTD) and update both.
 
 ## How each element is written
 

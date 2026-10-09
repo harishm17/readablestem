@@ -122,7 +122,13 @@ class Settings(BaseSettings):
     # --- public pages
     source_url: str = "https://github.com/harishm17/a11y-stem"
     contact_email: str | None = None
-    # The two questions after a download ("Did it work?" and what to improve).
+    # Where the footer's "Feedback" link goes (http or https). Unset: an email to
+    # CONTACT_EMAIL. A form service here is a new data processor: name it in the privacy
+    # notice before setting it.
+    feedback_url: str | None = None
+    # The two optional questions after a download ("Will you post this for students?",
+    # "About how many minutes did this save?"), stored as usage events: they need
+    # EVENTS_ENABLED too.
     feedback_questions_enabled: bool = True
     # Content-free usage events (`events` table: a name, a code, a number; never text).
     events_enabled: bool = True
@@ -152,6 +158,17 @@ class Settings(BaseSettings):
     @classmethod
     def _lower(cls, value: str) -> str:
         return value.strip().lower()
+
+    @field_validator("feedback_url")
+    @classmethod
+    def _web_url(cls, value: str | None) -> str | None:
+        """A link in every page footer: only a web address, never javascript: or data:."""
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        if not re.match(r"https?://[^\s\"'<>]+$", value):
+            raise ValueError("FEEDBACK_URL must be an http or https address")
+        return value
 
     @field_validator("ms_allowed_tenants", mode="before")
     @classmethod

@@ -95,4 +95,46 @@
   <p>No counts yet. They are written by the daily aggregation before documents are deleted.</p>
   {% endif %}
 </section>
+
+{# Usage events (web/events.py): numbers only, people by pseudonym, never by email. #}
+<section aria-labelledby="usage-heading">
+  <h2 id="usage-heading">Usage</h2>
+  <p>What people did in the app, counted from content-free usage events. People are shown
+    by the start of their random id, not by email. Events are kept for {{ event_days }} days.{% if not events_on %}
+    <strong>Recording is off (EVENTS_ENABLED=false).</strong>{% endif %}</p>
+  <h3 id="usage-day-heading">By day (last {{ usage.days }} days, UTC)</h3>
+  {% if usage.by_day %}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="usage-day-heading">
+  <table class="usage-table">
+    <thead>
+      <tr><th scope="col">Day</th>{% for key, label in usage_columns.day %}<th scope="col" class="num">{{ label }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in usage.by_day %}
+      <tr><th scope="row">{{ row.label }}</th>{% for key, label in usage_columns.day %}<td class="num">{{ row.cell(key) }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No usage events in the last {{ usage.days }} days.</p>
+  {% endif %}
+  <h3 id="usage-person-heading">By person (all kept events)</h3>
+  {% if usage.by_person %}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="usage-person-heading">
+  <table class="usage-table">
+    <thead>
+      <tr><th scope="col">Person</th>{% for key, label in usage_columns.person %}<th scope="col" class="num">{{ label }}</th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+      {% for row in usage.by_person %}
+      <tr><th scope="row"><code>{{ row.label }}</code></th>{% for key, label in usage_columns.person %}<td class="num">{{ row.cell(key) }}</td>{% endfor %}</tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No usage events yet.</p>
+  {% endif %}
+</section>
 {% endblock %}

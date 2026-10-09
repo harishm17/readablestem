@@ -24,8 +24,12 @@
   </ul>
   <h3 id="course-heading">Put it in your course</h3>
   {# TODO(Harish): the tested steps for eLearning (Blackboard) and Canvas (BW1 of the UX
-     review: upload the file, link it from the module, keep the PDF beside it). #}
-  <p>Upload the HTML file to your course as a file, next to the PDF, and link to it. Do not
-    paste it into a page editor: course sites remove the images and the layout the
-    equations need.</p>
+     review: upload the file, link it from the module, keep the PDF beside it). The Canvas
+     steps are on /help/posting (help_posting.html), not yet tried in a live course. #}
+  <p><a href="/help/posting">How to post it in your course</a>: upload the HTML file to your
+    course as a file, next to the PDF, and link to it. Do not paste it into a page editor:
+    course sites remove the images and the layout the equations need.</p>
+  {# ux-a's part under the download (the two questions); its posting link is the one
+     above. #}
+  {% with posting_link = false %}{% include "_after_download.html" %}{% endwith %}
 </section>

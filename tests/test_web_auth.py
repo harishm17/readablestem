@@ -295,6 +295,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
         "/jobs/{job_id}/delete",
+        "/jobs/{job_id}/feedback",
         "/jobs/{job_id}/language",
         "/jobs/{job_id}/review/{element_id}",
         "/login",

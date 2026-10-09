@@ -353,7 +353,7 @@ def test_stopping_the_worker_cancels_the_running_job_and_ends_its_lease(env):
     ("data", "code", "message"),
     [
         (scanned_pdf(2), "scanned", "scanned page images with no text"),
-        (blank_pdf(), "no_content", "Every page of this PDF is blank"),
+        (blank_pdf(), "no_content", "Every page of notes.pdf is blank"),
         (huge_page_pdf(), "page_too_large", "too large to convert"),
     ],
     ids=["scanned", "blank", "huge-page"],

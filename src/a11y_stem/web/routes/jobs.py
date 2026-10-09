@@ -13,11 +13,13 @@ while decisions are open; and the language control's POST.
 from __future__ import annotations
 
 import logging
+import re
+import unicodedata
 from datetime import datetime, timedelta
 from typing import Annotated, Any
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, Form, Request
+from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
@@ -26,8 +28,9 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.pipeline import language as languages
 from a11y_stem.pipeline import text_pass
+from a11y_stem.web import documents, events, notation
+from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
-from a11y_stem.web import notation
 from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import (
@@ -47,7 +50,7 @@ from a11y_stem.web.deps import (
 )
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.outcome import JobOutcome, job_outcome
-from a11y_stem.web.quota import pages_left, try_consume_pages
+from a11y_stem.web.quota import next_day_start, pages_left, try_consume_pages
 from a11y_stem.web.security import VIEW_CSP
 from a11y_stem.web.uploads import (
     UploadRejected,
@@ -60,35 +63,89 @@ from a11y_stem.web.views import JobView, job_view, last_decision
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
-NOT_FOUND = ("Page not found", "There is nothing at this address, or it is not yours to see.")
+NOT_FOUND = (
+    "Page not found",
+    "There is no document at this address. It may have been deleted, or the link may be "
+    "incomplete.",
+)
+# What the owner of a deleted document sees at its old address (UX review MF10).
+DELETED = ("This document has been deleted", "This document has been deleted.")
 # Opt-in reload interval for the job page without JavaScript: long enough to hear the
 # status before the page starts over.
 AUTO_RELOAD_S = 15
+# How to save a fresh copy of a PDF: the advice for files that are damaged or cut short.
+FRESH_COPY = (
+    "If it opens on your computer, save a fresh copy (File > Save As, or Print to PDF) "
+    "and upload that."
+)
 
 
-def upload_error_message(code: str, ctx: AppContext) -> str:
+def upload_error_message(
+    code: str,
+    ctx: AppContext,
+    filename: str = "",
+    pages: int | None = None,
+    left: int | None = None,
+) -> str:
+    """What went wrong with an upload, naming the file (and its pages) when known. The
+    file name is shown to its owner only, never logged. `left`: pages left today, for
+    "page_quota"."""
     s = ctx.settings
+    name = filename or "This file"
+    limit = s.max_pages_per_job
+    too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
+    if code == "page_quota":
+        return _quota_message(name, pages, left, s.per_user_daily_page_quota)
     return {
         "missing_file": "Choose a PDF file to upload.",
         "bad_form": "The upload did not arrive complete. Please try again.",
-        "empty": "The file is empty. Choose a PDF that has content.",
-        "not_pdf": "This file is not a PDF. Choose a PDF file.",
-        "too_large": f"The file is larger than {s.max_upload_mb} MB. Split it into smaller "
+        "empty": f"{name} is empty. Choose a PDF that has content.",
+        "not_pdf": f"{name} is not a PDF. Choose a PDF file.",
+        "too_large": f"{name} is larger than {s.max_upload_mb} MB. Split it into smaller "
         "PDFs and upload each one.",
-        "encrypted": "This PDF is password-protected. Save a copy without a password (for "
+        "encrypted": f"{name} is password-protected. Save a copy without a password (for "
         "example with Print to PDF) and upload that.",
-        "unreadable": "This PDF could not be opened. It may be damaged; try saving it again "
-        "from the program that made it.",
-        "no_pages": "This PDF has no pages.",
-        "too_many_pages": f"This PDF has more than {s.max_pages_per_job} pages. Split it into "
-        f"parts of up to {s.max_pages_per_job} pages.",
-        "page_too_large": "This PDF has a page larger than 1.7 metres on a side, which is too "
+        "unreadable": f"{name} could not be opened. It may be damaged. {FRESH_COPY}",
+        "damaged": f"{name} looks damaged or incomplete: it may not have finished "
+        f"downloading. {FRESH_COPY}",
+        "no_pages": f"{name} has no pages. Check that you chose the right file.",
+        "too_many_pages": f"{too_many}; the limit is {limit} per upload. Split it into parts "
+        f"of up to {limit} pages (in Acrobat: Organize Pages, then Split) and upload each "
+        "part.",
+        "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
         "large to convert. Course documents are usually Letter or A4 size.",
-        "scanned": "This PDF is made of scanned page images with no text in it, so there is "
+        "scanned": f"{name} is made of scanned page images with no text in it, so there is "
         "nothing this tool can convert yet. Run text recognition (OCR) on it first, for "
         "example with your scanner's software or Adobe Acrobat, then upload the result.",
-        "no_content": "Every page of this PDF is blank. Check that you chose the right file.",
-    }.get(code, "This file cannot be converted.")
+        "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
+        "chose the right file.",
+    }.get(code, f"{name} cannot be converted.")
+
+
+def _quota_message(name: str, pages: int | None, left: int | None, quota: int | None) -> str:
+    """The daily page limit refused an upload (UX review MF20, MF21): the file, its
+    pages, what is left, and when the count starts again (the page under it says when
+    in the reader's own time)."""
+    has = f"{name} has {pages} {'page' if pages == 1 else 'pages'}"
+    if not left:
+        return (
+            f"{has}, and you have used all {quota} pages you can convert today. Upload it "
+            "again after the count starts again at midnight UTC. Nothing was uploaded."
+        )
+    return (
+        f"{has}, but you have {left} of today's {quota} pages left. Upload a part of up "
+        f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
+        "count starts again at midnight UTC. Nothing was uploaded."
+    )
+
+
+class QuotaRefused(Exception):
+    """The upload has more pages than are left today (`_store_upload`)."""
+
+    def __init__(self, pages: int, left: int) -> None:
+        super().__init__("page_quota")
+        self.pages = pages
+        self.left = left
 
 
 def owned_job(session: Session, job_id: str, user: CurrentUser, *, lock: bool = False) -> Job:
@@ -99,8 +156,28 @@ def owned_job(session: Session, job_id: str, user: CurrentUser, *, lock: bool = 
         raise PageError(404, *NOT_FOUND)
     job = session.get(Job, job_id, with_for_update=lock or None)
     if job is None or job.user_id != user.id or expired(job):
-        raise PageError(404, *NOT_FOUND)
+        raise _missing(session, job_id, user, job)
     return job
+
+
+def _missing(session: Session, job_id: str, user: CurrentUser, job: Job | None) -> PageError:
+    """The 404 for a job that cannot be shown. Its owner learns that it was deleted and
+    why (an expired row still waiting for the purge, or the upload in their own usage
+    events); anyone else learns nothing, not even that the id exists."""
+    if job is not None and job.user_id == user.id:
+        kept = (as_utc(job.retain_until) or utcnow()) - (as_utc(job.created_at) or utcnow())
+        return PageError(404, *DELETED, template="job_deleted.html", context={"kept": _kept(kept)})
+    if job is None and events.uploaded_at(session, user.id, job_id) is not None:
+        return PageError(404, *DELETED, template="job_deleted.html", context={"kept": ""})
+    return PageError(404, *NOT_FOUND)
+
+
+def _kept(delta: timedelta) -> str:
+    """'24 hours', '30 days': how long a job was kept."""
+    hours = round(delta.total_seconds() / 3600)
+    if hours >= 48 and hours % 24 == 0:
+        return f"{hours // 24} days"
+    return f"{hours} {'hour' if hours == 1 else 'hours'}"
 
 
 def expired(job: Job, now: datetime | None = None) -> bool:
@@ -123,24 +200,10 @@ def require_done(job: Job) -> None:
 
 def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
     spend_closed = ctx.guard.cap_reached(ctx.min_headroom_usd)
+    now = utcnow()
     with session_scope(ctx.factory) as session:
-        jobs = session.scalars(
-            select(Job)
-            .where(Job.user_id == user.id, Job.retain_until > utcnow())  # see `owned_job`
-            .order_by(Job.created_at.desc())
-        ).all()
-        views = [job_view(session, job) for job in jobs]
-        # Labels only (no counts), so the stored results are not loaded for the list.
-        outcomes = {
-            job.id: outcome
-            for job in jobs
-            if (
-                outcome := job_outcome(
-                    status=str(job.status), error_code=job.error_code, budget_closed=spend_closed
-                )
-            )
-            is not None
-        }
+        # My documents as a to-do list (web/documents.py); expired jobs count as deleted.
+        listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
         left = pages_left(
             session,
             user.id,
@@ -152,10 +215,12 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
         )
     return {
-        "jobs": views,
-        "outcomes": outcomes,
+        "documents": listing,
         "pages_left": left,
+        "page_quota": ctx.settings.per_user_daily_page_quota,
         "spend_closed": spend_closed,
+        # Daily limits and today's budget start again then (shown in local time by app.js).
+        "next_reset": next_day_start(now),
         "active": "app",
         "courses": courses,
     }
@@ -166,12 +231,45 @@ def app_home(request: Request, user: UserDep) -> Response:
     return render(request, "app.html", app_context(get_ctx(request), user))
 
 
-def _upload_error_page(request: Request, user: CurrentUser, code: str, status: int) -> Response:
+@router.get("/app/documents")
+def app_documents(request: Request, user: UserDep, v: str = "") -> Response:
+    """The documents list alone, polled by htmx while a document is waiting or
+    converting. 204 (no swap) while nothing changed, so an open tab costs one small
+    query every few seconds; when something did, the whole list, with a `<title>` that
+    htmx moves into the tab title ("My documents (4 of 6 finished)")."""
+    ctx = get_ctx(request)
+    spend_closed = ctx.guard.cap_reached(ctx.min_headroom_usd)
+    now = utcnow()
+    with session_scope(ctx.factory) as session:
+        if v and v == documents.list_version(session, user.id, now=now, budget_closed=spend_closed):
+            return Response(status_code=204)
+        listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
+    context: dict[str, Any] = {"documents": listing}
+    if request.headers.get("HX-Request") == "true":
+        context["page_title"] = listing.page_title
+    return render(request, "_documents.html", context)
+
+
+def _upload_error_page(
+    request: Request,
+    user: CurrentUser,
+    code: str,
+    status: int,
+    filename: str = "",
+    pages: int | None = None,
+    left: int | None = None,
+    headers: dict[str, str] | None = None,
+) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code)
-    errors = [{"field_id": "pdf", "message": upload_error_message(code, ctx)}]
-    context = app_context(ctx, user) | {"errors": errors, "field_errors": {"pdf": errors[0]}}
-    return render(request, "app.html", context, status_code=status)
+    message = upload_error_message(code, ctx, filename, pages, left)
+    context = app_context(ctx, user)
+    # With no pages left the form is replaced by a notice (app.html): the summary's link
+    # goes there instead of to a file field that is not on the page.
+    field_id = "upload-closed" if context["pages_left"] == 0 else "pdf"
+    errors = [{"field_id": field_id, "message": message}]
+    context |= {"errors": errors, "field_errors": {"pdf": errors[0]}}
+    return render(request, "app.html", context, status_code=status, headers=headers)
 
 
 @router.post("/jobs")
@@ -205,9 +303,10 @@ UPLOAD_BUSY = {
     ),
     "own_upload": (
         429,
-        "Your other upload is still in progress",
-        "You are already uploading a document. Wait until it has finished, then upload "
-        "the next one. Nothing was uploaded.",
+        "Another upload of yours is still being checked",
+        "A document you uploaded a moment ago, perhaps in another tab, is still being "
+        "checked. Wait a few seconds, then go back and upload this one again. Nothing was "
+        "uploaded this time.",
     ),
 }
 
@@ -233,12 +332,40 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
             lambda: inspect_pdf_isolated(form.data or b"", max_pages=ctx.settings.max_pages_per_job)
         )
     except UploadRejected as exc:
-        return await run_in_threadpool(_upload_error_page, request, user, exc.code, exc.status_code)
+        return await run_in_threadpool(
+            _upload_error_page,
+            request,
+            user,
+            exc.code,
+            exc.status_code,
+            form.filename,
+            exc.pages,
+        )
     keep = form.fields.get("keep") == "on"
-    job_id = await run_in_threadpool(
-        _store_upload, ctx, user, form.filename, form.data, pages, keep, course_id
-    )
+    try:
+        job_id = await run_in_threadpool(
+            _store_upload, ctx, user, form.filename, form.data, pages, keep, course_id
+        )
+    except QuotaRefused as exc:
+        return await run_in_threadpool(
+            _upload_error_page,
+            request,
+            user,
+            "page_quota",
+            429,
+            form.filename,
+            exc.pages,
+            left=exc.left,
+            headers={"Retry-After": "3600"},
+        )
     log_event(logger, "job_created", job_id=job_id, pages=pages, opt_in=keep)
+    # Usage events (web/events.py): `uploaded`, and `reuploaded` for the same file again.
+    data = form.data or b""
+    await run_in_threadpool(
+        lambda: events.record_upload(
+            ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, data=data, pages=pages
+        )
+    )
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
@@ -293,15 +420,8 @@ def _store_upload(
             left = pages_left(
                 session, user.id, quota=s.per_user_daily_page_quota, day=utc_today(now)
             )
-            log_event(logger, "upload_rejected", code="page_quota")
-            raise PageError(
-                429,
-                "Daily page limit reached",
-                f"You can convert up to {s.per_user_daily_page_quota} pages a day. This PDF has "
-                f"{pages} pages and you have {left} left today. The limit resets at midnight "
-                "UTC. Nothing was uploaded.",
-                headers={"Retry-After": "3600"},
-            )
+            # The upload page again, with the file named (`_take_upload`).
+            raise QuotaRefused(pages, left or 0)
         job = Job(
             user_id=user.id,
             status=JobStatus.QUEUED,
@@ -361,6 +481,7 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     job, outcome = load_job_status(request, job_id, user)
     context = status_context(job, outcome) | {"auto_reload": auto == "1"}
     context["course"] = _job_course(request, job_id, user)  # notation memory
+    context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).
     return render(request, "job.html", context | {"auto_reload_s": AUTO_RELOAD_S})
@@ -473,9 +594,26 @@ def _crops(session: Session, job_id: str) -> dict[str, bytes]:
 # --------------------------------------------------------------------------- results
 
 
-def download_filename(filename: str) -> str:
-    stem = filename.rsplit(".", 1)[0] if "." in filename else filename
-    return f"{stem or 'document'}-accessible.html"
+# Longest title part of a download's file name: long enough to recognise, short enough
+# for a course's file list.
+MAX_SLUG = 60
+
+
+def slug(text: str) -> str:
+    """'Problem Set 2: Kinematics' -> 'problem-set-2-kinematics'. Letters and digits of
+    any script are kept (the download header carries UTF-8); everything else is a hyphen."""
+    folded = unicodedata.normalize("NFKC", text).casefold()
+    words = re.sub(r"[\W_]+", "-", folded).strip("-")
+    if len(words) > MAX_SLUG:
+        words = words[:MAX_SLUG].rsplit("-", 1)[0] if "-" in words[:MAX_SLUG] else words[:MAX_SLUG]
+    return words
+
+
+def download_filename(title: str, job_id: str) -> str:
+    """The document's title as a slug plus the start of its id, so two versions of a
+    handout (or two uploads called "source.pdf") never overwrite each other in a
+    Downloads folder or a course's files (UX review MF24)."""
+    return f"{slug(title) or 'document'}-{job_id[:6]}.html"
 
 
 def content_disposition(filename: str) -> str:
@@ -486,10 +624,17 @@ def content_disposition(filename: str) -> str:
 
 @router.get("/jobs/{job_id}/download")
 def download(request: Request, job_id: str, user: UserDep) -> Response:
-    with session_scope(get_ctx(request).factory) as session:
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
-        html, name = job.html or "", download_filename(job.filename)
+        result = job.result_json or {}
+        title = documents.display_title(result.get("title"), job.filename)
+        html, name = job.html or "", download_filename(title, job.id)
+        still_open = documents.open_decisions(result.get("fixes"))
+    events.record_download(
+        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+    )
     return Response(
         html,
         media_type="text/html; charset=utf-8",
@@ -502,13 +647,26 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
 
 @router.get("/jobs/{job_id}/view")
 def view(request: Request, job_id: str, user: UserDep) -> Response:
-    with session_scope(get_ctx(request).factory) as session:
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
         html = job.html or ""
+    events.record(
+        ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True
+    )
     return Response(
         html, media_type="text/html; charset=utf-8", headers={"Content-Security-Policy": VIEW_CSP}
     )
+
+
+def after_download_state(
+    request: Request, job_id: str, user: CurrentUser
+) -> feedback_questions.AfterDownload:
+    """What `_after_download.html` shows under the download link (web/feedback.py)."""
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        return feedback_questions.after_download(session, ctx.settings, user.id, job_id)
 
 
 @router.get("/jobs/{job_id}/crops/{element_id}.png")
@@ -527,17 +685,39 @@ def crop(request: Request, job_id: str, element_id: str, user: UserDep) -> Respo
     return Response(png, media_type="image/png")
 
 
-def _confirm_delete_page(request: Request, job_id: str, user: CurrentUser) -> Response:
+def _confirm_delete_page(
+    request: Request, job_id: str, user: CurrentUser, came_from: str = ""
+) -> Response:
+    """'Delete <title>?' with what will go: the file, when it was uploaded and how many
+    decisions the person made on it. "No, keep it" goes back where they came from (the
+    list's Delete links say `from=app`)."""
     with session_scope(get_ctx(request).factory) as session:
-        filename = owned_job(session, job_id, user).filename
-    context = {"job_id": job_id, "filename": filename}
+        job = owned_job(session, job_id, user)
+        result = job.result_json or {}
+        title = documents.display_title(result.get("title"), job.filename)
+        decided = documents.decided_by_you(result.get("fixes"))
+        filename, uploaded = job.filename, as_utc(job.created_at)
+    context = {
+        "job_id": job_id,
+        "title": title,
+        "filename": filename,
+        "uploaded": uploaded,
+        "decided": decided,
+        "back": "/app" if came_from == "app" else f"/jobs/{job_id}",
+    }
     return render(request, "delete_confirm.html", context)
 
 
 @router.get("/jobs/{job_id}/delete")
-def confirm_delete(request: Request, job_id: str, user: UserDep) -> Response:
-    """The confirmation step on its own (for a link)."""
-    return _confirm_delete_page(request, job_id, user)
+def confirm_delete(
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    came_from: Annotated[str, Query(alias="from")] = "",
+) -> Response:
+    """The confirmation step on its own: what the Delete links of My documents open (a
+    link, so going Back afterwards never offers to send a form again)."""
+    return _confirm_delete_page(request, job_id, user, came_from)
 
 
 @router.post("/jobs/{job_id}/delete", dependencies=[Depends(require_csrf)])

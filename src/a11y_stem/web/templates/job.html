@@ -52,6 +52,8 @@
   <li><a href="/jobs/{{ job.id }}/view">Preview the student version</a></li>
   <li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>
 </ul>
+{# ux-a: under the download link, where to post the file and the two questions. #}
+{% include "_after_download.html" %}
 {% else %}
 {% include "_job_ready.html" %}
 {% endif %}

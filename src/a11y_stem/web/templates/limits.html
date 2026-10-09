@@ -2,12 +2,43 @@
 {% block title %}Known limits{% endblock %}
 {% block content %}
 <h1>Known limits</h1>
-{# TODO(Harish): write the known-limits copy (architecture rule 8: Harish writes it).
-   Facts to cover, from the code as it is: scanned pages (no OCR: refused when the whole
-   PDF is scanned, kept as flagged images when some pages are); the hosted app runs the
-   static HTML checks on every conversion but axe-core only in CI and the eval harness
-   (no browser in the image); pages larger than 1.7 m are refused; docs/output.md
-   "Engineering limits" and docs/steps.md "Known limits" list the rest. #}
-<p class="draft-note"><strong>TODO(Harish):</strong> this page will list what the tool
-  cannot do yet. It is being written.</p>
+{# TODO(Harish): write the known-limits copy (architecture rule 8: Harish writes it). Until
+   then this page lists, in plain words, facts that hold whatever content features are on
+   (UX review MF8), so it no longer reads as "no limits". Still to add once the content
+   features land and their flags are decided (docs/design/content-features.md): tables,
+   links, coloured text, language, maths in captions; also docs/output.md "Engineering
+   limits" and docs/steps.md "Known limits". #}
+<p class="draft-note"><strong>Draft, to be reviewed by Harish.</strong> This list describes
+  the beta as it works today; the wording is not final.</p>
+
+<h2>What it does not do yet</h2>
+<ul>
+  <li><strong>Scanned pages are not read.</strong> There is no text recognition (OCR): a PDF
+    made only of scanned pages is refused, and scanned pages in a PDF with text are kept as
+    images, marked “Not converted”. Run OCR first, for example in Adobe Acrobat.</li>
+  <li><strong>Handwriting and chemistry notation</strong> are not converted.</li>
+  <li><strong>Two-column pages and slides</strong> convert less well than single-column
+    notes: check the reading order.</li>
+  <li><strong>Size.</strong> Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
+    Split longer documents.</li>
+  <li><strong>Your documents are deleted</strong> {{ retention_hours }} hours after upload
+    ({{ opt_in_days }} days if you choose to keep them longer). Download the file before
+    then.</li>
+  <li><strong>The checks look at structure, not meaning.</strong> Every file is checked for
+    structure (language, title, headings, lists, image text alternatives). The full axe-core
+    accessibility test runs on our own test documents, not on yours, and nothing here
+    replaces testing with a screen reader.</li>
+</ul>
+
+<h2 id="accuracy">How accurate it is</h2>
+<p>Measured on a small sample only: three sections of one high-school physics textbook
+  (OpenStax <cite>Physics</cite>, chapter 2), 43 PDF pages, on 8 October 2026.</p>
+<ul>
+  <li>Equations: 23 of 30 came out exactly right (95% interval: 59% to 88%).</li>
+  <li>Headings: all 121 were found; 120 of them at the right level.</li>
+  <li>Decisions it asked for: about 6 in 10 pointed at a real problem.</li>
+</ul>
+<p>Real course PDFs, especially ones typeset with LaTeX or exported from Word, may do
+  worse. <a href="{{ source_url }}/blob/main/docs/eval.md">The evaluation report</a> says how
+  this was measured and what the numbers do not show.</p>
 {% endblock %}

@@ -215,6 +215,7 @@ def render(
         "flash": pop_flash(request),
         "source_url": ctx.settings.source_url,
         "contact_email": ctx.settings.contact_email,
+        "feedback_url": ctx.settings.feedback_url,  # the footer's Feedback link
         "google_login": ctx.oauth is not None,
         "dev_login": ctx.dev_login_enabled,
         "max_upload_mb": ctx.settings.max_upload_mb,

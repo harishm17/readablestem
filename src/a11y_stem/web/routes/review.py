@@ -51,7 +51,8 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web.db import Blob, ReviewEdit, session_scope
+from a11y_stem.web import events
+from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
 from a11y_stem.web.deps import (
     ELEMENT_ID,
     CurrentUser,
@@ -650,7 +651,10 @@ def list_url(job_id: str, anchor: str) -> str:
 
 @router.get("/jobs/{job_id}/review/list")
 def review_list(request: Request, job_id: str, user: UserDep) -> Response:
-    return _page(request, job_id, user)
+    response = _page(request, job_id, user)
+    ctx = get_ctx(request)  # usage event (web/events.py)
+    events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "list")
+    return response
 
 
 def _split_redirect(job_id: str, result: DocumentResult, after: str | None) -> Response:
@@ -762,6 +766,7 @@ def review_action(
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             job.result_version = next_version
             session.add(_review_edit(job.id, user, change_made))
+            _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewInvalid as exc:
@@ -841,6 +846,7 @@ def _group_action(
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 job.result_version = next_version
                 session.add_all(_review_edit(job.id, user, c) for c in outcome.changes)
+                _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
         raise PageError(404, *NOT_FOUND) from None
     except ReviewInvalid as exc:
@@ -933,6 +939,7 @@ def _bulk_action(
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 job.result_version = next_version
                 session.add_all(_review_edit(job.id, user, c) for c in changes)
+                _decision_events(request, session, user, job, result, "bulk", len(changes))
     except ReviewInvalid as exc:
         log_event(logger, "review_invalid", job_id=job_id, action="bulk")
         return _page(request, job_id, user, invalid=(slug, exc), status_code=422)
@@ -978,6 +985,28 @@ def _bulk_message(bulk: BulkRequest, n: int) -> str:
 def _crops(session: Session, job_id: str) -> dict[str, bytes]:
     blobs = session.scalars(select(Blob).where(Blob.job_id == job_id, Blob.kind == "crop"))
     return {b.element_id: b.content for b in blobs if b.element_id}
+
+
+def _decision_events(
+    request: Request,
+    session: Session,
+    user: CurrentUser,
+    job: Job,
+    result: DocumentResult,
+    kind: str,
+    changed: int,
+) -> None:
+    """Usage events of a review write (web/events.py), in its transaction:
+    `decision_made`, and `review_completed` when no decision is left open."""
+    events.add_decision(
+        session,
+        get_ctx(request).settings,
+        user_id=user.id,
+        job=job,
+        kind=kind,
+        changed=changed,
+        open_after=triage.open_decisions(result.fixes),
+    )
 
 
 def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange) -> ReviewEdit:

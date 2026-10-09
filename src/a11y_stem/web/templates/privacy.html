@@ -70,6 +70,16 @@
   <code>unknown_command</code>). They never contain document text, images, LaTeX, alt
   text, file names or your email address. Before documents are deleted, daily counts (for
   example, how many equations needed review) are added to totals that contain no content.</p>
+{# TODO(Harish): final wording of the usage-events line (web/events.py, FEATURE-REVIEW
+   "Beta 6"); the number of days is EVENT_RETENTION_DAYS. #}
+{% if events_on %}
+<p>We also note what you do in the app, never what is in your documents: for example that
+  you signed in, uploaded, made a review decision or downloaded, and your answers to the
+  two optional questions after a download. Each note is a random id, a time, a category
+  and at most a number; to notice the same file uploaded twice, it keeps a scrambled
+  fingerprint from which the file cannot be rebuilt. No cookies or scripts are used for
+  this. These notes are deleted after {{ event_days }} days, or with your account.</p>
+{% endif %}
 
 <h2>Requests, takedowns and rights</h2>
 <p>To have your data deleted, to report material that should not be here, or for any

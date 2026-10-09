@@ -23,6 +23,7 @@ PUBLIC_TEMPLATES = (
     "privacy.html",
     "terms.html",
     "limits.html",
+    "help_posting.html",
     "status.html",
 )
 # Written into a demo built with the offline client (`a11y-stem demo build --fake`);

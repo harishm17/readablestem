@@ -1,0 +1,21 @@
+{# ux-a: under the job page's download link (docs/web.md, "After a download"): where to
+   post the file (help_posting.html) and the two optional questions (web/feedback.py).
+   `after_download` is a web.feedback.AfterDownload; without it, only the posting link.
+   Until a download is recorded the questions are hidden: app.js shows them when the
+   download link is used; without JavaScript they show on the next visit. A <div>, not a
+   <section>: the job page's results are one section. #}
+{% set ad = after_download|default(none) %}
+{# `posting_link` false: the including block already links the posting help (the job
+   page's "Put it in your course"). #}
+{% if posting_link|default(true) %}
+<p class="after-download"><a href="/help/posting">How to post it in your course</a>:
+  upload the file and link to it. Do not paste it into a page.</p>
+{% endif %}
+{% if ad and ad.ask %}
+<div id="feedback" class="feedback"{% if ad.hidden %} hidden data-after-download{% endif %}>
+  <h3 id="feedback-heading">Two quick questions (optional)</h3>
+  {% with fb_job_id=job.id, fb_choices=ad.choices, fb_values={}, fb_errors={} %}
+  {% include "_feedback_form.html" %}
+  {% endwith %}
+</div>
+{% endif %}

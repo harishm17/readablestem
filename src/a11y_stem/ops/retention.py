@@ -22,6 +22,9 @@ Erasing a person (a data-deletion request, `a11y-stem users delete`) goes throug
 `erase_user`: their jobs through `delete_jobs` (so counts are kept), then every row of
 every table that holds their user id, then the user. Only content-free aggregates and
 daily spend remain. A new table with a user id must be added there.
+
+Usage events (`web.events`) outlive the jobs they mention, by design, but not for ever:
+the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
 """
 
 from __future__ import annotations
@@ -29,7 +32,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, cast
 
 from sqlalchemy import delete, select
@@ -58,6 +61,7 @@ from a11y_stem.web.db import (
     User,
     session_scope,
 )
+from a11y_stem.web.events import EVENT_RETENTION_DAYS
 
 BATCH_SIZE = 200
 
@@ -67,6 +71,7 @@ class PurgeStats:
     jobs_deleted: int
     blobs_deleted: int
     unaggregated_deleted: int  # finished jobs deleted without their counts
+    events_deleted: int = 0  # usage events past EVENT_RETENTION_DAYS
 
 
 def purge_expired(
@@ -90,14 +95,24 @@ def purge_expired(
         stats.unaggregated_deleted += batch.unaggregated_deleted
         if batch.jobs_deleted < BATCH_SIZE:
             break
+    with session_scope(factory) as session:
+        stats.events_deleted = purge_old_events(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
         jobs_deleted=stats.jobs_deleted,
         blobs_deleted=stats.blobs_deleted,
         unaggregated_deleted=stats.unaggregated_deleted,
+        events_deleted=stats.events_deleted,
     )
     return stats
+
+
+def purge_old_events(session: Session, now: datetime) -> int:
+    """Delete usage events older than `EVENT_RETENTION_DAYS`, in the caller's transaction.
+    Returns how many. One DELETE on the indexed `created_at`."""
+    cutoff = _as_utc(now) - timedelta(days=EVENT_RETENTION_DAYS)
+    return _deleted(session.execute(delete(Event).where(Event.created_at < cutoff)))
 
 
 def aggregate_and_purge(

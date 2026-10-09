@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block title %}Posting the file in your course{% endblock %}
+{% block content %}
+{# UX review MF11 and FEATURE-REVIEW "Beta 5". TODO(Harish): try the Canvas steps in a
+   real course (Canvas Lite, then UTD's Canvas) and update this page: whether an .html
+   file in Files opens or downloads, the Canvas Student app, and the wording of the "main
+   version" section with UTD's accessibility office. Guidance, not legal advice. #}
+<h1>Posting the file in your course</h1>
+<p class="lede">The file you download is one web page (an .html file) with everything
+  built in: the text, the equations and the images. Share it by uploading the file and
+  linking to it. Do not paste it into a page.</p>
+
+<h2>In Canvas</h2>
+<ol class="steps-list">
+  <li>In your course, open <strong>Files</strong> and upload the .html file.</li>
+  <li>Link to it where students look for the material: in a module (add an item, then
+    choose the file), or from a page with the editor's link to a course file.</li>
+  <li>Where the PDF was linked, link the HTML file instead, so students find it first.</li>
+  <li>Open the link once as a student would (Student View). Check that the figures show
+    and the equations display.</li>
+</ol>
+<p><strong>Do not paste the file into a Canvas page</strong>, and do not paste its code into
+  the page editor. Canvas removes what the file needs: its images (they are stored inside
+  the file, and Canvas only keeps images that live at a web address) and its styles, so
+  figures disappear and list numbers can show twice.</p>
+<p>In some Canvas courses an .html file in Files downloads instead of opening. Students
+  can still open the downloaded file in any browser. If this happens in your course,
+  please tell us{% if contact_email %} at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}.</p>
+<p class="hint">These steps follow Canvas's published rules for files and pages. We have
+  not yet tried them in a live Canvas course.</p>
+
+<h2>Make it the main version</h2>
+<p>Post the HTML as the main course material, where students look first. If students
+  also want to print, you can keep the PDF as a print copy: link it after the HTML and
+  call it that, for example “Week 3 notes (PDF, print copy)”.</p>
+<p>Why the HTML comes first: the federal rule for public universities (28 CFR 35.202)
+  allows a separate accessible version only when the main material cannot be made
+  accessible for technical or legal reasons. The Justice Department's fact sheet on the
+  rule says that, usually, there should not be an inaccessible main page with a separate
+  accessible version beside it.</p>
+
+<h2>Other course systems</h2>
+<p>We have not tried Blackboard, Moodle or D2L Brightspace yet. Upload the file and link to
+  it there too. Do not paste it into a page: Moodle, for example, removes the equations
+  and the images from pasted content.</p>
+
+<h2>Check with your accessibility office</h2>
+<p>This page is guidance, not legal advice. Your campus accessibility office can say what
+  your courses need, and can help with documents this tool does not handle well (see the
+  <a href="/limits">known limits</a>).</p>
+
+<h2>Sources</h2>
+<ul>
+  <li><a href="https://www.ecfr.gov/current/title-28/chapter-I/part-35/subpart-H/section-35.202">28 CFR 35.202, conforming alternate versions</a> (Electronic Code of Federal Regulations)</li>
+  <li><a href="https://www.ada.gov/resources/2024-03-08-web-rule/">Fact sheet: new rule on the accessibility of web content and mobile apps</a> (ADA.gov, U.S. Department of Justice)</li>
+</ul>
+{% endblock %}

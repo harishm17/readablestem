@@ -181,12 +181,13 @@ thead th { border-bottom: 2px solid var(--border); }
 tbody th { font-weight: 600; }
 .num { text-align: right; }
 
-/* Status badges: the text says the status; the colour only repeats it. */
+/* Status badges: the text says the status; the colour only repeats it. A small radius,
+   not a pill: a long status wraps on a phone, and a pill's curve cut through the words. */
 .status-badge {
   display: inline-block;
   padding: 0.05rem 0.5rem;
   border: 2px solid var(--border);
-  border-radius: 999px;
+  border-radius: 0.4rem;
   font-weight: 600;
   font-size: 0.95rem;
   background: var(--bg);
@@ -624,3 +625,54 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .table-fieldset .checkbox-field { margin: 0.35rem 0; }
 .stale-line { margin: 0 0 0.5rem; }
 .table-continue { margin: 0.75rem 0 0; font-weight: 600; }
+/* ===================================================================== ux-a
+   Pages outside the review screen and the job page: My documents as a to-do list, the
+   upload form's own messages, the two questions after a download, the posting help.
+   No new colours: statuses reuse the badge styles above, in words first. */
+
+.documents-summary { font-size: 1.1rem; margin: 0.5rem 0 0.75rem; }
+.documents h3 { font-size: 1.1rem; margin: 1.5rem 0 0.25rem; }
+.doc-file { display: block; font-weight: 400; color: var(--muted); font-size: 0.95rem; }
+/* The same column widths in every group's table, so the groups line up. */
+.doc-table { table-layout: fixed; }
+.doc-table th:nth-child(1) { width: 44%; }
+.doc-table th:nth-child(2) { width: 26%; }
+.doc-table th:nth-child(4) { width: 5rem; }
+.doc-table .status-badge { margin: 0 0.4rem 0.2rem 0; }
+/* Days and pseudonyms are short codes: never break them to make room. */
+.usage-table tbody th { overflow-wrap: normal; white-space: nowrap; }
+.status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
+
+.upload-status { font-weight: 600; }
+.upload-status:empty { display: none; }
+
+/* The questions after a download: a fieldset that looks like the other fields. */
+fieldset.field { border: 0; padding: 0; min-width: 0; }
+fieldset.field legend { font-weight: 600; padding: 0; margin-bottom: 0.4rem; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.75rem; }
+.choice { display: inline-flex; align-items: center; gap: 0.45rem; }
+.choice input { width: 1.3rem; height: 1.3rem; margin: 0; }
+.field .choice label { display: inline; font-weight: 400; margin: 0; }
+input[type="text"].input-short { width: 8rem; }
+.feedback { border-top: 1px solid var(--rule); margin-top: 1.25rem; }
+.steps-list li { margin: 0.35rem 0; }
+
+/* Phones: each document is a block of lines instead of a table row wider than the
+   screen (UX review MF22). The table keeps its roles in the markup, so a screen reader
+   still hears it as a table; the labels below are for the eye, with empty alternative
+   text where the browser supports it so they are not read twice. */
+@media (max-width: 37.5rem) {
+  .doc-table thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .doc-table, .doc-table tbody, .doc-table tr, .doc-table th, .doc-table td { display: block; }
+  .doc-table tr { padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
+  .doc-table th, .doc-table td { border: 0; padding: 0.15rem 0; }
+  .doc-table th:nth-child(n) { width: auto; }
+  .doc-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    content: attr(data-label) ": " / "";
+    color: var(--muted);
+  }
+}

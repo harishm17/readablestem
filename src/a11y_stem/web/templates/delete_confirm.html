@@ -1,13 +1,15 @@
 {% extends "base.html" %}
-{% block title %}Delete {{ filename }}?{% endblock %}
+{% block title %}Delete {{ title }}?{% endblock %}
 {% block content %}
-<h1>Delete {{ filename }}?</h1>
+<h1>Delete {{ title }}?</h1>
+<p>{% if title != filename %}{{ filename }}, uploaded{% else %}Uploaded{% endif %} {{ uploaded|utc }}.
+  {% if decided %}You made {{ decided }} {{ "decision" if decided == 1 else "decisions" }} on it.{% endif %}</p>
 <p>This deletes the uploaded PDF, the converted HTML, the images cut from it and your review
-  decisions. It cannot be undone.</p>
+  decisions. It cannot be undone. Files you have already downloaded are not affected.</p>
 <form method="post" action="/jobs/{{ job_id }}/delete" class="inline-form">
   <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
   <input type="hidden" name="confirm" value="yes">
   <button type="submit" class="button-danger">Yes, delete it</button>
 </form>
-<p><a href="/jobs/{{ job_id }}">No, keep it</a></p>
+<p><a href="{{ back }}">No, keep it</a></p>
 {% endblock %}
