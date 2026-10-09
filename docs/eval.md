@@ -346,7 +346,7 @@ or models than the code under test, so a prompt change cannot pass on an old com
 | Field | Content |
 |---|---|
 | `schema_version`, `task`, `date` | `date` comes from `--date` (default: today, taken in the CLI) |
-| `pipeline_version`, `prompt_versions` | prompt versions as seen on the model calls; module constants when no call ran |
+| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. The committed `data/eval/latest-*.json` are 0.2.0 reports until they are regenerated after the sign check merges |
 | `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, `openai` or `fake` |
 | `dataset` | `gold_dir`, `manifest_sha256`, `limit`, `unit`, `selection_sha256` (hash of the planned item ids) |
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
@@ -579,6 +579,54 @@ calls). The cosmetic notes (OpenStax `𝐝𝟎` and `𝐝𝐟`, the handout's th
 optional notes (5 more main-model calls over the two documents, a few tenths of a cent;
 the call totals also move with the other escalations). The bold omega that remains is
 still required. No `symbol_mismatch` fired in any run.
+
+### Sign and relation check (pipeline 0.3.0, same day)
+
+A review found that a dropped or flipped sign was still accepted silently
+(`e^{-λt}` read as `e^{λt}`, `a = -9.8` read as `a = 9.8`): the symbol check sees
+letters, digits and Greek letters only. Harish's decision: sign and operator differences
+are meaning-level, so required (`equation.text_layer_signs`, code `sign_mismatch`;
+docs/steps.md "Sign and relation check"). The review rules changed, so the pipeline
+version went to 0.3.0; every report above is a 0.2.0 report.
+
+Offline replay (no model calls) of the new check on every recorded real model answer
+that has a text layer:
+
+| Source | Answers | Check ran | `sign_mismatch` |
+|---|---|---|---|
+| equations task: runs 1-3 and the final run (main checkout `.local/eval/`; text layers from the eval's Chromium cache) | 120 | 88 | 0 |
+| equations task: triage before, after, review (`/tmp/triage-*/`) | 90 | 66 | 0 |
+| document task: triage before, after, review and the partial review run (`Element.text` as captured; layout re-run today on the three page PDFs gives the same text for all 201 answers that can be matched to a section; the other 14, the partial run's last section, have no section id) | 215 | 116 | 0 |
+| convert, OpenStax 2.1 and the LaTeX handout (three triage runs and the stored design copies) | 192 | 80 | 0 |
+| the committed demo (OpenStax 2.3) | 19 | 14 | 0 |
+| **all** | **636 (134 distinct text layer and MathML pairs)** | **364 (88 distinct)** | **0** |
+
+So it adds no required decision on real outputs (the 46 distinct pairs where it did not
+run have no sign or relation in their text layer: lone variables such as `𝐝0`). The
+recorded answers hold no real sign error either, so recall comes from synthetic errors
+put into the same 88 real answers and checked against their real text layers: a
+dropped minus 45/45, minus to plus 45/45, `=` to `<`, `≤` or `≈` 146/146 each, `+` to
+`±` 9/9, a dropped `+` 9/9. `×` to `·` was flagged 2 of 13 times: the two vector
+products (the handout's `𝛚 × 𝐫`), never scientific notation (`1.1 × 10²`), as the policy
+says.
+
+A review of the check printed its own equations with Tectonic in 8 maths font setups,
+Chromium, KaTeX and LibreOffice (docs/steps.md "Review of the check"): on its 429 right
+answers the check flagged 57 before the fixes and 6 after, and caught 51 of 52 wrong
+answers (43 before); a dot product of arrow vectors read as a cross product is caught
+in 111 of 180 swaps (0 before). The replay above, re-run after the fixes, is unchanged:
+636 answers, the check ran on 364, 0 `sign_mismatch`, so no new required decision on
+real answers. The same synthetic errors on the 88 real text layers are caught as
+before (`×` to `·` still 2/13: the one real arrow vector, `→𝑠`, is in no product).
+
+The same review found a false `symbol_mismatch` the eval items could not show: pdfTeX
+writes `\Delta` as U+2206 INCREMENT, which is not a letter, so every correct `\Delta`
+from a LaTeX PDF needed a decision. It now counts as `Δ` (no recorded answer changes:
+none of them has a TeX `\Delta`).
+
+TODO(Harish): after this merges, re-run the four tasks and commit the new
+`data/eval/latest-*.json` (0.3.0); the 0.2.0 ones stay valid for everything but review
+load.
 
 ## What the numbers do not show
 

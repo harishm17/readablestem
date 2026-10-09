@@ -129,7 +129,7 @@ def test_main_model_dropping_bold_goes_to_review(monkeypatch):
     fix = transcribe(element, b"png", client=client, settings=make_settings())
     assert fix.status == Status.NEEDS_REVIEW
     assert fix.confidence is not None
-    assert fix.confidence < 0.99 * equation_step.STYLE_MISMATCH_FACTOR + 1e-9
+    assert fix.confidence < 0.99 * equation_step.MEANING_MISMATCH_FACTOR + 1e-9
     assert any(c.code == "style_mismatch" for c in fix.failed_checks)
     assert fix.review == "required"
 

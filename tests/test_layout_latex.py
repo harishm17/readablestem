@@ -8,7 +8,8 @@ fixtures: equation numbers at the right margin, align environments, inline integ
 set on a baseline of their own, limits under a sum, matrices, bold vectors, the
 negation slash of \\neq, a cases brace, absolute-value bars, nested itemize/enumerate
 with TeX's bullets and dashes, beamer's triangle bullets and sans-serif maths, a
-two-column page and a TikZ figure.
+two-column page and a TikZ figure. A fifth page, vectors_relations, holds signs TeX
+draws from pieces (arrows over points, \\cong, \\models) for tests/test_sign_check.py.
 """
 
 from __future__ import annotations
@@ -24,7 +25,13 @@ from a11y_stem.core.types import Element, Kind, inline_marker
 from a11y_stem.pipeline.layout import Layout, analyze, heading_levels
 
 LATEX = Path(__file__).parent / "fixtures" / "layout" / "latex"
-NAMES = ("calculus_notes", "problem_set", "kinematics_slides", "linear_algebra_twocol")
+NAMES = (
+    "calculus_notes",
+    "problem_set",
+    "kinematics_slides",
+    "linear_algebra_twocol",
+    "vectors_relations",
+)
 
 
 @cache

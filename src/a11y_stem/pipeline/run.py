@@ -92,7 +92,10 @@ from a11y_stem.pipeline import (
 
 log = logging.getLogger(__name__)
 
-PIPELINE_VERSION = "0.2.0"
+# 0.3.0 (2026-10-08): review rules changed, a sign or relation that differs from the text
+# layer is a required decision (`signs.compare_signs`). Results and eval reports from
+# 0.2.0 were made under the old review policy.
+PIPELINE_VERSION = "0.3.0"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 

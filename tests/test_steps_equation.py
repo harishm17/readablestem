@@ -499,7 +499,9 @@ def test_any_symbol_difference_needs_a_decision(text_layer, latex):
         ("ATA\u02c6\U0001d431 = AT\U0001d41b", r"A^{T}A\hat{\mathbf{x}} = A^{T}\mathbf{b}"),
         # \hat{\imath} (the unit vector i-hat) is a dotless i in the text layer.
         ("\U0001d465\U0001d6a4\u02c6", r"x\hat{i}"),
-        ("x =", "x"),  # one symbol is enough to compare
+        # pdfTeX's \Delta is U+2206 INCREMENT (the glyph list's "Delta"); \bar a macron.
+        ("\u00afv = \u2206x \u2206t", r"\bar{v} = \frac{\Delta x}{\Delta t}"),
+        ("x =", "x ="),  # one symbol is enough to compare
     ],
 )
 def test_the_same_symbols_pass(text_layer, latex):

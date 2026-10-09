@@ -22,8 +22,13 @@ the model, so the cross-check stays independent. Letter styles are compared too
 plain read as a bold vector), or a double-struck, script or fraktur letter read as a
 plain one, is meaning-level and is treated like a symbol mismatch; any other style
 difference (the bold subscript of a bold symbol, a bold digit, a double-struck R the
-text layer cannot show) is cosmetic, an optional note only. Any failed text-layer check
-on a cheap-model answer, a cosmetic one included, escalates to the main model.
+text layer cannot show) is cosmetic, an optional note only. Signs and relations are
+compared as well (`signs.compare_signs`, check `equation.text_layer_signs`): a minus
+that was dropped or added, ± read as +, ≤ read as <, = read as ≈, a dot product read
+as a cross product. That is meaning-level too, and asked only when the
+letters and digits mostly agree with the text layer (so it can be trusted). Any failed
+text-layer check on a cheap-model answer, a cosmetic one included, escalates to the main
+model.
 
 Status rules, in order:
 1. no parsed output from any attempt -> FAILED, reason "model_<outcome>";
@@ -58,6 +63,7 @@ from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCa
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
+from a11y_stem.pipeline.signs import compare_signs
 from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
 from a11y_stem.pipeline.validate import (
     LatexConversionError,
@@ -182,8 +188,11 @@ def strip_trailing_punctuation(latex: str) -> str:
 
 
 # Typesetting artefacts that are not symbols: the dotless i and j a LaTeX accent sits on
-# (\hat{\imath} is the unit vector i-hat) are i and j.
-_DOTLESS = str.maketrans({"\u0131": "i", "\u0237": "j"})
+# (\hat{\imath} is the unit vector i-hat) are i and j. And TeX's capital Delta: the Adobe
+# Glyph List maps the glyph name "Delta" to U+2206 INCREMENT, so every pdfTeX \Delta is
+# U+2206 in the text layer, which NFKC keeps and which is not a letter (Omega and mu come
+# out as U+2126 and U+00B5, which NFKC already turns into the Greek letters).
+_DOTLESS = str.maketrans({"\u0131": "i", "\u0237": "j", "\u2206": "\u0394"})
 
 
 def _symbol_bag(text: str) -> Counter[str]:
@@ -191,7 +200,7 @@ def _symbol_bag(text: str) -> Counter[str]:
 
     Modifier letters (Unicode category Lm, such as the U+02C6 circumflex a LaTeX hat
     accent leaves in a text layer) are accents, not symbols, so they are dropped."""
-    folded = unicodedata.normalize("NFKC", text).casefold().translate(_DOTLESS)
+    folded = unicodedata.normalize("NFKC", text).translate(_DOTLESS).casefold()
     return Counter(ch for ch in folded if ch.isalnum() and unicodedata.category(ch) != "Lm")
 
 
@@ -200,10 +209,13 @@ def _mathml_symbols(mathml: str) -> Counter[str]:
     return _symbol_bag(" ".join(root.itertext()))
 
 
-# A meaning-level style difference (the PDF has a bold d, a vector, and the transcription
-# a plain d, a scalar) scales confidence by this factor: enough to escalate a cheap-model
-# answer and to keep the fix for a person's decision. A cosmetic one changes nothing.
-STYLE_MISMATCH_FACTOR = 0.6
+# A meaning-level difference from the text layer (a bold d, a vector, read as a plain d,
+# a scalar; a sign or relation that differs: `signs.compare_signs`) scales confidence by
+# this factor, once however many there are: enough to escalate a cheap-model answer and
+# to keep the fix for a person's decision, without pushing a 0.95 answer below the
+# abstain bar (two factors would, and the proposal would be lost). A cosmetic difference
+# changes nothing.
+MEANING_MISMATCH_FACTOR = 0.6
 # Failed checks that are only notes: the fix is still ACCEPTED (review="optional").
 # A cosmetic style difference, and a reading aid for the review screen that could not
 # be made (the MathML in the output is unaffected).
@@ -487,6 +499,8 @@ def _evaluate(
         return candidate
     candidate.speech, speech_check = _speech(candidate.mathml)
     candidate.checks.append(speech_check)
+    meaning = False  # a meaning-level difference from the text layer
+    mismatch = False  # the strong symbol mismatch: the text layer is no use for signs
     differ = text_layer_symbols_differ(element.text, candidate.mathml)
     if differ is not None:
         similarity = text_layer_similarity(element.text, candidate.mathml)
@@ -523,8 +537,27 @@ def _evaluate(
                 code=style_code,
             )
         )
-        if style == "meaning" and candidate.confidence is not None:
-            candidate.confidence *= STYLE_MISMATCH_FACTOR
+        meaning = style == "meaning"
+    # Signs and relations: only against a text layer whose letters and digits mostly
+    # agree with the transcription (it has some, and no strong mismatch), so a garbled
+    # layer or a different equation never adds a sign flag on top.
+    signs = (
+        compare_signs(element.text, candidate.mathml)
+        if differ is not None and not mismatch
+        else None
+    )
+    if signs is not None:
+        candidate.checks.append(
+            Check(
+                name="equation.text_layer_signs",
+                passed=not signs.mismatch,
+                severity="warning",
+                code="sign_mismatch" if signs.mismatch else None,
+            )
+        )
+        meaning = meaning or signs.mismatch
+    if meaning and candidate.confidence is not None:
+        candidate.confidence *= MEANING_MISMATCH_FACTOR
     return candidate
 
 
