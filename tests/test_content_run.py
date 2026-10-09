@@ -171,8 +171,11 @@ def test_a_table_step_sees_its_neighbouring_text(recorder):
 
 def test_the_new_result_fields_start_empty(recorder):
     result = convert().result
-    assert result.notices == [] and result.source_facts is None
-    assert result.lang_source == "default"
+    assert result.source_facts is None
+    # Two short sentences are too little text to detect a language from: "en" is assumed,
+    # with the text pass's notice to confirm it.
+    assert (result.lang, result.lang_source) == ("en", "default")
+    assert [n.code for n in result.notices] == ["lang_assumed"]
 
 
 def test_stage_progress_is_accepted(recorder):
