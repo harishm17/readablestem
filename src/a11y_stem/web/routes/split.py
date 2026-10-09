@@ -45,7 +45,7 @@ from sqlalchemy import select
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import events, marks, page_images, queue
+from a11y_stem.web import events, marks, notation, page_images, queue
 from a11y_stem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
@@ -1015,7 +1015,9 @@ def live_check(
         check = EditCheck(latex=typed, mathml=None, speech="", checks=[], display="block")
         check.blocking = [f"Keep the LaTeX under {MAX_LATEX_CHARS} characters."]
     else:
-        check = check_equation_edit(element, fix, typed)
+        ctx = get_ctx(request)
+        with notation.in_force(ctx.factory, ctx.settings, job_id):
+            check = check_equation_edit(element, fix, typed)
     context = {
         "check": check,
         "eid": element_id,

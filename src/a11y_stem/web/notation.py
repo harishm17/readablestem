@@ -21,7 +21,8 @@ logs or events (ids and counts only), and they are erased with the user
 from __future__ import annotations
 
 import unicodedata
-from collections.abc import Iterable
+from collections.abc import Generator, Iterable
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from sqlalchemy import delete, func, select, update
@@ -344,6 +345,21 @@ def conversion_options(
     if not found:
         return None
     return ConversionOptions.from_settings(settings).model_copy(update={"notation": found})
+
+
+@contextmanager
+def in_force(factory: sessionmaker[Session], settings: Settings, job_id: str) -> Generator[None]:
+    """The job's course notation in force (`pipeline.options`) for checks run outside a
+    conversion: a reviewer's equation edit is checked with the same course evidence as
+    the model's proposal was (`web.edit_check`). Nothing changes without one."""
+    found = conversion_options(factory, settings, job_id)
+    if found is None:
+        yield
+        return
+    from a11y_stem.pipeline import options
+
+    with options.using(found):
+        yield
 
 
 def job_course(session: Session, job: Job) -> Course | None:

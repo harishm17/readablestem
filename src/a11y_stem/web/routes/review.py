@@ -52,7 +52,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import events
+from a11y_stem.web import events, notation
 from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
 from a11y_stem.web.deps import (
     ELEMENT_ID,
@@ -979,8 +979,12 @@ def review_action(
     # the PDF's text where that changes the meaning (web.edit_check).
     anyway = action == EDIT_ANYWAY
     action = "edit" if anyway else action
+    ctx = get_ctx(request)
     try:
-        with session_scope(get_ctx(request).factory) as session:
+        with (
+            session_scope(ctx.factory) as session,
+            notation.in_force(ctx.factory, ctx.settings, job_id),
+        ):
             job = owned_job(session, job_id, user, lock=True)
             require_done(job)
             _refuse_stale(job, version)

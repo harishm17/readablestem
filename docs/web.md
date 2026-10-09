@@ -800,7 +800,11 @@ for the decision went away. Now an edit gets what the equation step runs on a pr
 the same cleaning, the LaTeX validators, the conversion, the MathML checks, the spoken
 version, and the cross-checks against the PDF's own text (letters, digits and Greek
 letters; letter styles, such as a vector's bold; signs and relations), with the step's
-check names and codes. What fails is said in plain words, in three kinds:
+check names and codes. With FEATURE_NOTATION_MEMORY and a job read for a course, the
+check runs with that course's notation in force (`web.notation.in_force`, the options
+the run had): a letter the course writes bold is evidence for the style check where the
+PDF shows no bold at all, and the spoken version reads it by its meaning ("vector d"),
+as for the proposal. What fails is said in plain words, in three kinds:
 
 - *cannot be used* (an error-level check: an unknown command, unbalanced braces, LaTeX
   that does not convert): never saved; the message names the problem without codes

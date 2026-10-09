@@ -451,3 +451,33 @@ def test_courses_and_notation_go_with_the_user(web):
         assert session.scalar(select(func.count()).select_from(Job)) == 0
         assert [c.id for c in session.scalars(select(Course))] == [bobs]
         assert [e.course_id for e in session.scalars(select(CourseNotation))] == [bobs]
+
+
+def test_an_equation_edit_is_checked_with_the_courses_notation(web):
+    """A reviewer's edit gets the same course evidence as the model's proposal did (UX
+    review MF3): with the course listing bold d as a vector, a plain d typed into a PDF
+    whose font shows no bold is a meaning-level difference ("Use my edit anyway"), and
+    the bold d of an edit is read as "vector d"."""
+    from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
+    from a11y_stem.web import notation
+    from a11y_stem.web.edit_check import check_equation_edit
+
+    element = Element(id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(0, 0, 10, 10), order=0,
+                      text="d = v t", display="block")  # fmt: skip
+    fix = Fix(element_id="p1-e1", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW,
+              equation=EquationFix(latex=r"\mathbf{d} = v t", mathml="", speech="",
+                                   display="block"))  # fmt: skip
+    # Without a course: the plain d matches the PDF.
+    assert not check_equation_edit(element, fix, "d = v t").meaning
+    course_id = new_course(web.browser)
+    add(web.browser, course_id, "bold d")
+    job_id = job_id_from(upload_for(web.browser, course_id))
+    with notation.in_force(web.ctx.factory, web.ctx.settings, job_id):
+        plain = check_equation_edit(element, fix, "d = v t")
+        bold = check_equation_edit(element, fix, r"\mathbf{d} = v t")
+    assert plain.meaning and "style_mismatch" in [c.code for c in plain.checks if not c.passed]
+    assert not bold.meaning and bold.speech.startswith("vector d")
+    # Another job without a course: nothing in force.
+    other = job_id_from(upload_for(web.browser, None))
+    with notation.in_force(web.ctx.factory, web.ctx.settings, other):
+        assert not check_equation_edit(element, fix, "d = v t").meaning

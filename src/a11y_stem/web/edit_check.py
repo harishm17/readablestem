@@ -129,8 +129,13 @@ def evaluate(
     """(MathML or None, speech, checks) for already cleaned LaTeX: the equation step's
     `_evaluate` without a model answer, step by step in the same order with the same
     check names and codes."""
-    from a11y_stem.pipeline import equation_step, signs, validate
+    from a11y_stem.pipeline import equation_step, notation_memory, signs, validate
 
+    # The course notation in force (web.notation.in_force), as the step reads it: its
+    # bold letters are evidence for the style check, and its meanings read the maths.
+    entries = notation_memory.entries_in_force()
+    course_bold = notation_memory.course_bold_letters(entries)
+    spoken = notation_memory.readings(entries)
     checks = list(validate.check_latex(latex))
     if validate.has_errors(checks):
         return None, "", checks
@@ -143,7 +148,7 @@ def evaluate(
     checks = [*checks, Check(name="latex.converts", passed=True), *mathml_checks]
     if validate.has_errors(mathml_checks):
         return None, "", checks
-    speech, speech_check = _speech(mathml)
+    speech, speech_check = _speech(mathml, spoken)
     checks.append(speech_check)
     text = element.text if element is not None else None
     regular = element.regular_letters if element is not None else None
@@ -158,7 +163,9 @@ def evaluate(
                 name="equation.text_layer", passed=symbols is None, severity="warning", code=symbols
             )
         )
-    style = equation_step.text_layer_style(text, mathml, regular_letters=regular)
+    style = equation_step.text_layer_style(
+        text, mathml, regular_letters=regular, course_bold=course_bold
+    )
     if style is not None:
         code = (
             None
@@ -183,12 +190,18 @@ def evaluate(
     return mathml, speech, checks
 
 
-def _speech(mathml: str) -> tuple[str, Check]:
-    """The step's speech check. Speech is a reading aid: any failure is a note."""
+def _speech(mathml: str, readings: dict[str, str] | None = None) -> tuple[str, Check]:
+    """The step's speech check (with the course's readings, "vector d", as the step reads
+    them). Speech is a reading aid: any failure is a note."""
     from a11y_stem.pipeline import speech
 
     try:
-        spoken = speech.mathml_to_speech(mathml)
+        # Without course readings, the one-argument call as before (as the step does).
+        spoken = (
+            speech.mathml_to_speech(mathml, readings=readings)
+            if readings
+            else speech.mathml_to_speech(mathml)
+        )
     except Exception as exc:
         logger.warning("speech_failed", extra={"exc_type": type(exc).__name__})
         return "", Check(
