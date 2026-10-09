@@ -53,7 +53,7 @@
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
     <div><dt>Need your decision</dt><dd>{{ s.decisions }}</dd></div>
     <div><dt>Accepted automatically</dt><dd>{{ s.accepted }}</dd></div>
-    <div><dt>Optional checks (accepted; nothing to do)</dt><dd>{{ s.optional }}</dd></div>
+    <div><dt>Optional checks (accepted; {% if s.second_check %}nothing required, {{ s.second_check }} worth a look{% else %}nothing to do{% endif %})</dt><dd>{{ s.optional }}</dd></div>
     <div><dt>Not converted (original kept)</dt><dd>{{ s.not_converted }}</dd></div>
     <div><dt>Reviewed by you (accepted, edited or rejected)</dt><dd>{{ s.reviewed }}</dd></div>
     {# Every attempt, including one interrupted before it could store a result. #}

@@ -4,6 +4,7 @@
 - `openai_client`: `OpenAIVisionClient` (Responses API, spend reservation, outcomes)
 - `fake`: `FakeVisionClient` (deterministic, offline)
 - `router`: `call_with_fallback` (main model, then the other one once)
+- `verifier`, `decisions_client`: the second automated check (OpenAI Decisions API)
 - `pricing`, `prompts`: prices and versioned prompt text
 
 `make_vision_client` is the one place that picks the real or the offline client, so the
@@ -26,6 +27,7 @@ from a11y_stem.models.router import (
     call_with_fallback,
     calls_made,
 )
+from a11y_stem.models.verifier import any_check_enabled, make_verifier
 
 __all__ = [
     "OFFLINE_DEFAULTS",
@@ -62,9 +64,16 @@ def make_vision_client(
     `fake=True` gives an offline `FakeVisionClient` with `OFFLINE_DEFAULTS` that still
     reserves and settles against `budget`, so spend limits behave as they would for real.
     Otherwise an `OpenAIVisionClient`; it reads the API key on its first call, not here.
+
+    The client carries the job's second automated check (`models.verifier`, the
+    Decisions API; offline, the fake) on the same budget, unless both uses of it are
+    switched off in the settings.
     """
+    verifier = make_verifier(settings, budget, fake=fake) if any_check_enabled(settings) else None
     if fake:
-        return FakeVisionClient(defaults=copy.deepcopy(OFFLINE_DEFAULTS), budget=budget)
+        return FakeVisionClient(
+            defaults=copy.deepcopy(OFFLINE_DEFAULTS), budget=budget, verifier=verifier
+        )
     from a11y_stem.models.openai_client import OpenAIVisionClient
 
-    return OpenAIVisionClient(settings, budget)
+    return OpenAIVisionClient(settings, budget, verifier=verifier)

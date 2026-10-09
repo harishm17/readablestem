@@ -668,10 +668,18 @@ def transcribe(
         return _evaluate(output, calls, element, display)
 
     first_model = _first_model(element, settings)
-    candidate = attempt(first_model)
+    candidate = first = attempt(first_model)
     calls = list(candidate.calls)
     if first_model != settings.main_model and _needs_escalation(candidate, settings):
         escalated = attempt(settings.main_model, escalation=True)
         calls += escalated.calls
         candidate = _prefer(escalated, candidate)
-    return _fix(element, candidate, calls, display, settings)
+    fix = _fix(element, candidate, calls, display, settings)
+    # Second automated check, shadow mode (ADR 0005): records P(meaning_changing) for the
+    # final proposal and the cheap answer before escalation; changes nothing else.
+    from a11y_stem.pipeline import equation_shadow
+
+    escalated_from = first.latex if first is not candidate and first.valid else None
+    return equation_shadow.record(
+        fix, png, client=client, settings=settings, cheap_latex=escalated_from
+    )

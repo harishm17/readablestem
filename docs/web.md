@@ -55,8 +55,9 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per user per UTC day (`quota_days`) |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
-| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together) |
+| `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
+| `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary in the cron (docs/steps.md, docs/operations.md). All on by default |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
 | `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted (24 h, or 30 days if the user opts in) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`. Required (non-empty) in production, or the purge would never run |
@@ -223,7 +224,11 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
 
   which also checks ownership; settling replaces the hold with the actual cost. So
   `Job.cost_usd` is always current, and an attempt that dies mid-call leaves its holds
-  counted rather than handing its spend to the retry. The defaults are
+  counted rather than handing its spend to the retry. A request of the second automated
+  check (ADR 0005) holds dollars only: its UPDATE adds 0 to `model_calls` and does not
+  test the call cap, so the checks never use the calls the steps need (the call caps
+  were sized for those); they still count against `MAX_USD_PER_JOB`, the per-page
+  dollar allowance and the daily cap. The defaults are
   `pipeline.run.convert_pdf` and `models.make_vision_client`; tests pass fakes to
   `create_app`.
 - **Storing.** `result_json` (the `DocumentResult` without `html`), `html`, crops as
@@ -296,7 +301,17 @@ reflow, keyboard, no JavaScript; `browser` marker).
    "optional"`: a bold subscript, a double-struck R the PDF cannot show, a heading with
    weak evidence, a long alt text), folded into a `<details>`. Each item's summary line is
    its note in plain English (`web/messages.py`); unfolding it shows the full card, which
-   can still be edited or rejected. Nothing here counts toward "done".
+   can still be edited or rejected. Nothing here counts toward "done". The second
+   automated check's note on a figure (ADR 0005: a possible mismatch between the alt
+   text and the image) is listed here by policy, but it is not something small, so the
+   page does not call it that: when there is one, the line at the top says "... optional
+   checks do not hold anything up, but 1 of them is worth a look" instead of "can be
+   looked at if you want", the intro says such figures are worth a look (a wrong alt text
+   changes what a screen reader user hears; the check is new and can be wrong, so it does
+   not hold up the document), the section's lead counts them apart from the small notes,
+   and their card says "Optional check (worth a look; it does not hold up the document)"
+   instead of "nothing to do unless you disagree" (`core.triage.second_check_note`;
+   tests in `tests/test_web_second_check_review.py`).
 3. **Accepted or decided**: everything else, folded.
 
 A table of contents at the top links to each section and kind group with its counts.
@@ -407,7 +422,9 @@ all" for equations) is refused with a 422 and an error linked to the threshold s
 once; failed and not-converted items too, since each needs a decision) and is broken down
 by kind, each linking to its group ("3 need your decision: 1 equation, 1 figure, 1 group
 of repeated headings."). "Optional checks (accepted; nothing to do)" counts the notes
-nobody has opened; they never count toward done. The summary also counts
+nobody has opened; they never count toward done. When some of them are the second
+automated check's, the label says so: "Optional checks (accepted; nothing required, 1
+worth a look)". The summary also counts
 list items, gives the model cost of the whole job (`Job.cost_usd`: every attempt,
 including one interrupted before it stored a result) and lists the static checks of the
 HTML file that did not pass, each as a sentence from `web/messages.py` with its code

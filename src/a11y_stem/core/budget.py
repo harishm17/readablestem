@@ -13,6 +13,13 @@ Flow for one call: `reservation = budget.reserve(estimate)` -> call the model ->
 `budget.settle(reservation, actual_cost)`. If the call raises, `settle(reservation, 0)`
 releases the hold (the provider may still bill a failed call; the estimate is an upper
 bound, so settling at the real usage when it is known is preferred).
+
+A request that is not a model call, the second automated check (`models.verifier`,
+ADR 0005), reserves with `count_call=False`: it is held against every dollar cap like any
+call, but it neither needs nor uses one of the job's model calls. The call cap was sized
+for the steps' own calls; if the checks counted, an equation-heavy document that fits
+today would run out of calls part way and its last elements would fail, so an optional
+check (and the equation shadow, which must change nothing) would change other elements.
 """
 
 from __future__ import annotations
@@ -97,14 +104,18 @@ class JobBudget:
     _held: float = 0.0
     _lock: threading.Lock = field(default_factory=threading.Lock, repr=False)
 
-    def reserve(self, amount_usd: float) -> Reservation:
+    def reserve(self, amount_usd: float, *, count_call: bool = True) -> Reservation:
+        """Hold `amount_usd` against the job's and the daily dollar caps, and one of the
+        job's model calls unless `count_call` is False (a second-check request, which
+        is not a model call: see the module docstring). Raises BudgetExceeded."""
         with self._lock:
-            if self.calls + 1 > self.max_calls:
+            if count_call and self.calls + 1 > self.max_calls:
                 raise BudgetExceeded("job_calls", f"job call cap {self.max_calls} reached")
             if self.spent_usd + self._held + amount_usd > self.max_usd + 1e-12:
                 raise BudgetExceeded("job_usd", f"job spend cap ${self.max_usd:.2f} reached")
             reservation = self.guard.reserve(amount_usd)  # may raise "daily"
-            self.calls += 1
+            if count_call:
+                self.calls += 1
             self._held += amount_usd
             return reservation
 

@@ -18,6 +18,7 @@ from a11y_stem.core.budget import JobBudget
 from a11y_stem.core.types import ModelCall, Outcome
 from a11y_stem.models.base import T, VisionRequest
 from a11y_stem.models.pricing import cost_usd, estimate_max_cost_usd
+from a11y_stem.models.verifier import Verifier
 
 
 def image_key(png: bytes) -> str:
@@ -38,6 +39,8 @@ class FakeVisionClient:
     input_tokens: int = 800
     output_tokens: int = 60
     requests: list[VisionRequest] = field(default_factory=list)
+    # The job's second automated check, as on the real client (`verifier.verifier_of`).
+    verifier: Verifier | None = None
 
     def run(
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False

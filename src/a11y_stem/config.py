@@ -51,6 +51,31 @@ class Settings(BaseSettings):
     # so the web app can be tried end to end without an OpenAI key. Dev and test only.
     fake_models: bool = False
 
+    # --- second automated check: the OpenAI Decisions API (ADR 0005, docs/steps.md)
+    # Only gpt-6-luna serves /v1/decisions. Answers come back in ~0.15 s, so a short
+    # timeout: a slow check is skipped (fail-open), it never holds up a conversion.
+    decisions_model: str = CHEAP_MODEL
+    decisions_timeout_s: float = Field(default=10.0, gt=0)
+    # Figures: ask whether an accepted alt text matches the image. Default on: the result
+    # is only an optional note on an otherwise accepted figure (never a required decision,
+    # never a status change), any failure leaves the figure as it is today, it costs about
+    # $0.0001 per figure (2-3% of describing it), and the model's own confidence cannot
+    # tell a wrong alt text from a right one (every real figure: 0.95-0.99), so without
+    # it nothing ever points a reviewer at a factual error. Set false to turn it off.
+    decisions_figure_verify: bool = True
+    # Pre-registered rule (2026-10-08): a note when min(P(ok), 1 - P(factual error)) is
+    # below this. Not calibrated on Harish's labels yet (docs/eval.md).
+    decisions_figure_flag_below: float = Field(default=0.5, ge=0, le=1)
+    # Equations: shadow mode only. P(meaning_changing) is recorded on the fix and counted
+    # in the aggregates; it never changes a status, a confidence, a tier or escalation.
+    decisions_equation_shadow: bool = True
+    # Shadow only: P(meaning_changing) at or above this counts as "would flag" in the
+    # aggregates and the eval (research value, tuned in-sample; not a gate).
+    decisions_equation_flag_at: float = Field(default=0.2, ge=0, le=1)
+    # A daily drift canary in the hourly cron (ops/canary.py): ~20 fixed requests, at
+    # most once per UTC day; an answer that moves by more than 0.02 logs an ERROR.
+    decisions_canary: bool = True
+
     # --- cost and abuse limits (no defaults for the money ones on purpose)
     daily_spend_cap_usd: float | None = Field(default=None, gt=0)
     per_user_daily_page_quota: int | None = Field(default=None, gt=0)

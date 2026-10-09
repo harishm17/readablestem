@@ -30,6 +30,13 @@ Rows are (day, step, category, count). `step` is the fix kind ("equation", "figu
     job       aggregate:invalid_result                  result_json that did not parse
     document  check:heading.order:skipped_level         failed static HTML checks
     equation  aggregate:checks_edited                   checks lost to an earlier edit
+    figure    verify:figure_alt:final:outcome:ok        second automated check answers
+    figure    verify:figure_alt:final:flagged           ... that flagged (figure: a note)
+    equation  verify:equation_match:cheap:score:0.1     ... by score, in tenths (figure:
+                                                        min(P(ok), 1 - P(factual error));
+                                                        equation: P(meaning_changing))
+    figure    verify:cost_microusd                      their spend (a sum; also in the
+                                                        job's cost_microusd)
 
 So production cost per page is sum(cost_microusd) / sum(pages) / 1e6 over any days, and
 the review load per page is sum(decisions:required) / sum(pages) (`ops report`).
@@ -73,7 +80,16 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.core import triage
-from a11y_stem.core.types import Check, DocumentResult, Fix, Kind, Review, default_review
+from a11y_stem.core.types import (
+    Check,
+    DocumentResult,
+    Fix,
+    Kind,
+    Review,
+    Verification,
+    default_review,
+)
+from a11y_stem.models.verifier import verification_score
 from a11y_stem.observability.logging import get_logger
 from a11y_stem.web.db import ErrorAggregate, Job, JobStatus, ReviewEdit, session_scope
 
@@ -166,6 +182,32 @@ def fix_counts(
             counts[_key(step, "call", "fallback")] += 1
     if _escalated(fix):
         counts[_key(step, "call", "escalated")] += 1
+    for record in fix.verifications:
+        counts.update(verification_counts(step, record))
+    return counts
+
+
+SCORE_BUCKETS = 10  # tenths: "0.0" holds [0, 0.1), ..., "0.9" holds [0.9, 1]
+
+
+def score_bucket(score: float) -> str:
+    return f"{min(SCORE_BUCKETS - 1, max(0, int(score * SCORE_BUCKETS))) / SCORE_BUCKETS:.1f}"
+
+
+def verification_counts(step: str, record: Verification) -> Counter[Key]:
+    """Categories for one answer of the second automated check: its outcome, whether it
+    flagged, its score in tenths, and its cost. Numbers and codes only."""
+    counts: Counter[Key] = Counter()
+    prefix = ("verify", code(record.check), code(record.stage))
+    counts[_key(step, *prefix, "outcome", code(record.outcome))] += 1
+    if record.flagged:
+        counts[_key(step, *prefix, "flagged")] += 1
+    score = verification_score(record)
+    if score is not None:
+        counts[_key(step, *prefix, "score", score_bucket(score))] += 1
+    micro = max(0, round(record.cost_usd * 1_000_000))
+    if micro:
+        counts[_key(step, "verify", "cost_microusd")] += micro
     return counts
 
 

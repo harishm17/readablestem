@@ -64,6 +64,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import Check, Element, Fix, Kind, ModelCall, Status
 from a11y_stem.eval import judge as judge_mod
+from a11y_stem.eval import verifier_metrics as vm
 from a11y_stem.eval.equations import (
     EquationScore,
     MathMLError,
@@ -583,6 +584,8 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "wrong": not score.exact_lenient,
         "wrong_not_required": not score.exact_lenient and fix.review != "required",
         **_calls_summary(fix.calls),
+        # Second automated check, shadow mode (ADR 0005; eval.verifier_metrics).
+        **vm.equation_fields(fix),
     }
 
 
@@ -651,6 +654,7 @@ def equation_metrics(items: Sequence[dict]) -> dict:
         "by_display": _group_rates(items, "display", ["block", "inline"]),
         "selective": selective_table(items),
         "review_load": equation_review_load(items),
+        "second_check": vm.equation_metrics(items),
     }
 
 
@@ -1035,6 +1039,8 @@ def figure_item(record: dict, fix: Fix, judgement: judge_mod.Judgement | None) -
         "judge_latency_ms": judgement.call.latency_ms if judgement is not None else 0,
         "judge_prompt_version": judgement.call.prompt_version if judgement is not None else None,
         **_calls_summary(fix.calls),
+        # Second automated check (ADR 0005; eval.verifier_metrics).
+        **vm.figure_fields(fix),
     }
 
 
@@ -1070,6 +1076,7 @@ def figure_metrics(items: Sequence[dict]) -> dict:
         "judge_mean_score": mean(i["judge_score"] for i in judged),
         "judge_factual_error_rate": rate(bool(i["judge_factual_error"]) for i in judged),
         "decorative_rate": rate(bool(i["decorative"]) for i in items if i["has_proposal"]),
+        "second_check": vm.figure_metrics(items),
     }
 
 
@@ -1176,6 +1183,7 @@ def document_page_item(
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
+                **_shadow_pair(fix),
             }
         )
     matched_gold = {gi for gi, _, _ in pairs}
@@ -1211,6 +1219,12 @@ def document_page_item(
         "axe_violations": _failed_codes(axe) if axe_status(axe) == "ran" else [],
         "axe_status": axe_status(axe),
     }
+
+
+def _shadow_pair(fix: Fix | None) -> dict[str, Any]:
+    """The final proposal's shadow answer for a matched pair (None without one)."""
+    fields = vm.equation_fields(fix) if fix is not None else {}
+    return {key: fields.get(key) for key in ("shadow_p_meaning", "shadow_flagged")}
 
 
 def _split_pieces(
@@ -1394,6 +1408,7 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "axe_error_pages": sum(i["axe_status"] == "error" for i in items),
         "page_errors": _page_errors(items),
         "review_load": document_review_load(items),
+        "second_check": vm.document_metrics(items),
     }
 
 
@@ -1486,6 +1501,9 @@ def _eval_document(
         item["heading_flags"] = heading_flags(heading_item, headings)
         calls = [c for f in result.fixes for c in f.calls]
         item.update(_calls_summary(calls))
+        item["verifier"] = vm.page_summary(result.fixes)
+        item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
+        item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
         item["latency_ms"] = result.stats.latency_ms or item["latency_ms"]
         item["prompt_versions"] = dict(result.prompt_versions) or item["prompt_versions"]
         # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
@@ -1559,7 +1577,10 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
     refused) was paid for but is not in `items`. `budget_spent_usd` includes it;
     `dropped_usd` is the difference.
     """
-    step_cost = sum(i.get("cost_usd", 0.0) for i in items)
+    # The second automated check is part of what the pipeline spends (ADR 0005); it is
+    # also reported on its own so the added cost is visible.
+    verifier_cost = sum(i.get("verifier_cost_usd", 0.0) for i in items)
+    step_cost = sum(i.get("cost_usd", 0.0) for i in items) + verifier_cost
     judge_cost = sum(i.get("judge_cost_usd", 0.0) for i in items)
     n = len(items)
     unit = COST_UNITS.get(task, "page")
@@ -1572,6 +1593,9 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
         "per_item_usd": step_cost / n if n else None,
         "per_item_unit": unit,
         "model_calls": calls,
+        "verifier_usd": verifier_cost,
+        "verifier_per_item_usd": verifier_cost / n if n else None,
+        "verifier_requests": sum(i.get("verifier_requests", 0) for i in items),
     }
     if task == "figures":
         out["judge_usd"] = judge_cost
@@ -1579,6 +1603,7 @@ def _cost(task: str, items: Sequence[dict], budget: JobBudget | None) -> dict:
         pdf_pages = sum(i.get("pdf_pages", 0) for i in items)
         out["pdf_pages"] = pdf_pages
         out["per_pdf_page_usd"] = step_cost / pdf_pages if pdf_pages else None
+        out["verifier_per_pdf_page_usd"] = verifier_cost / pdf_pages if pdf_pages else None
     if budget is not None:
         out["budget_spent_usd"] = budget.spent_usd
         out["budget_calls"] = budget.calls
@@ -1724,6 +1749,51 @@ def _review_rows(task: str, load: dict) -> list[tuple[str, Any]]:
     return rows
 
 
+def _usd(value: float | None) -> str:
+    """A small dollar amount with enough digits to read (the check costs ~$0.00005)."""
+    return "n/a" if value is None else f"${value:.6f}"
+
+
+def _second_check_rows(task: str, metrics: dict) -> list[tuple[str, Any]]:
+    """Headline numbers of `eval.verifier_metrics` for one report."""
+    check = metrics["second_check"]
+    if task == "figures":
+        agreement = check["agreement_with_judge"]
+        return [
+            ("answered", check["answered"]),
+            ("outcomes", check["outcomes"]),
+            ("flagged", check["flagged"]),
+            ("flag_rate", check["flag_rate"]),
+            ("agreement_with_judge", agreement["raw_agreement"]),
+            ("kappa_with_judge", agreement["kappa"]),
+            ("auroc_vs_judge_fail", agreement["auroc_score_vs_judge_fail"]),
+            ("cost_per_figure_usd", _usd(check["per_figure_usd"])),
+        ]
+    shadow = check["final"] if task == "equations" else check["equations_matched"]
+    rows: list[tuple[str, Any]] = [
+        ("answered (final proposal)", shadow["answered"]),
+        ("wrong (not exact_lenient)", shadow["wrong"]),
+        ("auroc_vs_wrong", shadow["auroc_vs_wrong"]),
+        ("auroc_vs_wrong_excluding_scorer_gaps", shadow["auroc_vs_wrong_excluding_scorer_gaps"]),
+        ("would_flag", shadow["would_flag"]),
+        ("would_flag_precision", shadow["would_flag_precision"]),
+        ("would_flag_recall", shadow["would_flag_recall"]),
+    ]
+    if task == "equations":
+        rows += [
+            ("cheap_stage_answered", check["cheap_stage"]["answered"]),
+            ("cheap_stage_would_flag", check["cheap_stage"]["would_flag"]),
+            ("cost_per_equation_usd", _usd(check["per_equation_usd"])),
+        ]
+    else:
+        rows += [
+            ("figure_checked", check["figure_checked"]),
+            ("figure_flagged", check["figure_flagged"]),
+            ("cost_per_pdf_page_usd", _usd(check["per_pdf_page_usd"])),
+        ]
+    return rows
+
+
 def format_markdown(report: dict) -> str:
     """Human summary of a report (metrics only; no document text)."""
     metrics = report["metrics"]
@@ -1759,6 +1829,9 @@ def format_markdown(report: dict) -> str:
     if "review_load" in metrics:
         lines += ["", "### Review load", ""]
         lines += _table(["metric", "value"], _review_rows(report["task"], metrics["review_load"]))
+    if "second_check" in metrics:
+        lines += ["", "### Second automated check (Decisions API)", ""]
+        lines += _table(["metric", "value"], _second_check_rows(report["task"], metrics))
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]
         lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())

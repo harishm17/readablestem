@@ -62,7 +62,7 @@ import time
 import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, field
-from typing import Any, Final, Literal, cast
+from typing import TYPE_CHECKING, Any, Final, Literal, cast
 
 import openai
 from openai.types.responses import (
@@ -78,6 +78,9 @@ from a11y_stem.core.types import ModelCall, Outcome
 from a11y_stem.models.base import T, VisionRequest, fence_untrusted
 from a11y_stem.models.pricing import cost_usd, estimate_max_cost_usd
 from a11y_stem.observability.logging import log_fields
+
+if TYPE_CHECKING:
+    from a11y_stem.models.verifier import Verifier
 
 log = logging.getLogger(__name__)
 
@@ -150,7 +153,9 @@ class OpenAIVisionClient:
     callers inject an `openai.OpenAI` (or a duck-typed stand-in); without it the client is
     created on first use from `settings.require_openai_key()`, so constructing this object
     never needs a key. `safety_identifier` is optional and is passed to OpenAI for abuse
-    attribution. It must be an opaque hash of the user id, never an email.
+    attribution. It must be an opaque hash of the user id, never an email. `verifier` is
+    the job's second automated check (`models.verifier`, charging the same budget), which
+    the steps find with `verifier.verifier_of(client)`; None when it is off.
     """
 
     def __init__(
@@ -160,9 +165,11 @@ class OpenAIVisionClient:
         *,
         client: openai.OpenAI | None = None,
         safety_identifier: str | None = None,
+        verifier: Verifier | None = None,
     ) -> None:
         if safety_identifier is not None:
             _check_safety_identifier(safety_identifier)
+        self.verifier = verifier
         self._settings = settings
         self._budget = budget
         self._given_client = client

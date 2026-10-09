@@ -23,6 +23,12 @@ from a11y_stem.core.types import Fix, Kind
 BELOW_ACCEPT = "below_accept"
 # Reason for a member of a group of repeated headings (`Fix.group_key`).
 REPEATED_LABEL = "heading.repeated_label"
+# Code of the second automated check's note on a figure (`figure_step.second_check`, ADR
+# 0005). Optional by policy in this version, but unlike the other notes it says the alt
+# text may not match the image, so the review screen never calls it something small.
+# The figure step writes it as a literal, so the message-table test can find the code;
+# tests/test_web_second_check_review.py checks the two agree.
+SECOND_CHECK_MISMATCH = "second_check_mismatch"
 
 
 def units(fixes: Iterable[Fix]) -> list[list[Fix]]:
@@ -49,6 +55,12 @@ def required_decisions(fixes: Iterable[Fix]) -> int:
 def open_decisions(fixes: Iterable[Fix]) -> int:
     """Decisions still waiting now: a group counts while any member is waiting."""
     return len(units(f for f in fixes if f.pending))
+
+
+def second_check_note(fix: Fix) -> bool:
+    """An optional note nobody has acted on yet that comes from the second automated
+    check: a possible mismatch between the alt text and the image."""
+    return fix.optional_note and any(c.code == SECOND_CHECK_MISMATCH for c in fix.failed_checks)
 
 
 def tier_reasons(fix: Fix) -> list[str]:

@@ -37,7 +37,7 @@
 {% endif %}
 {% if item.checks %}
 <div class="explained">
-  <p><strong>{% if item.optional %}Optional check (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
+  <p><strong>{% if item.second_check %}Optional check (worth a look; it does not hold up the document):{% elif item.optional %}Optional check (nothing to do unless you disagree):{% else %}What the checks found:{% endif %}</strong></p>
   <ul class="check-list">
     {% for check in item.checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}
@@ -261,7 +261,8 @@
 <div id="review-progress" class="review-progress" tabindex="-1">
   {% for notice in notices %}{{ notice_box(notice) }}{% endfor %}
   <p>{% if remaining %}<strong>{{ remaining }} {{ "decision is" if remaining == 1 else "decisions are" }} still needed:</strong>
-    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}{% if optional %}
+    {{ remaining_by_kind|join(", ") }}.{% else %}Nothing left that needs your decision.{% endif %}{% if optional and second_checks %}
+    {{ counted(optional|length, "optional check", "optional checks") }} {{ "does" if optional|length == 1 else "do" }} not hold anything up, but {% if second_checks == optional|length %}{{ "it is" if second_checks == 1 else "they are" }}{% else %}{{ second_checks }} of them {{ "is" if second_checks == 1 else "are" }}{% endif %} worth a look.{% elif optional %}
     {{ counted(optional|length, "optional check", "optional checks") }} can be looked at if you want; {{ "it does" if optional|length == 1 else "they do" }} not hold anything up.{% endif %}</p>
 </div>
 
@@ -270,7 +271,10 @@
   letter, a figure without a usable description, and repeated headings (one decision for
   all copies). Equations come first, then figures, then headings. Small things (a bold
   subscript, a heading with weak evidence, a long alt text) were accepted and are listed
-  under “Optional checks”. For each fix:</p>
+  under “Optional checks”.{% if second_checks %} So are figures where a second automated
+  check found a possible mismatch between the alt text and the image. Those are worth a
+  look, since a wrong alt text changes what a screen reader user hears; the check is new
+  and can be wrong, so it does not hold up the document.{% endif %} For each fix:</p>
 <ul>
   <li><strong>Accept</strong> keeps the proposal as it is.</li>
   <li><strong>Save edit</strong> checks your change again and, if it passes, uses it.</li>
@@ -335,9 +339,19 @@
 <section id="optional-checks" class="review-section" aria-labelledby="optional-checks-title" tabindex="-1">
   <h2 id="optional-checks-title">Optional checks ({{ optional|length }})</h2>
   {% if optional %}
+  {% if second_checks %}
+  {% set small = optional|length - second_checks %}
+  <p>These were accepted automatically, and nothing here holds up the document, but you
+    can still change any of them. For {{ counted(second_checks, "figure", "figures") }},
+    a second automated check found a possible mismatch between the alt text and the
+    image: worth a look, because a wrong alt text changes what a screen reader user
+    hears.{% if small %} For the other {{ small if small > 1 else "one" }}, the checks
+    found something small that does not change the meaning.{% endif %}</p>
+  {% else %}
   <p>These were accepted automatically: the checks found something small that does not
     change the meaning. Nothing here holds up the document, but you can still change any
     of them.</p>
+  {% endif %}
   <details class="done-group"{% if optional_open %} open{% endif %}>
     <summary>Show the {{ counted(optional|length, "optional check", "optional checks") }}</summary>
     <ol class="fix-list done-list">

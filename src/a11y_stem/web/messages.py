@@ -114,6 +114,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("figure.decorative_consistency", "decorative_conflict"): "The figure was marked "
     "decorative but looks like it carries information (a chart, a caption or a "
     "description), so check before hiding it from screen readers.",
+    ("figure.second_check", "second_check_mismatch"): "A second automated check found a "
+    "possible mismatch between the alt text and the image; worth a look.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",

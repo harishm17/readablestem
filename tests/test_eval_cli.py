@@ -145,9 +145,12 @@ def test_max_usd_builds_the_openai_client_with_the_cap(gold, tmp_path, fake_inpu
     built = []
 
     class StubOpenAIVisionClient(FakeVisionClient):
-        def __init__(self, settings, budget, *, client=None):
+        def __init__(self, settings, budget, *, client=None, verifier=None):
             super().__init__(budget=budget)
             built.append(budget)
+            verifiers.append(verifier)
+
+    verifiers: list = []
 
     from a11y_stem.cli import eval_cli
     from a11y_stem.config import Settings
@@ -161,6 +164,11 @@ def test_max_usd_builds_the_openai_client_with_the_cap(gold, tmp_path, fake_inpu
     (budget,) = built
     assert (budget.max_usd, budget.max_calls, budget.guard.cap_usd) == (1.5, 7, 1.5)
     assert json.loads((tmp_path / "report.json").read_text())["client"] == "openai"
+    # The second automated check rides on the same client (and so the same budget).
+    from a11y_stem.models.verifier import DecisionsVerifier
+
+    (verifier,) = verifiers
+    assert isinstance(verifier, DecisionsVerifier)
 
 
 def test_missing_api_key_is_explained(gold, tmp_path, fake_inputs, monkeypatch, capsys):

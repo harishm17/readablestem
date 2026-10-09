@@ -115,10 +115,14 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
     if args.fake:
         return FakeVisionClient(budget=budget), budget, "fake"
     from a11y_stem.models.openai_client import OpenAIVisionClient
+    from a11y_stem.models.verifier import any_check_enabled, make_verifier
 
     try:
         settings.require_openai_key()  # fail before any work, not on the first call
-        client = OpenAIVisionClient(settings, budget)
+        # The second automated check rides on the client and the same budget, as in the
+        # app (DECISIONS_FIGURE_VERIFY, DECISIONS_EQUATION_SHADOW turn it off).
+        verifier = make_verifier(settings, budget) if any_check_enabled(settings) else None
+        client = OpenAIVisionClient(settings, budget, verifier=verifier)
     except ConfigError as exc:
         return str(exc)
     return client, budget, "openai"

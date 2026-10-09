@@ -1,8 +1,11 @@
-"""CLI commands: a11y-stem ops aggregate|purge|cron|launch-check|report|export-opted-in.
+"""CLI commands: a11y-stem ops aggregate|purge|cron|launch-check|report|export-opted-in|
+decisions-canary.
 
 The same tasks the web app runs on Cloud Scheduler's hourly call, for running by hand or
 from a Cloud Run job. Output is counts only, as `key=value` pairs on one line; database
 errors are reported by type, because their messages can include connection details.
+`decisions-canary` is the Decisions API drift canary the hourly cron runs once a day
+(ops/canary.py); by hand it needs no database, only a key and `--max-usd`.
 """
 
 from __future__ import annotations
@@ -49,6 +52,33 @@ def register(
     mode.add_argument("--out", type=Path, help="write one directory per job here")
     mode.add_argument("--prune", type=Path, help="delete exported jobs past their retention date")
     export.set_defaults(func=_cmd_export)
+    canary = sub.add_parser(
+        "decisions-canary",
+        help="send the fixed Decisions API canary requests and compare with the recorded "
+        "answers (about $0.001; exit 1 on drift)",
+    )
+    canary.add_argument(
+        "--max-usd", type=_positive_usd, required=True, help="hard spend cap for this run"
+    )
+    canary.add_argument(
+        "--record",
+        action="store_true",
+        help="write today's answers as the expected file (after a deliberate change)",
+    )
+    canary.add_argument(
+        "--expected", type=Path, help="expected-answers file (default: the committed one)"
+    )
+    canary.set_defaults(func=_cmd_decisions_canary)
+
+
+def _positive_usd(value: str) -> float:
+    try:
+        number = float(value)
+    except ValueError:
+        raise argparse.ArgumentTypeError(f"expected a number, got {value!r}") from None
+    if not 0 < number < float("inf"):
+        raise argparse.ArgumentTypeError(f"must be a positive amount, got {value}")
+    return number
 
 
 def _factory() -> sessionmaker[Session]:
@@ -158,3 +188,57 @@ def _cmd_export(args: argparse.Namespace) -> int:
     print(f"jobs={stats.jobs} crops={stats.crops} labels={stats.labels}")
     print("delete them by their EXPIRES date: a11y-stem ops export-opted-in --prune DIR")
     return 0
+
+
+def _cmd_decisions_canary(args: argparse.Namespace) -> int:
+    """Exit 0: no answer moved; 1: drift (also an ERROR log line); 2: could not compare
+    (no key, a case without an answer, or expectations recorded for other requests)."""
+    import json
+    from datetime import UTC, datetime
+
+    from a11y_stem.config import ConfigError, get_settings
+    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from a11y_stem.models.decisions_client import DecisionsClient
+    from a11y_stem.observability.logging import configure_logging
+    from a11y_stem.ops import canary
+
+    settings = get_settings()
+    configure_logging(settings)
+    try:
+        settings.require_openai_key()  # the key itself is never printed
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    cases = canary.load_cases()
+    # Dollars only: Decisions requests are not model calls (`core.budget`).
+    budget = JobBudget(InMemorySpendGuard(cap_usd=args.max_usd), max_usd=args.max_usd, max_calls=0)
+    path = args.expected or canary.EXPECTED_FILE
+    expected = {"cases": {}} if args.record or not path.is_file() else canary.load_expected(path)
+    result = canary.run_canary(
+        DecisionsClient(settings, budget),
+        model=settings.decisions_model,
+        cases=cases,
+        expected=expected,
+    )
+    for case, question, delta in result.drifted:
+        print(f"drift case={case} question={question} delta={delta}")
+    for case, outcome in result.failed:
+        print(f"failed case={case} outcome={outcome}")
+    if args.record:
+        try:
+            document = canary.expected_document(
+                result, model=settings.decisions_model, day=datetime.now(UTC).date()
+            )
+        except ValueError as exc:
+            print(f"error: {exc}", file=sys.stderr)
+            return 2
+        path.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"cases={result.cases} cost_usd={result.cost_usd:.6f} recorded={path.name}")
+        return 0
+    canary.report(result, source="cli")
+    print(
+        f"cases={result.cases} compared={result.compared} drifted={len(result.drifted)} "
+        f"failed={len(result.failed)} stale={len(result.stale)} "
+        f"cost_usd={result.cost_usd:.6f} status={result.status}"
+    )
+    return {"ok": 0, "drift": 1}.get(result.status, 2)
