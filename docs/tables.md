@@ -135,7 +135,9 @@ wrong "1" when a "1" appears elsewhere in the table).
 **Maths cells** are compared with the PDF glyphs of the local cell in the same place
 (only when the grids are the same size): `equation_step.text_layer_symbols_differ`,
 `signs.compare_signs` when the letters mostly agree, and `text_layer_style`, the same
-rules and thresholds as an equation.
+rules and thresholds as an equation. Unlike an equation, a maths cell where the PDF has
+no letters or digits at all is a `symbol_mismatch`: the rest of the table has a text
+layer, so maths read into an empty cell was invented.
 
 ### Status and review tier
 

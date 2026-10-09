@@ -351,6 +351,13 @@ def test_a_maths_cell_that_drops_a_minus_sign_needs_review():
     assert run(by_model(cheap=right), element(local(pdf))).status is Status.ACCEPTED
 
 
+def test_maths_read_into_an_empty_cell_needs_review():
+    pdf = [["Quantity", "Value"], ["g", ""]]
+    invented = maths_table(r"9.8\ \text{m/s}^{2}")
+    fix = run(by_model(cheap=invented, main=invented), element(local(pdf)))
+    assert fix.status is Status.NEEDS_REVIEW and codes(fix) == {"symbol_mismatch"}
+
+
 def test_a_bold_vector_read_as_plain_needs_review():
     plain = answer(
         with_header_row([["Symbol", "Meaning"], [cell({"latex": r"v_{x}"}), "velocity"]])

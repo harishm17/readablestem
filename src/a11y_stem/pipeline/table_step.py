@@ -599,7 +599,11 @@ class _MathsVerdict:
 def maths_verdict(grid: TableGrid, local: TableGrid) -> _MathsVerdict:
     """Each maths cell against the text of the local cells in its place (the equation
     step's rules: `text_layer_symbols_differ`, `compare_signs` when the letters mostly
-    agree, `text_layer_style`). The grids have the same size."""
+    agree, `text_layer_style`). The grids have the same size.
+
+    Unlike an equation, a maths cell is compared even where the PDF has no letters or
+    digits: the rest of the table has a text layer, so maths read into an empty cell
+    was invented."""
     owner = _owners(local)
     verdict = _MathsVerdict()
     for cell in grid.cells:
@@ -608,6 +612,9 @@ def maths_verdict(grid: TableGrid, local: TableGrid) -> _MathsVerdict:
         layer = " ".join(local.cells[i].text for i in _counterparts(cell, owner)).strip()
         differ = text_layer_symbols_differ(layer, cell.mathml)
         if differ is None:
+            if _mathml_symbols(cell.mathml):
+                verdict.compared += 1
+                verdict.symbols = True
             continue
         verdict.compared += 1
         verdict.symbols = verdict.symbols or differ
