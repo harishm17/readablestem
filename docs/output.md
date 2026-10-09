@@ -49,7 +49,7 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
-| Figure | `<figure><img alt="..."><figcaption>` | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
+| Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables") | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
@@ -91,6 +91,60 @@ broken grid (`core.types.grid_problems`) still renders as a rectangular table.
 narrow screen and takes focus (named by the caption, else "Table"), and keeps the image of
 any table that was not rebuilt. Table CSS is added only to documents with a rebuilt
 table, so other documents are byte-for-byte what 0.3.0 wrote.
+
+## Long descriptions and chart data
+
+With long descriptions on (FEATURE_LONG_DESCRIPTIONS, docs/steps.md), a chart, diagram
+or complex illustration can have a long description and a chart its data table
+(`FigureFix.long_description`, `data_table`). Following the W3C WAI complex images
+tutorial (a short alt on the image, a long description next to it), they are written
+right after the figure, folded, by `pipeline/figure_details.py render_details`:
+
+```html
+<figure id="p3-e0"><img src="data:image/png;base64,..." alt="Line graph of position
+  against time: a straight line rising from 400 m." width="437" height="267">
+  <figcaption>Figure 2.3 ...</figcaption></figure>
+<details class="figure-description"><summary class="a11y-stem">Description of Figure
+  2.3</summary><p>Line graph of the position of a car against time.</p><p>...</p>
+  <div class="table-scroll" role="group" aria-labelledby="p3-e0-data-caption" tabindex="0">
+  <table><caption id="p3-e0-data-caption">Data read from Figure 2.3; the values are
+  approximate</caption><thead>...</thead><tbody>...</tbody></table></div></details>
+```
+
+- The `<details>` follows the `<figure>` instead of sitting in it: a `<figcaption>` must
+  be the figure's first or last child, and a long description inside the figcaption
+  would become the figure's accessible name, read in full on entering it.
+- The summary names the figure from its caption ("Description of Figure 2.3", "Data for
+  Figure 2.3" when there is only a table, "the figure" without a number), so it makes
+  sense out of context in a screen reader's list of controls. It works without scripts.
+- Each line of the long description is a `<p>`; everything the model wrote is escaped.
+- The data table goes through `table_html.render_table` like a rebuilt table, in a box
+  that scrolls sideways and takes focus, named by its caption. The caption is the tool's
+  own and says where the values came from: "Data shown in Figure 2.3" when every number
+  is in the PDF's text, else "Data read from Figure 2.3; the values are approximate".
+- Nothing is written for a decorative figure or a proposal that is not used (rejected,
+  failed, abstained). Its CSS (`DETAILS_CSS`, plus the table CSS with a table) is added
+  only to documents with one.
+
+## Figure images in the student file (UX review MF23)
+
+Figure images are re-encoded for the student file only (`pipeline/figure_images.py`;
+the stored crops and the review screen keep their PNGs). At most 1600 px on the long
+side, never upscaled; photos and illustrations as JPEG at quality 82 unless the PNG is
+smaller; charts, diagrams and anything else (flagged figures and scanned pages too) as
+PNG unless the JPEG is at most half its size, which happens for raster charts that are
+photographs or JPEG scans; an image with transparency is kept. MuPDF does the encoding,
+so there is no new dependency, and the bytes depend only on the crop and the figure
+type, so a stored result re-renders to the same file. Equation images are not touched.
+
+| File | Before | After | Images |
+|---|---|---|---|
+| The public demo (OpenStax Physics 2.3, 7 figures; stored result re-rendered with its crops) | 2,210 KB (gzip 1,657 KB) | 666 KB (gzip 460 KB) | 3 JPEG (a photo, two raster charts), 4 PNG |
+| `tests/fixtures/layout/` PDFs converted offline (`lecture_notes`, `two_column`, `worked_example`; one small figure each) | 35, 14, 40 KB | the same | PNG kept: line art, smaller than JPEG |
+
+A page-sized crop (1700 x 2200 px) takes about 0.15-0.3 s to re-encode, so a document of
+many scanned pages takes a few seconds more to re-render after each review decision.
+The UX review expected about 250 KB for the demo with WebP, which MuPDF does not write.
 
 ## Lists
 
@@ -284,7 +338,9 @@ About 35 lines of inline CSS:
   item, since `text-indent` is inherited), equation numbers to the right of their
   equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
   readers still read it);
-- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together.
+- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together;
+- only in documents that have one: a figure's folded description (a bold summary with
+  the browser's own marker, no new colours) and table rules.
 
 There is no dark mode yet.
 
@@ -431,3 +487,5 @@ TODO(Harish): turn these into the public known-limits copy.
   alt text.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
+- A figure's long description and data table are folded: they print only if opened
+  first. A chart's data table read from the image is approximate (its caption says so).

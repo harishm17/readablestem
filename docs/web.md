@@ -357,7 +357,19 @@ the results".
   when those checks pass and the same comparison then finds no meaning-level
   difference), the edit box open, and Accept as the secondary **Accept anyway**.
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
-  Accept, Save edit and Reject.
+  Accept, Save edit and Reject. With long descriptions on (docs/steps.md), a chart's
+  data table comes right under the image, as students will get it (`table_html`, in a
+  box that scrolls sideways and takes focus, captioned "Data read from Figure 1; the
+  values are approximate" when its values were read from the image, which is why such
+  a figure asks for a decision), then the long description in its own field ("Longer
+  description for figure 1"; empty to remove it) and a **Remove the data table (keep
+  the descriptions)** box, both saved with Save edit. The long description is cleaned
+  and checked like the model's (`figure_details`: no URL or markup, 40-2,000
+  characters, at most 12 lines); the table cannot be edited, only removed. Accept with
+  either changed is refused like a changed alt text ("You changed the longer
+  description. Choose Save edit ..."). The fields are shown only when the figure has a
+  long description or a table; a form without them (the list view) keeps both, and
+  marking a figure decorative drops both. The list view does not show them yet.
 - *Heading group*: one card. "“Teacher Support” appears 11 times as a bold line in the
   body text size.", the first one in its band of the page (`compare.band_clip`, the
   heading outlined), the pages it is on, **Keep as headings at level 3** and **Make bold
@@ -769,6 +781,7 @@ a user id is added without it.
 | `uv run pytest -m postgres` | Postgres only: spend and quota under 20 threads, SKIP LOCKED with two workers, migration check |
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
+| `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown and after a refused edit; no sideways scrolling at 320 px; "Remove the data table" without JavaScript) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

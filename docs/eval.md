@@ -219,6 +219,38 @@ the 2000-character fence limit; 2 of the 13 sample references exceed 800 charact
 Output schema: `conveys_key_information` (bool), `factual_error` (bool), `score` (1-5),
 `confidence` (0-1).
 
+#### Long descriptions (FEATURE_LONG_DESCRIPTIONS on)
+
+With `FEATURE_LONG_DESCRIPTIONS=true` in the environment, the figures task runs the step
+with the options the app would use (`ConversionOptions.from_settings`), so it sends the
+long prompt (`figure_long.md`). The gold figures are images, so the step gets no PDF
+text from inside the figure: every data table counts as read from the image. A second
+judge (`judge.judge_long`, prompt `models/prompts/judge_long_description.md`, a rubric of
+its own, main model, no fallback, always with the image) grades every figure that got a
+long description or a data table. It sees the long description, the table (one row a
+line, cells separated by " | "), the OpenStax alt as a reference (not an answer key) and
+the caption, fenced and capped at 1000 / 400 / 250 / 150 characters. Output:
+`accurate`, `complete`, `invented_values` (bools), `score` (1-5), `table_values_ok`
+(null without a table; true when every value equals a printed one or, read off the
+chart, lies within half of the axis's smallest labelled step), `table_wrong_values`,
+`confidence`. **Long pass** = accurate and complete and no invented values. The report
+gains `metrics.long_descriptions` and a "Long descriptions" table:
+
+| Metric | Definition |
+|---|---|
+| `described`, `described_rate` | figures with a long description, and their share of proposals |
+| `complex_described_rate` | the same over charts and diagrams only (the rest get the notice `long_description_missing`) |
+| `mean_chars` | mean length of the long descriptions |
+| `judged`, `pass_rate` (+ `_ci95`) | long descriptions the judge graded, and the share that passed |
+| `accurate_rate`, `complete_rate`, `invented_values_rate`, `mean_score` | the judge's fields over graded long descriptions |
+| `unsure` | long descriptions the model marked unsure (an optional note each) |
+| `data_tables`, `table_values_ok_rate`, `table_wrong_values` | data tables proposed; the share whose values were all within tolerance; cells outside it |
+| `values_from_text` | tables whose every number is in the PDF text (always 0 here: the inputs are images) |
+| `colour_only` | figures flagged as telling things apart by colour alone |
+| `required_decisions`, `required_for_values` | figures needing a decision, and those because their table was read from the image: the review load the option adds |
+
+The long judge is not calibrated against human labels yet.
+
 ### document
 
 For each gold page: print to PDF, `run.convert_pdf`, then align predicted equations with
@@ -408,6 +440,12 @@ uv run a11y-stem eval pipeline --task equations --max-usd 0.50 --items data/eval
 uv run a11y-stem eval pipeline --task headings  --max-usd 0.01
 uv run a11y-stem eval pipeline --task figures   --max-usd 0.50 --items data/eval/judged.jsonl
 uv run a11y-stem eval pipeline --task document  --max-usd 2.00 --items data/eval/items-document.jsonl
+```
+
+The figures task with long descriptions on (about $0.13 for the 13 gold figures):
+
+```
+FEATURE_LONG_DESCRIPTIONS=true uv run a11y-stem eval pipeline --task figures --max-usd 1.00 --out .local/eval/figures-long.json --items .local/eval/figures-long.jsonl
 ```
 
 `--limit N` takes the first N equations or figures, or the first N pages. `--fake` swaps
@@ -682,6 +720,49 @@ LaTeX text, is not usable as a signal on bold vectors; that is what shadow mode 
 Before any equation gate: label real crops, compare the predicate form the research
 measured (variant b), and keep the text-layer style rule as the bold check.
 
+## Long descriptions (2026-10-09, FEATURE_LONG_DESCRIPTIONS on)
+
+The figures task on the 13 gold figures with the long prompt (`figure_long-a2c98225`),
+graded by the alt judge (`judge_figure-137e2607`, as before) and the long-description
+judge (`judge_long_description-ba1c35dc`), gpt-6.1-sol. Report:
+`data/eval/figures-long-descriptions.json` (kept apart from `latest-figures.json`, the
+option being off by default). Small: read the intervals.
+
+| | Long prompt (this run) | Short prompt (`latest-figures.json`, 2026-10-08) |
+|---|---|---|
+| alt judge pass | 0.846 (11 of 13; CI 0.578-0.957) | 0.923 (12 of 13) |
+| alt factual errors | 0 | 0 |
+| long descriptions | 9 of 13: every chart and diagram (9), no photo or painting; mean 480 characters | |
+| long judge pass | 9 of 9 (CI 0.701-1.000): accurate 9, complete 9, invented values 0, mean score 5.0 | |
+| data tables | 3 (the position-time graphs with marked or labelled points), values within tolerance 3 of 3, 0 wrong cells | |
+| values from the PDF text | 0 of 3 (the inputs are images) | |
+| decisions added | 3 required (`values_from_image`), 0 optional notes (no description marked unsure), 0 colour-only flags | 0 |
+| cost | $0.0040 per figure for the step; $0.124 for the run with both judges | $0.0035 per figure |
+| step latency | p50 7.7 s, p95 15.9 s (sum of call latencies) | p50 5.8 s, p95 10.0 s |
+
+Reading it:
+
+- The long descriptions follow the W3C two-part pattern: axes with units and ranges,
+  the trend, the labelled points, and "about" for values read off an axis. The judge
+  found every table value within tolerance, but every table asks for a decision because
+  its values came from pixels; in a PDF whose chart labels are real text, the printed
+  values (400 m, 525 m at 0.50 s, 2000 m at 6.40 s) would be found in the text and ask
+  nothing.
+- The one alt result that changed: "Graph of y versus x" lost "rise over run" from its alt
+  text (the long description carries it), and the alt judge, which does not see the long
+  description, marked it as missing key information. One figure is within run-to-run
+  variation at this size, but it is the direction to watch: the prompt now says the alt
+  text must stand on its own. A first full run with an earlier wording gave the same
+  numbers.
+- One of three descriptions with a table still mentions "the table" despite the prompt;
+  removing the table on the review screen then leaves that sentence to edit.
+- The long judge is not calibrated, and it agreed with every description: a 100% pass on
+  9 is an upper bound, not a measurement of the error rate. Label these before quoting
+  them (`eval calibrate` covers the alt judge only).
+
+Spend for this work: $0.252 in all (a one-figure smoke run $0.007, the first full run
+$0.121, this run $0.124).
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -732,7 +813,9 @@ measured (variant b), and keep the text-layer style rule as the bold check.
 |---|---|
 | `src/a11y_stem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
 | `src/a11y_stem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
-| `src/a11y_stem/eval/judge.py` | figure judge request, schema, pass rule |
+| `src/a11y_stem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |
+| `src/a11y_stem/models/prompts/judge_long_description.md` | the long-description and data-table rubric (versioned by hash) |
+| `data/eval/figures-long-descriptions.json` | the figures report with long descriptions on (2026-10-09) |
 | `src/a11y_stem/eval/verifier_metrics.py` | the second automated check's eval metrics |
 | `src/a11y_stem/models/prompts/judge_figure.md` | judge instructions (versioned by hash) |
 | `src/a11y_stem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
