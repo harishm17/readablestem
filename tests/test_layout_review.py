@@ -128,10 +128,15 @@ def table_page(page: pymupdf.Page) -> None:
 
 
 def test_numeric_table_cells_are_not_headings():
+    # Since pipeline 0.4.0 both tables are TABLE elements (pipeline/tables.py): their
+    # cells leave the paragraph flow and none of them can become a heading.
     layout_ = analyze(one_page(table_page))
     assert not [e for e in layout_.elements if e.kind == Kind.HEADING]
     assert layout_.title is None
-    assert {"0.0", "2.0", "2 kg", "12 Metres"} <= set(texts(layout_.elements, Kind.PARAGRAPH))
+    assert [e.kind for e in layout_.elements] == [Kind.PARAGRAPH, Kind.TABLE, Kind.TABLE]
+    cells = {c.text for e in layout_.elements if e.table for c in e.table.cells}
+    assert {"0.0", "2.0", "2 kg", "12 Metres"} <= cells
+    assert not {"0.0", "2.0", "2 kg", "12 Metres"} & set(texts(layout_.elements, Kind.PARAGRAPH))
 
 
 def test_a_numbered_section_title_on_its_own_line_is_still_an_accepted_heading():

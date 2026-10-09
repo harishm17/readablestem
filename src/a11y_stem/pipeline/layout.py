@@ -71,7 +71,8 @@ from itertools import count, pairwise
 import pymupdf
 
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
-from a11y_stem.core.types import BBox, Element, Kind, inline_marker
+from a11y_stem.core.types import BBox, Element, Kind, TableGrid, inline_marker
+from a11y_stem.pipeline import tables
 from a11y_stem.pipeline.parse import (
     EQUATION_THRESHOLD,
     GREEK,
@@ -2924,6 +2925,7 @@ class _Block:
     origin: float = 0.0  # list items: left edge of their column's text (`_column_origins`)
     label: str | None = None  # display equations: the equation number beside them
     regular: str | None = None  # display equations: `Element.regular_letters`
+    table: TableGrid | None = None  # tables: the grid built from the PDF (`_table_blocks`)
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -3290,6 +3292,56 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure]) -> None:
             block.kind = Kind.PARAGRAPH if index not in used_captions else "attached"
 
 
+# ============================================================================ tables
+
+
+def _claim_tables(
+    page: pymupdf.Page,
+    number: int,
+    frags: dict[int, list[_Row]],
+    paths: dict[int, list[_Path]],
+    previous: list[tables.PageTable] | None,
+) -> list[tables.PageTable]:
+    """Find the page's data tables (`pipeline.tables`) and take their lines (cells and
+    "Table N" caption) and rules out of the page, before columns, rows, headings and
+    equations are worked out: a table's numbers are not an equation, its bold header
+    cells not headings, its ruled cells not a figure, and its columns not text columns.
+    Only pages the probe passed get here (`analyze` probes every selected page first).
+    `previous` is the page before's tables, when it was analysed: a table that goes on
+    from its last one is marked."""
+    found = tables.find(page, frags[number], paths[number], clean=_clean)
+    if not found:
+        return found
+    lines = set().union(*(t.lines for t in found))
+    drawn = set().union(*(t.paths for t in found))
+    frags[number] = [f for i, f in enumerate(frags[number]) if i not in lines]
+    paths[number] = [p for i, p in enumerate(paths[number]) if i not in drawn]
+    if previous and tables.continues(previous[-1], found[0], page.rect.width):
+        found[0].reasons.append(tables.REASON_CONTINUED)
+    return found
+
+
+def _table_blocks(page_tables: Sequence[tables.PageTable]) -> list[_Block]:
+    """TABLE blocks, placed in reading order like figures. The grid carries the caption;
+    the element's text is the cells' text, row by row (what a crop-less fallback shows)."""
+    blocks = []
+    for found in page_tables:
+        grid = found.grid.model_copy(update={"caption": found.caption})
+        cells = sorted(grid.cells, key=lambda c: (c.row, c.col))
+        text = _clean(" ".join(c.text for c in cells if c.text))
+        blocks.append(
+            _Block(
+                Kind.TABLE,
+                found.bbox,
+                text=text or None,
+                caption=found.caption,
+                reasons=list(found.reasons),
+                table=grid,
+            )
+        )
+    return blocks
+
+
 # ============================================================================ pages
 
 
@@ -3319,6 +3371,7 @@ def _page_blocks(
     ctx: _Context,
     paths: list[_Path],
     margins: _MarginFilter,
+    page_tables: Sequence[tables.PageTable] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_labels(rows)
@@ -3336,7 +3389,8 @@ def _page_blocks(
     figures = [f for f in figures if _absorb_labels(f, rows, ctx)]
     text_rows = [r for r in rows if not r.absorbed]
     _equation_regions(text_rows, used_rules)
-    order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, [f.bbox for f in figures])
+    placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
+    order = _reading_order([r.bbox for r in text_rows], gutter, ctx.body, placed)
     ordered = _contiguous_regions([text_rows[i] for i in order])
     runs = _runs(ordered, ctx)
     blocks = [_classify_run(run, ctx) for run in runs]
@@ -3358,6 +3412,7 @@ def _page_blocks(
                 reasons=figure.reasons,
             )
         )
+    blocks.extend(_table_blocks(page_tables))
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
@@ -3478,16 +3533,18 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     paths: dict[int, list[_Path]] = {}
     margins = _margin_filter(doc, selected, frags, paths)
     prepared = {}
+    found: dict[int, list[tables.PageTable]] = {}
     for number in selected:
         if number not in frags:
             frags[number] = _page_rows(doc[number])
         if number not in paths:
             paths[number] = _page_paths(doc[number])
+        found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
     ctx = _body_and_pitch({n: rows for n, (rows, _) in prepared.items()})
     _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx)
     pages = [
-        _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins)
+        _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins, found[n])
         for n in selected
     ]
     elements = _to_elements(pages, ctx)
@@ -3574,6 +3631,7 @@ def _to_elements(pages: list[_PageBlocks], ctx: _Context) -> list[Element]:
                     equation_label=block.label if kind == Kind.EQUATION else None,
                     caption=block.caption,
                     regular_letters=block.regular if kind == Kind.EQUATION else None,
+                    table=block.table if kind == Kind.TABLE else None,
                 )
             )
     return elements
