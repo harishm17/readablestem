@@ -302,3 +302,21 @@ def test_the_table_decisions_can_be_made_without_javascript(site, browser, job):
     assert statuses["p1-e1"] == "accepted"
     assert statuses["p1-e3"] == "edited"
     assert statuses["p2-e0"] == "rejected"
+
+
+def test_the_shortcuts_reach_the_table_card(site, browser, job):
+    """With shortcuts on, E opens "Change the table" at the cell list; A accepts."""
+    context, page = open_page(browser, site)
+    url = f"{site.base}/jobs/{job}/review"
+    page.goto(url)
+    page.locator("#shortcuts summary").click()
+    page.get_by_label("Use keyboard shortcuts on this screen").check()
+    page.locator("#decision-title").focus()
+    page.keyboard.press("e")
+    assert page.evaluate("document.activeElement.id") == "cell-pick-p1-e1"
+    assert page.locator(".table-edit").evaluate("d => d.open")
+    page.locator("#decision-title").focus()
+    page.keyboard.press("a")
+    page.wait_for_url(f"{url}?item=p1-e3")
+    assert "Table 1: Accepted." in page.get_by_role("status").inner_text()
+    context.close()
