@@ -855,13 +855,15 @@ def apply(
 def set_document_language(result: DocumentResult, tag: str) -> DocumentResult:
     """The stored result with the document language the instructor chose on the job page.
 
-    `lang` becomes `tag` (normalised: "fr", "pt-BR"), `lang_source` "user"; the
-    `lang_detected` / `lang_assumed` notices go (the instructor has answered them), and
-    the passage languages are worked out again against the new language, so a passage
-    is marked only where it differs from it. Raises ValueError when `tag` is not a BCP 47
-    language tag. Elements and fixes are otherwise unchanged; the caller re-renders the
+    `tag` is a BCP 47 tag ("fr", "pt_br") or the English name of a language in
+    `language.LANGUAGE_NAMES` ("French"); `lang` becomes its usual form ("fr", "pt-BR")
+    and `lang_source` "user". The `lang_detected` / `lang_assumed` notices go (the
+    instructor has answered them), and the passage languages are worked out again
+    against the new language, so a passage is marked only where it differs from it.
+    Raises ValueError for anything else, including tags that name no language ("und",
+    "x-none"). Fixes are unchanged and so is the input result; the caller re-renders the
     HTML from the returned result (`web.review.rerender_html`) and stores both, as after
-    a review decision.
+    a review decision (bumping `jobs.result_version` like one).
     """
     lang = language.document_tag(tag)
     if lang is None:
