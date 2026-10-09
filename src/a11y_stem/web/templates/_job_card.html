@@ -6,10 +6,12 @@
 {% set card = pg.card %}
 <section aria-labelledby="changed-heading">
   <h2 id="changed-heading">What changed for a screen-reader user</h2>
-  {# On a narrow screen the table scrolls inside its box (a data table may: WCAG 1.4.10),
-     so the box can take focus and be scrolled with the keyboard. #}
+  {# The review screen's compare table style (app.css .diff-table): on a phone each row
+     is stacked, every value with its column's name (data-label), so no word is broken
+     to fit three columns. Between that and a wide screen the table may scroll inside
+     its box (a data table may: WCAG 1.4.10), so the box can take keyboard focus. #}
   <div class="table-scroll" role="region" aria-labelledby="compare-caption" tabindex="0">
-    <table>
+    <table class="diff-table">
       <caption id="compare-caption" class="visually-hidden">Your PDF and the HTML file, compared</caption>
       <thead>
         <tr>
@@ -22,8 +24,8 @@
         {% for row in card.rows %}
         <tr>
           <th scope="row">… {{ row.question }}?</th>
-          <td>{{ row.pdf }}</td>
-          <td>{{ row.html }}</td>
+          <td data-label="In your PDF">{{ row.pdf }}</td>
+          <td data-label="In the HTML">{{ row.html }}</td>
         </tr>
         {% endfor %}
       </tbody>
