@@ -78,7 +78,14 @@ def cost_fields(fix: Fix) -> dict[str, Any]:
         "verifier_cost_usd": fix.verifier_cost_usd,
         "verifier_latency_ms": sum(v.latency_ms for v in fix.verifications),
         "verifier_requests": requests_sent(fix),
+        # The question wording's version ("<check>-<sha8>"), like a prompt version: two
+        # runs with different versions asked different questions.
+        "verifier_versions": sorted({v.version for v in fix.verifications if v.version}),
     }
+
+
+def _versions(items: Sequence[dict]) -> list[str]:
+    return sorted({v for i in items for v in i.get("verifier_versions", [])})
 
 
 def figure_fields(fix: Fix) -> dict[str, Any]:
@@ -132,6 +139,7 @@ def figure_metrics(items: Sequence[dict]) -> dict[str, Any]:
     cost = sum(i.get("verifier_cost_usd", 0.0) for i in items)
     return {
         "mode": "note",
+        "versions": _versions(items),
         "ran": len(ran),
         "answered": len(answered),
         "outcomes": dict(sorted(Counter(str(i["verifier_outcome"]) for i in ran).items())),
@@ -191,6 +199,7 @@ def equation_metrics(items: Sequence[dict]) -> dict[str, Any]:
     cost = sum(i.get("verifier_cost_usd", 0.0) for i in items)
     return {
         "mode": "shadow",
+        "versions": _versions(items),
         "ran": len(ran),
         "outcomes": dict(sorted(Counter(str(i["shadow_outcome"]) for i in ran).items())),
         "final": _shadow(items, score_key="shadow_p_meaning", flag_key="shadow_flagged"),

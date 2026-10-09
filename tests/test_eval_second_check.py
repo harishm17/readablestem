@@ -10,7 +10,7 @@ from a11y_stem.core.types import Fix, Kind, Status, Verification
 from a11y_stem.eval import pipeline_eval as pe
 from a11y_stem.eval import verifier_metrics as vm
 from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.models.verifier import FakeVerifier
+from a11y_stem.models.verifier import EQUATION_VERSION, FIGURE_VERSION, FakeVerifier
 from test_eval_support import (
     EQ_A,
     EQ_F,
@@ -110,6 +110,7 @@ def test_figure_eval_reports_flag_rate_agreement_and_cost(tmp_path):
     assert [r["verifier_flagged"] for r in rows] == [False, True, True]
     assert rows[1]["verifier_score"] == pytest.approx(0.1)
     check = run.report["metrics"]["second_check"]
+    assert check["versions"] == [FIGURE_VERSION]
     assert (check["answered"], check["flagged"], check["flag_rate"]) == (
         3,
         2,
@@ -168,6 +169,7 @@ def test_equation_eval_reports_the_shadow_auroc_against_exact_lenient(tmp_path):
     assert wrong["shadow_flagged"] is True
     check = run.report["metrics"]["second_check"]
     assert check["mode"] == "shadow" and check["ran"] == 4
+    assert check["versions"] == [EQUATION_VERSION]
     assert check["final"]["auroc_vs_wrong"] == 1.0
     assert (check["final"]["would_flag"], check["final"]["would_flag_precision"]) == (1, 1.0)
     # Shadow: the statuses are what they would be without the check.
