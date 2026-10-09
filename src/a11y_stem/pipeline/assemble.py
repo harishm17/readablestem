@@ -856,6 +856,22 @@ figcaption { margin-top: 0.5em; }
 """
 
 
+# The tool's own words (notes, labels, the student note) are English. In a document in
+# another language they say so (`lang="en"`, WCAG 3.1.2 Language of Parts), on every
+# element carrying AUTHORED_CLASS. Document text is escaped, so only our own tags match.
+_AUTHORED_TAG = re.compile(
+    r'(<[a-z][a-z0-9]*\b[^<>]*\bclass="(?:[^"]*\s)?' + AUTHORED_CLASS + r'(?:\s[^"]*)?")'
+)
+
+
+def _authored_in_english(part: str, lang: str) -> str:
+    """`part` with `lang="en"` on the tool's own elements when the document is not in
+    English; unchanged (byte for byte) when it is."""
+    if _clean_lang(lang).split("-", 1)[0].lower() == "en":
+        return part
+    return _AUTHORED_TAG.sub(r'\1 lang="en"', part)
+
+
 def render_html(
     *,
     title: str | None,
@@ -904,10 +920,10 @@ def render_html(
             "</head>",
             "<body>",
             "<main>",
-            *([note] if (note := _notice(notice)) else []),
-            *body,
+            *([_authored_in_english(note, lang)] if (note := _notice(notice)) else []),
+            *(_authored_in_english(part, lang) for part in body),
             "</main>",
-            about,
+            _authored_in_english(about, lang),
             "</body>",
             "</html>",
             "",
