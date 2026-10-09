@@ -1,5 +1,6 @@
 # Common tasks. Everything runs through uv; no global installs needed.
-.PHONY: sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check
+.PHONY: sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
+	table-model fuzz-tables
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
 # Harish picks the real gold-set pages; override with e.g. make gold GOLD_CHAPTER=5.
@@ -16,6 +17,17 @@ test:
 
 test-network:  ## live OpenStax API check (skipped by default)
 	uv run pytest -m network
+
+# The SLANet-plus table-structure model (7.5 MB), SHA-256 checked, into
+# ~/.cache/a11y-stem/models (or TABLE_MODEL_DIR). Without it tables use PyMuPDF's grid.
+table-model:
+	uv run python -m a11y_stem.pipeline.table_model
+
+# Upgrade check before any PyMuPDF bump: byte mutants of the repo's own fixtures through
+# the probe and the table detector; fails if a file passes the probe and then kills the
+# table step (docs/tables.md "Upgrade check"). Takes a few minutes.
+fuzz-tables:
+	uv run pytest -q -s -m slow tests/test_tables_fuzz.py
 
 lint:
 	uv run ruff check .

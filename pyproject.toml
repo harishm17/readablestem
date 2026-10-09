@@ -18,11 +18,15 @@ dependencies = [
     "jinja2>=3.1.6",
     "latex2mathml>=3.81.1",
     "markupsafe>=3.0",
+    "numpy>=2.3",
+    "onnxruntime>=1.31.0,<1.32",
     "openai>=3.26.0",
+    "pillow>=12.0",
     "psycopg[binary]>=3.3.6",
     "pydantic>=2.13.5",
     "pydantic-settings>=2.15.0",
-    "pymupdf>=1.28.2",
+    "pymupdf==1.28.2",
+    "pymupdf-layout==1.28.2",
     "python-multipart>=0.0.32",
     "sqlalchemy>=2.1.4",
     "structlog>=26.1.0",
@@ -84,10 +88,11 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-ra -m 'not network and not live_model and not browser'"
+addopts = "-ra -m 'not network and not live_model and not browser and not slow'"
 markers = [
     "network: hits the live OpenStax API (run with: uv run pytest -m network)",
     "live_model: calls the real OpenAI API and costs money (run with: uv run pytest -m live_model)",
     "browser: needs Playwright Chromium (run with: uv run pytest -m browser)",
     "postgres: needs a Postgres server (DATABASE_URL or embedded pgserver)",
+    "slow: minutes-long upgrade checks (run with: make fuzz-tables)",
 ]

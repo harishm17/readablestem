@@ -1,7 +1,8 @@
 # Layout analysis (`pipeline/layout.py`, `pipeline/heading_step.py`)
 
 Step 1 of the conversion: a PDF becomes a list of `Element`s (headings, paragraphs, list
-items, display and inline equations, figures) in reading order, with no model call. Everything later
+items, display and inline equations, figures, data tables) in reading order, with no model
+call. Everything later
 (equation transcription, alt text, HTML assembly) works from these elements and from crops
 of their boxes. The code is deterministic: the same PDF always gives the same elements.
 
@@ -43,9 +44,25 @@ Element conventions:
   private-use Symbol bullet (U+F0B7) becomes `•`.
 - Figures carry the nearby `"Figure N ..."` text in `caption` and any labels drawn inside
   or right next to them (axis titles, tick labels) in `text`.
+- **Tables** (since pipeline 0.4.0) are `Kind.TABLE`: `table` is the grid built from the
+  PDF (`TableGrid`, source "local"), `caption` the `"Table N ..."` text printed above or
+  below it (also in `table.caption`), `text` the cells' text row by row, and `bbox` the
+  table without its caption. `reasons` say how it was found and built (`"ruled grid"`,
+  `"aligned text grid"`, `"box extended along rules"`, `"SLANet-plus grid"`,
+  `"drawn cell grid"`, `"PyMuPDF grid"`, `"continued from previous page"`). How tables
+  are found: [tables.md](tables.md).
 
 ## How a page is read
 
+0. **Tables first.** On every analysed page the data tables are found
+   (`pipeline/tables.py`, [tables.md](tables.md)) before anything below: their lines,
+   rules and `"Table N"` caption leave the page, and each comes back as one TABLE element
+   placed in reading order like a figure. So a table's numbers are not a display
+   equation, its bold header cells not headings, its drawn grid not a figure, and its
+   columns not text columns. This happens whatever `FEATURE_TABLES` says; with the flag
+   off the table step keeps the table as an image with a required decision. A grid of
+   prose (one column, or a term and its long definition) is not claimed and is read as
+   before.
 1. **Characters.** PyMuPDF's raw text dictionary with `TEXT_ACCURATE_BBOXES`, so glyph boxes
    are tight. Without it, a fraction's numerator and denominator boxes overlap the main
    line and cannot be told apart. Ligatures are expanded.
@@ -427,6 +444,14 @@ Layout switches both off (`TOOLS.mupdf_display_errors(False)`, `..._warnings(Fal
 every call, because the switch is process-wide and other code could turn it back on, and
 empties MuPDF's in-memory warning store after every `analyze` and `crop`.
 
+The probe also guards table detection: `find_tables` renders the page for its layout
+model, where the known MuPDF aborts are, and it only ever runs on pages the probe passed.
+The 2026-10-08 evaluation ran 837 malformed files through the probe and then the table
+detector: the 41 that made MuPDF abort were all stopped by the probe, and none that
+passed it crashed the detector.
+`make fuzz-tables` repeats that check on mutants of the fixtures; run it before any
+PyMuPDF, pymupdf-layout or onnxruntime upgrade ([tables.md](tables.md), "Upgrade check").
+
 What the probe does not cover: the analysis itself (Python code in this process) has no
 time limit. Fragment resolution, run building, column detection and script attachment are
 indexed so a crafted page of thousands of rows stays near-linear (a 16-column page of
@@ -494,9 +519,11 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - **Equation numbers** to the left of an equation are found only in brackets (`(2.4)`);
   a number that is the only thing on a line between two equations attaches to the
   nearer one.
-- **Tables** are not a separate element kind: cell text becomes paragraphs (read left to
-  right, row by row) and drawn grids are ignored. A two-column table with long cells can
-  look like text columns.
+- **Tables the detector does not propose** keep the old path: their cells become
+  paragraphs (read left to right, row by row), and a table of numbers set without any
+  rules can become a display equation. So does a grid of prose, on purpose (a two-column
+  table with long cells can still look like text columns). What is missed, and why:
+  [tables.md](tables.md), "Known misses".
 - **Equations drawn entirely as vector outlines** (some MathJax SVG prints) have no text;
   they come out as figures.
 - **Drop caps** (a huge first letter) become a one-letter paragraph.
@@ -505,9 +532,9 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 - **Plain body-size numbered headings with a bare integer** (`3 Forces` in body text,
   not bold) are paragraphs: at body size a bare integer is too often a quantity. They
   are found when bold (as weak evidence) or in a larger font.
-- **Bold table header cells** (`Time`, `Distance`) can still become weak headings (an
-  optional note; a group decision if the same header repeats); numeric cells no longer
-  do.
+- **Bold table header cells** (`Time`, `Distance`) of a table the detector missed can
+  still become weak headings (an optional note; a group decision if the same header
+  repeats); numeric cells no longer do. In a detected table they are header cells.
 - **Bold run-in labels** ("Solution", "Discussion", "Procedure") become weak headings;
   see "Run-in labels" above for why no rule removes them.
 - **Repeated margin logos drawn as vectors** are recognised only from drawings that lie
@@ -543,6 +570,10 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
   `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline
   maths) pin the layout v2 fixes from the eval pages and the smoke test.
+- `tests/test_tables_detect.py` and `tests/test_tables_fixtures.py` cover table
+  detection and how layout claims tables, on generated pages, the LaTeX
+  `latex/tables.tex` (Tectonic) and a Word-style page exported by LibreOffice
+  (`tests/fixtures/tables/`); see [tables.md](tables.md).
 - `tests/test_layout_latex.py` checks four documents written for the tests and compiled
   by Tectonic, in `tests/fixtures/layout/latex/`: article notes (numbered equations,
   `align`, limits, inline integrals, nested itemize/enumerate, a TikZ figure), a problem
