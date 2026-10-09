@@ -142,7 +142,36 @@ def _cmd_pipeline(args: argparse.Namespace) -> int:
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
     out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
+    if getattr(args, "notation", None):
+        return _run_with_notation(args, gold_dir, out)
     return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir))
+
+
+def _run_with_notation(args: argparse.Namespace, gold_dir: Path, out: Path) -> int:
+    """The equations task with a course notation in force (FEATURE_NOTATION_MEMORY), as a
+    conversion for that course would run it: `--notation "bold d" "v=other"` (a symbol,
+    then `=meaning`, vector by default). The report records the entries."""
+    from a11y_stem.core.notation import canonical_symbol
+    from a11y_stem.core.types import ConversionOptions, NotationEntry
+    from a11y_stem.pipeline import options as run_options
+
+    if args.task != "equations":
+        return _error("--notation applies to the equations task only")
+    meanings = {"vector", "matrix", "set", "operator", "constant", "unit", "other"}
+    entries = []
+    for spec in args.notation:
+        symbol, _, meaning = spec.rpartition("=") if "=" in spec else (spec, "", "vector")
+        key = canonical_symbol(symbol)
+        if key is None or meaning not in meanings:
+            return _error(f'not a notation entry: {spec!r} (e.g. "bold d" or "v=other")')
+        entry = {"symbol": symbol, "canonical": key, "meaning": meaning}
+        entries.append(NotationEntry.model_validate(entry))
+    options = ConversionOptions.from_settings(_settings()).model_copy(
+        update={"notation": entries, "notation_memory": True}
+    )
+    extra = {"notation": [{"canonical": e.canonical, "meaning": e.meaning} for e in entries]}
+    with run_options.using(options):
+        return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir), extra=extra)
 
 
 def _cmd_sample(args: argparse.Namespace) -> int:
@@ -542,6 +571,12 @@ def register(
     pipeline.add_argument("--paper", choices=["Letter", "A4"], default="Letter")
     pipeline.add_argument(
         "--concurrency", type=_positive_int, default=4, help="document task: worker threads"
+    )
+    pipeline.add_argument(
+        "--notation",
+        nargs="+",
+        metavar="SYMBOL[=MEANING]",
+        help='equations task: a course notation in force, e.g. "bold d" "v=other"',
     )
     pipeline.set_defaults(func=_cmd_pipeline)
 
