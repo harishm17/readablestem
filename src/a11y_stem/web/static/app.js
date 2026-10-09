@@ -216,6 +216,10 @@
  * notice after it names the item: data-saved), when the page is drawn with that text
  * anyway, and when Sign out is chosen in this tab. Without JavaScript nothing is kept
  * (the browser's Back button usually still has the text).
+ *
+ * TODO(Harish): decide whether the privacy page should say that unsaved review text is
+ * kept in the browser tab (sessionStorage) until it is saved, the tab is closed, or you
+ * sign out there.
  */
 (function () {
   "use strict";
