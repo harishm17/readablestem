@@ -1,9 +1,12 @@
-"""The assembled HTML of two stored results, byte for byte (golden files).
+"""The assembled HTML of two stored results and two whole conversions, byte for byte
+(golden files).
 
 `demo` is the public demo's stored result (real model output: headings, lists, inline and
 display equations, figures); `sample` is the hand-written fixture. Both golden files were
 written by the pipeline 0.3.0 assembler, so this test is how the content features keep
-their promise that documents without the new kinds are written exactly as before.
+their promise that documents without the new kinds are written exactly as before. The
+`flags_off_*` cases convert two LaTeX fixtures with every content flag off and the
+offline model client, so a flag-off change anywhere in the pipeline shows as a diff.
 
 When the output changes on purpose, regenerate them and review the diff:
 `UPDATE_GOLDEN=1 uv run pytest tests/test_assemble_golden.py`.
@@ -47,7 +50,33 @@ def sample() -> str:
     )
 
 
-CASES = {"demo": demo, "sample": sample}
+def converted(name: str) -> str:
+    """A whole conversion with every content flag off and the offline model client: the
+    pipeline-level promise (layout, the always-on text pass, figure images, assembly)
+    that documents without the new things are unchanged. `problem_set` has equations
+    and lists; `kinematics_slides` has a figure crop (MF23's smaller image)."""
+    from a11y_stem.config import Settings
+    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from a11y_stem.core.types import ConversionOptions
+    from a11y_stem.models.fake import FakeVisionClient
+    from a11y_stem.pipeline.run import convert_pdf
+
+    budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
+    output = convert_pdf(
+        (HERE / "fixtures" / "layout" / "latex" / f"{name}.pdf").read_bytes(),
+        settings=Settings(_env_file=None),  # type: ignore[call-arg]
+        client=FakeVisionClient(budget=budget),
+        options=ConversionOptions(),  # every content flag off, whatever the environment
+    )
+    return output.result.html
+
+
+CASES = {
+    "demo": demo,
+    "sample": sample,
+    "flags_off_problem_set": lambda: converted("problem_set"),
+    "flags_off_kinematics_slides": lambda: converted("kinematics_slides"),
+}
 
 
 @pytest.mark.parametrize("name", sorted(CASES))
