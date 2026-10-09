@@ -213,9 +213,9 @@
  *
  * sessionStorage belongs to this browser tab: it is never sent to the server and is gone
  * when the tab is closed. A draft is also forgotten when the decision is saved (the
- * notice after it names the item: data-saved), when the field shows it anyway, and when
- * Sign out is chosen in this tab. Without JavaScript nothing is kept (the browser's Back
- * button usually still has the text).
+ * notice after it names the item: data-saved), when the page is drawn with that text
+ * anyway, and when Sign out is chosen in this tab. Without JavaScript nothing is kept
+ * (the browser's Back button usually still has the text).
  */
 (function () {
   "use strict";
@@ -300,13 +300,17 @@
     fieldsOf(form).forEach(function (field) {
       if (!Object.prototype.hasOwnProperty.call(draft, field.name)) return;
       var value = String(draft[field.name]);
-      if (value === valueOf(field)) return;
-      if (field.type === "checkbox") field.checked = value === "on";
-      else field.value = value;
+      // What the server drew: saved since, or never different. (The browser itself may
+      // have put the text back on a reload: still a draft, so still said.)
+      if (value === defaultOf(field)) return;
+      if (valueOf(field) !== value) {
+        if (field.type === "checkbox") field.checked = value === "on";
+        else field.value = value;
+      }
       if (valueOf(field) === value) restored.push(field);
     });
     if (!restored.length) {
-      store.removeItem(key(form)); // the page shows it already: saved, or moot
+      store.removeItem(key(form));
       return;
     }
     form.classList.add("is-edited");
