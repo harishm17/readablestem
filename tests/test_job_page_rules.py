@@ -279,6 +279,26 @@ def test_the_card_rows_say_what_is_lost_specifically_and_never_score():
             assert "unreadable" not in text.lower()
 
 
+def test_tables_still_waiting_for_a_decision_are_said_so():
+    # tables.pdf: five rebuilt tables waiting for review were "5 of 5 tables rebuilt".
+    from a11y_stem.core.types import TableCell, TableFix, TableGrid
+
+    result = card_result(UNTAGGED.model_copy(update={"tables": 2}))
+    grid = TableGrid(rows=1, cols=1, cells=[TableCell(row=0, col=0, text="x")])
+    result.elements += [el("t1", Kind.TABLE, 8), el("t2", Kind.TABLE, 9)]
+    result.fixes += [
+        Fix(element_id="t1", kind=Kind.TABLE, status=Status.NEEDS_REVIEW,
+            table=TableFix(grid=grid)),
+        Fix(element_id="t2", kind=Kind.TABLE, status=Status.FAILED, reason="table_not_rebuilt"),
+    ]  # fmt: skip
+    card = job_page.before_after(result)
+    assert card is not None
+    rows = {row.question: row for row in card.rows}
+    assert rows["read a table cell by cell"].html == (
+        "1 of 2 tables rebuilt as data tables; 1 is shown as an image; 2 wait for your decision."
+    )
+
+
 def test_a_tagged_pdf_is_not_called_unstructured():
     facts = UNTAGGED.model_copy(update={"tagged": True, "images_with_alt": 1})
     card = job_page.before_after(card_result(facts))

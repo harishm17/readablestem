@@ -597,8 +597,12 @@ def _table_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
     rebuilt = sum(1 for f in tables if _used(f) and f.table is not None)
     images = sum(1 for f in tables if f.status in KEPT_ORIGINAL_STATUSES)
     html = f"{rebuilt} of {plural(len(tables) or facts.tables, 'table')} rebuilt as data tables"
-    html += f"; {images} {'is' if images == 1 else 'are'} shown as an image." if images else "."
-    return Row("read a table cell by cell", pdf, html)
+    if images:
+        html += f"; {images} {'is' if images == 1 else 'are'} shown as an image"
+    waiting = sum(1 for f in tables if f.pending)
+    if waiting:  # as for figures: a proposal still waiting is not settled yet
+        html += f"; {waiting} {'waits' if waiting == 1 else 'wait'} for your decision"
+    return Row("read a table cell by cell", pdf, html + ".")
 
 
 def _link_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
