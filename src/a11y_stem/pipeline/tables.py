@@ -25,8 +25,10 @@ from the text flow. Deterministic; no model calls. docs/tables.md explains the n
    compete.
 4. **Fill** (`fill`): the cell text comes from the PDF's own glyphs, each word placed in the
    cell its box falls in (a subscript stays in its cell), never from OCR.
-5. **Data or layout** (`is_layout_grid`): a two-column grid of prose (or one column) is
-   text set out in boxes; it is not claimed and keeps the paragraph path.
+5. **Data or layout** (`is_layout_grid`, `is_word_grid`): a two-column grid of prose (or
+   one column), or a grid of single terms with no digit and no "Table N" caption (a
+   key-terms box), is text set out in boxes; it is not claimed and keeps the paragraph
+   path.
 
 The result is a `PageTable` per data table: its box, its `TableGrid` (source "local"),
 its "Table N" caption when one is printed just above or below it, the indices of the
@@ -91,6 +93,8 @@ CURVE_SHARE = 0.05  # one curve covering this share of the box makes it a drawin
 IMAGE_SHARE = 0.2  # raster images covering this share of the box make it a picture
 CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (as figures)
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
+WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
+WORD_GRID_ROWS = 6  # ... no more rows than this, no digit, and no "Table N" caption
 TOP_BAND = 0.07  # top share of the page where running headers live (as layout)
 CONTINUED_TOL = 0.03  # column edges of a continued table match within this share of width
 SNAP = 2.0  # x font size: a table box grows to the rules drawn this close around it
@@ -1642,6 +1646,23 @@ def _numeric(text: str) -> bool:
     return bool(_NUMBER.match(text))
 
 
+def is_word_grid(grid: TableGrid) -> bool:
+    """A grid of single terms set out in boxes (OpenStax's ruled "Key Terms": displacement
+    | distance | kinematics | magnitude), not data: every cell filled (a blank worksheet
+    is a table to fill in), no digit in any cell, every cell at most WORD_GRID_WORDS
+    words, at most WORD_GRID_ROWS rows. Only without a "Table N" caption (`find`
+    checks): a captioned table of words is data. Kept as text, its words stay readable;
+    claimed as a table, they became an image and a decision."""
+    texts = [c.text for c in grid.cells if c.text.strip()]
+    return (
+        bool(texts)
+        and len(texts) == len(grid.cells)
+        and grid.rows <= WORD_GRID_ROWS
+        and not any(ch.isdigit() for text in texts for ch in text)
+        and all(len(text.split()) <= WORD_GRID_WORDS for text in texts)
+    )
+
+
 def is_layout_grid(grid: TableGrid) -> bool:
     """Text set out in boxes, not data: one column, or two columns whose second is prose
     (its cells average more than LAYOUT_CELL_CHARS characters) and neither numeric."""
@@ -1706,12 +1727,18 @@ def find_with_judgements(
             judgement.verdict = "overlap"  # nested or repeated box: the larger one stays
             continue
         kept.append((proposal, judgement))
-    tables = []
+    built: list[tuple[PageTable, Judgement]] = []
     for proposal, judgement in sorted(kept, key=lambda pj: (pj[1].bbox[1], pj[1].bbox[0])):
         table = _build(page, view, proposal, judgement, clean)
         if table is not None:
-            tables.append(table)
-    _attach_captions(view, tables, clean)
+            built.append((table, judgement))
+    _attach_captions(view, [table for table, _ in built], clean)
+    tables = []
+    for table, judgement in built:
+        if table.caption is None and is_word_grid(table.grid):
+            judgement.verdict = "layout_grid"  # its words stay in the text, as before
+            continue
+        tables.append(table)
     for table in tables:
         table.lines |= _claimed_lines(view, table.bbox)
         table.paths = _claimed_paths(paths, table.bbox)

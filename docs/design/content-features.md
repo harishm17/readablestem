@@ -324,11 +324,12 @@ features after integration"):
 
 ### Open after integration
 
-- **Key-term grids.** A ruled grid of single words (OpenStax "Key Terms") is claimed as
-  a table; flag off it is `table_not_rebuilt`, flag on the model says "not a data
-  table": either way the words become an image and a required decision. Proposal for
-  Harish: when the model (or the local grid) says layout, write the cells' text in
-  reading order instead of the image, with no decision.
+- **Key-term grids.** A ruled grid of single words (OpenStax "Key Terms") was claimed as
+  a table (an image and a required decision either way). Fixed after the review:
+  `tables.is_word_grid` (no digit, no cell over three words, at most six rows, no
+  "Table N" caption) leaves it on the paragraph path, as 0.3.0 did. Still open, for
+  Harish: when the model says "not a data table" for a grid that is claimed, write the
+  cells' text in reading order instead of the image, with no decision.
 - **Data tables read from the image** add one required decision per chart (5 on the
   demo, 5 on the document gold). That is the tier as decided; it is the largest new load.
 - **The tables gate in model mode** fails `wrong cells not flagged` (14 on grid and

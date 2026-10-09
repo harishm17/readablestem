@@ -406,6 +406,49 @@ def test_a_two_column_grid_of_prose_is_a_layout_grid():
     assert not tables.is_layout_grid(grid([[*r, "9.8"] for r in terms]))
 
 
+KEY_TERMS = [
+    ["displacement", "distance", "kinematics", "magnitude"],
+    ["position", "reference frame", "scalar", "vector"],
+]
+
+
+def test_a_ruled_grid_of_key_terms_stays_text_unless_it_has_a_table_caption():
+    # OpenStax's ruled "Key Terms" box: claimed as a table, its words became an image and a
+    # required decision (flags off) or "not a data table" (flags on).
+    def terms(page):
+        write(page, 72, 100, PROSE[0])
+        grid_table(page, KEY_TERMS, y0=130)
+        write(page, 72, 200, PROSE[1])
+
+    result = analyze(pdf(terms))
+    assert [e.kind for e in result.elements if e.kind == Kind.TABLE] == []
+    text = " ".join(e.text or "" for e in result.elements)
+    assert "reference frame" in text and "kinematics" in text
+
+    def captioned(page):
+        write(page, 100, 120, "Table 1. Terms of motion")
+        grid_table(page, KEY_TERMS, y0=130)
+
+    tables_found = [e for e in analyze(pdf(captioned)).elements if e.kind == Kind.TABLE]
+    assert [e.caption for e in tables_found] == ["Table 1. Terms of motion"]
+
+
+def test_a_word_grid_has_no_digit_and_short_cells():
+    def grid(texts: list[list[str]]) -> TableGrid:
+        cells = [
+            TableCell(row=r, col=c, text=t)
+            for r, row in enumerate(texts)
+            for c, t in enumerate(row)
+        ]
+        return TableGrid(rows=len(texts), cols=len(texts[0]), cells=cells)
+
+    assert tables.is_word_grid(grid(KEY_TERMS))
+    assert not tables.is_word_grid(grid([["Trial", "Length"], ["first", "0.20 m"]]))
+    assert not tables.is_word_grid(grid([["Term", "Meaning"], ["speed", "how fast it goes"]]))
+    assert not tables.is_word_grid(grid([["a", "b"]] * 7))  # more rows than a box of terms
+    assert not tables.is_word_grid(grid([["Trial", "Length"], ["", ""]]))  # a blank worksheet
+
+
 def test_without_the_model_file_tables_still_get_a_grid_and_one_warning(caplog):
     def fill(page):
         grid_table(page, PENDULUM)

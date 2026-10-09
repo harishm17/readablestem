@@ -66,7 +66,12 @@ read", step 0). No model call; the same PDF always gives the same tables.
    value) or a header cell would span into the body. Empty cells are never headers.
 6. **Data or layout.** A grid of one column, or two columns whose second is prose (cells
    longer than 60 characters on average) and neither numeric, is text set out in boxes
-   (a key-terms list). It is not claimed and keeps the paragraph path.
+   (a key-terms list). So is a grid of single terms (`is_word_grid`: every cell filled,
+   no digit in any cell, no cell over three words, at most six rows) without a "Table N"
+   caption: the
+   ruled "Key Terms" boxes OpenStax prints (displacement | distance | kinematics |
+   magnitude), which were claimed as tables and became an image and a required decision.
+   Neither is claimed; both keep the paragraph path.
 7. **Caption.** A `"Table N ..."` line just above or below the table (within 36 pt, the
    same reach as figure captions; "Table 2 shows that ..." is not a caption) and its
    continuation lines become `Element.caption` and `TableGrid.caption`. A caption is
