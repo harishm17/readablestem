@@ -340,7 +340,9 @@
       else if (key === "e") {
         var edit = panel.querySelector(".edit-box");
         if (edit) edit.open = true;
-        target = panel.querySelector("[data-edit-field]");
+        // The first field, or where editing starts without being an edit itself (a
+        // table's cell list: data-edit-start, which keeps no draft).
+        target = panel.querySelector("[data-edit-field], [data-edit-start]");
         if (target) {
           event.preventDefault();
           target.focus();

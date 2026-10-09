@@ -93,7 +93,7 @@
       {{ table_error(item, "cell") }}
       <div class="inline-controls">
         {# Choosing a cell is navigation, not an edit: no draft is kept of it. #}
-        <select id="cell-pick-{{ eid }}" name="cell"{% if cell_err %} aria-describedby="cell-error-{{ eid }}" aria-invalid="true"{% endif %}>
+        <select id="cell-pick-{{ eid }}" name="cell" data-edit-start{% if cell_err %} aria-describedby="cell-error-{{ eid }}" aria-invalid="true"{% endif %}>
           {% for c in t.cells %}<option value="{{ c.ref }}">{{ c.label }}</option>{% endfor %}
         </select>
         <button type="submit" class="button-secondary">Change this cell</button>
