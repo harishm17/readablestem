@@ -1503,6 +1503,7 @@ def _eval_document(
         item.update(_calls_summary(calls))
         item["verifier"] = vm.page_summary(result.fixes)
         item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
+        item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
         item["latency_ms"] = result.stats.latency_ms or item["latency_ms"]
         item["prompt_versions"] = dict(result.prompt_versions) or item["prompt_versions"]
         # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
@@ -1748,6 +1749,11 @@ def _review_rows(task: str, load: dict) -> list[tuple[str, Any]]:
     return rows
 
 
+def _usd(value: float | None) -> str:
+    """A small dollar amount with enough digits to read (the check costs ~$0.00005)."""
+    return "n/a" if value is None else f"${value:.6f}"
+
+
 def _second_check_rows(task: str, metrics: dict) -> list[tuple[str, Any]]:
     """Headline numbers of `eval.verifier_metrics` for one report."""
     check = metrics["second_check"]
@@ -1761,7 +1767,7 @@ def _second_check_rows(task: str, metrics: dict) -> list[tuple[str, Any]]:
             ("agreement_with_judge", agreement["raw_agreement"]),
             ("kappa_with_judge", agreement["kappa"]),
             ("auroc_vs_judge_fail", agreement["auroc_score_vs_judge_fail"]),
-            ("cost_per_figure_usd", check["per_figure_usd"]),
+            ("cost_per_figure_usd", _usd(check["per_figure_usd"])),
         ]
     shadow = check["final"] if task == "equations" else check["equations_matched"]
     rows: list[tuple[str, Any]] = [
@@ -1777,13 +1783,13 @@ def _second_check_rows(task: str, metrics: dict) -> list[tuple[str, Any]]:
         rows += [
             ("cheap_stage_answered", check["cheap_stage"]["answered"]),
             ("cheap_stage_would_flag", check["cheap_stage"]["would_flag"]),
-            ("cost_per_equation_usd", check["per_equation_usd"]),
+            ("cost_per_equation_usd", _usd(check["per_equation_usd"])),
         ]
     else:
         rows += [
             ("figure_checked", check["figure_checked"]),
             ("figure_flagged", check["figure_flagged"]),
-            ("cost_per_pdf_page_usd", check["per_pdf_page_usd"]),
+            ("cost_per_pdf_page_usd", _usd(check["per_pdf_page_usd"])),
         ]
     return rows
 

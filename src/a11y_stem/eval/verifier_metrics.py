@@ -68,7 +68,7 @@ def find(fix: Fix, check: str, stage: str = "final") -> Verification | None:
     return next((v for v in fix.verifications if v.check == check and v.stage == stage), None)
 
 
-def _sent(fix: Fix) -> int:
+def requests_sent(fix: Fix) -> int:
     """Requests actually sent (a reused answer and a refused reservation cost nothing)."""
     return sum(1 for v in fix.verifications if v.cost_usd > 0 or v.latency_ms > 0)
 
@@ -77,7 +77,7 @@ def cost_fields(fix: Fix) -> dict[str, Any]:
     return {
         "verifier_cost_usd": fix.verifier_cost_usd,
         "verifier_latency_ms": sum(v.latency_ms for v in fix.verifications),
-        "verifier_requests": _sent(fix),
+        "verifier_requests": requests_sent(fix),
     }
 
 
