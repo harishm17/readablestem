@@ -8,12 +8,13 @@ CLI runs (convert, eval) take explicit `--max-usd` limits instead of the daily c
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
-from typing import Literal
+from typing import Annotated, Literal
 
 from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # The two models Harish chose on 2026-10-07 (ADR 0002). Each is the other's fallback.
 MAIN_MODEL = "gpt-6.1-sol"
@@ -106,6 +107,12 @@ class Settings(BaseSettings):
     admin_emails: str = ""
     # Local-only sign-in shortcut (any email, no password). Refused outside env=dev.
     dev_login_enabled: bool = False
+    # Microsoft (Entra ID) sign-in, next to Google. Only accounts of the listed tenants
+    # (directory ids, comma-separated in the environment) may use it; with no tenant
+    # listed it is off, even when a client id is set. The allowlist still applies.
+    ms_client_id: str | None = None
+    ms_client_secret: SecretStr | None = None
+    ms_allowed_tenants: Annotated[list[str], NoDecode] = Field(default_factory=list)
     # Shared secret that Cloud Scheduler sends to /internal/cron/* (header X-Cron-Token).
     cron_token: SecretStr | None = None
     # Run the background worker thread inside the web process (one Cloud Run service).
@@ -115,6 +122,23 @@ class Settings(BaseSettings):
     # --- public pages
     source_url: str = "https://github.com/harishm17/a11y-stem"
     contact_email: str | None = None
+    # The two questions after a download ("Did it work?" and what to improve).
+    feedback_questions_enabled: bool = True
+    # Content-free usage events (`events` table: a name, a code, a number; never text).
+    events_enabled: bool = True
+
+    # --- content features (docs/design/content-features.md). Each is off until its eval
+    # says it helps; ConversionOptions.from_settings reads them for every conversion.
+    # Rebuild data tables as <table> (off: a detected table is kept as an image of the
+    # table with a required decision, "table not rebuilt").
+    feature_tables: bool = False
+    # Long descriptions and data tables for complex figures, and the colour-only flag.
+    feature_long_descriptions: bool = False
+    # Keep coloured text (colours adjusted to 4.5:1 contrast) and note colour references.
+    feature_colour: bool = False
+    # Per-course notation memory: hints for the equation step, spoken readings, bold
+    # letters in running text as maths, "remember for this course" on the review screen.
+    feature_notation_memory: bool = False
 
     # --- tracing (off by default; never on for private-inputs/ runs)
     tracing_enabled: bool = False
@@ -129,9 +153,26 @@ class Settings(BaseSettings):
     def _lower(cls, value: str) -> str:
         return value.strip().lower()
 
+    @field_validator("ms_allowed_tenants", mode="before")
+    @classmethod
+    def _tenant_list(cls, value: object) -> object:
+        """ "id1, id2" (the environment) or a list -> lower-case ids, blanks dropped."""
+        if isinstance(value, str):
+            value = value.split(",")
+        if isinstance(value, list | tuple):
+            return [str(v).strip().lower() for v in value if str(v).strip()]
+        return value
+
     @property
     def admin_email_list(self) -> list[str]:
         return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
+
+    @property
+    def ms_sign_in_enabled(self) -> bool:
+        """Microsoft sign-in is offered: client id, secret and at least one tenant set."""
+        return not (_blank(self.ms_client_id) or _blank(self.ms_client_secret)) and bool(
+            self.ms_allowed_tenants
+        )
 
     @property
     def fallback_for(self) -> dict[str, str]:
@@ -144,7 +185,12 @@ class Settings(BaseSettings):
         return self.openai_api_key.get_secret_value()
 
     def check_production(self) -> None:
-        """Fail fast on a production start that would run without its safety limits."""
+        """Fail fast on a production start that would run without its safety limits.
+
+        The Microsoft sign-in settings are checked in every environment: half of them set
+        is always a mistake (`_check_microsoft`).
+        """
+        self._check_microsoft()
         if self.env != "prod":
             if self.dev_login_enabled and self.env not in {"dev", "test"}:
                 raise ConfigError("DEV_LOGIN_ENABLED is only allowed with ENV=dev or test")
@@ -173,6 +219,27 @@ class Settings(BaseSettings):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):
             raise ConfigError("BASE_URL must be https in production")
+
+    def _check_microsoft(self) -> None:
+        """A client id needs its secret; a secret needs the tenants it may sign in from
+        (an empty list would quietly turn the sign-in off); tenants are directory ids."""
+        has_id, has_secret = not _blank(self.ms_client_id), not _blank(self.ms_client_secret)
+        if has_id and not has_secret:
+            raise ConfigError("MS_CLIENT_ID is set but MS_CLIENT_SECRET is not")
+        if has_secret and not has_id:
+            raise ConfigError("MS_CLIENT_SECRET is set but MS_CLIENT_ID is not")
+        if has_secret and not self.ms_allowed_tenants:
+            raise ConfigError("MS_CLIENT_SECRET is set but MS_ALLOWED_TENANTS lists no tenant")
+        bad = [t for t in self.ms_allowed_tenants if not _TENANT_ID.fullmatch(t)]
+        if bad:
+            raise ConfigError(
+                "MS_ALLOWED_TENANTS must list directory (tenant) ids, like "
+                "00000000-0000-0000-0000-000000000000"
+            )
+
+
+# An Entra ID directory (tenant) id: a GUID. "common" and "organizations" are not tenants.
+_TENANT_ID = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}")
 
 
 def _blank(value: object) -> bool:
