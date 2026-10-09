@@ -36,9 +36,10 @@ Left out on purpose:
 - multiplication style: ×, · and juxtaposition are the same multiplication for numbers
   and scalars, and the text layer cannot show juxtaposition (`2ab`), while units in text
   mode (`\\text{N·m}`) put a dot on one side only. A swap of × and · is meaning-level
-  only where the text layer shows a vector product (a bold letter on both sides): the
-  dot and cross products. An ASCII letter x is never a times sign (it is a letter, so
-  the symbol check sees it);
+  only where the text layer shows a vector product (a vector on both sides: a bold
+  letter, or a letter with an arrow next to it, Chromium's standalone → or TeX's
+  combining U+20D7): the dot and cross products. An ASCII letter x is never a times
+  sign (it is a letter, so the symbol check sees it);
 - division: / and ÷ mean what a fraction bar means, and fraction bars are drawn lines
   that never appear as text, so a/b against \\frac{a}{b} cannot be compared;
 - brackets, bars and fences (out of scope), primes, accents other than arrows,
@@ -232,6 +233,10 @@ _COMPOSITES = (
 _OPENING = frozenset("([{⟨")
 # Skipped when looking for the operands of a product: spaces and brackets.
 _BRACKETS = frozenset("()[]{}|‖∥⟨⟩")
+# A vector arrow next to a letter in a flat text layer: Chromium prints \vec's arrow as a
+# standalone →, TeX as a combining arrow (or harpoon) above.
+_COMBINING_ARROWS = frozenset("\N{COMBINING RIGHT ARROW ABOVE}\N{COMBINING RIGHT HARPOON ABOVE}")
+_VECTOR_ARROWS = _COMBINING_ARROWS | {"→"}
 _MATH_TOKENS = frozenset({"mi", "mo", "mn"})
 _TEXT_TOKENS = frozenset({"mtext", "ms"})
 _UNDER_OVER = frozenset({"mover", "munder", "munderover"})
@@ -281,7 +286,7 @@ class SignTokens:
     uncertain: Counter[str] = field(default_factory=Counter)
     any_arrow: int = 0  # unknown arrows: each may be any arrow class
     any_sign: int = 0  # unnamed glyphs: each may be any class
-    vector_products: int = 0  # PDF only: × or · with a bold letter on both sides
+    vector_products: int = 0  # PDF only: × or · with a vector on both sides
 
     def low(self, cls: str) -> int:
         return self.certain[cls]
@@ -338,13 +343,50 @@ def _bold_letter(ch: str) -> bool:
     return ch.isalpha() and STYLE_GROUPS.get(char_variant(ch) or "") == "bold"
 
 
-def _operand(text: str, index: int, step: int) -> str:
-    """The nearest character before (step -1) or after (+1) `index`, skipping spaces and
-    brackets: the operand next to a product sign in a flat text layer."""
+def _char(text: str, index: int) -> str:
+    return text[index] if 0 <= index < len(text) else ""
+
+
+def _minus_glyph(ch: str) -> bool:
+    return ch in _ANY_DASH or _SIGNS.get(ch) == MINUS
+
+
+def _beside(text: str, index: int, step: int) -> int:
+    """The index next to `index` going back (step -1) or forward (+1), over one space."""
     i = index + step
-    while 0 <= i < len(text) and (text[i].isspace() or text[i] in _BRACKETS):
+    return i + step if _char(text, i) == " " else i
+
+
+def _vector_operand(text: str, index: int, step: int) -> bool:
+    """The operand before (step -1) or after (+1) the product sign at `index` is a vector:
+    a bold letter, or a letter with a vector arrow (`_VECTOR_ARROWS`) right before or
+    after it, a space between at most. Spaces and brackets are skipped on the way, and
+    after the sign a unary minus too ("× (−→𝑎)").
+
+    Chromium prints \\vec's arrow before its letter or, for some letters, after it
+    ("→𝐹· →𝑑", "𝜔→× →𝑟", "→ 𝜔×"); TeX prints a combining arrow, before its letter in
+    every font measured ("=⃗F ·⃗d"). A mapping arrow is a → too ("𝑓:𝐴→𝐵× 𝐶"), so after
+    the sign a letter with a → after it counts only when no operand follows the arrow
+    ("𝑍→𝑊" is a mapping); before the sign the other operand still has to be a vector."""
+    i = index + step
+    while 0 <= i < len(text) and (
+        text[i].isspace() or text[i] in _BRACKETS or (step > 0 and _minus_glyph(text[i]))
+    ):
         i += step
-    return text[i] if 0 <= i < len(text) else ""
+    ch = _char(text, i)
+    if _bold_letter(ch):
+        return True
+    if ch in _VECTOR_ARROWS:
+        # The arrow of the letter beyond it: "· →𝑑", "·⃗d" after the sign, "𝜔→×" before.
+        return _char(text, _beside(text, i, step)).isalpha()
+    if not ch.isalpha():
+        return False
+    if step < 0:
+        return _char(text, _beside(text, i, -1)) in _VECTOR_ARROWS
+    arrow = _beside(text, i, 1)
+    if _char(text, arrow) in _COMBINING_ARROWS:
+        return True
+    return _char(text, arrow) == "→" and not _char(text, _beside(text, arrow, 1)).isalnum()
 
 
 def _typed_signs(text: str) -> str:
@@ -437,9 +479,7 @@ def layer_signs(text_layer: str) -> SignTokens:
                 out.uncertain[cls] += 1
             else:
                 out.certain[cls] += 1
-            if cls in PRODUCTS and all(
-                _bold_letter(_operand(text, index, step)) for step in (-1, 1)
-            ):
+            if cls in PRODUCTS and all(_vector_operand(text, index, step) for step in (-1, 1)):
                 out.vector_products += 1
         elif ch == _KATEX_NOT:
             continue  # only ever a slash over a relation, counted with that relation

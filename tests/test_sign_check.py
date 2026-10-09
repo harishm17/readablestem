@@ -453,6 +453,59 @@ def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
     assert differs("𝐮 × 𝐯 = 𝐰", r"\mathbf{u}\mathbf{v} = \mathbf{w}") == ()
 
 
+# Review 2026-10-08: the dot-versus-cross rule saw bold vectors only, so an arrow vector's
+# product read the other way (W = F⃗·d⃗ as F⃗×d⃗) was accepted. Text layers as layout reads
+# them: Chromium prints \vec's arrow as a standalone → before its letter, or after it for
+# some letters (𝜔); TeX as a combining arrow (U+20D7) before its letter in every font
+# measured, after it in other producers.
+ARROW_VECTOR_PRODUCTS = [
+    pytest.param("𝑊= →𝐹· →𝑑", r"W = \vec{F} \cdot \vec{d}", id="chromium-work"),
+    pytest.param("→𝑎· →𝑏= 0", r"\vec{a} \cdot \vec{b} = 0", id="chromium-orthogonal"),
+    pytest.param("→𝜏= →𝑟× →𝐹", r"\vec{\tau} = \vec{r} \times \vec{F}", id="chromium-torque"),
+    pytest.param("→𝑣= 𝜔→× →𝑟", r"\vec{v} = \vec{\omega} \times \vec{r}", id="chromium-arrow-after"),
+    pytest.param("→𝑣= → 𝜔× →𝑟", r"\vec{v} = \vec{\omega} \times \vec{r}", id="chromium-spaced"),
+    pytest.param("→𝑏× ( − →𝑎)", r"\vec{b} \times (-\vec{a})", id="chromium-unary-minus"),
+    pytest.param("→𝐹= 𝑞→𝑣× →𝐵", r"\vec{F} = q \vec{v} \times \vec{B}", id="chromium-lorentz"),
+    pytest.param("W =⃗F ·⃗d", r"W = \vec{F} \cdot \vec{d}", id="tex-arrow-before"),
+    pytest.param("τ =⃗r ×⃗F", r"\vec{\tau} = \vec{r} \times \vec{F}", id="tex-torque"),
+    pytest.param("W = F⃗ · d⃗", r"W = \vec{F} \cdot \vec{d}", id="tex-arrow-after"),
+]
+
+
+def _swapped(latex: str) -> str:
+    return latex.replace(r"\cdot", "@").replace(r"\times", r"\cdot").replace("@", r"\times")
+
+
+@pytest.mark.parametrize(("text_layer", "latex"), ARROW_VECTOR_PRODUCTS)
+def test_an_arrow_vector_product_read_the_other_way_is_caught(text_layer, latex):
+    assert differs(text_layer, latex) == ()
+    assert differs(text_layer, _swapped(latex)) == (signs.VECTOR_PRODUCT,)
+
+
+# Scalar products next to arrows: a swap is multiplication style, never a flag. A mapping
+# arrow is a → too, so "𝑌× 𝑍→𝑊" is no vector product.
+ARROWS_NEAR_SCALAR_PRODUCTS = [
+    pytest.param("→𝑣= 3 × →𝑢", r"\vec{v} = 3 \cdot \vec{u}", id="number-times-vector"),
+    pytest.param("→𝐹= 𝑚· →𝑎", r"\vec{F} = m \times \vec{a}", id="scalar-times-vector"),
+    pytest.param("→𝐹= 2.0 × 103 N", r"\vec{F} = 2.0 \cdot 10^{3}\ \text{N}", id="sci"),
+    pytest.param("𝑓:𝐴→𝐵× 𝐶", r"f\colon A \to B \cdot C", id="map-into-a-product"),
+    pytest.param("𝑔:𝑋→𝑌× 𝑍→𝑊", r"g\colon X \to Y \cdot Z \to W", id="two-maps"),
+    pytest.param("g: X → Y × Z → W", r"g\colon X \to Y \cdot Z \to W", id="two-maps-spaced"),
+    pytest.param("lim𝑥→0 𝑥· 𝑦= 0", r"\lim_{x \to 0} x \times y = 0", id="limit"),
+    pytest.param("v = 3 ×⃗u", r"\vec{v} = 3 \cdot \vec{u}", id="tex-number-times-vector"),
+]
+
+
+@pytest.mark.parametrize(("text_layer", "latex"), ARROWS_NEAR_SCALAR_PRODUCTS)
+def test_a_scalar_product_next_to_an_arrow_is_not_a_vector_product(text_layer, latex):
+    assert differs(text_layer, latex) == ()
+
+
+def test_an_arrow_vector_product_read_the_other_way_needs_a_decision():
+    fix = run(by_model(main=out(r"W = \vec{F} \times \vec{d}")), equation_element(text="𝑊= →𝐹· →𝑑"))
+    assert codes(fix) == {"sign_mismatch"} and fix.review == "required"
+
+
 def test_word_hyphens_never_mask_a_dropped_minus():
     assert differs(
         f"𝑣(𝑡) = {MINUS}𝑔𝑡 (time-dependent)", r"v(t) = g t \quad \text{(time-dependent)}"
@@ -824,6 +877,15 @@ def test_latex_pdf_signs_drawn_from_pieces(text, right, wrong):
     assert differs(element.text, wrong), wrong
 
 
+def test_latex_pdf_arrow_vector_product_read_the_other_way():
+    # TeX prints \vec's arrow as a combining U+20D7 before its letter.
+    layout = layout_of(LATEX / "vectors_relations.pdf")
+    work = equation(layout, "W =⃗F ·⃗d,")
+    assert differs(work.text, r"W = \vec{F} \times \vec{d},") == (signs.VECTOR_PRODUCT,)
+    torque = equation(layout, "τ =⃗r ×⃗F.")
+    assert differs(torque.text, r"\vec{\tau} = \vec{r} \cdot \vec{F}.") == (signs.VECTOR_PRODUCT,)
+
+
 def test_latex_pdf_sign_error_through_the_step():
     element = equation(layout_of(LATEX / "linear_algebra_twocol.pdf"), "λ2 −5λ −2 = 0,")
     fix = run(by_model(main=out(r"\lambda^2 - 5\lambda + 2 = 0,")), element)
@@ -901,6 +963,10 @@ PAGE_CASES = [
     ("block", r"-\vec{v} + \vec{w} = \vec{0}", r"\vec{v} + \vec{w} = \vec{0}"),
     # A left arrow touching a minus ("𝑥←−1"): uncertain, so only the right answer is pinned.
     ("block", r"y \gets -1", None),
+    # Arrow vectors in a dot or cross product, the arrow before its letter ("→𝐹· →𝑑") or
+    # after it ("𝜔→× →𝑟"): the product read the other way is caught.
+    ("block", r"W = \vec{F} \cdot \vec{d}", r"W = \vec{F} \times \vec{d}"),
+    ("block", r"\vec{v} = \vec{\omega} \times \vec{r}", r"\vec{v} = \vec{\omega} \cdot \vec{r}"),
 ]
 
 
