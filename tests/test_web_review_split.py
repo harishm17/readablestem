@@ -91,16 +91,19 @@ def test_one_short_sentence_counts_decisions_not_fixes(split):
     assert re.search(r"<title>Decision 1 of 3: Review [^<]+ \| a11y-stem</title>", page)
 
 
+REST = "Everything else was accepted; optional checks are below."
+
+
 @pytest.mark.parametrize(
     ("left", "total", "optional", "sentence"),
     [
-        (3, 3, 2, "3 things need your decision. Everything else was accepted; optional checks are below."),
+        (3, 3, 2, "3 things need your decision. " + REST),
         (1, 1, 0, "1 thing needs your decision. Everything else was accepted."),
-        (2, 3, 1, "2 of 3 decisions left. Everything else was accepted; optional checks are below."),
-        (0, 3, 1, "All decisions made. Everything else was accepted; optional checks are below."),
+        (2, 3, 1, "2 of 3 decisions left. " + REST),
+        (0, 3, 1, "All decisions made. " + REST),
         (0, 0, 0, "Nothing needs your decision. Everything was accepted."),
     ],
-)  # fmt: skip
+)
 def test_headline(left, total, optional, sentence):
     assert headline(left, total, optional) == sentence
 
@@ -141,8 +144,9 @@ def test_marks_on_the_page_are_links_with_number_shape_and_text(split):
     assert 'aria-current="true"' in marks["p1-e2"]
     assert "1: Equation 1, needs your decision (1 of 3)" in marks["p1-e2"]
     assert "2: Figure 1, needs your decision (2 of 3)" in marks["p1-e6"]
-    assert "3: Heading 2, “Teacher Support”, repeated heading, needs your decision (3 of 3)" in (
-        marks["p1-e3"]
+    assert (
+        "3: Heading 2, “Teacher Support”, repeated heading, needs your decision (3 of 3)"
+        in (marks["p1-e3"])
     )
     assert 'class="box box-optional"' in marks["p1-e5"]
     assert "Note: Equation 2, optional check" in marks["p1-e5"]

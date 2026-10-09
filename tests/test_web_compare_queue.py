@@ -26,6 +26,9 @@ from a11y_stem.web.compare import (
 )
 from a11y_stem.web.mathml import sanitize_mathml
 
+BOLD_D, BOLD_ZERO = "\U0001d41d", "\U0001d7ce"  # MATHEMATICAL BOLD SMALL D, DIGIT ZERO
+ITALIC_V, ITALIC_D, ITALIC_T = "\U0001d463", "\U0001d451", "\U0001d461"  # math italic
+
 
 def equation(text: str | None, latex: str, *, regular: str | None = None, display="inline"):
     element = Element(
@@ -54,8 +57,8 @@ def test_a_vector_read_as_a_scalar_is_a_meaning_level_style_row():
 
 
 def test_a_bold_subscript_is_a_cosmetic_row_and_same_letters_are_listed():
-    c = compare_equation(*equation("𝐝𝟎", r"\mathbf{d}_0"))
-    assert [(r.symbol, r.meaning) for r in c.rows] == [("𝟎", False)]
+    c = compare_equation(*equation(BOLD_D + BOLD_ZERO, r"\mathbf{d}_0"))
+    assert [(r.symbol, r.meaning) for r in c.rows] == [(BOLD_ZERO, False)]
     assert c.summary == (
         "The 0 is bold in the PDF but plain in the proposal, which does not change the meaning."
     )
@@ -63,7 +66,7 @@ def test_a_bold_subscript_is_a_cosmetic_row_and_same_letters_are_listed():
 
 
 def test_a_scalar_known_to_be_plain_read_as_a_vector():
-    c = compare_equation(*equation("𝑣 = 𝑑/𝑡", r"\mathbf{v} = d / t"))
+    c = compare_equation(*equation(f"{ITALIC_V} = {ITALIC_D}/{ITALIC_T}", r"\mathbf{v} = d / t"))
     assert c.summary == "The v is plain in the PDF but bold (a vector) in the proposal."
 
 
@@ -145,8 +148,7 @@ def test_a_headings_band_starts_left_of_it_and_takes_lines_around_it():
 
 def _result(fixes: list[Fix], pages: dict[str, int]) -> DocumentResult:
     elements = [
-        Element(id=f.element_id, kind=f.kind, page=pages[f.element_id], bbox=(0, 0, 1, 1),
-                order=i)  # fmt: skip
+        Element(id=f.element_id, kind=f.kind, page=pages[f.element_id], bbox=(0, 0, 1, 1), order=i)
         for i, f in enumerate(fixes)
     ]
     stats = DocumentStats(pages=3, cost_usd=0, latency_ms=0, model_calls=0)
@@ -154,8 +156,11 @@ def _result(fixes: list[Fix], pages: dict[str, int]) -> DocumentResult:
 
 
 def _heading(eid: str, status=Status.NEEDS_REVIEW, group: str | None = None, **kw) -> Fix:
-    return Fix(element_id=eid, kind=Kind.HEADING, status=status, confidence=0.6,
-               heading=HeadingFix(level=2, text="Teacher Support"), group_key=group, **kw)  # fmt: skip
+    heading = HeadingFix(level=2, text="Teacher Support")
+    return Fix(
+        element_id=eid, kind=Kind.HEADING, status=status, confidence=0.6, heading=heading,
+        group_key=group, **kw,
+    )  # fmt: skip
 
 
 def _equation(eid: str, status=Status.NEEDS_REVIEW, **kw) -> Fix:

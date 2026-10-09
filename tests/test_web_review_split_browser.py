@@ -198,7 +198,8 @@ def test_every_mark_is_a_link_of_at_least_24_css_px(site, browser, job, viewport
     page.goto(f"{site.base}/jobs/{job}/review?accepted=1")
     wait_images(page)
     sizes = page.eval_on_selector_all(
-        ".box", "els => els.map(e => [e.id, e.tagName, e.getBoundingClientRect().width, "
+        ".box",
+        "els => els.map(e => [e.id, e.tagName, e.getBoundingClientRect().width, "
         "e.getBoundingClientRect().height])",
     )
     context.close()

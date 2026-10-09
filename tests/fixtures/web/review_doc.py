@@ -39,6 +39,7 @@ from a11y_stem.core.types import (
 )
 
 PAGE = (612.0, 792.0)
+BOLD_D0 = "\U0001d41d\U0001d7ce"  # MATHEMATICAL BOLD SMALL D, MATHEMATICAL BOLD DIGIT ZERO
 GROUP = "hg-p1-e3"
 FIGURE_BOX = (72.0, 300.0, 300.0, 440.0)
 
@@ -127,7 +128,7 @@ def review_output() -> ConversionOutput:
                 parent_id="p1-e1"),
         element("p1-e3", Kind.HEADING, 3, reasons=["bold body-size line"], **teacher),
         element("p1-e4", Kind.PARAGRAPH, 4, text="Discuss vectors and scalars with the class."),
-        element("p1-e5", Kind.EQUATION, 5, text="𝐝𝟎 = 0", font_size=11, display="block"),
+        element("p1-e5", Kind.EQUATION, 5, text=BOLD_D0 + " = 0", font_size=11, display="block"),
         element("p1-e6", Kind.FIGURE, 6, caption="Figure 1 A car moves from home to school."),
         element("p1-e7", Kind.HEADING, 7, reasons=["bold body-size line"], **teacher),
         element("p2-e0", Kind.HEADING, 8, reasons=["bold body-size line"], **teacher),
