@@ -395,7 +395,7 @@ def set_language(
                 "Choose the language from the list on the document's page.",
                 context={"job_id": job_id},
             )
-        page_rules.set_language(result, lang)
+        result = page_rules.set_language(result, lang)
         crops = _crops(session, job.id)
         from a11y_stem.web.review import rerender_html
 

@@ -335,6 +335,9 @@ class Example:
 class Card:
     rows: list[Row]
     examples: list[Example]
+    # A tagged PDF may give a screen reader more than its text layer (alt text on a
+    # formula, say), so the examples then say "text layer", not what a reader gets.
+    tagged: bool = False
 
 
 MAX_ROWS = 7
@@ -364,6 +367,9 @@ DOC_LOST_WORDS = {
     "accent": "marks over letters",
 }
 _BOLD_VARIANTS = frozenset({"bold", "bold-italic"})
+# Characters a screen reader names differently in running text than the spoken reading
+# of maths does (`speech.SYMBOLS`): a slash in "m/s" is read as "slash", not "divided by".
+TEXT_SYMBOLS = {"/": "slash"}
 
 
 def pdf_reading(text: str) -> str:
@@ -391,6 +397,8 @@ def pdf_reading(text: str) -> str:
             continue
         if ch in GREEK:
             words.append(GREEK[ch])
+        elif ch in TEXT_SYMBOLS:
+            words.append(TEXT_SYMBOLS[ch])
         elif ch in SYMBOLS:
             words.append(SYMBOLS[ch])
         elif (name := unicodedata.name(ch, "")).startswith(("SUPERSCRIPT ", "SUBSCRIPT ")):
@@ -455,7 +463,18 @@ def _examples(result: DocumentResult) -> list[Example]:
         block = 1 if element.display == "block" else 0
         scored.append((len(parts), block, -element.order, example))
     scored.sort(key=lambda item: item[:3], reverse=True)
-    return [example for *_, example in scored[:MAX_EXAMPLES]]
+    # Each kind of loss once before any is shown twice: four equations that all lose
+    # only a subscript say less than one each that loses something else.
+    ranked = [example for *_, example in scored]
+    seen: set[str] = set()
+    varied = []
+    for example in ranked:
+        if example.lost not in seen:
+            seen.add(example.lost)
+            varied.append(example)
+    chosen = {example.element_id for example in varied}
+    varied += [example for example in ranked if example.element_id not in chosen]
+    return varied[:MAX_EXAMPLES]
 
 
 def _first_fixes(result: DocumentResult) -> dict[str, Fix]:
@@ -627,7 +646,8 @@ def before_after(result: DocumentResult) -> Card | None:
         _title_row(facts, result),
         _language_row(facts, result),
     ]
-    return Card([row for row in rows if row is not None][:MAX_ROWS], _examples(result))
+    kept = [row for row in rows if row is not None][:MAX_ROWS]
+    return Card(kept, _examples(result), tagged=bool(facts.tagged))
 
 
 # --------------------------------------------------------------------------- notices
@@ -679,7 +699,8 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
 # --------------------------------------------------------------------------- language
 
 # Languages offered by the change control: BCP 47 tag -> English name. A document's own
-# tag outside this list is kept and shown as it is.
+# tag outside this list is kept and shown as it is. The text work has its own list
+# (`pipeline.language.LANGUAGE_NAMES`); once both are merged, one list serves both.
 LANGUAGES: dict[str, str] = {
     "en": "English",
     "es": "Spanish",
@@ -758,16 +779,25 @@ def language_choices(current: str) -> list[tuple[str, str]]:
     return choices
 
 
-def set_language(result: DocumentResult, tag: str) -> None:
-    """The instructor's choice: the document language, lang_source "user", the notices
-    that asked for it answered, and passages no longer marked when they are now in the
-    document's own language. The caller re-renders the HTML."""
-    result.lang = tag
-    result.lang_source = "user"
-    result.notices = [n for n in result.notices if n.code not in LANGUAGE_NOTICES]
-    for element in result.elements:
-        if element.lang is not None and element.lang.lower() == tag.lower():
-            element.lang = None
+def set_language(result: DocumentResult, tag: str) -> DocumentResult:
+    """The stored result with the instructor's choice: the document language,
+    lang_source "user", the notices that asked for it answered, and passages no longer
+    marked when they are now in the document's own language. The input is unchanged; the
+    caller re-renders the HTML and stores both.
+
+    The same contract as the text work's `pipeline.text_pass.set_document_language`,
+    which also works the passage languages out again: once both are merged, the route
+    calls that one and this function goes (docs/web.md "The job page")."""
+    elements = [
+        e.model_copy(update={"lang": None})
+        if e.lang is not None and e.lang.lower() == tag.lower()
+        else e
+        for e in result.elements
+    ]
+    notices = [n for n in result.notices if n.code not in LANGUAGE_NOTICES]
+    return result.model_copy(
+        update={"lang": tag, "lang_source": "user", "elements": elements, "notices": notices}
+    )
 
 
 # --------------------------------------------------------------------------- finish line

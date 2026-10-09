@@ -188,7 +188,7 @@ def test_an_ai_outage_is_not_finished():
     [
         ("λ2 − 5λ − 2 = 0", "lambda 2 minus 5 lambda minus 2 equals 0"),
         ("\U0001d41d= \U0001d42f\U0001d461+ \U0001d41d0", "d equals vt plus d 0"),
-        ("v = 1.0 m/s", "v equals 1.0 m divided by s"),
+        ("v = 1.0 m/s", "v equals 1.0 m slash s"),
         ("x² + y₁", "x superscript two plus y subscript one"),
         ("Ax = b.", "Ax equals b period"),
     ],
@@ -334,6 +334,25 @@ def test_at_most_four_examples():
     assert card is not None and len(card.examples) == job_page.MAX_EXAMPLES
 
 
+def test_each_kind_of_loss_is_shown_before_any_twice():
+    result = card_result(UNTAGGED)
+    for i in range(3):  # three fractions, each earlier in the document than the others
+        result.elements.append(el(f"x{i}", Kind.EQUATION, -10 + i, text=f"a{i}/b"))
+        result.fixes.append(
+            eq_fix(f"x{i}", math("<mfrac><mi>a</mi><mi>b</mi></mfrac>"), "a over b")
+        )
+    card = job_page.before_after(result)
+    assert card is not None
+    # Ranked, the three fractions come before the subscript (they are earlier); shown,
+    # the subscript comes before a second fraction.
+    assert [example.lost for example in card.examples] == [
+        "The power is gone.",
+        "The fraction bar is gone.",
+        "The subscript is gone.",
+        "The fraction bar is gone.",
+    ]
+
+
 # --------------------------------------------------------------------------- notices
 
 
@@ -381,10 +400,12 @@ def test_the_language_line_says_where_the_language_came_from():
 def test_setting_the_language_answers_its_notices_and_unmarks_passages():
     result = card_result(UNTAGGED, notices=[Notice(code="lang_assumed"), Notice(code="footnote")])
     result.elements[5].lang = "fr"
-    job_page.set_language(result, "fr")
-    assert (result.lang, result.lang_source) == ("fr", "user")
-    assert [n.code for n in result.notices] == ["footnote"]
-    assert result.elements[5].lang is None
+    changed = job_page.set_language(result, "fr")
+    assert (changed.lang, changed.lang_source) == ("fr", "user")
+    assert [n.code for n in changed.notices] == ["footnote"]
+    assert changed.elements[5].lang is None
+    # The stored result is replaced by the caller, not changed in place.
+    assert (result.lang, result.elements[5].lang, len(result.notices)) == ("en", "fr", 2)
 
 
 def test_language_choices_keep_a_tag_the_list_does_not_have():

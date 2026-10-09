@@ -369,15 +369,20 @@ From top to bottom:
    screen-reader user ... | In your PDF | In the HTML" (equations with their structure,
    bold vectors, figures, headings, lists, tables, links, the title, the language),
    chosen from what the PDF has. The PDF side says what is lost ("The symbols are there,
-   on one line. In 9 of 19, the fraction bars, subscripts and rows and columns are
-   gone."), says "Perhaps ... (we did not check)" for a tagged PDF, and never calls the
-   text layer unreadable; there is no score. A method note says how it was measured.
-   **Hear the difference** shows up to four equations, picked by the structure their
-   text layer loses (display ones first): the crop, "From your PDF a screen reader gets:"
-   the text layer read out flat (`job_page.pdf_reading`: Greek letters and symbols
-   named, a styled maths letter as its plain letter), what is lost ("The power is
+   on one line. In 9 of 19, the fraction bars and subscripts are gone."; the rows of an
+   aligned derivation are lines of the text layer too, so only a matrix or cases loses
+   "rows and columns"), says "Perhaps ... (we did not check)" for a tagged PDF, and
+   never calls the text layer unreadable; there is no score. A method note says how it
+   was measured. **Hear the difference** shows up to four equations, picked by the
+   structure their text layer loses (the most first, display ones first, each kind of
+   loss once before any twice): the crop, "From your PDF a screen reader gets:" (for a
+   tagged PDF "Your PDF's text layer gives:", since its tags may give more) the text
+   layer read out flat (`job_page.pdf_reading`: Greek letters and symbols named, "/" as
+   "slash", a styled maths letter as its plain letter), what is lost ("The power is
    gone."), and "In the HTML:" the spoken reading. That text is document content: it is
-   rendered for the owner only and never logged.
+   rendered for the owner only and never logged. On the committed demo PDF (13 pages,
+   one real run) the card has 7 rows and its first example is Equation 2.4: "capital
+   delta d capital delta t period" against "capital delta bold d over capital delta t".
 6. **Results**: what was found, and one breakdown everywhere (MF6): "Need your decision"
    (decisions, as on the review screen: a group of repeated headings is one), "Accepted
    for you" (with how many have a note, and how many of those the second automated
@@ -392,9 +397,12 @@ From top to bottom:
    this language" (when it was detected or assumed) or "Use this language". The POST
    (CSRF-checked, owner only, finished jobs only, only a listed language or the
    document's own) sets `lang` and `lang_source="user"`, drops the `lang_detected` and
-   `lang_assumed` notices, unmarks passages now in the document's language, makes the
-   HTML again (`review.rerender_html`, with the day of the last decision for the
-   student note) and bumps `jobs.result_version`. The language tag is not logged.
+   `lang_assumed` notices, unmarks passages now in the document's language
+   (`job_page.set_language`), makes the HTML again (`review.rerender_html`, with the day
+   of the last decision for the student note) and bumps `jobs.result_version`. The
+   language tag is not logged. The text work has the same function with passage
+   detection (`text_pass.set_document_language`) and its own list of languages
+   (`language.LANGUAGE_NAMES`): once both are merged, the route uses those.
 
 ## Review screen
 

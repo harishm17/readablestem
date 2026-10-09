@@ -39,7 +39,8 @@
   <h3 id="hear-heading">Hear the difference</h3>
   <p>Some of your equations, written out the way a screen reader is given them. Screen
     readers word them a little differently, but they can only say the structure the file
-    gives them.</p>
+    gives them.{% if card.tagged %} Your PDF is tagged, so a screen reader may get more
+    from it than its text layer; we did not check its tags.{% endif %}</p>
   <ul class="fix-list" aria-labelledby="hear-heading">
     {% for example in card.examples %}
     <li class="fix-card">
@@ -49,7 +50,7 @@
       </figure>
       <div class="fix-body">
         <div>
-          <p><strong>From your PDF a screen reader gets:</strong></p>
+          <p><strong>{{ "Your PDF's text layer gives:" if card.tagged else "From your PDF a screen reader gets:" }}</strong></p>
           <p>“{{ example.pdf_reading }}”</p>
           <p>{{ example.lost }}</p>
         </div>

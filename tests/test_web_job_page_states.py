@@ -374,6 +374,17 @@ def test_the_card_compares_the_pdf_with_the_html_and_hears_the_difference(web):
     assert "%" not in text and "score" not in text.lower()
 
 
+def test_for_a_tagged_pdf_the_examples_say_text_layer_not_what_a_reader_gets(web):
+    result = web.converter.output.result
+    result.elements[3].text = "x2 + 1"
+    result.elements[3].reasons = ["superscript"]
+    job_id = convert(web, source_facts=FACTS.model_copy(update={"tagged": True}))
+    text = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "changed-heading"))
+    assert "Your PDF's text layer gives: “x 2 plus 1”" in text
+    assert "a screen reader may get more from it than its text layer" in text
+    assert "From your PDF a screen reader gets" not in text
+
+
 def test_older_results_without_source_facts_have_no_card_and_still_load(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
