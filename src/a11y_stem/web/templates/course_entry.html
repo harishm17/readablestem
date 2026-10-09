@@ -35,7 +35,16 @@
   </div>
   <ul class="actions">
     <li><button type="submit" class="button">Save</button></li>
-    <li><a href="/courses/{{ course.id }}#entries">Cancel</a></li>
+    <li><a href="/courses/{{ course.id }}">Cancel</a></li>
   </ul>
 </form>
+
+<section aria-labelledby="remove-heading">
+  <h2 id="remove-heading">Remove it</h2>
+  <p>Documents you convert for this course will no longer use {{ entry.words }}.</p>
+  <form method="post" action="/courses/{{ course.id }}/entries/{{ entry.id }}/delete">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-secondary">Remove {{ entry.words }}</button>
+  </form>
+</section>
 {% endblock %}

@@ -11,7 +11,7 @@
   this course use them: a letter your course writes in bold is read as bold, and it is
   read aloud by its meaning (“vector d” for a bold d that is a vector).</p>
 
-<section aria-labelledby="entries-heading" id="entries" tabindex="-1">
+<section aria-labelledby="entries-heading">
   <h2 id="entries-heading">Notation</h2>
   {% if entries %}
   <div class="table-scroll">
@@ -33,15 +33,7 @@
         <td>{{ entry.meaning_label }}</td>
         <td>{{ entry.note or "" }}</td>
         <td>{{ "From a review" if entry.source == "review" else "By you" }}</td>
-        <td>
-          <ul class="actions">
-            <li><a href="/courses/{{ course.id }}/entries/{{ entry.id }}">Edit<span class="visually-hidden"> {{ entry.words }}</span></a></li>
-            <li><form method="post" action="/courses/{{ course.id }}/entries/{{ entry.id }}/delete" class="inline-form">
-              <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-              <button type="submit" class="link-button">Remove<span class="visually-hidden"> {{ entry.words }}</span></button>
-            </form></li>
-          </ul>
-        </td>
+        <td><a href="/courses/{{ course.id }}/entries/{{ entry.id }}">Edit or remove<span class="visually-hidden"> {{ entry.words }}</span></a></td>
       </tr>
       {% endfor %}
     </tbody>

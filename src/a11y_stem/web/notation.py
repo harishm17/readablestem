@@ -198,8 +198,8 @@ def parse_entry(symbol: str, meaning: str, note: str) -> EntryInput:
         canonical = canonical_symbol(symbol)
         if canonical is None:
             message = (
-                "This tool cannot tell which symbol that is. Write one symbol, for example "
-                f"{SYMBOL_EXAMPLES}."
+                "This tool cannot tell which symbol that is. Write one symbol another way, "
+                "for example “bold d” or “\\mathbf{d}”."
             )
             errors.append(FieldError("symbol", message))
     if meaning not in MEANINGS:

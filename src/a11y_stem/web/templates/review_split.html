@@ -277,12 +277,13 @@
 <div class="split">
   <section class="decision-area panel-{{ panel.mode }}" id="decision" aria-labelledby="decision-title">
     {% if notice %}<p class="decision-notice" id="decision-notice" role="status">{{ notice }}</p>{% endif %}
+    {# Notation memory: "Remember for <course>: bold ω is a vector", under the notice of
+       the decision that settled the letter. #}
+    {% include "_remember_notation.html" %}
     <div class="panel-head">
       <h2 id="decision-title" tabindex="-1"{% if focus_decision %} autofocus{% endif %}{% if notice %} aria-describedby="decision-notice"{% endif %}>{{ panel.title }}{% if panel.subtitle %}<span class="visually-hidden">: </span><span class="panel-sub">{{ panel.subtitle }}</span>{% endif %}</h2>
       {% if panel.status %}<p class="pill {{ panel.status_class }}">{{ panel.status }}</p>{% endif %}
     </div>
-    {# Notation memory: "Remember for <course>: bold ω is a vector" after a decision. #}
-    {% include "_remember_notation.html" %}
 
     {% if panel.mode == "done" %}
     <p>{% if total %}Your decisions are in the accessible HTML.{% else %}Everything was accepted automatically.{% endif %} Read it through once before you share it with students.</p>

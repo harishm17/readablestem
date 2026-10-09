@@ -197,7 +197,7 @@ def add_entry(
         return _course_page(request, course_id, user, extra, status=422)
     log_event(logger, "notation_added", course_id=course_id, source="user")
     flash(request, f"Added: {phrase(entry.canonical, entry.meaning)}.")
-    return RedirectResponse(f"/courses/{course_id}#entries", status_code=303)
+    return RedirectResponse(f"/courses/{course_id}", status_code=303)
 
 
 def _entry_page(
@@ -249,7 +249,7 @@ def save_entry(
         return _entry_page(request, course_id, entry_id, user, extra, status=422)
     log_event(logger, "notation_changed", course_id=course_id)
     flash(request, f"Saved: {phrase(entry.canonical, entry.meaning)}.")
-    return RedirectResponse(f"/courses/{course_id}#entries", status_code=303)
+    return RedirectResponse(f"/courses/{course_id}", status_code=303)
 
 
 @router.post("/courses/{course_id}/entries/{entry_id}/delete", dependencies=[Depends(require_csrf)])
@@ -262,7 +262,7 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
         session.delete(row)
     log_event(logger, "notation_removed", course_id=course_id)
     flash(request, f"Removed {words}. To keep it after all, add it again below.")
-    return RedirectResponse(f"/courses/{course_id}#entries", status_code=303)
+    return RedirectResponse(f"/courses/{course_id}", status_code=303)
 
 
 # --------------------------------------------------------------------------- remember
