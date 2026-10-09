@@ -514,6 +514,19 @@ CROSSREF = re.compile(
 _NUMBER_RE = re.compile(_NUMBER, re.IGNORECASE)
 # "(3)" alone, not right after a letter, digit or bracket ("f(3)", "x_(3)" are maths).
 BARE_EQUATION_REF = re.compile(r"(?<![\w)\]\u27e7])\((?P<num>\d+(?:\.\d+)*[a-z]?)\)(?!\w)")
+# A bare "(3)" is a reference only right after a word that introduces an equation
+# ("from (3)", "using (1)", "substituting (2) into (4)", "by (5)"), or joined to such a
+# reference ("using (1) and (2)"). Procedure steps, parts of a question and enumerations
+# print "(2)" too ("Repeat steps (2) and (3)", "Answer question (3)", "three parts: (1)
+# measure ..."), and a link from them would jump to the wrong place.
+_BARE_CUE = re.compile(
+    r"\b(?:from|using|use|into|by|in|with|via|substituting|substitute|combining|combine|"
+    r"comparing|compare|eliminating|eliminate|applying|apply|rearranging|rearrange|"
+    r"solving|solve|differentiating|differentiate|integrating|integrate|adding|add|"
+    r"subtracting|subtract|multiplying|multiply|dividing|divide|equating|equate|see)\s*$",
+    re.IGNORECASE,
+)
+_BARE_JOIN = re.compile(r"\s*(?:,|and|or|&|to|from|into|with|by|,\s*and|,\s*or)\s*", re.IGNORECASE)
 # A caption's own number ("Figure 2.3", "Fig. 4:", "Table 1.") at the start of a caption.
 _CAPTION_NUMBER = {
     "figure": re.compile(r"^\s*(?:figure|fig\.?)\s*(\d+(?:[.\-]\d+)*[a-z]?)\b", re.IGNORECASE),
@@ -599,11 +612,17 @@ def references(text: str) -> list[Reference]:
             start, end = offset + number.start(), offset + number.end()
             found.append(Reference(start, end, kind, number.group()))
     taken = [(r.start, r.end) for r in found]
+    cued_end = -1  # end of the last bare reference an equation cue introduced
     for match in BARE_EQUATION_REF.finditer(text):
         if not text[: match.start()].strip():
             continue  # "(1) Measure the speed": an enumeration label, not a reference
+        before = text[: match.start()]
+        joined = cued_end >= 0 and _BARE_JOIN.fullmatch(text[cued_end : match.start()])
+        if not (joined or _BARE_CUE.search(before)):
+            continue  # "Repeat steps (2) and (3)", "three parts: (1) ..., (2) ...": a list
         if not any(s < match.end() and match.start() < e for s, e in taken):
             found.append(Reference(match.start(), match.end(), "equation", match.group(), True))
+            cued_end = match.end()
     return sorted(found, key=lambda r: r.start)
 
 

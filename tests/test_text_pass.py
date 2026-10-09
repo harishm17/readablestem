@@ -356,6 +356,9 @@ def refs(text: str, *, taken=(), elements=FIGURES) -> list[tuple[str, str | None
         ("Equations (3), (4) and (5)", [("Equations (3)", "e3"), ("(4)", "e4"), ("(5)", "e4")]),
         ("Eq. (2.4) is the definition.", [("Eq. (2.4)", "e6")]),
         ("Adding (3) to (4) gives", [("(3)", "e3"), ("(4)", "e4")]),
+        ("Substituting (3) into (4), we get", [("(3)", "e3"), ("(4)", "e4")]),
+        ("From (3), the speed is", [("(3)", "e3")]),
+        ("using (3) and (4)", [("(3)", "e3"), ("(4)", "e4")]),
     ],
 )
 def test_references_link_to_the_one_target_with_that_number(text, expected):
@@ -374,6 +377,12 @@ def test_references_link_to_the_one_target_with_that_number(text, expected):
         "The period of 1990s tables.",
         "(3) Measure the speed of the cart.",  # an enumeration label, though (3) exists
         "  (4) Then the time.",
+        # A bare "(3)" without a word that introduces an equation: steps, parts, lists.
+        "Repeat steps (3) and (4) for each of the five masses.",
+        "The procedure has two parts: (3) measure the mass, and (4) time ten swings.",
+        "This agrees with earlier measurements (3) and with the textbook value (4).",
+        "Answer question (3) on the data sheet before you leave.",
+        "When the cart stops, Repeat (3)",  # the one link the real lab manuals made
     ],
 )
 def test_no_link_without_one_target(text):

@@ -527,7 +527,13 @@ In paragraphs and list items, `references` finds "Figure 2.3", "Fig. 4", "Figure
 and "Equations (3), (4) and (5)" (lists joined by commas, "and", "or", "&", "to" or a
 dash), and a bare "(3)" not right after a letter, digit or bracket (so "f(3)" is not
 one) and not at the start of a paragraph or list item (there it numbers the paragraph:
-"(3) Measure the speed"). The targets (`crossref_targets`) are figures and tables by the number at the start
+"(3) Measure the speed"). A bare "(3)" must also come right after a word that
+introduces an equation ("from", "using", "into", "by", "in", "with", "substituting",
+"adding", "comparing" and the like, `_BARE_CUE`), or be joined to such a reference
+("using (1) and (2)", "substituting (3) into (4)"): procedure steps, parts of a
+question and enumerations print "(2)" too ("Repeat steps (2) and (3)", "Answer question
+(3)", "three parts: (1) measure ..."). On four real lab manuals (393 pages) the one bare
+reference made before this rule, "Repeat (2)", was a step, not equation (2). The targets (`crossref_targets`) are figures and tables by the number at the start
 of their caption, and display equations by every number in their `equation_label` ("(2)
 (3)" on an `align` gives both). A reference links (`kind="crossref"`) only when exactly
 one target has its number; a bare "(3)" only when an equation prints exactly "(3)"
