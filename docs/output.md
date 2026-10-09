@@ -19,8 +19,8 @@ on it. The pipeline that feeds it is in `docs/design/beta-architecture.md`.
 <main>
   <p class="notice a11y-stem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
-  <section id="about-conversion" ...>About this conversion</section>
 </main>
+<footer id="about-conversion" ...>About this version (the note for students)</footer>
 </body>
 </html>
 ```
@@ -250,22 +250,35 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
-## About this conversion
+## The note for students ("About this version")
 
-The last section of `<main>` contains:
+The file ends with a short note for the people who read it, in a `<footer>` after
+`</main>` (`id="about-conversion"`, MF7 of the UX review). It has no counts and no
+review words ("needs review", "rejected"): those are for the instructor, on the job page
+(docs/web.md "The job page"). In order:
 
-- "This file was produced with a11y-stem, which assists with accessibility; review it
-  before publishing."
-- counts per kind and status (e.g. "Equations (5): 2 accepted, 1 not converted (model
-  unsure), ..."); a reviewer's Accept (`Fix.reviewed`) is counted apart from the
-  pipeline's, as "accepted by a reviewer",
-- how many items are flagged and what the flags look like,
+- what this is: "This is a web version of a PDF from your course, made with a11y-stem, a
+  tool that assists with accessibility.", plus "Its equations are written so that screen
+  readers can read them aloud." when the file has converted equations;
+- whether the instructor has checked it: nothing when the tool asked nothing and nobody
+  changed anything; "Some parts were made by the tool and have not been checked by your
+  instructor yet." while a decision is open (a draft download); "Your instructor checked
+  the parts the tool was unsure about on 9 October 2026." once every decision is made.
+  The date is `render_html(checked_on=...)`: the review screen passes the day of the
+  re-render that follows a decision (`web/review.py rerender_html`, UTC), the language
+  control the day of the last decision; the pipeline never passes one, so a result
+  renders the same from storage;
+- when something is shown as an image of the original: "Some parts could not be
+  converted. They are shown as pictures of the original, marked "Not converted" or
+  "Needs a description": ask your instructor for a version you can read.";
+- "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
-Model cost is not in the HTML: the file is meant for students. Cost is in the result JSON
-(`DocumentResult.stats`) and the CLI summary.
+The wording is `TODO(Harish)` in `pipeline/assemble.py` (whether to name the screen
+readers that read MathML aloud). Model cost is not in the HTML: the file is meant for
+students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
-Text the tool writes (notes, labels, this section) carries `class="a11y-stem"`. The
+Text the tool writes (notes, labels, the student note) carries `class="a11y-stem"`. The
 `banned_wording` check reads only that text, so course content that legitimately uses
 words like "compliance" (beam flexibility in mechanics) is not flagged.
 
@@ -350,12 +363,27 @@ and fast, so anyone holding only the HTML can recompute them.
    `budget_<scope>` with its crop kept. Calls a step made before the refusal were billed,
    so a recording wrapper around the client keeps them on the FAILED fix.
 7. `progress(pages_done, pages_total)` runs on the calling thread when all of a page's
-   steps have finished. An exception from it aborts the run.
+   steps have finished, and `stage_progress(ProgressEvent)` as each stage starts and
+   moves on: "layout" (when analysis starts, then with the pages and the elements found
+   per kind), "equations", "figures" and "tables" (their totals first, then after every
+   element: scanned pages and failed crops count as done), "assemble" and "checks". An
+   exception from either aborts the run.
 8. Once the last crop is made, `layout.release(pdf_bytes)` drops WP2's cached copy of
    the PDF (also when the run fails), so a long-lived worker does not keep a user's
    document in memory until newer jobs evict it.
-9. `render_html` (with the caller's optional `notice` and `source_note`), then
+9. `pipeline.source_facts.measure` reads the PDF once more for the job page's
+   before/after card (tagged, /Lang, title, bookmarks, pictures and, in a tagged PDF,
+   pictures with alt text, links; from the elements and fixes: equations, those whose
+   text layer loses a fraction, root or script, bold maths letters stored as plain
+   characters, tables). Numbers only; a fact it cannot read keeps its default, and it
+   never fails the run.
+10. `render_html` (with the caller's optional `notice` and `source_note`), then
    `static_checks`.
+11. `pipeline.notices.from_fixes` derives the notices that follow from the fixes (a
+   table shown as an image, a scanned page, a colour-only figure, a chart or diagram
+   without a long description when long descriptions are on) and merges them with the
+   others on `DocumentResult.notices` (one per code and element, or code and page with a
+   count).
 
 Stats: document `latency_ms` is wall-clock time for the whole run; page `latency_ms` is
 the summed time inside that page's steps (pages overlap in the pool, so per-page wall time
