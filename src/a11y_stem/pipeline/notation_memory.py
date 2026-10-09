@@ -146,6 +146,11 @@ def _greek_name(ch: str) -> str | None:
     return None
 
 
+def base_letter(canonical: str) -> str:
+    """The plain letter (or symbol) of a key: "d" for bold d and for d with an arrow."""
+    return _parts(canonical)[0]
+
+
 def describe(canonical: str) -> str:
     """A key in plain words: "bold d", "bold ω", "double-struck R", "v with an arrow"."""
     base, variant, accent = _parts(canonical)
