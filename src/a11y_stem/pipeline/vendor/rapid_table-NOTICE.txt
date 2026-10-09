@@ -1,0 +1,12 @@
+rapid_table.py in this folder contains code from RapidTable 3.0.2
+(https://github.com/RapidAI/RapidTable), Copyright (c) RapidAI (SWHL), which includes
+code from PaddleOCR's PP-Structure, Copyright (c) 2020 PaddlePaddle Authors. All Rights
+Reserved. Both are licensed under the Apache License, Version 2.0
+(rapid_table-LICENSE.txt in this folder).
+
+The code was modified for a11y-stem on 2026-10-09; the changes are listed at the top of
+rapid_table.py.
+
+The SLANet-plus model weights the code runs (slanet-plus.onnx, downloaded at build time,
+not part of this repository) are PaddlePaddle's, released under the Apache License,
+Version 2.0, and distributed by RapidAI.

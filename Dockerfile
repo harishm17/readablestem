@@ -35,6 +35,11 @@ RUN uv sync --locked --no-dev --no-editable --no-install-project --extra tracing
 COPY . /app
 RUN uv sync --locked --no-dev --no-editable --extra tracing
 
+# The SLANet-plus table-structure model (7.5 MB, Apache-2.0; see THIRD_PARTY_NOTICES.md),
+# downloaded once here and refused unless its SHA-256 matches the pin in
+# src/a11y_stem/pipeline/table_model.py. Without it, tables use PyMuPDF's own grid.
+RUN /app/.venv/bin/python -m a11y_stem.pipeline.table_model --dir /app/models
+
 # ---------------------------------------------------------------- runtime
 FROM python:3.12-slim-trixie@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f AS runtime
 
@@ -49,7 +54,8 @@ COPY --from=build /app /app
 ENV PATH="/app/.venv/bin:${PATH}" \
     PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
-    PORT=8080
+    PORT=8080 \
+    TABLE_MODEL_DIR=/app/models
 
 USER 10001:10001
 EXPOSE 8080
