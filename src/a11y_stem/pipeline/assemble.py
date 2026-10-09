@@ -69,7 +69,9 @@ EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
 FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
 # The student note (`_about_section`). It speaks to students: what this file is and who
 # to tell about problems. TODO(Harish): confirm this wording, and whether to name the
-# screen readers that read MathML aloud (NVDA with MathCAT, JAWS, VoiceOver).
+# screen readers that read MathML aloud (NVDA with MathCAT, JAWS, VoiceOver). The
+# feature review's challenge (10.3, row 4) warns that "checked" can read as a
+# certificate; its alternative is "N parts were decided by your instructor" (CHECKED).
 ABOUT_TITLE = "About this version"
 ABOUT_WORDING = (
     "This is a web version of a PDF from your course, made with a11y-stem, a tool that "

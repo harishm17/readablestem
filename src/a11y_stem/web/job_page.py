@@ -615,7 +615,12 @@ def _language_row(facts: SourceFacts, result: DocumentResult) -> Row:
         if facts.has_lang
         else "No: the PDF does not say, so the screen reader guesses."
     )
-    return Row("hear the right language", pdf, f"Yes: {language_line(result)}.")
+    # A detected or assumed language is a guess, so the HTML side does not say "Yes".
+    if language_needs_check(result):
+        html = f"{language_line(result)}: check it under Language below."
+    else:
+        html = f"Yes: {language_line(result)}."
+    return Row("hear the right language", pdf, html)
 
 
 def before_after(result: DocumentResult) -> Card | None:
@@ -643,9 +648,10 @@ def before_after(result: DocumentResult) -> Card | None:
         _list_row(facts, result),
         _table_row(facts, result),
         _link_row(facts, result),
-        _title_row(facts, result),
-        _language_row(facts, result),
     ]
+    # Past seven rows the last ones go: a language to check comes before the title.
+    tail = [_title_row(facts, result), _language_row(facts, result)]
+    rows += tail[::-1] if language_needs_check(result) else tail
     kept = [row for row in rows if row is not None][:MAX_ROWS]
     return Card(kept, _examples(result), tagged=bool(facts.tagged))
 

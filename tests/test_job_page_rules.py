@@ -289,6 +289,24 @@ def test_a_tagged_pdf_is_not_called_unstructured():
     assert "we did not check" in rows["hear equations with their structure"].pdf
 
 
+def test_a_language_to_check_is_a_row_and_is_not_called_right():
+    result = card_result(UNTAGGED)  # assumed: the PDF says none and none was detected
+    card = job_page.before_after(result)
+    assert card is not None and len(card.rows) == job_page.MAX_ROWS
+    rows = {row.question: row for row in card.rows}
+    assert "know which document is open" not in rows  # the title row gives way
+    language = rows["hear the right language"]
+    assert language.pdf == "No: the PDF does not say, so the screen reader guesses."
+    assert language.html == (
+        "English (assumed; your PDF did not say and none was detected): check it under "
+        "Language below."
+    )
+    result.source_facts = UNTAGGED.model_copy(update={"has_lang": True})
+    card = job_page.before_after(result)
+    assert card is not None
+    assert "hear the right language" not in {row.question for row in card.rows}
+
+
 def test_kept_links_are_counted():
     result = card_result(UNTAGGED)
     result.elements[5].links = [Link(start=0, end=3, kind="uri", href="https://openstax.org")]

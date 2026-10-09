@@ -372,8 +372,10 @@ From top to bottom:
    on one line. In 9 of 19, the fraction bars and subscripts are gone."; the rows of an
    aligned derivation are lines of the text layer too, so only a matrix or cases loses
    "rows and columns"), says "Perhaps ... (we did not check)" for a tagged PDF, and
-   never calls the text layer unreadable; there is no score. A method note says how it
-   was measured. **Hear the difference** shows up to four equations, picked by the
+   never calls the text layer unreadable; there is no score. A detected or assumed
+   language is not a "Yes" but "check it under Language below", and that row then comes
+   before the title's. A method note says how it was measured and that the checks catch
+   some equation errors, not all. **Hear the difference** shows up to four equations, picked by the
    structure their text layer loses (the most first, display ones first, each kind of
    loss once before any twice): the crop, "From your PDF a screen reader gets:" (for a
    tagged PDF "Your PDF's text layer gives:", since its tags may give more) the text

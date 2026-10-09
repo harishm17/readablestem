@@ -274,8 +274,10 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
-The wording is `TODO(Harish)` in `pipeline/assemble.py` (whether to name the screen
-readers that read MathML aloud). Model cost is not in the HTML: the file is meant for
+The wording is `TODO(Harish)` in `pipeline/assemble.py`: whether to name the screen
+readers that read MathML aloud, and whether "checked" stays (the feature review's
+challenge, 10.3 row 4, would say "decided by your instructor" instead, since the tool
+only knows that decisions were made). Model cost is not in the HTML: the file is meant for
 students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
 Text the tool writes (notes, labels, the student note) carries `class="a11y-stem"`. The
