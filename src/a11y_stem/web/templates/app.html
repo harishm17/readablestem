@@ -30,6 +30,7 @@
       <input type="file" id="pdf" name="pdf" accept="application/pdf,.pdf"
              aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
     </div>
+    {% include "_course_choice.html" %}
     <div class="field checkbox-field">
       <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint">
       <label for="keep">Keep my document and results for {{ opt_in_days }} days to help improve the tool</label>

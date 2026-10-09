@@ -16,6 +16,9 @@ conventions, kept short:
 - subscripts: "x sub 0", "v sub avg" ("... end sub" when compound);
 - large operators: "the sum from i equals 1 to n of", "the limit as x approaches 0 of";
 - accents: an arrow over a symbol is "vector d", a bold symbol is "bold d";
+- course notation: a styled letter the instructor's course gives a meaning reads with the
+  meaning in place of its style ("vector d" for a bold d the course calls a vector; see
+  `readings` below and `pipeline.notation_memory`);
 - tables: "row 1: ...; row 2: ..." (cells of an aligned equation read as one line);
 - text is read verbatim, except words that are a single maths symbol ("=" -> "equals").
 """
@@ -29,11 +32,13 @@ from __future__ import annotations
 import re
 import unicodedata
 import xml.etree.ElementTree as ET
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
+from contextvars import ContextVar
 
 import defusedxml
 import defusedxml.ElementTree as DET
 
+from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.eval.equations import normalize
 
 MAX_DEPTH = 64
@@ -205,11 +210,27 @@ def _symbol_text(text: str) -> str | None:
     return None
 
 
+# Course readings for the call in progress (`mathml_to_speech(readings=...)`): notation
+# key -> the word read in place of the letter's style ("vector").
+_READINGS: ContextVar[Mapping[str, str] | None] = ContextVar("speech_readings", default=None)
+
+
+def _course_reading(text: str, variant: str | None) -> str | None:
+    """The course's word for a one-letter token ("vector" for a bold d), if it has one."""
+    readings = _READINGS.get()
+    if not readings or len(text) != 1:
+        return None
+    key = canonical_from_parts(text, variant)
+    return readings.get(key) if key is not None else None
+
+
 def _speak_mi(node: ET.Element) -> list[str]:
     text = node.text or ""
     if not text:
         return []
-    variant = VARIANT_PREFIX.get(node.get("mathvariant", ""))
+    variant = _course_reading(text, node.get("mathvariant")) or VARIANT_PREFIX.get(
+        node.get("mathvariant", "")
+    )
     if text in FUNCTIONS:
         words = FUNCTIONS[text]
     elif text in LIMIT_OPERATORS:
@@ -502,9 +523,17 @@ def _speak(node: ET.Element) -> list[str]:
 _SPACE_BEFORE_PUNCT = re.compile(r"\s+([;:,])")
 
 
-def mathml_to_speech(mathml: str) -> str:
-    """Plain-English reading of presentation MathML. Raises SpeechError on unreadable input."""
+def mathml_to_speech(mathml: str, *, readings: Mapping[str, str] | None = None) -> str:
+    """Plain-English reading of presentation MathML. Raises SpeechError on unreadable input.
+
+    `readings` (notation key -> word, from the course notation) reads a styled letter by
+    its meaning: {"\U0001d41d": "vector"} makes a bold d "vector d" instead of "bold d"."""
     root = _parse(mathml)
     _drop_trailing_punctuation(root)
-    text = " ".join(word for word in _speak(root) if word)
+    token = _READINGS.set(readings or None)
+    try:
+        words = _speak(root)
+    finally:
+        _READINGS.reset(token)
+    text = " ".join(word for word in words if word)
     return _SPACE_BEFORE_PUNCT.sub(r"\1", " ".join(text.split()))

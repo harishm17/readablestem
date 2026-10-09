@@ -95,13 +95,19 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
 | POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`); with `equations`, `figures`, `tables` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` (the job's `result_version` the page was made from) refuses a form from a stale tab |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <file>? This cannot be undone" confirmation page; only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript) |
+| GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
+| GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
+| GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
+| GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
+| POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
 | POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone
-else, admins included, so job ids cannot be probed and admins never see documents.
+else, admins included, so job ids cannot be probed and admins never see documents. The
+`/courses/*` routes do the same for courses.
 
 ## Sign-in, sessions and CSRF
 
@@ -164,6 +170,62 @@ else, admins included, so job ids cannot be probed and admins never see document
 Validation errors re-show the upload page with an error summary linked to the file input.
 The opt-in box "Keep my document and results for 30 days to help improve the tool" is off
 by default; it sets `retain_until` to 30 days instead of 24 hours.
+
+## Courses and notation (`web/routes/courses.py`, `web/notation.py`)
+
+Only with `FEATURE_NOTATION_MEMORY` on. Off, every `/courses` route is a 404, the upload
+form shows no course choice and ignores a `course` field, and the job page and review
+screen show nothing about courses. The pipeline side is in docs/steps.md "Course
+notation" and docs/layout.md "Bold letters in prose".
+
+- **Courses** (`/courses`): a table of the user's courses with how many symbols each has,
+  and a form to add one. A name is one line of up to 200 characters, not the same as
+  another of the user's courses (ignoring case); up to 50 courses. A course page lists
+  its symbols (the styled letter, its words, what it means, the note, "By you" or "From a
+  review", and an "Edit or remove" link), and has forms to add a symbol, rename the
+  course and delete it.
+- **Symbols.** Typed in any form `core.notation.canonical_symbol` understands: "bold d",
+  `\mathbf{d}`, the styled letter `𝐝`, "bold omega", "double-struck R", "v with an
+  arrow". All of them are one entry (one per course for each symbol). A form it cannot
+  read gets "This tool cannot tell which symbol that is. Write one symbol another way,
+  for example “bold d” or “\mathbf{d}”." The meaning is one of vector, matrix, set,
+  operator, constant, unit or something else; the note (up to 200 characters) is for the
+  instructor and never sent to a model. Up to 200 symbols per course. The add form says
+  to add both forms when a course writes a letter both ways (a bold v for velocity and a
+  plain v for speed): a letter listed plain too is no evidence of a lost bold.
+- **Delete.** "Delete course" asks first on its own page (WCAG 3.3.4); only a POST with
+  `confirm=yes` deletes the course and its symbols. Documents converted for it keep their
+  results and lose only the link (`jobs.course_id` set to NULL). Removing one symbol does
+  not ask: the notice after it says how to add it back.
+- **Upload.** When the user has courses, the upload form has an optional "Course" choice
+  ("No course" first); without any, one line links to `/courses`. The choice must be one
+  of the user's courses, checked after the CSRF token and before the PDF is opened;
+  otherwise the form comes back with an error and nothing is uploaded or counted. The job
+  stores `course_id`, and the job page says "Course: <name>. This document is read with
+  its notation."
+- **Worker.** Before converting, `notation.conversion_options` loads the course's symbols
+  into the run's `ConversionOptions` (the settings' flags plus `notation`). The list is
+  read when the job runs, so a symbol added while it waits is used. A job without a
+  course, or a course without symbols, runs with the settings' flags as before.
+- **Review screen.** For an equation whose PDF text or proposal has a letter the course
+  lists, the card has one line: "Your course notation: bold d is a vector." When the
+  course was the reason for the decision (the PDF's text cannot show bold), a second line
+  says so. After a decision that settles a styled letter, the decision's notice has one
+  button, "Remember for <course>: bold ω is a vector" (bold means vector, double-struck
+  means set): an edit that adds a bold or double-struck letter the proposal did not have
+  (the screen's "Use bold ω" is one), or accepting a proposal the style check asked
+  about whose styled letter the PDF's text does not show. Only for a job with a course,
+  and a letter the course does not have yet. It is optional: nothing waits on it. The
+  POST checks that the job and the course are the user's and that the course is the
+  job's, adds the symbol with source "review", and goes back to the same decision with
+  "Remembered for <course>: ...".
+
+Course names, symbols and notes are user content: shown only to their owner, logged only
+as ids and counts (`course_created`, `course_renamed`, `course_deleted`,
+`notation_added` with its source, `notation_changed`, `notation_removed`), sent to a
+model only as the fenced course notation block, and erased with the user
+(`ops.retention.erase_user`). Every form is a plain POST with the CSRF token, with an
+error summary linked to the field, so it all works without JavaScript.
 
 ## Spend cap (`web/spend.py`)
 
@@ -878,6 +940,8 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown and after a refused edit; no sideways scrolling at 320 px; "Remove the data table" without JavaScript) |
+| `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |
+| `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

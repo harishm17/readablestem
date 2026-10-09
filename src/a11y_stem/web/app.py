@@ -39,7 +39,7 @@ from a11y_stem.web.database import as_utc, prepare_database
 from a11y_stem.web.db import make_engine, make_sessionmaker
 from a11y_stem.web.deps import AppContext, CsrfFailed, LoginRequired, PageError, render
 from a11y_stem.web.logsafe import log_event
-from a11y_stem.web.routes import admin, cron, jobs, pages, review, split
+from a11y_stem.web.routes import admin, courses, cron, jobs, pages, review, split
 from a11y_stem.web.security import (
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
@@ -304,7 +304,7 @@ def create_app(
     app.add_exception_handler(RequestValidationError, _on_validation_error)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    for module in (pages, jobs, split, review, admin, cron):
+    for module in (pages, jobs, split, review, admin, cron, courses):
         app.include_router(module.router)
     app.include_router(auth_router)
     return app

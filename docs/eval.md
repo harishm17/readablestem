@@ -950,6 +950,50 @@ Reading it:
 
 Spend for this work: $0.252 in all (a one-figure smoke run $0.007, the first full run
 $0.121, this run $0.124).
+## Course notation (2026-10-09, `FEATURE_NOTATION_MEMORY`)
+
+What a course's notation list changes on the equations task (docs/steps.md "Course
+notation"). `eval pipeline --notation` runs the task with a list in force, as a
+conversion for that course would (`SYMBOL[=MEANING]`, vector by default; the report
+records the entries under `notation`). The comparison run was made the same day without
+the list, because one run of 30 differs from the next by a few escalations. Real models,
+$0.087 for both runs. Reports in `.local/eval/notation/` (not committed: the list is not
+part of the gate's baseline).
+
+```
+uv run --env-file .env a11y-stem eval pipeline --task equations --max-usd 0.15 \
+  --notation "bold d" "bold v" "bold a" \
+  --out .local/eval/notation/equations-notation.json --items .local/eval/notation/items-equations-notation.jsonl
+uv run python -m a11y_stem.eval.notation_flags .local/eval/notation/items-equations-notation.jsonl \
+  --notation "bold d" "bold v" "bold a"
+```
+
+| Run (OpenStax physics gold, 30 equations) | Prompt | exact_lenient | Escalated | Model calls | Cost |
+|---|---|---|---|---|---|
+| Committed `latest-equations.json` (2026-10-08) | `equation-df0e12f1` | 0.767 | 5 | 35 | $0.049 |
+| Same day, no list | `equation-df0e12f1` | 0.767 | 6 | 36 | $0.048 |
+| Same day, "bold d, v and a are vectors" | `equation_notation-59309812` | 0.767 | 0 | 30 | $0.038 |
+
+- 23 of 30 right in all three. The same 7 are wrong in both same-day runs: 5 are the
+  scorer's known gaps, 2 are near misses (TEDS 0.97 and 0.90) the list did not change.
+  Every fix ACCEPTED in both same-day runs, with one optional note each.
+- With the list, the six short equations of section 2.1 (each with a bold d) were
+  accepted from the cheap model; without it, all six escalated to the main model. Fewer
+  calls, about a fifth less spent. The answers kept differ only in spacing and in how a
+  subscript is written (`\mathbf{d}_{\text{f}}` or `\mathbf{d}_f`).
+- The course list as evidence in the style check (it fires only where the PDF's text
+  shows no bold at all) never fires on this gold as printed: Chromium marks every
+  weight. Checked again on the same answers with every style removed from the text
+  layer (`eval/notation_flags.py`): 6 new required decisions on 30 equations, all false
+  (a plain v for average speed, a plain `d_Q`, which the list says nothing about).
+  Adding plain v and d to the list removes them. The same check on two earlier runs whose
+  answers often dropped a bold letter flags every answer the style check flags as
+  printed (16 and 5), plus the same 6.
+- Bold letters in running text (layout, no model call; docs/layout.md "Bold letters in
+  prose") are scored by `python -m a11y_stem.eval.bold_letters --openstax`: 9 of 9 on the
+  three gold pages and 11 of 11 on the LaTeX fixtures (the two-column handout's 10 bold
+  vectors and its bold omega), no false positives. The equations task does not see them:
+  it scores the gold's equations, not its prose.
 
 ## What the numbers do not show
 
@@ -1009,6 +1053,8 @@ $0.121, this run $0.124).
 | `src/a11y_stem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
 | `src/a11y_stem/eval/gate.py` | regression gate (comparability, judge and stale-report checks) |
 | `src/a11y_stem/eval/sample.py` | the weekly seeded sample of the gold set |
+| `src/a11y_stem/eval/bold_letters.py` | bold letters in running text: found against the LaTeX and OpenStax sources (offline) |
+| `src/a11y_stem/eval/notation_flags.py` | course notation as style evidence: new flags on stored answers, with and without the text layer's styles (offline) |
 | `src/a11y_stem/cli/eval_cli.py` | `eval pipeline/gate/calibrate/render`, `demo build` |
 | `src/a11y_stem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
 | `src/a11y_stem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |

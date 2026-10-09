@@ -820,6 +820,13 @@ def split_page(
         "list_url": f"/jobs/{builder.job_id}/review/list",
         "max_steps": MAX_STEPS,
     }
+    # Course notation (notation memory): the card's lines, and "remember for this course"
+    # after a decision that settled a styled letter.
+    from a11y_stem.web.routes.courses import review_context
+
+    shown = panel.item.element_id if panel.item is not None else None
+    context |= review_context(request, builder.job_id, user, builder.result, shown, flashes)
+    context["remember_item"] = panel.decision_key or shown
     return render(request, "review_split.html", context, status_code=status_code)
 
 

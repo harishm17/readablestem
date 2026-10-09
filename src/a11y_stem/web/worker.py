@@ -573,7 +573,13 @@ class Worker:
         if self.tracer is not None:
             kwargs["tracer"] = self.tracer
 
-        # options: the notation work loads the job's course notation here.
+        # options: the job's course notation (FEATURE_NOTATION_MEMORY); without a course
+        # with entries, convert_pdf uses the settings' flags as before.
+        from a11y_stem.web import notation
+
+        options = notation.conversion_options(self.factory, self.settings, attempt.claim.job_id)
+        if options is not None:
+            kwargs["options"] = options
 
         # stage_progress: the job-page work stores ProgressEvents on the job here.
 

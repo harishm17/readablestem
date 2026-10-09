@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Delete {{ name }}?{% endblock %}
+{% block content %}
+<h1>Delete {{ name }}?</h1>
+<p>This deletes the course and its {{ entries }} {{ "symbol" if entries == 1 else "symbols" }}.
+  It cannot be undone. Documents you converted for this course keep their results.</p>
+<form method="post" action="/courses/{{ course_id }}/delete" class="inline-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button type="submit" class="button-danger">Yes, delete it</button>
+</form>
+<p><a href="/courses/{{ course_id }}">No, keep it</a></p>
+{% endblock %}

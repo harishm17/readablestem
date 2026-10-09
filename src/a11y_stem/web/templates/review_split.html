@@ -85,6 +85,8 @@
 {% endif %}
 {% if p.compare and p.compare.same %}<p class="same-line">Same in both: {{ p.compare.same|join(", ") }}.</p>{% endif %}
 {% if p.compare and p.compare.unseen and p.compare.rows %}<p class="unseen-line">The PDF's text cannot show the style of: {{ p.compare.unseen|join(", ") }} (in the proposal). Check {{ "it" if p.compare.unseen|length == 1 else "them" }} in the image.</p>{% endif %}
+{# Notation memory: the job's course notation about this equation. #}
+{% include "_course_notation_card.html" %}
 {% set anyway = p.changes_meaning %}
 {% if p.suggestion %}
 {# The fix the table points to, as one button: an edit with only that letter changed,
@@ -299,6 +301,9 @@
 <div class="split">
   <section class="decision-area panel-{{ panel.mode }}" id="decision" aria-labelledby="decision-title">
     {% if notice %}<p class="decision-notice" id="decision-notice" role="status">{{ notice }}</p>{% endif %}
+    {# Notation memory: "Remember for <course>: bold ω is a vector", under the notice of
+       the decision that settled the letter. #}
+    {% include "_remember_notation.html" %}
     <div class="panel-head">
       <h2 id="decision-title" tabindex="-1"{% if focus_decision %} autofocus{% endif %}{% if notice %} aria-describedby="decision-notice"{% endif %}>{{ panel.title }}{% if panel.subtitle %}<span class="visually-hidden">: </span><span class="panel-sub">{{ panel.subtitle }}</span>{% endif %}</h2>
       {% if panel.status %}<p class="pill {{ panel.status_class }}">{{ panel.status }}</p>{% endif %}

@@ -2,8 +2,9 @@
 
 How the two model-backed steps turn a crop into a fix, and the deterministic checks that
 decide whether a fix is trusted. Code: `src/a11y_stem/pipeline/{equation_step,
-figure_step, validate, speech, signs}.py`; prompts: `src/a11y_stem/models/prompts/{equation,
-figure}.md`; tests: `tests/test_steps_*.py`.
+figure_step, validate, speech, signs, notation_memory}.py`; prompts:
+`src/a11y_stem/models/prompts/{equation, equation_notation, figure}.md`; tests:
+`tests/test_steps_*.py`, `tests/test_notation_steps.py`.
 
 The steps assist a reviewer. They never treat model output as correct on its own: every
 proposal passes through validators, carries a confidence and the checks it passed, and
@@ -47,6 +48,7 @@ tell the model that text between `<document_text>` tags is data, not instruction
 | Prompt | Output schema (strict pydantic, `extra=forbid`) | What it asks for |
 |---|---|---|
 | `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
+| `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
 | `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
 
@@ -388,6 +390,64 @@ with a vector product a × that became a · anywhere counts as the swap. Signs i
   subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline maths
   that layout cuts at the dot.
 
+## Course notation (equations)
+
+With `FEATURE_NOTATION_MEMORY` on and a job converted for a course with notation entries
+(docs/web.md "Courses and notation"), the worker puts the course's `NotationEntry` list in
+the run's `ConversionOptions` and the equation step reads it with `options.current()`
+(`pipeline/notation_memory.py`). Without entries, or with the flag off, nothing below
+happens and every request is as before (same prompt, same version, same context).
+
+- **Hints.** The model gets the list as a fenced block at the start of the untrusted
+  context, never in the instructions: `[course notation: ...]`, one line per entry with
+  the styled letter, its words and LaTeX, and its meaning (`𝐝 (bold d, \mathbf{d}):
+  vector`), at most 24 entries and 700 characters. The instructor's own spelling and note
+  are not sent. The prompt is `equation_notation.md`: `equation.md` plus a section saying
+  the list is data, settles only what the image leaves unclear (is this letter bold?),
+  and never makes a letter bold or adds a symbol because the list mentions it; a course
+  can use a letter both ways. Its version (`NOTATION_PROMPT_VERSION`) is recorded on
+  every call that used it.
+- **Evidence for the style check.** The letter-style check stays the authority. One case
+  is added (`text_layer_style(..., course_bold=...)`): when the text layer shows no bold
+  at all (a font that does not mark it), a letter the course writes bold, not known
+  plain there, read as a plain variable and bold nowhere in the transcription, is the
+  meaning-level `style_mismatch` (a required decision; a cheap answer escalates). A letter
+  the course also lists plain (a plain v for speed beside a bold v for velocity) is no
+  evidence. When the text layer shows any bold, it alone decides, as before. The review
+  card says why: "The PDF's text does not show which letters are bold, and the proposal
+  has a plain d".
+- **Speech.** A bold letter the course calls a vector or matrix reads by its meaning:
+  "vector d" for a bold d, "matrix capital A" for a bold A (`mathml_to_speech(mathml,
+  readings=...)`). Other meanings keep the style words ("double-struck capital R"). The
+  speech is the review screen's reading aid; the output keeps MathML only.
+- **Bold letters in prose.** An inline equation layout made from one bold letter in
+  running text (docs/layout.md "Bold letters in prose", reason `bold letter in prose`)
+  gets its fix here without a model call (`notation_memory.bold_letter_fix`):
+  `\mathbf{a}` for a Latin letter, `\boldsymbol{\omega}` for a Greek one, through the
+  usual validators and speech, ACCEPTED at 0.95 with check `equation.bold_letter` and
+  review "none". This needs only the flag, not a course. Anything else (two letters, a
+  plain letter, a letter without the reason) goes to the model as before.
+
+Measured on 2026-10-09, OpenStax physics gold (30 equations), course notation "bold d,
+v and a are vectors", real models (docs/eval.md "Course notation"):
+
+- With the hints: the same accuracy as without (exact lenient 23 of 30 in both runs that
+  day and in the committed run), no escalations (6 the same day without the list, all on
+  equations with a bold d), 30 model calls instead of 36, $0.038 instead of $0.048.
+- The course evidence never fires on that gold as printed (Chromium marks every weight).
+  On the same transcriptions with every style removed from the text layer (a font that
+  marks no weight; `python -m a11y_stem.eval.notation_flags`), it flags 6 of 30, all
+  false: the equations that print a plain v (average speed) or a plain d (`d_Q`), which
+  the course list does not mention. Listing plain v and d as well removes all 6. On two
+  earlier runs (2026-10-08, before later pipeline fixes; `equations-run1` and `-run2` in
+  the main checkout's `.local/eval/`) whose answers often dropped a bold letter, the
+  style check as printed flags 16 and 5 answers; with styles removed and the course list,
+  it flags every one of them again, plus the same 6.
+  So the case is worth its required decision only where a course writes a letter one
+  way; the course page asks instructors to add both forms when they use both.
+  TODO(Harish): keep this case required (content-features.md's tier), or make it an
+  optional note for letters the course lists in bold only.
+
 ## Validators and codes
 
 All validators return one `Check` per rule, passed or failed, so the review screen can
@@ -566,6 +626,9 @@ never reaches the instructions, and that the equation's text layer is never sent
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
 | `tests/test_style_check.py` | the letter-style check: meaning-level and cosmetic cases, layout's bold and regular letters |
 | `tests/test_sign_check.py` | the sign and relation check: flips and drops that must flag, hyphens, ranges, product style, accents and long arrows that must not; tiers, escalation and the single confidence factor; the LaTeX fixtures' CMSY signs and the Chromium fixtures; a course page printed by Chromium (`browser`); a result stored by pipeline 0.2.0 still loads |
+| `tests/test_notation_steps.py` | course notation: keys as words and LaTeX, the fenced block (first, capped, no notes), its own prompt only with entries, spoken readings, the course evidence in the style check (only where the PDF shows no bold), escalation, the bold letter fix without a model call |
+| `tests/test_layout_bold_letters.py` | bold letters in prose: evidence, labels, bold words, sentence capitals, the flag off, the course; no misses and no false positives on the LaTeX fixtures |
+| `tests/test_eval_notation_flags.py` | the false-flag count and `eval pipeline --notation` |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
 | `tests/test_steps_figure_long.py` | long descriptions on and off: the request off is what it was, the long prompt and fenced labels on, cleaning and dropping long descriptions, the unsure note, values from the text or the image, tables that are dropped, colour only, number normalisation and the data grid |
 | `tests/test_steps_live.py` | `live_model`: a gold equation rendered from MathML in Chromium and a generated bar chart, through the real API |
@@ -589,7 +652,12 @@ decorative rules were added; the prompt versions have changed since.
   `e-kt`) and a minus touching a TeX arrow head are ambiguous, so dropping them is missed
   ("Sign and relation check", Limits).
 - Speech is a reviewer aid, not a screen reader: it does not do function application
-  ("f open parenthesis x close parenthesis"), and it reads `\cdot` as "times".
+  ("f open parenthesis x close parenthesis"), and it reads `\cdot` as "times". A
+  reviewer's LaTeX edit is read without the course's readings ("bold d", not "vector
+  d"): the review code that makes it (`web/review.py`) does not load the course.
+- Course notation as style evidence flags a plain letter the course lists only in bold,
+  even where the course uses it plain too ("Course notation" above): the instructor
+  lists both forms to avoid that.
 - The command allowlist is curated; a legitimate command outside it (for example
   `\hslash` or `\varGamma`) fails as `unknown_command` and the fix goes to FAILED
   `invalid_latex` after escalation. Extend the lists in `validate.py`; the conversion
