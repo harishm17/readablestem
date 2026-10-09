@@ -1,0 +1,27 @@
+{# What the file does not handle, and what is worth a look, per page (pipeline/notices.py
+   and web/job_page.py `notice_lists`). A notice never adds a decision: when one has a
+   decision, the line links to it and says whether it is still open. #}
+{% macro notice_items(lines, job_id) %}
+{% for line in lines %}
+<li><strong>{{ line.where }}:</strong> {{ line.text }}{% if line.count > 1 %} ({{ line.count }} times){% endif %}
+  {% if line.decision == "open" and line.element_id %}<a href="/jobs/{{ job_id }}/review?item={{ line.element_id }}">Decide it</a> (one of your decisions).{% elif line.decision == "made" %}You have decided it.{% endif %}
+  {% if line.code in ("lang_detected", "lang_assumed") %}<a href="#language-heading">Check the language</a>.{% endif %}</li>
+{% endfor %}
+{% endmacro %}
+{% if pg.notices.not_handled %}
+<section aria-labelledby="not-handled-heading">
+  <h2 id="not-handled-heading">Not handled in this file</h2>
+  <ul class="check-list">
+    {{ notice_items(pg.notices.not_handled, job.id) }}
+  </ul>
+</section>
+{% endif %}
+{% if pg.notices.worth_checking %}
+<section aria-labelledby="worth-checking-heading">
+  <h2 id="worth-checking-heading">Worth checking</h2>
+  <p class="hint">None of these holds anything up.</p>
+  <ul class="check-list">
+    {{ notice_items(pg.notices.worth_checking, job.id) }}
+  </ul>
+</section>
+{% endif %}

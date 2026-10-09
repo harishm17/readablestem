@@ -6,9 +6,11 @@ model work part way ("budget_<scope>") or pages that were only scanned images
 ("scanned_pages"). Those jobs have results, but showing them as a plain "Finished. The
 accessible HTML is ready." would hide that part of the document was not converted. A
 queued job can also be held back because today's budget is spent (the worker claims
-nothing then). `job_outcome` turns those cases into a label and a plain-language message
-for the job page and the documents list; for everything else it returns None and the
-usual status text applies.
+nothing then). And a finished job converted during an AI service outage, with most of
+its equations and figures failed, is not "finished" either ("model_outage", read from
+the stored result). `job_outcome` turns those cases into a label and a plain-language
+message for the job page and the documents list; for everything else it returns None
+and the usual status text applies.
 
 Messages say what happened, what the output contains and what to do next, and never
 quote the document.
@@ -69,6 +71,28 @@ def _pages_text(pages: list[int]) -> str:
 
 KEPT = "The HTML keeps their original images, marked “Not converted”."
 
+# A finished job converted while the AI service was down: most of its equations, figures
+# and tables failed because the service returned errors or did not answer in time. Read
+# from the stored result (the job itself carries no code), so it shows only where the
+# result is loaded (the job page), and it goes away once the instructor has filled
+# enough of them in on the review screen.
+MODEL_OUTAGE = "model_outage"
+OUTAGE_REASONS = frozenset({"model_api_error", "model_timeout"})
+_MODEL_KINDS = frozenset({"equation", "figure", "table"})
+
+
+def _outage(result_json: dict[str, Any] | None) -> tuple[int, int] | None:
+    """(fixes the service failed, model fixes) when more than half failed that way."""
+    if not result_json:
+        return None
+    fixes = [f for f in result_json.get("fixes") or [] if isinstance(f, dict)]
+    model = [
+        f for f in fixes if f.get("kind") in _MODEL_KINDS and f.get("reason") != "scanned_page"
+    ]
+    failed = [f for f in model if f.get("status") == "failed" and f.get("reason") in OUTAGE_REASONS]
+    return (len(failed), len(model)) if failed and 2 * len(failed) > len(model) else None
+
+
 FAILED_MESSAGES = {
     "scanned": "Every page of this PDF is a scanned image with no text, so there is nothing "
     "this tool can convert yet. Run text recognition (OCR) on it first, for example with "
@@ -100,6 +124,15 @@ def job_outcome(
         )
     if status == JobStatus.FAILED and error_code in FAILED_MESSAGES:
         return JobOutcome(error_code, "Stopped", FAILED_MESSAGES[error_code])
+    if status == JobStatus.DONE and not error_code and (outage := _outage(result_json)):
+        n, total = outage
+        message = (
+            f"The AI service did not answer for {n} of {total} equations and figures, so "
+            f"they were not converted. Nothing is wrong with your PDF. {KEPT} Upload the "
+            "document again later to convert them."
+        )
+        return JobOutcome(MODEL_OUTAGE, "Stopped: the AI service did not answer", message,
+                          partial=True)  # fmt: skip
     if status != JobStatus.DONE or not error_code:
         return None
     if error_code == "budget_daily":

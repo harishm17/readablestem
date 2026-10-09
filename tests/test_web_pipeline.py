@@ -86,7 +86,7 @@ def without(html: str, *parts: str) -> str:
 
 
 def about(html: str) -> str:
-    match = re.search(r'<section id="about-conversion".*?</section>', html, flags=re.S)
+    match = re.search(r'<footer id="about-conversion".*?</footer>', html, flags=re.S)
     assert match
     return match.group(0)
 
@@ -120,7 +120,8 @@ def test_an_inline_equation_edited_in_review_stays_in_its_paragraph(site):
     assert re.search(r'<math[^>]*\bdisplay="inline"[^>]*\bid="p1-e9"|<math[^>]*\bid="p1-e9"[^>]*'
                      r'\bdisplay="inline"', edited)  # fmt: skip
     assert 'id="p1-e10"' in edited  # its neighbour is still there, unconverted
-    # Nothing else changed but that paragraph and the About section's counts.
+    # Nothing else changed but that paragraph (and the student note, which may say
+    # whether the instructor has checked the file).
     assert without(after, edited, about(after)) == without(
         before, paragraph(before, "p1-e8"), about(before)
     )
@@ -163,9 +164,31 @@ def test_a_review_decision_reruns_the_checks_on_the_real_output(site):
     assert result.html_checks == static_checks(job.html or "")
     assert result.html_checks and all(c.passed for c in result.html_checks)
     assert result.fix_for("p1-e3").reviewed  # type: ignore[union-attr]
-    assert "3 accepted, 1 accepted by a reviewer</li>" in about(job.html or "")
+    note = about(job.html or "")
+    assert "accepted" not in note and "reviewer" not in note  # no counts for students
     page = site.browser.get(f"/jobs/{site.job_id}").text
     assert f"All {len(result.html_checks)} checks passed" in page
+
+
+def test_the_student_note_gives_the_date_once_the_last_decision_is_made(site):
+    """While a decision is open the file says some parts are not checked yet; after the
+    last one, the re-rendered file says the instructor checked them, and on which day."""
+    from a11y_stem.pipeline.assemble import CHECKED, NOT_CHECKED_YET, long_date
+    from a11y_stem.web.db import utcnow
+
+    assert NOT_CHECKED_YET in about(site.job(site.job_id).html or "")
+    result = DocumentResult.model_validate(site.job(site.job_id).result_json)
+    for fix in [f for f in result.fixes if f.pending]:
+        if fix.group_key:
+            response = review(site, fix.group_key, action="reject")
+        else:
+            response = review(site, fix.element_id, action="reject")
+        assert response.status_code == 303, response.text[:300]
+        result = DocumentResult.model_validate(site.job(site.job_id).result_json)
+    assert not any(f.pending for f in result.fixes)
+    note = about(site.job(site.job_id).html or "")
+    assert f"{CHECKED} on {long_date(utcnow().date())}." in note
+    assert NOT_CHECKED_YET not in note
 
 
 @pytest.mark.browser

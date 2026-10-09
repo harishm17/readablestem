@@ -51,6 +51,10 @@ queue is safe with several workers or instances:
   running), so a job deleted or requeued meanwhile is never resurrected. If storing
   fails (a database error, after one retry of a transient one) the job is failed with
   "store_failed" rather than left running, which would convert (and pay for) it again.
+- Live progress for the job page: the converter's `ProgressEvent`s (stage, done, total,
+  counts per kind) are kept per stage and stored on `jobs.progress_json`, throttled
+  (`PROGRESS_WRITE_S`), only while this attempt owns the job; a requeued job starts
+  again from none.
 
 Failures become `Job.error_code` categories: `LayoutError.code`, "budget_<scope>",
 "timeout", "store_failed", "model_not_configured" or "internal_error". A finished job
@@ -62,6 +66,7 @@ image. Nothing from the document is logged.
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 import threading
@@ -77,7 +82,7 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
-from a11y_stem.core.types import ConversionOutput, DocumentResult
+from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.logsafe import log_event, log_exception
@@ -115,6 +120,10 @@ _EPSILON = 1e-9
 # Codes a finished (DONE) job can carry; see `result_outcome`.
 BUDGET_STOPS = frozenset({"budget_daily", "budget_job_usd", "budget_job_calls"})
 SCANNED_PAGES = "scanned_pages"
+# Live progress is written to the job row at most this often (seconds), apart from a
+# stage seen for the first time or just finished (`Worker._stage_progress`). The job page
+# polls every 3 s.
+PROGRESS_WRITE_S = 2.0
 
 
 class Converter(Protocol):
@@ -230,6 +239,16 @@ def db_safe(value: Any) -> Any:
     if isinstance(value, list):
         return [db_safe(v) for v in value]
     return value
+
+
+def _accepts(function: Callable[..., Any], name: str) -> bool:
+    """Whether `function` takes the keyword argument `name` (or any keyword). A callable
+    whose signature cannot be read is assumed to take it."""
+    try:
+        parameters = inspect.signature(function).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters)
 
 
 class JobCancelled(BudgetExceeded):
@@ -371,7 +390,9 @@ class Worker:
                 session.execute(
                     update(Job)
                     .where(*expired, Job.attempts < MAX_ATTEMPTS)
-                    .values(status=JobStatus.QUEUED, lease_until=None, pages_done=0)
+                    .values(
+                        status=JobStatus.QUEUED, lease_until=None, pages_done=0, progress_json=None
+                    )
                     .execution_options(synchronize_session=False)
                 )
             )
@@ -581,9 +602,64 @@ class Worker:
         if options is not None:
             kwargs["options"] = options
 
-        # stage_progress: the job-page work stores ProgressEvents on the job here.
+        # stage_progress: live progress by stage, stored on the job row for its page
+        # (only to a converter that takes it: older fakes and scripts do not).
+        if _accepts(self.converter, "stage_progress"):
+            kwargs["stage_progress"] = self._stage_progress(attempt)
 
         return kwargs
+
+    # ------------------------------------------------------------------ live progress
+
+    def _stage_progress(self, attempt: _Attempt) -> StageProgressFn:
+        """Receiver for the converter's `ProgressEvent`s (on the conversion thread).
+
+        Keeps the latest event of every stage and stores them on the job as
+        `{"stages": {stage: event}}` (`jobs.progress_json`; content-free): a stage seen
+        for the first time or just finished at once, anything else at most every
+        `PROGRESS_WRITE_S`, so a document with hundreds of equations does not write the
+        row hundreds of times. Raises `JobCancelled` once the job is no longer this
+        attempt's, which stops the run like the page progress callback does. A failed
+        write is logged and skipped: progress is never worth a failed conversion.
+        """
+        stages: dict[str, dict[str, Any]] = {}
+        written = [float("-inf")]
+
+        def stage_progress(event: ProgressEvent) -> None:
+            if attempt.cancelled.is_set():
+                raise JobCancelled()
+            new = event.stage not in stages
+            stages[event.stage] = event.model_dump(mode="json")
+            finished = event.total > 0 and event.done >= event.total
+            now = time.monotonic()
+            if not (new or finished) and now - written[0] < PROGRESS_WRITE_S:
+                return
+            written[0] = now
+            try:
+                owned = self._write_progress(attempt, {"stages": dict(stages)})
+            except Exception as exc:
+                log_exception(logger, "progress_write_failed", exc, job_id=attempt.claim.job_id)
+                return
+            if not owned:
+                self._cancel(attempt, "not_owned")
+                raise JobCancelled()
+
+        return stage_progress
+
+    def _write_progress(self, attempt: _Attempt, value: dict[str, Any]) -> bool:
+        """Store live progress if this attempt still owns the job (False if not)."""
+        with session_scope(self.factory) as session:
+            return (
+                rowcount(
+                    session.execute(
+                        update(Job)
+                        .where(*self._owned(attempt.claim))
+                        .values(progress_json=value)
+                        .execution_options(synchronize_session=False)
+                    )
+                )
+                == 1
+            )
 
     def _start_conversion(self, attempt: _Attempt, pdf: bytes) -> tuple[threading.Thread, _Run]:
         run = _Run()

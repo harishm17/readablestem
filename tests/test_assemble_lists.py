@@ -66,7 +66,7 @@ def accepted(element: Element, display: str = "block") -> Fix:
 
 def body(elements: list[Element], fixes: list[Fix] | None = None) -> str:
     html = render_html(title="T", lang="en", elements=elements, fixes=fixes or [], crops={})
-    main = html.split("<main>", 1)[1].split('<section id="about-conversion"', 1)[0]
+    main = html.split("<main>", 1)[1].split("</main>", 1)[0]
     return "".join(line.strip() for line in main.splitlines())
 
 

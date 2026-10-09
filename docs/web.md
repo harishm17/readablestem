@@ -83,8 +83,11 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | POST `/logout` | signed in | Clears the session |
 | GET `/app` | signed in | Upload form and the user's documents |
 | POST `/jobs` | signed in | Upload: checks, quota, queue; 303 to `/jobs/{id}` |
-| GET `/jobs/{id}` | owner | Status and progress; results summary when done |
-| GET `/jobs/{id}/status?v=` | owner | Status fragment for htmx polling (204 while unchanged) |
+| GET `/jobs/{id}` | owner | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
+| GET `/jobs/{id}/status?v=` | owner | Status fragment for htmx polling (204 while unchanged); changes per step |
+| GET `/jobs/{id}/progress?v=` | owner | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
+| GET `/jobs/{id}/draft` | owner | Asked before a download while decisions are open: what students would get, "Review N decisions first" or "Download the draft anyway"; with none open, 303 to the finish line |
+| POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
@@ -327,6 +330,14 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `upload_missing` | The upload blob was gone |
   | `internal_error` | Anything else |
 
+- **Live progress.** The converter's `ProgressEvent`s (`convert_pdf(stage_progress=)`:
+  "layout", then "equations", "figures", "tables" with done and total, then "assemble"
+  and "checks"; content-free) are kept per stage and written to `jobs.progress_json` as
+  `{"stages": {stage: event}}`: a stage seen for the first time or just finished at
+  once, other updates at most every 2 s (`worker.PROGRESS_WRITE_S`), and only while
+  this attempt owns the job (otherwise the next event raises `JobCancelled`). A failed
+  write is logged (`progress_write_failed`) and skipped. A requeued job starts again with
+  none. Only a converter that takes `stage_progress` gets it.
 - **Outcome codes on finished jobs** (`worker.result_outcome`; status `done`, results
   available, but incomplete). The job page and the documents list show them instead of
   "Finished" (`web/outcome.py`), and `ops.aggregate` counts them as `job error:<code>`:
@@ -336,6 +347,12 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `budget_daily` | The daily cap ran out part way | "Stopped early": N of M equations and figures not converted, originals kept; upload again after 00:00 UTC |
   | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | "Stopped early": split the PDF |
   | `scanned_pages` | Some pages were only scanned images (kept as flagged images) | Which pages; run OCR and upload again |
+
+  A finished job with no code whose equations, figures and tables mostly failed with
+  `model_api_error` or `model_timeout` is shown as "Stopped: the AI service did not
+  answer" (`outcome.MODEL_OUTAGE`, read from the stored result on the job page; nothing
+  is stored on the job, and it goes away once enough of them are filled in). Retrying
+  without a new upload is not built yet.
 
 **Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
 web process, not in a child process like the upload probe. A conversion stuck in native
@@ -348,6 +365,108 @@ the fix; it is not built yet.
 
 `Worker.run_once()` and `process_next_job(...)` process one job synchronously, for tests
 and scripts.
+
+## The job page
+
+Code: `web/routes/jobs.py` (routes), `web/job_page.py` (every rule and sentence),
+`web/views.py` (what is read from the database), `web/outcome.py` (stops and outages),
+`pipeline/source_facts.py` and `pipeline/notices.py` (what the pipeline measures and
+derives), templates `job.html`, `_job_status.html`, `_job_progress.html`,
+`_job_ready.html`, `_job_notices.html`, `_job_card.html`, `_job_language.html`,
+`job_draft.html`. Tests: `tests/test_job_page_rules.py` (the rules on their own),
+`tests/test_web_job_page.py` and `tests/test_web_job_page_states.py` (the page in every
+state, the routes), `tests/test_web_job_page_browser.py` (axe at 1280 and 320 CSS px,
+reflow, htmx, no JavaScript), `tests/test_job_source_facts.py`,
+`tests/test_job_notices.py`, `tests/test_job_progress.py`.
+
+From top to bottom:
+
+1. **The status box**, a polite live region, with a headline that says what is left
+   to do (MF5 of the UX review; `job_page.headline`):
+
+   | State | Label | Sentence |
+   |---|---|---|
+   | queued | Waiting | "2 documents ahead of yours (1 is yours), about 3 minutes to go. You can leave this page; it keeps its place." |
+   | queued, today's budget spent | Waiting | the `waiting_budget` outcome |
+   | converting | Converting | the step it is on: "Reading the equations and checking each against your PDF's text." |
+   | stopped by a spend cap | Stopped early | the outcome's message (and the open decisions) |
+   | AI service outage | Stopped: the AI service did not answer | "... Nothing is wrong with your PDF ..." |
+   | scanned pages | Finished, with pages not converted | which pages, OCR |
+   | decisions open | Converted | "3 decisions need you before you share it." |
+   | no decision open, parts shown as images | Ready | "1 equation is shown as an image that screen readers cannot read." |
+   | nothing left | Ready to share | "Everything was converted." |
+   | failed | Stopped | why (the failure codes above) |
+
+   The tab title follows the label. The estimate while waiting is the pages ahead (in
+   the worker's claim order), what is left of the jobs converting and the job's own
+   pages, at the pace of the last 20 finished jobs (start to finish, per page; 10 s a
+   page with none to go by: `views.seconds_per_page`). The box changes per step, not
+   per element, so a screen reader hears each step once.
+2. **The steps**, outside the live region and polled on their own: "Reading the layout:
+   16 pages", "Found 21 equations, 7 figures and 52 headings", "Equations: 14 of 21 read
+   and checked against your PDF's text", "Figures: 5 of 7 described", "Tables: ...",
+   "Building the HTML file", "Running the structure checks", each "(done)" or "(in
+   progress)". Without JavaScript the page shows them as they were when it loaded, with
+   the "refresh the status" link and the opt-in reload.
+3. **What to do next.** With decisions open: "Review 3 decisions" (the main button,
+   straight to the first open decision), "Preview the student version" and "Download a
+   draft (3 decisions open)", which asks first on its own page what students would get
+   ("For 1 equation and 1 figure, students will get the tool's suggestion as it is. 1
+   equation is an image marked "Not converted"."). The polled status links to the first
+   decision as soon as the job finishes ("Start the review"), so it is one click from
+   finished to deciding. With none open, **Ready to share** (BW1, MF9): "You made 3
+   decisions on 9 October." (or "Nothing in this file needed your decision."), the
+   download as the main button, the student version, "Before you share" (read it
+   through; the notes, optional; what is not handled) and "Put it in your course"
+   (upload it as a file next to the PDF, do not paste it into a page editor; the tested
+   steps per LMS are `TODO(Harish)`). Deleting is a quiet button at the end of the page.
+4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
+   (notices derived again from the fixes as they are now, plus the stored ones of other
+   codes), one sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
+   "The whole document:"), "(2 times)" for a count, and, when the notice has a decision,
+   "Decide it (one of your decisions)" or "You have decided it". A notice never adds a
+   decision: the table kept as an image is counted once, as its fix.
+5. **What changed for a screen-reader user** (Beta 1 of the feature review), shown for
+   results with `source_facts` (older ones have no card): up to 7 rows "Can a
+   screen-reader user ... | In your PDF | In the HTML" (equations with their structure,
+   bold vectors, figures, headings, lists, tables, links, the title, the language),
+   chosen from what the PDF has. The PDF side says what is lost ("The symbols are there,
+   on one line. In 9 of 19, the fraction bars and subscripts are gone."; the rows of an
+   aligned derivation are lines of the text layer too, so only a matrix or cases loses
+   "rows and columns"), says "Perhaps ... (we did not check)" for a tagged PDF, and
+   never calls the text layer unreadable; there is no score. A detected or assumed
+   language is not a "Yes" but "check it under Language below", and that row then comes
+   before the title's. A method note says how it was measured and that the checks catch
+   some equation errors, not all. **Hear the difference** shows up to four equations, picked by the
+   structure their text layer loses (the most first, display ones first, each kind of
+   loss once before any twice): the crop, "From your PDF a screen reader gets:" (for a
+   tagged PDF "Your PDF's text layer gives:", since its tags may give more) the text
+   layer read out flat (`job_page.pdf_reading`: Greek letters and symbols named, "/" as
+   "slash", a styled maths letter as its plain letter), what is lost ("The power is
+   gone."), and "In the HTML:" the spoken reading. That text is document content: it is
+   rendered for the owner only and never logged. On the committed demo PDF (13 pages,
+   one real run) the card has 7 rows and its first example is Equation 2.4: "capital
+   delta d capital delta t period" against "capital delta bold d over capital delta t".
+6. **Results**: what was found, and one breakdown everywhere (MF6): "Need your decision"
+   (decisions, as on the review screen: a group of repeated headings is one), "Accepted
+   for you" (with how many have a note, and how many of those the second automated
+   check calls worth a look) and "Decided by you" add up to the items, and a sentence
+   says so ("Of the 62 items found, 17 wait for your decision, 45 were accepted for you
+   and 0 were decided by you. The 17 waiting make 3 decisions: repeated headings are
+   decided together."). Then the links per kind to their first decision, and the
+   automatic checks of the file.
+7. **Language**: "Language: English (detected; your PDF did not say)" ("from your PDF",
+   "assumed; ...", "you chose it"; a result made before detection existed counts as
+   "from your PDF" when the PDF has /Lang) and a select of 25 languages with "Confirm
+   this language" (when it was detected or assumed) or "Use this language". The POST
+   (CSRF-checked, owner only, finished jobs only, only a listed language or the
+   document's own) sets `lang` and `lang_source="user"`, drops the `lang_detected` and
+   `lang_assumed` notices, unmarks passages now in the document's language
+   (`job_page.set_language`), makes the HTML again (`review.rerender_html`, with the day
+   of the last decision for the student note) and bumps `jobs.result_version`. The
+   language tag is not logged. The text work has the same function with passage
+   detection (`text_pass.set_document_language`) and its own list of languages
+   (`language.LANGUAGE_NAMES`): once both are merged, the route uses those.
 
 ## Review screen
 
@@ -847,10 +966,12 @@ a stylesheet from our origin (`marks.css`), not as inline styles.
 ## Accessibility of the app itself
 
 Server-rendered pages that work without JavaScript: htmx only polls the job status
-(every 3 s, 204 while unchanged). When the job finishes the status box, a live region,
-says so and links to the results ("Show the results", or "Show why it stopped"); the
-page is not reloaded under the reader, which would send a screen reader back to the
-top. Without
+and, separately, its list of steps (every 3 s, 204 while unchanged). The status box is
+a polite live region that changes per step, not per element; the counts are in the list
+of steps outside it. When the job finishes the status box says so and links to the first
+decision and to the results ("Start the review or show the results", "Show the results",
+or "Show why it stopped"); the page is not reloaded under the reader, which would send a
+screen reader back to the top. Without
 JavaScript the status page does not reload by itself, because a reload the user did not
 choose sends a screen reader back to the top each time (WCAG 2.2.1, failure F41; axe
 rule `meta-refresh`, critical). It has a "refresh the status" link and, inside
@@ -942,6 +1063,7 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown and after a refused edit; no sideways scrolling at 320 px; "Remove the data table" without JavaScript) |
 | `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
+| `uv run pytest -m browser tests/test_web_job_page_browser.py` | Chromium: the job page in each state (axe at 1280 and 320 px, reflow with text spacing, htmx steps outside the live region, draft and language without JavaScript, the one-click download) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

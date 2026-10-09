@@ -59,6 +59,7 @@ import re
 from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass, field
+from datetime import UTC, date, datetime
 from typing import Any
 
 from a11y_stem.core import triage
@@ -1173,11 +1174,16 @@ def guard_result_version(current: int | None, sent: str | None, field: str) -> i
 # --------------------------------------------------------------------------- output
 
 
-def rerender_html(result: DocumentResult, crops: dict[str, bytes]) -> str:
+def rerender_html(
+    result: DocumentResult, crops: dict[str, bytes], *, checked_on: date | None = None
+) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
 
     The static checks of the new HTML replace `result.html_checks`, so the job page lists
     the checks of the file the user downloads, not of the one before the review.
+    `checked_on` is the day of the last decision for the student note ("checked by your
+    instructor on ..." once no decision is open); by default today (UTC), since a
+    re-render follows a decision. The assembler ignores it while a decision is open.
     """
     from a11y_stem.pipeline import assemble, html_checks
 
@@ -1188,6 +1194,7 @@ def rerender_html(result: DocumentResult, crops: dict[str, bytes]) -> str:
         fixes=result.fixes,
         crops=crops,
         source_note=None,
+        checked_on=checked_on or datetime.now(UTC).date(),
     )
     result.html_checks = html_checks.static_checks(html)
     return html

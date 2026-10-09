@@ -1,14 +1,18 @@
 """Read-only view models for templates: plain data, no ORM objects past the session.
 
 Error codes are categories; the user-facing sentences for them live here so templates and
-tests share one wording.
+tests share one wording. The job page's own data (progress, the honest headline, the
+before/after card, notices, language) is built by `web.job_page` from what is read here:
+the job row, its stored progress and result, the queue ahead of it, and the day of the
+last review decision.
 """
 
 from __future__ import annotations
 
+import zlib
 from collections import Counter
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import date, datetime
 from typing import Any
 
 from sqlalchemy import func, select, tuple_
@@ -16,8 +20,9 @@ from sqlalchemy.orm import Session
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
+from a11y_stem.web import job_page
 from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Job, JobStatus, User
+from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User
 from a11y_stem.web.messages import Explained, explain_check, severity_label
 from a11y_stem.web.outcome import FAILED_MESSAGES
 
@@ -121,6 +126,8 @@ class ResultSummary:
     # ran, and the ones that failed. `checks_run` is 0 for results stored without them.
     checks_run: int = 0
     failed_checks: list[CheckLine] = field(default_factory=list)
+    # One breakdown of every item, the same on every screen (`job_page.breakdown`).
+    counts: job_page.Breakdown = field(default_factory=job_page.Breakdown)
 
 
 @dataclass
@@ -142,15 +149,42 @@ class JobView:
     # `jobs.result_version` as loaded with the result: review forms send it back, so a
     # form made before another tab changed the review is refused (web.review).
     result_version: int = 0
+    # While queued: how many of the jobs ahead are this user's, and the estimated wait.
+    ahead_yours: int = 0
+    wait_s: float | None = None
+    # While converting: the stored live progress (`jobs.progress_json`).
+    progress: dict[str, Any] | None = None
+    # The job page's data from the result (`job_page.PageData`), when asked for.
+    page: job_page.PageData | None = None
 
     @property
     def finished(self) -> bool:
         return self.status in {JobStatus.DONE, JobStatus.FAILED}
 
     @property
+    def stage(self) -> str | None:
+        """The step a running conversion is on (`job_page.current_stage`)."""
+        if self.status != JobStatus.RUNNING:
+            return None
+        return job_page.current_stage(self.progress)
+
+    @property
+    def stage_lines(self) -> list[job_page.StageLine]:
+        if self.status != JobStatus.RUNNING:
+            return []
+        return job_page.stage_lines(self.progress)
+
+    @property
     def version(self) -> str:
-        """Changes whenever the status partial would look different (htmx polling)."""
-        return f"{self.status}-{self.pages_done}-{self.queue_ahead}"
+        """Changes whenever the status partial would look different (htmx polling). The
+        status box is a live region, so it changes per step, not per element."""
+        return f"{self.status}-{self.stage or 'none'}-{self.queue_ahead}"
+
+    @property
+    def progress_version(self) -> str:
+        """Changes whenever the list of steps would look different (its own poll)."""
+        lines = "|".join(f"{line.text}:{line.state}" for line in self.stage_lines)
+        return f"{self.status}-{zlib.crc32(lines.encode()):08x}"
 
     @property
     def status_label(self) -> str:
@@ -159,14 +193,11 @@ class JobView:
     @property
     def status_detail(self) -> str:
         if self.status == JobStatus.QUEUED:
-            if self.queue_ahead == 0:
-                return "Your document is next in line."
-            noun = "document" if self.queue_ahead == 1 else "documents"
-            return f"{self.queue_ahead} {noun} ahead of yours."
+            return job_page.queue_sentence(self.queue_ahead, self.ahead_yours, self.wait_s)
         if self.status == JobStatus.RUNNING:
-            return f"{self.pages_done} of {self.page_count} pages done."
+            return job_page.stage_sentence(self.progress)
         if self.status == JobStatus.DONE:
-            return "The accessible HTML is ready."
+            return "The HTML file is ready."
         return job_error_message(self.error_code)
 
 
@@ -221,6 +252,7 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
         list_items=sum(e.kind is Kind.LIST_ITEM for e in result.elements),
         checks_run=len(result.html_checks),
         failed_checks=[_check_line(explain_check(c), severity_label(c)) for c in failed],
+        counts=job_page.breakdown(result.fixes),
     )
 
 
@@ -254,8 +286,80 @@ def queue_ahead(session: Session, job: Job) -> int:
     )
 
 
-def job_view(session: Session, job: Job, *, with_summary: bool = False) -> JobView:
+# Estimates of the wait use the last few finished jobs (seconds per page, start to end);
+# with none to go by, this many seconds per page (a little slower than measured: a
+# 16-page section took 51 s, a 1-page handout about 30 s). Not a setting yet.
+RECENT_JOBS = 20
+DEFAULT_SECONDS_PER_PAGE = 10.0
+
+
+def seconds_per_page(session: Session) -> float:
+    """Recent finished jobs' conversion time per page (content-free: times and counts)."""
+    rows = session.execute(
+        select(Job.started_at, Job.finished_at, Job.page_count)
+        .where(
+            Job.status == JobStatus.DONE,
+            Job.started_at.is_not(None),
+            Job.finished_at.is_not(None),
+            Job.page_count > 0,
+        )
+        .order_by(Job.finished_at.desc())
+        .limit(RECENT_JOBS)
+    ).all()
+    seconds = pages = 0.0
+    for started, finished, count in rows:
+        start, end = as_utc(started), as_utc(finished)
+        if start is not None and end is not None and end > start:
+            seconds += (end - start).total_seconds()
+            pages += count
+    return seconds / pages if pages else DEFAULT_SECONDS_PER_PAGE
+
+
+def queue_wait(session: Session, job: Job) -> tuple[int, float]:
+    """(jobs ahead that are this user's, estimated seconds until this one is done) for a
+    queued job: the pages ahead (in `Worker.claim` order, like `queue_ahead`), what is
+    left of the jobs converting now, and its own pages, at the recent pace."""
+    ahead = session.execute(
+        select(Job.user_id, Job.page_count)
+        .join(User, User.id == Job.user_id)
+        .where(
+            Job.status == JobStatus.QUEUED,
+            User.is_allowed.is_(True),
+            tuple_(Job.attempts, Job.created_at, Job.id)
+            < tuple_(job.attempts, job.created_at, job.id),
+        )
+    ).all()
+    running = session.execute(
+        select(Job.page_count, Job.pages_done).where(Job.status == JobStatus.RUNNING)
+    ).all()
+    pages = sum(count or 0 for _, count in ahead) + (job.page_count or 0)
+    pages += sum(max(0, (count or 0) - (done or 0)) for count, done in running)
+    yours = sum(1 for user_id, _ in ahead if user_id == job.user_id)
+    return yours, pages * seconds_per_page(session)
+
+
+def last_decision(session: Session, job: Job) -> date | None:
+    """The day (UTC) of the job's most recent review decision, if any."""
+    when = as_utc(
+        session.scalar(select(func.max(ReviewEdit.created_at)).where(ReviewEdit.job_id == job.id))
+    )
+    return when.date() if when is not None else None
+
+
+def job_view(
+    session: Session, job: Job, *, with_summary: bool = False, with_page: bool = False
+) -> JobView:
+    """The job's view model. `with_summary`: the counts from its result (the job page and
+    the review list); `with_page`: also the job page's own data (`job_page.PageData`),
+    the queue estimate and the live progress."""
     ahead = queue_ahead(session, job) if job.status == JobStatus.QUEUED else 0
+    yours, wait_s = (
+        queue_wait(session, job) if with_page and job.status == JobStatus.QUEUED else (0, None)
+    )
+    page = None
+    if with_page and job.status == JobStatus.DONE and job.result_json:
+        result = DocumentResult.model_validate(job.result_json)
+        page = job_page.page_data(result, last_decision(session, job))
     return JobView(
         id=job.id,
         filename=job.filename,
@@ -270,6 +374,10 @@ def job_view(session: Session, job: Job, *, with_summary: bool = False) -> JobVi
         cost_usd=job.cost_usd,
         model_calls=job.model_calls,
         queue_ahead=ahead,
-        summary=summarise(job.result_json) if with_summary else None,
+        summary=summarise(job.result_json) if with_summary or with_page else None,
         result_version=job.result_version or 0,
+        ahead_yours=yours,
+        wait_s=wait_s,
+        progress=job.progress_json if job.status == JobStatus.RUNNING else None,
+        page=page,
     )

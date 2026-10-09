@@ -1,10 +1,11 @@
 {% extends "base.html" %}
-{# `outcome` (web/outcome.py): a finished job that is incomplete (a spend cap stopped it,
-   scanned pages), a failed job with its own explanation (scanned, no content, ...), or
-   a queued job waiting for tomorrow's budget. It replaces the plain status everywhere
-   on this page: title, status box and the sections below. #}
+{# The job page (docs/web.md "The job page"). `headline` (web/job_page.py) says what is
+   left to do, from the status, the outcome (web/outcome.py: a stop, scanned pages, an
+   AI outage, tomorrow's budget) and the open decisions; it replaces the plain status
+   everywhere on this page: title, status box and the sections below. `job.page` is the
+   page's data from a finished job's result. #}
 {% set outcome = outcome|default(none) %}
-{% block title %}{{ outcome.label if outcome else job.status_label }}: {{ job.filename }}{% endblock %}
+{% block title %}{{ headline.label }}: {{ job.filename }}{% endblock %}
 {% block head %}
 {% if auto_reload and not job.finished %}
 {# Without JavaScript, and only when the user asked for it (?auto=1), reload until the
@@ -17,10 +18,13 @@
 {% block content %}
 <h1>{{ job.filename }}</h1>
 {% include "_job_course.html" %}
+{# A polite live region that changes per step, not per element: the counts are in the
+   list below it, outside the region (_job_progress.html). #}
 <div id="job-status-region" role="status">
   {% include "_job_status.html" %}
 </div>
 {% if not job.finished %}
+{% include "_job_progress.html" %}
 <p>With JavaScript on, the status above updates by itself. You can also
   <a href="/jobs/{{ job.id }}{% if auto_reload %}?auto=1{% endif %}">refresh the status</a>,
   or leave and come back later.</p>
@@ -35,8 +39,31 @@
 </noscript>
 {% endif %}
 
-{% if job.status == "done" and job.summary %}
+{% if job.status == "done" and job.summary and job.page %}
 {% set s = job.summary %}
+{% set c = s.counts %}
+{% set pg = job.page %}
+{% set review_url = "/jobs/" ~ job.id ~ "/review" ~ ("?item=" ~ pg.first_open if pg.first_open else "") %}
+{% if c.decisions %}
+{# Decisions open: the review is the main action; downloading now is a draft, and the
+   draft link asks first (/jobs/{id}/draft) what students would get. #}
+<ul class="actions" id="next-actions">
+  <li><a class="button" href="{{ review_url }}">Review {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}</a></li>
+  <li><a href="/jobs/{{ job.id }}/view">Preview the student version</a></li>
+  <li><a href="/jobs/{{ job.id }}/draft">Download a draft ({{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} open)</a></li>
+</ul>
+{% else %}
+{% include "_job_ready.html" %}
+{% endif %}
+
+{% if pg.notices.total %}
+{% include "_job_notices.html" %}
+{% endif %}
+
+{% if pg.card %}
+{% include "_job_card.html" %}
+{% endif %}
+
 <section aria-labelledby="results-heading">
   <h2 id="results-heading">Results</h2>
   {% if outcome and outcome.partial %}
@@ -46,41 +73,43 @@
       original, marked “Not converted”.</p>
   </div>
   {% endif %}
+  <p>{{ pg.found }}</p>
+  {# One breakdown (MF6): every item is waiting, accepted for you or decided by you. #}
   <dl class="summary-list">
     <div><dt>Pages</dt><dd>{{ s.pages }}</dd></div>
     <div><dt>Equations</dt><dd>{{ s.by_kind.get("equation", 0) }}</dd></div>
     <div><dt>Figures</dt><dd>{{ s.by_kind.get("figure", 0) }}</dd></div>
     <div><dt>Headings</dt><dd>{{ s.by_kind.get("heading", 0) }}</dd></div>
+    {% if s.by_kind.get("table") %}<div><dt>Tables</dt><dd>{{ s.by_kind["table"] }}</dd></div>{% endif %}
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
-    <div><dt>Need your decision</dt><dd>{{ s.decisions }}</dd></div>
-    <div><dt>Accepted automatically</dt><dd>{{ s.accepted }}</dd></div>
-    <div><dt>Optional checks (accepted; {% if s.second_check %}nothing required, {{ s.second_check }} worth a look{% else %}nothing to do{% endif %})</dt><dd>{{ s.optional }}</dd></div>
-    <div><dt>Not converted (original kept)</dt><dd>{{ s.not_converted }}</dd></div>
-    <div><dt>Reviewed by you (accepted, edited or rejected)</dt><dd>{{ s.reviewed }}</dd></div>
+    <div><dt>Need your decision</dt><dd>{{ c.decisions }}</dd></div>
+    <div><dt>Accepted for you</dt><dd>{{ c.accepted }}{% if c.notes %} <span class="meta">({{ c.notes }} with a note{% if s.second_check %}, {{ s.second_check }} worth a look{% endif %})</span>{% endif %}</dd></div>
+    <div><dt>Decided by you</dt><dd>{{ c.decided }}</dd></div>
     {# Every attempt, including one interrupted before it could store a result. #}
     <div><dt>Model cost</dt><dd>{{ job.cost_usd|usd }}</dd></div>
   </dl>
-  {% if s.decisions %}
+  <p id="items-count">Of the {{ c.items }} {{ "item" if c.items == 1 else "items" }} found,
+    {{ c.waiting }} {{ "waits" if c.waiting == 1 else "wait" }} for your decision,
+    {{ c.accepted }} {{ "was" if c.accepted == 1 else "were" }} accepted for you and
+    {{ c.decided }} {{ "was" if c.decided == 1 else "were" }} decided by you.
+    {% if c.waiting != c.decisions %}The {{ c.waiting }} waiting make {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}: repeated headings are decided together.{% endif %}
+    {% if c.as_image %}{{ c.as_image }} {{ "is" if c.as_image == 1 else "are" }} shown as an image of the original.{% endif %}</p>
+  {% if c.decisions %}
   {# One link per kind, straight to its first decision on the review screen. A group of
      repeated headings is one decision. #}
-  <p id="review-breakdown">{{ s.decisions }} {{ "needs" if s.decisions == 1 else "need" }} your decision:
-    {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("heading", "headings")] if s.review_by_kind.get(kind) %}
+  <p id="review-breakdown">{{ c.decisions }} {{ "needs" if c.decisions == 1 else "need" }} your decision:
+    {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("table", "tables"), ("heading", "headings")] if s.review_by_kind.get(kind) %}
     <a href="/jobs/{{ job.id }}/review{% if s.review_first.get(kind) %}?item={{ s.review_first[kind] }}{% endif %}">{{ s.review_labels.get(kind, s.review_by_kind[kind] ~ " " ~ many) }}</a>{{ "." if loop.last else "," }}
     {% endfor %}
   </p>
   {% endif %}
-  <ul class="actions">
-    <li><a class="button" href="/jobs/{{ job.id }}/review">Review fixes{% if s.decisions %} ({{ s.decisions }} {{ "needs" if s.decisions == 1 else "need" }} your decision){% endif %}</a></li>
-    <li><a href="/jobs/{{ job.id }}/view">Open the accessible HTML</a></li>
-    <li><a href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
-  </ul>
-  <p class="hint">The converted document is a single HTML file with the equations, headings
-    and figure descriptions built in. Check it before you share it with students.</p>
+  <p class="hint">The full list of items, with every note, is on
+    <a href="/jobs/{{ job.id }}/review/list">all items as a list</a>.</p>
   {% if s.checks_run %}
   <h3 id="checks-heading">Automatic checks of the HTML file</h3>
   {% if s.failed_checks %}
   {% set n = s.failed_checks|length %}
-  <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if s.decisions %} (they run again after each review decision){% endif %}:</p>
+  <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if c.decisions %} (they run again after each review decision){% endif %}:</p>
   <ul class="check-list" aria-labelledby="checks-heading">
     {% for check in s.failed_checks %}
     <li><strong>{{ check.severity }}:</strong> {{ check.text }}
@@ -93,6 +122,8 @@
   {% endif %}
   {% endif %}
 </section>
+
+{% include "_job_language.html" %}
 {% elif job.status == "failed" %}
 <section aria-labelledby="failed-heading">
   <h2 id="failed-heading">Why the conversion stopped</h2>
@@ -101,6 +132,7 @@
 </section>
 {% endif %}
 
+{# A secondary action, last on the page (MF17): deleting is confirmed on its own page. #}
 <section aria-labelledby="delete-heading">
   <h2 id="delete-heading">Deleting this document</h2>
   <p>This document and everything made from it will be deleted automatically on
@@ -108,7 +140,7 @@
     improve the tool){% endif %}.</p>
   <form method="post" action="/jobs/{{ job.id }}/delete">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
-    <button type="submit" class="button-danger">Delete now</button>
+    <button type="submit" class="button-secondary">Delete now</button>
   </form>
 </section>
 {% endblock %}

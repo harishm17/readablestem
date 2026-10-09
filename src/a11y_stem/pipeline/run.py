@@ -50,6 +50,15 @@ Design notes:
   (links, cross-references, the document and passage languages, colour runs) runs once
   after layout, before any step; it sets `lang`, `lang_source` and its own notices, and
   never fails the conversion.
+- Live progress (`stage_progress`, for the job page): "layout" when analysis starts and
+  again with the pages and the elements found per kind; "equations", "figures" and
+  "tables" with how many of each are done, first with their totals and then after every
+  element (the receiver decides how often to store them); "assemble" and "checks" as the
+  HTML is written and checked. All on the calling thread, content-free.
+- After the steps, `pipeline.notices` derives the notices that follow from the fixes
+  (a table kept as an image, a scanned page, a colour-only figure, a chart without a
+  long description) and `pipeline.source_facts` measures the PDF for the before/after
+  card. Neither can fail the run.
 """
 
 from __future__ import annotations
@@ -64,7 +73,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Any
 
@@ -88,6 +97,7 @@ from a11y_stem.core.types import (
     PageStats,
     ProgressEvent,
     SourceFacts,
+    Stage,
     Status,
     inline_marker,
 )
@@ -105,7 +115,9 @@ from a11y_stem.pipeline import (
     table_step,
     text_pass,
 )
+from a11y_stem.pipeline import notices as notice_rules
 from a11y_stem.pipeline import options as run_options
+from a11y_stem.pipeline import source_facts as pdf_facts
 
 log = logging.getLogger(__name__)
 
@@ -135,6 +147,12 @@ FATAL_ERRORS: tuple[type[Exception], ...] = (ConfigError, UnknownModelError)
 # Fix.reason of the figure that stands for a scanned page (nothing on it to convert).
 SCANNED_PAGE_REASON = "scanned_page"
 _PAGE_TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
+# The live-progress stage of each kind that goes to a model step.
+_STAGE_OF: dict[Kind, Stage] = {
+    Kind.EQUATION: "equations",
+    Kind.FIGURE: "figures",
+    Kind.TABLE: "tables",
+}
 
 
 class PipelineOutput(ConversionOutput):
@@ -542,6 +560,24 @@ class _Pages:
             self._progress(self.done, self.total)
 
 
+def _send(
+    stage_progress: StageProgressFn | None,
+    stage: Stage,
+    done: int = 0,
+    total: int = 0,
+    counts: dict[str, int] | None = None,
+) -> None:
+    """One `ProgressEvent` to the caller, if it asked for them. Like `progress`, an
+    exception from the receiver aborts the run."""
+    if stage_progress is not None:
+        stage_progress(ProgressEvent(stage=stage, done=done, total=total, counts=counts or {}))
+
+
+def _kind_counts(elements: Iterable[Element]) -> dict[str, int]:
+    """Elements found per kind ("equation": 21), for the "layout" event."""
+    return dict(sorted(Counter(e.kind.value for e in elements).items()))
+
+
 @dataclass
 class _Run:
     """State of one conversion while its steps are in flight."""
@@ -549,7 +585,7 @@ class _Run:
     pdf_bytes: bytes
     settings: Settings
     options: ConversionOptions
-    stage_progress: StageProgressFn | None  # the job-page builder emits ProgressEvents
+    stage_progress: StageProgressFn | None  # live progress by stage, for the job page
     client: VisionClient
     tracer: Tracer
     pages: _Pages
@@ -560,6 +596,28 @@ class _Run:
     crops: dict[str, bytes]
     page_ms: Counter[int]
     futures: dict[Future[_Done], Element]
+    # Per model kind: how many elements it has, and the ids that have their fix.
+    stage_totals: dict[Kind, int] = field(default_factory=dict)
+    stage_done: dict[Kind, set[str]] = field(default_factory=dict)
+
+    def start_stages(self, elements: list[Element]) -> None:
+        """Each model stage's total, counting what was decided before any model work (a
+        scanned page) as done."""
+        for kind, stage in _STAGE_OF.items():
+            members = [e.id for e in elements if e.kind is kind]
+            self.stage_totals[kind] = len(members)
+            self.stage_done[kind] = {i for i in members if i in self.fixes}
+            if members:
+                _send(self.stage_progress, stage, len(self.stage_done[kind]), len(members))
+
+    def step_done(self, element: Element) -> None:
+        """Count one equation, figure or table as done and say so."""
+        stage = _STAGE_OF.get(element.kind)
+        done = self.stage_done.get(element.kind)
+        if stage is None or done is None or element.id in done:
+            return
+        done.add(element.id)
+        _send(self.stage_progress, stage, len(done), self.stage_totals.get(element.kind, 0))
 
     def process_page(self, page: int, elements: list[Element]) -> None:
         """Crop this page's equations, figures and tables here (PyMuPDF), queue their steps."""
@@ -576,12 +634,14 @@ class _Run:
         except Exception as exc:
             log.warning("crop failed: %s", type(exc).__name__)
             self.fixes[element.id] = _failed(element, "crop_error")
+            self.step_done(element)
             return
         self.crops[element.id] = png
         if element.id in self.fixes:  # decided before any model work: a scanned page
             return
         if self.stop.scope is not None:  # still cropped: the output shows the original
             self.fixes[element.id] = _failed(element, self.stop.reason())
+            self.step_done(element)
             return
         work = partial(
             _run_step,
@@ -626,6 +686,7 @@ class _Run:
             self.fixes[element.id] = done.fix
             self.page_ms[element.page] += done.elapsed_ms
         self.pages.finished(element.page)
+        self.step_done(element)
 
 
 # --------------------------------------------------------------------------- results
@@ -782,6 +843,18 @@ def _page_image(page: int, scans: dict[int, BBox], elements: list[Element]) -> E
     )
 
 
+def _source_facts(
+    pdf_bytes: bytes, pages: list[int], elements: list[Element], fixes: list[Fix]
+) -> SourceFacts | None:
+    """`source_facts.measure`, which never raises; None if it did anyway (a bug there
+    must not cost the user a finished conversion)."""
+    try:
+        return pdf_facts.measure(pdf_bytes, pages=pages, elements=elements, fixes=fixes)
+    except Exception as exc:
+        log.warning("source facts failed: %s", type(exc).__name__)
+        return None
+
+
 # --------------------------------------------------------------------------- entry point
 
 
@@ -819,6 +892,7 @@ def _process(
     for element in elements:
         by_page[element.page].append(element)
     try:
+        run.start_stages(elements)
         for page in page_list:
             run.process_page(page, by_page[page])
             run.collect(block=False)  # report finished pages while cropping the rest
@@ -859,9 +933,9 @@ def convert_pdf(
 
     `options` (feature flags, the course's notation) are in force for the whole run, for
     every step to read with `pipeline.options.current()`; None means
-    `ConversionOptions.from_settings(settings)`. `stage_progress` receives a
-    `ProgressEvent` per stage on the calling thread (none are sent yet: the job-page
-    work adds them); like `progress`, an exception from it aborts the run.
+    `ConversionOptions.from_settings(settings)`. `stage_progress` receives
+    `ProgressEvent`s on the calling thread as each stage starts and moves on (see the
+    module docstring); like `progress`, an exception from it aborts the run.
     """
     if options is None:
         options = ConversionOptions.from_settings(settings)
@@ -901,6 +975,7 @@ def _convert(
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
         cached = _CachedDocument(pdf_bytes)
         try:
+            _send(stage_progress, "layout")
             doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
             elements = sorted(doc.elements, key=lambda e: e.order)
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
@@ -908,6 +983,8 @@ def _convert(
             elements, scan_fixes = _with_page_images(elements, scans)
             text = _text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer)
             elements = text.elements
+            read = len(page_list)
+            _send(stage_progress, "layout", read, read, _kind_counts(elements))
             fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
             fixes.update({f.element_id: f for f in scan_fixes})
             run = _Run(
@@ -931,7 +1008,9 @@ def _convert(
             cached.release()  # also when analysis, a step or `progress` failed
 
         ordered = _ordered_fixes(elements, run.fixes)
+        source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
+            _send(stage_progress, "assemble")
             html = assemble.render_html(
                 title=doc.title,
                 lang=text.lang,
@@ -941,6 +1020,7 @@ def _convert(
                 source_note=source_note,
                 notice=notice,
             )
+            _send(stage_progress, "checks")
             checks = html_checks.static_checks(html)
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
@@ -965,9 +1045,14 @@ def _convert(
         stats.latency_ms,
     )
     # Content-free additions of the content features (docs/design/content-features.md):
-    # each feature adds its notices here; the job-page work measures the source facts.
+    # each feature adds its notices here (the text pass's first); those that follow from
+    # the fixes are derived once, then everything is merged (one notice per code and
+    # element, or code and page) and ordered by page and reading order.
     notices: list[Notice] = [*text.notices]
-    source_facts: SourceFacts | None = None
+    derived = notice_rules.from_fixes(
+        elements, ordered, long_descriptions=options.long_descriptions
+    )
+    notices = notice_rules.ordered(notice_rules.merge(derived, notices), elements)
     result = DocumentResult(
         pipeline_version=PIPELINE_VERSION,
         prompt_versions=_prompt_versions(ordered),

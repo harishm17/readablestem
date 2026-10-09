@@ -42,7 +42,9 @@ figcaption { margin-top: 0.5em; }
 .flag-note { margin: 0.75em 0 0; }
 .flag-label { font-weight: 700; }
 .original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
-.about { border-top: 2px solid #1b1b1b; margin-top: 3em; padding-top: 0.5em; }
+.about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
+  border-top: 2px solid #1b1b1b; }
+@media (min-width: 44rem) { .about { margin: 0 auto; } }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
 </style>
@@ -62,12 +64,14 @@ figcaption { margin-top: 0.5em; }
 <p id="p2-e3"><strong>NOTE TO STUDENTS</strong></p>
 <div class="decorative" id="p2-e4"></div>
 <p id="p2-e5">The slope of a position-time graph is the velocity.</p>
-<section id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
-<h2 id="about-conversion-title">About this conversion</h2>
-<p>This file was produced with a11y-stem, which assists with accessibility; review it before publishing.</p>
-<ul><li>Headings (3): 1 accepted, 1 needs review, 1 rejected by a reviewer</li><li>Equations (5): 2 accepted, 1 not converted (model unsure), 1 not converted (error or spending limit), 1 rejected by a reviewer</li><li>Figures (3): 2 accepted, 1 not converted (model unsure)</li></ul>
-<p>4 items could not be converted. They keep the original (an image of the page where one is available), outlined and labelled &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;.</p><p>Sample written for tests.</p>
-</section>
 </main>
+<footer id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
+<h2 id="about-conversion-title">About this version</h2>
+<p>This is a web version of a PDF from your course, made with a11y-stem, a tool that assists with accessibility. Its equations are written so that screen readers can read them aloud.</p>
+<p>Some parts were made by the tool and have not been checked by your instructor yet.</p>
+<p>Some parts could not be converted. They are shown as pictures of the original, marked &ldquo;Not converted&rdquo; or &ldquo;Needs a description&rdquo;: ask your instructor for a version you can read.</p>
+<p>If something is hard to read or looks wrong, tell your instructor.</p>
+<p>Sample written for tests.</p>
+</footer>
 </body>
 </html>

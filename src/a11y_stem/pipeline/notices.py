@@ -1,0 +1,155 @@
+"""Notices that follow from the fixes, and one list of notices for the job page.
+
+A notice (`core.types.Notice`) is something the job page lists beyond the review
+decisions: "Not handled in this file" (review "required" or "none") and "Worth checking"
+(review "optional"). It never adds a decision: when one is needed, the decision is the
+fix with the same `element_id`, and only fixes count (docs/design/content-features.md,
+"Notices").
+
+Some notices are facts about a fix, so they are derived here from the fixes rather than
+written by the steps (the figure and table work only set their fix fields):
+
+- `table_not_rebuilt` (required): a table shown as an image of the original, because
+  the step did not rebuild it, a spend cap stopped it, or the reviewer kept the image;
+- `scanned_page` (required): the figure that stands for a scanned page;
+- `colour_only` (optional): a figure with `FigureFix.colour_only`;
+- `long_description_missing` (optional): a chart or diagram without a long
+  description, when long descriptions are on.
+
+Other notices (the text pass's links, colour and language codes, layout facts) come
+with the result and are merged in unchanged. `current(result)` derives the fix-based
+ones again from the fixes as they are now, so the job page stays true after review
+decisions (a table rebuilt by hand is no longer "not rebuilt").
+
+Content-free: codes, pages, element ids and counts only (rule 1).
+"""
+
+from __future__ import annotations
+
+from collections.abc import Iterable
+from typing import Literal
+
+from a11y_stem.core.types import (
+    KEPT_ORIGINAL_STATUSES,
+    DocumentResult,
+    Element,
+    Fix,
+    Kind,
+    Notice,
+)
+
+TABLE_NOT_REBUILT = "table_not_rebuilt"
+SCANNED_PAGE = "scanned_page"
+COLOUR_ONLY = "colour_only"
+LONG_DESCRIPTION_MISSING = "long_description_missing"
+# Codes this module derives from the fixes; any stored notice with one of them is
+# replaced by `current`.
+DERIVED_CODES = frozenset({TABLE_NOT_REBUILT, SCANNED_PAGE, COLOUR_ONLY, LONG_DESCRIPTION_MISSING})
+# Figures that need more than short alt text (W3C "complex images").
+COMPLEX_FIGURES = frozenset({"chart", "diagram"})
+# Where a notice is listed on the job page.
+Section = Literal["not_handled", "worth_checking"]
+
+
+def section(notice: Notice) -> Section:
+    """ "Not handled in this file" for required and none, "Worth checking" for optional."""
+    return "worth_checking" if notice.review == "optional" else "not_handled"
+
+
+def _not_rebuilt(fix: Fix) -> bool:
+    """A table shown as an image of the original: the step did not rebuild it ("table
+    not rebuilt", or a spend cap stopped it), or the reviewer kept the image. A table
+    whose rebuilt grid is used (accepted, waiting, or rebuilt by the reviewer) is not."""
+    return fix.kind is Kind.TABLE and fix.status in KEPT_ORIGINAL_STATUSES
+
+
+def _missing_long_description(fix: Fix) -> bool:
+    figure = fix.figure
+    if fix.kind is not Kind.FIGURE or figure is None or figure.decorative:
+        return False
+    if figure.figure_type not in COMPLEX_FIGURES:
+        return False
+    return not (figure.long_description or "").strip()
+
+
+def from_fixes(
+    elements: Iterable[Element], fixes: Iterable[Fix], *, long_descriptions: bool
+) -> list[Notice]:
+    """The notices that follow from these fixes, one per (code, element), in reading
+    order. `long_descriptions`: whether the run wrote long descriptions (the flag);
+    without it, a chart without one is the expected output, not something to check."""
+    page_of = {e.id: e.page for e in elements}
+    found: list[Notice] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add(code: str, fix: Fix, review: Literal["required", "optional", "none"]) -> None:
+        if (code, fix.element_id) in seen:
+            return
+        seen.add((code, fix.element_id))
+        found.append(
+            Notice(code=code, page=page_of.get(fix.element_id), element_id=fix.element_id,
+                   review=review)
+        )  # fmt: skip
+
+    for fix in fixes:
+        if _not_rebuilt(fix):
+            add(TABLE_NOT_REBUILT, fix, "required")
+        if fix.kind is Kind.FIGURE and fix.reason == SCANNED_PAGE:
+            add(SCANNED_PAGE, fix, "required")
+        if fix.figure is not None and fix.figure.colour_only:
+            add(COLOUR_ONLY, fix, "optional")
+        if long_descriptions and _missing_long_description(fix):
+            add(LONG_DESCRIPTION_MISSING, fix, "optional")
+    return found
+
+
+def _key(notice: Notice) -> tuple[str, str | int | None]:
+    """One notice per (code, element), or per (code, page) for those without one."""
+    if notice.element_id is not None:
+        return notice.code, notice.element_id
+    return notice.code, notice.page
+
+
+def merge(*groups: Iterable[Notice]) -> list[Notice]:
+    """Every notice once: the first one for a (code, element); page-level notices for
+    the same (code, page) add up their counts. Order: first seen."""
+    merged: dict[tuple[str, str | int | None], Notice] = {}
+    for group in groups:
+        for notice in group:
+            key = _key(notice)
+            known = merged.get(key)
+            if known is None:
+                merged[key] = notice.model_copy()
+            elif notice.element_id is None:
+                known.count += notice.count
+    return list(merged.values())
+
+
+def ordered(notices: Iterable[Notice], elements: Iterable[Element] = ()) -> list[Notice]:
+    """Whole-document notices first, then by page and reading order (stable)."""
+    order = {e.id: e.order for e in elements}
+    far = 1 << 30
+    return sorted(
+        notices,
+        key=lambda n: (
+            -1 if n.page is None else n.page,
+            order.get(n.element_id or "", far if n.element_id else -1),
+        ),
+    )
+
+
+def current(result: DocumentResult) -> list[Notice]:
+    """The result's notices as the job page lists them now: the fix-based ones derived
+    again from the fixes as they are (after review decisions), merged with the stored
+    notices of every other code, in page and reading order.
+
+    Whether the run wrote long descriptions is not stored; a stored
+    `long_description_missing` notice, or any figure with a long description, says it
+    did (without either, there is nothing to report either way).
+    """
+    long_descriptions = any(n.code == LONG_DESCRIPTION_MISSING for n in result.notices) or any(
+        f.figure is not None and f.figure.long_description for f in result.fixes
+    )
+    derived = from_fixes(result.elements, result.fixes, long_descriptions=long_descriptions)
+    kept = [n for n in result.notices if n.code not in DERIVED_CODES]
+    return ordered(merge(derived, kept), result.elements)

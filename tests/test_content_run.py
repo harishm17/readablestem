@@ -169,19 +169,27 @@ def test_a_table_step_sees_its_neighbouring_text(recorder):
     )
 
 
-def test_the_new_result_fields_start_empty(recorder):
+def test_the_new_result_fields_are_filled_in(recorder):
+    """The table kept as an image is a notice beside its decision; the source facts come
+    from the elements when the PDF itself cannot be read (this one is not a PDF)."""
     result = convert().result
-    assert result.source_facts is None
-    # Two short sentences are too little text to detect a language from: "en" is assumed,
-    # with the text pass's notice to confirm it.
+    # The text pass's document-wide notice first (two short sentences are too little
+    # text to detect a language from, so "en" is assumed and the job page asks to
+    # confirm it), then the table kept as an image, derived from its fix.
+    assert [(n.code, n.element_id, n.review) for n in result.notices] == [
+        ("lang_assumed", None, "optional"),
+        ("table_not_rebuilt", "p1-e1", "required"),
+    ]
+    assert result.source_facts is not None
+    assert (result.source_facts.equations, result.source_facts.tables) == (1, 1)
+    assert result.source_facts.tagged is None
     assert (result.lang, result.lang_source) == ("en", "default")
-    assert [n.code for n in result.notices] == ["lang_assumed"]
 
 
 def test_stage_progress_is_accepted(recorder):
     events: list[ProgressEvent] = []
     convert(stage_progress=events.append)
-    assert all(isinstance(e, ProgressEvent) for e in events)
+    assert events and all(isinstance(e, ProgressEvent) for e in events)
 
 
 def test_the_table_step_keeps_tables_as_images_until_it_is_built():

@@ -1,0 +1,22 @@
+{# The document's language and where it came from, with a small control to confirm or
+   change it (POST /jobs/{id}/language: CSRF-checked, owner only; the HTML file is made
+   again with the new language). Screen readers choose their voice from it. #}
+<section aria-labelledby="language-heading">
+  <h2 id="language-heading">Language</h2>
+  <p>Language: {{ pg.language }}.</p>
+  {% if pg.language_check %}
+  <p class="hint">Screen readers use it to choose a voice, so check it is right.</p>
+  {% endif %}
+  <form method="post" action="/jobs/{{ job.id }}/language">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field">
+      <label for="document-language">Language of this document</label>
+      <select id="document-language" name="lang">
+        {% for tag, name in pg.language_choices %}
+        <option value="{{ tag }}"{% if tag == pg.lang %} selected{% endif %}>{{ name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <button type="submit" class="button-secondary">{{ "Confirm this language" if pg.language_check else "Use this language" }}</button>
+  </form>
+</section>
