@@ -36,6 +36,7 @@ import dataclasses
 import hashlib
 import json
 import logging
+import time
 from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, date, datetime
@@ -58,6 +59,9 @@ REQUESTS_FILE = HERE / "canary_requests.json"
 EXPECTED_FILE = HERE / "canary_expected.json"
 TOLERANCE = 0.02
 CANARY_MAX_USD = 0.02  # ~50x a run's worst case; a run costs about $0.001
+# A run takes about 3 s. If the API hangs (10 s timeout per request), the cases left
+# after this long count as failed, so the cron request it runs in stays short.
+CANARY_DEADLINE_S = 60.0
 SCHEMA = 1
 CANARY_STEP = "canary"
 REFUSED = "refused"
@@ -199,18 +203,25 @@ def run_canary(
     model: str,
     cases: Iterable[Case] | None = None,
     expected: Mapping[str, Any] | None = None,
+    deadline_s: float = CANARY_DEADLINE_S,
+    clock: Callable[[], float] = time.monotonic,
 ) -> CanaryResult:
     """Send every case once and compare with the expected answers.
 
     Stops at the first refused reservation (the remaining cases count as failed with
-    "budget_exceeded"). Never raises for provider problems (they are failed cases).
+    "budget_exceeded") and once `deadline_s` has passed ("deadline"). Never raises for
+    provider problems (they are failed cases).
     """
+    started = clock()
     cases = list(load_cases() if cases is None else cases)
     expected_cases: Mapping[str, Any] = (load_expected() if expected is None else expected).get(
         "cases", {}
     )
     result = CanaryResult(cases=len(cases))
     for index, case in enumerate(cases):
+        if clock() - started > deadline_s:
+            result.failed += [(c.id, "deadline") for c in cases[index:]]
+            break
         sha = request_sha(case.request, model)
         try:
             answer = decider.decide(case.request)

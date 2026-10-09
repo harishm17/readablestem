@@ -264,7 +264,8 @@ of the model or the service, seen the day it happens.
   Fail-open: nothing about the canary changes the cron's response or its status code.
   Off with `DECISIONS_CANARY=false`, and never with `ENV=test`, `FAKE_MODELS` or no
   key. It reserves through a `JobBudget` of $0.02 on the daily spend cap; a run costs
-  about $0.00075. `ops cron` (the by-hand cron) does not run it; use the command below.
+  about $0.00075 and takes about 3 s; cases still unsent after 60 s count as failed
+  (`deadline`), so a hanging API cannot hold the cron request. `ops cron` (the by-hand cron) does not run it; use the command below.
 - **By hand:** `uv run --env-file .env a11y-stem ops decisions-canary --max-usd 0.02`
   (exit 0 no drift, 1 drift, 2 could not compare). After a deliberate change (new
   question wording, new canary cases) or a drift you have looked at and accept:

@@ -246,6 +246,15 @@ def test_a_refused_reservation_stops_the_run_and_fails_the_rest():
     assert {o for _, o in result.failed} == {"budget_exceeded"}
 
 
+def test_a_slow_run_stops_at_its_deadline():
+    ticks = iter(range(1000))
+    result = canary.run_canary(
+        Replay(), model="gpt-6-luna", deadline_s=4.5, clock=lambda: float(next(ticks))
+    )
+    assert result.status == "failed" and result.compared == 4
+    assert {o for _, o in result.failed} == {"deadline"}
+
+
 def test_expectations_for_other_requests_are_stale_not_compared():
     expected = canary.load_expected()
     expected["cases"]["text-root-true"]["request_sha"] = "0" * 64
