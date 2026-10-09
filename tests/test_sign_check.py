@@ -374,6 +374,28 @@ def test_typed_ascii_relations_still_catch_a_changed_sign():
     assert differs("x<-1", r"x <= -1") == (signs.LESS, signs.LESS_EQUAL)
 
 
+def test_an_overline_bar_does_not_hide_a_dropped_minus():
+    # Review 2026-10-08: latex2mathml writes \overline's and \underline's bar as U+2015 in
+    # an accent <mo>, which counted as an uncertain minus and covered one dropped minus.
+    for latex in (r"\overline{x}", r"\underline{x}"):
+        got = signs.mathml_signs(mathml(latex))
+        assert not got.certain and not got.uncertain, latex
+    # Chromium prints the bar as U+2015, which the text layer treats as uncertain.
+    layer = f"―{IT['x']}= −3"
+    assert differs(layer, r"\overline{x} = -3") == ()
+    assert differs(layer, r"\overline{x} = 3") == (signs.MINUS,)
+    assert differs(f"¯{IT['x']}= −2.5 m", r"\overline{x} = 2.5\ \text{m}") == (signs.MINUS,)
+
+
+def test_latex_pdf_overline_with_a_dropped_minus():
+    # TeX draws \bar and \overline without a minus-like glyph (¯ or a rule).
+    element = equation(layout_of(LATEX / "problem_set.pdf"), "¯v = ∆x ∆t = xf −x0 tf −t0 .")
+    tail = r"= \frac{\Delta x}{\Delta t} = \frac{x_f - x_0}{t_f - t_0}."
+    assert differs(element.text, r"\overline{v} " + tail) == ()
+    dropped = r"\overline{v} = \frac{\Delta x}{\Delta t} = \frac{x_f - x_0}{t_f t_0}."
+    assert differs(element.text, dropped) == (signs.MINUS,)
+
+
 def test_a_dropped_multiplication_sign_between_vectors_is_not_a_swap():
     # Only a swap of × and · is meaning-level: a missing sign may be juxtaposition
     # (a scalar times a vector), which the text layer cannot tell apart.

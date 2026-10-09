@@ -65,7 +65,8 @@ create a flag on its own:
 - MathML: `<mo>`, `<mi>` and `<mn>` are maths, so their signs are certain (a leading
   minus inside `<mn>` included; latex2mathml writes ± and ∼ as `<mi>`). An accent (the
   `<mo>` script of `<mover>`/`<munder>`: \\vec's arrow, \\tilde's ~) is uncertain:
-  Chromium prints it as a standalone →, TeX as a combining accent or not at all. A
+  Chromium prints it as a standalone →, TeX as a combining accent or not at all. The bar
+  of \\overline and \\underline (U+2015 there) is no sign at all: TeX draws a rule. A
   relation after latex2mathml's \\not (a zero-width slash) is uncertain, and so is its
   negation: TeX composes the two into ≠, Chromium prints them apart. In
   `<mtext>` a hyphen between letters or digits is a word hyphen and is skipped
@@ -407,7 +408,11 @@ def _count_math(text: str, out: SignTokens, *, accent: bool, negated: bool = Fal
     counts = out.uncertain if accent else out.certain
     for ch in unicodedata.normalize("NFC", text):
         if ch in _LOOSE_DASHES:
-            out.uncertain[MINUS] += 1
+            # In an accent it is the bar of \overline or \underline (latex2mathml writes
+            # U+2015), which TeX draws as a rule and Chromium prints as U+2015, which the
+            # text layer counts as uncertain itself: not a minus here.
+            if not accent:
+                out.uncertain[MINUS] += 1
         elif ch in _DASHES:
             counts[MINUS] += 1  # in a maths token a hyphen is a minus
         elif ch in _SIGNS:
