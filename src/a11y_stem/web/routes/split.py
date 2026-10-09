@@ -905,7 +905,9 @@ def split_page(
         else None,
         "decided_lines": builder.decided_lines(),
         # Undo, in the notice after a decision: only for the write this page shows.
-        "undo": bool(notice) and undo_offer(request, builder.job_id, user, builder.version),
+        "undo": bool(notice)
+        and flashes[-1].get("undo", True) is not False
+        and undo_offer(request, builder.job_id, user, builder.version),
         # The item the last decision saved (app.js forgets a kept draft of it).
         "saved_target": target if ELEMENT_ID.match(target) else "",
     }

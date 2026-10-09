@@ -378,6 +378,10 @@ def test_using_bold_omega_offers_to_remember_it(reviewing):
     after = reviewing.browser.get(response.headers["location"]).text
     assert "Remembered for Physics 1: bold ω is a vector." in text_of(after)
     assert "Remember for Physics 1" not in text_of(after)  # offered once, after the decision
+    # Remembering is no review write: no Undo under it (it would undo the edit before).
+    assert 'action="/jobs/' + reviewing.job_id + '/undo"' not in after
+    # The decision's own notice still offers Undo.
+    assert 'action="/jobs/' + reviewing.job_id + '/undo"' in page
 
 
 def test_a_decision_that_settles_no_style_offers_nothing(reviewing):

@@ -308,7 +308,9 @@ def remember(
         else:
             message = f"Remembered for {course.name}: {phrase(canonical, meaning)}."
             log_event(logger, "notation_added", course_id=course_id, source="review")
-    flash(request, message)
+    # Remembering is no review write: the Undo shown under a decision's notice would
+    # take back the decision before it, so none is offered here.
+    flash(request, message, undo=False)
     return RedirectResponse(back, status_code=303)
 
 
