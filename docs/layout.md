@@ -484,7 +484,7 @@ single letters (mostly variables), symbols, styled maths letters and code-like t
 needs at least 100 letters of such prose and a probability of 0.90. A paragraph or list
 item gets `Element.lang` when it has at least 40 characters of prose, at least 60 % of
 its tokens are words, and the detector gives another language than the document's with
-a probability of at least 0.98. Headings are never marked. Checked on about 230 pages of
+a probability of at least 0.98. Headings are never marked. Tried on about 230 pages of
 English course material and reports (OpenStax pages, LaTeX notes and slides, the layout
 fixtures, accessibility reports, a Federal Register notice, an arXiv paper, a 59-page
 chapter): no passage was marked; the French quotation of the LaTeX fixture is.

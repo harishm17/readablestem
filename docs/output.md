@@ -230,7 +230,7 @@ items and headings; offsets are into the stored text, markers included.
 
 - **Web and email links** ("uri") keep the PDF's visible text as the link text, never an
   `aria-label` in its place (WCAG 2.5.3, label in name), and are written only while
-  `href` is http, https or mailto (`core.types.is_safe_href`, checked again when the
+  `href` is http, https or mailto (`core.types.is_safe_href`, tested again when the
   file is written). Any other PDF link (ftp, a file, a program, javascript) is not
   written; its text stays, and the job page lists the notice `link_scheme_dropped`.
 - **Links inside the document** ("internal": a PDF link to a place in it; "crossref":
