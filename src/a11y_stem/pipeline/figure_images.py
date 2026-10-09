@@ -82,10 +82,7 @@ def student_image(png: bytes, figure_type: str | None) -> tuple[str, bytes]:
                 return "image/jpeg", jpeg
             if scale == 1.0:
                 return "image/png", png
-            # Line art can grow when scaled (smoothed edges compress worse): keep the
-            # crop's own PNG then, which is sharper too.
-            scaled = pixmap.tobytes("png")
-            return "image/png", (scaled if len(scaled) < len(png) else png)
+            return "image/png", pixmap.tobytes("png")
         except Exception as exc:  # a bad image never fails the document: keep the crop
             log.warning("figure image kept as it is: %s", type(exc).__name__)
             return "image/png", png
