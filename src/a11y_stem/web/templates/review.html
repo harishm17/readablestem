@@ -110,7 +110,7 @@
   {% set err = item.errors.get("latex") %}
   <div class="field{% if err %} field-error{% endif %}">
     <label for="latex-{{ eid }}">LaTeX for {{ name }}</label>
-    <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Change it and choose Save edit to check it again and update the MathML.{% else %}Type the LaTeX for the equation in the image, then choose Save edit.{% endif %}</p>
+    <p class="hint" id="latex-hint-{{ eid }}">{% if item.values.get("latex") %}Save edit checks your LaTeX against the PDF, as it does a proposal, and uses it.{% else %}Type the LaTeX for the equation in the image, then choose Save edit.{% endif %}</p>
     {% if err %}<p class="error-message" id="latex-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
     <textarea id="latex-{{ eid }}" name="latex" rows="3" spellcheck="false" autocapitalize="off" data-edit-field
               aria-describedby="latex-hint-{{ eid }}{% if err %} latex-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ item.values.get("latex", "") }}</textarea>
