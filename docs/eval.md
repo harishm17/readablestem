@@ -466,7 +466,7 @@ once their review labels exist as gold.
 Public demo:
 
 A provisional demo is committed: OpenStax *Physics* 2.3 "Position vs. Time Graphs" (13 PDF
-pages, 28 model calls, $0.027, built 2026-10-08 with the real models; axe-core clean at
+pages, 27 model calls, $0.026, built 2026-10-09 with the real models on pipeline 0.3.0; axe-core clean at
 1100 and 320 CSS px). It shows the pipeline's proposals as they come, including ones a
 reviewer would fix (equation 2.5 has a plain v where the book has a bold vector).
 TODO(Harish): keep this page or choose another, then rebuild with the command below. A
@@ -482,17 +482,17 @@ and a link to the original), `report.json` (the `DocumentResult` without the HTM
 `source.pdf` (the exact input) to `src/a11y_stem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
-## Results (2026-10-08, beta code, gpt-6.1-sol and gpt-6-luna)
+## Results (pipeline 0.3.0, 2026-10-09, gpt-6.1-sol and gpt-6-luna)
 
 Reports: `data/eval/latest-<task>.json`. Sample: 3 sections of OpenStax *Physics* ch. 2 (CC
 BY 4.0). Small: read the confidence intervals before reading the point estimates.
 
 | Task | n | Headline | Cost |
 |---|---|---|---|
-| equations | 30 | exact_lenient 0.767 (95% CI 0.591-0.882; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.865 | $0.0016 per equation |
+| equations | 30 | exact_lenient 0.733 (95% CI 0.556-0.858; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.861 | $0.0018 per equation |
 | headings | 121 | recall 1.000 (CI 0.969-1.000), level accuracy 0.992, precision 0.877 (every extra is NEEDS_REVIEW) | no model calls |
-| figures | 13 | image-aware judge pass 0.923 (CI 0.667-0.986), factual errors 0 (judge not yet calibrated) | $0.0035 per figure |
-| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations | $0.0032 per PDF page |
+| figures | 13 | image-aware judge pass 0.923 (CI 0.667-0.986), factual errors 0 (judge not yet calibrated) | $0.0036 per figure |
+| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations | $0.0033 per PDF page |
 
 How the equations number got there (error analysis on real runs, same 30 equations):
 
@@ -650,9 +650,17 @@ writes `\Delta` as U+2206 INCREMENT, which is not a letter, so every correct `\D
 from a LaTeX PDF needed a decision. It now counts as `Δ` (no recorded answer changes:
 none of them has a TeX `\Delta`).
 
-TODO(Harish): after this merges, re-run the four tasks and commit the new
-`data/eval/latest-*.json` (0.3.0); the 0.2.0 ones stay valid for everything but review
-load.
+### Re-run under 0.3.0 (2026-10-09)
+
+The four tasks were re-run on the merged code (sign check, second automated check and
+Split View) and committed as `data/eval/latest-*.json`; $0.28 in all. Headings are
+unchanged (no model calls). Equations: exact_lenient 0.733 (0.767 on 2026-10-08; the
+same 30 items, inside each other's CI: the models are not deterministic). Of the 8
+misses, 5 are the known scorer gaps, one is a bold subscript and one a misplaced comma
+(both small, accepted with no note), and one, 2.3 eq-003, was kept for a decision: no
+meaning-level miss was accepted. Document: required decisions 0.233 per PDF page (10),
+optional notes 0.535; figures: judge pass 0.923, one second-check note. The demo was
+rebuilt on the same code (27 model calls, $0.026).
 
 ## Second automated check (2026-10-08, ADR 0005)
 
