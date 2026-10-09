@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-10-08",
-  "pipeline_version": "0.2.0",
+  "date": "2026-10-09",
+  "pipeline_version": "0.3.0",
   "prompt_versions": {},
   "models": {
     "main": "gpt-6.1-sol",
     "cheap": "gpt-6-luna"
   },
   "models_used": [],
-  "client": "fake",
+  "client": "openai",
   "dataset": {
     "gold_dir": "data/gold",
     "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
@@ -35,12 +35,12 @@
     "level_accuracy": 0.9917355371900827,
     "precision_by_status": {
       "accepted": {
-        "n": 77,
-        "precision": 1.0
+        "n": 97,
+        "precision": 0.9690721649484536
       },
       "needs_review": {
-        "n": 61,
-        "precision": 0.7213114754098361
+        "n": 41,
+        "precision": 0.6585365853658537
       }
     },
     "recall_by_context": {
@@ -123,7 +123,90 @@
         "error": null
       }
     ],
-    "page_errors": {}
+    "page_errors": {},
+    "review_load": {
+      "required_decisions": 9,
+      "required_fixes": 41,
+      "optional": 20,
+      "none": 77,
+      "required_by_kind": {
+        "heading": 9
+      },
+      "optional_by_kind": {
+        "heading": 20
+      },
+      "required_by_reason": {
+        "heading.repeated_label": 41,
+        "heading.weak_evidence": 41
+      },
+      "optional_by_reason": {
+        "heading.weak_evidence": 20
+      },
+      "sections": 3,
+      "pdf_pages": 43,
+      "required_per_section": 3.0,
+      "required_per_pdf_page": 0.2093,
+      "optional_per_pdf_page": 0.4651,
+      "flags": {
+        "units": 106,
+        "required_units": 9,
+        "required_units_wrong": 5,
+        "wrong": 18,
+        "wrong_required": 14,
+        "flag_precision": 0.5555555555555556,
+        "flag_recall": 0.7777777777777778
+      },
+      "wrong_not_required": [
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Displacement Problems",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "wrong_level",
+          "gold_level": 5
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Solution",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Discussion",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Procedure",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        }
+      ]
+    }
   },
   "cost": {
     "total_usd": 0.0,
@@ -131,6 +214,9 @@
     "per_item_usd": 0.0,
     "per_item_unit": "page",
     "model_calls": 0,
+    "verifier_usd": 0.0,
+    "verifier_per_item_usd": 0.0,
+    "verifier_requests": 0,
     "budget_spent_usd": 0.0,
     "budget_calls": 0,
     "dropped_usd": 0.0

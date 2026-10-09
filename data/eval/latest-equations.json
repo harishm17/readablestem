@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "task": "equations",
-  "date": "2026-10-08",
-  "pipeline_version": "0.2.0",
+  "date": "2026-10-09",
+  "pipeline_version": "0.3.0",
   "prompt_versions": {
     "equation": "equation-df0e12f1"
   },
@@ -28,25 +28,25 @@
   "stopped_reason": null,
   "metrics": {
     "exact_strict": 0.4,
-    "exact_lenient": 0.7666666666666667,
+    "exact_lenient": 0.7333333333333333,
     "exact_lenient_ci95": [
-      0.5907167369328042,
-      0.8820761191944214
+      0.5555203815871325,
+      0.8581733675241899
     ],
-    "mean_teds": 0.864787814230452,
+    "mean_teds": 0.8614544808971188,
     "proposal_rate": 1.0,
     "by_status": {
       "accepted": {
         "n": 29,
         "share": 0.9666666666666667,
-        "exact_lenient": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "exact_lenient": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       "needs_review": {
         "n": 1,
         "share": 0.03333333333333333,
         "exact_lenient": 0.0,
-        "mean_teds": 0.9705882352941176
+        "mean_teds": 0.8
       }
     },
     "by_route": {
@@ -54,27 +54,27 @@
         "n": 8,
         "share": 0.26666666666666666,
         "exact_lenient": 1.0,
-        "mean_teds": 0.9125
+        "mean_teds": 0.9375
       },
       "main": {
         "n": 17,
         "share": 0.5666666666666667,
-        "exact_lenient": 0.5882352941176471,
-        "mean_teds": 0.8633510447204057
+        "exact_lenient": 0.5294117647058824,
+        "mean_teds": 0.8574686917792291
       },
       "escalated": {
         "n": 5,
         "share": 0.16666666666666666,
         "exact_lenient": 1.0,
-        "mean_teds": 0.7933333333333333
+        "mean_teds": 0.7533333333333333
       }
     },
     "by_display": {
       "block": {
         "n": 17,
         "share": 0.5666666666666667,
-        "exact_lenient": 0.5882352941176471,
-        "mean_teds": 0.8633510447204057
+        "exact_lenient": 0.5294117647058824,
+        "mean_teds": 0.8574686917792291
       },
       "inline": {
         "n": 13,
@@ -88,87 +88,238 @@
         "threshold": 0.5,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7666666666666667,
-        "mean_teds": 0.864787814230452
+        "accuracy": 0.7333333333333333,
+        "mean_teds": 0.8614544808971188
       },
       {
         "threshold": 0.55,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7666666666666667,
-        "mean_teds": 0.864787814230452
+        "accuracy": 0.7333333333333333,
+        "mean_teds": 0.8614544808971188
       },
       {
         "threshold": 0.6,
         "kept": 29,
         "coverage": 0.9666666666666667,
-        "accuracy": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.65,
         "kept": 29,
         "coverage": 0.9666666666666667,
-        "accuracy": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.7,
         "kept": 29,
         "coverage": 0.9666666666666667,
-        "accuracy": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.75,
         "kept": 29,
         "coverage": 0.9666666666666667,
-        "accuracy": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.8,
         "kept": 29,
         "coverage": 0.9666666666666667,
-        "accuracy": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.85,
         "kept": 29,
         "coverage": 0.9666666666666667,
-        "accuracy": 0.7931034482758621,
-        "mean_teds": 0.8611395238489464
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.9,
-        "kept": 28,
-        "coverage": 0.9333333333333333,
-        "accuracy": 0.7857142857142857,
-        "mean_teds": 0.8633230782721231
+        "kept": 29,
+        "coverage": 0.9666666666666667,
+        "accuracy": 0.7586206896551724,
+        "mean_teds": 0.8635736009280539
       },
       {
         "threshold": 0.95,
-        "kept": 22,
-        "coverage": 0.7333333333333333,
-        "accuracy": 0.8181818181818182,
-        "mean_teds": 0.8723918066293432
+        "kept": 23,
+        "coverage": 0.7666666666666667,
+        "accuracy": 0.7391304347826086,
+        "mean_teds": 0.8757041479357965
       }
-    ]
+    ],
+    "review_load": {
+      "required": 1,
+      "optional": 1,
+      "required_per_item": 0.0333,
+      "optional_per_item": 0.0333,
+      "sections": 3,
+      "required_per_section": 0.3333,
+      "optional_per_section": 0.3333,
+      "required_by_reason": {
+        "style_mismatch": 1
+      },
+      "optional_by_reason": {
+        "style_cosmetic": 1
+      },
+      "flags": {
+        "units": 30,
+        "required_units": 1,
+        "required_units_wrong": 1,
+        "wrong": 8,
+        "wrong_required": 1,
+        "flag_precision": 1.0,
+        "flag_recall": 0.125
+      },
+      "scorer_gaps": [
+        "openstax/physics/2-2-speed-and-velocity/eq-003",
+        "openstax/physics/2-2-speed-and-velocity/eq-004",
+        "openstax/physics/2-2-speed-and-velocity/eq-010",
+        "openstax/physics/2-3-position-vs-time-graphs/eq-004",
+        "openstax/physics/2-3-position-vs-time-graphs/eq-007"
+      ],
+      "flags_excluding_scorer_gaps": {
+        "units": 25,
+        "required_units": 1,
+        "required_units_wrong": 1,
+        "wrong": 3,
+        "wrong_required": 1,
+        "flag_precision": 1.0,
+        "flag_recall": 0.3333333333333333
+      },
+      "wrong_not_required": [
+        {
+          "id": "openstax/physics/2-2-speed-and-velocity/eq-003",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/physics/2-2-speed-and-velocity/eq-004",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/physics/2-2-speed-and-velocity/eq-007",
+          "review": "optional",
+          "reasons": [
+            "style_cosmetic"
+          ],
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/physics/2-2-speed-and-velocity/eq-010",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/physics/2-3-position-vs-time-graphs/eq-004",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": true
+        },
+        {
+          "id": "openstax/physics/2-3-position-vs-time-graphs/eq-005",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": false
+        },
+        {
+          "id": "openstax/physics/2-3-position-vs-time-graphs/eq-007",
+          "review": "none",
+          "reasons": [],
+          "scorer_gap": true
+        }
+      ]
+    },
+    "second_check": {
+      "mode": "shadow",
+      "versions": [
+        "equation_match-45fc775c"
+      ],
+      "ran": 30,
+      "outcomes": {
+        "api_error": 1,
+        "ok": 29
+      },
+      "final": {
+        "answered": 29,
+        "wrong": 8,
+        "auroc_vs_wrong": 0.5565,
+        "auroc_vs_wrong_excluding_scorer_gaps": 0.6667,
+        "would_flag": 15,
+        "would_flag_precision": 0.3333,
+        "would_flag_recall": 0.625,
+        "would_flag_wrong_excluding_scorer_gaps": 3
+      },
+      "cheap_stage": {
+        "ran": 5,
+        "answered": 5,
+        "would_flag": 0,
+        "mean_p_meaning": 0.062
+      },
+      "p_meaning": {
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-000": null,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-001": 0.01,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-002": 0.23,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-003": 0.46,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-004": 0.37,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-005": 0.36,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-006": 0.31,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-007": 0.32,
+        "openstax/physics/2-2-speed-and-velocity/eq-000": 0.03,
+        "openstax/physics/2-2-speed-and-velocity/eq-001": 0.03,
+        "openstax/physics/2-2-speed-and-velocity/eq-002": 0.01,
+        "openstax/physics/2-2-speed-and-velocity/eq-003": 0.03,
+        "openstax/physics/2-2-speed-and-velocity/eq-004": 0.02,
+        "openstax/physics/2-2-speed-and-velocity/eq-005": 0.06,
+        "openstax/physics/2-2-speed-and-velocity/eq-006": 0.02,
+        "openstax/physics/2-2-speed-and-velocity/eq-007": 0.2,
+        "openstax/physics/2-2-speed-and-velocity/eq-008": 0.16,
+        "openstax/physics/2-2-speed-and-velocity/eq-009": 0.43,
+        "openstax/physics/2-2-speed-and-velocity/eq-010": 0.31,
+        "openstax/physics/2-2-speed-and-velocity/eq-011": 0.59,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-000": 0.01,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-001": 0.42,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-002": 0.26,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-003": 0.5,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-004": 0.38,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-005": 0.2,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-006": 0.01,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-007": 0.02,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-008": 0.01,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-009": 0.01
+      },
+      "cost_usd": 0.0012172,
+      "per_equation_usd": 4.057e-05,
+      "requests": 35
+    }
   },
   "cost": {
-    "total_usd": 0.04933064,
-    "pipeline_usd": 0.04933064,
-    "per_item_usd": 0.0016443546666666667,
+    "total_usd": 0.05309934,
+    "pipeline_usd": 0.05309934,
+    "per_item_usd": 0.001769978,
     "per_item_unit": "equation",
     "model_calls": 35,
-    "budget_spent_usd": 0.049330639999999995,
+    "verifier_usd": 0.0012172,
+    "verifier_per_item_usd": 4.057333333333333e-05,
+    "verifier_requests": 35,
+    "budget_spent_usd": 0.053099340000000016,
     "budget_calls": 35,
-    "dropped_usd": 0.0
+    "dropped_usd": 1.3877787807814457e-17
   },
   "latency_ms": {
-    "p50": 6085.5,
-    "p95": 15574.15,
+    "p50": 5327.5,
+    "p95": 10062.7,
     "n": 30,
     "basis": "sum of model-call latencies per item (excludes rendering)"
   }

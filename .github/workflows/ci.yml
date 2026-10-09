@@ -109,6 +109,11 @@ jobs:
         run: uv sync --locked --all-groups --all-extras
       - name: Install Chromium and its system libraries
         run: uv run playwright install --with-deps chromium
+      # The fonts the eval renderer and the browser tests name (eval/render.py: Noto Sans
+      # Math, Liberation Serif). Without them Chromium falls back to other fonts and the
+      # printed PDFs differ from the ones the tests were written against.
+      - name: Install the fonts the printed test pages use
+        run: sudo apt-get install -y --no-install-recommends fonts-noto-core fonts-liberation
       - name: Pytest (browser-marked tests only, including axe-core checks)
         run: |
           set +e

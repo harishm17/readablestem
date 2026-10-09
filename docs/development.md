@@ -5,7 +5,10 @@ Reference for working on the code. The public README is separate and Harish writ
 ## Setup and commands
 
 Requires [uv](https://docs.astral.sh/uv/). Python 3.12+ (`.python-version` pins 3.12 locally;
-CI also runs 3.14).
+CI also runs 3.14). The browser tests and the eval renderer print pages with the fonts
+`eval/render.py` names: install `fonts-noto-core` (Noto Sans Math) and `fonts-liberation`
+on Debian or Ubuntu, as CI does. Without them Chromium falls back to other fonts and some
+printed pages read differently.
 
 | Command | What it does |
 |---|---|
