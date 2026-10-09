@@ -289,6 +289,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/review/{element_id}",
         "/login",
+        "/login/microsoft",
         "/logout",
     ]
     for path in posts:

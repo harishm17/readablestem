@@ -195,7 +195,7 @@ def test_security_headers_on_app_pages(web):
     assert headers["content-security-policy"] == (
         "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; "
         "object-src 'none'; base-uri 'none'; frame-ancestors 'none'; "
-        "form-action 'self' https://accounts.google.com"
+        "form-action 'self' https://accounts.google.com https://login.microsoftonline.com"
     )
     assert headers["x-content-type-options"] == "nosniff"
     assert headers["referrer-policy"] == "same-origin"
