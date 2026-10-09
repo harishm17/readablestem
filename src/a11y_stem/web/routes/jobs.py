@@ -19,8 +19,6 @@ from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from a11y_stem.core import triage
-from a11y_stem.core.types import Fix
 from a11y_stem.web import documents, events
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web.database import as_utc, utc_today
@@ -507,8 +505,7 @@ def _confirm_delete_page(
         job = owned_job(session, job_id, user)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename)
-        fixes = [Fix.model_validate(f) for f in result.get("fixes") or [] if isinstance(f, dict)]
-        decided = len(triage.units(f for f in fixes if f.decided_by_reviewer))
+        decided = documents.decided_by_you(result.get("fixes"))
         filename, uploaded = job.filename, as_utc(job.created_at)
     context = {
         "job_id": job_id,

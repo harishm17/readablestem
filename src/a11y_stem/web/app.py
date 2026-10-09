@@ -70,7 +70,7 @@ ERROR_TEXT = {
     400: ("Something was wrong with that request", "Please go back and try again."),
     401: ("Please sign in", "Sign in to continue."),
     403: ("Not allowed", "You do not have access to this page."),
-    404: ("Page not found", "There is nothing at this address. Check the link, or start again."),
+    404: ("Page not found", "There is nothing at this address. Check the link."),
     405: ("Not allowed", "That action is not available at this address."),
     413: ("Request too large", "That request was larger than this page accepts."),
 }

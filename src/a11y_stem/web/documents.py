@@ -142,15 +142,24 @@ def display_title(title: object, filename: str) -> str:
     return filename
 
 
+def _fixes(fixes: object) -> list[Fix]:
+    """A stored result's fixes; none when this version cannot read them."""
+    if not isinstance(fixes, list):
+        return []
+    try:
+        return [Fix.model_validate(f) for f in fixes if isinstance(f, dict)]
+    except ValidationError:
+        return []
+
+
 def open_decisions(fixes: object) -> int:
     """Decisions still open in a stored result's fixes (a heading group is one)."""
-    if not isinstance(fixes, list):
-        return 0
-    try:
-        parsed = [Fix.model_validate(f) for f in fixes if isinstance(f, dict)]
-    except ValidationError:  # a result this version cannot read: nothing to offer
-        return 0
-    return triage.open_decisions(parsed)
+    return triage.open_decisions(_fixes(fixes))
+
+
+def decided_by_you(fixes: object) -> int:
+    """Decisions a reviewer made in a stored result's fixes (a heading group is one)."""
+    return len(triage.units(f for f in _fixes(fixes) if f.decided_by_reviewer))
 
 
 def _live(user_id: str, now: datetime):
