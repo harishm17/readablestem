@@ -49,6 +49,9 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DATABASE_URL` | SQLite locally, Postgres (`postgresql+psycopg://...`) in production |
 | `SESSION_SECRET` | Signs the session cookie. Required in production, at least 32 characters (e.g. `python -c 'import secrets; print(secrets.token_urlsafe(48))'`) |
 | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` | Google sign-in. Without them the "Sign in with Google" button is hidden |
+| `MS_CLIENT_ID`, `MS_CLIENT_SECRET`, `MS_ALLOWED_TENANTS` | Microsoft (Entra ID) sign-in, on only with all three set; tenants are directory ids, comma-separated. Half of them set refuses to start (`check_production`, any environment) |
+| `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
+| `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table). Both on by default |
 | `BASE_URL` | Builds the OAuth redirect URI, `${BASE_URL}/auth/callback` |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
@@ -736,6 +739,13 @@ white text on the numbered discs at least 4.5:1.
 
 Schema: `web/db.py`. Migrations: `migrations/` with `alembic.ini` at the repo root. The
 URL comes from `DATABASE_URL` (or the settings, which read `.env`).
+
+Besides jobs and their children, the schema holds a user's courses and their notation
+entries (user content), content-free usage events, sign-in identities and the daily
+counters (docs/design/content-features.md "Database"). `a11y-stem users delete` erases a
+person through `ops.retention.erase_user`: every job (counted first), then every row of
+every table that holds their user id, then the account; a test fails when a table with
+a user id is added without it.
 
 - Dev and test create tables directly on start-up. Production refuses to start when the
   schema is missing or behind this release's migrations: run `uv run a11y-stem db

@@ -44,7 +44,10 @@ flowchart LR
 ## Module map and contracts
 
 Signatures below are fixed. Work packages (WP) implement them; tests live in
-`tests/test_<area>_*.py`.
+`tests/test_<area>_*.py`. The content features of pipeline 0.4.0 (tables, long
+descriptions, links and language, colour, notation memory, the job page, Microsoft
+sign-in) have their own contracts, flags and ownership map in
+[content-features.md](content-features.md).
 
 | Module | Contract | WP |
 |---|---|---|
@@ -66,11 +69,16 @@ Signatures below are fixed. Work packages (WP) implement them; tests live in
 | `pipeline/signs.py` | `compare_signs(text_layer, mathml) -> SignComparison \| None` | sign check |
 | `pipeline/figure_step.py` | `describe(element, png, *, client, settings, context_text) -> Fix` | WP3 |
 | `pipeline/assemble.py` | `render_html(*, title, lang, elements, fixes, crops, source_note) -> str` | WP4 |
+| `pipeline/safe_html.py` | `escape_text`, `sanitize_mathml(mathml, *, display, element_id)` | contracts |
+| `pipeline/table_html.py` | `render_table(grid, *, id_prefix, math_display) -> str`, `needs_header_ids` | contracts |
+| `pipeline/assemble_tables.py`, `pipeline/inline_text.py` | `render_table_element(element, fix, ctx)`; `render_inline_text(text, *, element, equation, add_style)`, `passage_attrs(element)` | contracts |
+| `pipeline/table_step.py` | `rebuild(element, png, *, client, settings, context_text) -> Fix` | contracts |
+| `pipeline/options.py`, `core/notation.py` | `current()`, `using(options)`; `canonical_symbol(text)`, `canonical_from_parts(base, variant, accent)` | contracts |
 | `pipeline/html_checks.py` | `static_checks(html)`, `axe_checks(html)` | WP4 |
-| `pipeline/run.py` | `convert_pdf(pdf_bytes, *, settings, client, pages, progress, tracer, concurrency, notice)` | WP4 |
+| `pipeline/run.py` | `convert_pdf(pdf_bytes, *, settings, client, pages, progress, tracer, concurrency, notice, source_note, options, stage_progress)` | WP4 |
 | `web/db.py` | schema, `make_engine`, `session_scope` | spine |
 | `web/*` | `create_app(settings=None, *, converter=None, client_factory=None) -> FastAPI` | WP5 |
-| `ops/retention.py`, `ops/aggregate.py` | `purge_expired(factory, now)`, `aggregate_finished(factory, now)` | WP6 |
+| `ops/retention.py`, `ops/aggregate.py` | `purge_expired(factory, now)`, `delete_jobs(session, ids)`, `erase_user(session, user_id)`, `aggregate_finished(factory, now)` | WP6 |
 | `observability/*` | `make_tracer(settings)`, `configure_logging(settings)` | WP6 |
 | `eval/render.py`, `eval/pipeline_eval.py`, `eval/judge.py`, `eval/calibration.py`, `eval/gate.py` | eval harness | WP7 |
 | `cli/{convert,serve,ops,eval_cli}.py` | `register(group, top=None)` | WP4/5/6/7 |
