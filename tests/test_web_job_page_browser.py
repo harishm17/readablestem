@@ -254,6 +254,8 @@ def test_the_draft_and_the_language_work_without_javascript(site, browser, jobs)
     page.get_by_label("Language of this document").select_option("de")
     page.get_by_role("button", name="Confirm this language").click()
     assert "The language is now German." in page.locator(".notice").first.inner_text()
+    # The confirmation is where focus is, in view (it was 1,365 px above the viewport).
+    assert page.evaluate("document.activeElement.classList.contains('notice')")
     assert "German (you chose it)" in page.locator("#language-heading + p").inner_text()
     context.close()
 

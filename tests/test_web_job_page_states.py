@@ -458,7 +458,8 @@ def test_the_language_can_be_confirmed_or_changed(web, caplog):
     before = web.job(job_id).result_version
     response = post_language(web, job_id, "fr")
     assert response.status_code == 303
-    assert response.headers["location"] == f"/jobs/{job_id}#language-heading"
+    # No fragment: the confirmation at the top takes focus (a fragment kept it off).
+    assert response.headers["location"] == f"/jobs/{job_id}"
     after = stored(web, job_id)
     assert (after.lang, after.lang_source, after.notices) == ("fr", "user", [])
     job = web.job(job_id)

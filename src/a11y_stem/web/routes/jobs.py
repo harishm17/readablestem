@@ -597,7 +597,9 @@ def set_language(
         f"The language is now {page_rules.language_label(result.lang)}. "
         "The HTML file was made again with it.",
     )
-    return RedirectResponse(f"/jobs/{job_id}#language-heading", status_code=303)
+    # No fragment: the confirmation (the flash at the top) takes focus on load, as after
+    # any other change; a fragment would scroll past it and keep focus on the page.
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 
 def _crops(session: Session, job_id: str) -> dict[str, bytes]:
