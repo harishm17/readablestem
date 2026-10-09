@@ -245,9 +245,9 @@ items and headings; offsets are into the stored text, markers included.
 - Links keep the browser's link style (colour and underline), so they are not told apart
   by colour alone. A long URL as link text wraps (`overflow-wrap: break-word` on
   `<main>`), so the page still reflows at 320 px.
-- Link text that does not say where it goes ("click here", a long bare URL) is kept as
-  printed, with the optional notice `link_text_unclear`: only the instructor can reword
-  it.
+- Link text that does not say where it goes ("click here", a long bare URL with next to
+  no text around it) is kept as printed, with the optional notice `link_text_unclear`:
+  only the instructor can reword it.
 
 ## Language
 

@@ -442,10 +442,14 @@ writes with their id can be targets: headings and paragraphs with text, list ite
 display equations, figures and tables. A target that is an inline equation becomes its
 paragraph.
 
-Link text that says nothing on its own ("click here", "here", "this link", "read more",
-a bare URL longer than 40 characters) gets the optional notice `link_text_unclear`. The
-text itself is kept: it is the visible name of the link (WCAG 2.5.3), and only the
-instructor can reword it.
+Link text that says nothing on its own ("click here", "here", "this link", "read more")
+gets the optional notice `link_text_unclear`, and so does a bare URL longer than 40
+characters with fewer than three words around it in its paragraph or list item ("Notes:
+https://..."). A URL inside a sentence or after a reference ("Smith (2024). Notes on
+kinematics. Retrieved from https://...") is not flagged: the text around it says what it
+is (WCAG 2.4.4, link purpose in context), so a reference list does not fill the job page
+with notices. The text itself is kept: it is the visible name of the link (WCAG 2.5.3),
+and only the instructor can reword it.
 
 ### Cross-references
 
@@ -453,7 +457,8 @@ In paragraphs and list items, `references` finds "Figure 2.3", "Fig. 4", "Figure
 3", "Table 1", "Equation (3)", "equation (3)", "Eq. 3", "Eqn. (4)", "Eqs. (3) and (4)"
 and "Equations (3), (4) and (5)" (lists joined by commas, "and", "or", "&", "to" or a
 dash), and a bare "(3)" not right after a letter, digit or bracket (so "f(3)" is not
-one). The targets (`crossref_targets`) are figures and tables by the number at the start
+one) and not at the start of a paragraph or list item (there it numbers the paragraph:
+"(3) Measure the speed"). The targets (`crossref_targets`) are figures and tables by the number at the start
 of their caption, and display equations by every number in their `equation_label` ("(2)
 (3)" on an `align` gives both). A reference links (`kind="crossref"`) only when exactly
 one target has its number; a bare "(3)" only when an equation prints exactly "(3)"
@@ -487,7 +492,10 @@ its tokens are words, and the detector gives another language than the document'
 a probability of at least 0.98. Headings are never marked. Tried on about 230 pages of
 English course material and reports (OpenStax pages, LaTeX notes and slides, the layout
 fixtures, accessibility reports, a Federal Register notice, an arXiv paper, a 59-page
-chapter): no passage was marked; the French quotation of the LaTeX fixture is.
+chapter): no passage was marked; the French quotation of the LaTeX fixture is. In an
+86-page English report with Swedish sources, two reference entries with Swedish titles
+were marked Swedish (one of them starts "Retrieved from" in English): a reference in
+another language is read in that language's voice, which is usually what a reader wants.
 
 The detector is py3langid 0.4 (BSD-3-Clause), chosen 2026-10-09 over two others:
 

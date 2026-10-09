@@ -67,7 +67,8 @@ def test_the_ftp_link_is_dropped_and_unclear_links_are_noted():
     owner = element(result, "The course syllabus").id
     notices = [(n.code, n.element_id, n.count, n.review) for n in result.notices]
     assert ("link_scheme_dropped", owner, 1, "optional") in notices
-    assert ("link_text_unclear", owner, 2, "optional") in notices  # the bare URL and "here"
+    # "here"; the bare URL is not counted: the sentence around it says what it is.
+    assert ("link_text_unclear", owner, 1, "optional") in notices
     assert "file server" in (element(result, "The course syllabus").text or "")
 
 

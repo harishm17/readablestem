@@ -11,8 +11,9 @@ keep, and adds to the elements without changing their text or anything a model s
   notice `link_scheme_dropped`. URLs are never fetched.
 - `Element.links`, "crossref": "Figure 2.3", "Fig. 2", "Table 1", "Equation (3)",
   "Eq. 3", "Eqs. (3) and (4)", and a bare "(3)" only when a display equation has exactly
-  that number printed beside it. Each links to the one figure, table or equation with
-  that number; a number that two targets share, or none has, gets no link.
+  that number printed beside it (and not at the start of a paragraph, where it numbers
+  the paragraph). Each links to the one figure, table or equation with that number; a
+  number that two targets share, or none has, gets no link.
 - `DocumentResult.lang` and `lang_source`: the PDF's /Lang ("pdf"), else detected from
   the body text ("detected", notice `lang_detected`), else "en" ("default", notice
   `lang_assumed`); and `Element.lang` on a paragraph or list item confidently in
@@ -22,7 +23,7 @@ keep, and adds to the elements without changing their text or anything a model s
   a colour ("shown in red"). The assembler writes the colour, made dark enough for
   4.5:1 contrast (`pipeline.contrast`, `pipeline.inline_text`).
 - the notice `link_text_unclear` for a link whose text says nothing on its own ("click
-  here", a long bare URL).
+  here", a long bare URL with next to no text around it).
 
 Every notice is optional ("Worth checking"); nothing here adds a decision.
 
@@ -82,7 +83,11 @@ TARGET_X_SLACK = 6.0  # pt: ... and this close in x is in its column
 MAX_ALIGN_CHARS = 20_000  # longer texts are not aligned (cost; no real paragraph is this long)
 
 # Link text that says nothing on its own (WCAG 2.4.4), compared case-folded with the
-# punctuation around it removed; and a bare URL longer than this as the whole text.
+# punctuation around it removed; and a bare URL longer than `LONG_URL_CHARS` as the whole
+# link text, when its element has fewer than `URL_CONTEXT_WORDS` other words. A URL after
+# a reference ("Smith (2024). Title. Retrieved from https://...") or inside a sentence has
+# its purpose given by the text around it, so a reference list is not flagged entry by
+# entry.
 UNCLEAR_LINK_TEXT = frozenset(
     {
         "click",
@@ -100,7 +105,9 @@ UNCLEAR_LINK_TEXT = frozenset(
     }
 )
 LONG_URL_CHARS = 40
+URL_CONTEXT_WORDS = 3
 _URL_TEXT = re.compile(r"(?:https?://|www\.)\S+", re.IGNORECASE)
+_CONTEXT_WORD = re.compile(r"[^\W\d_]{2,}")
 
 # Colours of text that are not runs: near black and dark greys read as the body text
 # (the output writes them in its own body colour). OKLCH lightness below
@@ -475,11 +482,20 @@ def visible_text(text: str, start: int, end: int) -> str:
     return " ".join(INLINE_MARKER_RE.sub("[equation]", text[start:end]).split())
 
 
-def unclear_link_text(text: str) -> bool:
-    """Link text that does not say where the link goes ("click here", a long bare URL)."""
+def context_words(text: str, start: int, end: int) -> int:
+    """Words of `text` outside the span [start, end): inline equations, URLs, numbers and
+    single letters left out."""
+    rest = INLINE_MARKER_RE.sub(" ", f"{text[:start]} {text[end:]}")
+    return len(_CONTEXT_WORD.findall(_URL_TEXT.sub(" ", rest)))
+
+
+def unclear_link_text(text: str, context: int = 0) -> bool:
+    """Link text that does not say where the link goes: "click here" and the like, or a
+    long bare URL with fewer than `URL_CONTEXT_WORDS` words around it (`context`, from
+    `context_words`; see `UNCLEAR_LINK_TEXT`)."""
     plain = " ".join(text.split())
     if _URL_TEXT.fullmatch(plain.replace(" ", "")) and len(plain) > LONG_URL_CHARS:
-        return True
+        return context < URL_CONTEXT_WORDS
     words = re.sub(r"[^\w\s]", " ", plain.casefold())
     return " ".join(words.split()) in UNCLEAR_LINK_TEXT
 
@@ -584,6 +600,8 @@ def references(text: str) -> list[Reference]:
             found.append(Reference(start, end, kind, number.group()))
     taken = [(r.start, r.end) for r in found]
     for match in BARE_EQUATION_REF.finditer(text):
+        if not text[: match.start()].strip():
+            continue  # "(1) Measure the speed": an enumeration label, not a reference
         if not any(s < match.end() and match.start() < e for s, e in taken):
             found.append(Reference(match.start(), match.end(), "equation", match.group(), True))
     return sorted(found, key=lambda r: r.start)
@@ -783,7 +801,8 @@ def annotate(
         if element.kind in RUNNING_KINDS:
             own = widen_internal(element.text, own)
         for link in own:
-            if unclear_link_text(visible_text(element.text, link.start, link.end)):
+            shown = visible_text(element.text, link.start, link.end)
+            if unclear_link_text(shown, context_words(element.text, link.start, link.end)):
                 unclear[(element.page, element.id)] += 1
         if element.kind in RUNNING_KINDS:
             own = sorted([*own, *crossrefs(element.text, targets, own)], key=lambda k: k.start)
@@ -844,9 +863,11 @@ def apply(
         return annotate(elements, pdf, layout_lang=layout_lang, colour=colour)
     except Exception as exc:
         log.warning("text pass failed: %s", type(exc).__name__)
-        from_pdf = bool(pdf.lang) or layout_lang != language.DEFAULT_LANG
-        source: LangSource = "pdf" if from_pdf else "default"
-        return TextPassResult(list(elements), pdf.lang or layout_lang, source, [])
+        if pdf.lang or layout_lang != language.DEFAULT_LANG:
+            return TextPassResult(list(elements), pdf.lang or layout_lang, "pdf", [])
+        # Nothing says which language this is: assumed, and the job page asks.
+        notices = [Notice(code="lang_assumed")]
+        return TextPassResult(list(elements), language.DEFAULT_LANG, "default", notices)
 
 
 # ============================================================================ language change

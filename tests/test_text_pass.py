@@ -208,6 +208,35 @@ def test_an_unclear_link_gets_an_optional_notice():
     assert ("link_text_unclear", "p1-e0", 1) in codes(result)
 
 
+URL = "https://example.org/physics/archive/2025/lecture-notes.pdf"
+
+
+@pytest.mark.parametrize(
+    ("text", "unclear"),
+    [
+        (URL, True),  # the URL alone
+        (f"Notes: {URL}", True),
+        (f"{URL} (PDF, 2 MB)", True),  # two words and a number say little
+        (f"Smith, A. (2024). Notes on kinematics. Retrieved from {URL}", False),
+        (f"Last year's notes are at {URL} for revision.", False),
+    ],
+)
+def test_a_long_url_is_unclear_only_with_next_to_no_words_around_it(text, unclear):
+    link = PdfLink(0, rect_of(text, URL), "uri", uri=URL)
+    result = annotate([el("p1-e0", text=text, bbox=(72, 98, 900, 112))],
+                      pdf_with(line(text), link))  # fmt: skip
+    assert links_of(result, "p1-e0") == [("uri", URL, URL)]
+    assert ("link_text_unclear" in [code for code, _, _ in codes(result)]) is unclear
+
+
+def test_context_words_leave_out_the_link_urls_and_maths():
+    marker = inline_marker("p1-e1")
+    text = f"See {marker} at https://example.org/a and x = 2 in the notes"
+    start = text.index("https")
+    assert text_pass.context_words(text, start, start + len("https://example.org/a")) == 6
+    assert text_pass.context_words("https://a.org/x https://b.org/y", 0, 15) == 0
+
+
 # --------------------------------------------------------------------------- internal links
 
 
@@ -343,6 +372,8 @@ def test_references_link_to_the_one_target_with_that_number(text, expected):
         "Equation (9) is inline.",  # inline equations are not targets
         "Figure 2.3a shows a detail.",  # a part of a figure no caption names
         "The period of 1990s tables.",
+        "(3) Measure the speed of the cart.",  # an enumeration label, though (3) exists
+        "  (4) Then the time.",
     ],
 )
 def test_no_link_without_one_target(text):
@@ -584,6 +615,10 @@ def test_a_failing_pass_leaves_the_elements_as_they_were(monkeypatch):
     result = text_pass.apply(b"not a pdf", elements, pages=[0], layout_lang="fr")
     assert result.elements == elements and (result.lang, result.lang_source) == ("fr", "pdf")
     assert result.notices == []
+    # With no language from the PDF either, English is assumed and the job page asks.
+    result = text_pass.apply(b"not a pdf", elements, pages=[0])
+    assert (result.lang, result.lang_source) == ("en", "default")
+    assert result.notices == [Notice(code="lang_assumed")]
 
 
 def test_counts_are_numbers_only():
