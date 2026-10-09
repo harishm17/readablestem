@@ -291,3 +291,31 @@ def test_tiers_of_results_stored_before_tiers_come_from_the_pipeline_status():
     assert counts[("equation", "tier:required")] == 3
     assert counts[("equation", "decisions:required")] == 3
     assert counts[("figure", "tier:none")] == 1
+
+
+def test_the_weekly_report_counts_table_decisions_and_every_reviewable_kind():
+    from a11y_stem.core.triage import REVIEWABLE_KINDS
+    from a11y_stem.core.types import DocumentResult, DocumentStats, Element
+    from a11y_stem.ops import export, report
+
+    assert set(report.STEPS) == {k.value for k in REVIEWABLE_KINDS}
+    assert set(export.PROPOSAL_KEYS) == {k.value for k in REVIEWABLE_KINDS}
+    elements = [
+        Element(id="p1-e1", kind=Kind.TABLE, page=0, bbox=(0, 0, 100, 100), order=0),
+        Element(id="p1-e2", kind=Kind.EQUATION, page=0, bbox=(0, 0, 10, 10), order=1),
+    ]
+    fixes = [
+        Fix(element_id="p1-e1", kind=Kind.TABLE, status=Status.FAILED,
+            reason="table_not_rebuilt", review="required"),
+        Fix(element_id="p1-e2", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW,
+            review="required"),
+    ]  # fmt: skip
+    result = DocumentResult(
+        pipeline_version="0.4.0", elements=elements, fixes=fixes,
+        stats=DocumentStats(pages=1, cost_usd=0.0, latency_ms=1, model_calls=0),
+    )  # fmt: skip
+    counts = job_counts("done", None, 1, result.model_dump(mode="json"))
+    text = report.render_report(counts, since=date(2026, 10, 1), until=date(2026, 10, 7))
+    load = text[text.index("Review load") :].split("\n\n", 1)[0]
+    assert "required decisions    2" in load
+    assert "table: required     1" in load and "equation: required  1" in load

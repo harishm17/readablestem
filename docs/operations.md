@@ -170,8 +170,10 @@ FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 
 `a11y-stem ops report --days 7` prints the weekly error-analysis tables from these rows
 (through the Cloud SQL Auth Proxy, like the other `ops` commands), including the review
-load (required decisions and optional notes per page, by step) and, per step, the tier
-mix and the most frequent reasons for each tier.
+load (required decisions and optional notes per page, by step) and, per step (equation,
+figure, table, heading: every reviewable kind), the tier mix and the most frequent
+reasons for each tier. The opted-in export's labels carry the table proposal and the
+reviewed table too.
 
 ## Logs
 
