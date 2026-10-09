@@ -1,7 +1,10 @@
 # Content features: shared contracts (2026-10-09)
 
-Status: contracts built on branch `feat/content-contracts` (from `feat/beta-app`), before
-about eleven builders work on the features in parallel, one branch each. This page is
+Status: integrated on `feat/content-integration` (2026-10-09): what was built, what was
+decided where builders overlapped, and what is open are in "Status after integration" at
+the end. Before that: contracts built on branch `feat/content-contracts` (from
+`feat/beta-app`), before about eleven builders work on the features in parallel, one
+branch each. This page is
 what they share: the data model, the flags, the schema, the extension points, the review
 tier of every new item, and who owns which files. The product decisions behind it are
 taken; this page does not reopen them. The rules of
@@ -246,3 +249,96 @@ Merge hazards and order:
   figures, text, notation, job-page, ux-a, ux-b, auth-ms. Each rebases on the
   integration branch and runs `ruff check`, `ruff format --check`, `ty check src`, and
   the offline, `postgres` and `browser` suites before it merges.
+
+## Status after integration (2026-10-09)
+
+All eleven builders' branches are merged on `feat/content-integration` (from
+`feat/content-contracts`), in the order above: tables-review, tables-detect, tables-step,
+tables-eval, figures, text, notation, job-page, ux-a, ux-b, auth-ms. None was skipped.
+Every merge was followed by `ruff check`, `ruff format --check`, `ty check src` and the
+offline suite; the postgres and browser suites, the migration tests and the golden HTML
+ran after the last merge. The four feature flags stay **off by default**.
+
+### What was built
+
+| Work | What it does now | Where it is described |
+|---|---|---|
+| tables-detect | Every analysed page is searched for tables (PyMuPDF Layout, arbitrated); a kept one is a `Kind.TABLE` element with the local grid (drawn cell grid, SLANet-plus or PyMuPDF's) filled with the PDF's words and its "Table N" caption. Runs whatever the flag says. | [tables.md](../tables.md) "Detection" |
+| tables-step | With `FEATURE_TABLES` the crop goes to gpt-6-luna (gpt-6.1-sol on any failed check), the answer is checked against the PDF's words, the local grid and the maths validators, and written by `table_html` in a scroll box. Flag off: the image, `table_not_rebuilt`, required. | [tables.md](../tables.md) "The table step" |
+| tables-review | Tables on both review screens: the crop beside the table as students get it, Accept, Keep as image, use the grid read from the PDF, headers, one cell at a time; each change re-runs the step's checks. | [web.md](../web.md) "The table card" |
+| tables-eval | `eval pipeline --task tables` (local and model modes), OpenStax and authored gold, floors in `eval gate`. | [eval.md](../eval.md) "Tables" |
+| figures | With `FEATURE_LONG_DESCRIPTIONS`: long descriptions, chart data tables (required when read from the image), the colour-only flag; smaller figure images in the student file (MF23, always). | [steps.md](../steps.md), [output.md](../output.md) |
+| text | Always: PDF links, cross-references, the document and passage language; with `FEATURE_COLOUR`, colour runs adjusted to 4.5:1. | [layout.md](../layout.md) "The text pass", [output.md](../output.md) |
+| notation | With `FEATURE_NOTATION_MEMORY`: courses and their notation, hints to the equation model, spoken readings, bold letters in prose made maths, "remember for this course". | [web.md](../web.md), [steps.md](../steps.md) |
+| job-page | Source facts, the before/after card, live progress by stage, notices derived from the fixes, honest headlines, the language control, the student note as a footer. | [web.md](../web.md) "The job page" |
+| ux-a | Usage events, the two questions after a download, the posting help page, honest deletion, local times, My documents as a to-do list, upload fixes. | [web.md](../web.md), [operations.md](../operations.md) |
+| ux-b | Edits checked like proposals ("Use my edit anyway"), the stale-tab guard on every form, Undo, Reject named per kind, back to the decision after signing in again, drafts in the tab. | [web.md](../web.md) "Review screen" |
+| auth-ms | Microsoft (Entra ID) sign-in next to Google, tenant allowlist, identities in `auth_identities`. | [web.md](../web.md), [deploy.md](../deploy.md) step 3b |
+
+### Decided at integration (where the builders overlapped)
+
+- **One stale-tab guard.** ux-b's `web.review.is_stale` / `bump_result_version` /
+  `ReviewStale` (a 409 page that shows the item as it is now) serves every form,
+  table forms included; tables-review's `guard_result_version` (a 422) is gone. The
+  job page's language change bumps the version with the same helper. What was typed in
+  a table cell comes back when its form was stale.
+- **Reject is named per kind**, a table's too: "Keep as image" ("Students see a picture
+  of the table, marked “not converted”; screen readers get no table to read.").
+- **The table card calls `table_step.table_checks` directly** and does not repeat a
+  structural problem the step already reported under its broader code.
+- **One language rule and one list of names**: the job page's control uses
+  `text_pass.set_document_language` (passage languages worked out again) and
+  `language.LANGUAGE_NAMES` (35 languages); the job page's copies are gone. Source facts
+  count links with `text_pass.link_count`. The text pass's notices are merged with the
+  ones derived from the fixes in `run._convert`.
+- **`long_description_missing`** follows the figures work's rule
+  (`figure_step.long_description_missing`: described with the long prompt), so the job
+  page no longer guesses whether long descriptions were on.
+- **The tool's own English words** (flag notes, labels, the student note) say
+  `lang="en"` in a document in another language (WCAG 3.1.2); English documents are
+  unchanged byte for byte.
+- **Every sign-in ends in one place** (`auth._signed_in`): back to the page asked for
+  (ux-b) and one `signed_in` usage event (ux-a), for Google, Microsoft and dev sign-in.
+- **The job page's finish line** links the posting help ("How to post it in your
+  course", ux-a's Canvas page) under "Put it in your course", followed by the two
+  questions; with decisions open, ux-a's part sits under the draft link.
+- **Static HTML rules**: the text work's four always run; the five table rules come last
+  and only for documents with a `<table>` (15 rules, 20 with a table).
+- `a11y-stem convert` counts tables and lists notices and the language.
+
+### Measured after integration
+
+Real models, every flag on, $1.00 of the $1.50 cap ([eval.md](../eval.md) "Content
+features after integration"):
+
+- The LaTeX tables fixture: all 5 detected tables rebuilt and accepted on gpt-6-luna with
+  every check passed. The links fixture: every link and cross-reference resolves, the
+  French passage is marked, colours at 4.53:1 or more. All smoke outputs pass the static
+  checks and axe.
+- Review load on the document gold: 17 required decisions on 43 PDF pages (0.395 per
+  page) against 0.3.0's 10 (0.233): the same 10, plus 5 chart data tables read from the
+  image and 2 ruled key-term grids kept as images. Equation accuracy unchanged (0.733).
+- Tables evaluation: local mode passes every floor (recall 0.909, precision 0.978, TEDS
+  0.867); model mode TEDS 0.958 (grid and authored), but "wrong cells not flagged" is
+  14, not 0.
+
+### Open after integration
+
+- **Key-term grids.** A ruled grid of single words (OpenStax "Key Terms") is claimed as
+  a table; flag off it is `table_not_rebuilt`, flag on the model says "not a data
+  table": either way the words become an image and a required decision. Proposal for
+  Harish: when the model (or the local grid) says layout, write the cells' text in
+  reading order instead of the image, with no decision.
+- **Data tables read from the image** add one required decision per chart (5 on the
+  demo, 5 on the document gold). That is the tier as decided; it is the largest new load.
+- **The tables gate in model mode** fails `wrong cells not flagged` (14 on grid and
+  authored, 8 on the partial booktabs/norules run): mostly gold spellings and
+  run-to-run variation, 2 real (a wrapped last row cut by the table box).
+- **Not merged here:** `feat/beta-app` has `0ecf511` (eval reports and the demo rebuilt
+  on 0.3.0), which `feat/content-contracts` was cut before. Merging the integration
+  branch into `feat/beta-app` conflicts on `web/static/demo/index.html`, and the
+  `report.json` it brings changes the demo golden: regenerate the demo page and
+  `UPDATE_GOLDEN=1` then. The demo page was not regenerated with the smaller images
+  (figures work) for the same reason.
+- `FEATURE_TABLES` stays off until detection is checked on a private set of real course
+  PDFs (the real-document floors are skipped without one).

@@ -406,7 +406,7 @@ with or without a baseline (see "Tables": "Gate").
 | Field | Content |
 |---|---|
 | `schema_version`, `task`, `date` | `date` comes from `--date` (default: today, taken in the CLI) |
-| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. The committed `data/eval/latest-*.json` are 0.2.0 reports until they are regenerated after the sign check merges. 0.4.0 (2026-10-09) added the content-feature data model (docs/design/content-features.md) without changing equations, figures or headings, so 0.4.0 and 0.3.0 reports compare; once layout detects tables, each one kept as an image is a required decision of its own |
+| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. The committed `data/eval/latest-*.json` are 0.2.0 reports until they are regenerated after the sign check merges. 0.4.0 (2026-10-09) added the content-feature data model (docs/design/content-features.md) without changing equations, figures or headings, so 0.4.0 and 0.3.0 reports compare. Since the integration layout detects tables, and each one kept as an image is a required decision of its own (2 more on the document gold, its ruled key-term grids, flags off or on); with every flag on, chart data tables read from the image add theirs ("Content features after integration") |
 | `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, `openai` or `fake` |
 | `dataset` | `gold_dir`, `manifest_sha256`, `limit`, `unit`, `selection_sha256` (hash of the planned item ids) |
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
@@ -726,10 +726,10 @@ measured (variant b), and keep the text-layer style rule as the bold check.
 
 ## Tables (`--task tables`, 2026-10-09)
 
-Status: the task, its gold and its gate are built (branch `feat/tables-eval`); table
-detection (`pipeline/tables.py`) and the table step are built in parallel, so until they
-merge a run finds no tables (recall 0). The scorer was checked against the research
-benchmark first (below). Code: `eval/tables.py`; design: `PDF-RECOMMENDATION.md` 4.6 and
+Status: the task, its gold and its gate are built (branch `feat/tables-eval`), and since
+the integration (2026-10-09) it runs against the real detector and table step: the first
+in-repo numbers are in "Content features after integration" below. The scorer was
+checked against the research benchmark first (below). Code: `eval/tables.py`; design: `PDF-RECOMMENDATION.md` 4.6 and
 its challenge (Harish's research notes, not in the repo).
 
 ### Gold
@@ -994,6 +994,79 @@ uv run python -m a11y_stem.eval.notation_flags .local/eval/notation/items-equati
   three gold pages and 11 of 11 on the LaTeX fixtures (the two-column handout's 10 bold
   vectors and its bold omega), no false positives. The equations task does not see them:
   it scores the gold's equations, not its prose.
+
+## Content features after integration (2026-10-09, pipeline 0.4.0)
+
+The first runs of the integrated branch (`feat/content-integration`: all eleven content
+builders merged). Reports and per-item rows are kept local (`.local/integration/smoke/`),
+not promoted: the committed `latest-*.json` stay the baselines until Harish decides.
+Real spend for everything below and the conversions in docs/design/content-features.md
+("Status after integration"): $1.00 of a $1.50 cap.
+
+### Review load with every flag on (document task)
+
+The document task on the same three OpenStax sections (43 PDF pages, `data/gold`) as the
+0.3.0 report on `feat/beta-app` (`latest-document.json`, 2026-10-09), with
+`FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR` and
+`FEATURE_NOTATION_MEMORY` on:
+
+| | 0.3.0 | 0.4.0, every flag on |
+|---|---|---|
+| required decisions | 10 (0.233 per PDF page) | 17 (0.395 per PDF page) |
+| of which headings / equations | 9 / 1 | 9 / 1 (the same) |
+| new: chart data tables read from the image (`values_from_image`) | | 5 |
+| new: ruled key-term grids the model calls "not a data table" (`not_data_table`, kept as an image) | | 2 |
+| optional notes per PDF page | 0.535 | 0.535 |
+| equations exact (lenient), matched and end to end | 0.733 / 0.733 | 0.733 / 0.733 |
+| predicted equations (unmatched "other") | 55 (1) | 64 (10: bold letters in prose made maths, review none) |
+| static and axe violations | 0 / 0 | 0 / 0 |
+| cost | $0.141 | $0.142 |
+
+Reading it: outside the new items the tiers call for, the review load is the 0.3.0 load
+(same headings, same equation). The 5 data-table decisions are the tier's ("values read
+from the image": required); the 2 key-term grids are the "Key Terms" boxes OpenStax prints
+as a ruled grid of single words: detection claims them, the model rightly says they are
+not data tables, and the table is then kept as an image, which needs a decision and
+turns readable words into a picture. With `FEATURE_TABLES` off the same two grids are
+`table_not_rebuilt` decisions, so merging detection alone already makes this 12 (0.279
+per PDF page). That is an open product question (docs/design/content-features.md).
+
+### Tables (`--task tables`)
+
+| run | tables | recall | precision | TEDS | column headers exact | wrong cells not flagged | review | cost |
+|---|---|---|---|---|---|---|---|---|
+| local (no model; SLANet-plus file present), every style + authored | 197 gold data | 0.909 | 0.978 | 0.867 (0.955 on found) | 0.843 | 0 | every table a decision (kept as image) | $0 |
+| model, `grid` + authored | 89 | 0.978 | 0.989 | 0.958 | 0.888 | 14 | 20 decisions for 96 tables (0.21 per table), 7 kept as images | $0.260 ($0.0027 per table) |
+| model, `booktabs` + `norules` (stopped by its $0.45 cap after 20 of 26 documents) | 54 | 0.963 | 0.945 | 0.945 | 0.926 | 8 | 26 decisions for 63 tables | $0.404 ($0.0064 per table) |
+
+`eval gate` on the local report passes every gold floor (the real-document part is
+skipped: no private set). On the model reports it fails one floor, `wrong cells not
+flagged` (0): the 14 cells of the first run, looked at table by table (re-run on the four
+tables, $0.034):
+
+- 2 are real: the last row of the physics orders-of-magnitude table loses its wrapped
+  second line ("... the known *universe*", "*(current upper limit)*") in both the local
+  grid and the model's answer, so the cell-text check agrees with a wrong grid; the box
+  ends a line early.
+- 6 are run-to-run: the contingency table scored 0 errors when run again.
+- The rest are gold text written another way: OpenStax's "10–18" for 10⁻¹⁸ (the model
+  writes `10^-18` as text), "13" for ⅓, "____" fill-in blanks the model leaves empty,
+  and a footnote row gold keeps inside the table.
+
+So the floor of 0 needs either a scorer that knows these spellings or a few labelled
+exceptions before it can gate model runs (TODO(Harish) in gate.py stands). Superscript
+powers written as `^` in text cells are a prompt issue for the table step to take up.
+
+### Demo and fixtures (smoke, real models)
+
+| input | pages | required decisions | what they are | cost |
+|---|---|---|---|---|
+| `tests/fixtures/layout/latex/tables.pdf` | 4 | 6 | equations only; all 5 detected tables rebuilt and ACCEPTED on gpt-6-luna, every check passed | $0.019 |
+| `tests/fixtures/layout/latex/problem_set.pdf` | 1 | 0 | | $0.007 |
+| `tests/fixtures/layout/latex/links_language_colour.pdf` | 1 | 0 | 4 web links, 4 cross-references and 2 internal links all resolve; the French passage is marked; 2 colour classes, the lowest at 4.53:1 | $0.003 |
+| demo `source.pdf` (OpenStax Physics 2.3) | 13 | 9 (0.3.0 demo: 3) | the same 3 headings; 5 chart data tables read from the image; 1 equation whose bold v the model dropped (a right catch) | $0.066 |
+
+All four pass the static checks and axe.
 
 ## What the numbers do not show
 

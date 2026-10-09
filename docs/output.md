@@ -652,8 +652,11 @@ TODO(Harish): turn these into the public known-limits copy.
 - An equation wider than the screen does not wrap: it scrolls sideways inside its own
   box (a tab stop when it may not fit a phone screen).
 - NEEDS_REVIEW items look like converted ones in an export made before review.
-- Tables are not rebuilt; a table that layout reports as a figure becomes an image with
-  alt text.
+- A data table is rebuilt only with `FEATURE_TABLES` on (off by default). Off, or when
+  the model cannot read it, the table stays an image with its "not converted" note and a
+  required decision. A table the detector misses (an unruled table of numbers only)
+  stays in the text flow, sometimes read as a display equation; a grid of key terms
+  printed with rules is claimed as a table and, not being a data table, kept as an image.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
 - A figure's long description and data table are folded: they print only if opened

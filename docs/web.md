@@ -306,8 +306,12 @@ the hourly purge, and with their user (docs/operations.md, "Usage events").
 
 ## After a download (`web/feedback.py`)
 
-Under the job page's download link (`templates/_after_download.html`, one include in
-`job.html`): a link to `/help/posting`, and two optional questions, "Will you post this
+Under the job page's download link (`templates/_after_download.html`): with decisions
+open, under the draft link in `job.html`; once the file is ready to share, at the end
+of "Put it in your course" in `_job_ready.html`, whose own line already links
+`/help/posting` ("How to post it in your course", so the partial leaves its link out
+there: `posting_link=false`). It has a link to `/help/posting` and two optional
+questions, "Will you post this
 for students?" (yes, no, not sure) and "About how many minutes did this save you?" (a
 whole number up to 2000). They are in the page but hidden until the download link is
 used (`app.js`); without JavaScript they show on the next visit, once the server has
@@ -567,8 +571,10 @@ From top to bottom:
    decisions on 9 October." (or "Nothing in this file needed your decision."), the
    download as the main button, the student version, "Before you share" (read it
    through; the notes, optional; what is not handled) and "Put it in your course"
-   (upload it as a file next to the PDF, do not paste it into a page editor; the tested
-   steps per LMS are `TODO(Harish)`). Deleting is a quiet button at the end of the page.
+   ("How to post it in your course" links the Canvas steps on `/help/posting`; upload it
+   as a file next to the PDF, do not paste it into a page editor; the tested steps per
+   LMS are `TODO(Harish)`), then the two questions after a download ("After a
+   download"). Deleting is a quiet button at the end of the page.
 4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
    (notices derived again from the fixes as they are now, plus the stored ones of other
    codes), one sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",

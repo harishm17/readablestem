@@ -425,12 +425,15 @@ uv run --env-file .env pytest -m live_model tests/test_tables_live.py -s
 `test_live_drawn_table` draws a small ruled table with PyMuPDF (signed values, a squared
 unit) and fills its local grid from the page's words by position; on 2026-10-09 it was
 ACCEPTED on gpt-6-luna alone for $0.0005. `test_live_latex_fixture_tables` rebuilds every
-TABLE element layout finds in `tests/fixtures/layout/latex` with its real local grid; it
-is skipped until a fixture has a table.
+TABLE element layout finds in `tests/fixtures/layout/latex` with its real local grid.
 
-TODO for the integrator: once tables-detect has merged with its LaTeX table fixture, run
-`tests/test_tables_live.py` (or `a11y-stem convert` with `FEATURE_TABLES=true` and a small
-`--max-usd`) and compare with the results above.
+After integration (2026-10-09, branch `feat/content-integration`, detection and the step
+together): `test_live_latex_fixture_tables` rebuilt all 5 tables layout finds in
+`tables.pdf` (Table 3, the unruled all-number table, is the known detection miss) and
+every one was ACCEPTED on gpt-6-luna alone with every check passed ($0.0003 to $0.0005
+each; the drawn table again $0.0004). `a11y-stem convert` of the same PDF with every
+flag on gave the same 5 accepted tables for $0.0194 in all (13 equations included). The
+tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 
 ### Known limits
 
