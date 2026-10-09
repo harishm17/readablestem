@@ -522,6 +522,40 @@ def test_nothing_from_the_tokens_reaches_the_logs(ms, caplog):
     assert CLIENT_SECRET not in logged
 
 
+# --------------------------------------------------------------------------- launch check
+
+
+def test_launch_check_wants_microsoft_in_the_privacy_notice_once_it_is_on(tmp_path, monkeypatch):
+    from a11y_stem.ops import launch
+
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    privacy = templates / "privacy.html"
+    privacy.write_text("<p>You sign in with Google.</p>")
+    monkeypatch.setattr(launch, "TEMPLATES_DIR", templates)
+    on = make_settings(tmp_path, **MS_SETTINGS)
+
+    def flagged(settings) -> bool:
+        return any(
+            "Microsoft sign-in is on" in item for item in launch.launch_blockers(settings=settings)
+        )
+
+    assert flagged(on)
+    assert not flagged(make_settings(tmp_path)) and not flagged(None)
+    privacy.write_text("<p>You sign in with Google or with your university's Microsoft.</p>")
+    assert not flagged(on)
+
+
+def test_launch_check_reads_the_sign_in_pages(tmp_path, monkeypatch):
+    from a11y_stem.ops import launch
+
+    (tmp_path / "org_not_set_up.html").write_text("<p>TODO(Harish): wording</p>")
+    monkeypatch.setattr(launch, "TEMPLATES_DIR", tmp_path)
+    assert "web/templates/org_not_set_up.html: still has a TODO(Harish) note" in (
+        launch.launch_blockers()
+    )
+
+
 # --------------------------------------------------------------------------- the checks
 
 

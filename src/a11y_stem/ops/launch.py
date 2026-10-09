@@ -2,8 +2,10 @@
 
 `launch_blockers()` lists unfinished public copy (a `TODO(Harish)` or a "Draft" note on a
 page anyone can open), a missing or placeholder demo, and a missing eval baseline (the CI
-gate skips without one). `a11y-stem ops launch-check` prints the list and exits 1 while
-it is not empty; the web app logs `launch_blockers` with the count at a production start.
+gate skips without one). Given the settings, it also lists what a setting turns on that
+the public pages do not describe yet (Microsoft sign-in and the privacy notice).
+`a11y-stem ops launch-check` prints the list and exits 1 while it is not empty; the web
+app logs `launch_blockers` with the count at a production start.
 
 It does not refuse to start: a staging deploy runs with ENV=prod and must work before the
 copy is final. Each item names the file to change; none of it is document content.
@@ -12,6 +14,10 @@ copy is final. Each item names the file to change; none of it is document conten
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from a11y_stem.config import Settings
 
 WEB_DIR = Path(__file__).resolve().parents[1] / "web"
 TEMPLATES_DIR = WEB_DIR / "templates"
@@ -24,15 +30,27 @@ PUBLIC_TEMPLATES = (
     "terms.html",
     "limits.html",
     "status.html",
+    "login.html",
+    "_signin.html",
+    "org_not_set_up.html",
 )
 # Written into a demo built with the offline client (`a11y-stem demo build --fake`);
 # the same string as eval.render.PLACEHOLDER_ATTR (kept here so this module stays light).
 FAKE_DEMO_MARKER = 'data-a11y-stem-demo="placeholder"'
 
 
-def launch_blockers(repo_root: Path | None = None) -> list[str]:
+def launch_blockers(
+    repo_root: Path | None = None, *, settings: Settings | None = None
+) -> list[str]:
     """Plain-language list of unfinished items, empty when the beta is ready to share."""
     items: list[str] = []
+    if settings is not None and settings.ms_sign_in_enabled:
+        privacy = TEMPLATES_DIR / "privacy.html"
+        if privacy.is_file() and "Microsoft" not in privacy.read_text(encoding="utf-8"):
+            items.append(
+                "web/templates/privacy.html: Microsoft sign-in is on (MS_CLIENT_ID) but the "
+                "privacy notice describes Google sign-in only"
+            )
     for name in PUBLIC_TEMPLATES:
         path = TEMPLATES_DIR / name
         if not path.is_file():

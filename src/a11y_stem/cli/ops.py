@@ -145,9 +145,10 @@ def _cmd_cron(args: argparse.Namespace) -> int:
 def _cmd_launch_check(args: argparse.Namespace) -> int:
     """Exit 1 while anything is unfinished (ops.launch); no database needed."""
     from a11y_stem.cli.main import project_root
+    from a11y_stem.config import get_settings
     from a11y_stem.ops.launch import launch_blockers
 
-    items = launch_blockers(project_root())
+    items = launch_blockers(project_root(), settings=get_settings())
     for item in items:
         print(f"- {item}")
     print(f"launch_blockers={len(items)}")
