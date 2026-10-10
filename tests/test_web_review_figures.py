@@ -115,7 +115,7 @@ def test_the_card_offers_the_table_read_from_the_image_as_an_optional_extra(card
         "the values are approximate</caption>"
     ) in body
     assert '<th scope="row">5</th><td>1.5</td>' in body
-    assert '<button type="submit" name="action" value="add_data_table"' in body
+    assert '<button type="submit" id="datatable-p1-e6" name="action" value="add_data_table"' in body
     assert "Add the data table" in body
     textarea = re.search(r'<textarea id="longdesc-p1-e6"[^>]*>([^<]*)</textarea>', body)
     assert textarea and textarea.group(1) == LONG
