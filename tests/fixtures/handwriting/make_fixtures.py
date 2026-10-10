@@ -552,6 +552,286 @@ def build(out: Path) -> list[Path]:
     ink_page(doc, 1002, lines=3)
     scan_page(doc, ocr="mode3")
     made.append(save(doc, out, "mixed_course.pdf"))
+    made += build_review_cases(out)
+    return made
+
+
+# ----------------------------------------------------------------------------- review cases
+# The routing review's failing cases (2026-10-09), rebuilt from made-up text and drawings.
+
+PROBLEM = (
+    "Problem 3. A ball is thrown upward with a speed of 12 m/s from a height of 2 m. Find "
+    "the maximum height and the time it takes to reach the ground."
+)
+SECRET = "Grading note: Student 2291 (Jane Roe) has an accommodation for extra time."
+HINT = "Hint: state the units of every quantity you compute."
+
+
+def _secret_page(doc: pymupdf.Document) -> tuple[pymupdf.Page, pymupdf.Rect]:
+    """A typed problem, the line to hide, and a typed hint; returns the line's box."""
+    page = doc.new_page(width=612, height=792)
+    page.insert_textbox(pymupdf.Rect(72, 72, 540, 140), PROBLEM, fontsize=11)
+    page.insert_text((72, 300), SECRET, fontsize=11)
+    page.insert_text((72, 340), HINT, fontsize=11)
+    return page, pymupdf.Rect(66, 286, 520, 306)
+
+
+def _bezier_through(shape, pts) -> None:
+    """A smooth curve through `pts` (Catmull-Rom as cubic Beziers), as drawing tools write."""
+    for i in range(len(pts) - 1):
+        p0, p1, p2 = pts[max(i - 1, 0)], pts[i], pts[i + 1]
+        p3 = pts[min(i + 2, len(pts) - 1)]
+        c1 = (p1[0] + (p2[0] - p0[0]) / 6, p1[1] + (p2[1] - p0[1]) / 6)
+        c2 = (p2[0] - (p3[0] - p1[0]) / 6, p2[1] - (p3[1] - p1[1]) / 6)
+        shape.draw_bezier(p1, c1, c2, p2)
+
+
+def _coil(shape, x0: float, x1: float, y: float, loops: int, r: float) -> None:
+    """An inductor's coil from x0 to x1, machine-drawn."""
+    pts = []
+    for k in range(loops * 12 + 1):
+        t = k / (loops * 12)
+        th = 2 * math.pi * loops * t
+        pts.append((x0 + (x1 - x0) * t - r * 0.9 * math.sin(th), y + r * (1 - math.cos(th))))
+    _bezier_through(shape, pts)
+
+
+def _plot(page: pymupdf.Page, box: pymupdf.Rect) -> None:
+    """A framed plot with a grid and three damped waves, filling `box`."""
+    shape = page.new_shape()
+    shape.draw_rect(box)
+    shape.finish(color=(0, 0, 0), width=0.8)
+    for k in range(1, 10):
+        x = box.x0 + box.width * k / 10
+        y = box.y0 + box.height * k / 10
+        shape.draw_line((x, box.y0), (x, box.y1))
+        shape.draw_line((box.x0, y), (box.x1, y))
+    shape.finish(color=(0.8, 0.8, 0.8), width=0.3)
+    for colour, (amp, waves) in zip(
+        [(0.8, 0, 0), (0, 0, 0.8), (0, 0.5, 0)], [(0.4, 2), (0.25, 3), (0.15, 5)], strict=True
+    ):
+        pts = [
+            (
+                box.x0 + box.width * t / 200,
+                (box.y0 + box.y1) / 2
+                - box.height * amp * math.exp(-t / 150) * math.sin(waves * 2 * math.pi * t / 200),
+            )
+            for t in range(201)
+        ]
+        shape.draw_polyline(pts)
+        shape.finish(color=colour, width=1.2)
+    shape.commit()
+
+
+def build_review_cases(out: Path) -> list[Path]:
+    made = []
+
+    # 11. Fake redactions drawn with annotation tools over a typed line (Acrobat or Preview
+    #     shapes: a black box, a black highlight, a black text box, a white box), and a
+    #     yellow highlight, which hides nothing.
+    doc = pymupdf.open()
+    styles = ("square_black", "highlight_black", "freetext_black", "square_white")
+    for style in (*styles, "highlight_yellow"):
+        page, box = _secret_page(doc)
+        if style.startswith("square"):
+            annot = page.add_rect_annot(box)
+            colour = (0, 0, 0) if style.endswith("black") else (1, 1, 1)
+            annot.set_colors(stroke=colour, fill=colour)
+        elif style.startswith("freetext"):
+            annot = page.add_freetext_annot(box, " ", fill_color=(0, 0, 0), text_color=(0, 0, 0))
+        else:
+            annot = page.add_highlight_annot(box)
+            annot.set_colors(stroke=(0, 0, 0) if style.endswith("black") else (1, 1, 0))
+        annot.update()
+    made.append(save(doc, out, "annot_redactions.pdf"))
+
+    # 12. Text nobody sees in three more ways: used as a clip with nothing painted through
+    #     it, painted over by a shading, and painted over by thick white strokes.
+    covers = [
+        "q 0 0 0 rg BT /F1 11 Tf 7 Tr 72 300 Td ({secret}) Tj ET n Q",
+        "0 0 0 rg BT /F1 11 Tf 72 300 Td ({secret}) Tj ET q 60 290 500 24 re W n /Sh1 sh Q",
+        "0 0 0 rg BT /F1 11 Tf 72 300 Td ({secret}) Tj ET q 1 1 1 RG 16 w 60 303 m 560 303 l S Q",
+    ]
+    shading = (
+        "/Shading<</Sh1<</ShadingType 2/ColorSpace/DeviceRGB/Coords[0 0 600 0]"
+        "/Function<</FunctionType 2/Domain[0 1]/C0[1 1 1]/C1[0.9 0.9 0.9]/N 1>>>>>>"
+    )
+    doc = pymupdf.open()
+    for cover in covers:
+        part, page, font = _raw_doc()
+        secret = SECRET.replace("(", "\\(").replace(")", "\\)")
+        content = "0 0 0 rg " + _text_ops([PROBLEM[:80], PROBLEM[80:]], 72, 720)
+        _set_content(part, page, font, content + "\n" + cover.format(secret=secret), shading)
+        doc.insert_pdf(part)
+        part.close()
+    made.append(save(doc, out, "painted_over.pdf"))
+
+    # 13. A scan whose CropBox trims the scanner's margins, with a short typed header: the
+    #     visible page is all picture.
+    jpeg, _ = scan_png(612, 792, dpi=72)
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_image(page.rect, stream=jpeg)
+    page.insert_text((70, 100), "PHYS 101 Week 3 reading", fontsize=10)
+    page.set_cropbox(pymupdf.Rect(40, 50, 572, 742))
+    made.append(save(doc, out, "cropped_scan.pdf"))
+
+    # 14. A digital timing diagram with no text: square waves of horizontal and vertical
+    #     lines only (not paper rules), and dashed time markers.
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    shape = page.new_shape()
+    signals = [[0, 1] * 8, [0, 0, 1, 1, 1, 0, 0, 1, 0, 1, 1, 0, 0, 0, 1, 1]]
+    signals.append([0, 0, 0, 1, 1, 1, 0, 0, 1, 1, 1, 1, 0, 0, 0, 1])
+    for row, bits in enumerate(signals):
+        high, low = 200 + row * 60, 225 + row * 60
+        x, pts = 120.0, []
+        for bit in bits:
+            y = high if bit else low
+            if not pts or pts[-1][1] != y:
+                pts.append((x, y))
+            x += 25
+            pts.append((x, y))
+        shape.draw_polyline(pts)
+        shape.finish(color=(0, 0, 0), width=1.2, closePath=False)
+    for k in range(9):
+        shape.draw_line((120 + 50 * k, 185), (120 + 50 * k, 400))
+    shape.finish(color=(0.6, 0.6, 0.6), width=0.4, dashes="[2 2] 0")
+    shape.commit()
+    made.append(save(doc, out, "timing_diagram.pdf"))
+
+    # 15. Machine-drawn diagrams under a short typed title: a circuit with five coils, and a
+    #     slide of five different waves (one row of a few smooth curves).
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 80), "Coupled LC network", fontsize=16)
+    shape = page.new_shape()
+    x = 80.0
+    for i, loops in enumerate([4, 5, 3, 6, 4]):
+        shape.draw_line((x, 300), (x + 15, 300))
+        shape.finish(color=(0, 0, 0), width=1)
+        _coil(shape, x + 15, x + 15 + 10 * loops, 300, loops, 3.5 + 0.5 * i)
+        shape.finish(color=(0, 0, 0), width=1, closePath=False)
+        x += 15 + 10 * loops
+        shape.draw_line((x, 300), (x + 15, 300))
+        shape.draw_line((x + 15, 290), (x + 15, 310))
+        shape.draw_line((x + 19, 290), (x + 19, 310))
+        shape.finish(color=(0, 0, 0), width=1)
+        x += 22
+    shape.draw_polyline([(x, 300), (x, 360), (80, 360), (80, 300)])  # the return wire
+    shape.finish(color=(0, 0, 0), width=1, closePath=False)
+    shape.commit()
+    page = doc.new_page(width=960, height=540)
+    page.insert_text((60, 70), "Wave types", fontsize=28)
+    waves = [
+        lambda t: math.sin(6 * math.pi * t),
+        lambda t: math.exp(-3 * t) * math.sin(10 * math.pi * t),
+        lambda t: math.sin(8 * math.pi * t) * math.sin(math.pi * t),
+        lambda t: math.sin(2 * math.pi * (2 + 6 * t) * t),
+        lambda t: 0.5 * math.sin(4 * math.pi * t) + 0.5 * math.sin(9 * math.pi * t),
+    ]
+    for i, wave in enumerate(waves):
+        shape = page.new_shape()
+        left, amp = 70 + i * 170, 18 + 3 * i
+        _bezier_through(shape, [(left + 85 * k / 80, 280 - amp * wave(k / 80)) for k in range(81)])
+        shape.finish(color=(0, 0.2, 0.7), width=1.5, closePath=False)
+        shape.commit()
+    made.append(save(doc, out, "diagram_slides.pdf"))
+
+    # 16. Machine vector content (the same word shapes stamped again and again, as text
+    #     turned into outlines is) under an invisible search layer (render mode 3), as an
+    #     OCR program writes over a vector page with no text layer.
+    doc = pymupdf.open()
+    page = doc.new_page(width=A4[0], height=A4[1])
+    stamp = pymupdf.open()
+    sheet = stamp.new_page(width=A4[0], height=A4[1])
+    writer = Writer(sheet, 1601, "ribbon", INK_BLACK)
+    for i, word in enumerate(("table", "ends", "lost", "sea")):
+        writer.word(word, 80 + 120 * i, 60, 8, 0.1)
+    writer.commit()
+    with pymupdf.open("pdf", stamp.tobytes()) as source:
+        for row in range(12):
+            for col in range(2):
+                left = 70 + 120 * ((row + col) % 4)
+                top = 90 + 52 * row
+                page.show_pdf_page(
+                    pymupdf.Rect(80 + 230 * col, top, 200 + 230 * col, top + 50),
+                    source,
+                    0,
+                    clip=pymupdf.Rect(left, 30, left + 120, 80),
+                )
+    stamp.close()
+    Writer(page, 1602, "ribbon", INK_BLACK).lines(  # one line in other words: no repeats
+        pymupdf.Rect(80, 720, 520, 750), pitch=22, em=8, count=1
+    )
+    words = [
+        (pymupdf.Rect(80, 100 + 52 * r, 520, 120 + 52 * r), "table ends lost sea")
+        for r in range(12)
+    ]
+    text_layer(page, words, "mode3")
+    made.append(save(doc, out, "vector_with_layer.pdf", "OCRmyPDF 16 / Tesseract"))
+
+    # 17. Writing on ruled paper that the ink checks reject (one line written twice, stroke
+    #     for stroke: exact repeats) under a short typed title, and the same under a long
+    #     title.
+    doc = pymupdf.open()
+    for seed, title in ((1701, "Lecture 14 notes"),
+                        (1702, "MATH 2413 Lecture 14: regular languages, pumping")):  # fmt: skip
+        page = doc.new_page(width=A4[0], height=A4[1])
+        shape = page.new_shape()  # paper ruled from top to bottom
+        for y in range(64, int(A4[1]) - 20, 22):
+            shape.draw_line((0, y), (A4[0], y))
+        shape.finish(color=(0.36, 0.8, 1.0), width=0.5)
+        shape.commit()
+        page.insert_text((80, 50), title, fontsize=14, fontname="helv")
+        for i, line_seed in enumerate((seed, seed, seed + 10, seed + 20)):
+            top = 70 + 22 * i
+            Writer(page, line_seed, "polyline", INK_BLACK, width=0.9).lines(
+                pymupdf.Rect(80, top, 560, top + 22), pitch=22, em=7, count=1
+            )
+    made.append(save(doc, out, "ink_titled.pdf"))
+
+    # 18. Drawings that fill the page: a typed problem with a plot on a page with a drawn
+    #     border, a full-page plot with a caption, and a slide with a full-bleed chart.
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    shape = page.new_shape()
+    shape.draw_rect(pymupdf.Rect(24, 24, 588, 768))
+    shape.finish(color=(0, 0, 0), width=1.5)
+    shape.commit()
+    page.insert_textbox(pymupdf.Rect(72, 72, 540, 160), PROBLEM, fontsize=11)
+    shape = page.new_shape()
+    shape.draw_line((200, 350), (400, 350))
+    shape.draw_line((200, 350), (200, 200))
+    shape.finish(color=(0, 0, 0), width=1)
+    pts = [(200 + t * 2, 350 - (2 + 12 * t / 40 - 4.9 * (t / 40) ** 2) * 14) for t in range(101)]
+    shape.draw_polyline([(x, y) for x, y in pts if y <= 350])
+    shape.finish(color=(0.8, 0, 0), width=1.5)
+    shape.commit()
+    page.insert_text((290, 368), "time t (s)", fontsize=9)
+    page.insert_text((150, 270), "h (m)", fontsize=9)
+    page.insert_text((200, 390), "Figure 1: height of the ball against time.", fontsize=10)
+    page = doc.new_page(width=612, height=792)
+    _plot(page, pymupdf.Rect(30, 40, 582, 752))
+    page.insert_text((40, 60), "Damped oscillation x(t) for three damping ratios", fontsize=12)
+    page.insert_text((40, 780), "Figure 2: displacement against time (s).", fontsize=9)
+    page = doc.new_page(width=960, height=540)
+    page.insert_text((60, 40), "Results: damped oscillators", fontsize=24)
+    _plot(page, pymupdf.Rect(55, 50, 900, 515))
+    made.append(save(doc, out, "big_drawings.pdf"))
+
+    # 19. Pages with nothing to read: a blank slide of a template (a background fill and a
+    #     coloured band), a page with only a drawn frame, then a typed slide.
+    doc = pymupdf.open()
+    page = doc.new_page(width=720, height=405)
+    page.draw_rect(page.rect, color=None, fill=(0.95, 0.95, 1.0))
+    page.draw_rect(pymupdf.Rect(0, 0, 720, 40), color=None, fill=(0.1, 0.2, 0.5))
+    page = doc.new_page(width=720, height=405)
+    page.draw_rect(pymupdf.Rect(20, 20, 700, 385), color=(0, 0, 0), width=2)
+    page = doc.new_page(width=720, height=405)
+    page.insert_text((40, 60), "Average velocity", fontsize=28)
+    page.insert_textbox(pymupdf.Rect(40, 90, 680, 300), TYPED[2], fontsize=16)
+    made.append(save(doc, out, "template_pages.pdf"))
     return made
 
 

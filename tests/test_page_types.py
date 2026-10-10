@@ -62,6 +62,22 @@ def refusal(path: Path, **kwargs) -> str | None:
             [None, "handwritten_page", "handwritten_page", "scanned_page"],
             None,
         ),
+        # The routing review's cases (2026-10-09). Boxes drawn with annotation tools hide
+        # the line under them; a yellow highlight hides nothing.
+        ("annot_redactions.pdf", ["mixed_hidden_text"] * 4 + ["born_digital"], [None] * 5, None),
+        ("painted_over.pdf", ["mixed_hidden_text"] * 3, [None] * 3, None),
+        # A CropBox that trims a scan's margins leaves a picture of the whole page; with
+        # a short typed header and no hidden layer it is kept, never refused.
+        ("cropped_scan.pdf", ["scan_no_text"], ["scanned_page"], None),
+        # Square waves are drawings, not paper rules.
+        ("timing_diagram.pdf", ["vector_no_text"], [None], None),
+        # A row of five machine-drawn curves under a typed title is not handwriting.
+        ("diagram_slides.pdf", ["vector_no_text"] * 2, [None] * 2, None),
+        # A hidden OCR layer over machine-drawn vector content: drawings, not handwriting.
+        ("vector_with_layer.pdf", ["vector_no_text"], [None], None),
+        ("ink_titled.pdf", ["vector_no_text", "born_digital"], [None, None], None),
+        ("big_drawings.pdf", ["born_digital", "born_digital", "vector_no_text"], [None] * 3, None),
+        ("template_pages.pdf", ["vector_no_text"] * 2 + ["born_digital"], [None] * 3, None),
     ],
 )
 def test_each_fixture_gets_its_page_type_and_what_happens_to_it(name, kinds, kept, refused):
@@ -117,6 +133,71 @@ def test_a_page_of_paper_rules_alone_is_blank():
     assert page_type.refusal_code([result.to_record(0)]) == "no_content"
 
 
+def test_square_waves_and_short_lines_are_marks_not_paper_rules():
+    (diagram,) = classify(HANDWRITING / "timing_diagram.pdf")
+    assert diagram.ink.marks > 0 and diagram.kind == "vector_no_text"
+
+    def ticks(page):  # short horizontal and vertical lines, each its own: a drawing
+        shape = page.new_shape()
+        for k in range(20):
+            shape.draw_line((100 + 20 * k, 300), (100 + 20 * k, 310))
+        shape.draw_line((100, 305), (480, 305))
+        shape.finish(color=(0, 0, 0), width=1)
+        shape.commit()
+
+    assert _page_with(ticks).kind == "vector_no_text"
+
+
+SECRET_CHARS = 63  # the hidden line's characters, spaces left out
+
+
+def test_boxes_drawn_with_annotation_tools_cover_the_line_under_them():
+    pages = classify(HANDWRITING / "annot_redactions.pdf")
+    # A black box, a black highlight, a black text box and a white box (annotations):
+    # the line under each is covered. A yellow highlight hides nothing.
+    assert [p.text.covered_chars for p in pages] == [SECRET_CHARS] * 4 + [0]
+    assert all("text_covered" in p.reasons for p in pages[:4])
+
+
+def test_clip_text_nothing_shows_through_and_text_under_a_shading_or_thick_stroke():
+    clip, shading, stroke = classify(HANDWRITING / "painted_over.pdf")
+    assert clip.text.invisible_chars == SECRET_CHARS and clip.text.covered_chars == 0
+    assert shading.text.covered_chars == stroke.text.covered_chars == SECRET_CHARS
+    # The clip-mode title over coloured bands shows: it is still read.
+    (title,) = classify(HANDWRITING / "typed_hidden.pdf")
+    assert title.text.invisible_chars == 80 and title.text.covered_chars == 32
+
+
+def test_a_scan_cropped_to_its_picture_covers_the_whole_visible_page():
+    (page,) = classify(HANDWRITING / "cropped_scan.pdf")
+    assert page.image_coverage == 1.0 and page.text.visible_chars == 19
+
+
+def test_a_few_strokes_under_a_typed_title_need_more_ink_to_be_handwriting():
+    coils, waves = classify(HANDWRITING / "diagram_slides.pdf")
+    for page in (coils, waves):
+        assert (page.ink.strokes, page.ink.rows) == (5, 1) and 0 < page.text.visible_chars < 40
+        assert page.kind == "vector_no_text"
+    # The same strokes with no typed text at all are a short handwritten note.
+    alone = page_type.decide(page_type.TextStats(), coils.ink, 0.0)
+    assert alone.kind == "handwritten" and "ink_few" in alone.reasons
+
+
+def test_a_hidden_layer_over_machine_drawn_vector_content_is_not_handwriting():
+    (page,) = classify(HANDWRITING / "vector_with_layer.pdf")
+    assert {"ink_rejected", "invisible_without_image"} <= set(page.reasons)
+    assert page.ink.rows < page_type.INK_PAGE_ROWS  # repeated shapes make no rows of writing
+    assert page.kind == "vector_no_text" and page.text.invisible_chars > 100
+
+
+def test_ink_not_analysed_under_a_short_typed_title_is_kept_as_an_image():
+    short, long = classify(HANDWRITING / "ink_titled.pdf", budget=page_type.InkBudget(0))
+    assert "ink_not_analysed" in short.reasons and short.text.visible_chars == 14
+    assert page_type.kept_reason(short) == "unread_page"
+    # A line of typed text or more: read as a typed page (layout's safety net decides).
+    assert long.kind == "born_digital" and page_type.kept_reason(long) is None
+
+
 def test_text_painted_under_an_opaque_image_is_covered_also_on_a_turned_page():
     with pymupdf.open(HANDWRITING / "scan_text_under_image.pdf") as doc:
         doc[0].set_rotation(90)
@@ -163,6 +244,10 @@ def _record(kind: str, visible: int = 0, invisible: int = 0, reasons=()) -> Page
         # Anything convertible, or not sure, never refuses.
         ([_record("handwritten"), _record("born_digital", 500)], None),
         ([_record("scan_no_text", 12)], None),  # a photo with a short title: maybe a slide
+        # A few strokes under a typed title may be a machine-drawn diagram.
+        ([_record("handwritten", 16, reasons=["ink_few"])], None),
+        ([_record("handwritten", 16, reasons=["ink_some"])], "handwritten_no_text"),
+        ([_record("handwritten", 0, reasons=["ink_few"])], "handwritten_no_text"),
         ([_record("vector_no_text", reasons=["ink_not_analysed"])], None),
         ([_record("vector_no_text")], None),
         ([], None),

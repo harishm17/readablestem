@@ -99,6 +99,7 @@ COVER_PIXEL_DELTA = 24
 COVER_CHANGED_SHARE = 0.01
 COVER_TEST_SPANS = 24
 REDACT_INSET = 0.5  # pt: how far inside a run of glyphs the removal stays
+THICK_STROKE = 3.0  # pt: a stroked line this wide can cover the middle of a glyph
 
 # Raster coverage: the union of image boxes on a 64 x 64 grid. A scan is one or more
 # images covering most of the page; margin crops, letter-on-A4 and strip tiling stay
@@ -166,6 +167,9 @@ INK_MAX_REPEATS = 0.35  # typed glyph outlines and plot markers repeat exactly; 
 # A page with little text is "vector_no_text" only if something is drawn: at least this
 # many visible paths, or an image. Otherwise its little text is all there is.
 VECTOR_MIN_PATHS = 3
+# Paper rules (ruled, squared, margin or Cornell paper) are separate lines at least this
+# share of the page across; shorter or joined horizontal and vertical lines are marks.
+RULE_MIN_SHARE = 0.5
 
 # Time budget (C1.6). The ink analysis is pure Python and dense pages are slow (up to
 # 0.9 s a page measured; 30 dense pages took 34 s on one core). A document gets
@@ -240,7 +244,9 @@ class TextStats:
     covered_chars: int = 0  # painted, then covered by an image or a fill painted later
     ocr_font_chars: int = 0  # GlyphLessFont (Tesseract), Apple ".SF..." (iOS)
     clipped_chars: int = 0  # text used as a clip: kept, recorded only
-    # Origins (`origin_key`) of the covered characters, for layout to leave out.
+    # Origins (`origin_key`) of the characters layout must leave out although their span
+    # looks visible: covered ones, and clip text nothing was painted through (counted as
+    # invisible).
     covered: set[tuple[int, int]] = field(default_factory=set)
 
     @property
@@ -389,14 +395,16 @@ def image_boxes(page: pymupdf.Page) -> tuple[list[BBox], float]:
     """Visible boxes of raster images (unrotated page space) and their union coverage of
     the page. MuPDF's image blocks are clipped by the clip path in force, unlike
     get_image_info and get_bboxlog (Google Docs and Canva crop screenshots with clip
-    paths); "blocks" output does not decode or copy any image."""
-    mb = page.mediabox
-    grid = _Grid(mb.width, mb.height)
+    paths); "blocks" output does not decode or copy any image. The page is its CropBox
+    (what a reader sees), in whose frame MuPDF gives every box: a scan cropped to trim
+    the scanner's margins covers all of it."""
+    frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
+    grid = _Grid(frame.width, frame.height)
     boxes = []
     for block in page.get_text("blocks", flags=IMAGE_FLAGS):
         if block[6] != 1:
             continue
-        box = _clip(block[:4], mb.width, mb.height)
+        box = _clip(block[:4], frame.width, frame.height)
         if _area(box) > 0:
             boxes.append(box)
             grid.add(box)
@@ -418,6 +426,7 @@ def text_stats(
     filled shape (`_maybe_covered`), so a page with neither costs nothing more."""
     stats = TextStats()
     spans: list[BBox] = []
+    clips: list[tuple[BBox, list[tuple[int, int]], int]] = []
     for block in raw_blocks:
         if block.get("type") != 0:
             continue
@@ -437,21 +446,53 @@ def text_stats(
                 stats.visible_chars += n
                 b = span["bbox"]
                 spans.append((b[0], b[1], b[2], b[3]))
+                if (run := _clip_run(span)) is not None:
+                    clips.append(run)
     if spans and _maybe_covered(spans, images, drawings):
-        covered = _covered(page)
+        covered = _covered(page, _thick_strokes(drawings))
         if covered:
             stats.covered = covered
             stats.covered_chars = min(len(covered), stats.visible_chars)
             stats.visible_chars -= stats.covered_chars
+    if clips:
+        hidden = _cover_test(page, clips)
+        for (_, origins, _), gone in zip(clips, hidden, strict=True):
+            if gone:  # a clip that nothing was painted through: nobody sees it
+                new = {o for o in origins if o not in stats.covered}
+                stats.covered |= new
+                n = min(len(new), stats.visible_chars)
+                stats.invisible_chars += n
+                stats.visible_chars -= n
     return stats
+
+
+def _clip_run(span: dict[str, Any]) -> tuple[BBox, list[tuple[int, int]], int] | None:
+    """Text used as a clip that paints nothing itself (render mode 7: MuPDF gives it the
+    CLIPPED flag and alpha 0): a run for the render test, which tells a gradient- or
+    picture-filled title (visible) from a clip nothing was painted through (C1.4)."""
+    flags = int(span.get("char_flags", CHAR_FILLED))
+    if not flags & CHAR_CLIPPED or int(span.get("alpha", 255)) > INVISIBLE_ALPHA:
+        return None
+    chars = [ch for ch in span.get("chars", ()) if _ink(ch.get("c", ""))]
+    if not chars:
+        return None
+    box = (
+        min(ch["bbox"][0] for ch in chars),
+        min(ch["bbox"][1] for ch in chars),
+        max(ch["bbox"][2] for ch in chars),
+        max(ch["bbox"][3] for ch in chars),
+    )
+    return box, [origin_key(ch["origin"]) for ch in chars], len(chars)
 
 
 def _maybe_covered(
     spans: Sequence[BBox], images: Sequence[BBox], drawings: Sequence[dict[str, Any]] | None
 ) -> bool:
-    """Some visible span lies under an image or an opaque filled shape (either order):
-    the shape spans the middle of the line's height and overlaps it sideways, so a box
-    over one word of a line counts (`_covered` then looks glyph by glyph)."""
+    """Some visible span lies under an image, a shading, an opaque filled shape or a
+    thick stroke (either order): the shape spans the middle of the line's height and
+    overlaps it sideways, so a box over one word of a line counts (`_covered` then looks
+    glyph by glyph). Annotations count: MuPDF lists their appearance with the drawings.
+    MuPDF's image blocks include shadings."""
     shapes = list(images)
     if drawings is None:
         shapes.append((-1e9, -1e9, 1e9, 1e9))  # unknown: look at the paint order
@@ -464,7 +505,27 @@ def _maybe_covered(
             rect = d.get("rect")
             if rect is not None and _area(rect) >= 4.0:
                 shapes.append((rect[0], rect[1], rect[2], rect[3]))
+        shapes += _thick_strokes(drawings) or []
     return any(_across(s, b) for s in spans for b in shapes)
+
+
+def _thick_strokes(drawings: Sequence[dict[str, Any]] | None) -> list[BBox] | None:
+    """Boxes of the stroked drawings with a pen of at least THICK_STROKE, grown by half
+    the pen (a marker scribble or a white bar drawn as a line): strokes that can cover
+    the middle of a glyph. None when the drawings were not read (every stroke may)."""
+    if drawings is None:
+        return None
+    boxes = []
+    for d in drawings:
+        width = float(d.get("width") or 0.0)
+        opacity = d.get("stroke_opacity")
+        if width < THICK_STROKE or d.get("color") is None:
+            continue
+        if isinstance(opacity, int | float) and opacity <= INVISIBLE_OPACITY:
+            continue
+        r, half = d["rect"], width / 2
+        boxes.append((r[0] - half, r[1] - half, r[2] + half, r[3] + half))
+    return boxes
 
 
 def _across(span: Sequence[float], shape: Sequence[float]) -> bool:
@@ -478,14 +539,22 @@ def _across(span: Sequence[float], shape: Sequence[float]) -> bool:
     )
 
 
-def _covered(page: pymupdf.Page) -> set[tuple[int, int]]:
-    """Origins of visible characters painted before an image or a filled shape that
-    covers them, and that do not show through it (`_cover_test`)."""
+def _covered(page: pymupdf.Page, thick: Sequence[BBox] | None = None) -> set[tuple[int, int]]:
+    """Origins of visible characters painted before an image, a shading, a filled shape
+    or a thick stroke that covers them, and that do not show through it (`_cover_test`).
+    Annotations are painted after the page, so a box drawn with an annotation tool is a
+    cover like any other. A stroke is a cover only when it matches one of the `thick`
+    strokes (`_thick_strokes`; None: any stroke may be), so the thin rules of a table drawn
+    over its cells are not tested."""
     log = page.get_bboxlog()
     covers = [
         (i, box)
         for i, (kind, box) in enumerate(log)
-        if kind in ("fill-image", "fill-imgmask", "fill-path") and _area(box) >= 4.0
+        if _area(box) >= 4.0
+        and (
+            kind in ("fill-image", "fill-imgmask", "fill-path", "fill-shade")
+            or (kind == "stroke-path" and (thick is None or any(_same_box(box, t) for t in thick)))
+        )
     ]
     if not covers:
         return set()
@@ -523,11 +592,22 @@ def _overlap(a: Sequence[float], b: Sequence[float]) -> bool:
     return a[0] < b[2] and b[0] < a[2] and a[1] < b[3] and b[1] < a[3]
 
 
+def _same_box(a: Sequence[float], b: Sequence[float]) -> bool:
+    """Two boxes of one drawing (the paint log's and the drawings list's): they share at
+    least half of the smaller one."""
+    w = min(a[2], b[2]) - max(a[0], b[0])
+    h = min(a[3], b[3]) - max(a[1], b[1])
+    if w <= 0 or h <= 0:
+        return False
+    return w * h >= 0.5 * min(_area(a), _area(b))
+
+
 def _cover_test(
     page: pymupdf.Page, runs: list[tuple[BBox, list[tuple[int, int]], int]]
 ) -> list[bool]:
     """For each candidate run of covered text: is it really hidden? Render the page (a
-    one-page copy, unrotated), remove the runs with redactions that remove text only,
+    one-page copy, unrotated, with its annotations: a box drawn with an annotation tool
+    hides like one in the page), remove the runs with redactions that remove text only,
     render again: text that still showed changes pixels in its box. The largest
     COVER_TEST_SPANS runs are tested; the rest follow the majority. Any failure means
     "not hidden", so the text is kept as it was before this check existed."""
@@ -536,7 +616,10 @@ def _cover_test(
     verdict: dict[int, bool] = {}
     copy = pymupdf.open()
     try:
-        copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number, annots=False)
+        copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number, annots=True)
+        # Annotations become page content first: applying a redaction deletes the ones it
+        # touches (a FreeText box), which would make covered text look visible.
+        copy.bake(annots=True, widgets=True)
         one = copy[0]
         one.set_rotation(0)
         clip = pymupdf.Rect(runs[tested[0]][0])
@@ -600,18 +683,35 @@ def _visible_paint(colour: object, opacity: object) -> bool:
     return not (isinstance(colour, tuple | list) and all(v >= 0.97 for v in colour))
 
 
-def _rules_only(drawing: dict[str, Any]) -> bool:
-    """A drawing of horizontal and vertical lines only, stroked, not filled: the rules of
-    ruled, squared or margin paper (a page with only these is blank paper)."""
+def _rules_only(drawing: dict[str, Any], width: float, height: float) -> bool:
+    """The rules of ruled, squared or margin paper (a page with only these is blank
+    paper): stroked, not filled, horizontal and vertical lines only, each a line of its
+    own (not continuing the one before it) and long, at least RULE_MIN_SHARE of the
+    page across. A square wave, a step plot or a line-drawn block diagram joins its
+    lines into one path, or has short ones: it is a mark."""
     if drawing.get("fill") is not None:
         return False
+    last = None
     for item in drawing.get("items") or ():
         if item[0] != "l":
             return False
         (x0, y0), (x1, y1) = item[1], item[2]
         if abs(x0 - x1) > 0.5 and abs(y0 - y1) > 0.5:
             return False
+        if last is not None and _near(item[1], last[1]):
+            if _near(item[2], last[0]):
+                continue  # the same line back: a closed one-line subpath
+            return False  # continues the line before it: a polyline
+        long_x = abs(x1 - x0) >= RULE_MIN_SHARE * width
+        long_y = abs(y1 - y0) >= RULE_MIN_SHARE * height
+        if not (long_x or long_y):
+            return False
+        last = (item[1], item[2])
     return True
+
+
+def _near(p: Sequence[float], q: Sequence[float]) -> bool:
+    return abs(p[0] - q[0]) <= 0.5 and abs(p[1] - q[1]) <= 0.5
 
 
 def _subpaths(items: Sequence[Any]) -> list[list[Any]]:
@@ -834,7 +934,7 @@ def ink_stats(
     """Handwriting evidence from the drawings layout extracted. Counts the visible paths
     always; the stroke analysis only within the budget and the item cap."""
     stats = InkStats()
-    mb = page.mediabox
+    frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
     for d in drawings:
         if not (
             _visible_paint(d.get("fill"), d.get("fill_opacity"))
@@ -842,11 +942,11 @@ def ink_stats(
         ):
             continue
         rect = d["rect"]
-        if rect[2] < 0 or rect[3] < 0 or rect[0] > mb.width or rect[1] > mb.height:
+        if rect[2] < 0 or rect[3] < 0 or rect[0] > frame.width or rect[1] > frame.height:
             continue
         stats.paths += 1
         stats.items += len(d.get("items") or ())
-        if not _rules_only(d):
+        if not _rules_only(d, frame.width, frame.height):
             stats.marks += 1
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_INK]) or []:
         stats.annot_strokes += len(annot.vertices or [])
@@ -862,7 +962,7 @@ def ink_stats(
 def _ink_candidates(page: pymupdf.Page, drawings: Sequence[dict[str, Any]]) -> list[_Candidate]:
     """Every subpath that could be a pen stroke. /Ink annotation appearances are in the
     drawings already (MuPDF traces them), so they are not added again."""
-    mb = page.mediabox
+    frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
     display = _Display(page)
     cands: list[_Candidate] = []
     # Stroked ink: Xournal++ writes one segment per path object, so open subpaths that
@@ -889,7 +989,7 @@ def _ink_candidates(page: pymupdf.Page, drawings: Sequence[dict[str, Any]]) -> l
         if not (filled or stroked):
             continue
         rect = d["rect"]
-        if rect[2] < 0 or rect[3] < 0 or rect[0] > mb.width or rect[1] > mb.height:
+        if rect[2] < 0 or rect[3] < 0 or rect[0] > frame.width or rect[1] > frame.height:
             continue
         if rect[2] - rect[0] < STROKE_MIN_SIDE and rect[3] - rect[1] < STROKE_MIN_SIDE and filled:
             continue  # a dot; a stroked tiny segment may still be part of a chain
@@ -1033,7 +1133,16 @@ def decide(
     )
     writing = clean and ink.strokes >= INK_PAGE_STROKES and ink.rows >= INK_PAGE_ROWS
     some_ink = clean and ink.strokes >= INK_MIXED_STROKES and ink.rows >= INK_MIXED_ROWS
+    # A few clean strokes in one row are a short note only on a page with no typed text:
+    # under a typed title they are as likely a row of machine-drawn curves (five waves,
+    # five inductor coils), so such a page needs some ink or a second row.
     ink_alone = clean and ink.strokes >= INK_ALONE_STROKES and ink.rows >= 1
+    if text.visible_chars:
+        ink_alone = some_ink or (ink_alone and ink.rows >= 2)
+    # Rows of writing made of pen strokes, though the clean checks rejected the ink
+    # (exact repeats among tiny strokes): what dense handwriting looks like; typed glyph
+    # outlines vote against their own rows (they repeat), so they make none.
+    written_rows = ink.strokes >= INK_MIXED_STROKES and ink.rows >= INK_PAGE_ROWS
     reasons: list[str] = []
     if text.invisible_chars:
         reasons.append("invisible_text")
@@ -1091,12 +1200,16 @@ def decide(
     if image_coverage >= SCAN_COVERAGE and picture:
         return result("scan_ocr" if ocr else "scan_no_text")
     if untrusted >= OCR_MIN:
-        # A hidden layer and no picture of a page: over vector ink (dense or rejected
-        # writing, or ink not analysed) it is a handwriting recognition layer.
-        if image_coverage < SCAN_COVERAGE and (
-            ink.strokes >= INK_MIXED_STROKES or not ink.analysed
-        ):
-            return result("handwritten_ocr", ["invisible_without_image"])
+        # A hidden layer and no picture of a page: over vector ink (clean, or rows of
+        # writing the checks rejected, or ink not analysed) it is a handwriting
+        # recognition layer. Over machine-drawn vector content (text turned into
+        # outlines, a diagram: what an OCR program writes over a vector page) the page
+        # is drawings: the hidden layer is dropped and the drawings are read as figures.
+        if image_coverage < SCAN_COVERAGE:
+            if some_ink or written_rows or not ink.analysed:
+                return result("handwritten_ocr", ["invisible_without_image"])
+            if ink.marks >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS:
+                return result("vector_no_text", ["invisible_without_image"])
         return result("scan_ocr", ["invisible_without_image"])
     if ink.marks >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS or image_coverage > 0:
         return result("vector_no_text", ["little_text"])
@@ -1132,9 +1245,10 @@ SCAN_KINDS = frozenset({"scan_no_text", "scan_ocr"})
 def kept_reason(page: PageTypeResult | PageType) -> str | None:
     """The Fix reason when this app keeps the whole page as its image (nothing on it is
     converted), else None. There is no handwriting or scan conversion: handwritten and
-    scanned pages are kept as images, and so is a page with drawings and no visible text
-    whose ink could not be analysed in time (C1.6). Works on a classifier result and on
-    the stored record alike."""
+    scanned pages are kept as images, and so is a page with drawings and less than a line
+    of visible text whose ink could not be analysed in time (C1.6: a page of notes with a
+    typed title, after the budget ran out, may be handwriting; its title is kept in the
+    page image). Works on a classifier result and on the stored record alike."""
     if page.kind in HANDWRITTEN_KINDS:
         return HANDWRITTEN_PAGE
     if page.kind in SCAN_KINDS:
@@ -1142,9 +1256,9 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     if (
         page.kind == "vector_no_text"
         and "ink_not_analysed" in page.reasons
-        and _visible_chars(page) == 0
+        and _visible_chars(page) < TEXT_MIN
     ):
-        return UNREAD_PAGE  # drawings and no visible text at all (C1.6): a title + chart is read
+        return UNREAD_PAGE
     return None
 
 
@@ -1211,12 +1325,14 @@ REFUSAL_CODES = ("handwritten", "handwritten_no_text", "scanned", "scanned_ocr",
 def _certain(page: PageType) -> str | None:
     """`kept_reason` for a page that is certainly handwritten or a scan. A full-page
     picture with a few visible characters and no hidden layer may be a slide with a
-    background photo and a title: it is kept as an image with a decision when the PDF
-    is converted, but it never refuses the upload."""
+    background photo and a title, and a few strokes under a typed title ("ink_few") may
+    be a machine-drawn diagram: such pages are kept as images with a decision when the
+    PDF is converted, but they never refuse the upload."""
     reason = kept_reason(page)
-    if reason == HANDWRITTEN_PAGE:
+    sure = page.visible_chars == 0 or page.untrusted_chars >= HIDDEN_FEW
+    if reason == HANDWRITTEN_PAGE and (sure or "ink_few" not in page.reasons):
         return reason
-    if reason == SCANNED_PAGE and (page.visible_chars == 0 or page.untrusted_chars >= HIDDEN_FEW):
+    if reason == SCANNED_PAGE and sure:
         return reason
     return None
 
