@@ -118,26 +118,33 @@ def upload_error_message(
         "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
         "large to convert. Course documents are usually Letter or A4 size.",
         # Every page handwritten or scanned (pipeline.page_type.refusal_code). Never "run
-        # OCR first": that makes exactly the files refused here. TODO(Harish): final words.
-        "scanned": f"{name} is scanned pages, so this tool cannot convert it. It has no text "
+        # OCR first": that makes exactly the files refused here. One sentence for what
+        # happened (the error summary's link), then why and what to do (the field's
+        # message, `upload_error_summary`). TODO(Harish): final words.
+        "scanned": f"{name} is scanned, so this tool cannot convert it. It has no text "
         f"this tool can use. {NOTHING_TAKEN} If you have the original file (LaTeX, Word or "
         "PowerPoint), upload that instead.",
-        "scanned_ocr": f"{name} is scanned pages, so this tool cannot convert it. Any text in "
-        "it was guessed from the images by a text recognition (OCR) program. OCR text is "
-        "often wrong, most of all in maths, so this tool does not use it. Running OCR again "
-        f"will not help. {NOTHING_TAKEN} If you have the original file (LaTeX, Word or "
-        "PowerPoint), upload that instead.",
-        "handwritten": f"{name} is handwritten notes, so this tool cannot convert it. The PDF "
-        "also holds hidden text that a tablet or a text recognition (OCR) program guessed "
-        "from the handwriting. That text is often wrong, most of all in maths, so this tool "
-        f"does not use it. {NOTHING_TAKEN} If you have a typed version of these notes "
+        "scanned_ocr": f"{name} is scanned, so this tool cannot convert it. Its text was "
+        "guessed from the images by a text recognition (OCR) program, which is often wrong "
+        f"in maths, so it is not used; running OCR again will not help. {NOTHING_TAKEN} If "
+        "you have the original file (LaTeX, Word or PowerPoint), upload that instead.",
+        "handwritten": f"{name} is handwritten, so this tool cannot convert it. Its hidden "
+        "text, guessed from the handwriting by a tablet or an OCR program, is often wrong in "
+        f"maths, so it is not used. {NOTHING_TAKEN} If you have a typed version (LaTeX, Word "
+        "or PowerPoint), upload that instead.",
+        "handwritten_no_text": f"{name} is handwritten, so this tool cannot convert it. "
+        f"It has no text this tool can use. {NOTHING_TAKEN} If you have a typed version "
         "(LaTeX, Word or PowerPoint), upload that instead.",
-        "handwritten_no_text": f"{name} is handwritten notes, so this tool cannot convert it. "
-        f"It has no text this tool can use. {NOTHING_TAKEN} If you have a typed version of "
-        "these notes (LaTeX, Word or PowerPoint), upload that instead.",
         "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
         "chose the right file.",
     }.get(code, f"{name} cannot be converted.")
+
+
+def upload_error_summary(message: str) -> str:
+    """The error summary's link for an upload error: its first sentence, when the message
+    has more (the whole message is shown under the file field)."""
+    first, dot, rest = message.partition(". ")
+    return first + "." if dot and rest else message
 
 
 def _quota_message(name: str, pages: int | None, left: int | None, quota: int | None) -> str:
@@ -289,8 +296,13 @@ def _upload_error_page(
     # With no pages left the form is replaced by a notice (app.html): the summary's link
     # goes there instead of to a file field that is not on the page.
     field_id = "upload-closed" if context["pages_left"] == 0 else "pdf"
-    errors = [{"field_id": field_id, "message": message}]
-    context |= {"errors": errors, "field_errors": {"pdf": errors[0]}}
+    # The summary links to the field with a short line; the field says all of it.
+    summary = message if field_id == "upload-closed" else upload_error_summary(message)
+    errors = [{"field_id": field_id, "message": summary}]
+    context |= {
+        "errors": errors,
+        "field_errors": {"pdf": {"field_id": field_id, "message": message}},
+    }
     return render(request, "app.html", context, status_code=status, headers=headers)
 
 

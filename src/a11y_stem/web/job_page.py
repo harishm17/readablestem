@@ -36,7 +36,7 @@ from __future__ import annotations
 
 import unicodedata
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date
 from typing import Any, Literal
 
@@ -227,6 +227,28 @@ class Breakdown:
     decided_units: int = 0  # ... as decisions
     as_image: int = 0  # shown as an image of the original (not converted)
     as_image_kinds: dict[str, int] = field(default_factory=dict)
+    # Waiting decisions that hold more than one item: repeated headings, and pages (or
+    # handwriting) kept as images for one reason.
+    heading_groups: int = 0
+    page_groups: int = 0
+
+    @property
+    def grouped_reason(self) -> str:
+        """Why the waiting items make fewer decisions than there are items."""
+        reasons = []
+        if self.heading_groups:
+            reasons.append("repeated headings are decided together")
+        if self.page_groups:
+            reasons.append("pages kept as images for the same reason are decided together")
+        return "; ".join(reasons)
+
+    @property
+    def as_image_sentence(self) -> str:
+        """ "2 pages are shown as images of the original." ("" when none)."""
+        if not self.as_image:
+            return ""
+        verb = "is shown as an image" if self.as_image == 1 else "are shown as images"
+        return f"{kinds_phrase(self.as_image_kinds)} {verb} of the original."
 
 
 def breakdown(fixes: list[Fix]) -> Breakdown:
@@ -234,6 +256,7 @@ def breakdown(fixes: list[Fix]) -> Breakdown:
     decided = [f for f in fixes if not f.pending and f.decided_by_reviewer]
     accepted = [f for f in fixes if not f.pending and not f.decided_by_reviewer]
     images = [f for f in fixes if f.status in KEPT_ORIGINAL_STATUSES]
+    grouped = [unit[0] for unit in triage.units(waiting) if len(unit) > 1]
     return Breakdown(
         items=len(fixes),
         waiting=len(waiting),
@@ -244,6 +267,8 @@ def breakdown(fixes: list[Fix]) -> Breakdown:
         decided_units=len(triage.units(decided)),
         as_image=len(images),
         as_image_kinds=dict(Counter(word_kind(f) for f in images)),
+        heading_groups=sum(f.kind is Kind.HEADING for f in grouped),
+        page_groups=sum(word_kind(f) in ("page", "handwriting") for f in grouped),
     )
 
 
@@ -697,6 +722,9 @@ class NoticeLine:
     element_id: str | None
     decision: Literal["open", "made"] | None  # the fix that is its decision, if any
     label: str = ""  # that decision's item ("Table 2"), so two "Decide it" links differ
+    # A page kept as an image whose decision is its group's, listed with its first page:
+    # that page's name ("page 2"), and no "Decide it" of its own.
+    with_label: str = ""
 
 
 # Notices whose element's fix is the decision they describe (a table kept as an image, a
@@ -743,7 +771,38 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
             lists.worth_checking.append(line)
         else:
             lists.not_handled.append(line)
+    lists.not_handled = _one_line_per_kept_page(lists.not_handled, fixes, labels)
     return lists
+
+
+def _one_line_per_kept_page(
+    lines: list[NoticeLine], fixes: dict[str, Fix], labels: dict[str, str]
+) -> list[NoticeLine]:
+    """A page kept as an image says it once: its hidden text that was not used joins its
+    line, and the pages kept for one reason have one "Decide it", on the first of them
+    (the others say they are decided with it)."""
+    kept_codes = notice_rules.KEPT_IMAGE_CODES
+    kept_at = {line.where: i for i, line in enumerate(lines) if line.code in kept_codes}
+    hidden: dict[int, str] = {}  # index of a kept page's line -> its hidden-text sentence
+    for line in lines:
+        if line.code == "ocr_text_layer_ignored" and line.where in kept_at:
+            hidden[kept_at[line.where]] = line.text
+    first: dict[str, str] = {}  # group key -> the name of its first page ("page 2")
+    out: list[NoticeLine] = []
+    for i, line in enumerate(lines):
+        if line.code == "ocr_text_layer_ignored" and line.where in kept_at:
+            continue  # said on the page's own line
+        if i in hidden:
+            line = replace(line, text=f"{line.text} {hidden[i]}")
+        fix = fixes.get(line.element_id or "")
+        key = fix.group_key if fix is not None and line.code in kept_codes else None
+        if key and key in first and line.decision is not None:
+            line = replace(line, decision=None, with_label=first[key])
+        elif key:
+            name = labels.get(line.element_id or "", "")
+            first[key] = name[:1].lower() + name[1:]
+        out.append(line)
+    return out
 
 
 # --------------------------------------------------------------------------- language

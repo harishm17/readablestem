@@ -184,7 +184,7 @@ def test_the_counts_add_up_and_match_the_review_screen(web):
     assert "Of the 5 items found, 3 wait for your decision, 2 were accepted for you and 0 " in (
         results
     )
-    assert "1 is shown as an image of the original." in results
+    assert "1 equation is shown as an image of the original." in results, results
     review = page_text(web.browser.get(f"/jobs/{job_id}/review").text)
     assert "3" in review and "Need your decision 3" in results
 

@@ -209,16 +209,35 @@ DECISION_NOUNS = {
 }
 
 
+# The pages (or handwriting) kept as images for one reason are one decision, named by
+# what they are, never as "repeated figures" (pipeline.page_type; web.review).
+KEPT_IMAGE_NOUNS = {
+    "handwritten_page": ("the handwritten page", "the handwritten pages"),
+    "scanned_page": ("the scanned page", "the scanned pages"),
+    "unread_page": ("the page kept as an image", "the pages kept as images"),
+    "handwriting_on_page": ("the handwriting on a typed page", "the handwriting on typed pages"),
+}
+
+
 def decisions_label(units: list[list[Fix]], kind: Kind) -> str:
     """'2 equations', '1 group of repeated headings', '3 headings and 1 group of
-    repeated headings': decisions of one kind (a heading group is one decision)."""
+    repeated headings': decisions of one kind (a heading group is one decision). Pages
+    kept as images are named by why ('the handwritten pages and the scanned page')."""
     one, many = DECISION_NOUNS[kind]
+    kept: list[list[Fix]] = []
+    rest: list[list[Fix]] = []
+    for unit in units:
+        (kept if job_page.word_kind(unit[0]) in ("page", "handwriting") else rest).append(unit)
+    units = rest
     groups = sum(1 for unit in units if unit[0].group_key)
     singles = len(units) - groups
     parts = [f"{singles} {one if singles == 1 else many}"] if singles else []
     if groups:
         parts.append(f"{groups} {'group' if groups == 1 else 'groups'} of repeated {many}")
-    return " and ".join(parts)
+    for unit in kept:
+        nouns = KEPT_IMAGE_NOUNS.get(unit[0].reason or "", KEPT_IMAGE_NOUNS["unread_page"])
+        parts.append(nouns[0] if len(unit) == 1 else nouns[1])
+    return job_page.join_words(parts)
 
 
 def _check_line(explained: Explained, severity: str) -> CheckLine:
@@ -232,19 +251,23 @@ def summarise(result_json: dict[str, Any] | None) -> ResultSummary | None:
     statuses = Counter(f.status for f in result.fixes)
     waiting = triage.units(f for f in result.fixes if f.pending)
     failed = [c for c in result.html_checks if not c.passed]
+    # Kinds as the job page names them: pages and handwriting kept as images are figures
+    # in the data model, but not in words (`job_page.word_kind`).
+    word = job_page.word_kind
+    by_word: dict[str, list[list[Fix]]] = {}
+    for unit in waiting:
+        by_word.setdefault(word(unit[0]), []).append(unit)
     return ResultSummary(
         pages=result.stats.pages,
-        by_kind=dict(Counter(f.kind.value for f in result.fixes)),
+        by_kind=dict(Counter(word(f) for f in result.fixes)),
         needs_review=statuses[Status.NEEDS_REVIEW],
         accepted=sum(f.status is Status.ACCEPTED and not f.reviewed for f in result.fixes),
         not_converted=statuses[Status.ABSTAINED] + statuses[Status.FAILED],
         reviewed=sum(f.decided_by_reviewer for f in result.fixes),
         decisions=triage.open_decisions(result.fixes),
-        review_by_kind=dict(Counter(unit[0].kind.value for unit in waiting)),
+        review_by_kind={kind: len(units) for kind, units in by_word.items()},
         review_labels={
-            kind.value: decisions_label([u for u in waiting if u[0].kind is kind], kind)
-            for kind in DECISION_NOUNS
-            if any(u[0].kind is kind for u in waiting)
+            kind: decisions_label(units, units[0][0].kind) for kind, units in by_word.items()
         },
         review_first=_first_open_by_kind(result),
         optional=sum(f.optional_note for f in result.fixes),
@@ -262,7 +285,7 @@ def _first_open_by_kind(result: DocumentResult) -> dict[str, str]:
     first: dict[str, str] = {}
     for decision in queue.decisions(result):
         if decision.open:
-            first.setdefault(decision.kind.value, decision.key)
+            first.setdefault(job_page.word_kind(decision.lead), decision.key)
     return first
 
 

@@ -264,7 +264,7 @@
 {% set n = hg.waiting %}
 <p class="group-question">“{{ hg.text }}” appears {{ "twice" if hg.size == 2 else hg.size ~ " times" }} {{ hg.style }}{% if n and n != hg.size %} ({{ n }} still waiting){% endif %}.</p>
 {{ region(p) }}
-{% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}<a href="{{ pl.href }}"><span class="visually-hidden">page </span>{{ pl.number }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>{% endif %}
+{% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if n %}
 {% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
 <div class="decide-row" id="group-actions-{{ key }}" tabindex="-1">
@@ -335,7 +335,9 @@
 <p class="group-question">{{ pg.lead }}</p>
 <p>{{ pg.explain }}</p>
 {{ region(p) }}
-{% if p.group_pages|length > 1 %}<p class="group-pages">On pages {% for pl in p.group_pages %}<a href="{{ pl.href }}"><span class="visually-hidden">page </span>{{ pl.number }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>{% endif %}
+{# "On pages 2, 3 and 5", each number a link to its page (its purpose is clear in the
+   sentence; a hidden "page" in each made screen readers say "pages page 2"). #}
+{% if p.group_pages|length > 1 %}<p class="group-pages">On pages {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
 {% if pg.waiting %}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">

@@ -304,8 +304,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     # characters (web.job_page). TODO(Harish): final wording (handwriting design, 3.3).
     "scanned_page": "A scanned image, not converted: the page is kept as an image.",
     "handwritten_page": "Handwritten, not converted: the page is kept as an image.",
-    "unread_page": "Drawings or images with nothing this tool could read, not converted: the "
-    "page is kept as an image.",
+    "unread_page": "Drawings or writing this tool could not read, not converted: the page is "
+    "kept as an image, after any text read from it.",
     "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
     "the handwriting is kept as an image after it.",
     "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "

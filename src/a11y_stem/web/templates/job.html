@@ -83,6 +83,9 @@
     <div><dt>Figures</dt><dd>{{ s.by_kind.get("figure", 0) }}</dd></div>
     <div><dt>Headings</dt><dd>{{ s.by_kind.get("heading", 0) }}</dd></div>
     {% if s.by_kind.get("table") %}<div><dt>Tables</dt><dd>{{ s.by_kind["table"] }}</dd></div>{% endif %}
+    {# Pages and handwriting kept as images are figures in the data, not in words. #}
+    {% if s.by_kind.get("page") %}<div><dt>Pages kept as images</dt><dd>{{ s.by_kind["page"] }}</dd></div>{% endif %}
+    {% if s.by_kind.get("handwriting") %}<div><dt>Handwriting kept as images</dt><dd>{{ s.by_kind["handwriting"] }}</dd></div>{% endif %}
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
     <div><dt>Need your decision</dt><dd>{{ c.decisions }}</dd></div>
     <div><dt>Accepted for you</dt><dd>{{ c.accepted }}{% if c.notes %} <span class="meta">({{ c.notes }} with a note{% if s.second_check %}, {{ s.second_check }} worth a look{% endif %})</span>{% endif %}</dd></div>
@@ -94,13 +97,14 @@
     {{ c.waiting }} {{ "waits" if c.waiting == 1 else "wait" }} for your decision,
     {{ c.accepted }} {{ "was" if c.accepted == 1 else "were" }} accepted for you and
     {{ c.decided }} {{ "was" if c.decided == 1 else "were" }} decided by you.
-    {% if c.waiting != c.decisions %}The {{ c.waiting }} waiting make {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}: repeated headings are decided together.{% endif %}
-    {% if c.as_image %}{{ c.as_image }} {{ "is" if c.as_image == 1 else "are" }} shown as an image of the original.{% endif %}</p>
+    {%- if c.waiting != c.decisions and c.grouped_reason %} The {{ c.waiting }} waiting make {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}: {{ c.grouped_reason }}.{% endif %}
+    {%- if c.as_image %} {{ c.as_image_sentence }}{% endif %}</p>
   {% if c.decisions %}
   {# One link per kind, straight to its first decision on the review screen. A group of
-     repeated headings is one decision. #}
+     repeated headings is one decision, and so are the pages kept as images for one
+     reason. #}
   <p id="review-breakdown">{{ c.decisions }} {{ "needs" if c.decisions == 1 else "need" }} your decision:
-    {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("table", "tables"), ("heading", "headings")] if s.review_by_kind.get(kind) %}
+    {% for kind, many in [("equation", "equations"), ("figure", "figures"), ("table", "tables"), ("heading", "headings"), ("page", "pages"), ("handwriting", "pieces of handwriting")] if s.review_by_kind.get(kind) %}
     <a href="/jobs/{{ job.id }}/review{% if s.review_first.get(kind) %}?item={{ s.review_first[kind] }}{% endif %}">{{ s.review_labels.get(kind, s.review_by_kind[kind] ~ " " ~ many) }}</a>{{ "." if loop.last else "," }}
     {% endfor %}
   </p>

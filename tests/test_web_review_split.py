@@ -253,7 +253,7 @@ def test_a_heading_group_is_one_card_whoever_names_it(split, item):
     assert "Keep as headings at level 2" in body and "Make bold text" in body
     assert "(all 3 “Teacher Support”)" in body  # in the buttons' names
     assert f'action="/jobs/{split.job_id}/review/{GROUP}"' in body
-    assert text_of(section(body, '<p class="group-pages">', "</p>")) == "On pages page 1 , page 2 ."
+    assert text_of(section(body, '<p class="group-pages">', "</p>")) == "On pages 1 and 2 ."
     # The heading in its band, outlined.
     assert f'src="/jobs/{split.job_id}/regions/p1-e3.png"' in body
 

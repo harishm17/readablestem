@@ -130,11 +130,11 @@ FAILED_MESSAGES = {
     "text is often wrong, most of all in maths, so this tool does not use it, and running "
     "OCR again will not help. If you have the original file (LaTeX, Word or PowerPoint), "
     "upload that instead.",
-    "handwritten": "This PDF is handwritten notes, so this tool cannot convert it. It also "
-    "holds hidden text that a tablet or a text recognition (OCR) program guessed from the "
+    "handwritten": "This PDF is handwritten, so this tool cannot convert it. It also holds "
+    "hidden text that a tablet or a text recognition (OCR) program guessed from the "
     "handwriting. That text is often wrong, most of all in maths, so this tool does not "
     "use it. If you have a typed version (LaTeX, Word or PowerPoint), upload that instead.",
-    "handwritten_no_text": "This PDF is handwritten notes, so this tool cannot convert it. "
+    "handwritten_no_text": "This PDF is handwritten, so this tool cannot convert it. "
     "It has no text this tool can use. If you have a typed version (LaTeX, Word or "
     "PowerPoint), upload that instead.",
     "no_content": "This PDF has no text, equations or figures that could be converted.",
@@ -194,7 +194,9 @@ def job_outcome(
         return JobOutcome(error_code, "Stopped early", message, partial=True)
     if error_code in PAGES_NOT_CONVERTED:
         message = _pages_message(result_json)
-        return JobOutcome(error_code, "Finished, with pages not converted", message, partial=True)
+        by_reason, handwriting, _ = _kept(result_json)
+        what = "handwriting" if handwriting and not by_reason else "pages"
+        return JobOutcome(error_code, f"Finished, with {what} not converted", message, partial=True)
     return None
 
 
@@ -205,7 +207,10 @@ PAGES_NOT_CONVERTED = frozenset({"pages_not_converted", "scanned_pages"})
 PAGE_WORDS = {
     "handwritten_page": ("is handwritten", "are handwritten"),
     "scanned_page": ("is a scanned image", "are scanned images"),
-    "unread_page": ("has nothing this tool could read", "have nothing this tool could read"),
+    "unread_page": (
+        "has drawings or writing this tool could not read",
+        "have drawings or writing this tool could not read",
+    ),
 }
 HANDWRITING_ON_PAGE = "handwriting_on_page"
 HIDDEN_FEW = 3  # pipeline.page_type.HIDDEN_FEW: hidden characters that count as a layer
@@ -256,7 +261,9 @@ def _pages_message(result_json: dict[str, Any] | None) -> str:
             it = _plural(len(pages), "it was", "they were")
             sentences.append(f"{_pages_text(pages)} {verb}, so {it} not converted.")
     if sentences:
-        sentences.append("The HTML keeps each one as an image, marked “Not converted”.")
+        kept = sum(len(p) for p in by_reason.values())
+        each = "it" if kept == 1 else "each one"
+        sentences.append(f"The HTML keeps {each} as an image, marked “Not converted”.")
     elif not handwriting:  # a stored result without the details
         sentences.append(
             "Some pages were not converted. The HTML keeps each one as an image, marked "

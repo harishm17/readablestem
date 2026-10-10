@@ -190,10 +190,11 @@ class FixGroup:
     pending: list[Fix]  # waiting for a decision, page and reading order
     done: list[Fix]  # accepted (no note), edited or rejected, page and reading order
     optional: list[Fix] = field(default_factory=list)  # accepted with an optional note
+    name: str = ""  # a slug of its own ("pages": the figures that are kept images)
 
     @property
     def slug(self) -> str:
-        return GROUP_SLUGS[self.kind]
+        return self.name or GROUP_SLUGS[self.kind]
 
     @property
     def units(self) -> list[list[Fix]]:
@@ -223,6 +224,30 @@ def _positions(result: DocumentResult) -> dict[str, tuple[int, int, int]]:
         element = elements.get(fix.element_id)
         page, order = (element.page, element.order) if element else (far, far)
         out[fix.element_id] = (GROUP_KINDS.index(fix.kind), page, order)
+    return out
+
+
+KEPT_IMAGES_SLUG = "pages"
+
+
+def kept_images_apart(groups: list[FixGroup]) -> list[FixGroup]:
+    """The figure group split in two for the list view: the figures, then the pages and
+    handwriting kept as images (`is_kept_image`), which are not figures in words."""
+    out: list[FixGroup] = []
+    for group in groups:
+        if group.kind is not Kind.FIGURE:
+            out.append(group)
+            continue
+        for name, kept in (("", False), (KEPT_IMAGES_SLUG, True)):
+            part = FixGroup(
+                group.kind,
+                pending=[f for f in group.pending if is_kept_image(f) is kept],
+                done=[f for f in group.done if is_kept_image(f) is kept],
+                optional=[f for f in group.optional if is_kept_image(f) is kept],
+                name=name,
+            )
+            if part.pending or part.done or part.optional:
+                out.append(part)
     return out
 
 
@@ -412,6 +437,10 @@ def apply_review(
     fix = result.fix_for(element_id)
     if fix is None:
         raise LookupError(element_id)
+    if is_kept_image(fix) and action != "reject":
+        # A page (or handwriting) kept as an image has one decision, keep it: alt text or
+        # "decorative" would take its "Not converted" mark, or the page, from students.
+        raise ReviewInvalid([FieldError(field_id("actions", element_id), KEPT_IMAGE_ONLY)])
     if action == ADD_DATA_TABLE:
         return add_data_table(result, fix)
     if action not in ACTIONS:
@@ -998,6 +1027,10 @@ KEPT_IMAGE_REASONS = frozenset(
     {"handwritten_page", "scanned_page", "unread_page", "handwriting_on_page"}
 )
 KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"})
+KEPT_IMAGE_ONLY = (
+    "This stays an image of the original, marked “Not converted”: there is nothing else "
+    "to choose for it."
+)
 
 
 def is_kept_image(fix: Fix) -> bool:

@@ -361,7 +361,7 @@ def test_stopping_the_worker_cancels_the_running_job_and_ends_its_lease(env):
 @pytest.mark.parametrize(
     ("data", "code", "message"),
     [
-        (scanned_pdf(2), "scanned", "is scanned pages, so this tool cannot convert it"),
+        (scanned_pdf(2), "scanned", "is scanned, so this tool cannot convert it"),
         (blank_pdf(), "no_content", "Every page of notes.pdf is blank"),
         (huge_page_pdf(), "page_too_large", "too large to convert"),
     ],

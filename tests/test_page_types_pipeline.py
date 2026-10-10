@@ -296,10 +296,10 @@ def pages_used(env) -> int:
 @pytest.mark.parametrize(
     ("name", "says"),
     [
-        ("ios_notes.pdf", "cannot convert it. The PDF also holds hidden text"),
+        ("ios_notes.pdf", "is handwritten, so this tool cannot convert it. Its hidden text"),
         ("ink_no_layer.pdf", "cannot convert it. It has no text this tool can use"),
-        ("scan_ocr.pdf", "Running OCR again will not help"),
-        ("scan_text_under_image.pdf", "is scanned pages, so this tool cannot convert it"),
+        ("scan_ocr.pdf", "running OCR again will not help"),
+        ("scan_text_under_image.pdf", "is scanned, so this tool cannot convert it"),
     ],
 )  # fmt: skip
 def test_a_pdf_of_only_handwritten_or_scanned_pages_is_refused_before_any_quota(env, name, says):
@@ -309,6 +309,11 @@ def test_a_pdf_of_only_handwritten_or_scanned_pages_is_refused_before_any_quota(
     assert says in text
     assert "no pages were taken from your daily allowance" in text
     assert "yet" not in text.split("cannot convert it")[1][:5]  # no promise of later
+    # The error summary links one sentence to the field, which says the rest once.
+    found = re.search(r'<div class="error-summary".*?</ul>', response.text, re.S)
+    assert found and "so this tool cannot convert it." in text_of(found.group(0))
+    assert "daily allowance" not in found.group(0)
+    assert text.count("no pages were taken from your daily allowance") == 1
     with session_scope(env.ctx.factory) as session:
         assert session.scalar(select(Job.id)) is None
     assert pages_used(env) == 0
@@ -393,7 +398,7 @@ def test_one_click_keeps_every_page_of_the_group(env):
     assert html.count('data-reason="handwritten_page"') == 2  # still kept, marked
 
 
-def _post(env, job_id: str, key: str, action: str, view: str):
+def _post(env, job_id: str, key: str, action: str, view: str, **fields: str):
     page = env.browser.get(f"/jobs/{job_id}/review" + ("/list" if view == "list" else ""))
     token = re.search(r'name="csrf_token" value="([^"]+)"', page.text)
     version = re.search(r'name="version" value="(\d+)"', page.text)
@@ -401,7 +406,7 @@ def _post(env, job_id: str, key: str, action: str, view: str):
     return env.browser.post(
         f"/jobs/{job_id}/review/{key}",
         data={"csrf_token": token.group(1), "action": action, "view": view,
-              "version": version.group(1)},
+              "version": version.group(1), **fields},
         follow_redirects=False,
     )  # fmt: skip
 
@@ -419,3 +424,97 @@ def test_the_list_view_keeps_the_group_and_refuses_anything_but_keep(env):
     assert "Needs your decision (1)" in listing
     assert "Kept by you" in listing  # the scanned page, in "Your decisions"
     assert _post(env, job_id, "pg-nothing", "reject", "split").status_code == 404
+
+
+def test_a_kept_page_stays_a_marked_image_after_its_group_decision(env):
+    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
+    _worker(env).run_once()
+    assert _post(env, job_id, "pg-p2-e0", "reject", "list").status_code == 303
+    page = env.browser.get(f"/jobs/{job_id}/review/list").text
+    # Under "Your decisions" each page says what it is now; no alt text, no Decorative.
+    assert 'name="decorative"' not in page and 'name="alt"' not in page
+    listing = text_of(page)
+    assert "Page 2: Kept by you" in listing and "Page 2, page 2" not in listing
+    assert "Kept as an image, marked “Not converted”" in listing
+    # The review screen shows the page with its group, never a figure form.
+    split = env.browser.get(f"/jobs/{job_id}/review?item=p3-e0").text
+    assert 'name="decorative"' not in split and 'name="alt"' not in split
+    for action, fields in (
+        ("edit", {"alt": "", "decorative": "on"}),
+        ("edit", {"alt": "Handwritten notes on kinematics."}),
+        ("accept", {}),
+    ):
+        refused = _post(env, job_id, "p3-e0", action, "list", **fields)
+        assert refused.status_code == 422
+        assert "nothing else to choose" in text_of(refused.text)
+        assert 'href="#actions-p3-e0"' in refused.text  # the error summary's link
+    html = env.job(job_id).html or ""
+    assert html.count('data-reason="handwritten_page"') == 2
+    assert 'class="decorative"' not in html
+    assert "Pages 2, 3 and 4 are shown only as pictures of the pages" in html
+
+
+def test_kept_pages_are_named_as_pages_not_repeated_figures(env):
+    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
+    _worker(env).run_once()
+    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
+    assert "repeated figures" not in page and "repeated headings" not in page
+    assert "2 need your decision: the handwritten pages and the scanned page" in page
+    assert (
+        "The 3 waiting make 2 decisions: pages kept as images for the same reason are "
+        "decided together. 3 pages are shown as images of the original."
+    ) in page
+    assert "Figures 0" in page and "Pages kept as images 3" in page
+    listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
+    assert "repeated figures" not in listing and "Figures (" not in listing
+    assert "2 decisions are still needed: the handwritten pages and the scanned page." in listing
+    assert "Pages kept as images (2 decisions)" in listing
+    assert re.search(r"Pages kept as images\s*:\s*3 not converted", listing)
+
+
+def test_the_job_page_and_the_review_screen_agree_on_the_finish_line(env):
+    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
+    _worker(env).run_once()
+    _post(env, job_id, "pg-p2-e0", "reject", "split")
+    _post(env, job_id, "pg-p4-e0", "reject", "split")
+    job = env.browser.get(f"/jobs/{job_id}").text
+    review = env.browser.get(f"/jobs/{job_id}/review").text
+    ready = re.search(r'<h2 id="ready-heading">([^<]*)', job)
+    title = re.search(r'id="decision-title"[^>]*>([^<]*)', review)
+    assert ready and title
+    assert ready.group(1).strip() == title.group(1).strip() != "Ready to share"
+
+
+def test_kept_pages_are_listed_once_each_with_one_decide_link_per_decision(env):
+    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
+    _worker(env).run_once()
+    html = env.browser.get(f"/jobs/{job_id}").text
+    start = html.index('id="not-handled-heading"')
+    listed = html[start : html.index("</ul>", start)]
+    assert listed.count("<li>") == 3  # pages 2, 3 and 4: the hidden text on its page's line
+    assert listed.count(">Decide it<") == 2  # two decisions: handwritten, scanned
+    assert "It is decided together with page 2." in text_of(listed)
+    split = env.browser.get(f"/jobs/{job_id}/review").text
+    strip = text_of(split[split.index('class="page-chip') - 200 :])
+    for n in (2, 3, 4):  # each page of a waiting group says so
+        assert f"Page {n} , 1 to decide" in strip or f"Page {n}, 1 to decide" in strip
+
+
+def test_handwriting_kept_on_a_typed_page_is_named_as_handwriting(env):
+    job_id = job_id_from(upload(env.browser, data("typed_with_ink.pdf"), filename="t.pdf"))
+    _worker(env).run_once()
+    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
+    assert "Finished, with handwriting not converted" in page
+    assert "pages not converted" not in page
+
+
+def test_a_page_kept_by_the_safety_net_is_not_told_to_be_typed_up(env):
+    job_id = job_id_from(upload(env.browser, data("ink_titled.pdf"), filename="notes.pdf"))
+    _worker(env).run_once()
+    split = text_of(env.browser.get(f"/jobs/{job_id}/review").text)
+    assert "Pages 1 and 2 have drawings or writing that this tool could not read." in split
+    assert "describe it in your source file" in split and "type them up" not in split
+    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
+    assert "Pages 1 and 2 have drawings or writing this tool could not read" in page
+    html = env.job(job_id).html or ""
+    assert "Lecture 14 notes" in html and html.count('data-reason="unread_page"') == 2

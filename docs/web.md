@@ -247,6 +247,10 @@ yours to see". It is a 404 either way. The
    upload page again, naming the file, its pages and the pages left today).
 
 Validation errors re-show the upload page with an error summary linked to the file input.
+For a refused handwritten or scanned PDF the summary's link is the message's first
+sentence ("notes.pdf is handwritten, so this tool cannot convert it."), and the field
+says the rest once: why, that no pages were taken, and what to upload instead
+(`routes/jobs.py upload_error_summary`).
 Every message names the file and the numbers it is about ("chapter2.pdf has 59 pages;
 the limit is 30 per upload"); the file name is shown to its owner only, never logged.
 With JavaScript, `app.js` checks the chosen file's size and type as soon as it is chosen
@@ -515,7 +519,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|---|
   | `budget_daily` | The daily cap ran out part way | "Stopped early": N of M equations and figures not converted, originals kept; upload again after 00:00 UTC |
   | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | "Stopped early": split the PDF |
-  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with nothing readable on them), or handwriting on typed pages kept as images | "Finished, with pages not converted": which pages are handwritten, scanned or unread; that the HTML keeps each one as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
+  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with drawings or writing nothing could be read from), or handwriting on typed pages kept as images | "Finished, with pages not converted" ("Finished, with handwriting not converted" when only handwriting on typed pages was kept): which pages are handwritten, scanned or unread; that the HTML keeps it (or each one) as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
   | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
 
   A finished job with no code whose equations, figures and tables mostly failed with
@@ -601,7 +605,16 @@ From top to bottom:
    hidden-text notices, says "(1,083 characters)" in the sentence instead), and, when the
    notice has a decision, "Decide it (one of your decisions)" or "You have decided it". A
    notice never adds a decision: the table kept as an image is counted once, as its fix,
-   and the pages kept as images for one reason once, as their group.
+   and the pages kept as images for one reason once, as their group. A kept page is one
+   line: its hidden text that was not used is said on it, and only the first page of a
+   group has "Decide it"; the others say "It is decided together with page 2."
+   (`job_page.notice_lists`). The Results list counts "Pages kept as images" and
+   "Handwriting kept as images" apart from the figures, the decisions name them ("the
+   handwritten pages and the scanned page", never "groups of repeated figures"), and the
+   waiting items say why they make fewer decisions ("pages kept as images for the same
+   reason are decided together"). The finish line's heading is the status box's label:
+   **Ready to share** only when everything was converted, else "Ready" or "Finished,
+   with pages not converted", as on the review screen.
 5. **What changed for a screen-reader user** (Beta 1 of the feature review), shown for
    results with `source_facts` (older ones have no card): up to 7 rows "Can a
    screen-reader user ... | In your PDF | In the HTML" (equations with their structure,
@@ -787,7 +800,10 @@ the results".
   first page's image and the pages it is on, and has one button, **Keep the page images,
   marked “Not converted”** (each one's Keep as image, `web.review.apply_page_group`),
   with the hint "To make them accessible, type them up (for example in LaTeX or Word) and
-  upload the typed version." "Hidden text in the PDF" (folded) gives only a count of the
+  upload the typed version." (for pages of drawings or writing nothing could be read
+  from, "describe it in your source file (for example as a figure with a description)").
+  "On pages 2 and 3" links each page number. Each page of a waiting group counts the
+  decision in the page strip. "Hidden text in the PDF" (folded) gives only a count of the
   hidden characters that were not used, never the text. There is nothing to accept and
   no promise of a later conversion. TODO(Harish): the wording is the design's draft;
   its second button ("Leave this page out of the HTML") is not built.
@@ -1190,8 +1206,13 @@ for one reason are one card in "Figures", like the review screen's: which pages,
 students get, **Keep the page images, marked “Not converted”** and the hint; once kept,
 "Kept as images, marked “Not converted”." It posts to the same route with its group key
 (`pg-` + the first page image's element id); only "reject" (keep) is accepted. Each page
-is named by its page ("Page 2", "Handwriting on page 3"), not counted among the figures,
-and its state after the decision is "Kept by you".
+is named by its page ("Page 2", "Handwriting on page 3"), not counted among the figures:
+the list has its own section, "Pages kept as images". After the decision each page's
+card under "Your decisions" says what it is now ("Kept as an image, marked “Not
+converted”") and has no form: no alt text and no Decorative, which would take the
+"Not converted" mark, or the page, from students. `web.review.apply_review` refuses
+anything but keep for such a fix (422, "there is nothing else to choose for it"); Undo
+the last decision still works.
 
 **One fix.** Each card shows:
 

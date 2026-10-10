@@ -66,6 +66,7 @@ from a11y_stem.web.deps import (
     render,
     require_csrf,
 )
+from a11y_stem.web.job_page import word_kind
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.mathml import try_sanitize_mathml
 from a11y_stem.web.messages import (
@@ -107,6 +108,7 @@ from a11y_stem.web.review import (
     is_stale,
     item_labels,
     item_numbers,
+    kept_images_apart,
     kind_for_slug,
     needs_attention,
     next_to_review,
@@ -260,6 +262,13 @@ NOUNS = {
     Kind.TABLE: ("table", "tables"),
     Kind.HEADING: ("heading", "headings"),
 }
+# The list view's own section for pages and handwriting kept as images
+# (`web.review.kept_images_apart`): figures in the data, not in words.
+KEPT_IMAGE_NOUNS = {
+    "page": ("page kept as an image", "pages kept as images"),
+    "handwriting": ("piece of handwriting kept as an image", "handwriting kept as images"),
+    "both": ("page or handwriting kept as an image", "pages and handwriting kept as images"),
+}
 
 
 def counted(n: int, kind: Kind) -> str:
@@ -393,6 +402,10 @@ class ReviewItem:
     # What a screen reader gets from the PDF for an equation: its text layer ("" when
     # the PDF has none). Shown only to the job's owner, on the review screens.
     text_layer: str = ""
+    # A page (or handwriting) kept as an image (`web.review.is_kept_image`): its card says
+    # what it is now and offers no figure form (its one decision is the page group's).
+    kept_image: bool = False
+    kept_state: str = ""  # what students get, once decided
 
     @property
     def open(self) -> bool:
@@ -504,14 +517,14 @@ PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
     "unread_page": {
         "title": ("Page kept as an image", "Pages kept as images"),
         "lead": (
-            "{pages} has drawings or images, but nothing this tool could read.",
-            "{pages} have drawings or images, but nothing this tool could read.",
+            "{pages} has drawings or writing that this tool could not read.",
+            "{pages} have drawings or writing that this tool could not read.",
         ),
         "explain": (
-            "In the HTML the page is an image marked “Not converted”, so a student using a "
-            "screen reader hears only that.",
-            "In the HTML each page is an image marked “Not converted”, so a student using a "
-            "screen reader hears only that.",
+            "In the HTML the page is an image marked “Not converted”, after any text read "
+            "from it, so a student using a screen reader hears only that for the rest.",
+            "In the HTML each page is an image marked “Not converted”, after any text read "
+            "from it, so a student using a screen reader hears only that for the rest.",
         ),
     },
     "handwriting_on_page": {
@@ -527,6 +540,11 @@ PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
         ),
     },
 }
+# A decided page (or piece of handwriting) kept as an image, in the list of decisions.
+KEPT_IMAGE_STATE = (
+    "Kept as an image, marked “Not converted”: a student using a screen reader hears only "
+    "that. There is nothing else to choose for it."
+)
 PAGE_GROUP_HINTS = {
     "page": (
         "To make it accessible, type it up (for example in LaTeX or Word) and upload the "
@@ -537,6 +555,13 @@ PAGE_GROUP_HINTS = {
     "handwriting": (
         "If it matters, type it into your source file and upload that again.",
         "If it matters, type it into your source file and upload that again.",
+    ),
+    # A page of drawings or pictures nothing could be read from: not a page to type up.
+    "drawn": (
+        "If students need what is on it, describe it in your source file (for example as a "
+        "figure with a description) and upload that again.",
+        "If students need what is on them, describe it in your source file (for example as "
+        "figures with descriptions) and upload that again.",
     ),
 }
 
@@ -564,7 +589,8 @@ def page_group_view(
     pages = sorted({page_of[f.element_id] for f in members if f.element_id in page_of})
     many = 1 if len(pages) > 1 else 0
     region = reason == "handwriting_on_page"
-    hint = PAGE_GROUP_HINTS["handwriting" if region else "page"][many]
+    hint_kind = "handwriting" if region else "drawn" if reason == "unread_page" else "page"
+    hint = PAGE_GROUP_HINTS[hint_kind][many]
     if region:
         button = "Keep the handwriting as images" if len(members) > 1 else "Keep it as an image"
         button += ", marked “Not converted”"
@@ -705,6 +731,8 @@ def _item(
         text_layer=(element.text or "").strip()
         if element is not None and fix.kind is Kind.EQUATION
         else "",
+        kept_image=is_kept_image(fix),
+        kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
     )
 
 
@@ -821,6 +849,9 @@ def _group(
     places: dict[str, HeadingPlace],
 ) -> GroupView:
     one, many = NOUNS[group.kind]
+    if group.name:  # pages and handwriting kept as images
+        words = {word_kind(f) for f in (*group.pending, *group.done, *group.optional)}
+        one, many = KEPT_IMAGE_NOUNS[words.pop() if len(words) == 1 else "both"]
     units = [
         UnitView(group=_heading_group(result, unit, items, elements, places))
         if unit[0].group_key and unit[0].kind is Kind.HEADING
@@ -953,7 +984,7 @@ def _page(
     elements = {e.id: e for e in result.elements}
     numbers = item_numbers(result)
     labels = item_labels(result)
-    fix_groups = group_fixes(result)
+    fix_groups = kept_images_apart(group_fixes(result))
     places = heading_places(result)
     items = {
         f.element_id: _item(

@@ -27,6 +27,7 @@
    `item.label` ("Equation 3") is its number within its kind in reading order, so it
    stays the same while the list reorders. #}
 {% macro card_body(item) %}
+{% if item.kept_image %}{{ kept_image_body(item) }}{% else %}
 {% set eid = item.element_id %}
 {% set name = item.label|lower %}
 {% for message in item.changed %}
@@ -190,6 +191,32 @@
   <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>
 </form>
 {% endif %}
+{% endif %}
+{% endmacro %}
+
+{# A page (or handwriting) kept as an image: what it is now, and no figure form. Its one
+   decision, keep it, is made on its page group's card; there is no handwriting or scan
+   conversion, so no alt text and no "decorative". #}
+{% macro kept_image_body(item) %}
+{% set eid = item.element_id %}
+{% for message in item.changed %}
+<p class="changed-note" role="status"><strong>Just changed:</strong> {{ message }}</p>
+{% endfor %}
+<div class="fix-body">
+  <figure class="crop">
+    {% if item.crop_url %}
+    <img src="{{ item.crop_url }}" loading="lazy" alt="{{ item.label }} of the PDF, as an image.">
+    {% else %}
+    <p>No image of the original is available.</p>
+    {% endif %}
+    <figcaption>Original in the PDF</figcaption>
+  </figure>
+  <div class="proposal">
+    {% set err = item.errors.get("actions") %}
+    {% if err %}<p class="error-message" id="actions-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+    <p id="actions-{{ eid }}" tabindex="-1">{{ item.kept_state or item.status_label }}</p>
+  </div>
+</div>
 {% endmacro %}
 
 {# One card for repeated headings: one decision for all of the ones still waiting. #}
@@ -286,7 +313,7 @@
 <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">
   <details class="done-item"{% if item.open %} open{% endif %}>
     {# The summary names the item (its words, or the equation itself), not only its number. #}
-    <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.mathml %} <span class="item-math">{{ item.mathml }}</span>{% elif item.preview %} “{{ item.preview }}”{% endif %}{% if item.page %}, page {{ item.page }}{% endif %}: {% if with_notes %}{{ item.notes }}{% else %}{{ item.status_label }}{% endif %}</summary>
+    <summary id="fix-title-{{ item.element_id }}">{{ item.label }}{% if item.mathml %} <span class="item-math">{{ item.mathml }}</span>{% elif item.preview %} “{{ item.preview }}”{% endif %}{% if item.page and not item.kept_image %}, page {{ item.page }}{% endif %}: {% if with_notes %}{{ item.notes }}{% else %}{{ item.status_label }}{% endif %}</summary>
     <article id="fix-{{ item.element_id }}" class="fix-card status-card-{{ item.status }}" aria-labelledby="fix-title-{{ item.element_id }}">
       {{ card_body(item) }}
     </article>

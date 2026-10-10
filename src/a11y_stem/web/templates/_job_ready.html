@@ -1,8 +1,10 @@
 {# The finish line (BW1, MF9 of the UX review): no decision is open, so the file can go to
    students. The download is the main action; what to do before and how to post it
-   follow. Plain text, no check marks or scores: it assists, it does not certify. #}
+   follow. Plain text, no check marks or scores: it assists, it does not certify. The
+   heading is the status box's label (`job_page.headline`), as on the review screen:
+   "Ready to share" only when everything was converted. #}
 <section id="ready" aria-labelledby="ready-heading">
-  <h2 id="ready-heading">Ready to share</h2>
+  <h2 id="ready-heading">{{ headline.label if headline is defined else "Ready to share" }}</h2>
   <p>{{ pg.finish.sentence }}</p>
   <ul class="actions">
     <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>

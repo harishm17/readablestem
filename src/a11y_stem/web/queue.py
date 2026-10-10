@@ -130,12 +130,14 @@ def page_of(fix: Fix, elements: dict[str, Element]) -> int | None:
 
 def open_by_page(queue: list[Decision], elements: dict[str, Element]) -> dict[int, int]:
     """0-based page -> open decisions on it, each counted once, on the page of its first
-    fix still waiting."""
+    fix still waiting; the pages kept as images for one reason count their decision on
+    each of their pages (each page is waiting for it)."""
     counts: dict[int, int] = {}
     for decision in queue:
         if not decision.open:
             continue
-        page = page_of(decision.lead, elements)
-        if page is not None:
+        fixes = decision.waiting if decision.is_page_group else [decision.lead]
+        pages = {page for f in fixes if (page := page_of(f, elements)) is not None}
+        for page in pages:
             counts[page] = counts.get(page, 0) + 1
     return counts
