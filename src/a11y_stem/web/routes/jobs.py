@@ -79,6 +79,8 @@ FRESH_COPY = (
     "If it opens on your computer, save a fresh copy (File > Save As, or Print to PDF) "
     "and upload that."
 )
+# A refused upload costs nothing: the probe runs before the daily page count.
+NOTHING_TAKEN = "Nothing was converted, and no pages were taken from your daily allowance."
 
 
 def upload_error_message(
@@ -115,9 +117,24 @@ def upload_error_message(
         "part.",
         "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
         "large to convert. Course documents are usually Letter or A4 size.",
-        "scanned": f"{name} is made of scanned page images with no text in it, so there is "
-        "nothing this tool can convert yet. Run text recognition (OCR) on it first, for "
-        "example with your scanner's software or Adobe Acrobat, then upload the result.",
+        # Every page handwritten or scanned (pipeline.page_type.refusal_code). Never "run
+        # OCR first": that makes exactly the files refused here. TODO(Harish): final words.
+        "scanned": f"{name} is scanned pages, so this tool cannot convert it. It has no text "
+        f"this tool can use. {NOTHING_TAKEN} If you have the original file (LaTeX, Word or "
+        "PowerPoint), upload that instead.",
+        "scanned_ocr": f"{name} is scanned pages, so this tool cannot convert it. Any text in "
+        "it was guessed from the images by a text recognition (OCR) program. OCR text is "
+        "often wrong, most of all in maths, so this tool does not use it. Running OCR again "
+        f"will not help. {NOTHING_TAKEN} If you have the original file (LaTeX, Word or "
+        "PowerPoint), upload that instead.",
+        "handwritten": f"{name} is handwritten notes, so this tool cannot convert it. The PDF "
+        "also holds hidden text that a tablet or a text recognition (OCR) program guessed "
+        "from the handwriting. That text is often wrong, most of all in maths, so this tool "
+        f"does not use it. {NOTHING_TAKEN} If you have a typed version of these notes "
+        "(LaTeX, Word or PowerPoint), upload that instead.",
+        "handwritten_no_text": f"{name} is handwritten notes, so this tool cannot convert it. "
+        f"It has no text this tool can use. {NOTHING_TAKEN} If you have a typed version of "
+        "these notes (LaTeX, Word or PowerPoint), upload that instead.",
         "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
         "chose the right file.",
     }.get(code, f"{name} cannot be converted.")

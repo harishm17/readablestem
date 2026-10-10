@@ -249,6 +249,37 @@
 </li>
 {% endmacro %}
 
+{# Pages (or handwriting) kept as images for one reason: one decision for all of them
+   (routes/review.py `page_group_view`). Nothing on them was converted; the hidden text
+   is shown as a count only. #}
+{% macro page_group_card(pg) %}
+{% set key = pg.key %}
+<li id="{{ pg.anchor }}" class="review-item" tabindex="-1">
+  {% for message in pg.notices %}<div class="notice" role="status"><p>{{ message }}</p></div>{% endfor %}
+  <article class="fix-card heading-group status-card-failed" aria-labelledby="{{ pg.anchor }}-title">
+    <h4 id="{{ pg.anchor }}-title">{{ pg.title }}</h4>
+    <p class="group-question">{{ pg.lead }}</p>
+    <p>{{ pg.explain }}</p>
+    {% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
+    {% if pg.waiting %}
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+      {{ hidden_fields() }}
+      <div class="button-row" id="group-actions-{{ key }}" tabindex="-1">
+        <button type="submit" name="action" value="reject" class="button" aria-describedby="hint-{{ key }}">{{ pg.button }}</button>
+      </div>
+    </form>
+    {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
+    <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+    {% if pg.hidden %}
+    <details class="done-group">
+      <summary>Hidden text in the PDF</summary>
+      <p>{{ pg.hidden }}</p>
+    </details>
+    {% endif %}
+  </article>
+</li>
+{% endmacro %}
+
 {# A fix that is folded away: its summary line says what it is and, for an optional
    check, what the note says; unfolding it shows the full card (still editable). #}
 {% macro folded_item(item, with_notes) %}
@@ -326,6 +357,8 @@
       {% for unit in g.units %}
       {% if unit.group %}
       {{ heading_group_card(unit.group) }}
+      {% elif unit.pages %}
+      {{ page_group_card(unit.pages) }}
       {% else %}
       {% set item = unit.item %}
       <li id="item-{{ item.element_id }}" class="review-item" tabindex="-1">

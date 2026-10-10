@@ -13,10 +13,18 @@
 
 <h2>What it does not do yet</h2>
 <ul>
-  <li><strong>Scanned pages are not read.</strong> There is no text recognition (OCR): a PDF
-    made only of scanned pages is refused, and scanned pages in a PDF with text are kept as
-    images, marked “Not converted”. Run OCR first, for example in Adobe Acrobat.</li>
-  <li><strong>Handwriting and chemistry notation</strong> are not converted.</li>
+  {# TODO(Harish): your final wording for the next two lines (handwriting design, 3.3). #}
+  <li><strong>Handwritten notes and scanned pages are not converted.</strong> A PDF made
+    only of them is refused before it counts against your daily pages. In a PDF with typed
+    pages, each one is kept as an image, marked “Not converted”, and you are asked about
+    it. Handwriting on a typed page is kept as an image too.</li>
+  <li><strong>Hidden text is never used.</strong> Text that a tablet or a text recognition
+    (OCR) program guessed and hid in the PDF, and text that cannot be seen when the page is
+    shown or printed, is left out. Running OCR does not help: OCR text is often wrong,
+    most of all in maths. Some hidden text is not detected: white text on a white page,
+    text under a drawn shape that only partly covers it, very small text, and OCR text
+    that is visible on the page.</li>
+  <li><strong>Chemistry notation</strong> is not converted.</li>
   <li><strong>Two-column pages and slides</strong> convert less well than single-column
     notes: check the reading order.</li>
   <li><strong>Size.</strong> Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.

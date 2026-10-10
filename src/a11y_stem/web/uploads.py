@@ -55,6 +55,9 @@ REJECTION_STATUS = {
     "too_many_pages": 422,
     "page_too_large": 422,
     "scanned": 422,
+    "scanned_ocr": 422,
+    "handwritten": 422,
+    "handwritten_no_text": 422,
     "no_content": 422,
 }
 

@@ -26,6 +26,7 @@ import pytest
 
 import a11y_stem
 from a11y_stem.core.types import NOTICE_CODES, Check, Notice, Outcome
+from a11y_stem.pipeline import run
 from a11y_stem.web import messages
 from a11y_stem.web.messages import (
     CHECK_MESSAGES,
@@ -270,6 +271,9 @@ def test_no_message_for_a_code_the_pipeline_no_longer_emits(emitted):
     reasons = set(emitted.reasons)
     reasons |= {f"model_{outcome}" for outcome in get_args(Outcome)}
     reasons |= {f"budget_{scope}" for scope in budget_scopes()}
+    # Pages and handwriting kept as images: the reason is the page type's
+    # (`pipeline.page_type.kept_reason`, `run._with_page_images`), not a literal there.
+    reasons |= set(run.KEPT_REASONS)
     assert sorted(set(CHECK_MESSAGES) - emitted.checks) == []
     assert sorted(set(REASON_MESSAGES) - reasons) == []
 

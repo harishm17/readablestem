@@ -93,6 +93,7 @@ from a11y_stem.web.review import (
     ReviewInvalid,
     ReviewStale,
     apply_group,
+    apply_page_group,
     apply_review,
     bump_result_version,
     can_accept,
@@ -101,6 +102,8 @@ from a11y_stem.web.review import (
     heading_level_written,
     heading_places,
     is_group_key,
+    is_kept_image,
+    is_page_group_key,
     is_stale,
     item_labels,
     item_numbers,
@@ -200,9 +203,20 @@ OTHER_WORDS = RejectWords(
 )
 
 
-def reject_words(kind: Kind, element: Element | None) -> RejectWords:
+# A page (or handwriting) kept as an image before any model work (pipeline.page_type).
+KEPT_IMAGE_WORDS = RejectWords(
+    "Keep as image",
+    "Students see a picture of it, marked “Not converted”; screen readers hear only that.",
+    "Kept as an image, marked “Not converted”.",
+    "Kept by you",  # short: the review screen's status pill does not wrap at 320 px
+)
+
+
+def reject_words(kind: Kind, element: Element | None, fix: Fix | None = None) -> RejectWords:
     """What rejecting does here. A heading becomes a paragraph, bold when its line is
-    bold in the PDF (as `assemble` writes it)."""
+    bold in the PDF (as `assemble` writes it); a page kept as an image stays one."""
+    if fix is not None and is_kept_image(fix):
+        return KEPT_IMAGE_WORDS
     if kind is Kind.HEADING:
         return BOLD_TEXT_WORDS if element is not None and element.bold else PLAIN_TEXT_WORDS
     return REJECT_WORDS.get(kind, OTHER_WORDS)
@@ -211,14 +225,14 @@ def reject_words(kind: Kind, element: Element | None) -> RejectWords:
 def status_words(fix: Fix, element: Element | None) -> str:
     """The item's state in words, a reviewer's "Reject" named for what it did."""
     if fix.status is Status.REJECTED:
-        return reject_words(fix.kind, element).state
+        return reject_words(fix.kind, element, fix).state
     return fix_status_label(fix)
 
 
 def done_message(change: ReviewChange, element: Element | None) -> str:
     """What the notice after one decision says (content-free: it lives in the session)."""
     if change.action == "reject":
-        return reject_words(change.fix.kind, element).done
+        return reject_words(change.fix.kind, element, change.fix).done
     if change.anyway:
         return ANYWAY_DONE
     message = DONE_MESSAGES.get(change.action, "Done.")
@@ -297,7 +311,9 @@ def stale_notice(
     href: str,
     typed: Mapping[str, str] | None = None,
 ) -> StaleNotice:
-    fix = result.fix_for(target) if not is_group_key(target) else None
+    fix = (
+        result.fix_for(target) if not (is_group_key(target) or is_page_group_key(target)) else None
+    )
     now = ""
     if fix is not None and fix.kind in NOUNS:
         label = item_labels(result).get(
@@ -311,7 +327,7 @@ def stale_notice(
 
 
 def _stale_anchor(result: DocumentResult, target: str) -> str:
-    if is_group_key(target):
+    if is_group_key(target) or is_page_group_key(target):
         return group_anchor(target)
     if kind_for_slug(target) is not None:
         return f"group-{target}"
@@ -433,11 +449,170 @@ class HeadingGroupView:
 
 
 @dataclass
+class PageGroupView:
+    """One decision for the pages (or the handwriting) kept as images for one reason
+    (`web.review.page_group_members`): keep them, marked "Not converted". There is no
+    handwriting or scan conversion; the card says what students get and how to do better.
+    Content-free: page numbers and counts only."""
+
+    key: str
+    anchor: str
+    reason: str
+    title: str  # "Handwritten pages, not converted"
+    lead: str  # "Pages 2, 3 and 5 are handwritten."
+    explain: str  # what students get
+    hint: str  # what to do to make them accessible
+    hidden: str  # the hidden text that was not used, as a count; "" when none
+    button: str  # "Keep the page images, marked “Not converted”"
+    members: list[ReviewItem]  # the ones still waiting, reading order
+    pages: list[int]  # 1-based, of every member
+    size: int
+    state: str = ""  # once decided: what they are now
+    values: dict[str, str] = field(default_factory=dict)
+    error: str | None = None
+    notices: list[str] = field(default_factory=list)
+    members_open: bool = False
+
+    @property
+    def waiting(self) -> int:
+        return len(self.members)
+
+
+# What the page group card says, by the reason the pages were kept (pipeline.page_type).
+# "{pages}" is "Page 2" or "Pages 2 and 5". TODO(Harish): final wording (design 3.3).
+PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
+    "handwritten_page": {
+        "title": ("Handwritten page, not converted", "Handwritten pages, not converted"),
+        "lead": ("{pages} is handwritten.", "{pages} are handwritten."),
+        "explain": (
+            "This tool does not convert handwriting. In the HTML the page is an image marked "
+            "“Not converted”, so a student using a screen reader hears only that.",
+            "This tool does not convert handwriting. In the HTML each page is an image marked "
+            "“Not converted”, so a student using a screen reader hears only that.",
+        ),
+    },
+    "scanned_page": {
+        "title": ("Scanned page, not converted", "Scanned pages, not converted"),
+        "lead": ("{pages} is a scanned image.", "{pages} are scanned images."),
+        "explain": (
+            "This tool does not convert scans. In the HTML the page is an image marked “Not "
+            "converted”, so a student using a screen reader hears only that.",
+            "This tool does not convert scans. In the HTML each page is an image marked “Not "
+            "converted”, so a student using a screen reader hears only that.",
+        ),
+    },
+    "unread_page": {
+        "title": ("Page kept as an image", "Pages kept as images"),
+        "lead": (
+            "{pages} has drawings or images, but nothing this tool could read.",
+            "{pages} have drawings or images, but nothing this tool could read.",
+        ),
+        "explain": (
+            "In the HTML the page is an image marked “Not converted”, so a student using a "
+            "screen reader hears only that.",
+            "In the HTML each page is an image marked “Not converted”, so a student using a "
+            "screen reader hears only that.",
+        ),
+    },
+    "handwriting_on_page": {
+        "title": ("Handwriting on a typed page", "Handwriting on typed pages"),
+        "lead": ("{pages} has handwriting on it.", "{pages} have handwriting on them."),
+        "explain": (
+            "The typed text was converted. This tool does not convert handwriting, so it is "
+            "an image after the typed text, marked “Not converted”: a student using a screen "
+            "reader hears only that.",
+            "The typed text was converted. This tool does not convert handwriting, so each "
+            "piece of it is an image after the typed text, marked “Not converted”: a student "
+            "using a screen reader hears only that.",
+        ),
+    },
+}
+PAGE_GROUP_HINTS = {
+    "page": (
+        "To make it accessible, type it up (for example in LaTeX or Word) and upload the "
+        "typed version.",
+        "To make them accessible, type them up (for example in LaTeX or Word) and upload the "
+        "typed version.",
+    ),
+    "handwriting": (
+        "If it matters, type it into your source file and upload that again.",
+        "If it matters, type it into your source file and upload that again.",
+    ),
+}
+
+
+def pages_phrase(pages: list[int]) -> str:
+    """ "Page 2" or "Pages 2, 3 and 5" (1-based)."""
+    pages = sorted(set(pages))
+    if len(pages) == 1:
+        return f"Page {pages[0]}"
+    return "Pages " + ", ".join(str(p) for p in pages[:-1]) + f" and {pages[-1]}"
+
+
+def page_group_view(
+    result: DocumentResult, unit: list[Fix], items: dict[str, ReviewItem]
+) -> PageGroupView:
+    """The card of a group of kept images (`unit`: its fixes, the waiting ones first)."""
+    from a11y_stem.web.review import group_anchor, page_group_members
+
+    first = unit[0]
+    key = first.group_key or first.element_id
+    reason = first.reason or "unread_page"
+    words = PAGE_GROUP_WORDS.get(reason, PAGE_GROUP_WORDS["unread_page"])
+    members = page_group_members(result, key) if first.group_key else list(unit)
+    page_of = {e.id: e.page + 1 for e in result.elements}
+    pages = sorted({page_of[f.element_id] for f in members if f.element_id in page_of})
+    many = 1 if len(pages) > 1 else 0
+    region = reason == "handwriting_on_page"
+    hint = PAGE_GROUP_HINTS["handwriting" if region else "page"][many]
+    if region:
+        button = "Keep the handwriting as images" if len(members) > 1 else "Keep it as an image"
+        button += ", marked “Not converted”"
+    else:
+        button = f"Keep the page image{'s' if many else ''}, marked “Not converted”"
+    kept = {p - 1 for p in pages}
+    hidden_chars = sum(t.untrusted_chars for t in result.page_types if t.page in kept)
+    hidden = ""
+    if hidden_chars >= 3 and not region:  # page_type.HIDDEN_FEW
+        these = "These pages have" if many else "This page has"
+        hidden = (
+            f"{these} hidden text ({hidden_chars:,} characters) that a tablet or a text "
+            "recognition (OCR) program guessed from the page. It was not used. It is a count "
+            "only: the hidden text is not shown here."
+        )
+    waiting = [items[f.element_id] for f in members if f.pending and f.element_id in items]
+    state = ""
+    if not waiting:
+        state = (
+            "Kept as images, marked “Not converted”."
+            if many or len(members) > 1
+            else "Kept as an image, marked “Not converted”."
+        )
+    return PageGroupView(
+        key=key,
+        anchor=group_anchor(key),
+        reason=reason,
+        title=words["title"][many],
+        lead=words["lead"][many].format(pages=pages_phrase(pages) if pages else "This page"),
+        explain=words["explain"][1 if len(members) > 1 else 0],
+        hint=hint,
+        hidden=hidden,
+        button=button,
+        members=waiting,
+        pages=pages,
+        size=len(members),
+        state=state,
+    )
+
+
+@dataclass
 class UnitView:
-    """One decision in the "Needs your decision" list: a fix, or a heading group."""
+    """One decision in the "Needs your decision" list: a fix, a heading group, or the
+    pages kept as images for one reason."""
 
     item: ReviewItem | None = None
     group: HeadingGroupView | None = None
+    pages: PageGroupView | None = None
 
 
 @dataclass
@@ -524,7 +699,7 @@ def _item(
         second_check=triage.second_check_note(fix),
         table=table,
         **details,
-        reject=reject_words(fix.kind, element),
+        reject=reject_words(fix.kind, element, fix),
         by_you=fix.decided_by_reviewer,
         preview=_preview(fix, element),
         text_layer=(element.text or "").strip()
@@ -649,6 +824,8 @@ def _group(
     units = [
         UnitView(group=_heading_group(result, unit, items, elements, places))
         if unit[0].group_key and unit[0].kind is Kind.HEADING
+        else UnitView(pages=page_group_view(result, unit, items))
+        if unit[0].group_key and is_kept_image(unit[0])
         else UnitView(item=items[unit[0].element_id])
         for unit in group.units
     ]
@@ -696,7 +873,7 @@ def _place_flashes(
     result: DocumentResult,
     items: dict[str, ReviewItem],
     groups: dict[str, GroupView],
-    cards: dict[str, HeadingGroupView],
+    cards: dict[str, HeadingGroupView | PageGroupView],
 ) -> list[Notice]:
     """Put each one-time notice where the reviewer lands: a single decision's notice at
     the next decision still waiting (where the redirect points), linked back to the fix
@@ -745,7 +922,7 @@ def _apply_invalid(
     invalid: tuple[str, ReviewInvalid],
     items: dict[str, ReviewItem],
     groups: dict[str, GroupView],
-    cards: dict[str, HeadingGroupView],
+    cards: dict[str, HeadingGroupView | PageGroupView],
 ) -> None:
     target, exc = invalid
     if target in groups:
@@ -792,12 +969,15 @@ def _page(
         for f in (*g.pending, *g.optional, *g.done)
     }
     groups = {g.slug: _group(result, g, items, elements, places) for g in fix_groups}
-    cards = {
+    cards: dict[str, HeadingGroupView | PageGroupView] = {
         unit.group.key: unit.group
         for g in groups.values()
         for unit in g.units
         if unit.group is not None
     }
+    cards.update(
+        {unit.pages.key: unit.pages for g in groups.values() for unit in g.units if unit.pages}
+    )
     top = _place_flashes(pop_flash(request), result, items, groups, cards)
     errors: list[FieldError] = []
     if invalid is not None:
@@ -955,6 +1135,8 @@ def review_action(
         return _group_action(
             request, job_id, element_id, user, action, level or "", view, every, version
         )
+    if is_page_group_key(element_id):
+        return _page_group_action(request, job_id, element_id, user, action, view, version)
     sent = {
         "latex": latex,
         "alt": alt,
@@ -1098,6 +1280,57 @@ def _group_action(
         anchor = group_anchor(group_key) if outcome.left else "review-progress"
     else:
         anchor = review_anchor(result, landing) if landing else "review-progress"
+    return RedirectResponse(list_url(job_id, anchor), status_code=303)
+
+
+def _page_group_action(
+    request: Request,
+    job_id: str,
+    group_key: str,
+    user: CurrentUser,
+    action: str,
+    view: str,
+    version: str = "",
+) -> Response:
+    """Keep every page (or piece of handwriting) of a group still waiting as an image,
+    marked "Not converted" (`web.review.apply_page_group`). Its only action is "reject",
+    as "Keep as image" is for one figure."""
+    try:
+        if action != "reject":
+            message = "Choose “Keep”: these images have nothing else to accept."
+            raise ReviewInvalid([FieldError(f"group-actions-{group_key}", message)])
+        with session_scope(get_ctx(request).factory) as session:
+            job = owned_job(session, job_id, user, lock=True)
+            require_done(job)
+            _refuse_stale(job, version)
+            result = DocumentResult.model_validate(job.result_json or {})
+            outcome = apply_page_group(result, group_key)
+            if outcome.changes:  # nothing left to decide: no write, no re-render
+                job.html = rerender_html(result, _crops(session, job.id))
+                job.result_json = result.model_dump(mode="json", exclude={"html"})
+                written = bump_result_version(job)
+                session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
+                _decision_events(request, session, user, job, result, "group", len(outcome.changes))
+    except LookupError:
+        raise PageError(404, *NOT_FOUND) from None
+    except ReviewStale:
+        return _stale_page(request, job_id, user, view, group_key)
+    except ReviewInvalid as exc:
+        log_event(logger, "review_invalid", job_id=job_id, action="page_group_unknown")
+        return _invalid_page(request, job_id, user, view, group_key, exc)
+    log_event(
+        logger, "review_page_group", job_id=job_id, group=group_key, changed=len(outcome.changes)
+    )
+    n = len(outcome.changes)
+    if n:
+        message = f"Kept {n} as {'an image' if n == 1 else 'images'}, marked “Not converted”."
+    else:
+        message = "Nothing changed: none of these were waiting for a decision."
+    flash(request, message, element_id=HEADING_GROUP_FLASH + group_key)
+    if view != LIST_VIEW:
+        return _split_redirect(job_id, result, group_key)
+    landing = next_to_review(result, outcome.changes[-1].fix.element_id) if n else None
+    anchor = review_anchor(result, landing) if landing else "review-progress"
     return RedirectResponse(list_url(job_id, anchor), status_code=303)
 
 

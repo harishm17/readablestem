@@ -251,9 +251,12 @@ def item_numbers(result: DocumentResult) -> dict[str, int]:
     numbers: dict[str, int] = {}
     for kind in GROUP_KINDS:
         ordered = sorted(
-            (f.element_id for f in result.fixes if f.kind is kind), key=position.__getitem__
+            (f.element_id for f in result.fixes if f.kind is kind and not is_kept_image(f)),
+            key=position.__getitem__,
         )
         numbers.update({element_id: i for i, element_id in enumerate(ordered, start=1)})
+    # A page kept as an image is named by its page (`item_labels`), not as a figure.
+    numbers.update({f.element_id: 0 for f in result.fixes if is_kept_image(f)})
     return numbers
 
 
@@ -270,7 +273,7 @@ def item_labels(result: DocumentResult) -> dict[str, str]:
     from a11y_stem.web.views import KIND_LABELS
 
     numbers = item_numbers(result)
-    labels: dict[str, str] = {}
+    labels: dict[str, str] = _kept_image_labels(result)
     for fix in result.fixes:
         if fix.element_id in numbers and fix.element_id not in labels:
             kind = KIND_LABELS.get(fix.kind, fix.kind.value.title())
@@ -286,6 +289,28 @@ def item_labels(result: DocumentResult) -> dict[str, str]:
         printed[fix.element_id] = found.group(1)
     if len(set(printed.values())) == len(printed):
         labels.update({eid: f"Table {number}" for eid, number in printed.items()})
+    return labels
+
+
+def _kept_image_labels(result: DocumentResult) -> dict[str, str]:
+    """ "Page 3" for a page kept as an image; "Handwriting on page 3" for handwriting on a
+    typed page ("Handwriting 2 on page 3" when there is more than one there)."""
+    page_of = {e.id: e.page + 1 for e in result.elements}
+    kept = [f for f in result.fixes if is_kept_image(f) and f.element_id in page_of]
+    labels: dict[str, str] = {}
+    regions: dict[int, list[str]] = {}
+    for fix in kept:
+        page = page_of[fix.element_id]
+        if fix.reason in KEPT_PAGE_REASONS:
+            labels[fix.element_id] = f"Page {page}"
+        else:
+            regions.setdefault(page, []).append(fix.element_id)
+    position = _positions(result)
+    for page, ids in regions.items():
+        ids.sort(key=position.__getitem__)
+        for n, element_id in enumerate(ids, start=1):
+            which = f" {n}" if len(ids) > 1 else ""
+            labels[element_id] = f"Handwriting{which} on page {page}"
     return labels
 
 
@@ -959,6 +984,46 @@ def apply_group(
     if changes:
         _recount(result)
     return GroupOutcome(changes, left)
+
+
+# --------------------------------------------------------------------------- kept images
+
+# Pages and handwriting the pipeline kept as images before any model work
+# (pipeline.page_type; there is no handwriting or scan conversion). The fixes with one
+# reason share a group key ("pg-" + the first one's element id, pipeline.run) and are one
+# decision: keep them as images, marked "Not converted". A kept image has no proposal,
+# so the decision is the same as "Keep as image" (reject) on each of them.
+PAGE_GROUP_PREFIX = "pg-"  # pipeline.run.PAGE_GROUP_PREFIX
+KEPT_IMAGE_REASONS = frozenset(
+    {"handwritten_page", "scanned_page", "unread_page", "handwriting_on_page"}
+)
+KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"})
+
+
+def is_kept_image(fix: Fix) -> bool:
+    """A page (or a region of handwriting) kept as an image before any model work."""
+    return fix.kind is Kind.FIGURE and fix.reason in KEPT_IMAGE_REASONS
+
+
+def is_page_group_key(target: str) -> bool:
+    return target.startswith(PAGE_GROUP_PREFIX)
+
+
+def page_group_members(result: DocumentResult, group_key: str) -> list[Fix]:
+    """Every kept image of one group, in reading order."""
+    position = _positions(result)
+    members = [f for f in result.fixes if f.group_key == group_key and is_kept_image(f)]
+    return sorted(members, key=lambda f: position[f.element_id])
+
+
+def apply_page_group(result: DocumentResult, group_key: str) -> GroupOutcome:
+    """Keep every image of the group still waiting as it is, marked "Not converted" (each
+    one's "Keep as image"). Raises LookupError for an unknown group."""
+    members = page_group_members(result, group_key)
+    if not members:
+        raise LookupError(group_key)
+    changes = [apply_review(result, f.element_id, "reject", {}) for f in members if f.pending]
+    return GroupOutcome(changes, [])
 
 
 def _already(fix: Fix, action: str, level: int | None) -> bool:

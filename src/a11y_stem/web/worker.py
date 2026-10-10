@@ -59,9 +59,10 @@ queue is safe with several workers or instances:
 Failures become `Job.error_code` categories: `LayoutError.code`, "budget_<scope>",
 "timeout", "store_failed", "model_not_configured" or "internal_error". A finished job
 can carry a code too (`result_outcome`): "budget_<scope>" when a spend cap stopped model
-work part way (the result is partial), "scanned_pages" when some pages were only images.
-A result with nothing in it fails as "no_content", or "scanned" when every page was an
-image. Nothing from the document is logged.
+work part way (the result is partial), "pages_not_converted" when pages (or handwriting
+on typed pages) were kept as images. A result with nothing in it fails as "no_content",
+and one the upload probe should have refused (every page handwritten or scanned) with
+the probe's code ("handwritten", "scanned", ...). Nothing from the document is logged.
 """
 
 from __future__ import annotations
@@ -120,7 +121,12 @@ _CODE = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 _EPSILON = 1e-9
 # Codes a finished (DONE) job can carry; see `result_outcome`.
 BUDGET_STOPS = frozenset({"budget_daily", "budget_job_usd", "budget_job_calls"})
-SCANNED_PAGES = "scanned_pages"
+SCANNED_PAGES = "scanned_pages"  # before page types: some pages were only scanned images
+PAGES_NOT_CONVERTED = "pages_not_converted"
+# Fix reasons of what the pipeline kept as an image before any model work.
+KEPT_IMAGE_REASONS = frozenset(
+    {"scanned_page", "handwritten_page", "unread_page", "handwriting_on_page"}
+)
 # Live progress is written to the job row at most this often (seconds), apart from a
 # stage seen for the first time or just finished (`Worker._stage_progress`). The job page
 # polls every 3 s.
@@ -188,20 +194,33 @@ def error_code_for(exc: BaseException) -> str:
 def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
     """Status and code for a conversion that returned a result.
 
-    Nothing to convert is a failure: "scanned" when every analysed page was only a
-    picture of a page, "no_content" when the result has no elements at all. Otherwise
-    the job is done, with a code when it is incomplete: the spend cap that stopped model
-    work ("budget_<scope>"), else "scanned_pages" when some pages were only images.
+    Nothing to convert is a failure: the upload probe's own code when every analysed page
+    is certainly handwritten or scanned (`page_type.refusal_code` on the stored page
+    types; for a result without them, "scanned" when every page was only a picture of a
+    page), "no_content" when the result has no elements at all. Otherwise the job is
+    done, with a code when it is incomplete: the spend cap that stopped model work
+    ("budget_<scope>"), else "pages_not_converted" when pages or handwriting were kept as
+    images. A page the probe could not be sure of (a full-page picture with a short
+    title, ink not analysed in time) is kept as an image with a decision, never failed.
     """
+    from a11y_stem.pipeline.page_type import refusal_code
+
     analysed = {page.page for page in result.stats.per_page}
     image_only = set(result.image_only_pages)
-    if image_only and analysed <= image_only:
+    typed = {t.page for t in result.page_types}
+    if result.page_types and analysed <= typed:
+        refused = refusal_code([t for t in result.page_types if t.page in analysed])
+        if refused is not None and refused != "no_content":
+            return JobStatus.FAILED, refused
+    elif image_only and analysed <= image_only:
         return JobStatus.FAILED, "scanned"
     if not result.elements:
         return JobStatus.FAILED, "no_content"
     if result.stopped_by in BUDGET_STOPS:
         return JobStatus.DONE, result.stopped_by
-    if image_only:
+    if any(f.reason in KEPT_IMAGE_REASONS for f in result.fixes):
+        return JobStatus.DONE, PAGES_NOT_CONVERTED
+    if image_only:  # a result from before page types, without its fixes' reasons
         return JobStatus.DONE, SCANNED_PAGES
     return JobStatus.DONE, None
 

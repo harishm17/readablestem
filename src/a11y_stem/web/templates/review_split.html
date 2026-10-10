@@ -324,6 +324,34 @@
 {% endif %}
 {% endmacro %}
 
+{# Pages (or handwriting) kept as images for one reason: one decision for all of them
+   (routes/review.py `page_group_view`). There is no handwriting or scan conversion, so
+   the choice is to keep them, marked "Not converted"; the hint says how to do better. #}
+{% macro page_group_body(p) %}
+{% set pg = p.pages %}
+{% set key = pg.key %}
+<p class="group-question">{{ pg.lead }}</p>
+<p>{{ pg.explain }}</p>
+{{ region(p) }}
+{% if p.group_pages|length > 1 %}<p class="group-pages">On pages {% for pl in p.group_pages %}<a href="{{ pl.href }}"><span class="visually-hidden">page </span>{{ pl.number }}</a>{{ ", " if not loop.last }}{% endfor %}.</p>{% endif %}
+{% if pg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ pg.error }}</p>{% endif %}
+{% if pg.waiting %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
+  {{ hidden_fields() }}
+  <div class="decide-row" id="group-actions-{{ key }}" tabindex="-1">
+    <button type="submit" name="action" value="reject" class="button" data-role="reject" aria-describedby="hint-{{ key }}">{{ pg.button }}</button>
+  </div>
+</form>
+{% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
+<p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+{% if pg.hidden %}
+<details class="tech">
+  <summary>Hidden text in the PDF</summary>
+  <p>{{ pg.hidden }}</p>
+</details>
+{% endif %}
+{% endmacro %}
+
 {% block content %}
 <div class="review-head">
   <div class="review-title">
@@ -399,6 +427,7 @@
     {% if panel.mode == "item" and panel.status_class == "pill-optional" %}<p class="hint">It was accepted: nothing to do unless you disagree.</p>{% endif %}
     {% if panel.show_on_page %}<p class="on-page"><a href="{{ panel.show_on_page }}">Show on the page</a></p>{% endif %}
     {% if panel.group %}{{ group_body(panel) }}
+    {% elif panel.pages %}{{ page_group_body(panel) }}
     {% elif panel.item.kind == "equation" %}{{ equation_body(panel) }}
     {% elif panel.item.kind == "figure" %}{{ figure_body(panel) }}
     {% elif panel.item.kind == "table" %}{{ table_split_body(panel) }}

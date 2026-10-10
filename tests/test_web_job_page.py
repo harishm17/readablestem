@@ -89,7 +89,7 @@ def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     job_id = convert(web, image_only_pages=[1])
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Finished, with pages not converted: notes.pdf | a11y-stem"
-    assert "Page 2 is a scanned image with no text" in page_text(html)
+    assert "Page 2 is a scanned image, so it was not converted." in page_text(html)
     assert 'id="partial-note"' in html
 
 
@@ -110,7 +110,8 @@ def test_a_scanned_pdf_says_why_it_stopped_everywhere_on_the_page(web):
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Stopped: notes.pdf | a11y-stem"
     why = page_text(section(html, "failed-heading"))
-    assert "Run text recognition (OCR) on it first" in why
+    assert "Every page of this PDF is a scanned image, so this tool cannot convert it." in why
+    assert "OCR" not in why  # the old advice made exactly these files
     assert "stopped unexpectedly" not in page_text(html)
 
 

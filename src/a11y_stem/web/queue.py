@@ -2,7 +2,9 @@
 
 A reviewer makes decisions, not fixes (docs/design/beta-architecture.md, "Review tiers"):
 a fix that needs a decision is one, and a group of repeated headings that share a
-`Fix.group_key` is one for all of its headings. The queue holds every decision the
+`Fix.group_key` is one for all of its headings, and so are the pages (or the pieces of
+handwriting) kept as images for one reason ("pg-" keys, `web.review.is_kept_image`). The
+queue holds every decision the
 pipeline asked for (`Fix.review == "required"`, plus anything still waiting, for results
 stored before tiers existed), in the review order of `web.review` (equations, then
 figures, then tables, then headings, each in page and reading order), numbered from 1. A
@@ -22,21 +24,28 @@ from dataclasses import dataclass
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Element, Fix, Kind
-from a11y_stem.web.review import GROUP_KINDS, group_fixes
+from a11y_stem.web.review import GROUP_KINDS, PAGE_GROUP_PREFIX, group_fixes, is_kept_image
 
 
 @dataclass(frozen=True)
 class Decision:
-    """One decision: a single fix, or every heading of a group (reading order)."""
+    """One decision: a single fix, every heading of a group, or every page kept as an
+    image for one reason (reading order)."""
 
-    key: str  # the element id, or the group key ("hg-p1-e7") for a heading group
+    key: str  # the element id, or the group key: "hg-p1-e7" (headings), "pg-p2-e0" (pages)
     number: int  # 1-based position in the queue
     kind: Kind
     fixes: tuple[Fix, ...]
 
     @property
     def is_group(self) -> bool:
+        """A group of repeated headings."""
         return self.key.startswith("hg-")
+
+    @property
+    def is_page_group(self) -> bool:
+        """Pages (or handwriting) kept as images for one reason."""
+        return self.key.startswith(PAGE_GROUP_PREFIX)
 
     @property
     def open(self) -> bool:
@@ -73,7 +82,8 @@ def decisions(result: DocumentResult) -> list[Decision]:
     out: list[Decision] = []
     for number, unit in enumerate(triage.units(ordered), start=1):
         first = unit[0]
-        key = first.group_key if first.group_key and first.kind is Kind.HEADING else None
+        grouped = first.kind is Kind.HEADING or is_kept_image(first)
+        key = first.group_key if first.group_key and grouped else None
         out.append(Decision(key or first.element_id, number, first.kind, tuple(unit)))
     return out
 

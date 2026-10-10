@@ -79,6 +79,7 @@ from a11y_stem.web.review import (
     FieldError,
     ReviewInvalid,
     heading_places,
+    is_kept_image,
     item_labels,
     item_numbers,
 )
@@ -88,11 +89,13 @@ from a11y_stem.web.routes.review import (
     HEADING_GROUP_FLASH,
     CheckView,
     HeadingGroupView,
+    PageGroupView,
     ReviewItem,
     _heading_group,
     _item,
     _load,
     _load_versioned,
+    page_group_view,
     stale_notice,
     undo_offer,
 )
@@ -219,6 +222,7 @@ class Panel:
     status_class: str = ""
     item: ReviewItem | None = None
     group: HeadingGroupView | None = None
+    pages: PageGroupView | None = None  # pages (or handwriting) kept as images
     why: str | None = None
     checks: list[CheckView] = field(default_factory=list)
     reason_code: str | None = None
@@ -532,6 +536,9 @@ class SplitBuilder:
             if decision.is_group:
                 self._group_panel(panel, decision)
                 return panel
+            if decision.is_page_group:
+                self._page_group_panel(panel, decision)
+                return panel
             fix = lead
         else:
             assert fix is not None
@@ -646,6 +653,31 @@ class SplitBuilder:
             for p in pages
         ]
 
+    def _page_group_panel(self, panel: Panel, decision: queue.Decision) -> None:
+        """Pages (or handwriting) kept as images: one card for all of them, with the
+        first one's image."""
+        for fix in decision.fixes:
+            self.item(fix)
+        group = page_group_view(self.result, list(decision.fixes), self.items)
+        panel.pages = group
+        panel.subtitle = group.title
+        lead = decision.lead
+        page = self.page_of(lead)
+        panel.show_on_page = (
+            self.url(item=decision.key, page=page, anchor=f"box-{lead.element_id}")
+            if page
+            else None
+        )
+        crop = self.item(lead).crop_url
+        if crop is not None:
+            panel.region_url = crop
+            name = self.labels.get(lead.element_id, "The first one")
+            panel.region_alt = f"{name} as it is in the PDF."
+        panel.group_pages = [
+            PageLink(p, self.url(item=decision.key, page=p, anchor="page-view"), 0, False)
+            for p in group.pages
+        ]
+
     # ------------------------------------------------------------------ page
 
     def page_view(self, number: int, selected: set[str], current_key: str | None) -> PageView:
@@ -680,7 +712,8 @@ class SplitBuilder:
                     )
                 of = f"{decision.number} of {len(self.queue)}"
                 home = queue.page_of(decision.lead, self.elements)
-                if decision.is_group and home is not None and home != index:
+                grouped = decision.is_group or decision.is_page_group
+                if grouped and home is not None and home != index:
                     # A group's heading on another page than the one the decision counts
                     # on (`queue.open_by_page`): a lighter mark, so a page without "N to
                     # decide" never shows a solid decision mark.
@@ -805,6 +838,11 @@ class SplitBuilder:
                     )
                 )
                 continue
+            if decision.is_page_group:
+                group = page_group_view(self.result, list(decision.fixes), self.items)
+                label = f"{group.title}, {len(decision.fixes)}"
+                out.append(OptionalLine(label=label, note=group.state, href=href))
+                continue
             fix = decision.fixes[0]
             out.append(self._line(fix, self.item(fix).status_label + ".", href))
         far = (1 << 30, 1 << 30)
@@ -866,8 +904,11 @@ def _notice(
     if target.startswith(HEADING_GROUP_FLASH):
         key = target.removeprefix(HEADING_GROUP_FLASH)
         first = next((f for f in result.fixes if f.group_key == key), None)
-        text = first.heading.text if first is not None and first.heading else ""
-        label = f"Repeated heading “{text}”" if text else "Repeated heading"
+        if first is not None and is_kept_image(first):
+            label = page_group_view(result, [first], {}).title
+        else:
+            text = first.heading.text if first is not None and first.heading else ""
+            label = f"Repeated heading “{text}”" if text else "Repeated heading"
     elif target and not target.startswith(GROUP_FLASH):
         fix = result.fix_for(target)
         if fix is not None:
@@ -982,6 +1023,9 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
     if panel.group is not None and panel.group.key == target:
         panel.group.error = " ".join(e.message for e in exc.errors)
         panel.group.values.update(exc.values)
+        return
+    if panel.pages is not None and panel.pages.key == target:
+        panel.pages.error = " ".join(e.message for e in exc.errors)
         return
     item = panel.item
     if item is not None and item.element_id == target:

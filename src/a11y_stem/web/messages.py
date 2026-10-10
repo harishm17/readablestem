@@ -277,6 +277,16 @@ REASON_MESSAGES: dict[str, str] = {
     "was converted.",
     "budget_cancelled": "The conversion was stopped before this item was converted.",
     "budget_unknown": "A spending limit was reached before this item was converted.",
+    # Pages and handwriting kept as images before any model work (pipeline.page_type).
+    # TODO(Harish): final wording (handwriting design, section 3.3).
+    "handwritten_page": "This page is handwritten and this tool does not convert handwriting, "
+    "so the page is kept as an image, marked “Not converted”.",
+    "scanned_page": "This page is a scanned image and this tool does not convert scans, so "
+    "the page is kept as an image, marked “Not converted”.",
+    "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
+    "image, marked “Not converted”.",
+    "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
+    "convert handwriting, so it is kept as an image after the typed text.",
 }
 
 # DocumentResult.notices: one sentence per notice code for the job page's list ("Not
@@ -287,8 +297,19 @@ REASON_MESSAGES: dict[str, str] = {
 NOTICE_MESSAGES: dict[str, str] = {
     "table_not_rebuilt": "A table is kept as an image of the original, so screen readers "
     "cannot read its cells.",
-    "scanned_page": "A page is only a picture of a page (a scan), so nothing on it could "
-    "be converted.",
+    # Pages and hidden text (pipeline.page_type). "{count}" is replaced by the number of
+    # characters (web.job_page). TODO(Harish): final wording (handwriting design, 3.3).
+    "scanned_page": "A scanned image, not converted: the page is kept as an image.",
+    "handwritten_page": "Handwritten, not converted: the page is kept as an image.",
+    "unread_page": "Drawings or images with nothing this tool could read, not converted: the "
+    "page is kept as an image.",
+    "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
+    "the handwriting is kept as an image after it.",
+    "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "
+    "guessed from the page ({count} characters) was not used.",
+    "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
+    "the page is shown or printed, so it was left out: if students need it, add it to your "
+    "source file and upload that again.",
     "code_block": "Program code is kept as plain text, without its layout or highlighting.",
     "footnote": "A footnote is kept where it falls in the text, not linked to its mark.",
     "colour_reference": "The text refers to a colour (for example, shown in red), so add "

@@ -525,7 +525,7 @@ def _figure_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
     figures = [
         f
         for f in _first_fixes(result).values()
-        if f.kind is Kind.FIGURE and f.reason != notice_rules.SCANNED_PAGE
+        if f.kind is Kind.FIGURE and f.reason not in notice_rules.KEPT_IMAGE_CODES
     ]
     if not figures and not facts.images:
         return None
@@ -688,9 +688,10 @@ class NoticeLine:
 
 
 # Notices whose element's fix is the decision they describe (a table kept as an image, a
-# scanned page). Any other notice on an element with a decision (a figure telling things
-# apart by colour alone) is about something else: it gets no "Decide it".
-DECISION_NOTICES = frozenset({"table_not_rebuilt", "scanned_page"})
+# page or a region of handwriting kept as an image). Any other notice on an element with
+# a decision (a figure telling things apart by colour alone) is about something else: it
+# gets no "Decide it".
+DECISION_NOTICES = frozenset({"table_not_rebuilt"}) | notice_rules.KEPT_IMAGE_CODES
 
 
 @dataclass
@@ -711,8 +712,10 @@ def _line(notice: Notice, fixes: dict[str, Fix], labels: dict[str, str]) -> Noti
         decision = "open" if fix.pending else "made"
         label = labels.get(fix.element_id, "")
     where = f"Page {notice.page + 1}" if notice.page is not None else "The whole document"
-    return NoticeLine(where, explain_notice(notice).text, notice.code, notice.count,
-                      notice.element_id, decision, label)  # fmt: skip
+    text, count = explain_notice(notice).text, notice.count
+    if "{count}" in text:  # the count is in the sentence (characters), not "N times"
+        text, count = text.replace("{count}", f"{notice.count:,}"), 1
+    return NoticeLine(where, text, notice.code, count, notice.element_id, decision, label)
 
 
 def notice_lists(result: DocumentResult) -> NoticeLists:
