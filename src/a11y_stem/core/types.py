@@ -586,6 +586,14 @@ NOTICE_CODES = frozenset(
         "lang_detected",  # the document language was detected from the text
         "lang_assumed",  # no language in the PDF and none detected: the default is used
         "long_description_missing",  # a complex figure without a long description
+        # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text
+        # and page types"). The first four have a decision: the page's (or region's)
+        # FAILED figure fix with the same reason, grouped by reason.
+        "handwritten_page",  # a handwritten page, kept as an image (not converted)
+        "handwriting_on_page",  # handwriting on a typed page, kept as an image of it
+        "unread_page",  # drawings or images, nothing read from them: page kept as image
+        "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
+        "hidden_text_ignored",  # invisible or covered words on a typed page, left out
     }
 )
 
@@ -639,6 +647,47 @@ class SourceFacts(BaseModel):
     tables: int = Field(default=0, ge=0)
 
 
+class PageType(BaseModel):
+    """What one page is, as `pipeline.page_type` measured it. Content-free: a kind, reason
+    codes and counts, never text, so it can be aggregated after the document is deleted.
+
+    - `kind`: born_digital, mixed_ink, mixed_hidden_text, scan_no_text, scan_ocr,
+      handwritten, handwritten_ocr, vector_no_text or blank (a plain string, so a kind
+      from a newer release still loads);
+    - `trust`: which characters may be used ("all", "visible_only", "none", "empty");
+    - `route`: where the page's content would have to come from ("text_layer",
+      "text_layer_and_ink_regions", "visible_text_layer", "vision_page", "nothing").
+      This release reads text layers only: a "vision_page" that is handwritten or
+      scanned is kept as its page image, marked "Not converted";
+    - `reasons`: content-free codes ("invisible_text", "ink_writing", ...);
+    - counts: visible, invisible (render mode 3 or alpha 5 % or less) and covered
+      (painted, then hidden under an image or a filled shape) characters, the share of
+      the page under raster images, and the ink measures.
+    """
+
+    page: int = Field(ge=0)  # 0-based
+    kind: str
+    trust: str = "all"
+    route: str = "text_layer"
+    reasons: list[str] = Field(default_factory=list)
+    visible_chars: int = Field(default=0, ge=0)
+    invisible_chars: int = Field(default=0, ge=0)
+    covered_chars: int = Field(default=0, ge=0)
+    image_coverage: float = Field(default=0.0, ge=0.0, le=1.0)
+    ink_strokes: int = Field(default=0, ge=0)
+    ink_rows: int = Field(default=0, ge=0)
+    ink_repeat_share: float = Field(default=0.0, ge=0.0, le=1.0)
+    ink_pen_share: float = Field(default=0.0, ge=0.0, le=1.0)
+    ink_size_twins: float = Field(default=0.0, ge=0.0, le=1.0)
+    annot_strokes: int = Field(default=0, ge=0)
+    producer: str = "other"  # a coarse family of the producing software, a hint only
+    classifier_version: str = "page-type-v5"
+
+    @property
+    def untrusted_chars(self) -> int:
+        return self.invisible_chars + self.covered_chars
+
+
 # Where `DocumentResult.lang` came from: the PDF's /Lang, detection from the text, the
 # default ("en") when neither gave one, or the instructor's own choice on the job page.
 LangSource = Literal["pdf", "detected", "default", "user"]
@@ -660,9 +709,10 @@ class DocumentResult(BaseModel):
     # "budget_job_calls"): every equation and figure not done by then is FAILED with that
     # reason and keeps its original image. None when the run was not cut short.
     stopped_by: str | None = None
-    # 0-based pages that are only a picture of a page (one image covering it, no text):
-    # scanned pages. There is nothing to convert on them; the output keeps the image,
-    # flagged as not converted.
+    # 0-based pages kept whole as a page image, flagged as not converted, because
+    # nothing on them is converted: scanned and handwritten pages, and pages with
+    # drawings or images from which nothing could be read (before pipeline 0.4.0's page
+    # types: scanned pages only, one image covering the page and no text).
     image_only_pages: list[int] = Field(default_factory=list)
     # Static checks of `html` (pipeline.html_checks.static_checks) when it was rendered.
     html_checks: list[Check] = Field(default_factory=list)
@@ -676,6 +726,9 @@ class DocumentResult(BaseModel):
     # Facts about the input PDF for the before/after card. None when not measured.
     source_facts: SourceFacts | None = None
     lang_source: LangSource = "default"
+    # One record per analysed page (`PageType`), in page order. Empty in results stored
+    # before page types existed.
+    page_types: list[PageType] = Field(default_factory=list)
 
     def fix_for(self, element_id: str) -> Fix | None:
         return next((f for f in self.fixes if f.element_id == element_id), None)
