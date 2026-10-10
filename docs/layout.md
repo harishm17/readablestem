@@ -40,7 +40,9 @@ Element conventions:
 - **`reasons`** are short content-free evidence strings (`"math font"`, `"fraction bar"`,
   `"larger font"`, `"raster image"`, ...). They never contain document text.
 - **Text** is copied from the PDF with whitespace collapsed and invisible characters
-  removed. The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
+  (zero-width and control characters) removed. Text nobody sees on the page is never
+  content: render mode 3, 5 % opacity or less, or painted over by an image or a filled
+  shape ("Hidden text and page types" below). The inline-marker brackets `⟦` `⟧` (U+27E6/U+27E7) are replaced by the
   look-alikes `〚` `〛` (U+301A/U+301B) in every piece of document text, so a PDF cannot
   fake a marker: every marker in an element's `text` is a real inline child of it. Word's
   private-use Symbol bullet (U+F0B7) becomes `•`.
@@ -428,7 +430,8 @@ maths by the document's evidence; the equation step's own tiers then decide it.
 
 - **Raster images** from `page.get_image_info()`, skipped when either side is under 24 px
   or drawn under 12 pt (bullets, spacers), or when the image covers 85 % of the page or more
-  (backgrounds and scanned pages).
+  (backgrounds; a scanned page never gets here: it is kept whole as its image, "Hidden
+  text and page types" below).
 - **Vector figures**: drawings closer than 6 pt to each other are clustered, then clusters
   whose boxes overlap are joined (the markers of a sparse scatter plot are further apart
   than 6 pt but sit inside one plot). A cluster is a figure when it is at least 24 x 24 pt,
@@ -472,6 +475,178 @@ file" (review "none": no decision; `_layout_notices`):
 - `footnote`: a paragraph or list item in the bottom 40 % of the page, in a smaller font
   than the body, that starts with a digit, `*`, a dagger or `§` printed raised in the
   text above it on the same page. It is kept where it falls, not linked to its mark.
+
+## Hidden text and page types (`pipeline/page_type.py`, pipeline 0.4.0)
+
+**Why.** A PDF can carry text nobody sees. An iPad notes app writes an invisible layer of
+handwriting-recognition guesses over the ink (fill opacity 0, an Apple ".SF" font); an
+OCR program writes its guesses over a scan in render mode 3, or paints the page image
+over visible text. Read as content, a real 4-page set of iPad lecture notes became 26
+headings and 72 paragraphs of garbage, titled with a 35 pt scrawl, with no maths, no
+model call and 0 decisions: "Finished. The accessible HTML is ready." OCR'd scans fell
+into the same hole, and the app's own advice for scans ("run OCR and upload again")
+produced exactly those files. There is **no handwriting or scan conversion** (decided
+2026-10-09): such pages are kept as page images, marked "Not converted", with a decision.
+
+**What is never content** (`_page_rows`, the same extraction as before, no second one):
+
+- a span in render mode 3 (MuPDF's char flags show neither fill nor stroke);
+- a span at 5 % opacity or less (rawdict `alpha` <= 13), unless it is text used as a
+  clip (render mode 7, a gradient- or picture-filled title: MuPDF gives it alpha 0 with
+  the CLIPPED flag, and it is visible), `page_type.span_hidden`;
+- a visible character painted first and then covered by an image or a filled shape
+  ("covered": ABBYY-style text under the page image, a black box over a line). Paint
+  order comes from `get_bboxlog` and `get_texttrace` (only read when a visible span lies
+  inside an image or an opaque fill); a cover must hold the middle 60 % of the glyph, so
+  an underline or a strikeout is not one; and the text counts as covered only when
+  removing it (a text-only redaction on a one-page copy) does not change the rendered
+  page there by more than 1 % of its pixels. That render is the opacity check: soft
+  masks, colour-key and stencil masks, constant alpha and blend modes all let the text
+  show, and then it is kept. Up to 24 runs are tested per page, the rest follow them.
+
+The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
+
+**Page types.** `page_type.classify` reads the rawdict and the drawings layout already
+extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
+image) and returns a kind, the characters it may trust, where its content would have to
+come from, and content-free reason codes. It is detect v4 from the research, ported with
+the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.1"):
+
+| Kind | What it is | What the app does |
+|---|---|---|
+| `born_digital` | visible text, nothing hidden | reads it as before |
+| `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`) |
+| `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
+| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements |
+| `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has no visible text and its ink could not be analysed in time |
+| `blank` | nothing painted | nothing |
+
+The decisions in the rules, with the measured values next to each threshold in the code:
+
+- 40 visible characters make a page "have a text layer". Ink is "clean" when exact
+  repeats are at most 35 % of the complex shapes, filled strokes share one pen width
+  (80 % within 0.75-1.33 x the median of their colour), and at most half the strokes have
+  a same-size twin. A page of writing has 40 or more clean strokes in 3 or more rows; a
+  typed page with 12 strokes in a row has some handwriting.
+- **Hidden-ratio rule** (C1.2): a page is a picture or ink page whatever its visible text
+  when its hidden characters are at least max(20, its visible characters), or when a page
+  image covers half of it and 20 or more characters are hidden (a scan with a visible
+  "Downloaded from" stamp; notes under a typed template header).
+- **A scan is a picture of a page** (C1.5): images cover 85 % of the page, or half of it
+  with no visible text at all. A slide title over a photo is a typed page with a figure.
+  Hidden text with no picture of a page over vector ink is handwriting
+  (`invisible_without_image`).
+- **Time budget** (C1.6): the ink analysis (pure Python) gets 10 s per document
+  (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analysed
+  (`INK_MAX_ITEMS`); such a page says `ink_not_analysed`. Measured on this machine,
+  pinned to one core: the upload probe on a 19.6 MB file of 17 pages of dense synthetic
+  ink (no text layer) took 13.8 s alone and 17.4 s with another busy process on the same
+  core, under the probe's 30 s limit; the file was accepted, because pages not analysed
+  in time never refuse an upload. Not measured on Cloud Run's 1 vCPU.
+
+**The safety net** (C1.1, independent of the page types): after layout, a page with
+something painted on it outside the header and footer bands (an image or a drawing at
+least 12 pt on a side, or 3 smaller marks; rules alone do not count) and no element is
+kept as its image (`unread_page`). A page is "blank" only when nothing is painted on it.
+
+Layout returns `page_types` (per page) and `kept_pages` (page -> reason); the pipeline
+turns each kept page into a figure for the whole page that is FAILED before any model
+work, groups the kept images with one reason into one decision (`Fix.group_key`
+"pg-" + the first one's id: a 20-page handwritten file asks once), and stores the
+content-free records on `DocumentResult.page_types` (docs/output.md). Notices:
+`ocr_text_layer_ignored` (review "none") for the hidden characters of a kept page,
+`hidden_text_ignored` (optional) for those of a typed page, and one per kept image with
+its reason (required: its decision is the image's fix).
+
+**At upload** (`page_type.document_refusal`, in the probe child): the text of every page
+is read first and the check stops at the first typed page, so only a PDF with none pays
+for the drawings and the ink analysis. Every page certainly handwritten or scanned, or
+blank, refuses it before any quota is spent: `handwritten` (hidden recognition layer),
+`handwritten_no_text`, `scanned_ocr` (hidden OCR layer) or `scanned`. A full-page
+picture with a few visible characters and no hidden layer (perhaps a slide) and a page
+whose ink was not analysed never refuse: the conversion keeps them as images with a
+decision. The worker fails a result with the same rule (`worker.result_outcome`).
+
+**What is not detected** (the text reaches the HTML, or the content is lost as before):
+
+- white text on a white page or a white cell (needs the colour under each glyph);
+- text under a shape that covers less than the middle of its glyphs;
+- very small text (0.4 pt "microtext");
+- OCR text drawn visibly in place of the image (Acrobat ClearScan-like): it is trusted,
+  garbled maths included;
+- a full-page scan with 40 or more visible typed characters on it (a stamp, a header)
+  and no hidden layer: the scan is dropped as a page background, silently, as before
+  (the design review's "d1 rule" is not built: it would flag every slide with a
+  full-slide background picture);
+- light handwriting on a typed page (fewer than 12 strokes: a circle, a tick, a
+  signature): lost or absorbed into a figure as before;
+- grids of small machine-drawn curves (sparklines, small multiples of loops) can look
+  like handwriting: kept as an image with a needless decision;
+- a slide whose background is a full-slide picture and which has fewer than 40 visible
+  characters is kept as an image with a decision (never refused);
+- a typed page with at least as much hidden text as visible text (an OCR layer run over a
+  typed page) is kept as an image with a decision under the hidden-ratio rule, called a
+  scan: its typed text is not read (not silent, but a loss);
+- a page of dense handwriting the ink checks reject (exact repeats among tiny strokes)
+  is `vector_no_text`; layout then finds nothing on it and the safety net keeps it as an
+  image, but layout is slow on such pages (tens of seconds at 85,000 paths, most of it
+  table detection and figure clustering, as before).
+
+**Accuracy, honestly.** Measured with `python -m a11y_stem.eval.page_types --labels
+LABELS.json` (docs/eval.md "Page types") on sets that are not in this repository (they
+hold derivatives of a real lecturer's notes and local research PDFs). "Right action"
+means the app does with the page what its true kind calls for (read the text, keep the
+page as an image, cut out the ink); the scorer does not run layout, so the safety net,
+which keeps some `vector_no_text` pages of dense ink as images, is not counted.
+
+- **Fresh set 4, the only out-of-sample number**: 31 pages built after page-type-v5 was
+  frozen (commit `dc891a2`), with new generators (a cursive writer with one stroke per
+  word, grid and dot paper, scans of other pages at other resolutions, a highlight
+  annotation, a slide background, partial covers, blank paper). v5 got **27 of 31 page
+  kinds and 28 of 31 actions** right. Wrong: a picture of a slide letterboxed on a
+  portrait page (44 % of it; read as a figure, not lost), an /Ink annotation of 4 strokes
+  on a typed page (as designed: fewer than 12), a picture pasted over half of one line
+  (the check looked for covers of whole lines), and a page of ruled paper with nothing on
+  it (called drawings). The last two were then fixed (page-type-v5.1: a cover over part
+  of a line is looked for; paper rules alone are blank), so v5.1 has no out-of-sample
+  number of its own.
+- **The research corpus, 996 labelled pages** (not out of sample: every page was seen
+  while detect v1-v4 were tuned): 586 real born-digital pages, the 4 pages of one real
+  set of handwritten notes and 23 derivatives of them, and synthetic handwriting, scans,
+  OCR layers, mixed pages and hard negatives. page-type-v5.1 gets 984 page kinds right
+  (98.8 %) and 989 actions (99.3 %); detect v4 had 984 and 990. One real page labelled
+  born-digital now has 8 characters under a grey box and a seal painted over them
+  (checked by eye: they cannot be seen), so it is called `mixed_hidden_text` and counted
+  as an error against its label.
+
+  | true \ predicted | born | mixed ink | mixed hidden | scan | scan OCR | hand | hand OCR | vector | blank |
+  |---|---|---|---|---|---|---|---|---|---|
+  | born_digital (631) | 628 | 2 | 1 | | | | | | |
+  | mixed_ink (68) | 2 | 66 | | | | | | | |
+  | mixed_hidden_text (28) | 2 | | 26 | | | | | | |
+  | scan_no_text (51) | | | | 51 | | | | | |
+  | scan_ocr (46) | | | | | 46 | | | | |
+  | handwritten (60) | | | | | | 58 | | 2 | |
+  | handwritten_ocr (64) | | | | | 2 | | 62 | | |
+  | vector_no_text (44) | | | | | | 1 | | 43 | |
+  | blank (4) | | | | | | | | | 4 |
+
+  By split: the tuning pages 107 of 108, held-out 734 of 738, the three fresh sets of
+  the research 79 of 79, 48 of 48 and 16 of 23 (detect v4 scored 16 of 23 on its last
+  fresh set too, out of sample then, with 19 of 23 routes).
+- **The design review's 41 adversarial pages** (seen while the C1 changes were made;
+  built to break the classifier, so not a field error rate): v5.1 gets 29 kinds and 35
+  actions right. Still wrong: white on white (2), microtext, visible OCR, the stamp
+  without a hidden layer, a signature, two plot grids called handwriting, a dense page
+  called drawings (kept by the safety net at run time), and the 3 photo slides, whose
+  kind is `vector_no_text` but whose outcome (title read, photo a figure) is right.
+- **Only 4 real handwritten pages exist**, one writer and one app (iPad). No real OCR
+  engine output, real scan or real GoodNotes, Notability, OneNote or Xournal++ export was
+  measured: those were simulated from their documented properties. The labels were
+  given by the people who built the pages.
+- Time: median 6 ms a page, 95th percentile 0.14 s, at most about 1 s on the densest
+  synthetic ink (this machine); lec14 is refused at upload in 0.5 s.
 
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 
@@ -721,8 +896,10 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
 
 ## Known failure modes
 
-- **Scanned pages** have no text layer: the full-page image is skipped as a background and
-  the page yields nothing. OCR is out of scope for the beta.
+- **Handwritten and scanned pages** are not converted (no OCR, no handwriting
+  recognition): they are kept as page images with a decision, and a PDF made only of
+  them is refused at upload. What the page types miss is listed in "Hidden text and page
+  types" above.
 - **Synthetic italics.** When a PDF fakes italics by slanting an upright font (Chromium does
   this when the italic face is missing), the font name and flags say upright, so an italic
   `x = 5` typed as text is not recognised as maths unless a maths font or symbol is involved.
@@ -814,6 +991,17 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   `tests/test_layout_equations.py` (display-equation regions and equation numbers) and
   `tests/test_layout_fragments.py` (inline fragments and the punctuation after inline
   maths) pin the layout v2 fixes from the eval pages and the smoke test.
+- `tests/test_page_types.py`, `tests/test_page_types_pipeline.py` and
+  `tests/test_page_types_browser.py` (`browser` marker) cover hidden text and page types
+  on synthetic PDFs from `tests/fixtures/handwriting/make_fixtures.py` (seeded ink in the
+  shapes note apps export, made-up text in the layers iPad notes apps and OCR programs
+  write, the design review's failing cases rebuilt; each under 100 KB, no real
+  handwriting or scan): each fixture's kind and what happens to it, which spans are
+  hidden, covered text on a turned page, the refusal codes, the time budget, that every
+  committed born-digital fixture has no hidden text and no kept page, an iOS-style page
+  never giving a text element and always a decision, one decision per reason, the
+  upload refused before any quota, the group decision on both review screens, axe and
+  320 px reflow.
 - `tests/test_tables_detect.py` and `tests/test_tables_fixtures.py` cover table
   detection and how layout claims tables, on generated pages, the LaTeX
   `latex/tables.tex` (Tectonic) and a Word-style page exported by LibreOffice

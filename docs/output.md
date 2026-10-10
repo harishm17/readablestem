@@ -75,6 +75,7 @@ course (Canvas Lite, then UTD) and update both.
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items") |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
 | Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
@@ -283,6 +284,11 @@ right.
   `no_output`, `mathml_rejected`).
 - If there is no crop, the extracted text (if any) is shown in monospace with "The
   original image is not available."
+- A page (or handwriting) kept as an image is never called a figure: its alt text names
+  the page and what it is, and its note says a screen reader cannot read it and to ask
+  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, by the fix's reason,
+  so a stored result renders the same; `TODO(Harish)`: the design's draft wording).
+  Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
   (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
@@ -466,7 +472,9 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
   renders the same from storage;
 - when something is shown as an image of the original: "Some parts could not be
   converted. They are shown as pictures of the original, marked "Not converted" or
-  "Needs a description": ask your instructor for a version you can read.";
+  "Needs a description": ask your instructor for a version you can read.", and when whole
+  pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
+  scanned pages and were not converted." (`assemble.kept_pages_note`, `TODO(Harish)`);
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 

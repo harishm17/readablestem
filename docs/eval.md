@@ -1219,6 +1219,36 @@ row ends "(current" and the rest is read as headings and paragraphs (a detection
 unruled tables, docs/tables.md "Known misses"; not fixed: tables get no further work
 for now).
 
+## Page types (2026-10-09, no model)
+
+`pipeline.page_type` decides whether a page's text layer can be trusted and whether it
+is handwritten or scanned (docs/layout.md "Hidden text and page types"). Its scorer:
+
+```bash
+uv run python -m a11y_stem.eval.page_types --labels LABELS.json [--labels ...] [--out rows.json]
+```
+
+A labels file is a JSON list of `{"file", "page" (1-based), "label" (a page kind),
+"split", "group"}`; relative file names are read from the labels file's folder or the
+one above it. It prints the confusion matrix of page kinds for all pages and per split,
+the matrix of what the app does with each page ("text", "text_and_ink_images",
+"page_image", "nothing"), every error with its counts, and the time per page. Kinds,
+counts and file names only: never page text. No model is called.
+
+The labelled sets are not in this repository: the research corpus holds derivatives of
+a real lecturer's handwritten notes and PDFs from local research folders, and lives with
+the research (`a11y-research/handwriting/detect/corpus/labels_all.json`, 996 pages). The
+results, and why only one of them is out of sample, are in docs/layout.md "Accuracy,
+honestly": page-type-v5 on fresh set 4 (31 pages built after it was frozen) 27 of 31
+kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 989
+actions, on the design review's 41 adversarial pages 29 and 35.
+
+The headings and document evals were not re-run for this change: no model was called
+in this stage. The committed born-digital fixtures (`tests/test_page_types.py`) have no
+hidden character and no kept page, and the golden HTML is unchanged
+(`tests/test_assemble_golden.py`), so the expected change on the gold is none; re-run
+them with the next model run to confirm it (TODO).
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -1285,5 +1315,6 @@ for now).
 | `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
 | `data/authored/tables/` | authored table documents (MIT): sources, PDFs, gold, `make_authored.py` |
 | `tests/fixtures/tables/table_bench_excerpt.json` | table-bench predictions and its scores on five documents |
+| `src/a11y_stem/eval/page_types.py` | the page-type scorer: confusion matrices, actions, errors, time (no model) |
 | `data/eval/tolerances.json` | gate tolerances |
 | `tests/test_eval_*.py` | offline tests; `-m browser` runs the Chromium ones |

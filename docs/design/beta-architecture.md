@@ -61,7 +61,8 @@ sign-in) have their own contracts, flags and ownership map in
 | `models/openai_client.py` | `OpenAIVisionClient(settings, budget, *, client=None)` | WP1 |
 | `models/router.py` | `call_with_fallback(client, request, schema, *, settings)` | WP1 |
 | `models/prompts/` | versioned prompt text files + loader `load_prompt(name) -> (version, text)` | WP1 |
-| `pipeline/layout.py` | `analyze(pdf_bytes, *, pages, max_pages) -> Layout` (elements: headings, paragraphs, list items, equations, figures), `crop(...)`, `release(pdf_bytes=None)`, `LayoutError` | WP2 |
+| `pipeline/layout.py` | `analyze(pdf_bytes, *, pages, max_pages) -> Layout` (elements: headings, paragraphs, list items, equations, figures; `page_types`, `kept_pages`), `crop(...)`, `release(pdf_bytes=None)`, `LayoutError` | WP2 |
+| `pipeline/page_type.py` | `classify(page, raw_blocks, drawings, *, budget, producer) -> PageTypeResult`, `kept_reason`, `ink_regions`, `refusal_code`, `document_refusal(doc)`, `span_hidden(span)` (hidden text and page types, docs/layout.md) | page safety |
 | `pipeline/heading_step.py` | `heading_fixes(elements) -> list[Fix]` | WP2 |
 | `pipeline/validate.py` | `check_latex`, `safe_latex_to_mathml`, `check_mathml`, `check_alt` | WP3 |
 | `pipeline/speech.py` | `mathml_to_speech(mathml) -> str` | WP3 |

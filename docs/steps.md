@@ -649,7 +649,11 @@ decorative rules were added; the prompt versions have changed since.
 
 ## Known limits
 
-- The cross-check needs a text layer; scanned PDFs get no cross-check.
+- The cross-check needs a text layer; scanned PDFs get no cross-check. Hidden text (a
+  tablet's or an OCR program's invisible layer, text covered by an image) is never a text
+  layer here: layout does not read it, so a correct transcription is never blamed on an
+  OCR guess. OCR text drawn visibly is read and trusted (docs/layout.md "Hidden text and
+  page types", what is not detected).
 - The sign check compares counts, not positions: a minus moved to another term keeps
   every count. A minus typed as an ASCII hyphen between two letters (`x-y`, a flattened
   `e-kt`) and a minus touching a TeX arrow head are ambiguous, so dropping them is missed

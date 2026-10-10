@@ -107,7 +107,10 @@ for things without an element.
 | Code | Review | Comes from |
 |---|---|---|
 | `table_not_rebuilt` | required (its fix is the decision) | a table fix with that reason |
-| `scanned_page` | required (the page's FAILED figure fix, unchanged) | a figure fix with reason `scanned_page` |
+| `scanned_page`, `handwritten_page`, `unread_page` | required (the page's FAILED figure fix; the pages with one reason are one decision, `Fix.group_key` "pg-...") | a figure fix with that reason: a page kept as its image (docs/layout.md "Hidden text and page types") |
+| `handwriting_on_page` | required (the region's FAILED figure fix, grouped like the pages) | a figure fix with that reason: handwriting on a typed page |
+| `ocr_text_layer_ignored` | none (count = hidden characters) | layout: the hidden layer of a page kept as an image |
+| `hidden_text_ignored` | optional (count = hidden characters) | layout: invisible or covered text left out of a typed page |
 | `colour_only` | optional | a figure fix with `colour_only` |
 | `long_description_missing` | optional | a chart or diagram fix without `long_description`, with long descriptions on |
 | `code_block`, `footnote` | none | layout facts (`Layout.notices`, `layout._layout_notices`) |
@@ -174,7 +177,9 @@ document text.
 | Document language detected / assumed | optional | notice `lang_detected` / `lang_assumed`, confirm on the job page |
 | Notation hint used, bold letter in prose made maths | none | the equation step's own rules decide its tier |
 | Transcription contradicting a course entry (bold d read as plain d) | required | the existing `style_mismatch` |
-| Scanned page | required (unchanged) | notice `scanned_page` beside its FAILED figure fix |
+| Scanned or handwritten page, or a painted page nothing was read from (page safety, below) | required, one decision per reason for the document | the page image's FAILED figure fix, `group_key` "pg-..."; notice `scanned_page`, `handwritten_page` or `unread_page` |
+| Handwriting on a typed page | required, one decision for all of them | each region's FAILED figure fix; notice `handwriting_on_page` |
+| Hidden text (a tablet's or OCR program's layer, invisible or covered words) | none / optional | never read; notice `ocr_text_layer_ignored` (kept pages) or `hidden_text_ignored` (typed pages) with the count |
 | Code block, footnote | none | notice |
 
 ## Database (`web/db.py`, migration `fa3662c01396`)
@@ -365,3 +370,32 @@ features after integration"):
   (same prompts and models) and are to be re-run on 0.4.0 (docs/eval.md "Results").
 - `FEATURE_TABLES` stays off until detection is checked on a private set of real course
   PDFs (the real-document floors are skipped without one).
+
+### Page safety: hidden text, handwritten and scanned pages (2026-10-09, always on)
+
+A real set of iPad lecture notes came out as 26 headings and 72 paragraphs of an
+invisible recognition layer's guesses, with 0 decisions. Decided by Harish the same day:
+there is **no handwriting or scan conversion**; such pages are only ever kept as page
+images, marked "Not converted", with a decision, and nothing promises a conversion
+later. Built (docs/layout.md "Hidden text and page types"):
+
+- `pipeline/page_type.py` (new, page-type-v5.1): the research classifier, ported with
+  the design review's C1 changes, reading layout's own rawdict and drawings.
+- Layout: invisible text (render mode 3, 5 % opacity or less unless clip text) and text
+  covered by a later image or fill are never content; handwritten and scanned pages get
+  no elements (`Layout.kept_pages`); handwriting on typed pages becomes image regions; a
+  painted page with no element is kept too (the safety net).
+- Pipeline 0.4.0 contracts, with defaults: `core.types.PageType` and
+  `DocumentResult.page_types` (content-free), six notice codes, Fix reasons
+  `handwritten_page`, `unread_page`, `handwriting_on_page` beside `scanned_page`,
+  `Fix.group_key` "pg-..." for the kept images of one reason.
+- Upload refusal codes `handwritten`, `handwritten_no_text`, `scanned_ocr` (new) and
+  `scanned` (reworded); the job outcome `pages_not_converted`; the advice "run OCR and
+  upload again" removed everywhere; one card per group on both review screens; the
+  student file names the page and says it is a picture.
+- Ops: `page page_type:<kind>` and `page_type_reason:<code>`.
+
+Open: Harish's final wording (the drafts are marked `TODO(Harish)`), the design's second
+button ("Leave this page out of the HTML", not built), the d1 case (a scan with 40 or
+more visible typed characters and no hidden layer is still dropped silently), and the
+headings and document evals to re-run with the next model run.

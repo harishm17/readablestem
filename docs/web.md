@@ -231,9 +231,16 @@ yours to see". It is a 404 either way. The
    "no pages"; and so are refused, before any quota is spent:
    a page larger than 5000 pt on a side (`page_too_large`; MuPDF accepts page boxes far
    past the PDF maximum, and the conversion's crash probe renders whole pages, about
-   1 GB for an 18000 pt page), a PDF whose every page is a scanned image with no text
-   (`scanned`, with advice to run OCR first) and one whose every page is blank
-   (`no_content`). The child caps its own address space at 768 MB. The conversion
+   1 GB for an 18000 pt page), a PDF whose every page is handwritten or scanned
+   (`pipeline.page_type.document_refusal`: `handwritten` with a hidden recognition layer,
+   `handwritten_no_text` without one, `scanned` with no text, `scanned_ocr` with a hidden
+   OCR layer; text nobody sees never counts; each message says what the PDF is, that its
+   hidden text is not used, that nothing was taken from the daily pages, and to upload a
+   typed version: never "run OCR", which makes exactly these files) and one whose every
+   page is blank (`no_content`). A page the probe cannot be sure of (a full-page picture
+   with a short title and no hidden layer, which may be a slide; ink not analysed within
+   the 10 s budget) never refuses the upload: the conversion keeps it as an image with
+   a decision (docs/layout.md "Hidden text and page types"). The child caps its own address space at 768 MB. The conversion
    itself is not isolated this way; see "Limits of the worker" below;
 6. the page quota: one conditional `UPDATE quota_days SET pages = pages + n WHERE ... AND
    pages + n <= quota`, in the same transaction as the job insert (if over: 429 and the
@@ -482,7 +489,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
-  | `scanned` | Every page was only a scanned image (the upload probe normally refuses these first) |
+  | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analysed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe normally refuses these first). A result stored before page types: `scanned` when every page was only a picture of a page |
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no OpenAI key): every job would fail the same way |
   | `access_removed` | The owner was removed from the allowlist |
@@ -508,7 +515,8 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   |---|---|---|
   | `budget_daily` | The daily cap ran out part way | "Stopped early": N of M equations and figures not converted, originals kept; upload again after 00:00 UTC |
   | `budget_job_usd`, `budget_job_calls` | The job's own cap ran out | "Stopped early": split the PDF |
-  | `scanned_pages` | Some pages were only scanned images (kept as flagged images) | Which pages; run OCR and upload again |
+  | `pages_not_converted` | Pages kept as images, not converted (handwritten, scanned, or with nothing readable on them), or handwriting on typed pages kept as images | "Finished, with pages not converted": which pages are handwritten, scanned or unread; that the HTML keeps each one as an image marked “Not converted”; that hidden text guessed from them was not used. No OCR advice |
+  | `scanned_pages` | Jobs from before page types: some pages were only scanned images | The same sentence, for scanned pages |
 
   A finished job with no code whose equations, figures and tables mostly failed with
   `model_api_error` or `model_timeout` is shown as "Stopped: the AI service did not
@@ -553,7 +561,7 @@ From top to bottom:
    | converting | Converting | the step it is on: "Reading the equations and checking each against your PDF's text." |
    | stopped by a spend cap | Stopped early | the outcome's message (and the open decisions) |
    | AI service outage | Stopped: the AI service did not answer | "... Nothing is wrong with your PDF ..." |
-   | scanned pages | Finished, with pages not converted | which pages, OCR |
+   | pages kept as images | Finished, with pages not converted | which pages and why (handwritten, scanned, nothing readable); hidden text not used |
    | decisions open | Converted | "3 decisions need you before you share it." |
    | no decision open, parts shown as images | Ready | "1 equation is shown as an image that screen readers cannot read." |
    | nothing left | Ready to share | "Everything was converted." |
@@ -589,9 +597,11 @@ From top to bottom:
 4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
    (notices derived again from the fixes as they are now, plus the stored ones of other
    codes), one sentence each from `messages.NOTICE_MESSAGES`, with the page ("Page 3:",
-   "The whole document:"), "(2 times)" for a count, and, when the notice has a decision,
-   "Decide it (one of your decisions)" or "You have decided it". A notice never adds a
-   decision: the table kept as an image is counted once, as its fix.
+   "The whole document:"), "(2 times)" for a count (a message with "{count}" in it, the
+   hidden-text notices, says "(1,083 characters)" in the sentence instead), and, when the
+   notice has a decision, "Decide it (one of your decisions)" or "You have decided it". A
+   notice never adds a decision: the table kept as an image is counted once, as its fix,
+   and the pages kept as images for one reason once, as their group.
 5. **What changed for a screen-reader user** (Beta 1 of the feature review), shown for
    results with `source_facts` (older ones have no card): up to 7 rows "Can a
    screen-reader user ... | In your PDF | In the HTML" (equations with their structure,
@@ -767,6 +777,19 @@ the results".
 - *Single heading*: its band of the page, text and level, a level select, Accept and
   **Make bold text** (or **Make plain text**, when the line is not bold in the PDF).
 - *Table* (below, "The table card").
+- *Pages kept as images* (handwritten, scanned, nothing readable, or handwriting on a
+  typed page; docs/layout.md "Hidden text and page types"): one card for every page of
+  one reason (`routes/review.py page_group_view`; their fixes share a "pg-" group key).
+  It says which pages and what they are ("Pages 2 and 3 are handwritten."), what students
+  get ("This tool does not convert handwriting. In the HTML each page is an image marked
+  “Not converted”, so a student using a screen reader hears only that."), shows the
+  first page's image and the pages it is on, and has one button, **Keep the page images,
+  marked “Not converted”** (each one's Keep as image, `web.review.apply_page_group`),
+  with the hint "To make them accessible, type them up (for example in LaTeX or Word) and
+  upload the typed version." "Hidden text in the PDF" (folded) gives only a count of the
+  hidden characters that were not used, never the text. There is nothing to accept and
+  no promise of a later conversion. TODO(Harish): the wording is the design's draft;
+  its second button ("Leave this page out of the HTML") is not built.
 
 **"Reject" is named for what it does** (UX review MF14), per kind
 (`routes/review.py reject_words`): "Keep as image" for an equation, "Keep without a
@@ -1158,6 +1181,14 @@ its own `ReviewEdit`, the HTML is re-rendered once, and the reviewer lands on th
 decision. A group decision posts to the same route as a single one, with the group key
 (`hg-` + the first member's element id) in place of the element id.
 
+**Pages kept as images.** The pages (or the handwriting on typed pages) kept as images
+for one reason are one card in "Figures", like the review screen's: which pages, what
+students get, **Keep the page images, marked “Not converted”** and the hint; once kept,
+"Kept as images, marked “Not converted”." It posts to the same route with its group key
+(`pg-` + the first page image's element id); only "reject" (keep) is accepted. Each page
+is named by its page ("Page 2", "Handwriting on page 3"), not counted among the figures,
+and its state after the decision is "Kept by you".
+
 **One fix.** Each card shows:
 
 - the status in words ("Needs review", "Not converted (error)"; the coloured border
@@ -1420,6 +1451,8 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
 | `uv run pytest -m browser tests/test_web_job_page_browser.py` | Chromium: the job page in each state (axe at 1280 and 320 px, reflow with text spacing, htmx steps outside the live region, draft and language without JavaScript, the one-click download) |
 | `uv run pytest -m browser tests/test_web_ux_browser.py` | Chromium: My documents, the posting help, the questions after a download, the deleted-document page and the usage tables (axe at 1280 and 320 px, reflow with text spacing, no-JS), local times, the upload check, the list refreshing with focus kept |
+| `uv run pytest tests/test_page_types_pipeline.py` | Hidden text and kept pages through layout, the pipeline and the app (synthetic fixtures, offline model client): handwritten and scanned PDFs refused before any quota, the job page's outcome, one card per group on both review screens, one click keeping every page, a refused action |
+| `uv run pytest -m browser tests/test_page_types_browser.py` | Chromium: a course PDF with typed, handwritten and scanned pages (axe at 1440 and 390 px before and after the pages are kept, 320 px reflow with text spacing, the group decision without JavaScript) |
 | `uv run pytest -m browser tests/test_web_review_ux_browser.py` | Chromium: the UX review fixes (axe at 1280 and 320 px in each new state, reflow, keyboard flow, the live check, stale tab, Undo and "Use my edit anyway" without JavaScript, drafts kept across a session ending) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
@@ -1434,4 +1467,5 @@ run the real thing with the offline model client: `tests/test_web_pipeline.py` d
 `tests/fixtures/layout/worked_example.pdf` through upload, worker, review, aggregation and
 deletion (the stored HTML equals a review re-render, crops are keyed by element id, an
 inline equation edited in review stays in its paragraph), and `tests/test_web_outcomes.py`
-covers budget stops, scanned pages and removed users with `pipeline.run.convert_pdf`.
+covers budget stops, scanned pages and removed users with `pipeline.run.convert_pdf`
+(`tests/test_page_types_pipeline.py` does the same for handwritten and scanned pages).
