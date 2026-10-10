@@ -114,7 +114,8 @@ def test_a_chart_data_tables_caption_is_marked_english():
                      caption="Figure 1 Position")  # fmt: skip
     fix = Fix(element_id="p1-e1", kind=Kind.FIGURE, status=Status.NEEDS_REVIEW,
               figure=FigureFix(alt="Courbe de la position", figure_type="chart",
-                               data_table=grid, data_values_from_text=False))  # fmt: skip
+                               data_table=grid, data_values_from_text=False,
+                               data_table_added=True))  # fmt: skip
     html = render_html(title="t", lang="fr", elements=[figure], fixes=[fix], crops={"p1-e1": PNG})
     start = html.index("<caption")
     assert 'lang="en"' in html[start : html.index(">", start)]

@@ -725,24 +725,30 @@ the results".
   difference), the edit box open, and Accept as the secondary **Accept anyway**.
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
   Accept, Save edit and **Keep without a description**. With long descriptions on (docs/steps.md), a chart's
-  data table comes right under the image, as students will get it (`table_html`, in a
-  box that scrolls sideways and takes focus, captioned "Data read from Figure 1; the
-  values are approximate" when its values were read from the image, which is why such
-  a figure asks for a decision), then the long description in its own field ("Longer
-  description for figure 1"; empty to remove it) and a **Remove the data table (keep
-  the descriptions)** box, both saved with Save edit. The long description is cleaned
+  data table comes right under the image (`table_html`, in a box that scrolls sideways
+  and takes focus). When its values were read from the image it is not in the student
+  file: it is offered as an optional extra, never the decision, under "Optional: a data
+  table for this chart" ("A data table was read from the chart image; the values may be
+  off. Add it if you check them."), captioned "Data read from Figure 1; the values are
+  approximate", with its own small form and **Add the data table**
+  (`action=add_data_table`, `web.review.add_data_table`: sets
+  `FigureFix.data_table_added`, changes nothing else, stays on the figure; an automatic
+  accept with that note becomes the reviewer's own, a figure still waiting keeps
+  waiting; Undo takes it out again). A table in the file (values from the PDF's text,
+  or added) is shown as students get it. Then the long description in its own field
+  ("Longer description for figure 1"; empty to remove it) and, for a table in the file,
+  a **Remove the data table (keep the descriptions)** box, both saved with Save edit. The long description is cleaned
   and checked like the model's (`figure_details`: no URL or markup, 40-2,000
   characters, at most 12 lines); the table cannot be edited, only removed. Accept with
   either changed is refused like a changed alt text ("You changed the longer
   description. Choose Save edit ..."). The long description field is shown when the
-  figure has a long description or a table, and, empty, for a chart or diagram described
-  with long descriptions on but left without one (the notice `long_description_missing`),
-  so the reviewer can write it; the table box only with a table. A form without these
-  fields (the list view) keeps both, and marking a figure decorative drops both. The
-  list view shows the data table (as students will get it) and the longer description,
-  with a link to change them on the review screen. A bulk accept never takes a figure
-  whose data table has values read from the image (`web.review.values_from_image`): its
-  threshold is the alt text's confidence, and the values are the decision.
+  figure has a long description or a table in the file, and, empty, for a chart or
+  diagram described with long descriptions on but left without one (the notice
+  `long_description_missing`), so the reviewer can write it; the remove box only with a
+  table in the file. A form without these fields (the list view) keeps both, and
+  marking a figure decorative drops both. The list view shows the longer description
+  and the data table (as students get it, or as the optional extra with its own **Add
+  the data table**), with a link to change the rest on the review screen.
 - *Heading group*: one card. "“Teacher Support” appears 11 times as a bold line in the
   body text size.", the first one in its band of the page (`compare.band_clip`, the
   heading outlined), the pages it is on, **Keep as headings at level 3** and **Make bold
@@ -1403,7 +1409,7 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
-| `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown and after a refused edit; no sideways scrolling at 320 px; "Remove the data table" without JavaScript) |
+| `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px; "Add the data table" then "Remove the data table" without JavaScript) |
 | `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
 | `uv run pytest -m browser tests/test_web_job_page_browser.py` | Chromium: the job page in each state (axe at 1280 and 320 px, reflow with text spacing, htmx steps outside the live region, draft and language without JavaScript, the one-click download) |

@@ -189,18 +189,25 @@ def test_values_printed_in_the_figure_need_no_decision(long_on):
     assert check.passed and check.severity == "warning"
 
 
-def test_values_read_from_the_image_are_a_required_decision(long_on):
+def test_values_read_from_the_image_are_an_optional_extra_not_a_decision(long_on):
+    # Additive extras never add a required decision: the table is kept on the fix,
+    # offered on the review screen, and not written until a reviewer adds it.
+    from a11y_stem.pipeline import figure_details
+
     fix, _ = run(long(), element(text=None))  # a raster chart: no PDF text in the region
     assert fix.figure is not None and fix.figure.data_values_from_text is False
-    assert fix.status is Status.NEEDS_REVIEW and fix.review == "required"
+    assert fix.status is Status.ACCEPTED and fix.review == "optional"
     assert codes(fix) == {"values_from_image"}
     assert fix.confidence == pytest.approx(0.93)  # the confidence is the model's, unchanged
+    assert fix.figure.data_table is not None and not fix.figure.data_table_added
+    assert figure_details.data_table_offered(fix.figure)
+    assert not figure_details.data_table_shown(fix.figure)
 
 
 def test_one_value_missing_from_the_text_is_enough(long_on):
     fix, _ = run(long(data_table={"header": HEADER, "rows": [*ROWS, ["8", "2400.5"]]}))
     assert fix.figure is not None and fix.figure.data_values_from_text is False
-    assert fix.status is Status.NEEDS_REVIEW
+    assert fix.status is Status.ACCEPTED and fix.review == "optional"
 
 
 def test_values_the_model_estimated_are_read_from_the_image(long_on):
@@ -208,7 +215,14 @@ def test_values_the_model_estimated_are_read_from_the_image(long_on):
     # them by eye: they are still read from the image.
     fix, _ = run(long(values_printed=False))
     assert fix.figure is not None and fix.figure.data_values_from_text is False
-    assert fix.status is Status.NEEDS_REVIEW and codes(fix) == {"values_from_image"}
+    assert fix.status is Status.ACCEPTED and codes(fix) == {"values_from_image"}
+
+
+def test_a_doubtful_alt_text_is_still_a_decision_with_a_table_offered(long_on):
+    # The table never adds a decision, and never takes one away either.
+    fix, _ = run(long(confidence=0.6), element(text=None))
+    assert fix.status is Status.NEEDS_REVIEW and fix.review == "required"
+    assert codes(fix) == {"values_from_image"}
 
 
 @pytest.mark.parametrize(

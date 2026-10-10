@@ -200,8 +200,10 @@ def test_figures_get_long_descriptions_and_data_tables():
     figure = figures[0].figure
     assert figure is not None and figure.long_description and figure.data_table is not None
     assert figure.data_values_from_text is False
-    assert figures[0].status is Status.NEEDS_REVIEW  # values read from the image
+    # Values read from the image: an optional extra, not a decision, not in the file.
+    assert figures[0].status is Status.ACCEPTED and figures[0].review == "optional"
     assert 'class="figure-description"' in result.html
+    assert "Data read from" not in result.html
     assert "colour_only" in {n.code for n in result.notices}
 
 

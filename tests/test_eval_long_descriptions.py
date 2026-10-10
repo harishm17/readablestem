@@ -118,10 +118,10 @@ def test_with_the_option_on_the_long_output_is_judged_and_reported(tmp_path):
         0.5,
         1,
     )
-    # Fake gold images carry no PDF text, so every table was read from the image: each
-    # chart is a required decision, as the review tiers say.
-    assert (long["values_from_text"], long["required_for_values"]) == (0, 2)
-    assert long["required_decisions"] == 2
+    # Fake gold images carry no PDF text, so every table was read from the image: each is
+    # an optional extra offered to the reviewer, never a decision (the review tiers).
+    assert (long["values_from_text"], long["tables_offered"]) == (0, 2)
+    assert long["required_decisions"] == 0
     assert (long["unsure"], long["colour_only"]) == (1, 1)
     assert long["judge_usd"] > 0
 

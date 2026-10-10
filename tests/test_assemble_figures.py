@@ -91,8 +91,25 @@ def test_a_long_description_follows_the_figure_folded():
     assert all(c.passed for c in static_checks(html))
 
 
+def test_a_table_read_from_the_image_is_not_written_until_a_reviewer_adds_it():
+    # An optional extra: kept on the fix, offered on the review screen, not in the file.
+    offered = figure_fix(long_description=LONG, data_table=grid(), data_values_from_text=False)
+    html = render(offered)
+    assert "<table" not in html and "th, td {" not in html
+    assert '<summary class="a11y-stem">Description of Figure 2.3</summary>' in details(html)
+    only_table = figure_fix(data_table=grid(), data_values_from_text=False)
+    assert "<details" not in render(only_table) and "figure-description" not in render(only_table)
+
+
 def test_values_read_from_the_image_are_captioned_as_approximate():
-    html = render(figure_fix(long_description=LONG, data_table=grid(), data_values_from_text=False))
+    html = render(
+        figure_fix(
+            long_description=LONG,
+            data_table=grid(),
+            data_values_from_text=False,
+            data_table_added=True,  # the reviewer chose "Add the data table"
+        )
+    )
     block = details(html)
     assert (
         '<div class="table-scroll" role="group" aria-labelledby="p1-e5-data-caption" '
@@ -304,7 +321,12 @@ def wide_grid():
 
 def described_page() -> str:
     return render(
-        figure_fix(long_description=LONG, data_table=wide_grid(), data_values_from_text=False),
+        figure_fix(
+            long_description=LONG,
+            data_table=wide_grid(),
+            data_values_from_text=False,
+            data_table_added=True,
+        ),
         crops={"p1-e5": png(600, 300, noise=True)},
     )
 

@@ -19,9 +19,14 @@ share them:
   text inside the figure region (`Element.text` of a figure: the labels layout found in
   and beside it). Minus signs, thousands separators and trailing zeros are normalised
   the same way on both sides. A raster chart has no such text, so its values are always
-  "read from the image" (a required decision);
+  "read from the image";
+- `data_table_shown` / `data_table_offered`: a table whose values all come from the
+  PDF's text is written; one read from the image is an optional extra, kept on the fix
+  and offered on the review screen, and written only once a reviewer adds it
+  (`FigureFix.data_table_added`). Additive extras never add a required decision
+  (docs/design/content-features.md "Review tiers");
 - `render_details`: the `<details>` written after a figure in the output (the long
-  description, then the data table through `table_html.render_table`).
+  description, then the data table, when shown, through `table_html.render_table`).
 
 Everything here is pure and bounded, and never reads `ConversionOptions`: rendering
 depends on the stored fix only (docs/design/content-features.md rule 3).
@@ -208,6 +213,27 @@ def figure_name(figure: FigureFix, caption: str | None) -> str:
     return f"the figure \u201c{start}{more}\u201d"
 
 
+def data_table_shown(figure: FigureFix | None) -> bool:
+    """The figure's data table goes into the student file: every value is in the PDF's
+    text, or a reviewer added a table read from the image."""
+    return (
+        figure is not None
+        and figure.data_table is not None
+        and (figure.data_values_from_text is True or figure.data_table_added)
+    )
+
+
+def data_table_offered(figure: FigureFix | None) -> bool:
+    """A data table read from the image that nobody has added: an optional extra the
+    review screen offers ("Add the data table"), never written as it is."""
+    return (
+        figure is not None
+        and not figure.decorative
+        and figure.data_table is not None
+        and not data_table_shown(figure)
+    )
+
+
 def summary_text(figure: FigureFix, caption: str | None) -> str:
     """The `<summary>` of the details after a figure: says what is inside and which
     figure it belongs to ("Description of Figure 2.3")."""
@@ -228,7 +254,7 @@ def has_details(figure: FigureFix | None) -> bool:
     return (
         figure is not None
         and not figure.decorative
-        and (bool(paragraphs(figure.long_description)) or figure.data_table is not None)
+        and (bool(paragraphs(figure.long_description)) or data_table_shown(figure))
     )
 
 
@@ -245,15 +271,16 @@ def render_details(
     figure: FigureFix, caption: str | None, *, table_id: str | None, authored_class: str
 ) -> str:
     """The `<details>` written right after a figure: the long description as paragraphs,
-    then the data table (when `table_id`, a unique id prefix for it, is given) in a box
-    that scrolls sideways and takes focus, named by its caption. Everything the model
-    wrote is escaped; the summary and the table caption are the tool's own words."""
+    then the data table when it is shown (`data_table_shown`) and `table_id`, a unique
+    id prefix for it, is given, in a box that scrolls sideways and takes focus, named by
+    its caption. Everything the model wrote is escaped; the summary and the table
+    caption are the tool's own words."""
     parts = [
         f'<details class="figure-description">'
         f'<summary class="{authored_class}">{escape_text(summary_text(figure, caption))}</summary>'
     ]
     parts += [f"<p>{escape_text(p)}</p>" for p in paragraphs(figure.long_description)]
-    grid = figure.data_table
+    grid = figure.data_table if data_table_shown(figure) else None
     if grid is not None and table_id is not None:
         grid = grid.model_copy(update={"caption": table_caption(figure, caption)})
         table = render_table(grid, id_prefix=table_id)

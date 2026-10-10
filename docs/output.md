@@ -156,9 +156,12 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
   scripts.
 - Each line of the long description is a `<p>`; everything the model wrote is escaped.
 - The data table goes through `table_html.render_table` like a rebuilt table, in a box
-  that scrolls sideways and takes focus, named by its caption. The caption is the tool's
-  own and says where the values came from: "Data shown in Figure 2.3" when every number
-  is in the PDF's text, else "Data read from Figure 2.3; the values are approximate".
+  that scrolls sideways and takes focus, named by its caption. It is written only when
+  `figure_details.data_table_shown`: every number is in the PDF's text ("Data shown in
+  Figure 2.3"), or the values were read from the image and a reviewer chose "Add the
+  data table" (`FigureFix.data_table_added`; "Data read from Figure 2.3; the values are
+  approximate"). A table read from the image that nobody added stays on the fix as an
+  optional extra and is not in the file (a figure with only that has no `<details>`).
 - Nothing is written for a decorative figure or a proposal that is not used (rejected,
   failed, abstained). Its CSS (`DETAILS_CSS`, plus the table CSS with a table) is added
   only to documents with one.
@@ -674,7 +677,8 @@ TODO(Harish): turn these into the public known-limits copy.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
 - A figure's long description and data table are folded: they print only if opened
-  first. A chart's data table read from the image is approximate (its caption says so).
+  first. A chart's data table read from the image is in the file only when a reviewer
+  added it, and is approximate (its caption says so).
 - A PDF link over an image or a drawing (not over text) is not kept; neither is a link
   in a figure's caption. A link whose rectangle covers only part of a word links that
   part.

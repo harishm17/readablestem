@@ -248,7 +248,7 @@ gains `metrics.long_descriptions` and a "Long descriptions" table:
 | `data_tables`, `table_values_ok_rate`, `table_wrong_values` | data tables proposed; the share whose values were all within tolerance; cells outside it |
 | `values_from_text` | tables whose every number is in the PDF text (always 0 here: the inputs are images) |
 | `colour_only` | figures flagged as telling things apart by colour alone |
-| `required_decisions`, `required_for_values` | figures needing a decision, and those because their table was read from the image: the review load the option adds |
+| `required_decisions`, `tables_offered` | figures needing a decision; data tables read from the image, offered as optional extras (not in the file until a reviewer adds them, never a decision; `required_for_values` in reports before 2026-10-09, when each was a decision) |
 
 The long judge is not calibrated against human labels yet.
 

@@ -78,6 +78,7 @@ from a11y_stem.web.messages import (
 )
 from a11y_stem.web.review import (
     ACCEPT_ALL_KINDS,
+    ADD_DATA_TABLE,
     BULK_DEFAULT_THRESHOLD,
     BULK_THRESHOLDS,
     GROUP_SLUGS,
@@ -137,6 +138,7 @@ DONE_MESSAGES = {
     "accept": "Accepted.",
     "edit": "Your edit passed the required checks and was saved.",
     "reject": "The original from the PDF is kept in the document.",
+    ADD_DATA_TABLE: "The data table was added: students get it under the figure.",
 }
 # A table edit: the decision stays open while a required check fails (web.review
 # `table_still_open`), and the grid read from the PDF is not checked against itself.
@@ -369,6 +371,9 @@ class ReviewItem:
     long_description: str | None = None
     data_table: Markup | None = None
     data_table_id: str | None = None
+    # The data table was read from the image and is not in the student file: an
+    # optional extra the card offers ("Add the data table"), not the decision.
+    data_table_offered: bool = False
     # An edit refused only because it differs from the PDF where that changes the
     # meaning: the form offers "Use my edit anyway".
     override: bool = False
@@ -551,9 +556,11 @@ def _item(
 
 def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
     """A figure's long description and data table for its card (figures work). The long
-    description field is offered when the figure has one or a data table, or when it is
-    a chart or diagram described with long descriptions on but left without one (the
-    notice `long_description_missing`), so the reviewer can write it; "" when empty."""
+    description field is offered when the figure has one or a data table in the
+    document, or when it is a chart or diagram described with long descriptions on but
+    left without one (the notice `long_description_missing`), so the reviewer can write
+    it; "" when empty. A data table read from the image is shown as an optional extra
+    (`data_table_offered`) with "Add the data table"."""
     from a11y_stem.pipeline import assemble_tables, figure_details, figure_step, table_html
 
     figure = fix.figure
@@ -561,10 +568,16 @@ def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
         return {}
     long_description = figure.long_description
     if long_description is None and (
-        figure.data_table is not None or figure_step.long_description_missing(fix)
+        figure_details.data_table_shown(figure) or figure_step.long_description_missing(fix)
     ):
         long_description = ""
     shown: dict[str, Any] = {"long_description": long_description}
+    # A table read from the image is offered while the figure is in the document (not
+    # kept as the original image).
+    offered = figure_details.data_table_offered(figure)
+    if offered and fix.status is Status.REJECTED:
+        return shown
+    shown["data_table_offered"] = offered
     if figure.data_table is not None:
         table_id = "review-" + assemble_tables.id_prefix(fix.element_id) + "-data"
         caption = element.caption if element is not None else None
@@ -1019,8 +1032,8 @@ def review_action(
         return _stale_page(request, job_id, user, view, element_id, _typed(form))
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
-        logged_action = action if action in STATUS_FOR_ACTION else "unknown"
-        log_event(logger, "review_invalid", job_id=job_id, action=logged_action)
+        known = action in STATUS_FOR_ACTION or action == ADD_DATA_TABLE
+        log_event(logger, "review_invalid", job_id=job_id, action=action if known else "unknown")
         return _invalid_page(request, job_id, user, view, element_id, exc)
     log_event(
         logger,
@@ -1028,7 +1041,7 @@ def review_action(
         job_id=job_id,
         element_id=element_id,
         action=action,
-        status=STATUS_FOR_ACTION[action].value,
+        status=change_made.fix.status.value,
         # A table edit's kind (a fixed code: anything else was refused).
         change=change if change in TABLE_CHANGES and action == "edit" else None,
         anyway=change_made.anyway,
@@ -1039,9 +1052,10 @@ def review_action(
     message += _moved_message(change_made.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
-        if table and action == "edit":
-            # A table is often changed more than once (a header, then a cell): the
-            # reviewer stays on it, and sees the table as it is now.
+        if (table and action == "edit") or action == ADD_DATA_TABLE:
+            # A table is often changed more than once (a header, then a cell), and a
+            # data table just added is worth a look: the reviewer stays on the item and
+            # sees it as it is now.
             from a11y_stem.web.routes.split import review_url
 
             return RedirectResponse(review_url(job_id, item=element_id), status_code=303)

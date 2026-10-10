@@ -1,8 +1,8 @@
 """The figure card with a long description and a chart data table, in a real browser
 (Playwright Chromium): axe-core with the WCAG 2.2 AA and best-practice rules at 1440 and
 390 CSS px (the card as shown, and after a refused edit), no sideways scrolling at 320
-CSS px (the table scrolls in its own focusable box), and "Remove the data table" done
-without JavaScript.
+CSS px (the table scrolls in its own focusable box), and "Add the data table" then
+"Remove the data table" done without JavaScript.
 
 Run with: uv run pytest -m browser tests/test_web_review_figures_browser.py
 """
@@ -78,6 +78,10 @@ def figure_states(page, url: str, check) -> None:
     page.get_by_role("button", name="Save edit to figure 1").click()
     page.locator(".error-summary").wait_for()
     check("refused description")
+    page.goto(f"{url}?item=p1-e6")
+    page.get_by_role("button", name="Add the data table to figure 1").click()
+    page.get_by_label("Remove the data table (keep the descriptions)").wait_for()
+    check("table added")
 
 
 @pytest.mark.parametrize("viewport", [DESKTOP, PHONE], ids=["1440px", "390px"])
@@ -94,7 +98,7 @@ def test_the_figure_card_passes_wcag22_aa_and_best_practice(
 
     figure_states(page, f"{site.base}/jobs/{job}/review", check)
     context.close()
-    assert len(found) == 4
+    assert len(found) == 6
     failures = {state: describe(v) for state, v in found.items() if v}
     assert not failures, "\n".join(f"[{s}]\n{d}" for s, d in failures.items())
 
@@ -117,10 +121,15 @@ def test_the_figure_card_does_not_scroll_sideways_at_320_css_px(site, browser, j
     assert widths == dict.fromkeys(widths, 0), widths
 
 
-def test_remove_the_data_table_without_javascript(site, browser, job):
+def test_add_then_remove_the_data_table_without_javascript(site, browser, job):
     context, page = open_page(browser, site, viewport=PHONE, javascript=False)
     url = f"{site.base}/jobs/{job}/review"
     page.goto(f"{url}?item=p1-e6")
+    page.get_by_role("button", name="Add the data table to figure 1").click()
+    page.wait_for_url(f"{url}?item=p1-e6")
+    result = site.job(job).result_json
+    fix = next(f for f in result["fixes"] if f["element_id"] == "p1-e6")
+    assert fix["figure"]["data_table_added"] is True and fix["status"] == "needs_review"
     page.get_by_label("Remove the data table (keep the descriptions)").check()
     page.get_by_role("button", name="Save edit to figure 1").click()
     page.wait_for_url(f"{url}?item=hg-p1-e3")

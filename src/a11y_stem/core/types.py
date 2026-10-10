@@ -334,9 +334,13 @@ class FigureFix(BaseModel):
     # Charts: the plotted values as a data table (`table_html.render_table` writes it).
     data_table: TableGrid | None = None
     # True when every number in `data_table` appears in the PDF text inside the figure
-    # region; False when some were read from the image (approximate: a required
-    # decision); None when there is no data table.
+    # region (the table is in the student file); False when some were read from the
+    # image (approximate: an optional extra, kept here but not written until a reviewer
+    # adds it); None when there is no data table.
     data_values_from_text: bool | None = None
+    # A reviewer chose "Add the data table" for a table whose values were read from the
+    # image: only then is such a table written (`figure_details.data_table_shown`).
+    data_table_added: bool = False
     # The figure tells things apart by colour alone (series, regions): a notice.
     colour_only: bool = False
 

@@ -75,8 +75,9 @@ flags through `ConversionOptions` (below); the web app reads `Settings` directly
 `FigureFix` gains `long_description` (plain text, or None), `data_table` (a `TableGrid`
 of a chart's values), `data_values_from_text` (True when every number in the data table
 appears in the PDF text inside the figure region; False when some were read from the
-image; None without a data table) and `colour_only` (the figure tells things apart by
-colour alone).
+image; None without a data table), `data_table_added` (a reviewer chose "Add the data
+table" for one read from the image; only then is such a table written) and
+`colour_only` (the figure tells things apart by colour alone).
 
 ### Links, colour and language
 
@@ -159,8 +160,8 @@ document text.
 | Long description written | none | |
 | Long description the model was unsure of | optional | a note on the figure |
 | Complex figure without a long description | optional | notice `long_description_missing` |
-| Chart data table, every number in the PDF text | none | |
-| Chart data table with values read from the image | required | NEEDS_REVIEW (`data_values_from_text=False`) |
+| Chart data table, every number in the PDF text | none | written into the student file |
+| Chart data table with values read from the image | optional | not written; kept on the fix and offered on the figure card ("A data table was read from the chart image; the values may be off. Add it if you check them.", **Add the data table** sets `data_table_added`). The note `values_from_image` never makes the figure required (decided 2026-10-09: additive extras never add a required decision) |
 | Figure telling things apart by colour alone | optional | notice `colour_only`; the figure's tier is unchanged |
 | Coloured text, colour adjusted for contrast | none | |
 | Text referring to colour ("shown in red") | optional | notice `colour_reference` |

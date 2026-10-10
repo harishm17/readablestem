@@ -1193,8 +1193,9 @@ def long_description_metrics(items: Sequence[dict]) -> dict:
 
     Pass rates are over judged long descriptions (a figure with only a table has no
     description to grade); table accuracy over judged tables. `required_decisions` is
-    the figures left needing a decision, `required_for_values` those whose data table
-    was read from the image (the review load the option adds).
+    the figures left needing a decision; `tables_offered` the data tables read from the
+    image, which are optional extras (not in the student file until a reviewer adds
+    them, never a decision).
     """
     on = [i for i in items if i.get("long_descriptions")]
     proposals = [i for i in on if i["has_proposal"]]
@@ -1227,7 +1228,7 @@ def long_description_metrics(items: Sequence[dict]) -> dict:
         "values_from_text": sum(i["data_values_from_text"] is True for i in tables),
         "colour_only": sum(bool(i["colour_only"]) for i in on),
         "required_decisions": sum(i["review"] == "required" for i in on),
-        "required_for_values": sum(bool(i["values_from_image"]) for i in on),
+        "tables_offered": sum(bool(i["values_from_image"]) for i in on),
         "judge_usd": sum(i["long_judge_cost_usd"] for i in on),
     }
 
@@ -1838,7 +1839,7 @@ LONG_HEADLINE = [
     "described", "described_rate", "complex_described_rate", "mean_chars", "judged",
     "pass_rate", "pass_rate_ci95", "accurate_rate", "complete_rate", "invented_values_rate",
     "mean_score", "unsure", "data_tables", "table_values_ok_rate", "table_wrong_values",
-    "values_from_text", "colour_only", "required_decisions", "required_for_values",
+    "values_from_text", "colour_only", "required_decisions", "tables_offered",
     "judge_errors",
 ]  # fmt: skip
 

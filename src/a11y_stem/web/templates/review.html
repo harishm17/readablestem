@@ -92,17 +92,21 @@
     <p>No proposal yet: this figure needs a description.</p>
     {% endif %}
     {% if item.caption %}<p><strong>Caption in the PDF:</strong> {{ item.caption }}</p>{% endif %}
-    {# Long descriptions on: what students will also get, the data table first (when its
-       values were read from the image, it is what the decision is about). #}
-    {% if item.data_table %}
-    <p class="part-label">Data table, as students will get it</p>
-    <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
-    {% endif %}
+    {# Long descriptions on: what students will also get. A data table whose values were
+       read from the image is not in the student file: an optional extra, added below. #}
     {% if item.long_description %}
     <p class="part-label">Longer description</p>
     <p class="long-proposal">{{ item.long_description }}</p>
     {% endif %}
-    {% if item.data_table or item.long_description %}<p class="hint">To change the data table or the longer description, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>{% endif %}
+    {% if item.data_table and item.data_table_offered %}
+    <p class="part-label">Optional: a data table for this chart</p>
+    <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
+    <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+    {% elif item.data_table %}
+    <p class="part-label">Data table, as students will get it</p>
+    <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+    {% endif %}
+    {% if item.data_table or item.long_description %}<p class="hint">To change the {% if item.data_table and not item.data_table_offered %}data table or the {% endif %}longer description, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>{% endif %}
     {% elif item.kind == "heading" %}
     <p class="part-label">Heading text</p>
     <p class="heading-proposal">{{ item.heading_text or "(no text)" }}</p>
@@ -118,6 +122,14 @@
   </div>
 </div>
 
+{% if item.kind == "figure" and item.data_table and item.data_table_offered %}
+{% set err = item.errors.get("datatable") %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+  {{ hidden_fields() }}
+  {% if err %}<p class="error-message" id="datatable-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+  <button type="submit" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if err %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ name }}</span></button>
+</form>
+{% endif %}
 {% if item.kind == "table" %}
 {{ table_list_actions(item) }}
 {% else %}

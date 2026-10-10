@@ -18,9 +18,12 @@ context, and the proposal may also carry (`pipeline.figure_details`):
 - `data_table`: for charts only, the plotted values (`TableGrid`, source "model").
   `data_values_from_text` is True only when the model says every value is printed in
   the figure *and* every number in the table appears in the PDF's own text inside the
-  figure region; otherwise the warning check `figure.data_values` fails with
-  `values_from_image`, which is not a note: the figure is NEEDS_REVIEW, a required
-  decision ("values read from the image"), whatever the confidence;
+  figure region: the table then goes into the student file. Otherwise the warning check
+  `figure.data_values` fails with `values_from_image`, a note (review "optional"): the
+  table is kept on the fix as an optional extra the review screen offers ("Add the data
+  table"), not written into the student file until a reviewer adds it
+  (`figure_details.data_table_shown`). An additive extra never adds a required decision
+  (docs/design/content-features.md "Review tiers");
 - `colour_only`: the figure tells things apart by colour alone. It changes no status or
   tier (the job page lists it as the notice `colour_only`).
 The alt text, the status rules and the escalation below are the same either way.
@@ -120,10 +123,18 @@ COMPLEX_FIGURE_TYPES = frozenset({"chart", "diagram"})
 # ACCEPTED (review "optional"). A caption copy is not one: it describes nothing. The
 # second automated check's flag is one by policy: an optional tier only, never required
 # in this version (its thresholds are not calibrated on human labels yet). A long
-# description the model was unsure of is one (docs/design/content-features.md "Review
-# tiers"); a data table with values read from the image (`values_from_image`) is not.
+# description the model was unsure of is one, and so is a data table with values read
+# from the image (`values_from_image`): it is not in the student file until a reviewer
+# adds it, so it changes nothing a student reads (docs/design/content-features.md
+# "Review tiers").
 NOTE_CODES = frozenset(
-    {"too_long", "redundant_prefix", "second_check_mismatch", "long_description_unsure"}
+    {
+        "too_long",
+        "redundant_prefix",
+        "second_check_mismatch",
+        "long_description_unsure",
+        "values_from_image",
+    }
 )
 
 
@@ -271,7 +282,8 @@ def _evaluate(output: FigureOutput | None, calls: list[ModelCall], element: Elem
 def _details(output: FigureLongOutput, element: Element) -> tuple[_Details, list[Check]]:
     """The long description, data table and colour flag of a (non-decorative) answer, and
     their checks: `figure.long_description` (a note when the model was unsure) and
-    `figure.data_values` (values read from the image: a required decision)."""
+    `figure.data_values` (values read from the image: a note, the table an optional
+    extra)."""
     checks: list[Check] = []
     text = figure_details.clean_long_description(output.long_description)
     long_description = text if text and figure_details.long_description_ok(text) else None

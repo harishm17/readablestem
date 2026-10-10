@@ -144,7 +144,7 @@ the status rules above are unchanged; the answer adds (`pipeline/figure_details.
 |---|---|---|
 | `long_description` | the answer is usable after cleaning (one paragraph per line, invisible characters removed): 40-2,000 characters, at most 12 lines, no URL, markup, file name or placeholder (the alt-text rules of those codes). Anything else is dropped, never shown | `figure.long_description` passes; `long_description_unsure` (warning, a note in `NOTE_CODES`) when the model said part of the figure was hard to read: review "optional". A chart or diagram left without one gets the notice `long_description_missing` (optional; `figure_step.long_description_missing(fix)` says when) |
 | `data_table` | charts only, when the rows are rectangular, at most 60 rows and 12 columns, no cell over 120 characters, and the body has at least one number: a `TableGrid` (source "model", the header row as column headers, the first column as row headers) | `figure.data_values` passes when `data_values_from_text` |
-| `data_values_from_text` | with a data table | True only when the model says every value is printed in the figure **and** every number in the table appears in the PDF's own text in the figure region (`Element.text`). Numbers are read the same way on both sides: minus signs (U+2212, en dash, figure dash) become "-", but only where they cannot be a dash between two numbers or words; thousands separators (",", thin and no-break spaces before a group of three) are removed; "0.50" equals "0.5" and ".5"; subscripts are not numbers, and a run of superscripts is a number of its own (10²⁴ is 10 and 24, as "10^24" is), so an exponent is compared too. Otherwise False: the warning `values_from_image` fails, which is not a note, so the figure is NEEDS_REVIEW, a required decision ("values read from the image"), whatever its confidence. A raster chart has no PDF text, so its table always asks |
+| `data_values_from_text` | with a data table | True only when the model says every value is printed in the figure **and** every number in the table appears in the PDF's own text in the figure region (`Element.text`). Numbers are read the same way on both sides: minus signs (U+2212, en dash, figure dash) become "-", but only where they cannot be a dash between two numbers or words; thousands separators (",", thin and no-break spaces before a group of three) are removed; "0.50" equals "0.5" and ".5"; subscripts are not numbers, and a run of superscripts is a number of its own (10²⁴ is 10 and 24, as "10^24" is), so an exponent is compared too. Otherwise False: the warning `values_from_image` fails, a note (`NOTE_CODES`): the figure keeps the tier its alt text earns (ACCEPTED, review "optional", when that clears the bar), and the table is an optional extra kept on the fix, offered on the review screen ("Add the data table") and written only once a reviewer adds it (`FigureFix.data_table_added`, `figure_details.data_table_shown`). Additive extras never add a required decision (decided 2026-10-09). A raster chart has no PDF text, so its table is always offered, never written as it is |
 | `colour_only` | the model says the figure tells things apart by colour alone | none: the status and tier do not change; the job page lists the notice `colour_only` |
 
 Decorative answers carry none of these. Both conditions on `data_values_from_text` are
@@ -552,7 +552,7 @@ OpenStax's own alt text in the gold set triggers only `too_long` and `redundant_
 | Check name | Code | Severity | Fails when |
 |---|---|---|---|
 | `figure.long_description` | `long_description_unsure` | warning (a note) | the model marked its long description unsure |
-| `figure.data_values` | `values_from_image` | warning (a required decision) | some value of the data table is not printed in the PDF text inside the figure, or the model says it read one off the chart |
+| `figure.data_values` | `values_from_image` | warning (a note: the table is an optional extra, not in the file until a reviewer adds it) | some value of the data table is not printed in the PDF text inside the figure, or the model says it read one off the chart |
 
 ## Speech (`mathml_to_speech`)
 
@@ -673,9 +673,10 @@ decorative rules were added; the prompt versions have changed since.
   PDF (a long description is not a decision; tier "none"), only the data table's. A
   number that is printed in the figure but split or styled differently in the text
   layer ("10³" flattened to "103", a value split across two labels) makes the table
-  "read from the image": a decision too many, never one too few. The model sometimes
-  mentions the data table in its description despite the prompt; a reviewer who
-  removes the table should edit that sentence too.
+  "read from the image": offered rather than written, never written when it should not
+  be. The model sometimes mentions the data table in its description despite the
+  prompt; with the table only offered (or removed), that sentence may point at a table
+  the student file does not have.
 
 ## Second automated check (Decisions API)
 

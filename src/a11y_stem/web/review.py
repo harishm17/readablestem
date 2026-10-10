@@ -94,6 +94,10 @@ logger = logging.getLogger(__name__)
 
 ACTIONS = ("accept", "edit", "reject")
 STATUS_FOR_ACTION = {"accept": Status.ACCEPTED, "edit": Status.EDITED, "reject": Status.REJECTED}
+# A chart's data table read from the image is an optional extra, not in the student file
+# (`figure_details.data_table_offered`): the reviewer adds it with this action, which
+# changes nothing else about the figure (`add_data_table`).
+ADD_DATA_TABLE = "add_data_table"
 MAX_LATEX_CHARS = 5000
 MAX_ALT_CHARS = 1000
 
@@ -398,6 +402,8 @@ def apply_review(
     fix = result.fix_for(element_id)
     if fix is None:
         raise LookupError(element_id)
+    if action == ADD_DATA_TABLE:
+        return add_data_table(result, fix)
     if action not in ACTIONS:
         raise ReviewInvalid([FieldError(field_id("actions", element_id), "Choose an action.")])
     element = next((e for e in result.elements if e.id == element_id), None)
@@ -665,6 +671,34 @@ def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> 
 
 # --------------------------------------------------------------------------- figure details
 
+NO_TABLE_TO_ADD = (
+    "There is no data table to add: it is already in the document, or the figure has none."
+)
+
+
+def add_data_table(result: DocumentResult, fix: Fix) -> ReviewChange:
+    """ "Add the data table": the chart's data table read from the image goes into the
+    student file (`FigureFix.data_table_added`). Nothing else about the figure changes;
+    an automatic accept with this note becomes the reviewer's own (the note was acted
+    on), and a figure still waiting for a decision keeps waiting. Undo puts it back.
+    Refused for a figure kept as the original image: restore it first."""
+    from a11y_stem.pipeline import figure_details
+
+    figure = fix.figure
+    fid = field_id("datatable", fix.element_id)
+    if not figure_details.data_table_offered(figure) or figure is None:
+        raise ReviewInvalid([FieldError(fid, NO_TABLE_TO_ADD)])
+    if fix.status is Status.REJECTED:
+        message = "The original image is kept for this figure. Accept or edit it first."
+        raise ReviewInvalid([FieldError(fid, message)])
+    before = snapshot(fix)
+    fix.figure = figure.model_copy(update={"data_table_added": True})
+    if fix.status is Status.ACCEPTED:
+        fix.reviewed = True
+    _recount(result)
+    return ReviewChange(fix=fix, action=ADD_DATA_TABLE, before=before, after=snapshot(fix))
+
+
 # Long descriptions and chart data tables (FEATURE_LONG_DESCRIPTIONS, pipeline.figure_details).
 # The split view's figure card sends `long_description` when the figure has one, and the
 # `remove_data_table` checkbox when it has a table; a form without them (the list view)
@@ -698,7 +732,7 @@ def _details_changed(fix: Fix, form: Mapping[str, str]) -> bool:
         typed = figure_details.clean_long_description(form["long_description"])
         if typed != (figure.long_description or ""):
             return True
-    return form.get("remove_data_table") in _CHECKED and figure.data_table is not None
+    return form.get("remove_data_table") in _CHECKED and figure_details.data_table_shown(figure)
 
 
 def _refuse_unsaved_details(fix: Fix, form: Mapping[str, str], values: dict[str, str]) -> None:
@@ -714,7 +748,7 @@ def _refuse_unsaved_details(fix: Fix, form: Mapping[str, str], values: dict[str,
         if typed != (figure.long_description or ""):
             message = "You changed the longer description. " + UNSAVED.format(undo="undo it")
             raise ReviewInvalid([FieldError(field_id("longdesc", eid), message)], values)
-    if form.get("remove_data_table") in _CHECKED and figure.data_table is not None:
+    if form.get("remove_data_table") in _CHECKED and figure_details.data_table_shown(figure):
         message = "You chose to remove the data table. " + UNSAVED.format(undo="untick it")
         raise ReviewInvalid([FieldError(field_id("datatable", eid), message)], values)
 
@@ -744,15 +778,16 @@ def _edited_details(
         if text and not figure_details.long_description_ok(text):
             raise ReviewInvalid([FieldError(fid, LONG_NOT_SAVED)], values)
         long_description = text or None
-    table, from_text = old.data_table, old.data_values_from_text
+    table, from_text, added = old.data_table, old.data_values_from_text, old.data_table_added
     if form.get("remove_data_table") in _CHECKED:
-        table, from_text = None, None
+        table, from_text, added = None, None, False
     kept = table is not None
     checks = [c for c in fix.checks if c.name == "figure.data_values"] if kept else []
     details = {
         "long_description": long_description,
         "data_table": table,
         "data_values_from_text": from_text,
+        "data_table_added": added,
         "colour_only": old.colour_only,
     }
     return details, checks

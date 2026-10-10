@@ -721,7 +721,7 @@ class _Renderer:
             # complex images: a short alt plus a long description next to the image).
             self.add_style("figure_description", figure_details.DETAILS_CSS)
             table_id = assemble_tables.id_prefix(element.id) + "-data"
-            if proposal.data_table is not None:
+            if figure_details.data_table_shown(proposal):
                 if self.claim_id(f"{table_id}-caption") is None:
                     table_id = None  # an id already used (a layout bug): no table
                 else:
