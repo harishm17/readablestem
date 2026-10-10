@@ -432,14 +432,26 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   or drawn under 12 pt (bullets, spacers), or when the image covers 85 % of the page or more
   (backgrounds; a scanned page never gets here: it is kept whole as its image, "Hidden
   text and page types" below).
-- **Vector figures**: drawings closer than 6 pt to each other are clustered, then clusters
-  whose boxes overlap are joined (the markers of a sparse scatter plot are further apart
-  than 6 pt but sit inside one plot). A cluster is a figure when it is at least 24 x 24 pt,
-  is not only horizontal/vertical rules (separators, underlines, table grids), is not a
-  page border, and is not a box or table around text: a cluster without meaningful curves
-  (a plotted line covering 5 % of its area, or at least three curved paths such as
+- **Vector figures**: page furniture is set aside first: a frame round the page (one
+  rectangle outline at least 85 % of the page both ways, or a page-long rule within 15 % of
+  an edge), a background fill (85 % of the page's area or more) and a band of colour along
+  an edge (a slide template's title bar, at most 15 % of the page deep). A frame's box
+  holds everything on the page, so clustered with the rest it made every figure on a page
+  with a drawn border one "page border", dropped with no decision. Then drawings closer
+  than 6 pt to each other are clustered, and clusters whose boxes overlap are joined (the
+  markers of a sparse scatter plot are further apart than 6 pt but sit inside one plot).
+  A cluster is a figure when it is at least 24 x 24 pt, is not only horizontal/vertical
+  rules (separators, underlines, table grids, the long separate lines of ruled paper), and
+  is not a box or table around text. A cluster that still fills the page (85 % both ways:
+  a full-page plot, a slide's chart) is a figure when it has three curves or two bars and
+  no running text inside; else it is a decorated border or a background drawn behind
+  text, left out as before. On a page with ink (any `ink_*` reason of its page type) such
+  a drawing is never a figure for the model, as it may be a page of notes: the safety net
+  keeps the page image instead (on a typed page with handwriting, `mixed_ink`, the
+  handwriting is cut out already and the rest is left out). A cluster without meaningful
+  curves (a plotted line covering 5 % of its area, or at least three curved paths such as
   markers) and without bar-chart bars, with two or more text rows inside, is a box or
-  table. A rounded rectangle (at least 60 % of its outline straight horizontal and
+  table around text. A rounded rectangle (at least 60 % of its outline straight horizontal and
   vertical lines) is a box, not a curve, so a rounded callout around text is not a figure.
   One tick icon in a table cell does not make the table a figure. A small mark just left
   of a text row at its height is a drawn list bullet, not a curve of a figure. Equation
@@ -493,15 +505,21 @@ produced exactly those files. There is **no handwriting or scan conversion** (de
 - a span in render mode 3 (MuPDF's char flags show neither fill nor stroke);
 - a span at 5 % opacity or less (rawdict `alpha` <= 13), unless it is text used as a
   clip (render mode 7, a gradient- or picture-filled title: MuPDF gives it alpha 0 with
-  the CLIPPED flag, and it is visible), `page_type.span_hidden`;
-- a visible character painted first and then covered by an image or a filled shape
-  ("covered": ABBYY-style text under the page image, a black box over a line). Paint
-  order comes from `get_bboxlog` and `get_texttrace` (only read when a visible span lies
-  inside an image or an opaque fill); a cover must hold the middle 60 % of the glyph, so
-  an underline or a strikeout is not one; and the text counts as covered only when
-  removing it (a text-only redaction on a one-page copy) does not change the rendered
-  page there by more than 1 % of its pixels. That render is the opacity check: soft
-  masks, colour-key and stencil masks, constant alpha and blend modes all let the text
+  the CLIPPED flag), `page_type.span_hidden`. Clip text is visible only when something
+  is painted through it: it goes through the render test below, and a clip nothing was
+  painted through counts as invisible;
+- a visible character painted first and then covered by an image, a shading, a filled
+  shape or a stroke at least 3 pt wide ("covered": ABBYY-style text under the page image,
+  a black box over a line, a white bar or a marker scribble over it). Annotations count:
+  a box, highlight or text box drawn with Acrobat's or Preview's tools over a line is the
+  most common fake redaction. Paint order comes from `get_bboxlog` and `get_texttrace`
+  (only read when a visible span lies inside an image, a shading, an opaque fill or a
+  thick stroke); a cover must hold the middle 60 % of the glyph, so an underline or a
+  strikeout is not one; and the text counts as covered only when removing it (a
+  text-only redaction on a one-page copy, its annotations made page content first, as a
+  redaction deletes the ones it touches) does not change the rendered page there by more
+  than 1 % of its pixels. That render is the opacity check: soft masks, colour-key and
+  stencil masks, constant alpha, blend modes and a yellow highlight all let the text
   show, and then it is kept. Up to 24 runs are tested per page, the rest follow them.
 
 The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
@@ -510,7 +528,7 @@ The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
 image) and returns a kind, the characters it may trust, where its content would have to
 come from, and content-free reason codes. It is detect v4 from the research, ported with
-the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.1"):
+the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.2"):
 
 | Kind | What it is | What the app does |
 |---|---|---|
@@ -518,9 +536,9 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.1"):
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
 | `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`) |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
-| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements |
-| `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has no visible text and its ink could not be analysed in time |
-| `blank` | nothing painted | nothing |
+| `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`) |
+| `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analysed in time; its visible text is read, its drawings are not sent to the figure model |
+| `blank` | nothing painted, or paper rules alone | nothing |
 
 The decisions in the rules, with the measured values next to each threshold in the code:
 
@@ -528,15 +546,30 @@ The decisions in the rules, with the measured values next to each threshold in t
   repeats are at most 35 % of the complex shapes, filled strokes share one pen width
   (80 % within 0.75-1.33 x the median of their colour), and at most half the strokes have
   a same-size twin. A page of writing has 40 or more clean strokes in 3 or more rows; a
-  typed page with 12 strokes in a row has some handwriting.
+  typed page with 12 strokes in a row has some handwriting. With no visible text at all,
+  5 clean strokes in a row are already a short note; under a typed title (1 to 39
+  visible characters) the page needs 12 strokes or a second row, as a row of five
+  machine-drawn curves (five waves on a slide, five inductor coils) is not handwriting.
+  A handwritten page with visible typed text and no hidden layer is kept as an image
+  when converted, but never refuses the upload: it may be machine-drawn.
+- **Paper rules** are long (half the page or more) horizontal and vertical lines, each
+  its own: the rules of ruled, squared, margin or Cornell paper. A page with only these
+  is `blank`. A square wave, a step plot or a line-drawn block diagram joins its lines
+  into one path, or has short ones: those are drawings.
+- **The page is its CropBox**: image coverage and the off-page test of drawings are
+  measured in the CropBox's frame, in which MuPDF gives every box, so a scan whose
+  CropBox trims the scanner's margins is a picture of the whole page.
 - **Hidden-ratio rule** (C1.2): a page is a picture or ink page whatever its visible text
   when its hidden characters are at least max(20, its visible characters), or when a page
   image covers half of it and 20 or more characters are hidden (a scan with a visible
   "Downloaded from" stamp; notes under a typed template header).
 - **A scan is a picture of a page** (C1.5): images cover 85 % of the page, or half of it
   with no visible text at all. A slide title over a photo is a typed page with a figure.
-  Hidden text with no picture of a page over vector ink is handwriting
-  (`invisible_without_image`).
+  Hidden text with no picture of a page over vector ink (clean, or rows of writing the
+  checks rejected, or ink not analysed) is handwriting (`invisible_without_image`). Over
+  machine-drawn vector content (text turned into outlines, a diagram: what an OCR program
+  writes over a vector page with no text layer) the page is `vector_no_text`: the hidden
+  layer is dropped and the drawings are read as figures.
 - **Time budget** (C1.6): the ink analysis (pure Python) gets 10 s per document
   (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analysed
   (`INK_MAX_ITEMS`); such a page says `ink_not_analysed`. Measured on this machine,
@@ -545,10 +578,24 @@ The decisions in the rules, with the measured values next to each threshold in t
   core, under the probe's 30 s limit; the file was accepted, because pages not analysed
   in time never refuse an upload. Not measured on Cloud Run's 1 vCPU.
 
-**The safety net** (C1.1, independent of the page types): after layout, a page with
-something painted on it outside the header and footer bands (an image or a drawing at
-least 12 pt on a side, or 3 smaller marks; rules alone do not count) and no element is
-kept as its image (`unread_page`). A page is "blank" only when nothing is painted on it.
+**The safety net** (C1.1, independent of the page types): after layout, a page keeps its
+page image, with a decision (`unread_page`), when something painted on it was read into
+nothing. The elements read from it stay; the image comes after them. It fires when:
+
+- the page has no element and something painted outside the header and footer bands (an
+  image or a drawing at least 12 pt on a side, or 3 smaller marks). Rules, paper rules, a
+  frame round the page, a background fill and a band of colour along an edge (a blank
+  slide of a template) do not count;
+- a drawing filling the page was left out because the page has ink the checks did not
+  confirm (rejected or not analysed; `layout._vector_figures`): a page of notes under a
+  typed title, whatever the title's length;
+- 12 or more of the page's handwriting-like strokes (the page type's ink analysis, clean
+  or rejected) lie outside every element read from it and outside the header and footer
+  bands: writing that became no figure, table or handwriting region. Typed text turned
+  into outlines (`vector_no_text` with rejected ink) is kept this way too, beside the
+  figures read from it.
+
+A page is "blank" only when nothing is painted on it but paper rules.
 
 Layout returns `page_types` (per page) and `kept_pages` (page -> reason); the pipeline
 turns each kept page into a figure for the whole page that is FAILED before any model
@@ -564,14 +611,20 @@ is read first and the check stops at the first typed page, so only a PDF with no
 for the drawings and the ink analysis. Every page certainly handwritten or scanned, or
 blank, refuses it before any quota is spent: `handwritten` (hidden recognition layer),
 `handwritten_no_text`, `scanned_ocr` (hidden OCR layer) or `scanned`. A full-page
-picture with a few visible characters and no hidden layer (perhaps a slide) and a page
-whose ink was not analysed never refuse: the conversion keeps them as images with a
-decision. The worker fails a result with the same rule (`worker.result_outcome`).
+picture with a few visible characters and no hidden layer (perhaps a slide), drawings
+called handwriting under a typed title with no hidden layer (perhaps a diagram, a grid of
+sparklines) and a page whose ink was not analysed never refuse: the conversion keeps
+them as images with a decision. "Certainly" means no visible text, or a hidden layer
+(`page_type._certain`). The worker fails a
+result with the same rule (`worker.result_outcome`).
 
 **What is not detected** (the text reaches the HTML, or the content is lost as before):
 
 - white text on a white page or a white cell (needs the colour under each glyph);
-- text under a shape that covers less than the middle of its glyphs;
+- text under a shape that covers less than the middle of its glyphs, or under strokes
+  thinner than 3 pt (many passes of a thin pen over a line);
+- an annotation hidden from view (the Hidden or NoView flag) is not a cover, rightly:
+  the text under it shows;
 - very small text (0.4 pt "microtext");
 - OCR text drawn visibly in place of the image (Acrobat ClearScan-like): it is trusted,
   garbled maths included;
@@ -582,16 +635,29 @@ decision. The worker fails a result with the same rule (`worker.result_outcome`)
 - light handwriting on a typed page (fewer than 12 strokes: a circle, a tick, a
   signature): lost or absorbed into a figure as before;
 - grids of small machine-drawn curves (sparklines, small multiples of loops) can look
-  like handwriting: kept as an image with a needless decision;
+  like handwriting: kept as an image with a needless decision (a PDF of only such pages
+  is refused at upload when they have no visible text at all);
 - a slide whose background is a full-slide picture and which has fewer than 40 visible
-  characters is kept as an image with a decision (never refused);
+  characters is kept as an image with a decision (never refused); its typed text is read
+  as well, and the student file says "shown as a picture", not "scanned";
 - a typed page with at least as much hidden text as visible text (an OCR layer run over a
   typed page) is kept as an image with a decision under the hidden-ratio rule, called a
   scan: its typed text is not read (not silent, but a loss);
 - a page of dense handwriting the ink checks reject (exact repeats among tiny strokes)
-  is `vector_no_text`; layout then finds nothing on it and the safety net keeps it as an
-  image, but layout is slow on such pages (tens of seconds at 85,000 paths, most of it
-  table detection and figure clustering, as before).
+  is `vector_no_text` (or `born_digital` under a line of typed text); the safety net keeps
+  it as an image when its writing fills the page or became no element, but writing that
+  covers less of the page and clusters into one drawing is a figure, described by the
+  figure model like any drawing. Layout is slow on such pages (tens of seconds at 85,000
+  paths, most of it table detection and figure clustering, as before);
+- a page-filling drawing with fewer than three curves and two bars (a full-page plot of
+  one line), or with running text inside it, is left out, as before: a decorated border
+  or a background drawn behind text looks the same;
+- a flat drawing less than 24 pt tall (a one-line circuit, a timeline) is too small to be
+  a figure and is left out, as before; on a page with no other element the safety net
+  keeps the page;
+- typed text turned into outlines (no text layer) is read as figures where it clusters
+  into blocks; lines that do not are lost, so the safety net keeps the page image too
+  (one decision for the document's kept pages).
 
 **Accuracy, honestly.** Measured with `python -m a11y_stem.eval.page_types --labels
 LABELS.json` (docs/eval.md "Page types") on sets that are not in this repository (they
@@ -615,7 +681,13 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
   while detect v1-v4 were tuned): 586 real born-digital pages, the 4 pages of one real
   set of handwritten notes and 23 derivatives of them, and synthetic handwriting, scans,
   OCR layers, mixed pages and hard negatives. page-type-v5.1 gets 984 page kinds right
-  (98.8 %) and 989 actions (99.3 %); detect v4 had 984 and 990. One real page labelled
+  (98.8 %) and 989 actions (99.3 %); detect v4 had 984 and 990. page-type-v5.2 (the
+  routing review's changes, 2026-10-10) gets the same 984 and 989, with the same errors;
+  on fresh set 4 (seen while v5.1 was fixed, so no longer out of sample) 29 of 31 kinds
+  and actions, and on the design review's 41 adversarial pages 29 and 35, as v5.1.
+  Its new cases (fake redactions drawn with annotation tools, a CropBox, square waves,
+  diagrams under a title, a hidden layer over machine drawings) are tested on synthetic
+  fixtures only, so v5.2 has no out-of-sample number either. One real page labelled
   born-digital now has 8 characters under a grey box and a seal painted over them
   (checked by eye: they cannot be seen), so it is called `mixed_hidden_text` and counted
   as an error against its label.
@@ -1001,7 +1073,12 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   committed born-digital fixture has no hidden text and no kept page, an iOS-style page
   never giving a text element and always a decision, one decision per reason, the
   upload refused before any quota, the group decision on both review screens, axe and
-  320 px reflow.
+  320 px reflow. The routing review's cases (2026-10-09) are rebuilt there too: fake
+  redactions drawn with annotation tools, clip text with nothing painted, text under a
+  shading or a thick stroke, a scan with a CropBox, a timing diagram, machine-drawn
+  curves under a title, a hidden layer over machine drawings, rejected writing under a
+  short and a long title (and with the ink budget run out), a drawn page border, a
+  full-page plot and a slide's chart, blank template pages, and a title slide on a photo.
 - `tests/test_tables_detect.py` and `tests/test_tables_fixtures.py` cover table
   detection and how layout claims tables, on generated pages, the LaTeX
   `latex/tables.tex` (Tectonic) and a Word-style page exported by LibreOffice

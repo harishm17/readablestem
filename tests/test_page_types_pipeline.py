@@ -24,7 +24,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import Kind, Status
 from a11y_stem.models import OFFLINE_DEFAULTS
 from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import layout
+from a11y_stem.pipeline import layout, page_type
 from a11y_stem.pipeline.run import convert_pdf
 from a11y_stem.web.db import Job, User, session_scope
 from a11y_stem.web.worker import Worker, result_outcome
@@ -96,6 +96,74 @@ def test_the_safety_net_keeps_a_painted_page_layout_read_nothing_from():
     assert doc.kept_pages == {1: "unread_page"}  # ... but painted, and nothing read
 
 
+def test_the_safety_net_keeps_writing_read_into_nothing_under_a_typed_title():
+    # Writing the ink checks reject, on paper ruled from top to bottom, under a short and a
+    # long typed title: the titles are read, and each page keeps its image with a decision.
+    doc = layout.analyze(data("ink_titled.pdf"))
+    assert doc.kept_pages == {0: "unread_page", 1: "unread_page"}
+    assert [(e.page, e.kind) for e in doc.elements] == [(0, Kind.PARAGRAPH), (1, Kind.PARAGRAPH)]
+    assert doc.elements[0].text == "Lecture 14 notes"
+
+
+def test_writing_not_analysed_in_time_under_a_title_is_kept(monkeypatch):
+    # The ink budget ran out (a long document): the pages may be handwritten, so they are
+    # kept as images, whatever the length of their typed title.
+    real = page_type.InkBudget
+    monkeypatch.setattr(page_type, "InkBudget", lambda: real(0))
+    doc = layout.analyze(data("ink_titled.pdf"))
+    assert [doc.page_types[n].kind for n in (0, 1)] == ["vector_no_text", "born_digital"]
+    assert doc.kept_pages == {0: "unread_page", 1: "unread_page"}
+    # The titles are still read; nothing drawn goes to the figure model.
+    assert [(e.page, e.kind) for e in doc.elements] == [(0, Kind.PARAGRAPH), (1, Kind.PARAGRAPH)]
+
+
+def test_drawings_that_fill_the_page_are_figures():
+    doc = layout.analyze(data("big_drawings.pdf"))
+    assert doc.kept_pages == {}
+    figures = [e for e in doc.elements if e.kind is Kind.FIGURE]
+    assert [f.page for f in figures] == [0, 1, 2]
+    # Page 1: a plot inside a drawn page border; the border is not part of it.
+    border, plot = (24, 24, 588, 768), figures[0].bbox
+    assert plot[2] - plot[0] < 0.5 * (border[2] - border[0])
+    assert figures[0].caption == "Figure 1: height of the ball against time."
+    assert "Problem 3." in " ".join(e.text or "" for e in doc.elements if e.page == 0)
+    # Pages 2 and 3: a full-page plot with its caption, a slide's chart under its title.
+    assert figures[1].caption == "Figure 2: displacement against time (s)."
+    assert [e.kind for e in doc.elements if e.page == 2] == [Kind.HEADING, Kind.FIGURE]
+
+
+def test_template_pages_with_nothing_to_read_are_not_decisions():
+    doc = layout.analyze(data("template_pages.pdf"))
+    assert doc.kept_pages == {}
+    assert {e.page for e in doc.elements} == {2}
+    result = convert("template_pages.pdf").result
+    assert result.stats.required_decisions == 0
+    assert "Not converted" not in result.html
+
+
+def test_machine_drawn_diagrams_under_a_title_are_figures():
+    doc = layout.analyze(data("diagram_slides.pdf"))
+    assert doc.kept_pages == {}
+    assert [e.kind for e in doc.elements if e.page == 0] == [Kind.PARAGRAPH, Kind.FIGURE]
+    assert sum(e.kind is Kind.FIGURE for e in doc.elements if e.page == 1) == 5
+    timing = layout.analyze(data("timing_diagram.pdf"))
+    assert [e.kind for e in timing.elements] == [Kind.FIGURE] and timing.kept_pages == {}
+
+
+def test_a_picture_of_a_page_keeps_its_typed_text_and_its_image():
+    # A scan cropped to its picture with a typed header, and a title slide on a photo:
+    # pictures of the whole page with a little visible text and nothing hidden.
+    doc = layout.analyze(data("cropped_scan.pdf"))
+    assert doc.kept_pages == {0: "unread_page"}
+    assert [e.text for e in doc.elements] == ["PHYS 101 Week 3 reading"]
+    result = convert("title_slide.pdf").result
+    assert [e.kind for e in result.elements] == [Kind.HEADING, Kind.FIGURE]
+    assert "Lecture 3: Kinematics" in text_of(result.html)
+    assert 'alt="Page 1: not converted to text."' in result.html
+    assert "scanned" not in text_of(result.html)
+    assert result.stats.required_decisions == 1
+
+
 def test_photo_slides_keep_their_titles_and_photos():
     doc = layout.analyze(data("photo_slides.pdf"))
     assert doc.kept_pages == {}
@@ -130,7 +198,7 @@ def test_an_ios_style_page_never_yields_text_and_always_yields_a_decision():
     html = result.html
     assert 'data-reason="handwritten_page"' in html
     assert 'alt="Page 1: handwritten notes, not converted to text."' in html
-    assert "Page 1 is a picture of a handwritten or scanned page and was not converted." in html
+    assert "Page 1 is shown only as a picture of the page and was not converted." in html
     # Nothing of the hidden layer is in the file: its only text is the tool's own words.
     with pymupdf.open(HANDWRITING / "ios_notes.pdf") as doc:
         layer = [w[4] for w in doc[0].get_text("words") if len(w[4]) >= 4]
@@ -152,7 +220,7 @@ def test_kept_pages_are_one_decision_per_reason_and_typed_pages_convert():
     assert result.image_only_pages == [1, 2, 3]
     html = result.html
     assert "Displacement is the change in position" in html
-    assert "Pages 2, 3 and 4 are pictures of handwritten or scanned pages" in html
+    assert "Pages 2, 3 and 4 are shown only as pictures of the pages" in html
     assert html.count("Not converted.") == 3
     assert result_outcome(result) == ("done", "pages_not_converted")
 
@@ -177,6 +245,28 @@ def test_hidden_text_never_reaches_the_student_file():
     html = convert("typed_hidden.pdf").result.html
     assert not any(phrase in html for phrase in HIDDEN)
     assert "Momentum and energy" in html
+
+
+SECRET_WORDS = ("Student 2291", "Jane Roe", "accommodation")
+
+
+def test_fake_redactions_drawn_with_annotation_tools_never_reach_the_student_file():
+    result = convert("annot_redactions.pdf").result
+    text = text_of(result.html)
+    # Five pages each with the line; only the yellow highlight's (page 5) shows.
+    assert all(text.count(word) == 1 for word in SECRET_WORDS)
+    assert text.count("state the units of every quantity") == 5
+    doc = layout.analyze(data("annot_redactions.pdf"))
+    shown = {e.page for e in doc.elements if "Jane Roe" in (e.text or "")}
+    assert shown == {4}
+    hidden = [(n.code, n.page) for n in doc.notices]
+    assert hidden == [("hidden_text_ignored", page) for page in range(4)]
+
+
+def test_text_under_a_clip_a_shading_or_a_thick_stroke_never_reaches_the_student_file():
+    text = text_of(convert("painted_over.pdf").result.html)
+    assert not any(word in text for word in SECRET_WORDS)
+    assert text.count("A ball is thrown upward") == 3
 
 
 # --------------------------------------------------------------------------- the app
@@ -217,6 +307,24 @@ def test_a_pdf_of_only_handwritten_or_scanned_pages_is_refused_before_any_quota(
     with session_scope(env.ctx.factory) as session:
         assert session.scalar(select(Job.id)) is None
     assert pages_used(env) == 0
+
+
+@pytest.mark.parametrize(
+    "name", ["diagram_slides.pdf", "timing_diagram.pdf", "vector_with_layer.pdf"]
+)
+def test_pdfs_of_machine_drawn_diagrams_are_not_refused(env, name):
+    response = upload(env.browser, data(name), filename=name)
+    assert response.status_code == 303, text_of(response.text)[:300]
+    job_id = job_id_from(response)
+    assert _worker(env).run_once() == job_id
+    assert env.job(job_id).status == "done"
+
+
+def test_a_fake_redaction_never_reaches_the_job_through_the_app(env):
+    job_id = job_id_from(upload(env.browser, data("annot_redactions.pdf"), filename="r.pdf"))
+    assert _worker(env).run_once() == job_id
+    html = text_of(env.job(job_id).html or "")
+    assert html.count("Jane Roe") == 1  # the yellow highlight's line, nobody else's
 
 
 def _worker(env) -> Worker:

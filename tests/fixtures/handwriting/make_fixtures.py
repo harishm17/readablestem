@@ -832,6 +832,19 @@ def build_review_cases(out: Path) -> list[Path]:
     page.insert_text((40, 60), "Average velocity", fontsize=28)
     page.insert_textbox(pymupdf.Rect(40, 90, 680, 300), TYPED[2], fontsize=16)
     made.append(save(doc, out, "template_pages.pdf"))
+
+    # 20. A title slide: white typed text on a photo that fills the slide, nothing hidden.
+    doc = pymupdf.open()
+    page = doc.new_page(width=720, height=405)
+    photo = pymupdf.Pixmap(pymupdf.csRGB, pymupdf.IRect(0, 0, 144, 81), False)
+    photo.clear_with(40)
+    rng = random.Random(20)
+    for _ in range(40):
+        x, y = rng.randint(0, 134), rng.randint(0, 71)
+        photo.set_rect(pymupdf.IRect(x, y, x + 10, y + 10), (rng.randint(0, 120), 60, 140))
+    page.insert_image(page.rect, pixmap=photo)
+    page.insert_text((60, 200), "Lecture 3: Kinematics", fontsize=36, color=(1, 1, 1))
+    made.append(save(doc, out, "title_slide.pdf"))
     return made
 
 

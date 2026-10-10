@@ -837,17 +837,17 @@ def _review_line(fixes: list[Fix], checked_on: date | None) -> str:
 
 
 def kept_pages_note(kept_pages: list[int]) -> str:
-    """ "Pages 2 and 5 are pictures of handwritten or scanned pages and were not
-    converted." (1-based), or "" when no page is kept whole as an image.
-    TODO(Harish): confirm this line of the student note."""
+    """ "Pages 2 and 5 are shown only as pictures of the page and were not converted."
+    (1-based), or "" when no page is kept whole as an image. Whatever the reason (a
+    handwritten or scanned page, or one with drawings nothing could be read from): each
+    image's own note says which. TODO(Harish): confirm this line of the student note."""
     numbers = [str(p + 1) for p in sorted(set(kept_pages))]
     if not numbers:
         return ""
     if len(numbers) == 1:
-        what = "is a picture of a handwritten or scanned page and was"
-        return f"Page {numbers[0]} {what} not converted."
+        return f"Page {numbers[0]} is shown only as a picture of the page and was not converted."
     listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
-    return f"Pages {listed} are pictures of handwritten or scanned pages and were not converted."
+    return f"Pages {listed} are shown only as pictures of the pages and were not converted."
 
 
 def _about_section(

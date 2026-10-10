@@ -67,6 +67,7 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import count, pairwise
+from typing import Any
 
 import pymupdf
 
@@ -110,6 +111,14 @@ MIN_IMAGE_PT = 12.0  # ... and so are images drawn smaller than this on the page
 FULL_PAGE_FRACTION = 0.85  # images covering this share of the page: background or scan
 MIN_DRAWING_PT = 24.0  # a vector figure is at least this big on both sides
 DRAWING_CLUSTER_GAP = 6.0  # drawings closer than this belong to the same figure
+PAGE_SIZED_FRACTION = 0.85  # a drawing this wide and tall fills the page (or its frame)
+FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a frame's side
+# Page-type reasons for ink on a page: a page-filling drawing there is never a figure for
+# the model (it may be a page of notes). When the ink was not confirmed (rejected or not
+# analysed) the safety net keeps the page image instead; on a typed page with
+# handwriting (mixed_ink) the handwriting is cut out already and the rest is left out.
+INK_REASONS = frozenset({"ink_rejected", "ink_not_analysed", "ink_some", "ink_writing"})
+UNREAD_PAD = 2.0  # pt: a stroke within this of an element's box belongs to the element
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
@@ -2393,6 +2402,8 @@ class _Path:
     curved: bool  # has curves or diagonal lines (charts, diagrams; not tables or boxes)
     filled: bool  # a visible filled area (bars in a bar chart, shapes)
     source: int = -1  # index in the page's get_cdrawings list (handwriting is left out)
+    outline: bool = False  # the outline of one upright rectangle and nothing else (a frame)
+    rules: bool = False  # paper rules: long separate horizontal and vertical lines only
 
 
 def _visible(colour: object, opacity: object) -> bool:
@@ -2407,6 +2418,7 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
     shared with the page type's ink analysis."""
     display = _Display.of(page)
     width_pt, height_pt = page.rect.width, page.rect.height
+    frame = page.cropbox  # the drawings' own (unrotated) frame
     paths: list[_Path] = []
     for source, drawing in enumerate(drawings if drawings is not None else page.get_cdrawings()):
         stroked = _visible(drawing.get("color"), drawing.get("stroke_opacity"))
@@ -2441,8 +2453,29 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
             kind = "radical"
         else:
             kind = "shape"
-        paths.append(_Path(box, kind, curved, filled and kind == "shape", source))
+        outline = kind == "shape" and not filled and _rectangle_outline(items, segments, box)
+        rules = kind == "shape" and page_type.paper_rules(drawing, frame.width, frame.height)
+        paths.append(_Path(box, kind, curved, filled and kind == "shape", source, outline, rules))
     return paths
+
+
+def _rectangle_outline(
+    items: Sequence[Any], segments: list[tuple[float, float, float, float]], box: BBox
+) -> bool:
+    """One upright rectangle and nothing else: a single "re" item, or four or five
+    horizontal and vertical lines along the edges of the path's box (a page frame drawn
+    line by line, closed or not)."""
+    if len(items) == 1 and items[0][0] == "re":
+        return True
+    if len(segments) != len(items) or not 4 <= len(segments) <= 5:
+        return False
+    x0, y0, x1, y1 = box
+    for px, py, qx, qy in segments:
+        on_x = abs(px - qx) <= 0.5 and min(abs(px - x0), abs(px - x1)) <= 0.5
+        on_y = abs(py - qy) <= 0.5 and min(abs(py - y0), abs(py - y1)) <= 0.5
+        if not (on_x or on_y):
+            return False
+    return True
 
 
 def _radical_like(
@@ -2916,21 +2949,42 @@ def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
     return list(groups.values())
 
 
-def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rect) -> list[_Figure]:
-    """Clusters of drawings that look like a picture, not rules, borders or tables."""
+def _vector_figures(
+    paths: list[_Path],
+    rows: list[_Row],
+    page_rect: pymupdf.Rect,
+    ctx: _Context | None = None,
+    *,
+    page_sized: bool = True,
+    left_out: list[BBox] | None = None,
+) -> list[_Figure]:
+    """Clusters of drawings that look like a picture, not rules, borders or tables.
+
+    Page furniture (a frame round the page, a page-wide rule along an edge, a background
+    fill) is set aside first: a frame's box holds everything on the page, so clustered
+    with the rest it made every figure on the page one "page border" (docs/layout.md
+    "Figures"). A drawing that still fills the page (a full-page plot, a slide's chart)
+    is a figure when it has three curves or two bars and no running text inside (else it
+    is a decorated border or a background drawn behind text, left out as before). With
+    `page_sized` False (the page has ink: it may be a page of notes) such a drawing is
+    never a figure for the model: its box goes to `left_out`, and the safety net keeps
+    the page image instead (`INK_REASONS`)."""
     figures = []
     index = _RowIndex([r for r in rows if not r.vertical])
+    paths = [p for p in paths if not _page_furniture(p, page_rect)]
     for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
         members = [paths[i] for i in group]
-        if all(p.kind in ("hrule", "vrule") for p in members):
-            continue  # separators, underlines, table grids
+        if all(p.kind in ("hrule", "vrule") or p.rules for p in members):
+            continue  # separators, underlines, table grids, paper rules
         x0, y0, x1, y1 = _union(p.bbox for p in members)
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
         width, height = box[2] - box[0], box[3] - box[1]  # the visible part only
         if width < MIN_DRAWING_PT or height < MIN_DRAWING_PT or width * height < 1200:
             continue
-        if width >= 0.85 * page_rect.width and height >= 0.85 * page_rect.height:
-            continue  # page border
+        fills_page = (
+            width >= PAGE_SIZED_FRACTION * page_rect.width
+            and height >= PAGE_SIZED_FRACTION * page_rect.height
+        )
         inside = [r for r in rows if _centre_inside(r.bbox, box)]
         # Curves that matter: a plotted line, or many markers; not one tick icon in a table,
         # nor the round bullets of a list in a panel.
@@ -2941,10 +2995,41 @@ def _vector_figures(paths: list[_Path], rows: list[_Row], page_rect: pymupdf.Rec
             for p in members
             if p.filled and p.bbox[3] - p.bbox[1] >= 4 and p.bbox[2] - p.bbox[0] <= 0.5 * width
         ]
-        if not curved and len(bars) < 2 and len(inside) >= 2:
+        if fills_page:
+            if not page_sized:
+                if left_out is not None:
+                    left_out.append(box)
+                continue
+            if (len(curves) < 3 and len(bars) < 2) or (
+                ctx is not None and _running_text(inside, ctx)
+            ):
+                continue  # a decorated border, or a background drawn behind text
+        elif not curved and len(bars) < 2 and len(inside) >= 2:
             continue  # a box, shaded panel or table drawn around text
         figures.append(_Figure(box, paths=len(members)))
     return figures
+
+
+def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
+    """A frame round the page (one rectangle outline, or a page-long rule near an edge),
+    a background fill (at least PAGE_SIZED_FRACTION of the page's area) or a band of
+    colour along an edge (a slide template's title bar): never part of a figure, and
+    never content on its own."""
+    x0, y0, x1, y1 = path.bbox
+    w, h = page_rect.width, page_rect.height
+    big = PAGE_SIZED_FRACTION
+    if path.filled:
+        return (x1 - x0) * (y1 - y0) >= big * w * h or _edge_band(path, page_rect)
+    if path.curved:
+        return False
+    if path.outline:
+        return x1 - x0 >= big * w and y1 - y0 >= big * h
+    edge = FRAME_EDGE_BAND
+    if path.kind == "hrule":
+        return x1 - x0 >= big * w and (y1 <= edge * h or y0 >= (1 - edge) * h)
+    if path.kind == "vrule":
+        return y1 - y0 >= big * h and (x1 <= edge * w or x0 >= (1 - edge) * w)
+    return False
 
 
 def _bullet_mark(path: _Path, index: _RowIndex) -> bool:
@@ -3571,6 +3656,9 @@ class _PageBlocks:
     number: int
     size: tuple[float, float]
     blocks: list[_Block]
+    # Drawings that fill the page and were not made a figure because the page's ink was
+    # rejected or not analysed (`_vector_figures`): the safety net keeps the page image.
+    left_out: list[BBox] = field(default_factory=list)
 
 
 def _prepare_rows(
@@ -3594,6 +3682,8 @@ def _page_blocks(
     margins: _MarginFilter,
     page_tables: Sequence[tables.PageTable] = (),
     ink: Sequence[BBox] = (),
+    *,
+    page_sized: bool = True,
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_labels(rows)
@@ -3603,9 +3693,9 @@ def _page_blocks(
     used_rules = _resolve_fragments(rows, rules)
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
-    figures = _merge_figures(
-        _raster_figures(page, page_rect) + _vector_figures(loose, rows, page_rect)
-    )
+    left_out: list[BBox] = []
+    vector = _vector_figures(loose, rows, page_rect, ctx, page_sized=page_sized, left_out=left_out)
+    figures = _merge_figures(_raster_figures(page, page_rect) + vector)
     # A logo repeated in the header or footer band is decoration, like a running header.
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     figures = [f for f in figures if _absorb_labels(f, rows, ctx)]
@@ -3647,7 +3737,8 @@ def _page_blocks(
     for block in final:
         if block.marker is not None:
             block.origin = origins.get(block.rows[0].column, 0.0)
-    return _PageBlocks(number, (round(page_rect.width, 2), round(page_rect.height, 2)), final)
+    size = (round(page_rect.width, 2), round(page_rect.height, 2))
+    return _PageBlocks(number, size, final, left_out)
 
 
 _TEXT_BLOCKS = (Kind.PARAGRAPH, Kind.LIST_ITEM)  # blocks whose text may hold inline maths
@@ -3790,12 +3881,22 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     # (there is no handwriting or scan conversion). On a typed page with handwriting on
     # it, the ink stays out of the figures; each region of it is cut out instead.
     kept = {n: reason for n in selected if (reason := page_type.kept_reason(types[n]))}
+    # A page kept as an image that has some visible typed text and nothing hidden (a title
+    # slide on a photo, a page of notes not analysed in time under its typed title) keeps
+    # that text; nothing drawn on it goes to the figure model.
+    text_kept = {
+        n
+        for n, reason in kept.items()
+        if reason == page_type.UNREAD_PAGE and types[n].text.visible_chars
+    }
     prepared = {}
     found: dict[int, list[tables.PageTable]] = {}
     for number in selected:
-        if number in kept:
+        if number in kept and number not in text_kept:
             frags[number], paths[number], found[number] = [], [], []
             continue
+        if number in text_kept:
+            paths[number] = []
         if types[number].kind == "mixed_ink":
             ink = types[number].ink.ink_drawings
             paths[number] = [p for p in paths[number] if p.source not in ink]
@@ -3805,7 +3906,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx)
     pages = [
         _kept_page(doc[n], n)
-        if n in kept
+        if n in kept and n not in text_kept
         else _page_blocks(
             doc[n],
             n,
@@ -3816,18 +3917,29 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             margins,
             found[n],
             page_type.ink_regions(types[n]),
+            page_sized=not INK_REASONS & set(types[n].reasons),
         )
         for n in selected
     ]
     _settle_bold_letters(pages)
     block_ids: dict[int, str] = {}
     elements = _to_elements(pages, ctx, block_ids)
-    # The safety net (independent of the page types): a page with something painted on
-    # it from which nothing was read keeps its page image, with a decision. A page is
-    # "blank" only when nothing is painted on it.
-    read = {e.page for e in elements}
-    for n in selected:
-        if n not in kept and n not in read and _painted(doc[n], paths[n]):
+    # The safety net (independent of the page types; docs/layout.md "The safety net"): a
+    # page keeps its page image, with a decision, when something painted on it was read
+    # into nothing. The elements read from it stay.
+    boxes: dict[int, list[BBox]] = {}
+    for e in elements:
+        boxes.setdefault(e.page, []).append(e.bbox)
+    for page in pages:
+        n = page.number
+        if n in kept:
+            continue
+        if n not in boxes:
+            unread = _painted(doc[n], paths[n])
+        else:
+            left_out = bool(page.left_out) and types[n].kind != "mixed_ink"
+            unread = left_out or _unread_ink(types[n], boxes[n], page.size[1])
+        if unread:
             kept[n] = page_type.UNREAD_PAGE
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
@@ -3851,14 +3963,37 @@ def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:
     return _PageBlocks(number, (round(page.rect.width, 2), round(page.rect.height, 2)), [])
 
 
+def _unread_ink(kind: page_type.PageTypeResult, boxes: list[BBox], height: float) -> bool:
+    """INK_MIXED_STROKES or more of the page's handwriting-like strokes (the page type's
+    ink analysis, clean or rejected) lie outside every element read from the page and
+    outside the header and footer bands: writing layout made nothing of (a figure, a
+    table and a cut-out handwriting region each hold their own)."""
+    if len(kind.ink.stroke_boxes) < page_type.INK_MIXED_STROKES:
+        return False
+    pad = UNREAD_PAD
+    grown = [(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad) for b in boxes]
+    loose = 0
+    for stroke in kind.ink.stroke_boxes:
+        if _box_zone(stroke, height) is not None:
+            continue
+        if not any(_centre_inside(stroke, box) for box in grown):
+            loose += 1
+            if loose >= page_type.INK_MIXED_STROKES:
+                return True
+    return False
+
+
 def _painted(page: pymupdf.Page, paths: list[_Path]) -> bool:
     """Something is painted outside the header and footer bands: a raster image or a
     drawing at least MIN_IMAGE_PT on a side, or VECTOR_MIN_PATHS smaller marks (pen
-    strokes are small). Rules (lines, frames) alone are not content."""
+    strokes are small). Rules, a frame round the page, a background fill and a band of
+    colour along an edge (a slide template's) are not content, alone."""
     height = page.rect.height
     marks = 0
     for path in paths:
         if path.kind in ("hrule", "vrule") or _box_zone(path.bbox, height) is not None:
+            continue
+        if path.rules or _page_furniture(path, page.rect):
             continue
         if max(path.bbox[2] - path.bbox[0], path.bbox[3] - path.bbox[1]) >= MIN_IMAGE_PT:
             return True
@@ -3871,6 +4006,20 @@ def _painted(page: pymupdf.Page, paths: list[_Path]) -> bool:
         if min(box[2] - box[0], box[3] - box[1]) >= MIN_IMAGE_PT and _box_zone(box, height) is None:
             return True
     return False
+
+
+def _edge_band(path: _Path, page_rect: pymupdf.Rect) -> bool:
+    """A filled, straight-edged band along an edge of the page (a slide template's title
+    bar or side strip): touching an edge, and at most FRAME_EDGE_BAND of the page deep."""
+    if not path.filled or path.curved:
+        return False
+    x0, y0, x1, y1 = path.bbox
+    w, h = page_rect.width, page_rect.height
+    touches_x = x0 <= 1.0 or x1 >= w - 1.0
+    touches_y = y0 <= 1.0 or y1 >= h - 1.0
+    return (touches_y and y1 - y0 <= FRAME_EDGE_BAND * h) or (
+        touches_x and x1 - x0 <= FRAME_EDGE_BAND * w
+    )
 
 
 def _hidden_text_notices(

@@ -65,8 +65,11 @@ import pymupdf
 from a11y_stem.core.types import PageType
 
 # detect v4 plus the design review's C1 changes (v5); v5.1 after fresh set 4: a cover over
-# part of a line is looked for, and a page of paper rules alone is blank.
-CLASSIFIER_VERSION = "page-type-v5.1"
+# part of a line is looked for, and a page of paper rules alone is blank; v5.2 after the
+# routing review: annotation, shading, thick-stroke and empty-clip covers, the CropBox as
+# the page, paper rules that are long and separate, a few curves under a typed title and
+# a hidden layer over machine drawings not handwriting.
+CLASSIFIER_VERSION = "page-type-v5.2"
 
 BBox = tuple[float, float, float, float]
 
@@ -683,7 +686,7 @@ def _visible_paint(colour: object, opacity: object) -> bool:
     return not (isinstance(colour, tuple | list) and all(v >= 0.97 for v in colour))
 
 
-def _rules_only(drawing: dict[str, Any], width: float, height: float) -> bool:
+def paper_rules(drawing: dict[str, Any], width: float, height: float) -> bool:
     """The rules of ruled, squared or margin paper (a page with only these is blank
     paper): stroked, not filled, horizontal and vertical lines only, each a line of its
     own (not continuing the one before it) and long, at least RULE_MIN_SHARE of the
@@ -946,7 +949,7 @@ def ink_stats(
             continue
         stats.paths += 1
         stats.items += len(d.get("items") or ())
-        if not _rules_only(d, frame.width, frame.height):
+        if not paper_rules(d, frame.width, frame.height):
             stats.marks += 1
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_INK]) or []:
         stats.annot_strokes += len(annot.vertices or [])
@@ -1251,6 +1254,11 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
     page image). Works on a classifier result and on the stored record alike."""
     if page.kind in HANDWRITTEN_KINDS:
         return HANDWRITTEN_PAGE
+    if page.kind == "scan_no_text" and _visible_chars(page):
+        # A full-page picture with a little visible typed text and nothing hidden: a
+        # scan with a typed header, or a title slide on a photo. Not called a scan; its
+        # visible text is read (layout), and the page is kept as an image beside it.
+        return UNREAD_PAGE
     if page.kind in SCAN_KINDS:
         return SCANNED_PAGE
     if (
@@ -1323,16 +1331,15 @@ REFUSAL_CODES = ("handwritten", "handwritten_no_text", "scanned", "scanned_ocr",
 
 
 def _certain(page: PageType) -> str | None:
-    """`kept_reason` for a page that is certainly handwritten or a scan. A full-page
-    picture with a few visible characters and no hidden layer may be a slide with a
-    background photo and a title, and a few strokes under a typed title ("ink_few") may
-    be a machine-drawn diagram: such pages are kept as images with a decision when the
-    PDF is converted, but they never refuse the upload."""
+    """`kept_reason` for a page that is certainly handwritten or a scan: no visible text,
+    or a hidden layer. A full-page picture with a few visible characters and no hidden
+    layer may be a slide with a background photo and a title, and drawings under a typed
+    title may be machine-drawn (five waves on a slide, a grid of sparklines): such pages
+    are kept as images with a decision when the PDF is converted, but they never refuse
+    the upload."""
     reason = kept_reason(page)
     sure = page.visible_chars == 0 or page.untrusted_chars >= HIDDEN_FEW
-    if reason == HANDWRITTEN_PAGE and (sure or "ink_few" not in page.reasons):
-        return reason
-    if reason == SCANNED_PAGE and sure:
+    if reason in (HANDWRITTEN_PAGE, SCANNED_PAGE) and sure:
         return reason
     return None
 

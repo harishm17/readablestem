@@ -66,9 +66,11 @@ def refusal(path: Path, **kwargs) -> str | None:
         # the line under them; a yellow highlight hides nothing.
         ("annot_redactions.pdf", ["mixed_hidden_text"] * 4 + ["born_digital"], [None] * 5, None),
         ("painted_over.pdf", ["mixed_hidden_text"] * 3, [None] * 3, None),
-        # A CropBox that trims a scan's margins leaves a picture of the whole page; with
-        # a short typed header and no hidden layer it is kept, never refused.
-        ("cropped_scan.pdf", ["scan_no_text"], ["scanned_page"], None),
+        # A CropBox that trims a scan's margins leaves a picture of the whole page. With a
+        # short typed header and nothing hidden it is kept as an image (its header read,
+        # not called a scan) and never refused; so is a title slide on a photo.
+        ("cropped_scan.pdf", ["scan_no_text"], ["unread_page"], None),
+        ("title_slide.pdf", ["scan_no_text"], ["unread_page"], None),
         # Square waves are drawings, not paper rules.
         ("timing_diagram.pdf", ["vector_no_text"], [None], None),
         # A row of five machine-drawn curves under a typed title is not handwriting.
@@ -244,10 +246,13 @@ def _record(kind: str, visible: int = 0, invisible: int = 0, reasons=()) -> Page
         # Anything convertible, or not sure, never refuses.
         ([_record("handwritten"), _record("born_digital", 500)], None),
         ([_record("scan_no_text", 12)], None),  # a photo with a short title: maybe a slide
-        # A few strokes under a typed title may be a machine-drawn diagram.
+        # Drawings under a typed title may be machine-drawn (a few waves, a grid of
+        # sparklines): kept as images when converted, never refused. A hidden layer, or
+        # no visible text at all, is sure.
         ([_record("handwritten", 16, reasons=["ink_few"])], None),
-        ([_record("handwritten", 16, reasons=["ink_some"])], "handwritten_no_text"),
+        ([_record("handwritten", 16, reasons=["ink_some"])], None),
         ([_record("handwritten", 0, reasons=["ink_few"])], "handwritten_no_text"),
+        ([_record("handwritten_ocr", 16, 300, reasons=["ink_some"])], "handwritten"),
         ([_record("vector_no_text", reasons=["ink_not_analysed"])], None),
         ([_record("vector_no_text")], None),
         ([], None),

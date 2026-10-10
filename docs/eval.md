@@ -1241,7 +1241,9 @@ the research (`a11y-research/handwriting/detect/corpus/labels_all.json`, 996 pag
 results, and why only one of them is out of sample, are in docs/layout.md "Accuracy,
 honestly": page-type-v5 on fresh set 4 (31 pages built after it was frozen) 27 of 31
 kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 989
-actions, on the design review's 41 adversarial pages 29 and 35.
+actions, on the design review's 41 adversarial pages 29 and 35; page-type-v5.2
+(2026-10-10) on the 996-page corpus the same 984 and 989 (median 7 ms a page, p95
+146 ms), on fresh set 4 29 and 29, on the 41 adversarial pages 29 and 35.
 
 The headings and document evals were not re-run for this change: no model was called
 in this stage. The committed born-digital fixtures (`tests/test_page_types.py`) have no
