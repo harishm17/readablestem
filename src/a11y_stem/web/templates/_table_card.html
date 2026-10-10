@@ -209,10 +209,12 @@
       <button type="submit" name="action" value="accept" class="button">Accept<span class="visually-hidden"> {{ name }}</span></button>
     </form>
     {% endif %}
-    {% if t.local and not t.proposal %}
+    {# Also for a grid written as text (the model said it is not a data table): the
+       reviewer can make it a table again here, as on the review screen. #}
+    {% if t.local and (not t.proposal or not t.is_data) %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("list") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="use_local">
-      <button type="submit" class="{{ 'button-secondary' if t.local_flat else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
+      <button type="submit" class="{{ 'button-secondary' if t.local_flat or t.proposal else 'button' }}">Use the grid read from the PDF<span class="visually-hidden"> for {{ name }}</span></button>
     </form>
     {% endif %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
@@ -220,6 +222,6 @@
       <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or (t.local and not t.local_flat) else 'button' }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
     </form>
   </div>
-  <p class="hint">{% if t.proposal %}{{ item.reject.button }}: {{ item.reject.consequence }} To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% else %}{{ item.reject.button }}: {{ item.reject.consequence }}{% endif %}</p>
+  <p class="hint">{{ item.reject.button }}: {{ item.reject.consequence }}{% if t.proposal and t.is_data %} To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% elif t.proposal and t.local %} Use the grid read from the PDF: students get it as a table, as read from the PDF; compare it with the image first.{% endif %}</p>
 </div>
 {% endmacro %}

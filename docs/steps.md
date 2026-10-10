@@ -605,7 +605,10 @@ full description is in [tables.md](tables.md). In short:
   ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
   not a data table -> the grid read from the PDF written as its text in reading order,
   ACCEPTED with the note `written_as_text` (optional; ABSTAINED `not_data_table`,
-  required, when there is no such grid to write); no usable answer -> the local grid with
+  required, when there is no such grid to write); not a data table but a grid of numbers
+  (half the cells below the first row hold a digit) -> the local grid with first-row
+  headers, NEEDS_REVIEW (`numbers_not_a_table`: written as text, the values would lose
+  their columns); no usable answer -> the local grid with
   first-row headers, NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
   FAILED `table_not_rebuilt`. No model confidence: `Fix.confidence` is None.
 - Header policy: header rows from the top; row headers only for columns of non-empty,

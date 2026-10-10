@@ -415,6 +415,7 @@ First matching rule wins (content-features.md "Review tiers"):
 | # | Condition | Status | `reason` | Tier |
 |---|---|---|---|---|
 | 1 | rebuilding off | FAILED | `table_not_rebuilt` | required (image kept) |
+| 2a | the answer kept says it is not a data table, but the grid read from the PDF is a grid of numbers (`numeric_grid`: half its cells below the first row hold a digit) | NEEDS_REVIEW, the local grid with first-row headers | (check `table.kind` `numbers_not_a_table`) | required |
 | 2 | the answer kept says it is not a data table | ACCEPTED, the grid read from the PDF (`is_data` False) written as its text in reading order | (check `table.kind` `written_as_text`) | optional |
 | 2b | ... and there is no grid read from the PDF to write (none, no text, flattened maths) | ABSTAINED | `not_data_table` | required (image kept) |
 | 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with first-row headers | (check `local_grid`) | required |

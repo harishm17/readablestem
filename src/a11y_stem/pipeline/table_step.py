@@ -88,7 +88,10 @@ Status rules, in order (docs/design/content-features.md "Review tiers"):
    with the note `written_as_text` (review "optional": the local check called it data,
    so a person may look, but no decision is asked: no words are lost); without a grid
    read from the PDF that can be written (none, no text, or maths its text gives flat)
-   ABSTAINED "not_data_table" (required; the image is kept);
+   ABSTAINED "not_data_table" (required; the image is kept). A grid of numbers
+   (`numeric_grid`) is not written as text: its values would lose their columns. The
+   grid read from the PDF with first-row headers is proposed instead, NEEDS_REVIEW
+   (check `table.kind`, code `numbers_not_a_table`);
 3. no usable answer from any attempt (the API unavailable, or answers that cannot be a
    grid) -> the local grid with first-row headers, NEEDS_REVIEW (check `table.source`,
    code `local_grid`); without a local grid FAILED "model_<outcome>" or "invalid_table";
@@ -536,6 +539,19 @@ def text_grid(element: Element) -> TableGrid | None:
         update={"is_data": False, "caption": caption_of(element), "source": "local"}
     )
     return None if flattened_cells(grid) else grid
+
+
+NUMERIC_SHARE = 0.5  # cells below the first row holding a digit, for a grid of numbers
+
+
+def numeric_grid(local: TableGrid) -> bool:
+    """A grid of numbers: at least two filled cells below the first row, and at least
+    NUMERIC_SHARE of them with a digit. Written as loose items, its values would lose
+    their column (which time goes with which speed)."""
+    body = [c.text for c in local.cells if c.row > 0 and c.text.strip()]
+    if len(body) < 2:
+        return False
+    return sum(any(ch.isdigit() for ch in text) for text in body) >= NUMERIC_SHARE * len(body)
 
 
 def first_row_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
@@ -1034,6 +1050,17 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
         )
 
     if candidate.output is not None and not candidate.output.is_data_table:
+        local = _local(element)
+        if local is not None and numeric_grid(local):
+            # Numbers written as loose items lose which value is in which column, and the
+            # local check called the grid data: the verdict is doubted. The PDF's own grid
+            # is proposed as a table, for a person to check against the image.
+            grid = first_row_headers(local, caption=caption_of(element))
+            doubt = Check(
+                name="table.kind", passed=False, severity="warning", code="numbers_not_a_table"
+            )
+            checks = [doubt, *structure_checks(grid), *flattened_check(grid)]
+            return make(Status.NEEDS_REVIEW, grid=grid, checks=checks)
         text = text_grid(element)
         if text is None:
             return make(Status.ABSTAINED, "not_data_table", checks=[])

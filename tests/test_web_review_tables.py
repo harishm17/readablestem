@@ -990,6 +990,48 @@ def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
     assert fix is not None and fix.table is not None and fix.table.grid.is_data
 
 
+def test_the_list_view_offers_the_grid_read_from_the_pdf_for_a_table_written_as_text(as_text):
+    card = section(listing(as_text), 'id="fix-p2-e1"', "</article>")
+    assert 'name="change" value="use_local"' in card  # the way back to a table, here too
+    assert "Use the grid read from the PDF" in text_of(card)
+    assert "To change its headers or a cell" not in text_of(card)  # text has none
+    back = post(as_text, "p2-e1", action="edit", change="use_local", view="list")
+    assert back.status_code == 303
+    fix = stored(as_text).fix_for("p2-e1")
+    assert fix is not None and fix.table is not None and fix.table.grid.is_data
+
+
+def numbers_output():
+    """Table 5 (numbers) judged not a table of data by the model: the step proposes the
+    grid read from the PDF instead, a decision (`numbers_not_a_table`)."""
+    output = table_output()
+    fix = output.result.fix_for("p2-e2")
+    assert fix is not None
+    fix.status, fix.review = Status.NEEDS_REVIEW, "required"
+    fix.table = TableFix(grid=grid_of(TABLE_5))
+    fix.checks = [
+        Check(name="table.kind", passed=False, severity="warning", code="numbers_not_a_table")
+    ]
+    return output
+
+
+def test_numbers_the_model_calls_not_a_table_are_a_decision_before_the_finish_line(tmp_path):
+    env = WebEnv(tmp_path)
+    env.converter.output = numbers_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, table_pdf()))
+        env.run_worker()
+        assert "p2-e2" in {d.key for d in queue.decisions(stored(env)) if d.open}
+        page = text_of(screen(env, "?item=p2-e2"))
+        assert "but its cells hold numbers" in page
+        assert post(env, "p2-e2", action="accept").status_code == 303
+        html = env.browser.get(f"/jobs/{env.job_id}/download").text
+        assert "<table" in section(html, 'id="p2-e2"', "</table>")
+
+
 def test_a_maths_cell_unlike_the_pdf_needs_use_my_edit_anyway(tables):
     """The same checks as an equation's edit, against the PDF's text in that cell
     ("v = d / t"): x for d changes what a student reads, so it is not used without the

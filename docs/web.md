@@ -1092,7 +1092,10 @@ A table the model judged not a table of data (`table_step`: `written_as_text`, a
 optional note) is shown as students get it, its text in reading order ("As students get
 it: text, not a table"), with "Use this grid instead" (the grid read from the PDF, a
 table again) and Keep as image; its cells and headers are not changed as text ("use the
-grid read from the PDF first").
+grid read from the PDF first"). The list view offers "Use the grid read from the PDF"
+for it too. A grid of numbers the model called not a table is not written as text: its
+values would lose their columns, so the grid read from the PDF is proposed as a table,
+a decision (`numbers_not_a_table`).
 
 With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
 the cell list. In the list view a table card shows its crop, the proposal (or the grid

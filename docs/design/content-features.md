@@ -158,6 +158,7 @@ document text.
 | Claimed grid the local check calls not data: a grid of terms (`tables.is_term_grid`) | none | written as a list of its terms by layout, flag on or off; no table element, no image |
 | Data table kept as an image (flag off, or not rebuilt) | required | FAILED, reason `table_not_rebuilt`; the image stays, flagged (meaning would be lost otherwise) |
 | Data table the model calls "not a data table" (flag on) | optional | ACCEPTED with the note `written_as_text`: the grid read from the PDF written in reading order (a description list, a list or paragraphs); without one, ABSTAINED `not_data_table`, required |
+| ... when the grid read from the PDF is a grid of numbers (flag on) | required | NEEDS_REVIEW `numbers_not_a_table`: the grid read from the PDF with first-row headers is proposed (written as text, values would lose their columns; review finding 2026-10-09, until a real-model run shows how often the model says this) |
 | Table rebuilt, every check passed | none | ACCEPTED |
 | Table whose cells fail the bijection with the PDF words after escalation | required | NEEDS_REVIEW with the proposal; rejecting keeps the image |
 | Table failing grid agreement, a maths-cell check (as for equations: a symbol or sign) or header sanity after escalation | required | NEEDS_REVIEW |
