@@ -268,6 +268,25 @@ def test_fake_redactions_drawn_with_annotation_tools_never_reach_the_student_fil
     assert hidden == [("hidden_text_ignored", page) for page in range(4)]
 
 
+def test_a_comment_icon_or_a_file_icon_over_a_word_hides_nothing():
+    # A reader opens or moves a sticky note; it is not drawn to hide the words under it.
+    line = "Momentum is conserved when no external force acts on the carts."
+    doc = pymupdf.open()
+    for note in ("comment", "file"):
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((72, 100), line, fontsize=11)
+        page.insert_text((72, 130), "A second typed line, so the page is typed.", fontsize=11)
+        at = page.search_for("external")[0].tl + pymupdf.Point(2, 0)
+        if note == "comment":
+            page.add_text_annot(at, "Say why.")
+        else:
+            page.add_file_annot(at, b"notes", "notes.txt")
+    out = layout.analyze(doc.tobytes())
+    for n in (0, 1):
+        assert out.page_types[n].text.covered_chars == 0
+        assert line in " ".join(e.text or "" for e in out.elements if e.page == n)
+
+
 def test_text_under_a_clip_a_shading_or_a_thick_stroke_never_reaches_the_student_file():
     text = text_of(convert("painted_over.pdf").result.html)
     assert not any(word in text for word in SECRET_WORDS)

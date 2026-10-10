@@ -512,7 +512,8 @@ produced exactly those files. There is **no handwriting or scan conversion** (de
   shape or a stroke at least 3 pt wide ("covered": ABBYY-style text under the page image,
   a black box over a line, a white bar or a marker scribble over it). Annotations count:
   a box, highlight or text box drawn with Acrobat's or Preview's tools over a line is the
-  most common fake redaction. Paint order comes from `get_bboxlog` and `get_texttrace`
+  most common fake redaction. An icon the reader opens or moves (a sticky note's, an
+  attached file's) is not a cover: the word under it is kept whole. Paint order comes from `get_bboxlog` and `get_texttrace`
   (only read when a visible span lies inside an image, a shading, an opaque fill or a
   thick stroke); a cover must hold the middle 60 % of the glyph, so an underline or a
   strikeout is not one; and the text counts as covered only when removing it (a

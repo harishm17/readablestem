@@ -620,6 +620,8 @@ def _cover_test(
     copy = pymupdf.open()
     try:
         copy.insert_pdf(page.parent, from_page=page.number, to_page=page.number, annots=True)
+        # Icons a reader opens or moves (a sticky note, an attached file) hide nothing.
+        _drop_icons(copy[0])
         # Annotations become page content first: applying a redaction deletes the ones it
         # touches (a FreeText box), which would make covered text look visible.
         copy.bake(annots=True, widgets=True)
@@ -654,6 +656,28 @@ def _cover_test(
     hidden_votes = sum(verdict.values())
     majority = hidden_votes * 2 > len(verdict)
     return [verdict.get(i, majority) for i in range(len(runs))]
+
+
+# Annotations shown as an icon the reader opens or moves: never drawn to hide anything.
+ICON_ANNOTS = frozenset(
+    {
+        pymupdf.mupdf.PDF_ANNOT_TEXT,
+        pymupdf.mupdf.PDF_ANNOT_FILE_ATTACHMENT,
+        pymupdf.mupdf.PDF_ANNOT_SOUND,
+        pymupdf.mupdf.PDF_ANNOT_POPUP,
+        pymupdf.mupdf.PDF_ANNOT_CARET,
+    }
+)
+
+
+def _drop_icons(page: pymupdf.Page) -> None:
+    """Delete the page's icon annotations (`ICON_ANNOTS`): a comment's icon over a word
+    does not make the word covered."""
+    icons = [a.xref for a in page.annots() or [] if a.type[0] in ICON_ANNOTS]
+    for xref in icons:
+        annot = page.load_annot(xref)
+        if annot is not None:
+            page.delete_annot(annot)
 
 
 def _unchanged(
