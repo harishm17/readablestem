@@ -28,6 +28,20 @@ pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")
 
 
+def wide_output():
+    """The described figure with a chart table of six columns of decimals: wider than a
+    320 px card, so it must scroll in its box, not break its numbers."""
+    from a11y_stem.pipeline import figure_details
+
+    output = described_output()
+    fix = output.result.fix_for("p1-e6")
+    assert fix is not None and fix.figure is not None
+    header = ["Time (s)", "Cart A", "Cart B", "Cart C", "Cart D", "Cart E"]
+    rows = [[f"{t}.0"] + [f"{10.37 + t * k:.2f}" for k in range(1, 6)] for t in range(4)]
+    fix.figure.data_table = figure_details.data_grid(header, rows)
+    return output
+
+
 @pytest.fixture(scope="module")
 def site(tmp_path_factory) -> Iterator[WebEnv]:
     """The app on a free port, converting every upload into the review document with a
@@ -35,7 +49,7 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
     import uvicorn
 
     env = WebEnv(tmp_path_factory.mktemp("figure-browser"), per_user_daily_page_quota=1000)
-    env.converter.output = described_output()
+    env.converter.output = wide_output()
     port = free_port()
     server = uvicorn.Server(
         uvicorn.Config(env.app, host="127.0.0.1", port=port, log_level="warning", lifespan="on")
@@ -103,22 +117,35 @@ def test_the_figure_card_passes_wcag22_aa_and_best_practice(
     assert not failures, "\n".join(f"[{s}]\n{d}" for s, d in failures.items())
 
 
+# Lines each numeric cell of the review screen's data tables takes (a cell broken
+# mid-number, "10.3 / 7", takes two).
+NUMBER_LINES = """() => [...document.querySelectorAll('.decision-area .table-scroll td')]
+  .filter(td => /^[-\u2212]?[0-9][0-9.,]*$/.test(td.textContent.trim()))
+  .map(td => { const r = document.createRange(); r.selectNodeContents(td);
+               return new Set([...r.getClientRects()].map(b => Math.round(b.top))).size; })"""
+
+
 @pytest.mark.parametrize("spacing", [False, True], ids=["plain", "text-spacing"])
 def test_the_figure_card_does_not_scroll_sideways_at_320_css_px(site, browser, job, spacing):
     context, page = open_page(browser, site, viewport=NARROW)
     widths: dict[str, int] = {}
+    lines: dict[str, list[int]] = {}
 
     def check(state: str) -> None:
         if spacing:
             page.add_style_tag(content=TEXT_SPACING)
         unfold_everything(page)
         widths[state] = sideways_overflow(page)
+        lines[state] = page.evaluate(NUMBER_LINES)
 
     figure_states(page, f"{site.base}/jobs/{job}/review", check)
     table = page.get_by_role("group", name="Data read from Figure 1; the values are approximate")
     assert table.get_attribute("tabindex") == "0"  # a keyboard user can scroll it
     context.close()
     assert widths == dict.fromkeys(widths, 0), widths
+    # The table scrolls in its box; its numbers are never broken across lines.
+    assert lines["figure card"] and lines["table added"]
+    assert all(n == 1 for cells in lines.values() for n in cells), lines
 
 
 def test_add_then_remove_the_data_table_without_javascript(site, browser, job):

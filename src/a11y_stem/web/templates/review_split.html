@@ -172,22 +172,12 @@
   {% if item.caption %}<figcaption><span class="cap-label">Caption in the PDF:</span> {{ item.caption }}</figcaption>{% endif %}
 </figure>
 {# Long descriptions on (figures work): the chart's data table as students will get it.
-   It scrolls sideways in its own box on a narrow screen, so it can take focus. A table
-   whose values were read from the image is not in the student file: it is offered as an
-   optional extra, with its own small form (not part of the decision). #}
-{% if item.data_table and item.data_table_offered %}
-<div class="data-offer">
-  <p class="part-label">Optional: a data table for this chart</p>
-  <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
-  <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
-    {{ hidden_fields() }}
-    {{ error_line(item, "datatable") }}
-    <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if item.errors.get('datatable') %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
-  </form>
-</div>
-{% elif item.data_table %}
-<div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+   It scrolls sideways in its own box on a narrow screen, so it can take focus, and its
+   cells keep whole numbers (`table-view`). A table whose values were read from the image
+   is not in the student file: it is offered as an optional extra after the decision,
+   with its own small form (not part of the decision). #}
+{% if item.data_table and not item.data_table_offered %}
+<div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
 {% endif %}
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form{% if item.edited %} is-edited{% endif %}">
   {{ hidden_fields() }}
@@ -226,6 +216,18 @@
   {{ save_button(item) }}
   {{ decide_row(item) }}
 </form>
+{% if item.data_table and item.data_table_offered %}
+<div class="data-offer">
+  <p class="part-label">Optional: a data table for this chart</p>
+  <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
+  <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+    {{ hidden_fields() }}
+    {{ error_line(item, "datatable") }}
+    <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if item.errors.get('datatable') %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
+  </form>
+</div>
+{% endif %}
 {% endmacro %}
 
 {% macro heading_body(p) %}

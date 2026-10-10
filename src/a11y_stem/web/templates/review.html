@@ -101,10 +101,10 @@
     {% if item.data_table and item.data_table_offered %}
     <p class="part-label">Optional: a data table for this chart</p>
     <p id="offer-note-{{ eid }}">A data table was read from the chart image; the values may be off. Add it if you check them.</p>
-    <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+    <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
     {% elif item.data_table %}
     <p class="part-label">Data table, as students will get it</p>
-    <div class="table-scroll" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
+    <div class="table-scroll table-view" role="group" aria-labelledby="{{ item.data_table_id }}-caption" tabindex="0">{{ item.data_table }}</div>
     {% endif %}
     {% if item.data_table or item.long_description %}<p class="hint">To change the {% if item.data_table and not item.data_table_offered %}data table or the {% endif %}longer description, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.</p>{% endif %}
     {% elif item.kind == "heading" %}

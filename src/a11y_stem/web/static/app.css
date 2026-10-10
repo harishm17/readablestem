@@ -637,7 +637,7 @@ mark.said-diff {
 .table-view { background: #fff; border: 1px solid var(--rule); border-radius: 4px; overflow-wrap: normal; margin: 0 0 0.5rem; }
 .table-view table { width: auto; margin: 0; }
 .table-view caption { text-align: left; font-weight: 700; padding: 0.4rem 0.55rem 0.3rem; }
-.table-view th, .table-view td { border: 1px solid var(--border); padding: 0.3rem 0.55rem; }
+.table-view th, .table-view td { border: 1px solid var(--border); padding: 0.3rem 0.55rem; overflow-wrap: normal; }
 .table-view thead th { border-bottom-width: 3px; }
 .table-view math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }
 .table-findings { margin: 0.25rem 0 0.75rem; }

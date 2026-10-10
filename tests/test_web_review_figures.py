@@ -110,9 +110,10 @@ def test_the_card_offers_the_table_read_from_the_image_as_an_optional_extra(card
     assert "Optional: a data table for this chart" in body
     assert OFFER in text_of(body)
     assert (
-        '<div class="table-scroll" role="group" aria-labelledby="review-p1-e6-data-caption" '
-        'tabindex="0"><table><caption id="review-p1-e6-data-caption">Data read from Figure 1; '
-        "the values are approximate</caption>"
+        '<div class="table-scroll table-view" role="group" '
+        'aria-labelledby="review-p1-e6-data-caption" tabindex="0"><table><caption '
+        'id="review-p1-e6-data-caption">Data read from Figure 1; the values are '
+        "approximate</caption>"
     ) in body
     assert '<th scope="row">5</th><td>1.5</td>' in body
     assert '<button type="submit" id="datatable-p1-e6" name="action" value="add_data_table"' in body

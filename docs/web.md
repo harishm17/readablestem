@@ -737,8 +737,9 @@ the results".
 - *Figure*: its image (the stored crop), the caption, and the alt text field with
   Accept, Save edit and **Keep without a description**. With long descriptions on (docs/steps.md), a chart's
   data table comes right under the image (`table_html`, in a box that scrolls sideways
-  and takes focus). When its values were read from the image it is not in the student
-  file: it is offered as an optional extra, never the decision, under "Optional: a data
+  and takes focus; its cells never break a number across lines, `table-view`). When its
+  values were read from the image it is not in the student file: it is offered as an
+  optional extra after the decision's form, never the decision, under "Optional: a data
   table for this chart" ("A data table was read from the chart image; the values may be
   off. Add it if you check them."), captioned "Data read from Figure 1; the values are
   approximate", with its own small form and **Add the data table**
@@ -1446,7 +1447,7 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_browser.py` | Chromium: axe-core on every page, CSP, htmx polling, no-JS flow |
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
-| `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px; "Add the data table" then "Remove the data table" without JavaScript) |
+| `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px, and every number in a six-column table on one line; "Add the data table" then "Remove the data table" without JavaScript) |
 | `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
 | `uv run pytest -m browser tests/test_web_job_page_browser.py` | Chromium: the job page in each state (axe at 1280 and 320 px, reflow with text spacing, htmx steps outside the live region, draft and language without JavaScript, the one-click download) |
