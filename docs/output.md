@@ -76,7 +76,7 @@ course (Canvas Lite, then UTD) and update both.
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
 | Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
-| Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables") | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
+| Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
 A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assembly:
 
@@ -623,9 +623,11 @@ a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [
 `MAX_MODEL_CALLS_PER_JOB` cap it too. Before converting, a real run checks that
 OPENAI_API_KEY is set and that MAIN_MODEL and CHEAP_MODEL have prices: either problem is
 `error: ...` and exit 2, and nothing is written. `--fake` uses the offline fake client
-(no key needed); its answers are placeholders, so the HTML opens with the note "Offline
-test run: equations and figure descriptions in this file are placeholders from a fake
-model, not conversions. Do not publish it." Progress
+(no key needed); its answers are placeholders (an equation "x", a figure "Figure
+(offline placeholder)", with long descriptions on an empty one, and with tables on a
+one-cell table "Table (offline placeholder)", each a decision: `models.OFFLINE_DEFAULTS`),
+so the HTML opens with the note "Offline test run: equations, figure descriptions and tables in
+this file are placeholders from a fake model, not conversions. Do not publish it." Progress
 ("page 1/1 done") goes to stderr; the summary on stdout is content-free. A run with
 `--fake --report notes.json --axe` (fake layout and steps, as in the CLI tests):
 
@@ -673,7 +675,7 @@ TODO(Harish): turn these into the public known-limits copy.
   the model cannot read it, the table stays an image with its "not converted" note and a
   required decision. A table the detector misses (an unruled table of numbers only)
   stays in the text flow, sometimes read as a display equation; a grid of key terms
-  printed with rules is claimed as a table and, not being a data table, kept as an image.
+  printed with rules becomes a list of its terms.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
 - A figure's long description and data table are folded: they print only if opened

@@ -98,11 +98,11 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table |
-| GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind, with bulk accept |
+| GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind (no bulk accept) |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond two renders in progress for one person, 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`); with `equations`, `figures`, `tables` or `headings` in place of the id, bulk accept in that group; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`; `action=add_data_table` adds a chart's data table read from the image); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
 | POST `/jobs/{id}/review/{element_id}/check` | owner | The checks Save edit would run, on the LaTeX being typed (htmx, after a 0.6 s pause): an HTML fragment, nothing stored; 204 when signed out |
 | POST `/jobs/{id}/undo` | owner | Undo the job's last review write, from the page that write drew (its `version` must be the job's) |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
@@ -294,7 +294,7 @@ upload, review, download and mean to post it?) without cookies or scripts:
 `signed_in`, `uploaded` (value: pages; code: a fingerprint), `reuploaded` (the same
 file as an earlier upload of the same person; value: hours since), `finished` (code:
 `done`, `failed:<error code>`; value: seconds since upload), `review_opened` (once per
-visit of 30 minutes), `decision_made` (code: `single`, `group` or `bulk`; value: fixes
+visit of 30 minutes), `decision_made` (code: `single` or `group`, `bulk` in older rows; value: fixes
 changed), `review_completed` (the first time no decision is left open; value: seconds
 since it finished), `html_viewed` (once per visit), `downloaded` (code `open` or `done`:
 whether decisions were still open), and the two answers after a download, `will_post`
@@ -342,7 +342,8 @@ form shows no course choice and ignores a `course` field, and the job page and r
 screen show nothing about courses. The pipeline side is in docs/steps.md "Course
 notation" and docs/layout.md "Bold letters in prose".
 
-- **Courses** (`/courses`): a table of the user's courses with how many symbols each has,
+- **Courses** (`/courses`, "Courses" in the main navigation for a signed-in user while
+  the flag is on): a table of the user's courses with how many symbols each has,
   and a form to add one. A name is one line of up to 200 characters, not the same as
   another of the user's courses (ignoring case); up to 50 courses. A course page lists
   its symbols (the styled letter, its words, what it means, the note, "By you" or "From a
@@ -655,7 +656,7 @@ order, a cell changed from the keyboard, no JavaScript; `browser` marker),
 with accepted items shown, 320 px reflow, target sizes, the selected mark inside the page
 region on narrow and short screens, no JavaScript, Accept after typing, focus, shortcuts,
 forced colours, an image retried; `browser` marker), and for the list view `tests/test_web_review.py` (one fix),
-`tests/test_web_review_bulk.py` (order, landing, bulk accept),
+`tests/test_web_review_bulk.py` (order, landing, no bulk accept),
 `tests/test_web_review_messages.py` (every code has a sentence),
 `tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
 `tests/test_web_review_browser.py` and `tests/test_web_review_triage_browser.py`.
@@ -780,8 +781,15 @@ are unchanged.
 "Details for this item" (folded) keeps the confidence, every failed check with its
 sentence and code. Previous and next decision links close the card. After Accept, Save
 edit or the "Reject" button the form redirects (303) to the next decision still open
-after this one (`queue.next_open`, wrapping round), or to the done state: "All decisions
-made" with **Download the accessible HTML**. There the decision's heading takes focus
+after this one (`queue.next_open`, wrapping round), or to the done state, the finish
+line as the job page says it (`SplitBuilder.ready`, from `job_page.headline` and
+`job_page.Finish`): **Ready to share** ("You made 3 decisions on 9 October." or "Nothing
+in this file needed your decision."), or **Ready** with what is shown as an image ("2
+tables are shown as an image that screen readers cannot read."), then **Download the
+HTML file**, "Preview the student version", a line on reading it through before sharing
+(and the notes, optional), "How to post it in your course" and "Back to the results". A
+job that stopped early shows its outcome instead, with no download button. There the
+decision's heading takes focus
 (`autofocus` on the `tabindex="-1"` heading, which works without JavaScript; no URL
 fragment, which would cancel autofocus) and is described by a status line above it:
 "Equation 1: Accepted. 2 decisions left." The page title starts with the position
@@ -849,7 +857,7 @@ the field, so a screen reader hears the state, not the whole list. The route sto
 logs nothing but the request line; signed out it answers 204 and leaves the page alone.
 Save edit runs the same function, so the two never disagree.
 
-**Stale tabs** (MF12). Every review write (a decision, a group or bulk decision, Undo)
+**Stale tabs** (MF12). Every review write (a decision, a group decision, Undo)
 counts itself on the job, inside its transaction after the row is locked
 (`web.review.bump_result_version`, `jobs.result_version`), and every review form, in both
 views, carries the number its page was drawn at (`version`). A form drawn before the last
@@ -1023,9 +1031,13 @@ move on as for other kinds. The rules (`web.review`, "tables"):
   before are refused ("The headers are already like that").
 - *A cell.* Its text is cleaned as alt text is (invisible format characters removed,
   whitespace collapsed), at most 1,000 characters, and escaped when written; a maths
-  cell's LaTeX goes through what an equation edit does (`web.review.checked_latex`:
-  `clean_latex`, `check_latex`, `safe_latex_to_mathml` inline, `check_mathml`), and its
-  plain text stays as the serialiser's fallback. A cell of the grid read from the PDF
+  cell's LaTeX goes through an equation edit's checks (`web.edit_check.check_cell_edit`:
+  `clean_latex`, the LaTeX and MathML checks, the spoken version, and the cross-checks
+  against the PDF's text in that cell, `table_step.cell_text_layer`: letters, digits and
+  Greek letters, a letter's style, signs). LaTeX that differs from the PDF where that
+  changes the meaning is refused with **Use my edit anyway** on the cell's form, as for
+  an equation (the failed checks stay on the fix and the ReviewEdit records the choice).
+  Its plain text stays as the serialiser's fallback. A cell of the grid read from the PDF
   whose maths its text gives flat is edited as LaTeX too (its hint quotes the flat
   text). Text typed into an empty cell of the header row or column makes it a header.
   The same text again is refused.
@@ -1051,6 +1063,12 @@ with the grid read from the PDF, the cells' words, the maths cells). So a findin
 on the card until the cell is put right, and a failed one is a warning on the change
 ("1 check gives a warning"), never a refusal. Nothing about a table is logged but
 codes: the `review` event gets `change=cell|headers|use_local`.
+
+A table the model judged not a table of data (`table_step`: `written_as_text`, an
+optional note) is shown as students get it, its text in reading order ("As students get
+it: text, not a table"), with "Use this grid instead" (the grid read from the PDF, a
+table again) and Keep as image; its cells and headers are not changed as text ("use the
+grid read from the PDF first").
 
 With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
 the cell list. In the list view a table card shows its crop, the proposal (or the grid
@@ -1086,7 +1104,7 @@ or Meta, and never act while focus is in a field.
 ### The list view (`/jobs/{id}/review/list`)
 
 Every fix of the document, grouped by kind, as the review screen was before the split
-view; it keeps bulk accept. Its forms send `view=list`, so a decision there comes back to
+view, without bulk accept. Its forms send `view=list`, so a decision there comes back to
 the list's next card.
 
 **Order.** Only meaning-level problems ask for a decision (docs/design/beta-architecture.md
@@ -1204,27 +1222,15 @@ order and wrapping round to the first, or to `#review-progress` when none are le
 that changed ("Equation 1 on page 1: Accepted."), which is unfolded so the link works.
 The landing item has `tabindex="-1"`, so the next Tab reaches that link.
 
-**Bulk accept.** Each group offers to accept several proposals at once:
-
-- "Accept every equation proposal at or above X%" (X from 90, 80, 70, 60, 50; each
-  option says how many it would take), for every group;
-- "Accept all N remaining headings", for headings only: a wrong heading level is cheap
-  to spot and fix later, a wrong equation or alt text is not.
-
-Only fixes a single "Accept" could take are included: status `needs_review`, a proposal,
-no failed error-level check and, for a heading, a level the output writes as it is
-("Not included: 1 heading the document shows at another level than the one proposed").
-Failed and not-converted fixes, and fixes the reviewer already decided, are never
-touched. The threshold compares the whole percentage the page
-shows (0.795 is shown as 80%, so it is "at or above 80%"). Bulk accept posts to the same
-route as a single decision, with the group (`equations`, `figures`, `tables`, `headings`) in
-place of the element id (element ids look like `p3-e12`, so the two cannot collide).
-That keeps one CSRF- and ownership-checked way to change a review, and the POST-route
-list in `tests/test_web_auth.py` unchanged. It is one transaction: one `ReviewEdit` per
-fix, `result_json` updated, the HTML re-rendered once, then a redirect to
-`#group-<kind>` with the count ("Accepted 3 headings."). Repeating it changes nothing
-and re-renders nothing. A choice the page never offers (an unknown threshold, "accept
-all" for equations) is refused with a 422 and an error linked to the threshold select.
+**No bulk accept** (removed 2026-10-09). The list view used to offer "Accept every
+equation proposal at or above X%" and "Accept all N remaining headings". Both took
+proposals that need a decision without anyone opening them, and under the review tiers
+("meaning-level only", docs/design/beta-architecture.md) every decision asked for could
+change what a student reads: each is now opened and decided on its own (repeated
+headings are already one decision). Optional notes are accepted already and need no
+bulk action. A POST with a kind (`equations`, `figures`, `tables`, `headings`) in place
+of the element id is a 404 and changes nothing; Undo still puts back a bulk write made
+before the change.
 
 **Job page.** "Need your decision" counts the decisions still waiting (a heading group
 once; failed and not-converted items too, since each needs a decision) and is broken down

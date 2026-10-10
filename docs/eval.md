@@ -406,7 +406,7 @@ with or without a baseline (see "Tables": "Gate").
 | Field | Content |
 |---|---|
 | `schema_version`, `task`, `date` | `date` comes from `--date` (default: today, taken in the CLI) |
-| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. 0.4.0 (2026-10-09) added the content features (docs/design/content-features.md) without changing equations, figures or headings while the flags are off, so 0.4.0 and 0.3.0 reports compare. Layout detects tables whatever the flags say, and each table kept as an image is a required decision of its own; on the document gold it claims none (its ruled key-term grids stay text, `tables.is_word_grid`). With every flag on, chart data tables read from the image add theirs ("Content features after integration"). Which version made each committed `data/eval/latest-*.json`: "Results" |
+| `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. 0.4.0 (2026-10-09) added the content features (docs/design/content-features.md) without changing equations, figures or headings while the flags are off, so 0.4.0 and 0.3.0 reports compare. Layout detects tables whatever the flags say, and each data table kept as an image is a required decision of its own; on the document gold it claims no data table (its two ruled key-term grids are claimed as grids of terms and written as lists, `tables.is_term_grid`, with no decision). Chart data tables read from the image are optional extras, never a decision (since 2026-10-09; "Content features after integration"). Which version made each committed `data/eval/latest-*.json`: "Results" |
 | `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, `openai` or `fake` |
 | `dataset` | `gold_dir`, `manifest_sha256`, `limit`, `unit`, `selection_sha256` (hash of the planned item ids) |
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
@@ -811,12 +811,12 @@ an image still counts as found. A step that raises becomes a FAILED fix
 | `teds`, `teds_found` | TEDS (Zhong et al. 2020): 1 - TED / max(nodes) over table -> row -> cell trees. Unit cost to delete or insert a node; relabelling a cell costs 1 for another tag or span, else the normalised Levenshtein distance of its text (`eval/ted.py` relabel hook). Text is NFKC, one delta, one minus, no spaces. `teds` counts a missed table as 0; `teds_found` is over found tables only. Headers are ignored, as in table-bench, so its numbers reproduce |
 | `teds_structure` (`_found`) | the same with cell text ignored |
 | `teds_with_headers` (`_found`) | the same, with a header cell (and its direction) a different tag from a data cell |
-| `headers.column`, `headers.row` | precision, recall and F1 of header cells as (row, column, scope, text), micro-averaged over found tables; `exact`: share of gold tables with such headers whose header texts (a multiset) equal gold's; a missed table is not exact |
+| `headers.column`, `headers.row` | precision, recall and F1 of header cells as (row, column, scope, text), micro-averaged over found tables; `exact`: share of gold tables with such headers whose header texts (a multiset) equal gold's; a missed table is not exact. Header texts are compared after `header_text` (2026-10-09): a raised mark the grid read from the PDF writes "^([1])" counts as "[1]", as gold's text drops the raise |
 | `column_header_exact` | `headers.column.exact`: the headline header number (OpenStax marks only column headers, so row headers proposed for an identifying first column are a convention gap, counted apart as `row_headers_where_gold_has_none`). `headers.share_found_without_headers`: found tables given no header cell at all |
 | `header_exact` | table-bench's: all header texts equal gold's |
 | `data_vs_layout` | `accuracy_on_negatives`: layout tables no data-table prediction matched; `data_called_layout`: missed data tables a layout-table prediction covers |
 | `maths` | per gold maths cell: best letter/digit F1 of any predicted cell (`letter_digit_f1`, `cells_ok` at >= 0.9), and, when the gold cell is one formula, whether the predicted cell there has MathML equal to gold after the lenient normalisation of `eval/equations.py` (`mathml_match`) |
-| `text_fidelity` | cells whose text is gold's (exact after normalisation, else the same letters and digits); `wrong_cells` per table = max(predicted cells left over, gold cells left over), so a misread number is one, two cells merged into one are two; `wrong_cells_not_flagged`: wrong cells in found tables whose fix is not a required decision. Must be 0 |
+| `text_fidelity` | cells whose text is gold's (exact after `fidelity_text`, else the same letters and digits); `wrong_cells` per table = max(predicted cells left over, gold cells left over), so a misread number is one, two cells merged into one are two; `wrong_cells_not_flagged`: wrong cells in found tables whose fix is not a required decision. Must be 0. `fidelity_text` (2026-10-09) makes the ways gold and a reader write the same thing one: gold's text drops a superscript's raise ("10–18" for 10⁻¹⁸) while a cell writes 10^-18, 10^{-18} or 10⁻¹⁸; gold's stacked 1/3 reads "13" ("1/3" and ⅓ too); a "____" fill-in blank is an empty cell, however long; a raised mark the grid read from the PDF writes "^([1])" is "[1]"; and a gold footnote row (`<tfoot>`, printed under the table) counts only when the prediction has it. TEDS keeps table-bench's normalisation |
 | `by_style`, `by_feature` | recall, precision, TEDS and column headers per print style and authored, and for tables with spans, maths or row headers |
 | `review_load` | the table fixes' tiers (`core.triage`): `required_decisions`, per table and per PDF page, `optional`, `needs_review_share`, `kept_as_image`, `required_by_reason`; `flags` (precision and recall over found tables, wrong = a wrong cell, another structure, column headers not exact, or kept as an image) and `wrong_not_required` |
 | `cost` | `per_table_usd`, `per_pdf_page_usd`, `seconds_per_table_p50`/`p95` (model time), model calls; `latency_ms` is per document, wall clock (layout, crops, the step; printing excluded) |
@@ -951,7 +951,7 @@ option being off by default). Small: read the intervals.
 | long judge pass | 9 of 9 (CI 0.701-1.000): accurate 9, complete 9, invented values 0, mean score 5.0 | |
 | data tables | 3 (the position-time graphs with marked or labelled points), values within tolerance 3 of 3, 0 wrong cells | |
 | values from the PDF text | 0 of 3 (the inputs are images) | |
-| decisions added | 3 required (`values_from_image`), 0 optional notes (no description marked unsure), 0 colour-only flags | 0 |
+| decisions added | 3 required (`values_from_image`; since 2026-10-09 a note, the table an optional extra: 0 required), 0 optional notes (no description marked unsure), 0 colour-only flags | 0 |
 | cost | $0.0040 per figure for the step; $0.124 for the run with both judges | $0.0035 per figure |
 | step latency | p50 7.7 s, p95 15.9 s (sum of call latencies) | p50 5.8 s, p95 10.0 s |
 
@@ -959,10 +959,11 @@ Reading it:
 
 - The long descriptions follow the W3C two-part pattern: axes with units and ranges,
   the trend, the labelled points, and "about" for values read off an axis. The judge
-  found every table value within tolerance, but every table asks for a decision because
-  its values came from pixels; in a PDF whose chart labels are real text, the printed
-  values (400 m, 525 m at 0.50 s, 2000 m at 6.40 s) would be found in the text and ask
-  nothing.
+  found every table value within tolerance, but every table asked for a decision because
+  its values came from pixels (since 2026-10-09 such a table is not written and asks
+  nothing: the review screen offers it, "Add the data table"); in a PDF whose chart
+  labels are real text, the printed values (400 m, 525 m at 0.50 s, 2000 m at 6.40 s)
+  would be found in the text and the table written.
 - The one alt result that changed: "Graph of y versus x" lost "rise over run" from its alt
   text (the long description carries it), and the alt judge, which does not see the long
   description, marked it as missing key information. One figure is within run-to-run
@@ -1056,12 +1057,10 @@ as a ruled grid of single words: detection claims them, the model rightly says t
 not data tables, and the table is then kept as an image, which needs a decision and
 turns readable words into a picture. With `FEATURE_TABLES` off the same two grids were
 `table_not_rebuilt` decisions, so merging detection alone made this 12 (0.279 per PDF
-page). Fixed after this run (`tables.is_word_grid`): a ruled grid of a few short words
-with no digit and no "Table N" caption stays text, as in 0.3.0. Layout now claims no
-table on the three sections (checked offline after the sync with `feat/beta-app`), so
-tables add no decision there with the flags off, and with every flag on the 2 grid
-decisions go (neither re-measured with the models). What to do when the model calls a
-claimed grid "not a data table" is still open (docs/design/content-features.md).
+page). Both causes were removed afterwards, and neither change is re-measured with the
+models yet ("Review load after the meaning-level changes" below): a chart data table read
+from the image is an optional extra, never a decision, and the two key-term grids are
+written as lists of their terms (`tables.is_term_grid`), flag on or off.
 
 ### Tables (`--task tables`)
 
@@ -1088,6 +1087,8 @@ tables, $0.034):
 So the floor of 0 needs either a scorer that knows these spellings or a few labelled
 exceptions before it can gate model runs (TODO(Harish) in gate.py stands). Superscript
 powers written as `^` in text cells are a prompt issue for the table step to take up.
+Both were done afterwards (below): the scorer knows these spellings (`fidelity_text`),
+and the wrapped row is joined back; the model runs are not repeated yet.
 
 ### Demo and fixtures (smoke, real models)
 
@@ -1101,6 +1102,122 @@ powers written as `^` in text cells are a prompt issue for the table step to tak
 All four pass the static checks and axe. The committed demo was rebuilt afterwards with
 every flag off ("Public demo" above): 4 required decisions, the same 3 headings and
 again equation 2.5's dropped bold v.
+
+## Review load after the meaning-level changes (2026-10-09, evening)
+
+What changed (docs/design/content-features.md "Review tiers"; Harish's policy: additive
+extras never add a required decision):
+
+- A chart data table whose values are not all in the PDF text is not written into the
+  student file and is not a decision; the review screen offers it ("Add the data
+  table"). Tables whose values all come from the PDF text are written, as before.
+- A claimed grid the local check calls a grid of terms (`tables.is_term_grid`) is
+  written as a list of its terms, flag on or off: no table, no image, no decision. With
+  the tables flag on, a grid the model calls "not a data table" is written as its text
+  (an optional note, `written_as_text`). With the flag off, a grid the local check
+  calls data stays an image with a required decision.
+- The tables scorer compares gold's spellings as the same text (`fidelity_text`, and
+  the raised marks in headers), and a table row the page break split is joined back.
+
+**Not run: every real-model measurement of this stage.** The OpenAI account is out of
+credit: every call returns HTTP 429 `credit_balance_exhausted` (confirmed 2026-10-09,
+20:40 CDT). So the document task with the flags off and on (cap $0.40), the demo, and
+the tables model run on `grid` + authored were not run, and nothing was spent. The
+numbers below are offline: layout (no model), the document task with the fake client,
+and the stored real answers of the integration runs with today's rules applied.
+
+### Claimed grids (layout only, no model)
+
+`layout.analyze` on each set, counting the grids `tables.find` keeps:
+
+| set | PDFs (pages) | claimed data tables | claimed grids of terms, written as lists | grids left on the paragraph path |
+|---|---|---|---|---|
+| document gold (Physics 2.1-2.3) | 3 (43) | 0 | 2 | 0 |
+| table gold prints (13 pages x 3 styles) | 39 (654) | 151 (150 tables after a split row is joined) | 14 | 3 |
+| authored tables | 6 (21) | 34 | 0 | 0 |
+| test fixtures (`tests/fixtures/layout`) | 12 (18) | 5 | 0 | 0 |
+| demo `source.pdf` (Physics 2.3) | 1 (13) | 0 | 0 | 0 |
+
+The document gold's two grids are the "Key Terms" boxes of 2.1 (8 terms, displacement to
+vector) and 2.2 (6 terms, average speed to velocity). Converted offline, each is a `<ul>`
+of its terms, with no table, no flagged image and no decision; static checks and axe
+pass. In the tables eval, 31 of the 33 gold layout tables are kept out of the data
+tables (17 of 33 before `is_word_grid`, 24 with it). The two left: the norules print of
+the Physics 1.3 key terms, where a term wraps onto a row of its own (docs/tables.md
+"Known misses"), and the authored contact grid (Instructor | Dr. Alex Rivera, Office | ...),
+two columns of a label and a value with digits, which the local check calls data: with
+the flag off it is an image and a required decision.
+
+### Document task with the fake client (no model)
+
+`eval pipeline --task document --fake`, the flags all off, then all on
+(`.local/review-load/document-fake-{off,on}.json`, not committed). The fake refuses
+every call, so every equation and figure is a FAILED decision (`model_refused`: 71):
+those are not review load. Headings and tables do not depend on the model:
+
+| | flags off | flags on |
+|---|---|---|
+| heading decisions (groups counted once) | 9 | 9 |
+| table decisions | 0 | 0 |
+| optional heading notes | 20 | 20 |
+| predicted equations | 55 | 64 (bold letters in prose made maths) |
+| static and axe violations | 0 / 0 | 0 / 0 |
+
+The 9 heading decisions are the 0.3.0 report's 9.
+
+### Stored real answers, today's rules
+
+The flags-on demo conversion of the integration (Physics 2.3, the third section of the
+document gold; `.local/integration/smoke/demo.json`) had 9 required decisions: 3 heading
+groups, equation 2.5's dropped bold v, and 5 figures whose only failed check was
+`values_from_image` (confidence 0.96-0.99). With today's figure rule those 5 figures are
+accepted with a note and their tables offered: 4 required decisions, the same 4 as the
+flags-off demo rebuilt with real models during the sync.
+
+### What this gives for the targets (an estimate, not a measurement)
+
+| document gold, 43 PDF pages | measured with models | today's rules on the same answers | target |
+|---|---|---|---|
+| flags off | 12 (0.279; the 0.3.0 run's 10 plus the 2 key-term grids as images) | 10 (0.233) | <= 0.25 |
+| flags on | 17 (0.395) | 10 (0.233): minus 5 chart tables, minus 2 key-term grids | <= 0.28 |
+
+By cause, both: 9 heading decisions (measured offline above), 1 equation (equation 2.5,
+`style_mismatch`, a right catch in every real run so far), 0 tables, 0 figures. Model
+answers vary from run to run (an escalation more or less), so this is an estimate on
+the integration's answers.
+
+TODO(Harish): when the account has credit again, run the document task with the flags
+off and on (about $0.15 each), rebuild the demo with the flags on (about $0.07) and run
+the tables model task on `grid` + authored (about $0.26), then replace this estimate
+with the numbers.
+
+### Tables (`--task tables`, local mode, no model)
+
+`.local/review-load/tables-local-final.json`, every style and the authored documents:
+
+| | integration (13:00) | before the scorer change (20:30) | now |
+|---|---|---|---|
+| recall / precision | 0.909 / 0.978 | 0.909 / 0.984 | 0.909 / 0.984 |
+| TEDS (on found) | 0.867 (0.955) | 0.866 (0.954) | 0.866 (0.954) |
+| column headers exact | 0.843 | 0.792 | 0.843 |
+| header exact | 0.812 | 0.761 | 0.812 |
+| layout tables kept out | 17 of 33 | 31 of 33 | 31 of 33 |
+| cells faithful, wrong cells | 0.981, 197 | 0.983, 188 | 0.983, 188 |
+| wrong cells not flagged | 0 | 0 | 0 |
+
+`eval gate` passes every gold floor (the real-document part is skipped). Column headers
+fell to 0.792 when the local grid began writing a raised mark as "^([1])" (pipeline
+"keep raised glyphs as exponents"), against gold's "Relative Strength[1]": a spelling,
+not an error, so the header numbers now compare the mark's characters
+(`eval.tables.header_text`). In local mode every table is kept as an image with a
+decision, so "wrong cells not flagged" is 0 by construction; the floor matters for model
+runs, which were not repeated. The wrapped last row of the orders-of-magnitude table is
+joined in the `grid` print (17 rows, "the known universe", "(current upper limit)");
+in the `booktabs` print the page break falls between rows; in the `norules` print the
+next page's part (one row under a repeated header, no rules) is not detected, so the
+row ends "(current" and the rest is read as headings and paragraphs (a detection miss of
+unruled tables, docs/tables.md "Known misses"; not fixed: tables get no further work
+for now).
 
 ## What the numbers do not show
 

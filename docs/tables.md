@@ -64,14 +64,21 @@ read", step 0). No model call; the same PDF always gives the same tables.
 5. **Headers.** The top rows are column headers when SLANet-plus or PyMuPDF marks them,
    except when a header cell starts with a number ("Mass | 2 kg" is a label and its
    value) or a header cell would span into the body. Empty cells are never headers.
-6. **Data or layout.** A grid of one column, or two columns whose second is prose (cells
-   longer than 60 characters on average) and neither numeric, is text set out in boxes
-   (a key-terms list). So is a grid of single terms (`is_word_grid`: every cell filled,
-   no digit in any cell, no cell over three words, at most six rows) without a "Table N"
-   caption: the
-   ruled "Key Terms" boxes OpenStax prints (displacement | distance | kinematics |
-   magnitude), which were claimed as tables and became an image and a required decision.
-   Neither is claimed; both keep the paragraph path.
+6. **Data or layout** (the local data-vs-layout check). Without a "Table N" caption, a
+   **grid of terms** (`is_term_grid`: at least three columns and at most six rows, no
+   digit, every term at most four words with a word of three letters or more, no term
+   twice, empty cells only at the end, less than a row of them) is claimed but marked
+   not data (`TableGrid.is_data` False, reason `"grid of terms"`): layout writes its
+   terms as list items in reading order, in the grid's place (`layout._term_items`), so
+   a screen reader hears a list, with no table, image or decision, whatever
+   `FEATURE_TABLES` says. These are the ruled "Key Terms" boxes OpenStax prints
+   (displacement | distance | kinematics | magnitude); left in the text flow their
+   lines ran together ("position reference frame scalar vector"), claimed as data they
+   were an image and a required decision. A grid of one column, or two columns whose
+   second is prose (cells longer than 60 characters on average) and neither numeric, or
+   two columns of single words (`is_word_grid`), is not claimed and keeps the paragraph
+   path (equations and headings in it are found as usual). Everything else is a data
+   table.
 7. **Caption.** A `"Table N ..."` line just above or below the table (within 36 pt, the
    same reach as figure captions; "Table 2 shows that ..." is not a caption) and its
    continuation lines become `Element.caption` and `TableGrid.caption`. A caption is
@@ -79,13 +86,24 @@ read", step 0). No model call; the same PDF always gives the same tables.
 8. **Continued tables.** A table split across pages stays two tables. The second gets the
    reason `"continued from previous page"` when it has the same columns (left edges within
    3 % of the page width) as the last table of the page before and nothing but a running
-   header above it.
+   header above it. When the page break split a row (Word and browsers break a tall row;
+   the gold's orders-of-magnitude table ends "... the edges of the known" on one page
+   and "universe" on the next), `join_split_row` joins the end back: the first row after
+   any header rows repeated from the table before is the end of that table's last row
+   when its first cell is empty where the last row's is not, and each cell with text
+   goes on a cell of the last row (it starts in lower case or with a bracket, or the
+   cell before ends with a hyphen). Its text is joined to the last row
+   (`"last row continues on the next page"`), the row leaves the second table
+   (`"first row ends the last row of the page before"`), and a second table left with
+   only its repeated header is dropped (its caption goes to the first). The table step
+   reads the model's answers the same way (`table_step.with_split_rows`).
 
 What layout does with the result: the table's lines, rules and caption lines leave the
-page, and a TABLE element is placed in reading order like a figure. This happens whatever
-`FEATURE_TABLES` says: with the flag off the table step keeps the table as an image with
-a required decision (`table_not_rebuilt`), which fixes today's misreadings (numeric
-tables as equations, blank tables as figures) without rebuilding anything.
+page, and a TABLE element is placed in reading order like a figure (a grid of terms:
+its list items). This happens whatever `FEATURE_TABLES` says: with the flag off the
+table step keeps a data table as an image with a required decision
+(`table_not_rebuilt`), which fixes today's misreadings (numeric tables as equations,
+blank tables as figures) without rebuilding anything; meaning would be lost otherwise.
 
 ### Where it runs, and what it costs
 
@@ -200,8 +218,19 @@ with `taskset -c N`). The manuals come from the public URLs in the challenge sec
   kept, as superscript characters).
 - **Without the model file**, booktabs tables with spanning headers or maths cells can
   get a column too many (PyMuPDF splits "Specific heat (J/kg K)" or "p = mv").
-- **Layout grids** (a key-terms list set as a table) keep today's paragraph path, which
-  can still read them as text columns; they are not turned into `<dl>` yet.
+- **Prose layout grids** (one column, or a term and its definition in two columns) keep
+  the paragraph path, which can still read two columns as text columns. A key-terms
+  grid printed so that a term wraps onto a row of its own (one print of the gold's
+  1-3 page) is not a grid of terms and stays a data table. So does a form set out as two
+  columns of a label and a value with digits in it (the authored contact grid:
+  Instructor | Dr. Alex Rivera, Office | Science Building 2.104): with `FEATURE_TABLES`
+  off it is an image and a required decision; the local check cannot tell it from a
+  two-column table of data.
+- **A row split by a page break in an unruled table**: the next page's part (one row
+  under a repeated header, no rules) is not detected, so `join_split_row` has nothing to
+  join: the repeated header, the split row's last line and the next row are read as
+  headings and paragraphs (the `norules` print of the gold's 1-3 orders-of-magnitude
+  table). Not fixed: tables get no further work while `FEATURE_TABLES` is off.
 
 ### Upgrade check
 
@@ -386,11 +415,12 @@ First matching rule wins (content-features.md "Review tiers"):
 | # | Condition | Status | `reason` | Tier |
 |---|---|---|---|---|
 | 1 | rebuilding off | FAILED | `table_not_rebuilt` | required (image kept) |
-| 2 | the answer kept says it is not a data table | ABSTAINED | `not_data_table` | required (image kept) |
+| 2 | the answer kept says it is not a data table | ACCEPTED, the grid read from the PDF (`is_data` False) written as its text in reading order | (check `table.kind` `written_as_text`) | optional |
+| 2b | ... and there is no grid read from the PDF to write (none, no text, flattened maths) | ABSTAINED | `not_data_table` | required (image kept) |
 | 3 | no usable answer, a local grid exists | NEEDS_REVIEW, the local grid with first-row headers | (check `local_grid`) | required |
 | 3b | no usable answer, no local grid | FAILED | `model_<outcome>` or `invalid_table` | required (image kept) |
 | 4 | every check passed | ACCEPTED | | none |
-| 5 | only notes failed (`whitespace_differs`, `style_cosmetic`, `row_headers_dropped`) | ACCEPTED | | optional |
+| 5 | only notes failed (`whitespace_differs`, `style_cosmetic`, `row_headers_dropped`, `written_as_text`) | ACCEPTED | | optional |
 | 6 | otherwise | NEEDS_REVIEW, the model's grid | | required |
 
 The model gives no confidence: the checks decide, so `Fix.confidence` is None. A table
@@ -399,6 +429,12 @@ rejecting it keeps the image. The review screen shows the proposal beside the cr
 the local grid (`Element.table`), with the failing checks named (tables-review work).
 
 ### Output
+
+A grid that is not a table of data (rule 2) is written as its cells' text in reading
+order (`assemble_tables.text_html`), keeping what goes together: two columns whose every
+row is a short term and its text as a description list (`<dl>`), cells that are all
+short terms as a list, anything else one paragraph per cell; its "Table N" caption comes
+first as a paragraph, and nothing is flagged.
 
 `assemble_tables.render_table_element` writes a usable proposal with `render_table`
 inside `<div class="table-scroll">`, which scrolls sideways on a narrow screen (WCAG

@@ -603,7 +603,9 @@ full description is in [tables.md](tables.md). In short:
   and this page's symbol, sign and style rules against the PDF glyphs in their place.
 - Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic maths style ->
   ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
-  not a data table -> ABSTAINED `not_data_table`; no usable answer -> the local grid with
+  not a data table -> the grid read from the PDF written as its text in reading order,
+  ACCEPTED with the note `written_as_text` (optional; ABSTAINED `not_data_table`,
+  required, when there is no such grid to write); no usable answer -> the local grid with
   first-row headers, NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
   FAILED `table_not_rebuilt`. No model confidence: `Fix.confidence` is None.
 - Header policy: header rows from the top; row headers only for columns of non-empty,

@@ -32,7 +32,7 @@ to every builder, plus these:
 
 | Setting (environment) | Default | Off means |
 |---|---|---|
-| `FEATURE_TABLES` | false | Data tables are still detected and claimed from the text flow, but kept as an image of the table with a required decision ("table not rebuilt"). |
+| `FEATURE_TABLES` | false | Data tables are still detected and claimed from the text flow, but kept as an image of the table with a required decision ("table not rebuilt"), when the local check says data; a grid of terms is written as a list either way. |
 | `FEATURE_LONG_DESCRIPTIONS` | false | Figures get short alt text only: no long description, no chart data table, no colour-only flag. |
 | `FEATURE_COLOUR` | false | Coloured text is written in the body colour (as in 0.3.0); no colour runs, no colour-reference notices. |
 | `FEATURE_NOTATION_MEMORY` | false | No course notation: no hints, no spoken readings from it, no bold letters in prose turned into maths, no "remember for this course"; the courses pages are hidden. |
@@ -152,7 +152,9 @@ document text.
 
 | Item | Tier | How |
 |---|---|---|
-| Table kept as an image (flag off, or not rebuilt) | required | FAILED, reason `table_not_rebuilt`; the image stays, flagged |
+| Claimed grid the local check calls not data: a grid of terms (`tables.is_term_grid`) | none | written as a list of its terms by layout, flag on or off; no table element, no image |
+| Data table kept as an image (flag off, or not rebuilt) | required | FAILED, reason `table_not_rebuilt`; the image stays, flagged (meaning would be lost otherwise) |
+| Data table the model calls "not a data table" (flag on) | optional | ACCEPTED with the note `written_as_text`: the grid read from the PDF written in reading order (a description list, a list or paragraphs); without one, ABSTAINED `not_data_table`, required |
 | Table rebuilt, every check passed | none | ACCEPTED |
 | Table whose cells fail the bijection with the PDF words after escalation | required | NEEDS_REVIEW with the proposal; rejecting keeps the image |
 | Table failing grid agreement, a maths-cell check (as for equations: a symbol or sign) or header sanity after escalation | required | NEEDS_REVIEW |
@@ -268,7 +270,7 @@ ran after the last merge. The four feature flags stay **off by default**.
 | tables-step | With `FEATURE_TABLES` the crop goes to gpt-6-luna (gpt-6.1-sol on any failed check), the answer is checked against the PDF's words, the local grid and the maths validators, and written by `table_html` in a scroll box. Flag off: the image, `table_not_rebuilt`, required. | [tables.md](../tables.md) "The table step" |
 | tables-review | Tables on both review screens: the crop beside the table as students get it, Accept, Keep as image, use the grid read from the PDF, headers, one cell at a time; each change re-runs the step's checks. | [web.md](../web.md) "The table card" |
 | tables-eval | `eval pipeline --task tables` (local and model modes), OpenStax and authored gold, floors in `eval gate`. | [eval.md](../eval.md) "Tables" |
-| figures | With `FEATURE_LONG_DESCRIPTIONS`: long descriptions, chart data tables (required when read from the image), the colour-only flag; smaller figure images in the student file (MF23, always). | [steps.md](../steps.md), [output.md](../output.md) |
+| figures | With `FEATURE_LONG_DESCRIPTIONS`: long descriptions, chart data tables (written when every value is in the PDF text; read from the image, an optional extra the reviewer adds), the colour-only flag; smaller figure images in the student file (MF23, always). | [steps.md](../steps.md), [output.md](../output.md) |
 | text | Always: PDF links, cross-references, the document and passage language; with `FEATURE_COLOUR`, colour runs adjusted to 4.5:1. | [layout.md](../layout.md) "The text pass", [output.md](../output.md) |
 | notation | With `FEATURE_NOTATION_MEMORY`: courses and their notation, hints to the equation model, spoken readings, bold letters in prose made maths, "remember for this course". | [web.md](../web.md), [steps.md](../steps.md) |
 | job-page | Source facts, the before/after card, live progress by stage, notices derived from the fixes, honest headlines, the language control, the student note as a footer. | [web.md](../web.md) "The job page" |
@@ -322,24 +324,37 @@ features after integration"):
   checks and axe.
 - Review load on the document gold: 17 required decisions on 43 PDF pages (0.395 per
   page) against 0.3.0's 10 (0.233): the same 10, plus 5 chart data tables read from the
-  image and 2 ruled key-term grids kept as images. Equation accuracy unchanged (0.733).
+  image and 2 ruled key-term grids kept as images (both causes since removed: "Open
+  after integration"). Equation accuracy unchanged (0.733).
 - Tables evaluation: local mode passes every floor (recall 0.909, precision 0.978, TEDS
   0.867); model mode TEDS 0.958 (grid and authored), but "wrong cells not flagged" is
   14, not 0.
 
 ### Open after integration
 
-- **Key-term grids.** A ruled grid of single words (OpenStax "Key Terms") was claimed as
-  a table (an image and a required decision either way). Fixed after the review:
-  `tables.is_word_grid` (no digit, no cell over three words, at most six rows, no
-  "Table N" caption) leaves it on the paragraph path, as 0.3.0 did. Still open, for
-  Harish: when the model says "not a data table" for a grid that is claimed, write the
-  cells' text in reading order instead of the image, with no decision.
-- **Data tables read from the image** add one required decision per chart (5 on the
-  demo, 5 on the document gold). That is the tier as decided; it is the largest new load.
-- **The tables gate in model mode** fails `wrong cells not flagged` (14 on grid and
+- **Key-term grids** (done 2026-10-09). A ruled grid of single words (OpenStax "Key
+  Terms") was claimed as a table: an image and a required decision either way. Now a
+  grid of terms (`tables.is_term_grid`) is claimed and written as a list of its terms,
+  flag on or off, with no decision; with the tables flag on, a grid the model calls "not
+  a data table" is written as its text (an optional note, `written_as_text`). The
+  document gold's two grids are lists now (docs/eval.md "Review load after the
+  meaning-level changes").
+- **Data tables read from the image** (done 2026-10-09). They added one required
+  decision per chart (5 on the demo, 5 on the document gold). Now they are optional
+  extras: not written into the student file, offered on the figure card ("Add the data
+  table"); a table whose values all come from the PDF text is written as before.
+- **The tables gate in model mode** failed `wrong cells not flagged` (14 on grid and
   authored, 8 on the partial booktabs/norules run): mostly gold spellings and
-  run-to-run variation, 2 real (a wrapped last row cut by the table box).
+  run-to-run variation, 2 real (a wrapped last row cut by the table box). The scorer now
+  knows gold's spellings (`eval.tables.fidelity_text`) and the wrapped row is joined
+  back (`tables.join_split_row`); the model runs are to be repeated.
+- **Review load re-measured with real models: not yet.** The OpenAI account ran out of
+  credit (HTTP 429 `credit_balance_exhausted`, 2026-10-09 20:40 CDT). On the
+  integration's answers with today's rules the document gold has 10 required decisions
+  (0.233 per PDF page) with the flags off and on (targets 0.25 and 0.28); offline,
+  headings give 9 and tables 0 either way (docs/eval.md).
+- **Tables** stay behind their flag and get no further work for now (Harish,
+  2026-10-09); the misses found here are in docs/tables.md "Known misses".
 - **Synced with `feat/beta-app`** (its `0ecf511`, `0fcb6f1`, `9ad41db`: the 0.3.0 eval
   reports and demo, the frozen 0.2.0 demo report, the CI fonts and the Type3 xfail),
   merged into this branch. The public demo was then rebuilt on 0.4.0 with every flag off
