@@ -278,3 +278,31 @@ def test_one_click_keeps_every_page_of_the_group(env):
     assert "1 decision left" in after
     html = env.job(job_id).html or ""
     assert html.count('data-reason="handwritten_page"') == 2  # still kept, marked
+
+
+def _post(env, job_id: str, key: str, action: str, view: str):
+    page = env.browser.get(f"/jobs/{job_id}/review" + ("/list" if view == "list" else ""))
+    token = re.search(r'name="csrf_token" value="([^"]+)"', page.text)
+    version = re.search(r'name="version" value="(\d+)"', page.text)
+    assert token and version
+    return env.browser.post(
+        f"/jobs/{job_id}/review/{key}",
+        data={"csrf_token": token.group(1), "action": action, "view": view,
+              "version": version.group(1)},
+        follow_redirects=False,
+    )  # fmt: skip
+
+
+def test_the_list_view_keeps_the_group_and_refuses_anything_but_keep(env):
+    job_id = job_id_from(upload(env.browser, data("mixed_course.pdf"), filename="course.pdf"))
+    _worker(env).run_once()
+    refused = _post(env, job_id, "pg-p2-e0", "accept", "list")
+    assert refused.status_code == 422
+    assert "these images have nothing else to accept" in text_of(refused.text)
+    assert 'href="#group-actions-pg-p2-e0"' in refused.text  # the error summary's link
+    kept = _post(env, job_id, "pg-p4-e0", "reject", "list")
+    assert kept.status_code == 303 and "/review/list#" in kept.headers["location"]
+    listing = text_of(env.browser.get(f"/jobs/{job_id}/review/list").text)
+    assert "Needs your decision (1)" in listing
+    assert "Kept by you" in listing  # the scanned page, in "Your decisions"
+    assert _post(env, job_id, "pg-nothing", "reject", "split").status_code == 404

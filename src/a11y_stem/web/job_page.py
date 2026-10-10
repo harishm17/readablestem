@@ -243,7 +243,7 @@ def breakdown(fixes: list[Fix]) -> Breakdown:
         decided=len(decided),
         decided_units=len(triage.units(decided)),
         as_image=len(images),
-        as_image_kinds=dict(Counter(f.kind.value for f in images)),
+        as_image_kinds=dict(Counter(word_kind(f) for f in images)),
     )
 
 
@@ -252,7 +252,19 @@ KIND_WORDS = {
     "figure": ("figure", "figures"),
     "table": ("table", "tables"),
     "heading": ("heading", "headings"),
+    # Pages and handwriting kept as images (pipeline.page_type) are figures in the data
+    # model, but not in words.
+    "page": ("page", "pages"),
+    "handwriting": ("piece of handwriting", "pieces of handwriting"),
 }
+
+
+def word_kind(fix: Fix) -> str:
+    """The kind a fix is named by: "page" or "handwriting" for one kept as an image
+    before any model work, else its kind."""
+    if fix.kind is Kind.FIGURE and fix.reason in notice_rules.KEPT_IMAGE_CODES:
+        return "handwriting" if fix.reason == "handwriting_on_page" else "page"
+    return fix.kind.value
 
 
 def kinds_phrase(counts: dict[str, int]) -> str:
@@ -823,7 +835,7 @@ def draft_sentence(fixes: list[Fix]) -> str:
         kinds = kinds_phrase(dict(Counter(f.kind.value for f in proposals)))
         sentences.append(f"For {kinds}, students will get the tool's suggestion as it is.")
     if images:
-        kinds = kinds_phrase(dict(Counter(f.kind.value for f in images)))
+        kinds = kinds_phrase(dict(Counter(word_kind(f) for f in images)))
         verb, shown = ("is", "an image") if len(images) == 1 else ("are", "images")
         sentences.append(f"{kinds[0].upper()}{kinds[1:]} {verb} {shown} marked “Not converted”.")
     return " ".join(sentences)
@@ -850,7 +862,11 @@ class PageData:
 
 
 def found_sentence(result: DocumentResult) -> str:
-    kinds = Counter(f.kind.value for f in _first_fixes(result).values())
+    """ "Found 3 equations and 2 figures on 4 pages." Pages kept as images are not
+    "found": the outcome says which they are."""
+    kinds = Counter(
+        word_kind(f) for f in _first_fixes(result).values() if word_kind(f) == f.kind.value
+    )
     pages = plural(result.stats.pages, "page")
     found = kinds_phrase(dict(kinds)) if any(kinds.get(k) for k in KIND_WORDS) else ""
     return f"Found {found} on {pages}." if found else f"Read {pages}."
