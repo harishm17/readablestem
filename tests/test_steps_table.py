@@ -1144,3 +1144,41 @@ def test_recorded_answers_with_a_misread_symbol_are_caught():
         )
         assert fix.status is Status.NEEDS_REVIEW, name
         assert codes(fix) & {"text_mismatch", "symbol_mismatch"}, (name, codes(fix))
+
+
+# --------------------------------------------------------------------------- split rows
+
+SPLIT = [
+    ["Length (m)", "Phenomenon"],
+    ["10^21", "Diameter of the Milky Way Galaxy"],
+    ["10^26", "Distance from Earth to the edges of the known universe"],
+]
+
+
+def test_a_last_row_the_page_break_split_gets_the_pdfs_whole_text():
+    # The crop ends at the page bottom: the model reads "... the known"; layout joined
+    # "universe" from the next page's table into the grid read from the PDF.
+    from a11y_stem.pipeline.tables import REASON_ROW_SPLIT
+
+    cut = [*SPLIT[:2], ["10^26", "Distance from Earth to the edges of the known"]]
+    target = element(local(SPLIT)).model_copy(update={"reasons": [REASON_ROW_SPLIT]})
+    fix = run(by_model(cheap=answer(with_header_row(cut))), target)
+    assert fix.status is Status.ACCEPTED and fix.review == "none", fix.failed_checks
+    assert fix.table is not None
+    last = [c.text for c in fix.table.grid.cells if c.row == 2]
+    assert last == ["10^26", "Distance from Earth to the edges of the known universe"]
+    # Without the mark the same answer is a cell the PDF says more in: flagged.
+    flagged = run(by_model(cheap=answer(with_header_row(cut))), element(local(SPLIT)))
+    assert flagged.status is Status.NEEDS_REVIEW
+
+
+def test_the_end_of_a_split_row_is_left_out_of_the_next_tables_answer():
+    from a11y_stem.pipeline.tables import REASON_ROW_CONTINUED
+
+    rest = [["Length (m)", "Phenomenon"], ["10^30", "Mass of the Sun"]]
+    with_end = [rest[0], ["", "universe"], rest[1]]
+    target = element(local(rest)).model_copy(update={"reasons": [REASON_ROW_CONTINUED]})
+    fix = run(by_model(cheap=answer(with_header_row(with_end))), target)
+    assert fix.status is Status.ACCEPTED, fix.failed_checks
+    assert fix.table is not None and fix.table.grid.rows == 2
+    assert "universe" not in " ".join(c.text for c in fix.table.grid.cells)

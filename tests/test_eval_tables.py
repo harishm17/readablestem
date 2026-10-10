@@ -283,3 +283,77 @@ def test_cluster_bootstrap_keeps_a_clusters_values_together_and_is_seeded():
     assert 0.0 <= low <= high <= 1.0
     assert T.cluster_bootstrap(values, samples=500) == (low, high)
     assert T.cluster_bootstrap([]) is None
+
+
+# ------------------------------------------------------------------ notation in gold
+
+
+def gold_of(html: str) -> list[T.Cell]:
+    return T.cells_from_html(html)
+
+
+def pred_of(texts: list[list[str]]) -> list[T.Cell]:
+    return [T.Cell(row=r, col=c, text=t) for r, row in enumerate(texts) for c, t in enumerate(row)]
+
+
+POWERS = (
+    "<table><tr><th>Length (m)</th></tr><tr><td>10<sup>\u201318</sup></td></tr>"
+    "<tr><td>10<sup>2</sup></td></tr></table>"
+)
+
+
+@pytest.mark.parametrize("written", ["10^-18", "10\u207b\u00b9\u2078", "10^{-18}", "10\u221218"])
+def test_a_power_of_ten_written_another_way_is_not_an_error(written):
+    pred = pred_of([["Length (m)"], [written], ["10^2"]])
+    fidelity = T.cell_fidelity(pred, gold_of(POWERS))
+    assert (fidelity["errors"], fidelity["faithful"]) == (0, 3)
+
+
+def test_a_stacked_fraction_written_across_is_not_an_error():
+    gold = gold_of(
+        "<table><tr><td>WIN</td><td><math><mfrac><mn>1</mn><mn>3</mn></mfrac></math></td></tr>"
+        "<tr><td>LOSE</td><td><math><mfrac><mn>\u201312</mn><mn>3</mn></mfrac></math></td></tr></table>"
+    )
+    for third, other in (("1/3", "\u201312/3"), ("\u2153", "-12/3")):
+        assert T.cell_fidelity(pred_of([["WIN", third], ["LOSE", other]]), gold)["errors"] == 0
+
+
+def test_fill_in_blanks_are_empty_cells_however_long():
+    gold = gold_of("<table><tr><td>Female</td><td>18</td><td>___</td></tr></table>")
+    for blank in ("", "______", "\\_\\_\\_"):
+        pred = pred_of([["Female", "18", blank]])
+        fidelity = T.cell_fidelity(pred, gold)
+        assert (fidelity["errors"], fidelity["gold_cells"]) == (0, 2), blank
+
+
+def test_a_footnote_row_gold_keeps_in_the_table_counts_only_when_predicted():
+    gold = gold_of(
+        "<table><tbody><tr><td>Lens</td><td>1.41 average<sup>*</sup></td></tr></tbody>"
+        "<tfoot><tr><td colspan='2'><sup>*</sup>The index varies through the lens.</td></tr>"
+        "</tfoot></table>"
+    )
+    assert [c.footnote for c in gold] == [False, False, True]
+    without = T.cell_fidelity(pred_of([["Lens", "1.41 average*"]]), gold)
+    assert (without["errors"], without["gold_cells"]) == (0, 2)
+    with_it = pred_of([["Lens", "1.41 average*"], ["*The index varies through the lens."]])
+    assert T.cell_fidelity(with_it, gold)["faithful"] == 3
+
+
+def test_real_errors_still_count():
+    gold = gold_of(
+        "<table><tr><td>Water</td><td>1.33</td></tr><tr><td>Air</td><td>___</td></tr></table>"
+    )
+    assert T.cell_fidelity(pred_of([["Water", "1.35"], ["Air", ""]]), gold)["errors"] == 1
+    assert T.cell_fidelity(pred_of([["Water", "1.33"], ["Air", "1.00"]]), gold)["errors"] == 1
+
+
+def test_a_raised_footnote_mark_read_from_the_pdf_is_not_an_error():
+    # The grid read from the PDF marks raised text "^(...)"; gold's text drops the raise.
+    gold = gold_of(
+        "<table><thead><tr><th>Charge<sup>[1]</sup></th></tr></thead><tbody><tr><td>+1</td>"
+        "</tr></tbody><tfoot><tr><td><sup>[1]</sup>The lower sign is for antiquarks.</td></tr>"
+        "</tfoot></table>"
+    )
+    pred = pred_of([["Charge^([1])"], ["+1"], ["^([1]) The lower sign is for antiquarks."]])
+    fidelity = T.cell_fidelity(pred, gold)
+    assert (fidelity["errors"], fidelity["faithful"]) == (0, 3)

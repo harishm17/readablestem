@@ -24,6 +24,13 @@ checked against, as the equation step keeps an equation's text layer from the mo
 model that copied them could pass the checks with a flattened exponent (10⁵ is "105" in
 most text layers).
 
+A row a page break split (`tables.join_split_row`) is read the way layout joined it:
+each crop shows one page, so on the table whose last row goes on (`REASON_ROW_SPLIT`) a
+last-row cell the model read as the start of the PDF's cell gets the PDF's whole text,
+and on the table that holds the row's end (`REASON_ROW_CONTINUED`) the model's row of
+it, right after the header rows, is left out (`with_split_rows`). The checks then run as
+usual, so a model answer that differs anywhere else is still caught.
+
 The answer becomes a grid (`grid_from_output`): each row's cells placed from the left,
 skipping slots a cell above spans into (as HTML places them), slots no cell covers filled
 with empty cells, whitespace collapsed, and LaTeX kept only for real maths (a cell such as
@@ -140,6 +147,7 @@ from a11y_stem.pipeline.equation_step import (
     text_layer_symbols_differ,
 )
 from a11y_stem.pipeline.signs import compare_signs
+from a11y_stem.pipeline.tables import REASON_ROW_CONTINUED, REASON_ROW_SPLIT
 from a11y_stem.pipeline.validate import (
     LatexConversionError,
     check_latex,
@@ -721,6 +729,21 @@ def _cased(text: str) -> Counter[str]:
     return Counter(ch for ch in folded if ch.isalpha() and unicodedata.category(ch) != "Lm")
 
 
+def cell_text_layer(grid: TableGrid, cell: TableCell, element: Element | None) -> str | None:
+    """The PDF's text where `cell` stands, for checking a reviewer's LaTeX in it
+    (`web.edit_check.check_cell_edit`): the cell's own text in the grid read from the PDF
+    (its text stays when the cell is written as LaTeX), else the text of the cells of
+    that grid in its place, when the two grids line up. None when it is not known."""
+    if grid.source == "local":
+        return cell.text.strip() or None
+    local = _local(element) if element is not None else None
+    if local is None or not _aligned(grid, local):
+        return None
+    owner = _owners(local)
+    text = " ".join(local.cells[i].text for i in _counterparts(cell, owner)).strip()
+    return text or None
+
+
 def maths_numbers_or_case_differ(layer: str, mathml: str) -> bool:
     """Stricter than the equation step's case-folded bag of letters and digits, for a
     maths cell (a value with its unit): the letters with their case (5 mW is not 5 MW),
@@ -903,10 +926,54 @@ class _Candidate:
         return any(not c.passed and c.code not in NOTE_CODES for c in self.checks)
 
 
+def _without_row(grid: TableGrid, row: int) -> TableGrid | None:
+    """`grid` without `row` (1 x 1 cells only there, no span through it), else None."""
+    if any(c.row == row and (c.row_span, c.col_span) != (1, 1) for c in grid.cells):
+        return None
+    if any(c.row < row < c.row + c.row_span for c in grid.cells):
+        return None
+    cells = [
+        c.model_copy(update={"row": c.row - 1}) if c.row > row else c
+        for c in grid.cells
+        if c.row != row
+    ]
+    out = grid.model_copy(update={"rows": grid.rows - 1, "cells": cells})
+    return out if out.rows and not grid_problems(out) else None
+
+
+def with_split_rows(grid: TableGrid, element: Element) -> TableGrid:
+    """The model's grid read the way layout joined a row a page break split (module
+    docstring). Only where the element says so, and only where the answer fits the
+    pattern; otherwise the grid is returned as it is, and the checks judge it."""
+    local = _local(element)
+    if local is None:
+        return grid
+    if REASON_ROW_CONTINUED in element.reasons and grid.rows == local.rows + 1:
+        row = grid.header_rows
+        first = next((c for c in grid.cells if c.row == row and c.col == 0), None)
+        if first is not None and first.is_empty:
+            grid = _without_row(grid, row) or grid
+    if REASON_ROW_SPLIT in element.reasons and _aligned(grid, local):
+        owner = _owners(local)
+        last = grid.rows - 1
+        cells = []
+        for cell in grid.cells:
+            whole = [local.cells[i] for i in _counterparts(cell, owner)]
+            if cell.row == last and not cell.latex and cell.text and len(whole) == 1:
+                started, pdf = squeezed(cell.text), squeezed(whole[0].text)
+                if len(pdf) > len(started) and pdf.startswith(started):
+                    cell = cell.model_copy(update={"text": whole[0].text})
+            cells.append(cell)
+        grid = grid.model_copy(update={"cells": cells})
+    return grid
+
+
 def _evaluate(output: TableOutput | None, calls: list[ModelCall], element: Element) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
     placed = _grid_with_policy(output, caption=caption_of(element))
+    if placed is not None and output.is_data_table:
+        placed = (with_split_rows(placed[0], element), placed[1])
     candidate = _Candidate(output, calls, placed[0] if placed is not None else None)
     if candidate.grid is not None and output.is_data_table:
         candidate.checks = table_checks(candidate.grid, element)

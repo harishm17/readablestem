@@ -29,7 +29,11 @@ What is measured (docs/eval.md "tables"):
   headers apart; per table "exact" when the header texts (a multiset) equal gold.
 - Data vs layout, maths cells (letter/digit F1; MathML equal after `eval.equations`
   lenient normalisation), text fidelity (cells whose text is in gold, and cell errors in
-  tables nobody is asked about: must be 0), review load and cost.
+  tables nobody is asked about: must be 0; cell text compared after `fidelity_text`, so
+  the ways gold and a reader write the same thing are not errors: 10 en dash 18 and
+  10⁻¹⁸, ⅓
+  and 13, a "____" fill-in blank and an empty cell, and gold's footnote rows, which the
+  PDF prints under the table), review load and cost.
 
 Statistics: rates get 95% Wilson intervals (`pipeline_eval.wilson_interval`); metrics over
 gold tables get a cluster bootstrap over source tables (one OpenStax table printed three
@@ -140,6 +144,32 @@ def norm(text: str | None) -> str:
     return re.sub(r"\s+", "", s)
 
 
+# Raised text the grid read from the PDF marks "^(...)" (a footnote mark "^([1])"): its
+# characters are compared, the mark is not, as gold's text drops the raise.
+_RAISED = re.compile(r"\^\(([^()]*)\)")
+# Exponent markup a text cell may carry (10^{-18}, 10^-18): not compared.
+_EXPONENT_MARKS = str.maketrans("", "", "^{}")
+# A fraction written across: "1/3", and ⅓ (a fraction slash after NFKC), are gold
+# MathML's "13".
+_DIGIT_SLASH = re.compile(r"(?<=\d)[/\u2044](?=[-\d])")
+# A fill-in blank: underscores (escaped as LaTeX writes them, \_) or dots only.
+_BLANK = re.compile(r"[_\\\s.\u2026]*")
+
+
+def fidelity_text(text: str | None) -> str:
+    """Cell text for the fidelity count (`cell_fidelity`): `norm`, then the notations
+    that say the same thing made one. Gold's text drops the raise of a superscript, so
+    10⁻¹⁸ is "10", an en dash and "18" there, while a cell may write 10^-18 or
+    10⁻¹⁸ (both "10-18" here); gold's stacked fraction 1/3 reads "13" ("1/3" and
+    "⅓" too); a fill-in blank ("____")
+    is an empty cell. Only the fidelity count uses it: TEDS keeps table-bench's `norm`
+    so its numbers stay comparable."""
+    s = _RAISED.sub(r"\1", norm(text))
+    if _BLANK.fullmatch(s):
+        return ""
+    return _DIGIT_SLASH.sub("", s.translate(_EXPONENT_MARKS))
+
+
 def tokens(text: str | None) -> list[str]:
     """Words for detection matching: NFKC, lower case, runs of letters and digits."""
     return re.findall(r"[^\W_]+", unicodedata.normalize("NFKC", text or "").lower())
@@ -203,6 +233,9 @@ class Cell:
     header: HeaderKind | None = None
     math: bool = False
     mathml: str | None = None
+    # Gold only: a cell of the table's footer (<tfoot>: a footnote such as "*The index
+    # varies ..."), which the PDF prints under the table, so a prediction may leave it out.
+    footnote: bool = False
 
 
 def _local(tag: Any) -> str:
@@ -269,6 +302,13 @@ def cells_from_html(table_html: str) -> list[Cell]:
     """
     root = SafeET.fromstring(table_html)
     rows = [e for e in root.iter() if _local(e.tag) == "tr"]
+    footer = {
+        id(tr)
+        for foot in root.iter()
+        if _local(foot.tag) == "tfoot"
+        for tr in foot.iter()
+        if _local(tr.tag) == "tr"
+    }
     occupied: set[tuple[int, int]] = set()
     cells: list[Cell] = []
     for r, tr in enumerate(rows):
@@ -299,6 +339,7 @@ def cells_from_html(table_html: str) -> list[Cell]:
                     header=header,
                     math=has_math,
                     mathml=_cell_mathml(cell) if has_math else None,
+                    footnote=id(tr) in footer,
                 )
             )
             c += cs
@@ -495,35 +536,45 @@ def _same_maths(pred: str | None, gold: str) -> bool:
 
 
 def _fidelity_key(cell: Cell) -> str:
+    if not fidelity_text(cell.text):
+        return ""  # a fill-in blank has no letters to match
     return "".join(sorted(alnum_chars(cell.text).elements()))
 
 
 def cell_fidelity(pred: Sequence[Cell], gold: Sequence[Cell]) -> dict:
     """How many cells carry gold's text, and how many cell errors there are.
 
-    A predicted non-empty cell is faithful when its normalised text is a gold cell's
-    (each gold cell used once), or, failing that, its letters and digits are (maths
-    written another way). Errors per table = max(predicted cells left over, gold cells
-    left over): a misread number is one error, a dropped or invented one is one, two
-    cells merged into one are two.
+    A predicted non-empty cell is faithful when its text (`fidelity_text`) is a gold
+    cell's (each gold cell used once), or, failing that, its letters and digits are
+    (maths written another way). Errors per table = max(predicted cells left over, gold
+    cells left over): a misread number is one error, a dropped or invented one is one,
+    two cells merged into one are two. Fill-in blanks count as empty cells on both
+    sides; gold's footnote cells count only when the prediction has them too (the PDF
+    prints them under the table, not in it).
     """
-    gold_left = Counter(norm(c.text) for c in gold if norm(c.text))
+    printed = {fidelity_text(c.text) for c in pred} | {_fidelity_key(c) for c in pred}
+    gold = [
+        c
+        for c in gold
+        if not c.footnote or fidelity_text(c.text) in printed or _fidelity_key(c) in printed
+    ]
+    gold_left = Counter(fidelity_text(c.text) for c in gold if fidelity_text(c.text))
     pred_left: list[Cell] = []
     for cell in pred:
-        key = norm(cell.text)
+        key = fidelity_text(cell.text)
         if not key:
             continue
         if gold_left[key] > 0:
             gold_left[key] -= 1
         else:
             pred_left.append(cell)
-    gold_rest = [c for c in gold if norm(c.text)]
+    gold_rest = [c for c in gold if fidelity_text(c.text)]
     # Second pass on letters and digits for what is left on both sides.
     remaining = Counter(gold_left)
     gold_by_key: Counter[str] = Counter()
     for cell in gold_rest:
-        if remaining[norm(cell.text)] > 0:
-            remaining[norm(cell.text)] -= 1
+        if remaining[fidelity_text(cell.text)] > 0:
+            remaining[fidelity_text(cell.text)] -= 1
             gold_by_key[_fidelity_key(cell)] += 1
     still: list[Cell] = []
     for cell in pred_left:
@@ -532,7 +583,7 @@ def cell_fidelity(pred: Sequence[Cell], gold: Sequence[Cell]) -> dict:
             gold_by_key[key] -= 1
         else:
             still.append(cell)
-    gold_cells = sum(1 for c in gold if norm(c.text))
+    gold_cells = sum(1 for c in gold if fidelity_text(c.text))
     gold_unmatched = sum(gold_by_key.values())
     return {
         "gold_cells": gold_cells,

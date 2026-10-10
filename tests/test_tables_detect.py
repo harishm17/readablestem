@@ -688,3 +688,71 @@ def test_a_failure_in_table_detection_leaves_the_page_as_it_was(monkeypatch, cap
     assert [r.getMessage() for r in caplog.records] == [
         "table detection failed on a page: ZeroDivisionError"
     ]
+
+
+# --------------------------------------------------------------------------- split rows
+
+
+def page_table(rows: list[list[str]], *, header_rows: int = 1, caption=None) -> tables.PageTable:
+    cells = [
+        TableCell(row=r, col=c, text=t, header="col" if r < header_rows and t else None)
+        for r, row in enumerate(rows)
+        for c, t in enumerate(row)
+    ]
+    grid = TableGrid(rows=len(rows), cols=len(rows[0]), cells=cells, header_rows=header_rows)
+    return tables.PageTable(
+        bbox=(50, 50, 550, 700), grid=grid, caption=caption, lines=set(), paths=set(), reasons=[]
+    )
+
+
+HEAD = ["Length (m)", "Phenomenon", "Mass (kg)", "Phenomenon"]
+
+
+def texts(table: tables.PageTable) -> list[list[str]]:
+    rows: dict[int, list[str]] = {}
+    for c in sorted(table.grid.cells, key=lambda c: (c.row, c.col)):
+        rows.setdefault(c.row, []).append(c.text)
+    return list(rows.values())
+
+
+def test_a_row_the_page_break_split_is_joined_and_an_empty_rest_dropped():
+    # The physics orders-of-magnitude table: its last row breaks across the page, and
+    # the next page holds the repeated header, "universe" and "limit)", then the caption.
+    before = page_table(
+        [HEAD, ["1026", "Distance from Earth to the edges of the known", "1053",
+                "Mass of the known universe (current upper"]]
+    )  # fmt: skip
+    after = page_table([HEAD, ["", "universe", "", "limit)"]], caption="Table 1.3 Values")
+    assert tables.join_split_row(before, after)  # nothing left of it: layout drops it
+    assert texts(before)[-1] == [
+        "1026", "Distance from Earth to the edges of the known universe", "1053",
+        "Mass of the known universe (current upper limit)",
+    ]  # fmt: skip
+    assert before.caption == "Table 1.3 Values"
+    assert tables.REASON_ROW_SPLIT in before.reasons
+    assert tables.REASON_ROW_CONTINUED in after.reasons
+
+
+def test_a_split_row_with_more_rows_after_it_keeps_the_rest_of_the_table():
+    before = page_table([HEAD, ["1", "A wrapped descrip-", "2", "One more"]])
+    after = page_table([HEAD, ["", "tion here", "", "line"], ["3", "Next row", "4", "Last"]])
+    assert not tables.join_split_row(before, after)
+    assert texts(before)[-1] == ["1", "A wrapped description here", "2", "One more line"]
+    assert texts(after) == [HEAD, ["3", "Next row", "4", "Last"]]
+
+
+@pytest.mark.parametrize(
+    "rest",
+    [
+        ["5", "A new row", "6", "Another"],  # a row of its own
+        ["", "Gases at 0 C", "", ""],  # a section row: capitalised, not a continuation
+        ["", "", "", ""],  # an empty row
+    ],
+)
+def test_rows_that_are_not_the_end_of_a_split_row_are_left_alone(rest):
+    before = page_table([HEAD, ["1", "Diameter of a proton", "2", "Mass of a bacterium"]])
+    after = page_table([HEAD, rest, ["7", "x", "8", "y"]])
+    old_before, old_after = before.grid, after.grid
+    assert not tables.join_split_row(before, after)
+    assert (before.grid, after.grid) == (old_before, old_after)
+    assert before.reasons == after.reasons == []

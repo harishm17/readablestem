@@ -122,6 +122,10 @@ REASON_DRAWN_CELLS = "drawn cell grid"
 REASON_EXTENDED = "box extended along rules"
 REASON_CONTINUED = "continued from previous page"
 REASON_TERMS = "grid of terms"  # claimed, not data: written as a list (`is_term_grid`)
+# A row split by a page break (`join_split_row`): the table's last row goes on at the top
+# of the next page's table, and that table's first row is the end of it.
+REASON_ROW_SPLIT = "last row continues on the next page"
+REASON_ROW_CONTINUED = "first row ends the last row of the page before"
 
 # Verdicts of `judge` (codes, safe to log and count).
 TABLE = "table"
@@ -2087,6 +2091,107 @@ def _at_top(view: _PageView, table: PageTable) -> bool:
         _, y0, _, y1 = line.bbox
         if y1 <= top and (y0 + y1) / 2 > band:
             return False
+    return True
+
+
+def _row_cells(grid: TableGrid, row: int) -> list[TableCell] | None:
+    """The cells of `row`, one per column left to right, when every one is a plain 1 x 1
+    cell anchored there (no span reaches into or out of it); else None."""
+    cells = sorted((c for c in grid.cells if c.row == row), key=lambda c: c.col)
+    if [c.col for c in cells] != list(range(grid.cols)):
+        return None
+    if any(c.row_span != 1 or c.col_span != 1 for c in cells):
+        return None
+    if any(c.row < row < c.row + c.row_span for c in grid.cells):
+        return None
+    return cells
+
+
+def _row_texts(grid: TableGrid, row: int) -> list[str]:
+    return [
+        " ".join(c.text.split())
+        for c in sorted(grid.cells, key=lambda c: (c.row, c.col))
+        if c.row == row
+    ]
+
+
+def _goes_on(start: str, rest: str) -> bool:
+    """Is `rest` the end of a cell whose text began `start`? It begins with a lowercase
+    letter or an opening bracket ("universe", "(current upper limit)"), or `start` ends
+    with a hyphen (a word broken at the line end)."""
+    if not start or not rest:
+        return False
+    return rest[0].islower() or rest[0] in "([" or start.endswith("-")
+
+
+def _joined_text(start: str, rest: str) -> str:
+    if start.endswith("-") and start[-2:-1].isalpha() and rest[:1].islower():
+        return start[:-1] + rest
+    return f"{start} {rest}"
+
+
+def join_split_row(previous: PageTable, table: PageTable) -> bool:
+    """A table row broken by a page break (Word and browsers break a tall row across
+    pages): `table` goes on from `previous` (`continues`), and its first row after any
+    header rows repeated from `previous` is the end of `previous`'s last row: its first
+    cell is empty where the last row's is not, and every cell it has text in goes on a
+    cell of the last row (`_goes_on`). That text is joined to the last row, so the cell
+    reads "... the edges of the known universe", not "... the edges of the known" with
+    "universe" alone in a row of the next table, and the row is taken out of `table`.
+
+    Both tables are marked (`REASON_ROW_SPLIT`, `REASON_ROW_CONTINUED`) so the table step
+    can read the model's answers the same way (each sees one page's crop). Returns True
+    when `table` has nothing left but the repeated header rows: layout then drops it,
+    its "Table N" caption going to `previous` if that has none. Changes nothing and
+    returns False when the rows do not look like that, or when the result would not be
+    a valid grid."""
+    before, after = previous.grid, table.grid
+    if before.cols != after.cols or before.rows < 1:
+        return False
+    limit = max(before.header_rows, after.header_rows, 1)
+    repeated = 0
+    while repeated < min(limit, after.rows - 1, before.rows) and _row_texts(
+        after, repeated
+    ) == _row_texts(before, repeated):
+        repeated += 1
+    last = _row_cells(before, before.rows - 1)
+    rest = _row_cells(after, repeated)
+    if last is None or rest is None:
+        return False
+    if rest[0].text.strip() or not last[0].text.strip():
+        return False
+    filled = [(a, b) for a, b in zip(last, rest, strict=True) if b.text.strip()]
+    if not filled or not all(_goes_on(a.text.strip(), b.text.strip()) for a, b in filled):
+        return False
+    joined = {id(a): _joined_text(a.text.strip(), b.text.strip()) for a, b in filled}
+    grown = before.model_copy(
+        update={
+            "cells": [
+                c.model_copy(update={"text": joined[id(c)]}) if id(c) in joined else c
+                for c in before.cells
+            ]
+        }
+    )
+    kept = [c for c in after.cells if c.row != repeated]
+    shrunk = after.model_copy(
+        update={
+            "rows": after.rows - 1,
+            "cells": [
+                c.model_copy(update={"row": c.row - 1}) if c.row > repeated else c for c in kept
+            ],
+        }
+    )
+    left = shrunk.rows > repeated  # more than the repeated header rows is left
+    if grid_problems(grown) or (left and grid_problems(shrunk)):
+        return False
+    previous.grid = grown
+    previous.reasons.append(REASON_ROW_SPLIT)
+    table.grid = shrunk
+    table.reasons.append(REASON_ROW_CONTINUED)
+    if left:
+        return False
+    if previous.caption is None:
+        previous.caption = table.caption
     return True
 
 

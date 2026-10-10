@@ -3476,7 +3476,8 @@ def _claim_tables(
     cells not headings, its ruled cells not a figure, and its columns not text columns.
     Only pages the probe passed get here (`analyze` probes every selected page first).
     `previous` is the page before's tables, when it was analysed: a table that goes on
-    from its last one is marked."""
+    from its last one is marked, and the end of a row the page break split is joined to
+    that row (`tables.join_split_row`)."""
     found = tables.find(page, frags[number], paths[number], clean=_clean)
     if not found:
         return found
@@ -3486,6 +3487,11 @@ def _claim_tables(
     paths[number] = [p for i, p in enumerate(paths[number]) if i not in drawn]
     if previous and tables.continues(previous[-1], found[0], page.rect.width):
         found[0].reasons.append(tables.REASON_CONTINUED)
+        # A row the page break split: its end goes back to the table it belongs to; a
+        # table left with only its repeated header rows is no table (its lines stay
+        # claimed: they were the header again and the end of that row).
+        if tables.join_split_row(previous[-1], found[0]):
+            found = found[1:]
     return found
 
 
