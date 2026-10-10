@@ -646,7 +646,7 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
   measured: those were simulated from their documented properties. The labels were
   given by the people who built the pages.
 - Time: median 6 ms a page, 95th percentile 0.14 s, at most about 1 s on the densest
-  synthetic ink (this machine); lec14 is refused at upload in 0.5 s.
+  synthetic ink (this machine); the real iPad notes (4 pages) are refused at upload in 0.5 s.
 
 ## The text pass (`pipeline/text_pass.py`, pipeline 0.4.0)
 
