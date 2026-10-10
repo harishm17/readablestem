@@ -15,19 +15,21 @@
   <li>figures have short alt text, or a clear flag where a description is still needed.</li>
 </ul>
 
-{# The numbers below are from docs/eval.md, results of 2026-10-08 (equations task:
-   exact_lenient 0.767 on 30 equations; document task: flag precision 0.60; triage table:
-   OpenStax 2.1, 16 pages, 3 decisions; one-page LaTeX handout, 2). Update them when the
-   eval is rerun. TODO(Harish): decide whether the product shows these numbers at all
-   (FEATURE-REVIEW 10.3, row 3, says link "how we measure" instead). #}
+{# The numbers below are the committed eval reports (data/eval/latest-*.json, 2026-10-09:
+   equations exact_lenient 0.733, 22 of 30; document flag precision 0.60, 6 of 10) and the
+   triage re-runs in docs/eval.md "Review load" (OpenStax 2.1, 16 pages: 3 decisions in
+   both runs; the one-page LaTeX handout: 2, then 1). Update them when the eval is rerun.
+   TODO(Harish): decide whether the product shows these numbers at all (FEATURE-REVIEW
+   10.3, row 3, says link "how we measure" instead). #}
 <h2>How long it takes</h2>
 <p>Converting takes a few minutes. Then you decide only what could change what a student
   reads; everything else is accepted for you and listed, so you can look it over. In our
-  tests a 16-page textbook section needed 3 decisions, and a one-page problem set 2.</p>
+  tests a 16-page textbook section needed 3 decisions, and a one-page handout 1 or 2 (it
+  varies from run to run).</p>
 
 <h2>How accurate it is</h2>
 <p>It makes mistakes, so look over the equations your students rely on. In our small
-  test, 23 of 30 equations from one physics textbook came out exactly right, and about 6
+  test, 22 of 30 equations from one physics textbook came out exactly right, and about 6
   in 10 of the decisions it asked for pointed at a real problem. Its checks against the
   PDF's own text catch some wrong equations, not all.
   <a href="{{ source_url }}/blob/main/docs/eval.md">How we measured this, and what the

@@ -226,7 +226,7 @@ def test_limits_page_is_an_honest_draft_left_for_harish(pages):
     assert "Handwritten notes and scanned pages are not converted." in limits
     assert "Hidden text is never used." in limits and "Run OCR" not in limits
     assert "Up to 5 pages and 1 MB per upload." in limits  # from the settings
-    assert "23 of 30 came out exactly right" in limits and 'id="accuracy"' in limits
+    assert "22 of 30 came out exactly right" in limits and 'id="accuracy"' in limits
     assert "TODO(Harish)" in (TEMPLATES / "limits.html").read_text(encoding="utf-8")
 
 
