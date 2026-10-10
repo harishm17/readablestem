@@ -127,6 +127,8 @@ def walk(page, site, job: str, check) -> None:
     check("all decided")
     page.goto(f"{review}?item=pg-p2-e0")
     check("a decided page group")
+    page.goto(f"{review}/list")
+    check("list view, decided")  # each kept page's card: what it is now, no form
     page.goto(f"{site.base}/jobs/{job}")
     check("job page, decided")
 
@@ -142,7 +144,7 @@ def test_kept_pages_pass_wcag22_aa_and_best_practice(site, browser, job, axe_sou
 
     walk(page, site, job, check)
     context.close()
-    assert len(found) == 7
+    assert len(found) == 8
     failures = {state: describe(v) for state, v in found.items() if v}
     assert not failures, "\n".join(f"[{s}]\n{d}" for s, d in failures.items())
 
