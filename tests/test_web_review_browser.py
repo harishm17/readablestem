@@ -171,7 +171,7 @@ def walk_states(page, site, job: str, check) -> None:
     page.get_by_role("button", name="Accept equation 1", exact=True).click()
     page.wait_for_url(f"{url}#item-*")
     page.goto(url)
-    page.get_by_role("button", name="Accept heading 1", exact=True).click()
+    page.get_by_role("button", name="Accept heading 2", exact=True).click()
     page.wait_for_url(f"{url}#item-*")
     check("after more decisions")
     unfold_everything(page)
