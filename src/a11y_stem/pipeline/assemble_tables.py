@@ -13,6 +13,10 @@ lands here and not in `assemble.py` (docs/design/content-features.md). It writes
   named group (the caption, else "Table"), so the extra tab stop says what it is. A
   table with no caption of its own gets the element's "Table N" caption, which layout
   took out of the text, so the caption is never lost;
+- a grid that is not a table of data (`TableGrid.is_data` False: the model said so,
+  `table_step.text_grid`), its cells' text in reading order (`text_grid`,
+  `render_text`): a list when every cell is a short term, a description list when it is
+  two columns of a term and its text, else one paragraph per cell; no table, no image;
 - otherwise the image of the table, kept and flagged like a figure or an equation that
   was not converted: a fixed alt text, the caption, a border and a "Not converted."
   note (never colour alone). `data-reason` says why ("table_not_rebuilt" when rebuilding
@@ -134,6 +138,52 @@ def rebuilt_grid(fix: Fix | None) -> TableGrid | None:
     return grid if grid.is_data and grid.cells else None
 
 
+def text_grid(fix: Fix | None) -> TableGrid | None:
+    """The grid to write as text (not a table of data), or None. Never one with flattened
+    maths (it would read as something else) or with no text."""
+    if fix is None or fix.status in KEPT_ORIGINAL_STATUSES or fix.table is None:
+        return None
+    grid = fix.table.grid
+    if grid.is_data or flattened_cells(grid) or not any(_said(c) for c in grid.cells):
+        return None
+    return grid
+
+
+# A cell of a grid written as text is a term (a list item) when it is this many words or
+# fewer (as `tables.TERM_GRID_WORDS`).
+TERM_WORDS = 4
+
+
+def _said(cell: TableCell) -> str:
+    return " ".join(cell.text.split())
+
+
+def text_html(grid: TableGrid, caption: str | None = None) -> str:
+    """A grid that is not a table of data, as what its cells say in reading order (row
+    by row, left to right), keeping their meaning: two columns whose every row is a short
+    term and its text -> a description list (a term and what goes with it stay
+    together); every cell a short term -> a list; anything else -> one paragraph per
+    cell. The caption ("Table 3 ...", taken out of the text by layout) comes first, as a
+    paragraph. All text is escaped."""
+    order = sorted(grid.cells, key=lambda c: (c.row, c.col))
+    said = [(c, _said(c)) for c in order if _said(c)]
+    parts = [f"<p>{escape_text(' '.join(caption.split()))}</p>"] if caption else []
+    rows: dict[int, list[str]] = {}
+    for cell, text in said:
+        rows.setdefault(cell.row, []).append(text)
+    pairs = list(rows.values())
+    if grid.cols == 2 and all(len(t) == 2 and len(t[0].split()) <= TERM_WORDS for t in pairs):
+        items = "".join(
+            f"<dt>{escape_text(term)}</dt><dd>{escape_text(text)}</dd>" for term, text in pairs
+        )
+        parts.append(f"<dl>{items}</dl>")
+    elif all(len(text.split()) <= TERM_WORDS for _, text in said):
+        parts.append("<ul>" + "".join(f"<li>{escape_text(t)}</li>" for _, t in said) + "</ul>")
+    else:
+        parts.extend(f"<p>{escape_text(text)}</p>" for _, text in said)
+    return "".join(parts)
+
+
 def id_prefix(element_id: str) -> str:
     """The element id as a prefix `render_table` accepts (ids are "p1-e3" already)."""
     prefix = _NOT_ID.sub("-", element_id)[:64]
@@ -195,6 +245,10 @@ def _scroll_attrs(grid: TableGrid, prefix: str) -> str:
 
 
 def render_table_element(element: Element, fix: Fix | None, ctx: RenderContext) -> str:
+    written = text_grid(fix)
+    if written is not None:
+        caption = written.caption or element.caption
+        return f"<div{ctx.id_attr(element.id)}>{text_html(written, caption)}</div>"
     grid = rebuilt_grid(fix)
     if grid is not None:
         ctx.add_style("table", TABLE_CSS)

@@ -594,9 +594,14 @@ def _table_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
         pdf = "Perhaps: your PDF is tagged, so it may mark tables (we did not check)."
     else:
         pdf = "No: a table is read as a run of words, with no headers."
-    rebuilt = sum(1 for f in tables if _used(f) and f.table is not None)
+    rebuilt = sum(1 for f in tables if _used(f) and f.table is not None and f.table.grid.is_data)
+    as_text = sum(
+        1 for f in tables if _used(f) and f.table is not None and not f.table.grid.is_data
+    )
     images = sum(1 for f in tables if f.status in KEPT_ORIGINAL_STATUSES)
     html = f"{rebuilt} of {plural(len(tables) or facts.tables, 'table')} rebuilt as data tables"
+    if as_text:  # the model judged them not tables of data: their text, in reading order
+        html += f"; {as_text} written as text, not a table"
     if images:
         html += f"; {images} {'is' if images == 1 else 'are'} shown as an image"
     waiting = sum(1 for f in tables if f.pending)

@@ -48,9 +48,9 @@
   <p class="cmp-label">In the PDF</p>
   {% if p.region_url %}<img class="cmp-image table-crop" src="{{ p.region_url }}" alt="{{ p.region_alt }}">{% else %}<p class="cmp-none">No image of the original is available.</p>{% endif %}
   {% if t.proposal %}
-  <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
+  <p class="cmp-label">{% if not t.in_document %}Proposal (the document has the image instead){% elif not t.is_data %}As students get it: text, not a table{% elif item.pending %}Proposal, as students would get it{% else %}Rebuilt, as students get it{% endif %}</p>
   {{ table_box(t.proposal, "Proposed " ~ name) }}
-  {% if not t.is_data %}<p class="hint">The proposal says this is a layout table (text set out in boxes), not a data table, so the document keeps the image.</p>{% endif %}
+  {% if not t.is_data %}<p class="hint">The model judged that this is not a table of data (text set out in boxes), so its words are written in reading order. If it is a data table, use the grid read from the PDF.</p>{% endif %}
   {% elif t.local %}
   <p class="cmp-label">Grid read from the PDF</p>
   {{ table_box(t.local, "Grid read from the PDF for " ~ name) }}
@@ -65,6 +65,7 @@
 {% if t.proposal %}
 {% set cell_err = item.errors.get("cell") %}
 {% set header_err = item.errors.get("header") %}
+{% if t.is_data %}
 <details class="edit-box table-edit"{% if t.editing or cell_err or header_err %} open{% endif %}>
   <summary>Change the table</summary>
   {% if t.editing %}
@@ -121,6 +122,7 @@
     <button type="submit" class="button-secondary" data-role="save">Save headers<span class="visually-hidden"> of {{ name }}</span></button>
   </form>
 </details>
+{% endif %}
 {% if t.local %}
 <details class="edit-box">
   <summary>The grid read from the PDF</summary>
@@ -171,7 +173,7 @@
 {% set t = item.table %}
 {% set name = item.label|lower %}
 {% if t.proposal %}
-<p class="part-label">Proposed table</p>
+<p class="part-label">{% if t.is_data %}Proposed table{% else %}As students get it: text, not a table{% endif %}</p>
 {{ table_box(t.proposal, "Proposed " ~ name) }}
 {% if not t.in_document %}<p>The document has the image of the table instead.</p>{% endif %}
 {% elif t.local %}

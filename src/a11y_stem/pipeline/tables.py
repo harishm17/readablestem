@@ -25,10 +25,14 @@ from the text flow. Deterministic; no model calls. docs/tables.md explains the n
    compete.
 4. **Fill** (`fill`): the cell text comes from the PDF's own glyphs, each word placed in the
    cell its box falls in (a subscript stays in its cell), never from OCR.
-5. **Data or layout** (`is_layout_grid`, `is_word_grid`): a two-column grid of prose (or
-   one column), or a grid of single terms with no digit and no "Table N" caption (a
-   key-terms box), is text set out in boxes; it is not claimed and keeps the paragraph
-   path.
+5. **Data or layout** (`is_term_grid`, `is_layout_grid`, `is_word_grid`): the local
+   check of whether a claimed grid is a table of data. A grid of terms (`is_term_grid`:
+   three or more columns of short, distinct terms, no digit, no "Table N" caption; an
+   OpenStax "Key Terms" box) is claimed but marked not data (`TableGrid.is_data` False,
+   reason `REASON_TERMS`): layout writes its terms in reading order as a list, with no
+   decision and no image. A two-column grid of prose (or one column), or a two-column
+   grid of single words, is text set out in boxes; it is not claimed and keeps the
+   paragraph path (equations and headings in it are found as usual).
 
 The result is a `PageTable` per data table: its box, its `TableGrid` (source "local"),
 its "Table N" caption when one is printed just above or below it, the indices of the
@@ -95,6 +99,9 @@ CAPTION_MAX_GAP = 36.0  # furthest a "Table N" caption may sit from its table (a
 LAYOUT_CELL_CHARS = 60  # mean text length of a prose column in a layout grid
 WORD_GRID_WORDS = 3  # a grid of terms: no cell longer than this (words) ...
 WORD_GRID_ROWS = 6  # ... no more rows than this, no digit, and no "Table N" caption
+TERM_GRID_WORDS = 4  # a term grid's terms: at most this many words ("method of adding
+TERM_GRID_COLS = 3  # percents"), in at least this many columns (two are label | value)
+TERM_MIN_LETTERS = 3  # every term has a word this long: "H", "kg", "m" are not terms
 TOP_BAND = 0.07  # top share of the page where running headers live (as layout)
 CONTINUED_TOL = 0.03  # column edges of a continued table match within this share of width
 SNAP = 2.0  # x font size: a table box grows to the rules drawn this close around it
@@ -114,6 +121,7 @@ REASON_PYMUPDF = "PyMuPDF grid"
 REASON_DRAWN_CELLS = "drawn cell grid"
 REASON_EXTENDED = "box extended along rules"
 REASON_CONTINUED = "continued from previous page"
+REASON_TERMS = "grid of terms"  # claimed, not data: written as a list (`is_term_grid`)
 
 # Verdicts of `judge` (codes, safe to log and count).
 TABLE = "table"
@@ -227,7 +235,8 @@ class Judgement:
 
 @dataclass
 class PageTable:
-    """A data table found on a page, ready for layout to claim."""
+    """A table found on a page, ready for layout to claim: a data table, or a grid of
+    terms (`grid.is_data` False, `is_term_grid`), which layout writes as a list."""
 
     bbox: BBox
     grid: TableGrid
@@ -1663,6 +1672,40 @@ def is_word_grid(grid: TableGrid) -> bool:
     )
 
 
+def is_term_grid(grid: TableGrid) -> bool:
+    """A grid of terms set out in boxes (OpenStax's ruled "Key Terms": accuracy | ampere |
+    constant | conversion factor | ...), not a table of data: at least TERM_GRID_COLS
+    columns and at most WORD_GRID_ROWS rows; no digit anywhere; every term at most
+    TERM_GRID_WORDS words with a word of TERM_MIN_LETTERS letters or more (a column of
+    symbols or units is data); no term twice (a data table repeats its categories); and
+    the only empty cells are the last ones in reading order, less than a row of them (the
+    terms ran out). Only without a "Table N" caption (`find` checks): a captioned table
+    of words is data. Its terms are written as a list in reading order (layout), so they
+    stay readable with no decision; as a table they became an image and a decision."""
+    if grid.cols < TERM_GRID_COLS or grid.rows > WORD_GRID_ROWS:
+        return False
+    order = sorted(grid.cells, key=lambda c: (c.row, c.col))
+    texts = [" ".join(c.text.split()) for c in order]
+    filled = [t for t in texts if t]
+    empty = len(texts) - len(filled)
+    if not filled or empty >= grid.cols or any(not t for t in texts[: len(filled)]):
+        return False
+    if any(ch.isascii() and ch.isdigit() for t in filled for ch in t):
+        return False
+    if len({t.casefold() for t in filled}) != len(filled):
+        return False
+    return all(
+        len(t.split()) <= TERM_GRID_WORDS
+        and any(sum(ch.isalpha() for ch in w) >= TERM_MIN_LETTERS for w in t.split())
+        for t in filled
+    )
+
+
+def term_list(grid: TableGrid) -> list[TableCell]:
+    """A term grid's non-empty cells in reading order (row by row, left to right)."""
+    return [c for c in sorted(grid.cells, key=lambda c: (c.row, c.col)) if c.text.strip()]
+
+
 def is_layout_grid(grid: TableGrid) -> bool:
     """Text set out in boxes, not data: one column, or two columns whose second is prose
     (its cells average more than LAYOUT_CELL_CHARS characters) and neither numeric."""
@@ -1735,7 +1778,12 @@ def find_with_judgements(
     _attach_captions(view, [table for table, _ in built], clean)
     tables = []
     for table, judgement in built:
-        if table.caption is None and is_word_grid(table.grid):
+        if table.caption is None and is_term_grid(table.grid):
+            # Claimed (its lines leave the text flow, where they ran together), but not
+            # data: layout writes its terms as a list.
+            table.grid = table.grid.model_copy(update={"is_data": False})
+            table.reasons.append(REASON_TERMS)
+        elif table.caption is None and is_word_grid(table.grid):
             judgement.verdict = "layout_grid"  # its words stay in the text, as before
             continue
         tables.append(table)
@@ -2044,7 +2092,10 @@ def _at_top(view: _PageView, table: PageTable) -> bool:
 
 def continues(previous: PageTable, table: PageTable, page_width: float) -> bool:
     """Is `table` the rest of `previous` (the last table of the page before)? Same number
-    of columns, column edges in the same places, and nothing above it on its page."""
+    of columns, column edges in the same places, and nothing above it on its page. Both
+    must be data tables (a grid of terms goes on from nothing)."""
+    if not (previous.grid.is_data and table.grid.is_data):
+        return False
     if not table.at_top or previous.grid.cols != table.grid.cols:
         return False
     a, b = previous.column_edges, table.column_edges

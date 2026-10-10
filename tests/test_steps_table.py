@@ -673,10 +673,22 @@ def test_whitespace_in_cells_is_collapsed():
 # --------------------------------------------------------------------------- routes
 
 
-def test_not_a_data_table_escalates_then_abstains():
+def test_not_a_data_table_escalates_then_is_written_as_text_with_a_note():
+    # The local check called it data; the model, twice, says it is not: its words are
+    # written in reading order (no decision: nothing is lost), with a note to look at.
     layout_grid = answer([["accuracy", "ampere"], ["constant", "meter"]], data=False)
     fix = run(by_model(cheap=layout_grid, main=layout_grid))
     assert models(fix) == [CHEAP_MODEL, MAIN_MODEL]
+    assert (fix.status, fix.reason, fix.review) == (Status.ACCEPTED, None, "optional")
+    assert [c.code for c in fix.failed_checks] == ["written_as_text"]
+    assert fix.table is not None and not fix.table.grid.is_data
+    assert fix.table.grid.source == "local"  # the PDF's own words, not the model's
+
+
+def test_not_a_data_table_without_a_grid_from_the_pdf_keeps_the_image():
+    layout_grid = answer([["accuracy", "ampere"], ["constant", "meter"]], data=False)
+    bare = element()  # no grid read from the PDF
+    fix = run(by_model(cheap=layout_grid, main=layout_grid), bare)
     assert (fix.status, fix.reason, fix.review) == (Status.ABSTAINED, "not_data_table", "required")
     assert fix.table is None
 

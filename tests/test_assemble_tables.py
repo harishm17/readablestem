@@ -167,8 +167,23 @@ def test_a_table_not_rebuilt_keeps_its_image_flagged():
         (table_fix(status=Status.ACCEPTED), "no_output"),  # accepted, but nothing to write
         (table_fix(status=Status.REJECTED, table=TableFix(grid=grid())), ""),
         (
-            table_fix(table=TableFix(grid=grid().model_copy(update={"is_data": False}))),
-            "no_output",
+            # Not a table of data, but its grid holds maths its text gives flat: written
+            # out it would read as something else, so the image stays.
+            table_fix(
+                table=TableFix(
+                    grid=TableGrid(
+                        rows=1,
+                        cols=2,
+                        is_data=False,
+                        source="local",
+                        cells=[
+                            TableCell(row=0, col=0, text="K = \u00b92mv\u00b2"),
+                            TableCell(row=0, col=1, text="energy"),
+                        ],
+                    )
+                )
+            ),
+            "flattened_maths",
         ),
     ],
 )
@@ -179,6 +194,52 @@ def test_anything_but_a_usable_rebuilt_table_keeps_the_image(fix, reason):
         assert f'data-reason="{reason}"' in html
     else:
         assert "data-reason" not in html
+
+
+def text_fix(rows: list[list[str]], caption: str | None = None) -> Fix:
+    cells = [
+        TableCell(row=r, col=c, text=t) for r, row in enumerate(rows) for c, t in enumerate(row)
+    ]
+    grid = TableGrid(
+        rows=len(rows), cols=len(rows[0]), cells=cells, is_data=False, source="local",
+        caption=caption,
+    )  # fmt: skip
+    return table_fix(table=TableFix(grid=grid), review="optional")
+
+
+def test_a_grid_of_terms_that_is_not_data_is_written_as_a_list():
+    fix = text_fix(
+        [["accuracy", "ampere", "constant"], ["kilogram", "method of adding percents", ""]]
+    )
+    html = render([table_element(caption="Table 1 Free fall.")], [fix], {"p1-e1": png()})
+    assert (
+        '<div id="p1-e1"><p>Table 1 Free fall.</p><ul><li>accuracy</li><li>ampere</li>'
+        "<li>constant</li><li>kilogram</li><li>method of adding percents</li></ul></div>"
+    ) in html
+    assert "<table" not in html and TABLE_NOT_CONVERTED_ALT not in html
+    assert TABLE_CSS not in html and 'class="flagged"' not in html
+    assert all(c.passed for c in static_checks(html))
+
+
+def test_a_term_and_its_text_are_a_description_list():
+    long = "The change in position of an object, with its direction."
+    fix = text_fix([["displacement", long], ["distance", "How far it went, whatever the way."]])
+    element = table_element().model_copy(update={"caption": None})
+    html = render([element], [fix], {"p1-e1": png()})
+    assert (
+        f'<div id="p1-e1"><dl><dt>displacement</dt><dd>{long}</dd><dt>distance</dt>'
+        "<dd>How far it went, whatever the way.</dd></dl></div>"
+    ) in html
+
+
+def test_other_text_grids_are_one_paragraph_per_cell_and_escaped():
+    fix = text_fix([["Name: <b>", "Date:", "Signature of the student who did it"]])
+    element = table_element().model_copy(update={"caption": None})
+    html = render([element], [fix], {"p1-e1": png()})
+    assert (
+        '<div id="p1-e1"><p>Name: &lt;b&gt;</p><p>Date:</p>'
+        "<p>Signature of the student who did it</p></div>"
+    ) in html
 
 
 def test_without_a_crop_the_table_text_is_not_invented():

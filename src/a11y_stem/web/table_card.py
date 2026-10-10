@@ -19,7 +19,13 @@ from dataclasses import dataclass, field
 from markupsafe import Markup
 
 from a11y_stem.core.types import Element, Fix, TableCell, TableGrid, grid_problems
-from a11y_stem.pipeline.assemble_tables import flattened_cells, id_prefix, rebuilt_grid
+from a11y_stem.pipeline.assemble_tables import (
+    flattened_cells,
+    id_prefix,
+    rebuilt_grid,
+    text_grid,
+    text_html,
+)
 from a11y_stem.pipeline.table_html import render_table
 from a11y_stem.pipeline.table_step import STRUCTURE_PROBLEMS
 from a11y_stem.web.review import (
@@ -52,7 +58,7 @@ class CellChoice:
 @dataclass
 class TableCard:
     proposal: Markup | None  # the proposal as the student would get it; None without one
-    is_data: bool  # False: the proposal is a layout table, so the image is kept
+    is_data: bool  # False: not a table of data, written as its cells' text in reading order
     in_document: bool  # the document has the rebuilt table now (else the image)
     local: Markup | None  # the grid read from the PDF, when it can be used instead
     header_row: bool  # the first row is a header row
@@ -130,10 +136,16 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
     grid = fix.table.grid if fix.table is not None else None
     if local is not None and grid is not None and _same_table(local, grid):
         local = None  # the proposal is the grid read from the PDF: nothing else to offer
+    if grid is not None and not grid.is_data:
+        # Written as text: the card shows the text as the student gets it.
+        caption = grid.caption or (element.caption if element is not None else None)
+        proposal: Markup | None = Markup(text_html(grid, caption))
+    else:
+        proposal = _rendered(grid, f"tp-{eid}") if grid is not None else None
     card = TableCard(
-        proposal=_rendered(grid, f"tp-{eid}") if grid is not None else None,
+        proposal=proposal,
         is_data=grid.is_data if grid is not None else True,
-        in_document=rebuilt_grid(fix) is not None,
+        in_document=rebuilt_grid(fix) is not None or text_grid(fix) is not None,
         local=_rendered(local, f"tl-{eid}") if local is not None else None,
         local_flat=local is not None and bool(flattened_cells(local)),
         header_row=grid is not None and first_row_is_header(grid),

@@ -422,8 +422,9 @@ def test_a_ruled_grid_of_key_terms_stays_text_unless_it_has_a_table_caption():
 
     result = analyze(pdf(terms))
     assert [e.kind for e in result.elements if e.kind == Kind.TABLE] == []
-    text = " ".join(e.text or "" for e in result.elements)
-    assert "reference frame" in text and "kinematics" in text
+    # Its terms are a list, in reading order: not run together in one paragraph.
+    items = [e.text for e in result.elements if e.kind == Kind.LIST_ITEM]
+    assert items == [term for row in KEY_TERMS for term in row]
 
     def captioned(page):
         write(page, 100, 120, "Table 1. Terms of motion")
@@ -431,6 +432,63 @@ def test_a_ruled_grid_of_key_terms_stays_text_unless_it_has_a_table_caption():
 
     tables_found = [e for e in analyze(pdf(captioned)).elements if e.kind == Kind.TABLE]
     assert [e.caption for e in tables_found] == ["Table 1. Terms of motion"]
+
+
+TERMS = [
+    ["accuracy", "ampere", "constant", "conversion factor"],
+    ["derived units", "kilogram", "method of adding percents", ""],
+]
+
+
+def test_a_term_grid_is_written_as_a_list_with_no_table_and_no_decision():
+    # The trailing empty cell (the terms ran out) and a four-word term no longer make it
+    # a data table: OpenStax prints these in about half of the table gold's pages.
+    def terms(page):
+        write(page, 72, 100, PROSE[0])
+        grid_table(page, TERMS, x0=72, y0=130, widths=[125.0] * 4)
+        write(page, 72, 200, PROSE[1])
+
+    result = analyze(pdf(terms))
+    assert [e for e in result.elements if e.kind == Kind.TABLE] == []
+    items = [e.text for e in result.elements if e.kind == Kind.LIST_ITEM]
+    assert items == [term for row in TERMS for term in row if term]
+    order = [e.kind for e in result.elements]
+    first = order.index(Kind.LIST_ITEM)
+    assert order[first - 1] == Kind.PARAGRAPH and order[first + len(items)] == Kind.PARAGRAPH
+
+
+def test_what_a_term_grid_is():
+    def grid(texts: list[list[str]]) -> TableGrid:
+        cells = [
+            TableCell(row=r, col=c, text=t)
+            for r, row in enumerate(texts)
+            for c, t in enumerate(row)
+        ]
+        return TableGrid(rows=len(texts), cols=len(texts[0]), cells=cells)
+
+    assert tables.is_term_grid(grid(TERMS))
+    assert tables.is_term_grid(grid(KEY_TERMS))
+    assert tables.is_term_grid(grid([["W\u207b boson", "pion", "graviton"]]))  # a sign, no digit
+    # Data: a digit, a symbol or unit column, a category repeated, two columns (label |
+    # value), a gap inside the grid, a whole empty row, too many rows, a long cell.
+    assert not tables.is_term_grid(grid([["Trial", "Length", "Time"], ["first", "0.20 m", "x"]]))
+    assert not tables.is_term_grid(grid([["Element", "Symbol", "State"], ["Hydrogen", "H", "gas"]]))
+    assert not tables.is_term_grid(grid([["Type", "Image", "Sign"], ["convex", "real", "real"]]))
+    assert not tables.is_term_grid(grid([["Quantity", "Unit"], ["Length", "metre"]]))
+    assert not tables.is_term_grid(grid([["alpha", "", "gamma"], ["delta", "omega", "sigma"]]))
+    assert not tables.is_term_grid(grid([["alpha", "beta", "gamma"], ["", "", ""]]))
+    assert not tables.is_term_grid(grid([[f"term{n} one", "beta", "gamma"] for n in "abcdefg"]))
+    long = "a definition of several words"
+    assert not tables.is_term_grid(grid([["alpha", "beta", long]]))
+
+
+def test_a_term_grid_with_a_table_caption_is_data():
+    def captioned(page):
+        write(page, 72, 120, "Table 4. Terms used in this lab")
+        grid_table(page, TERMS, x0=72, y0=130, widths=[125.0] * 4)
+
+    found = [e for e in analyze(pdf(captioned)).elements if e.kind == Kind.TABLE]
+    assert len(found) == 1 and found[0].table is not None and found[0].table.is_data
 
 
 def test_a_word_grid_has_no_digit_and_short_cells():

@@ -165,6 +165,8 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "value can still be found by its row.",
     ("table.source", "local_grid"): "No model could read this table, so this is the grid "
     "built from the PDF's own text with the first row as headers: check it against the image.",
+    ("table.kind", "written_as_text"): "The model judged that this is not a table of data, so "
+    "students get its text in reading order; if it is one, use the grid read from the PDF.",
     # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)
     ("figure.data_values", "values_from_image"): "A data table was read from the chart "
     "image, so its values may be off; it is added only if you choose to after checking them.",

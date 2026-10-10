@@ -55,6 +55,7 @@ from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, uploa
 from fixtures.web.table_doc import (
     MATHS_LATEX,
     TABLE_2,
+    TABLE_4,
     TABLE_5,
     grid_of,
     table_1_local,
@@ -952,3 +953,52 @@ def test_tables_are_named_by_their_printed_numbers_when_every_one_has_its_own():
         "p1-e0": "Table 1",
         "p1-e1": "Table 2",
     }
+
+
+# --------------------------------------------------------------------------- written as text
+
+
+def text_output():
+    """Table p2-e1 judged not a table of data by the model (table_step: its words in
+    reading order, the note `written_as_text`), as the step now stores it."""
+    output = table_output()
+    fix = output.result.fix_for("p2-e1")
+    assert fix is not None
+    fix.table = TableFix(grid=grid_of(TABLE_4).model_copy(update={"is_data": False}))
+    fix.checks = [
+        Check(name="table.kind", passed=False, severity="warning", code="written_as_text")
+    ]
+    return output
+
+
+@pytest.fixture
+def as_text(tmp_path):
+    env = WebEnv(tmp_path)
+    env.converter.output = text_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        env.browser = client
+        env.job_id = job_id_from(upload(client, table_pdf()))
+        env.run_worker()
+        yield env
+
+
+def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
+    page = screen(as_text, "?item=p2-e1")
+    assert "As students get it: text, not a table" in page
+    assert "students get its text in reading order" in text_of(page)
+    assert "Change the table" not in page  # no cells or headers to change in text
+    assert "Use this grid instead" in page  # the way back to a table
+    assert queue.first_open(queue.decisions(stored(as_text))) is not None  # others wait
+    assert "p2-e1" not in {d.key for d in queue.decisions(stored(as_text))}  # not a decision
+    assert post(as_text, "p2-e1", action="accept").status_code == 303  # re-renders
+    html = as_text.browser.get(f"/jobs/{as_text.job_id}/download").text
+    assert '<div id="p2-e1"><p>Table 4 Constants</p><dl><dt>Constant</dt>' in html
+    response = post(as_text, "p2-e1", action="edit", change="cell", row="1", col="1", cell="9.8")
+    assert response.status_code == 422
+    assert "written as text, not as a table" in text_of(response.text)
+    back = post(as_text, "p2-e1", action="edit", change="use_local")
+    assert back.status_code == 303
+    fix = stored(as_text).fix_for("p2-e1")
+    assert fix is not None and fix.table is not None and fix.table.grid.is_data

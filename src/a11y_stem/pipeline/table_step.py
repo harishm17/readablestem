@@ -73,9 +73,15 @@ Checks (content-free codes; docs/tables.md):
   as a note). Only when the grids agree, so the PDF cell is known.
 
 Status rules, in order (docs/design/content-features.md "Review tiers"):
-1. rebuilding off -> FAILED "table_not_rebuilt" (required; the image is kept);
-2. the answer says it is not a data table, after escalation -> ABSTAINED
-   "not_data_table" (required; the image is kept);
+1. rebuilding off -> FAILED "table_not_rebuilt" (required; the image is kept). Layout
+   only makes a table element of a grid its local check calls data (`tables.find`: a
+   grid of terms becomes a list, prose grids stay paragraphs), so this is a data table;
+2. the answer says it is not a data table, after escalation -> its cells' text in
+   reading order (`text_grid`: the grid read from the PDF, `is_data` False), ACCEPTED
+   with the note `written_as_text` (review "optional": the local check called it data,
+   so a person may look, but no decision is asked: no words are lost); without a grid
+   read from the PDF that can be written (none, no text, or maths its text gives flat)
+   ABSTAINED "not_data_table" (required; the image is kept);
 3. no usable answer from any attempt (the API unavailable, or answers that cannot be a
    grid) -> the local grid with first-row headers, NEEDS_REVIEW (check `table.source`,
    code `local_grid`); without a local grid FAILED "model_<outcome>" or "invalid_table";
@@ -154,7 +160,9 @@ OUTPUT_TOKENS_PER_SLOT = 40
 MIN_OUTPUT_TOKENS = 4096
 MAX_OUTPUT_TOKENS = 16384
 # Failed checks that are only notes: the fix is still ACCEPTED (review "optional").
-NOTE_CODES = frozenset({"whitespace_differs", "style_cosmetic", "row_headers_dropped"})
+NOTE_CODES = frozenset(
+    {"whitespace_differs", "style_cosmetic", "row_headers_dropped", "written_as_text"}
+)
 # Failed checks a second reading cannot change: they never escalate.
 NO_ESCALATION_CODES = frozenset({"whitespace_differs", "no_pdf_text", "row_headers_dropped"})
 # `grid_problems` codes about the grid itself; the others are about its headers.
@@ -505,6 +513,21 @@ def _header_policy(grid: TableGrid) -> tuple[TableGrid, bool]:
         update={"cells": out, "header_rows": header_rows, "header_cols": header_cols}
     )
     return policy, dropped
+
+
+def text_grid(element: Element) -> TableGrid | None:
+    """The grid read from the PDF, to be written as its cells' text in reading order
+    (`is_data` False: `assemble_tables` writes a list or paragraphs, not a table), when
+    the model says the crop is not a table of data. None when there is no such grid, it
+    has no text, or it holds maths its text gives flat (written out, that would read as
+    something else: the image is kept)."""
+    local = _local(element)
+    if local is None or not any(c.text.strip() for c in local.cells):
+        return None
+    grid = local.model_copy(
+        update={"is_data": False, "caption": caption_of(element), "source": "local"}
+    )
+    return None if flattened_cells(grid) else grid
 
 
 def first_row_headers(local: TableGrid, *, caption: str | None) -> TableGrid:
@@ -944,7 +967,11 @@ def _fix(element: Element, candidate: _Candidate, calls: list[ModelCall]) -> Fix
         )
 
     if candidate.output is not None and not candidate.output.is_data_table:
-        return make(Status.ABSTAINED, "not_data_table", checks=[])
+        text = text_grid(element)
+        if text is None:
+            return make(Status.ABSTAINED, "not_data_table", checks=[])
+        note = Check(name="table.kind", passed=False, severity="warning", code="written_as_text")
+        return make(Status.ACCEPTED, grid=text, checks=[note], review="optional")
     if candidate.grid is None or not candidate.usable:
         local = _local(element)
         if local is not None:

@@ -1253,6 +1253,12 @@ def edit_table(
             "is one, or keep the image."
         )
         raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
+    if not fix.table.grid.is_data and change in {"headers", "cell"}:
+        message = (
+            "This table is written as text, not as a table. To change it, use the grid read "
+            "from the PDF first."
+        )
+        raise ReviewInvalid([FieldError(field_id("actions", eid), message)])
     if change == "headers":
         return _edit_headers(fix, fix.table.grid, element, form)
     if change == "cell":

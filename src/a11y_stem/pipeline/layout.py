@@ -3510,6 +3510,26 @@ def _table_blocks(page_tables: Sequence[tables.PageTable]) -> list[_Block]:
     return blocks
 
 
+def _term_items(blocks: list[_Block]) -> list[_Block]:
+    """A grid of terms (`tables.is_term_grid`: an OpenStax "Key Terms" box) becomes its
+    terms as list items, in reading order, in the grid's place: a screen reader hears a
+    list of terms, with no table, image or decision. Left in the text flow its lines ran
+    together ("position reference frame scalar vector"); claimed as a data table it was
+    an image. Every other block is kept as it is."""
+    out: list[_Block] = []
+    for block in blocks:
+        grid = block.table
+        if block.kind != Kind.TABLE or grid is None or grid.is_data:
+            out.append(block)
+            continue
+        for cell in tables.term_list(grid):
+            text = _clean(cell.text)
+            if text:
+                bbox = cell.bbox or block.bbox
+                out.append(_Block(Kind.LIST_ITEM, bbox, text=text, pieces=[text]))
+    return out
+
+
 # ============================================================================ pages
 
 
@@ -3587,6 +3607,7 @@ def _page_blocks(
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
+    final = _term_items(final)
     origins = _column_origins(text_rows)
     for block in final:
         if block.marker is not None:
