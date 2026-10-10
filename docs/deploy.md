@@ -383,8 +383,18 @@ schema that is behind its own code. A release whose migration removes or renames
 something cannot be rolled back by traffic alone: the old code would fail on the missing
 column. So write migrations in two releases (add the new thing, ship code that uses it,
 remove the old thing later), and treat rolling back past a destructive migration as a
-backup restore (or a forward fix). If data has to come back, restore a backup (this
-overwrites the instance's current data):
+backup restore (or a forward fix).
+
+Stored results are the other limit. A release reads the results that releases up to its
+own pipeline version stored, not newer ones: the 0.4.0 results have table elements and
+fixes (`Kind.TABLE`, made whatever `FEATURE_TABLES` says), which a release before 0.4.0
+(such as `9ad41db`) refuses to load. Rolled back below 0.4.0, every job with a detected
+table returns 500 on its job page and review screens (the download still works) until
+traffic goes forward again; jobs without tables, and the schema, are fine. Roll back
+below 0.4.0 only for a short time, or not at all.
+
+If data has to come back, restore a backup (this overwrites the instance's current
+data):
 
 ```sh
 gcloud sql backups list --filter=instance:a11y-stem-db --project="$PROJECT_ID"
