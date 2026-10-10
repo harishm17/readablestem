@@ -357,3 +357,20 @@ def test_a_raised_footnote_mark_read_from_the_pdf_is_not_an_error():
     pred = pred_of([["Charge^([1])"], ["+1"], ["^([1]) The lower sign is for antiquarks."]])
     fidelity = T.cell_fidelity(pred, gold)
     assert (fidelity["errors"], fidelity["faithful"]) == (0, 3)
+
+
+def test_a_raised_mark_in_a_header_does_not_make_the_headers_wrong():
+    gold = gold_of(
+        "<table><tr><th scope='col'>Force</th><th scope='col'>Relative Strength<sup>[1]</sup>"
+        "</th></tr><tr><td>Strong</td><td>1</td></tr></table>"
+    )
+    marked = [
+        T.Cell(0, 0, text="Force", header="col"),
+        T.Cell(0, 1, text="Relative Strength^([1])", header="col"),
+        T.Cell(1, 0, text="Strong"),
+        T.Cell(1, 1, text="1"),
+    ]
+    assert T.kind_exact(marked, gold, "col") is True
+    assert T.header_exact(marked, gold) is True
+    other = [*marked[:1], T.Cell(0, 1, text="Relative Range^([1])", header="col"), *marked[2:]]
+    assert T.kind_exact(other, gold, "col") is False  # a different word still counts

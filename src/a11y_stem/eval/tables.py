@@ -468,19 +468,29 @@ def teds(
 # ========================================================================= headers
 
 
+def header_text(text: str | None) -> str:
+    """A header cell's text for the header numbers: `norm`, with a raised mark the grid
+    read from the PDF writes "^([1])" compared as its characters ("[1]"), as gold's
+    text drops the raise ("Relative Strength<sup>[1]</sup>"). Nothing else changes, so
+    table-bench's predictions (which carry no such mark) score as before."""
+    return _RAISED.sub(r"\1", norm(text))
+
+
 def header_texts(cells: Iterable[Cell], kind: HeaderKind | None = None) -> Counter[str]:
     """Normalised texts of the non-empty header cells (of one direction, or all)."""
     return Counter(
-        norm(c.text)
+        header_text(c.text)
         for c in cells
-        if c.header and (kind is None or c.header == kind) and norm(c.text)
+        if c.header and (kind is None or c.header == kind) and header_text(c.text)
     )
 
 
 def header_keys(cells: Iterable[Cell], kind: HeaderKind) -> Counter[tuple[int, int, str, str]]:
     """(row, col, scope, text) of the non-empty header cells of one direction."""
     return Counter(
-        (c.row, c.col, kind, norm(c.text)) for c in cells if c.header == kind and norm(c.text)
+        (c.row, c.col, kind, header_text(c.text))
+        for c in cells
+        if c.header == kind and header_text(c.text)
     )
 
 
