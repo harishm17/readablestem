@@ -127,7 +127,7 @@
 <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
   {{ hidden_fields() }}
   {% if err %}<p class="error-message" id="datatable-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
-  <button type="submit" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if err %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ name }}</span></button>
+  <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if err %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ name }}</span></button>
 </form>
 {% endif %}
 {% if item.kind == "table" %}
@@ -249,40 +249,6 @@
 </li>
 {% endmacro %}
 
-{% macro bulk_forms(g) %}
-{% set select_id = "min-confidence-" ~ g.slug %}
-<div class="bulk-actions">
-  <p class="part-label">Accept several {{ g.many }} at once</p>
-  {% if g.accept_all %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ g.slug }}" class="bulk-form">
-    {{ hidden_fields() }}
-    <input type="hidden" name="action" value="accept_all">
-    <button type="submit" class="button-secondary">Accept all {{ counted(g.accept_all, "remaining " ~ g.one, "remaining " ~ g.many) }}</button>
-    {% if g.not_converted %}<p class="hint">Not included: {{ counted(g.not_converted, g.one, g.many) }} that could not be converted.</p>{% endif %}
-    {% if g.moved %}<p class="hint">Not included: {{ counted(g.moved, g.one, g.many) }} the document shows at another level than the one proposed. Choose a level on {{ "its card" if g.moved == 1 else "their cards" }}.</p>{% endif %}
-  </form>
-  {% endif %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ g.slug }}" class="bulk-form">
-    {{ hidden_fields() }}
-    <input type="hidden" name="action" value="accept_confident">
-    <div class="field{% if g.error %} field-error{% endif %}">
-      <label for="{{ select_id }}">Accept every {{ g.one }} proposal at or above</label>
-      <p class="hint" id="{{ select_id }}-hint">Only proposals waiting for a decision that passed every required check are included ({{ counted(g.bulk_eligible, g.one, g.many) }} now); {{ g.many }} that could not be converted never are.
-        {% if g.bulk_warned %}{{ g.bulk_warned }} of these {{ "has a warning: read it" if g.bulk_warned == 1 else "have warnings: read them" }} on the card first.{% endif %}</p>
-      {% if g.error %}<p class="error-message" id="{{ select_id }}-error"><span class="visually-hidden">Error: </span>{{ g.error }}</p>{% endif %}
-      <select id="{{ select_id }}" name="min_confidence"
-              aria-describedby="{{ select_id }}-hint{% if g.error %} {{ select_id }}-error{% endif %}"{% if g.error %} aria-invalid="true"{% endif %}>
-        {% for option in g.bulk_options %}
-        {# Short enough to fit a 320 px screen; the label says "at or above". #}
-        <option value="{{ option.percent }}"{% if option.selected %} selected{% endif %}>{{ option.percent }}% ({{ counted(option.count, g.one, g.many) }})</option>
-        {% endfor %}
-      </select>
-    </div>
-    <button type="submit" class="button-secondary">Accept these {{ g.many }}</button>
-  </form>
-</div>
-{% endmacro %}
-
 {# A fix that is folded away: its summary line says what it is and, for an optional
    check, what the note says; unfolding it shows the full card (still editable). #}
 {% macro folded_item(item, with_notes) %}
@@ -354,7 +320,6 @@
     {% for message in g.notices %}
     <div class="notice" role="status"><p>{{ message }}</p></div>
     {% endfor %}
-    {% if g.bulk_eligible or g.error %}{{ bulk_forms(g) }}{% endif %}
 
     {% if g.units %}
     <ol class="fix-list">

@@ -11,7 +11,7 @@ records that on the server, with no cookies and no script in the browser:
 | `reuploaded` | ... a file this person uploaded before | | hours since then |
 | `finished` | the worker finishes a job | `done`, `failed:timeout`, ... | seconds since upload |
 | `review_opened` | the review screen or list opens | `split` or `list` | |
-| `decision_made` | a review decision is saved | `single`, `group` or `bulk` | fixes changed |
+| `decision_made` | a review decision is saved | `single`, `group` (`bulk`: old) | fixes changed |
 | `review_completed` | no decision is left open (once) | | seconds since finished |
 | `html_viewed` | the HTML opens in the browser | | |
 | `downloaded` | the HTML is downloaded | `open` (decisions open) or `done` | decisions open |
@@ -289,7 +289,7 @@ def add_decision(
     open_after: int,
 ) -> None:
     """In the decision's transaction: `decision_made` for a review write that changed
-    something (`kind`: "single", "group" or "bulk"; value: fixes changed), and
+    something (`kind`: "single" or "group"; value: fixes changed), and
     `review_completed` the first time a write leaves no decision open (value: seconds
     since the job finished)."""
     if not settings.events_enabled or changed <= 0:

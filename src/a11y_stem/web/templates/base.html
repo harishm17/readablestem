@@ -24,6 +24,9 @@
           <li><a href="/demo"{% if active == "demo" %} aria-current="page"{% endif %}>Demo</a></li>
           {% if user %}
           <li><a href="/app"{% if active == "app" %} aria-current="page"{% endif %}>My documents</a></li>
+          {% if courses_enabled %}
+          <li><a href="/courses"{% if active == "courses" %} aria-current="page"{% endif %}>Courses</a></li>
+          {% endif %}
           {% if user.is_admin %}
           <li><a href="/admin"{% if active == "admin" %} aria-current="page"{% endif %}>Admin</a></li>
           {% endif %}

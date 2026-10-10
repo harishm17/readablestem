@@ -234,6 +234,8 @@ def render(
         "max_pages": ctx.settings.max_pages_per_job,
         "retention_hours": ctx.settings.retention_hours,
         "opt_in_days": ctx.settings.opt_in_retention_days,
+        # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.
+        "courses_enabled": ctx.settings.feature_notation_memory,
     }
     return ctx.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code, headers=headers

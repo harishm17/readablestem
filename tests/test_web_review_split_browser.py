@@ -307,8 +307,8 @@ def test_the_whole_review_can_be_done_without_javascript(site, browser, job):
     # Decision 3: the group, one button for all three.
     page.get_by_role("button", name=re.compile("^Keep as headings at level 2")).click()
     page.wait_for_url(url)
-    assert page.locator("#decision-title").inner_text() == "All decisions made"
-    assert page.get_by_role("link", name="Download the accessible HTML").is_visible()
+    assert page.locator("#decision-title").inner_text() == "Ready"  # one part stays an image
+    assert page.get_by_role("link", name="Download the HTML file").is_visible()
     assert page.locator(".page-scroll .box-required").count() == 0
     # The optional checks still open without scripts.
     page.locator("#optional-summary").click()

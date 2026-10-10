@@ -237,7 +237,9 @@ def test_flattened_maths_in_the_grid_read_from_the_pdf_never_reaches_the_student
         if cell.text.startswith("K = "):
             typed = "K = " + typed
         form = {"change": "cell", "row": str(cell.row), "col": str(cell.col), "cell": typed}
-        apply_review(result, element.id, "edit", form)
+        # Without the SLANet-plus file a formula may be split over two cells, so the LaTeX
+        # typed here says more than this cell's PDF text: used anyway (web.edit_check).
+        apply_review(result, element.id, "edit", form, anyway=True)
     fix = result.fix_for(element.id)
     assert fix is not None and fix.table is not None
     assert not flattened_cells(fix.table.grid)

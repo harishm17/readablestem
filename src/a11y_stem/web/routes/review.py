@@ -15,8 +15,8 @@ Layout (see `web.review` for the rules), in three sections:
    listing the fixes still waiting (page and reading order). Repeated headings that share a
    `Fix.group_key` are one card with one decision for all of them ("Apply to all 11",
    "Make all 11 bold text", or one level for all); their own cards are folded inside it.
-   N counts decisions, so such a group counts once. Groups offer bulk accept for
-   proposals that a single "Accept" could take anyway.
+   N counts decisions, so such a group counts once. There is no bulk accept: every
+   decision asked for is meaning-level, so each is opened (`web.review`).
 2. "Optional checks (M)": fixes accepted automatically with a note (a cosmetic style
    difference, a heading with weak evidence, a long alt text), folded away in a
    <details>, each note in plain English. Nothing there blocks "done"; each can still be
@@ -77,10 +77,7 @@ from a11y_stem.web.messages import (
     severity_label,
 )
 from a11y_stem.web.review import (
-    ACCEPT_ALL_KINDS,
     ADD_DATA_TABLE,
-    BULK_DEFAULT_THRESHOLD,
-    BULK_THRESHOLDS,
     GROUP_SLUGS,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
@@ -88,7 +85,6 @@ from a11y_stem.web.review import (
     UNDO_ACTION,
     USE_LOCAL_NOTE,
     WRITE_KEY,
-    BulkRequest,
     FieldError,
     FixGroup,
     GroupOutcome,
@@ -96,17 +92,13 @@ from a11y_stem.web.review import (
     ReviewChange,
     ReviewInvalid,
     ReviewStale,
-    apply_bulk_accept,
     apply_group,
     apply_review,
-    at_or_above,
-    bulk_eligible,
     bump_result_version,
     can_accept,
     group_anchor,
     group_fixes,
     heading_level_written,
-    heading_moved,
     heading_places,
     is_group_key,
     is_stale,
@@ -115,7 +107,6 @@ from a11y_stem.web.review import (
     kind_for_slug,
     needs_attention,
     next_to_review,
-    parse_bulk,
     rerender_html,
     restorable,
     review_anchor,
@@ -450,13 +441,6 @@ class UnitView:
 
 
 @dataclass
-class BulkOption:
-    percent: int
-    count: int
-    selected: bool
-
-
-@dataclass
 class GroupView:
     slug: str
     title: str  # "Equations"
@@ -468,11 +452,6 @@ class GroupView:
     done: list[ReviewItem]
     needs_review: int
     not_converted: int
-    accept_all: int  # proposals "Accept all" would take; 0 when it is not offered
-    moved: int  # headings left out of bulk accept: the output writes another level
-    bulk_options: list[BulkOption]
-    bulk_eligible: int  # proposals any bulk accept could take
-    bulk_warned: int  # ... of which have a failed warning-level check
     notices: list[str] = field(default_factory=list)
     error: str | None = None
 
@@ -667,11 +646,6 @@ def _group(
     places: dict[str, HeadingPlace],
 ) -> GroupView:
     one, many = NOUNS[group.kind]
-    eligible = [f for f in group.pending if bulk_eligible(f, places)]
-    options = [
-        BulkOption(t, sum(at_or_above(f, t) for f in eligible), t == BULK_DEFAULT_THRESHOLD)
-        for t in BULK_THRESHOLDS
-    ]
     units = [
         UnitView(group=_heading_group(result, unit, items, elements, places))
         if unit[0].group_key and unit[0].kind is Kind.HEADING
@@ -689,14 +663,6 @@ def _group(
         done=[items[f.element_id] for f in group.done],
         needs_review=sum(f.status is Status.NEEDS_REVIEW for f in group.pending),
         not_converted=sum(f.status in NOT_CONVERTED for f in group.pending),
-        accept_all=len(eligible) if group.kind in ACCEPT_ALL_KINDS else 0,
-        moved=sum(
-            f.status is Status.NEEDS_REVIEW and can_accept(f) and heading_moved(f, places)
-            for f in group.pending
-        ),
-        bulk_options=options,
-        bulk_eligible=len(eligible),
-        bulk_warned=sum(bool(f.failed_checks) for f in eligible),
     )
 
 
@@ -950,7 +916,6 @@ def review_action(
     alt: Annotated[str | None, Form()] = None,
     decorative: Annotated[str | None, Form()] = None,
     level: Annotated[str | None, Form()] = None,
-    min_confidence: Annotated[str, Form()] = "",
     view: Annotated[str, Form()] = "",
     scope: Annotated[str, Form()] = "",
     change: Annotated[str | None, Form()] = None,
@@ -964,10 +929,10 @@ def review_action(
     remove_data_table: Annotated[str | None, Form()] = None,
     version: Annotated[str, Form()] = "",
 ) -> Response:
-    """One decision on one fix; when `element_id` names a kind ("equations", "figures",
-    "tables", "headings"), a bulk accept in that group; when it is a heading group's key
-    ("hg-p1-e7"), one decision for every heading of that group still waiting (with
-    `scope=all`, for every heading of the group: a decided group decided again).
+    """One decision on one fix; when it is a heading group's key ("hg-p1-e7"), one
+    decision for every heading of that group still waiting (with `scope=all`, for every
+    heading of the group: a decided group decided again). A kind in place of the id
+    ("equations"), the bulk accept removed on 2026-10-09, is not found.
 
     Element ids look like "p3-e12", so neither a kind nor a group key can be one.
     Sharing the route keeps a single CSRF-checked, ownership-checked way to change a
@@ -983,9 +948,8 @@ def review_action(
         raise PageError(404, *NOT_FOUND)
     view = LIST_VIEW if view == LIST_VIEW else "split"
     if kind_for_slug(element_id) is not None:
-        return _bulk_action(
-            request, job_id, element_id, user, action, min_confidence, view, version
-        )
+        # No bulk accept: every decision asked for is meaning-level, decided one by one.
+        raise PageError(404, *NOT_FOUND)
     if is_group_key(element_id):
         every = scope == "all"
         return _group_action(
@@ -1170,75 +1134,6 @@ def _group_message(action: str, level: str, outcome: GroupOutcome, *, every: boo
     return message
 
 
-def _bulk_action(
-    request: Request,
-    job_id: str,
-    slug: str,
-    user: CurrentUser,
-    action: str,
-    min_confidence: str,
-    view: str,
-    version: str = "",
-) -> Response:
-    try:
-        with session_scope(get_ctx(request).factory) as session:
-            # Ownership first: someone else's job is a 404 whatever the form says.
-            job = owned_job(session, job_id, user, lock=True)
-            require_done(job)
-            _refuse_stale(job, version)
-            bulk = parse_bulk(slug, action, min_confidence)
-            result = DocumentResult.model_validate(job.result_json or {})
-            changes = apply_bulk_accept(result, bulk)
-            if changes:  # nothing left to accept: no write, no re-render (idempotent)
-                job.html = rerender_html(result, _crops(session, job.id))
-                job.result_json = result.model_dump(mode="json", exclude={"html"})
-                written = bump_result_version(job)
-                session.add_all(_review_edit(job.id, user, c, written) for c in changes)
-                _decision_events(request, session, user, job, result, "bulk", len(changes))
-    except ReviewStale:
-        return _stale_page(request, job_id, user, LIST_VIEW, slug)
-    except ReviewInvalid as exc:
-        log_event(logger, "review_invalid", job_id=job_id, action="bulk")
-        return _page(request, job_id, user, invalid=(slug, exc), status_code=422)
-    log_event(
-        logger,
-        "review_bulk",
-        job_id=job_id,
-        kind=bulk.kind.value,
-        min_percent=bulk.min_percent,
-        accepted=len(changes),
-    )
-    flash(request, _bulk_message(bulk, len(changes)), element_id=GROUP_FLASH + slug)
-    if view != LIST_VIEW:  # bulk accept is only offered on the list view
-        return _split_redirect(job_id, result, None)
-    return RedirectResponse(list_url(job_id, f"group-{slug}"), status_code=303)
-
-
-MOVED_NAMED = 5  # name up to this many moved headings; count any more
-
-
-def _moved_message(moved: list[str], numbers: dict[str, int]) -> str:
-    """' Heading 3 is now shown at a different level.': the other headings a heading
-    decision moved in the output, so the change to them is not silent."""
-    if not moved:
-        return ""
-    if len(moved) > MOVED_NAMED:
-        return f" {len(moved)} later headings are now shown at a different level."
-    names = [str(numbers[eid]) for eid in moved]
-    if len(names) == 1:
-        return f" Heading {names[0]} is now shown at a different level."
-    listed = ", ".join(names[:-1]) + " and " + names[-1]
-    return f" Headings {listed} are now shown at a different level."
-
-
-def _bulk_message(bulk: BulkRequest, n: int) -> str:
-    where = "" if bulk.min_percent is None else f" at {bulk.min_percent}% confidence or higher"
-    if n:
-        return f"Accepted {counted(n, bulk.kind)}{where}."
-    many = NOUNS[bulk.kind][1]
-    return f"Nothing changed: no {many}{where} were waiting that could be accepted."
-
-
 def _crops(session: Session, job_id: str) -> dict[str, bytes]:
     blobs = session.scalars(select(Blob).where(Blob.job_id == job_id, Blob.kind == "crop"))
     return {b.element_id: b.content for b in blobs if b.element_id}
@@ -1264,6 +1159,23 @@ def _decision_events(
         changed=changed,
         open_after=triage.open_decisions(result.fixes),
     )
+
+
+MOVED_NAMED = 5  # name up to this many moved headings; count any more
+
+
+def _moved_message(moved: list[str], numbers: dict[str, int]) -> str:
+    """' Heading 3 is now shown at a different level.': the other headings a heading
+    decision moved in the output, so the change to them is not silent."""
+    if not moved:
+        return ""
+    if len(moved) > MOVED_NAMED:
+        return f" {len(moved)} later headings are now shown at a different level."
+    names = [str(numbers[eid]) for eid in moved]
+    if len(names) == 1:
+        return f" Heading {names[0]} is now shown at a different level."
+    listed = ", ".join(names[:-1]) + " and " + names[-1]
+    return f" Headings {listed} are now shown at a different level."
 
 
 def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange, version: int) -> ReviewEdit:

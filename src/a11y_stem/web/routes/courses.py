@@ -80,7 +80,12 @@ def _courses_page(
 ) -> Response:
     with session_scope(get_ctx(request).factory) as session:
         courses = notation.list_courses(session, user.id)
-    context = {"courses": courses, "values": {}, "max_courses": notation.MAX_COURSES}
+    context = {
+        "courses": courses,
+        "values": {},
+        "max_courses": notation.MAX_COURSES,
+        "active": "courses",
+    }
     return render(request, "courses.html", context | (extra or {}), status_code=status)
 
 

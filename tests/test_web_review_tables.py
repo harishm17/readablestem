@@ -378,7 +378,9 @@ def test_keep_the_image_of_a_table_without_a_grid(tables):
     response = post(tables, "p1-e3", action="reject")
     assert response.headers["location"] == f"/jobs/{tables.job_id}/review"
     done = panel(follow(tables, response))
-    assert "All decisions made" in done and "Download the accessible HTML" in done
+    # Two tables are kept as images: "Ready", with what students get as images.
+    assert ">Ready<" in done and "Download the HTML file" in done
+    assert "2 tables are shown as an image that screen readers cannot read." in text_of(done)
 
 
 def test_accept_without_a_rebuilt_table_is_refused(tables):
@@ -467,20 +469,20 @@ def test_a_maths_cell_goes_through_the_latex_checks(tables):
     )
     assert bad.status_code == 422
     body = panel(bad.text)
-    assert "The LaTeX was not saved." in body
-    assert "latex.allowed_commands: unknown_command" in body
+    # The equation edit's own sentences (web.edit_check), not the check codes.
+    assert "Your LaTeX was not saved." in body
+    assert "is not a command this tool supports" in text_of(body)
     # The cell's form is open again, with what was typed and the error on it.
     form = section(body, 'class="decide-form table-cell-form', "</form>")
     assert r"\notacommand{v}</textarea>" in form and 'aria-invalid="true"' in form
     assert 'id="cell-error-p1-e1"' in form
+    assert "Use my edit anyway" not in form  # not a difference from the PDF: no override
     assert grid(tables, "p1-e1") == table_1_proposal() and version(tables) == 0
-    good = post(
-        tables, "p1-e1", action="edit", change="cell", row="3", col="1", cell=r"$v = \frac{x}{t}$"
-    )
+    good = post(tables, "p1-e1", action="edit", change="cell", row="3", col="1", cell=r"$v = d/t$")
     assert good.status_code == 303
     cell = next(c for c in grid(tables, "p1-e1").cells if (c.row, c.col) == (3, 1))
-    assert cell.latex == r"v = \frac{x}{t}"  # cleaned as model output is ($ removed)
-    assert cell.mathml is not None and "<mi>x</mi>" in cell.mathml
+    assert cell.latex == r"v = d/t"  # cleaned as model output is ($ removed)
+    assert cell.mathml is not None and "<mi>d</mi>" in cell.mathml
     assert cell.text == "v = d / t"  # the plain text the serialiser falls back on
     fix = fix_of(tables, "p1-e1")
     own = [c for c in fix.checks if c.name.split(".")[0] in {"latex", "mathml"}]
@@ -601,27 +603,11 @@ def test_every_review_write_moves_the_version_on(tables):
     # A form without the field (an older page, a script) is not checked, but still counts.
     post(tables, "p1-e3", sent_version=None, action="edit", change="use_local")
     assert version(tables) == 2
-    # Bulk accept: a write moves it on; one that changes nothing does not.
-    tables.browser.post(
-        f"/jobs/{tables.job_id}/review/tables",
-        data={"csrf_token": token(tables.browser, f"/jobs/{tables.job_id}/review/list"),
-              "action": "accept_confident", "min_confidence": "60", "view": "list"},
-    )  # fmt: skip
+    # Accept: a write moves it on; one refused (nothing to accept) does not.
+    assert post(tables, "p1-e1", action="accept").status_code == 303
     assert fix_of(tables, "p1-e1").status is Status.ACCEPTED and version(tables) == 3
-    tables.browser.post(
-        f"/jobs/{tables.job_id}/review/tables",
-        data={"csrf_token": token(tables.browser, f"/jobs/{tables.job_id}/review/list"),
-              "action": "accept_confident", "min_confidence": "60", "view": "list"},
-    )  # fmt: skip
+    assert post(tables, "p2-e0", action="accept").status_code == 422
     assert version(tables) == 3
-    # A stale bulk form is refused on its threshold select.
-    stale = tables.browser.post(
-        f"/jobs/{tables.job_id}/review/tables",
-        data={"csrf_token": token(tables.browser, f"/jobs/{tables.job_id}/review/list"),
-              "action": "accept_confident", "min_confidence": "60", "view": "list",
-              "version": "1"},
-    )  # fmt: skip
-    assert stale.status_code == 409 and STALE_TITLE in unescape(stale.text)
 
 
 def test_the_stale_guard_on_the_list_view(tables):
@@ -1002,3 +988,27 @@ def test_a_table_written_as_text_is_shown_as_students_get_it(as_text):
     assert back.status_code == 303
     fix = stored(as_text).fix_for("p2-e1")
     assert fix is not None and fix.table is not None and fix.table.grid.is_data
+
+
+def test_a_maths_cell_unlike_the_pdf_needs_use_my_edit_anyway(tables):
+    """The same checks as an equation's edit, against the PDF's text in that cell
+    ("v = d / t"): x for d changes what a student reads, so it is not used without the
+    reviewer's explicit choice, which is recorded."""
+    typed = r"v = \frac{x}{t}"
+    refused = post(tables, "p1-e1", action="edit", change="cell", row="3", col="1", cell=typed)
+    assert refused.status_code == 422
+    body = panel(refused.text)
+    assert "differs from the PDF where it changes the meaning" in text_of(body)
+    form = section(body, 'class="decide-form table-cell-form', "</form>")
+    assert '<button type="submit" name="action" value="edit_anyway"' in form
+    assert grid(tables, "p1-e1") == table_1_proposal() and version(tables) == 0
+    used = post(tables, "p1-e1", action="edit_anyway", change="cell", row="3", col="1", cell=typed)
+    assert used.status_code == 303
+    cell = next(c for c in grid(tables, "p1-e1").cells if (c.row, c.col) == (3, 1))
+    assert cell.latex == typed
+    fix = fix_of(tables, "p1-e1")
+    assert "symbol_mismatch" in {c.code for c in fix.failed_checks}  # kept on the fix
+    assert fix.status is Status.NEEDS_REVIEW  # a table is decided by Accept
+    with session_scope(tables.ctx.factory) as session:
+        edits = session.scalars(select(ReviewEdit).where(ReviewEdit.job_id == tables.job_id))
+        assert any((e.after or {}).get("anyway") for e in edits)

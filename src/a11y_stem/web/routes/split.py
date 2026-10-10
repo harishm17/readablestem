@@ -97,7 +97,7 @@ from a11y_stem.web.routes.review import (
     undo_offer,
 )
 from a11y_stem.web.speech_diff import SpokenDiff, spoken_diff
-from a11y_stem.web.views import KIND_LABELS, JobView
+from a11y_stem.web.views import KIND_LABELS, JobView, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -197,6 +197,17 @@ class OptionalLine:
     mathml: Markup | None = None  # an equation, small
 
 
+@dataclass(frozen=True)
+class ReadyView:
+    """The review screen's finish line (no decision open): what the job page says."""
+
+    title: str  # "Ready to share", "Ready", or a stopped job's outcome label
+    sentence: str  # what is shown as an image, or why the job stopped ("" when neither)
+    finish: str  # "You made 3 decisions on 9 October." / "Nothing in this file needed ..."
+    notes: int  # items accepted for you with a note (optional to look at)
+    shareable: bool  # the file can go to students (not a job that stopped early)
+
+
 @dataclass
 class Panel:
     """The decision (or item) shown on the right."""
@@ -229,6 +240,7 @@ class Panel:
     next_label: str = ""
     decision_key: str | None = None
     confidence: str = ""
+    ready: ReadyView | None = None  # mode "done": the finish line
     group_pages: list[PageLink] = field(default_factory=list)
     # A decided heading group: what was decided, and which of the two choices would
     # change something if made again for all of them ("Change all 11").
@@ -458,10 +470,40 @@ class SplitBuilder:
 
     # ------------------------------------------------------------------ panel
 
+    def ready(self) -> ReadyView:
+        """The finish line once no decision is open, as the job page says it
+        (`job_page.headline`, `job_page.Finish`): "Ready to share", or "Ready" with what
+        is shown as an image, or the outcome of a job that stopped early."""
+        from a11y_stem.web import job_page
+        from a11y_stem.web.outcome import job_outcome
+
+        with session_scope(get_ctx(self.request).factory) as session:
+            job = owned_job(session, self.job_id, self.user)
+            when = last_decision(session, job)
+            outcome = job_outcome(
+                status=str(job.status), error_code=job.error_code, result_json=job.result_json
+            )
+        counts = job_page.breakdown(self.result.fixes)
+        line = job_page.headline("done", "", outcome, counts)
+        finish = job_page.Finish(
+            decided_units=counts.decided_units,
+            last_decision=when,
+            notes=counts.notes,
+            not_handled=len(job_page.notice_lists(self.result).not_handled),
+        )
+        return ReadyView(
+            title=line.label,
+            sentence=line.message if line.state in {"images", "stopped"} else "",
+            finish=finish.sentence,
+            notes=finish.notes,
+            shareable=line.state in {"ready", "images"},
+        )
+
     def panel(self, decision: queue.Decision | None, fix: Fix | None) -> Panel:
         total = len(self.queue)
         if decision is None and fix is None:
-            return Panel(mode="done", title="All decisions made" if total else "Nothing to decide")
+            ready = self.ready()
+            return Panel(mode="done", title=ready.title, ready=ready)
         if decision is not None:
             lead = decision.lead
             panel = Panel(

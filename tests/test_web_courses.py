@@ -106,6 +106,15 @@ def test_with_the_flag_off_an_upload_ignores_a_course(off):
 # --------------------------------------------------------------------------- courses
 
 
+def test_courses_are_in_the_main_navigation_with_the_flag_on(web):
+    page = web.browser.get("/app").text
+    nav = page[page.index('<nav aria-label="Main">') : page.index("</nav>")]
+    assert '<a href="/courses">Courses</a>' in nav
+    courses = web.browser.get("/courses").text
+    nav = courses[courses.index('<nav aria-label="Main">') : courses.index("</nav>")]
+    assert '<a href="/courses" aria-current="page">Courses</a>' in nav
+
+
 def test_a_course_is_created_listed_renamed_and_deleted(web):
     page = web.browser.get("/courses").text
     assert "<h1>Your courses</h1>" in page and "You have no courses yet." in page

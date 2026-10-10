@@ -19,16 +19,18 @@ The web route owns the transaction; this module owns the rules:
   level the output's outline repair would change (one that skips a level after the
   heading before it) is refused, with the levels that fit; so is accepting a proposed
   level the repair would change (after a heading before it was rejected or changed),
-- reject: the original stays in the document, flagged,
-- bulk accept: many fixes of one kind at once, but only the ones a single "Accept" could
-  take (NEEDS_REVIEW, a proposal, no failed error-level check, and for a heading a
-  level the output keeps). FAILED and ABSTAINED fixes have nothing safe to accept and
-  are never included.
+- reject: the original stays in the document, flagged.
+
+There is no bulk accept (removed 2026-10-09): every decision the pipeline asks for is
+meaning-level ("Review tiers"), so each is opened and decided on its own; repeated
+headings are already one decision (`apply_group`).
 
 A table is edited one change at a time (`edit_table`, the "tables" section below): use
 the grid read from the PDF (`Element.table`), make the first row or column a header or
-not, or change one cell's text (a maths cell's LaTeX goes through the equation
-validators). Each is refused, with nothing saved, when it would leave the grid with a
+not, or change one cell's text (a maths cell's LaTeX goes through an equation's edit
+checks, `web.edit_check.check_cell_edit`, against the PDF's text in that cell: one that
+differs where it changes the meaning is used only with "Use my edit anyway"). Each is
+refused, with nothing saved, when it would leave the grid with a
 structural problem it did not have (`core.types.grid_problems`).
 
 A heading decision can change the level the output writes for later headings (the
@@ -85,7 +87,7 @@ from a11y_stem.core.types import (
     grid_problems,
 )
 from a11y_stem.web.edit_check import MEANING_CODES
-from a11y_stem.web.messages import confidence_percent, explain_check
+from a11y_stem.web.messages import explain_check
 
 if TYPE_CHECKING:
     from a11y_stem.web.db import Job
@@ -115,17 +117,6 @@ GROUP_KINDS = tuple(GROUP_SLUGS)
 # one, or reject to confirm the original stays).
 PENDING = PENDING_STATUSES
 NOT_CONVERTED = frozenset({Status.FAILED, Status.ABSTAINED})
-
-# Bulk accept. "Accept all" is only offered for headings: a wrong heading level is cheap
-# to spot and fix later, a wrong equation or alt text is not. The confidence threshold
-# is offered for every group, from a fixed list so the page can show how many each
-# choice would accept (no JavaScript).
-BULK_ACCEPT_ALL = "accept_all"
-BULK_ACCEPT_CONFIDENT = "accept_confident"
-BULK_ACTIONS = (BULK_ACCEPT_ALL, BULK_ACCEPT_CONFIDENT)
-ACCEPT_ALL_KINDS = frozenset({Kind.HEADING})
-BULK_THRESHOLDS = (90, 80, 70, 60, 50)  # percent
-BULK_DEFAULT_THRESHOLD = 80
 
 
 @dataclass
@@ -208,12 +199,6 @@ class FixGroup:
     def units(self) -> list[list[Fix]]:
         """The decisions waiting: one per fix, one per group of repeated headings."""
         return triage.units(self.pending)
-
-
-@dataclass(frozen=True)
-class BulkRequest:
-    kind: Kind
-    min_percent: int | None  # None: every eligible proposal ("accept all", headings only)
 
 
 # --------------------------------------------------------------------------- order
@@ -428,7 +413,8 @@ def apply_review(
     overridden = False
     status = STATUS_FOR_ACTION[action]
     if action == "edit" and fix.kind is Kind.TABLE:
-        warnings, note = edit_table(fix, element, form)
+        warnings, note = edit_table(fix, element, form, anyway=anyway)
+        overridden = anyway and any(c.code in MEANING_CODES for c in warnings)
         if table_still_open(warnings):
             # A table is changed one cell or setting at a time: while a required check
             # still fails (a header problem, a cell unlike the PDF, flattened maths), the
@@ -588,45 +574,6 @@ def _edit_equation(
     )
     fix.checks = checked.checks
     return [c for c in fix.checks if not c.passed]
-
-
-def checked_latex(
-    typed: str, display: str, fid: str, values: dict[str, str], *, empty: str
-) -> tuple[str, str, list[Check]]:
-    """A reviewer's LaTeX through what model output goes through: cleaned, checked,
-    converted to MathML and that checked too. Returns (latex, mathml, every check run);
-    raises ReviewInvalid on `fid` (with `values` re-shown) at the first error-level
-    failure, or with `empty` when nothing is left after cleaning."""
-    from a11y_stem.pipeline import equation_step, validate
-
-    # The cleaning model output gets: "$v = at$" loses its dollars, and a bare "%" (a
-    # percent sign here, a comment to the converter) is escaped instead of silently
-    # dropping the rest of the line.
-    latex = equation_step.clean_latex(typed)
-    if not latex:
-        raise ReviewInvalid([FieldError(fid, empty)], values)
-    if len(latex) > MAX_LATEX_CHARS:
-        raise ReviewInvalid(
-            [FieldError(fid, f"Keep the LaTeX under {MAX_LATEX_CHARS} characters.")], values
-        )
-    checks = list(validate.check_latex(latex))
-    if failed := _blocking(checks):
-        raise ReviewInvalid(
-            [FieldError(fid, "The LaTeX was not saved. " + describe_failed(failed))], values
-        )
-    try:
-        mathml = validate.safe_latex_to_mathml(latex, display)
-    except ValueError:  # LatexConversionError and latex2mathml's own errors
-        raise ReviewInvalid(
-            [FieldError(fid, "The LaTeX was not saved: it could not be converted to MathML.")],
-            values,
-        ) from None
-    mathml_checks = list(validate.check_mathml(mathml))
-    if failed := _blocking(mathml_checks):
-        raise ReviewInvalid(
-            [FieldError(fid, "The LaTeX was not saved. " + describe_failed(failed))], values
-        )
-    return latex, mathml, checks + mathml_checks
 
 
 def _edit_figure(fix: Fix, element: Element | None, form: Mapping[str, str]) -> list[Check]:
@@ -955,7 +902,7 @@ def apply_group(
     """One decision for every heading of a group still waiting, in reading order:
 
     - accept: keep each as a heading at its proposed level (one the output would write
-      at another level is left waiting, as bulk accept does);
+      at another level is left waiting);
     - edit: give each the level in `form["level"]`; refused as a whole (nothing saved) if
       the output would move that level for any of them;
     - reject: make each plain bold text (not a heading).
@@ -1025,86 +972,6 @@ def _already(fix: Fix, action: str, level: int | None) -> bool:
         and fix.heading is not None
         and fix.heading.level == level
     )
-
-
-# --------------------------------------------------------------------------- bulk
-
-
-def bulk_eligible(fix: Fix, places: Mapping[str, HeadingPlace]) -> bool:
-    """What a bulk accept may take: exactly what a single "Accept" could (for a heading,
-    only a level the output keeps; `places` from `heading_places`), and only while it is
-    still waiting for review (a reviewer's own decision is never overwritten). Never a
-    chart data table whose values were read from the image: the values are the decision,
-    and the confidence a bulk accept goes by is the alt text's, not theirs."""
-    return (
-        fix.status is Status.NEEDS_REVIEW
-        and can_accept(fix)
-        and not heading_moved(fix, places)
-        and not values_from_image(fix)
-    )
-
-
-def values_from_image(fix: Fix) -> bool:
-    """A figure whose chart data table has values read from the image (`figure.data_values`
-    failed): a person must look at them."""
-    return any(c.name == "figure.data_values" and not c.passed for c in fix.checks)
-
-
-def at_or_above(fix: Fix, min_percent: int) -> bool:
-    return fix.confidence is not None and confidence_percent(fix.confidence) >= min_percent
-
-
-def bulk_candidates(result: DocumentResult, request: BulkRequest) -> list[Fix]:
-    # Accepting a fix waiting for review changes no level and keeps it in the document,
-    # so the outline is the same after each one: one pass is enough.
-    places = heading_places(result) if request.kind is Kind.HEADING else {}
-    return [
-        f
-        for f in result.fixes
-        if f.kind is request.kind
-        and bulk_eligible(f, places)
-        and (request.min_percent is None or at_or_above(f, request.min_percent))
-    ]
-
-
-def bulk_field_id(slug: str) -> str:
-    """The control a bulk error points at: the threshold select of that group."""
-    return f"min-confidence-{slug}"
-
-
-def parse_bulk(slug: str, action: str, min_confidence: str) -> BulkRequest:
-    """The bulk form's fields as a request. Raises LookupError for an unknown group and
-    ReviewInvalid for anything the page never offers."""
-    kind = kind_for_slug(slug)
-    if kind is None:
-        raise LookupError(slug)
-    fid = bulk_field_id(slug)
-    if action == BULK_ACCEPT_ALL:
-        if kind not in ACCEPT_ALL_KINDS:
-            message = "Accepting every proposal at once is only offered for headings."
-            raise ReviewInvalid([FieldError(fid, message)])
-        return BulkRequest(kind, None)
-    if action != BULK_ACCEPT_CONFIDENT:
-        raise ReviewInvalid([FieldError(fid, "Choose an action.")])
-    raw = min_confidence.strip().removesuffix("%")
-    if not raw.isdigit() or int(raw) not in BULK_THRESHOLDS:
-        choices = ", ".join(f"{t}%" for t in BULK_THRESHOLDS)
-        raise ReviewInvalid([FieldError(fid, f"Choose a confidence from the list ({choices}).")])
-    return BulkRequest(kind, int(raw))
-
-
-def apply_bulk_accept(result: DocumentResult, request: BulkRequest) -> list[ReviewChange]:
-    """Accept every candidate in place; one ReviewChange each (empty if none were left,
-    so repeating the same request changes nothing)."""
-    changes = []
-    for fix in bulk_candidates(result, request):
-        before = snapshot(fix)
-        fix.status = Status.ACCEPTED
-        fix.reviewed = True
-        changes.append(ReviewChange(fix=fix, action="accept", before=before, after=snapshot(fix)))
-    if changes:
-        _recount(result)
-    return changes
 
 
 # --------------------------------------------------------------------------- tables
@@ -1231,11 +1098,13 @@ _INDEX = re.compile(r"[0-9]{1,4}")  # ASCII digits only, as for heading levels
 
 
 def edit_table(
-    fix: Fix, element: Element | None, form: Mapping[str, str]
+    fix: Fix, element: Element | None, form: Mapping[str, str], *, anyway: bool = False
 ) -> tuple[list[Check], str]:
     """Apply one table edit (`form["change"]`, one of TABLE_CHANGES) to `fix.table`.
     Returns (failed checks to warn about, what changed in words). Raises ReviewInvalid,
-    with nothing changed, for an edit the page never offers or one that fails a check."""
+    with nothing changed, for an edit the page never offers or one that fails a check.
+    `anyway`: a maths cell's LaTeX that differs from the PDF where it changes the
+    meaning is used ("Use my edit anyway"), as for an equation."""
     eid = fix.element_id
     change = form.get("change", "")
     if change == "use_local":
@@ -1262,7 +1131,7 @@ def edit_table(
     if change == "headers":
         return _edit_headers(fix, fix.table.grid, element, form)
     if change == "cell":
-        return _edit_cell(fix, fix.table.grid, element, form)
+        return _edit_cell(fix, fix.table.grid, element, form, anyway=anyway)
     raise ReviewInvalid([FieldError(field_id("actions", eid), "Choose what to change.")])
 
 
@@ -1323,9 +1192,15 @@ def _edit_headers(
 
 
 def _edit_cell(
-    fix: Fix, grid: TableGrid, element: Element | None, form: Mapping[str, str]
+    fix: Fix,
+    grid: TableGrid,
+    element: Element | None,
+    form: Mapping[str, str],
+    *,
+    anyway: bool = False,
 ) -> tuple[list[Check], str]:
-    from a11y_stem.pipeline import validate
+    from a11y_stem.pipeline import table_step, validate
+    from a11y_stem.web import edit_check
 
     eid = fix.element_id
     fid = field_id("cell", eid)
@@ -1341,17 +1216,31 @@ def _edit_cell(
     edited = cell.model_copy()
     checks: list[Check] = []
     if is_maths_cell(grid, cell):
-        # A maths cell: its LaTeX is checked as an equation's is, and shown in the line.
-        # A cell of the grid read from the PDF whose maths its text gives flat is one too:
-        # it is written as LaTeX (the PDF's text stays, for the checks).
-        latex, mathml, checks = checked_latex(
-            typed.strip(), "inline", fid, values, empty="Enter the LaTeX for this cell."
-        )
-        if (latex, mathml) == (cell.latex, cell.mathml):
+        # A maths cell: its LaTeX goes through an equation's edit checks, against the
+        # PDF's text in that cell (web.edit_check): one that differs where it changes
+        # the meaning is used only with "Use my edit anyway". A cell of the grid read
+        # from the PDF whose maths its text gives flat is one too: it is written as
+        # LaTeX (the PDF's text stays, for the checks).
+        if len(typed) > MAX_LATEX_CHARS:
+            message = f"Keep the LaTeX under {MAX_LATEX_CHARS} characters."
+            raise ReviewInvalid([FieldError(fid, message)], values)
+        layer = table_step.cell_text_layer(grid, cell, element)
+        checked = edit_check.check_cell_edit(layer, typed, current=cell.latex)
+        if checked.empty:
+            raise ReviewInvalid([FieldError(fid, "Enter the LaTeX for this cell.")], values)
+        if checked.mathml is None:
+            message = edit_check.blocking_message(checked)
+            raise ReviewInvalid([FieldError(fid, message)], values)
+        if checked.unchanged:
             raise ReviewInvalid(
                 [FieldError(fid, "This is the LaTeX the cell has already.")], values
             )
-        edited.latex, edited.mathml = latex, mathml
+        if checked.meaning and not anyway:
+            refused = ReviewInvalid([FieldError(fid, edit_check.meaning_message(checked))], values)
+            refused.override = True
+            raise refused
+        edited.latex, edited.mathml = checked.latex, checked.mathml
+        checks = checked.checks
     else:
         # What is stored is what is shown: invisible format characters (bidi controls,
         # zero-width spaces) removed and whitespace collapsed, as for alt text.

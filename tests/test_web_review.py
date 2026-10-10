@@ -1,9 +1,9 @@
 """Review screen: one fix at a time (display, accept / edit / reject, validation,
 re-render) and the MathML sanitizer.
 
-Grouping, bulk accept and where the reviewer lands after a decision are in
-test_web_review_bulk.py; the code -> sentence table in test_web_review_messages.py; axe
-in a real browser in test_web_review_browser.py.
+Grouping, that there is no bulk accept, and where the reviewer lands after a
+decision are in test_web_review_bulk.py; the code -> sentence table in
+test_web_review_messages.py; axe in a real browser in test_web_review_browser.py.
 
 `pipeline.validate`, `pipeline.speech` and `pipeline.assemble` belong to other work
 packages and are monkeypatched with small deterministic fakes here.
@@ -913,24 +913,9 @@ def test_rejecting_and_restoring_a_heading_moves_its_children_and_back():
     assert apply_review(data, "p1-e4", "reject", {}).moved == []  # nothing after it
 
 
-def test_bulk_accept_leaves_out_levels_the_output_would_move():
-    """Accept all on h1, h4, h2 used to store 4 for the second heading, written <h2>."""
-    from a11y_stem.web.review import BulkRequest, apply_bulk_accept, bulk_candidates
-
-    data = heading_doc(1, 4, 2)
-    request = BulkRequest(Kind.HEADING, None)
-    assert [f.element_id for f in bulk_candidates(data, request)] == ["p1-e0", "p1-e2"]
-    accepted = apply_bulk_accept(data, request)
-    assert [c.fix.element_id for c in accepted] == ["p1-e0", "p1-e2"]
-    written = written_levels(data)
-    assert all(written[c.fix.element_id] == c.fix.heading.level for c in accepted)  # type: ignore[union-attr]
-    assert stored_levels(data)["p1-e1"] == (4, "needs_review")
-    assert bulk_candidates(data, BulkRequest(Kind.HEADING, 80)) == []
-
-
 def test_the_page_shows_and_offers_the_level_the_document_writes(outline):
     """Reject the h2: the h3 is written as <h2>. Its card says so, offers level 2, has no
-    Accept button, and "Accept all" leaves it out."""
+    Accept button."""
     assert post(outline, "p1-e1", action="reject").status_code == 303
     page = review_page(outline)
     third = card(page, "p1-e2")
@@ -938,13 +923,11 @@ def test_the_page_shows_and_offers_the_level_the_document_writes(outline):
     assert "In the document: level 2." in third
     assert '<option value="2" selected>Level 2</option>' in third
     assert 'value="accept"' not in third
-    assert "Accept all 1 remaining heading</button>" in page
-    assert "Not included: 1 heading the document shows at another level" in page
     response = post(outline, "p1-e2", action="accept")  # from a page loaded earlier
     assert response.status_code == 422
     assert '<a href="#level-p1-e2">Level 3 would skip a level' in response.text
     assert 'id="level-error-p1-e2"' in response.text
-    assert post(outline, "headings", action="accept_all").status_code == 303
+    assert post(outline, "p1-e0", action="accept").status_code == 303
     assert {f.element_id: f.status.value for f in result(outline).fixes} == {
         "p1-e0": "accepted",
         "p1-e1": "rejected",

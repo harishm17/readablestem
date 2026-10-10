@@ -234,7 +234,7 @@ progress { width: 16rem; height: 1.1rem; }
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
-/* Review screen: progress, sections, groups, bulk accept, folded decided fixes.
+/* Review screen: progress, sections, groups, folded decided fixes.
    Document text (headings, alt text, captions) and codes can be long unbroken strings. */
 .review-progress { margin: 1rem 0; }
 .review-progress, .review-toc, .review-group, .fix-card { overflow-wrap: anywhere; }
@@ -244,10 +244,6 @@ progress { width: 16rem; height: 1.1rem; }
 .review-group { border-top: 2px solid var(--rule); margin-top: 2.5rem; }
 .review-group:focus { outline: none; }
 .group-count { font-weight: 400; color: var(--muted); font-size: 1rem; }
-.bulk-actions { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.25rem 1.25rem 1rem; margin: 1rem 0 1.5rem; }
-.bulk-form { margin: 0.75rem 0; }
-.bulk-form .field { margin-bottom: 0.5rem; }
-.bulk-form .hint { max-width: 44rem; }
 .part-label { font-weight: 700; margin: 0.75rem 0 0.35rem; }
 .fix-card h3, .fix-card h4 { font-size: 1.2rem; margin-top: 1rem; }
 .fix-card h5 { font-size: 1.1rem; margin-top: 1rem; }

@@ -173,8 +173,6 @@ def test_stale_group_and_list_view_writes_are_refused_too(ux):
     assert listed.status_code == 409
     assert "<h1>All items as a list</h1>" in listed.text
     assert f'href="/jobs/{ux.job_id}/review/list#item-p1-e6">Reload this page</a>' in listed.text
-    bulk = post(ux, "headings", action="accept_all", version="0", view="list")
-    assert bulk.status_code == 409
     assert stored(ux).fix_for("p1-e6").status.value == "needs_review"
 
 

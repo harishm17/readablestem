@@ -2,13 +2,14 @@
 
 - axe-core in every state a reviewer can put the page in: fixes needing review, failed
   and not converted, decided ones folded away and unfolded, just edited, just rejected,
-  after a bulk accept, and a refused edit (zero serious or critical violations);
+  after more decisions, and a refused edit (zero serious or critical violations);
 - every control has a label and every button says which fix or group it acts on;
 - status is written in words, not shown by colour alone;
 - no sideways scrolling at 320 CSS px (WCAG 1.4.10), even with a file name that has no
   break points and an equation wider than the screen;
 - at 320 CSS px, an error summary link shows the field with its label (app.js);
-- decisions and bulk accept work without JavaScript and land where the reviewer expects.
+- decisions work without JavaScript and land where the reviewer expects; there is no
+  bulk accept.
 
 Run with: uv run pytest -m browser tests/test_web_review_browser.py
 Uses the rich three-page document from test_web_review.py (every status in every group)
@@ -167,14 +168,14 @@ def walk_states(page, site, job: str, check) -> None:
     check("refused edit")
 
     page.goto(url)
-    page.get_by_role("button", name="Accept all 3 remaining headings").click()
-    page.wait_for_url(f"{url}#group-headings")
-    page.get_by_label("Accept every equation proposal at or above").select_option("60")
-    page.get_by_role("button", name="Accept these equations").click()
-    page.wait_for_url(f"{url}#group-equations")
-    check("after bulk accept")
+    page.get_by_role("button", name="Accept equation 1", exact=True).click()
+    page.wait_for_url(f"{url}#item-*")
+    page.goto(url)
+    page.get_by_role("button", name="Accept heading 1", exact=True).click()
+    page.wait_for_url(f"{url}#item-*")
+    check("after more decisions")
     unfold_everything(page)
-    check("after bulk accept, unfolded")
+    check("after more decisions, unfolded")
 
 
 # --------------------------------------------------------------------------- axe
@@ -228,7 +229,7 @@ def test_no_sideways_scrolling_at_320_css_px(site, browser, job):
     page.add_style_tag(content="h1, .lede { overflow-wrap: normal !important; }")
     assert sideways_overflow(page) > 300
     # The wide equation scrolls inside its own box instead of widening the page. (It was
-    # accepted in bulk above, so it is folded away: unfold it.)
+    # accepted above, so it is folded away: unfold it.)
     page.goto(review_url(site, job))
     unfold_everything(page)
     preview = page.locator("#fix-p1-e1 .mathml-preview")
@@ -322,7 +323,7 @@ def test_every_button_names_the_fix_or_group_it_acts_on(site, browser, job):
         assert [n for n in names if re.fullmatch(rf"{reject} \({item}\)", n)], (item, names)
     assert "Accept equation 1" in names
     assert "Accept equation 2" not in names  # failed: nothing to accept
-    assert {"Accept all 3 remaining headings", "Accept these equations"} <= set(names)
+    assert not [n for n in names if n.startswith(("Accept all", "Accept these"))]  # no bulk
     assert not {"Accept", "Reject", "Save edit"} & set(names)  # never a bare verb
     assert not [n for n in names if n.startswith("Reject")]
 
@@ -335,8 +336,6 @@ def test_every_control_has_a_visible_label(site, browser, job):
         "Alt text for figure 1",
         "Decorative: it adds nothing a reader needs, so it gets no alt text",
         "Level for heading 2",
-        "Accept every equation proposal at or above",
-        "Accept every figure proposal at or above",
     ):
         control = page.get_by_label(label).first
         assert control.is_visible(), label
@@ -348,9 +347,8 @@ def test_every_control_has_a_visible_label(site, browser, job):
         }"""
     )
     context.close()
-    # 6 LaTeX boxes, 4 alt text boxes, 4 "decorative" boxes, 5 heading levels and one
-    # bulk threshold per group.
-    assert (controls, unlabelled) == (22, 0)
+    # 6 LaTeX boxes, 4 alt text boxes, 4 "decorative" boxes and 5 heading levels.
+    assert (controls, unlabelled) == (19, 0)
 
 
 def test_status_is_written_in_words_not_only_colour(site, browser, job):
@@ -386,15 +384,11 @@ def test_a_decision_lands_on_the_next_fix_with_a_link_back(site, browser, job):
     context.close()
 
 
-def test_bulk_accept_and_decisions_work_without_javascript(site, browser, job):
+def test_decisions_work_without_javascript(site, browser, job):
     context, page = open_page(browser, site, javascript=False)
     url = review_url(site, job)
     page.goto(url)
-    page.get_by_role("button", name="Accept all 3 remaining headings").click()
-    assert page.url == f"{url}#group-headings"
-    group = page.locator("#group-headings")
-    assert "Accepted 3 headings." in group.inner_text()
-    assert group.get_by_role("button", name=re.compile("^Accept all")).count() == 0
+    assert page.get_by_role("button", name=re.compile("^Accept (all|these)")).count() == 0
     page.locator("#fix-p3-e1").get_by_role(
         "button", name="Keep without a description (figure 2)"
     ).click()

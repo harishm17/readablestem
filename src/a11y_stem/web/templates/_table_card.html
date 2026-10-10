@@ -71,7 +71,7 @@
   {% if t.editing %}
   {% set c = t.editing %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form table-cell-form{% if item.edited %} is-edited{% endif %}" data-draft-key="cell-{{ c.ref }}">
-    {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="cell"><input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
+    {{ table_fields("split") }}<input type="hidden" name="change" value="cell"><input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
     <div class="field{% if cell_err %} field-error{% endif %}">
       <label for="cell-{{ eid }}">{{ "LaTeX in" if c.maths else "Text in" }} {{ c.position|lower }}</label>
       <p class="hint" id="cell-hint-{{ eid }}">{% if c.flat %}This cell holds maths that the PDF's text gives flat (“{{ c.flat }}”), so it cannot be used as it is: type it as LaTeX. Save cell checks the LaTeX as it checks an equation.{% elif c.maths %}This cell holds maths. Save cell checks the LaTeX as it checks an equation.{% else %}As printed in the PDF. Save cell checks it and shows the table again.{% endif %}</p>
@@ -81,7 +81,12 @@
                 aria-describedby="cell-hint-{{ eid }}{% if cell_err %} cell-error-{{ eid }}{% endif %}"{% if cell_err %} aria-invalid="true"{% endif %}>{{ item.values.get("cell", c.value) }}</textarea>
     </div>
     <div class="inline-controls">
-      <button type="submit" class="button" data-role="save">Save cell<span class="visually-hidden">, {{ c.position|lower }} of {{ name }}</span></button>
+      <button type="submit" name="action" value="edit" class="button" data-role="save">Save cell<span class="visually-hidden">, {{ c.position|lower }} of {{ name }}</span></button>
+      {% if item.override and c.maths %}
+      {# Offered only after Save cell was refused because the LaTeX differs from the PDF's
+         text in this cell where that changes the meaning (web.edit_check). #}
+      <button type="submit" name="action" value="edit_anyway" class="button-secondary" data-role="anyway" aria-describedby="cell-error-{{ eid }}">Use my edit anyway<span class="visually-hidden"> for {{ c.position|lower }}</span></button>
+      {% endif %}
       <a href="{{ here }}">Cancel</a>
     </div>
   </form>

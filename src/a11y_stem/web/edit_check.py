@@ -16,7 +16,9 @@ bold) and signs. What fails is said in plain words, as three kinds:
 
 The review POST (`web.review._edit_equation`) and the live check while typing
 (`routes/split.py`, a server-rendered fragment for htmx) share this, so the two never
-disagree. The validators and the speech are looked up on their modules at call time (as
+disagree. A table's maths cell is checked the same way (`check_cell_edit`, used by
+`web.review._edit_cell`), against the PDF's text in that cell. The validators and the
+speech are looked up on their modules at call time (as
 in `web.review`), so tests can swap in stubs; `tests/test_web_review_ux.py` checks the
 result is the step's own on real input. Nothing here is logged or stored except the
 checks' codes on a saved fix.
@@ -28,7 +30,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Literal
 
-from a11y_stem.core.types import Check, Element, EquationFix, Fix
+from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind
 from a11y_stem.web.messages import explain_check
 
 logger = logging.getLogger(__name__)
@@ -116,6 +118,39 @@ def check_equation_edit(element: Element | None, fix: Fix, typed: str) -> EditCh
             out.notes.extend(said.get("cosmetic", []) or [explain_check(check).text])
         elif check.severity != "error":
             out.notes.append(explain_check(check).text)
+    return out
+
+
+def check_cell_edit(layer: str | None, typed: str, *, current: str | None = None) -> EditCheck:
+    """The proposal checks on `typed` for a maths cell of a table: the cleaning, the
+    LaTeX and MathML checks, the spoken version and the cross-checks against the PDF's
+    text in that cell (`layer`: `table_step.cell_text_layer`, None when it is not
+    known), as an equation's edit gets them. `current` is the LaTeX the cell has. A
+    cell is inline maths, and a short one, so the difference is said in the checks' own
+    sentences (the equation compare is about a whole equation's picture)."""
+    from a11y_stem.pipeline import equation_step
+
+    latex = equation_step.clean_latex(typed)
+    out = EditCheck(latex=latex, mathml=None, speech="", checks=[], display="inline")
+    out.has_text_layer = bool(layer and any(ch.isalnum() for ch in layer))
+    if not latex:
+        return out
+    out.unchanged = current is not None and _same(latex, current)
+    stand_in = Element(
+        id="cell", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=0,
+        text=layer or None, display="inline",
+    )  # fmt: skip
+    out.mathml, out.speech, out.checks = evaluate(latex, "inline", stand_in)
+    if out.mathml is None:
+        out.blocking = latex_problems(latex, out.failed)
+        return out
+    for check in out.failed:
+        said = explain_check(check).text
+        if (check.code or "") in MEANING_CODES:
+            if said not in out.meaning:
+                out.meaning.append(said)
+        elif check.severity != "error" and said not in out.notes:
+            out.notes.append(said)
     return out
 
 

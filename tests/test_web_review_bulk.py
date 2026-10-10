@@ -1,5 +1,5 @@
 """Review screen at document scale: grouping and order, stable numbering, where the
-reviewer lands after a decision, and bulk accept.
+reviewer lands after a decision, and that there is no bulk accept.
 
 Uses `rich_output()` from test_web_review.py: three pages with every status in every
 group, stored in scrambled order.
@@ -13,11 +13,10 @@ import re
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import Check, Fix, Kind, Status
-from a11y_stem.observability.logging import FIELDS_ATTR
+from a11y_stem.core.types import Check, Kind, Status
 from a11y_stem.web import review
 from a11y_stem.web.db import ErrorAggregate, ReviewEdit, session_scope
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, token
 from fixtures.web.support import upload as upload_pdf
 from test_web_review import card, cards, edits, install_fake_pipeline, result, rich_output
 
@@ -206,196 +205,48 @@ def test_landing_item_is_focusable_and_its_notice_comes_first(rich):
     assert landing.index('href="#item-p1-e1"') < landing.index('id="latex-p2-e1"')
 
 
-# --------------------------------------------------------------------------- bulk (rules)
+# --------------------------------------------------------------------------- no bulk accept
 
 
-def test_bulk_takes_only_what_a_single_accept_could():
-    data = rich_output().result
-    every = review.bulk_candidates(data, review.BulkRequest(Kind.EQUATION, 50))
-    # p2-e1 FAILED, p3-e0 has a failed error-level check, decided ones are not waiting.
-    assert sorted(f.element_id for f in every) == ["p1-e1", "p2-e2"]
-    at_80 = review.bulk_candidates(data, review.BulkRequest(Kind.EQUATION, 80))
-    assert [f.element_id for f in at_80] == ["p1-e1"]
-    headings = review.bulk_candidates(data, review.BulkRequest(Kind.HEADING, None))
-    assert sorted(f.element_id for f in headings) == ["p1-e3", "p2-e0", "p3-e3"]
-
-
-def test_threshold_compares_the_percentage_the_page_shows():
-    fix = Fix(element_id="x", kind=Kind.EQUATION, status=Status.NEEDS_REVIEW, confidence=0.795)
-    assert review.at_or_above(fix, 80)  # shown as 80%, so "at or above 80%" includes it
-    fix.confidence = 0.7949
-    assert not review.at_or_above(fix, 80)
-    fix.confidence = None
-    assert not review.at_or_above(fix, 50)
+def test_the_list_view_offers_no_bulk_accept(rich):
+    """Every decision the pipeline asks for is meaning-level (review tiers, "meaning-level
+    only"): none is accepted in bulk without being opened, by confidence or "accept all"
+    (removed 2026-10-09)."""
+    page = page_of(rich)
+    for gone in ("bulk-form", "min_confidence", "accept_confident", "accept_all", "Accept all"):
+        assert gone not in page
+    assert not hasattr(review, "apply_bulk_accept")
 
 
 @pytest.mark.parametrize(
-    ("slug", "action", "threshold", "error"),
+    ("slug", "fields"),
     [
-        ("equations", "accept_all", "", "only offered for headings"),
-        ("figures", "accept_all", "", "only offered for headings"),
-        ("equations", "accept_confident", "85", "Choose a confidence from the list"),
-        ("equations", "accept_confident", "", "Choose a confidence from the list"),
-        ("equations", "accept_confident", "1e3", "Choose a confidence from the list"),
-        ("headings", "delete", "80", "Choose an action"),
+        ("headings", {"action": "accept_all"}),
+        ("equations", {"action": "accept_confident", "min_confidence": "50"}),
+        ("figures", {"action": "accept"}),
     ],
 )
-def test_parse_bulk_refuses_what_the_page_never_offers(slug, action, threshold, error):
-    with pytest.raises(review.ReviewInvalid) as caught:
-        review.parse_bulk(slug, action, threshold)
-    [field] = caught.value.errors
-    assert field.field_id == f"min-confidence-{slug}" and error in field.message
-
-
-def test_parse_bulk_accepts_the_offered_choices():
-    assert review.parse_bulk("headings", "accept_all", "") == review.BulkRequest(Kind.HEADING, None)
-    assert review.parse_bulk("figures", "accept_confident", "70%") == review.BulkRequest(
-        Kind.FIGURE, 70
-    )
-    with pytest.raises(LookupError):
-        review.parse_bulk("paragraphs", "accept_all", "")
-
-
-# --------------------------------------------------------------------------- bulk (page)
-
-
-def test_bulk_forms_show_how_many_each_choice_accepts(rich):
-    page = page_of(rich)
-    equations = group(page, "equations")
-    assert '<option value="90">90% (0 equations)</option>' in equations
-    assert '<option value="80" selected>80% (1 equation)</option>' in equations
-    assert '<option value="60">60% (2 equations)</option>' in equations
-    assert "passed every required check are included (2 equations now)" in equations
-    assert "1 of these has a warning: read it on the card first." in equations
-    assert "Accept all" not in equations  # only headings get "accept all"
-    assert '<label for="min-confidence-equations">' in equations
-    headings = group(page, "headings")
-    assert "Accept all 3 remaining headings</button>" in headings
-    assert "Not included: 1 heading that could not be converted." in headings
-
-
-def test_accept_all_headings(rich, caplog):
+def test_a_bulk_post_is_not_found_and_changes_nothing(rich, slug, fields, caplog):
     caplog.set_level(logging.DEBUG)
     before = statuses(rich)
-    response = post(rich, "headings", action="accept_all")
-    assert response.status_code == 303
-    assert response.headers["location"] == f"/jobs/{rich.job_id}/review/list#group-headings"
-    after = statuses(rich)
-    for eid in ("p1-e3", "p2-e0", "p3-e3"):
-        assert after[eid] == "accepted"
-    assert after["p2-e4"] == "abstained"  # never accepted in bulk
-    changed = {eid for eid in after if after[eid] != before[eid]}
-    assert changed == {"p1-e3", "p2-e0", "p3-e3"}
-    assert result(rich).stats.by_status["accepted"] == 5
-    # One ReviewEdit per fix, as a single "Accept" would have stored.
-    recorded = edits(rich)
-    assert sorted(e.element_id for e in recorded) == ["p1-e3", "p2-e0", "p3-e3"]
-    assert {e.action for e in recorded} == {"accept"}
-    assert {e.before["status"] for e in recorded} == {"needs_review"}
-    assert {e.after["status"] for e in recorded} == {"accepted"}
-    # The output HTML is re-rendered once for the whole batch.
-    assert len(rich.pipeline.rendered) == 1
-    assert "p3-e3:accepted" in (rich.job(rich.job_id).html or "")
-    # The count is confirmed where the reviewer lands, and at the top.
-    page = page_of(rich)
-    headings = group(page, "headings")
-    assert '<div class="notice" role="status"><p>Accepted 3 headings.</p></div>' in headings
-    assert "Accepted 3 headings." in page[: page.index('class="review-toc"')]
-    assert "accept_all" not in headings.split("Accepted 3 headings.")[1]  # nothing left
-    bulk = [r for r in caplog.records if r.getMessage() == "review_bulk"]
-    assert len(bulk) == 1 and getattr(bulk[0], FIELDS_ATTR)["accepted"] == 3
-    assert "SECRET" not in caplog.text
-
-
-def test_bulk_accept_is_idempotent(rich):
-    post(rich, "headings", action="accept_all")
-    first = statuses(rich)
-    response = post(rich, "headings", action="accept_all")
-    assert response.status_code == 303
-    assert statuses(rich) == first
-    assert len(edits(rich)) == 3
-    assert len(rich.pipeline.rendered) == 1  # nothing to re-render
-    assert "Nothing changed: no headings were waiting that could be accepted." in group(
-        page_of(rich), "headings"
-    )
-
-
-def test_accept_by_confidence(rich):
-    assert post(rich, "equations", action="accept_confident", min_confidence="80").status_code
-    assert statuses(rich)["p1-e1"] == "accepted"
-    assert statuses(rich)["p2-e2"] == "needs_review"  # 65%
-    assert "Accepted 1 equation at 80% confidence or higher." in page_of(rich)
-    post(rich, "equations", action="accept_confident", min_confidence="60")
-    after = statuses(rich)
-    assert after["p2-e2"] == "accepted"
-    # Never in bulk: a FAILED fix, and a proposal that failed an error-level check even
-    # though its confidence (90%) clears every threshold.
-    assert after["p2-e1"] == "failed" and after["p3-e0"] == "needs_review"
-    assert len(rich.pipeline.rendered) == 2
-    post(rich, "equations", action="accept_confident", min_confidence="50")
-    assert "Nothing changed: no equations at 50% confidence or higher were waiting" in (
-        page_of(rich)
-    )
-    post(rich, "figures", action="accept_confident", min_confidence="70")
-    after = statuses(rich)
-    assert after["p1-e2"] == "accepted"  # exactly 70%
-    assert (after["p3-e1"], after["p3-e2"]) == ("abstained", "failed")
-
-
-def test_bulk_never_overrides_a_reviewers_decision(rich):
-    post(rich, "p1-e3", action="reject")
-    # Its proposed level 2 fits after the rejected h2. (Saving it as an edit at the level
-    # it already has would change nothing, and is refused as a no-op.)
-    assert post(rich, "p2-e0", action="edit", level="2").status_code == 422
-    assert post(rich, "p2-e0", action="accept").status_code == 303
-    post(rich, "headings", action="accept_all")
-    after = statuses(rich)
-    assert (after["p1-e3"], after["p2-e0"], after["p3-e3"]) == ("rejected", "accepted", "accepted")
-    assert "Accepted 1 heading." in page_of(rich)
-
-
-def test_a_bulk_choice_the_page_never_offers_changes_nothing(rich):
-    before = statuses(rich)
-    response = post(rich, "equations", action="accept_all")
-    assert response.status_code == 422
-    assert '<a href="#min-confidence-equations">' in response.text  # error summary
-    assert 'aria-invalid="true"' in group(response.text, "equations")
+    response = post(rich, slug, **fields)
+    assert response.status_code == 404
     assert statuses(rich) == before and edits(rich) == []
-    assert post(rich, "figures", action="accept_confident", min_confidence="5").status_code == 422
-    assert statuses(rich) == before and rich.pipeline.rendered == []
+    assert rich.pipeline.rendered == []
+    assert "review_bulk" not in caplog.text
 
 
-def test_bulk_accept_needs_the_csrf_token(rich):
-    before = statuses(rich)
+def test_a_bulk_post_needs_the_csrf_token_first(rich):
     response = rich.browser.post(
         f"/jobs/{rich.job_id}/review/headings",
         data={"csrf_token": "forged", "action": "accept_all"},
     )
     assert response.status_code == 403
-    assert statuses(rich) == before and edits(rich) == []
 
 
-def test_bulk_accept_on_someone_elses_job_is_not_found(rich, caplog):
-    caplog.set_level(logging.DEBUG)
-    before = statuses(rich)
-    rich.allow(BOB)
-    bob = rich.client()
-    login(bob, BOB)
-    for slug, action in [("headings", "accept_all"), ("equations", "accept_all")]:
-        # The second form is one the page never offers: still a 404, not a 422 that
-        # would confirm the job exists.
-        response = bob.post(
-            f"/jobs/{rich.job_id}/review/{slug}",
-            data={"csrf_token": token(bob), "action": action},
-        )
-        assert response.status_code == 404
-    assert statuses(rich) == before
-    assert edits(rich) == [] and rich.pipeline.rendered == []
-    assert "review_invalid" not in caplog.text and "review_bulk" not in caplog.text
-
-
-def test_bulk_accepts_are_counted_when_the_job_is_deleted(rich):
-    post(rich, "headings", action="accept_all")
+def test_accepts_are_counted_when_the_job_is_deleted(rich):
+    for eid in ("p1-e3", "p2-e0", "p3-e3"):
+        assert post(rich, eid, action="accept").status_code == 303
     response = rich.browser.post(
         f"/jobs/{rich.job_id}/delete",
         data={"csrf_token": token(rich.browser), "confirm": "yes"},

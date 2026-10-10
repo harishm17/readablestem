@@ -373,11 +373,6 @@ def test_unknown_groups_and_other_peoples_jobs_are_not_found(tri):
     assert other.post(f"/jobs/{tri.job_id}/review/{GROUP}", data=data).status_code == 404
 
 
-def test_bulk_accept_still_takes_group_members(tri):
-    assert post(tri, "headings", action="accept_all").status_code == 303
-    assert {stored(tri).fix_for(e).status for e in MEMBERS} == {Status.ACCEPTED}  # type: ignore[union-attr]
-
-
 def test_an_optional_check_can_still_be_edited(tri):
     assert post(tri, "p1-e2", action="edit", latex="d_0").status_code == 303
     fix = stored(tri).fix_for("p1-e2")

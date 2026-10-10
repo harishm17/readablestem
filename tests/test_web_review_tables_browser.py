@@ -296,7 +296,7 @@ def test_the_table_decisions_can_be_made_without_javascript(site, browser, job):
     page.get_by_role("link", name="Go on to decision 3").click()
     page.get_by_role("button", name="Keep as image (table 3)").click()
     page.wait_for_url(url)
-    assert page.locator("#decision-title").inner_text() == "All decisions made"
+    assert page.locator("#decision-title").inner_text() == "Ready"  # a table stays an image
     context.close()
     statuses = {f["element_id"]: f["status"] for f in site.job(job).result_json["fixes"]}
     assert statuses["p1-e1"] == "accepted"

@@ -183,25 +183,6 @@ def test_bob_signing_in_is_bobs_event_and_a_failed_job_says_why(web):
     assert stopped.code == "failed:budget_daily" and stopped.job_ref == job_id
 
 
-def test_a_bulk_accept_is_one_decision_event(web, monkeypatch):
-    from a11y_stem.pipeline import assemble
-
-    monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>re-rendered</html>")
-    job_id = finished(web)
-    form = {"action": "accept_confident", "min_confidence": "50", "view": "list"}
-    response = web.browser.post(
-        f"/jobs/{job_id}/review/equations", data={"csrf_token": token(web.browser), **form}
-    )
-    assert response.status_code == 303
-    made = all_events(web, "decision_made")
-    assert [(e.code, e.value) for e in made] == [("bulk", 1.0)]  # p1-e3 has a proposal
-    # A bulk accept that changes nothing is not a decision.
-    web.browser.post(
-        f"/jobs/{job_id}/review/equations", data={"csrf_token": token(web.browser), **form}
-    )
-    assert len(all_events(web, "decision_made")) == 1
-
-
 def test_nothing_is_recorded_when_events_are_off(tmp_path, monkeypatch):
     from a11y_stem.pipeline import assemble
 

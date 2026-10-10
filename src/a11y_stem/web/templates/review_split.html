@@ -183,7 +183,7 @@
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
     {{ hidden_fields() }}
     {{ error_line(item, "datatable") }}
-    <button type="submit" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if item.errors.get('datatable') %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
+    <button type="submit" id="datatable-{{ eid }}" name="action" value="add_data_table" class="button-secondary" aria-describedby="offer-note-{{ eid }}{% if item.errors.get('datatable') %} datatable-error-{{ eid }}{% endif %}">Add the data table<span class="visually-hidden"> to {{ item.label|lower }}</span></button>
   </form>
 </div>
 {% elif item.data_table %}
@@ -382,9 +382,18 @@
     </div>
 
     {% if panel.mode == "done" %}
-    <p>{% if total %}Your decisions are in the accessible HTML.{% else %}Everything was accepted automatically.{% endif %} Read it through once before you share it with students.</p>
-    <p class="done-actions"><a class="button" href="/jobs/{{ job.id }}/download">Download the accessible HTML</a>
-      <a href="/jobs/{{ job.id }}/view">Open it in this browser</a></p>
+    {# The finish line, as the job page says it (job_page: headline and Finish). Plain
+       text, no check marks or scores: it assists, it does not certify. #}
+    {% set ready = panel.ready %}
+    <p>{{ ready.finish }}{% if ready.sentence %} {{ ready.sentence }}{% endif %}</p>
+    {% if ready.shareable %}
+    <p class="done-actions"><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a>
+      <a href="/jobs/{{ job.id }}/view">Preview the student version</a></p>
+    <p>Before you share, read the student version through once: the automatic checks look at the structure of the file, not at whether each part says what you meant.{% if ready.notes %} {{ ready.notes }} {{ "item was" if ready.notes == 1 else "items were" }} accepted for you with a note; looking at {{ "it" if ready.notes == 1 else "them" }} is optional.{% endif %}</p>
+    <p><a href="/help/posting">How to post it in your course</a> · <a href="/jobs/{{ job.id }}#ready">Back to the results</a></p>
+    {% else %}
+    <p><a href="/jobs/{{ job.id }}">Back to the results</a></p>
+    {% endif %}
     {% else %}
     {% if panel.why %}<p class="why">{{ panel.why }}</p>{% endif %}
     {% if panel.mode == "item" and panel.status_class == "pill-optional" %}<p class="hint">It was accepted: nothing to do unless you disagree.</p>{% endif %}
