@@ -82,6 +82,41 @@ def test_invisible_text_is_counted_never_visible():
     assert hidden.trust == "visible_only"
 
 
+def _page_with(draw) -> page_type.PageTypeResult:
+    doc = pymupdf.open()
+    page = doc.new_page()
+    draw(page)
+    raw = page.get_text("rawdict", flags=page_type.TEXT_FLAGS)["blocks"]
+    result = page_type.classify(page, raw, page.get_cdrawings())
+    doc.close()
+    return result
+
+
+def test_a_box_over_one_word_of_a_paragraph_covers_that_word_only():
+    def draw(page):
+        lines = [
+            "Work is done when a force moves an object through a distance.",
+            "The secret answer is 42 and nobody should read it in the HTML.",
+            "Power is the rate at which work is done, measured in watts.",
+        ]
+        page.insert_textbox(pymupdf.Rect(72, 72, 520, 200), "\n".join(lines), fontsize=11)
+        word = page.search_for("answer is 42")[0]
+        box = pymupdf.Rect(word.x0 - 1, word.y0 - 1, word.x1 + 1, word.y1 + 1)
+        page.draw_rect(box, color=None, fill=(0, 0, 0))  # painted after the text
+
+    result = _page_with(draw)
+    assert result.text.covered_chars == 10  # "answer is 42", nothing else of its paragraph
+    assert result.kind == "mixed_hidden_text"
+
+
+def test_a_page_of_paper_rules_alone_is_blank():
+    from fixtures.handwriting.make_fixtures import ruled
+
+    result = _page_with(ruled)
+    assert result.kind == "blank" and result.reasons == ["paper_only"]
+    assert page_type.refusal_code([result.to_record(0)]) == "no_content"
+
+
 def test_text_painted_under_an_opaque_image_is_covered_also_on_a_turned_page():
     with pymupdf.open(HANDWRITING / "scan_text_under_image.pdf") as doc:
         doc[0].set_rotation(90)

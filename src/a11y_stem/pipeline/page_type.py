@@ -64,7 +64,9 @@ import pymupdf
 
 from a11y_stem.core.types import PageType
 
-CLASSIFIER_VERSION = "page-type-v5"  # detect v4 plus the design review's C1 changes
+# detect v4 plus the design review's C1 changes (v5); v5.1 after fresh set 4: a cover over
+# part of a line is looked for, and a page of paper rules alone is blank.
+CLASSIFIER_VERSION = "page-type-v5.1"
 
 BBox = tuple[float, float, float, float]
 
@@ -96,6 +98,7 @@ COVER_ZOOM = 2.0
 COVER_PIXEL_DELTA = 24
 COVER_CHANGED_SHARE = 0.01
 COVER_TEST_SPANS = 24
+REDACT_INSET = 0.5  # pt: how far inside a run of glyphs the removal stays
 
 # Raster coverage: the union of image boxes on a 64 x 64 grid. A scan is one or more
 # images covering most of the page; margin crops, letter-on-A4 and strip tiling stay
@@ -167,8 +170,8 @@ VECTOR_MIN_PATHS = 3
 # Time budget (C1.6). The ink analysis is pure Python and dense pages are slow (up to
 # 0.9 s a page measured; 30 dense pages took 34 s on one core). A document gets
 # INK_BUDGET_S of it, and a page with more than INK_MAX_ITEMS path items is not analysed
-# at all. A page not analysed says so (reason "ink_not_analysed"); with little visible
-# text and drawings on it, it is kept as a page image with a decision (`kept_reason`),
+# at all. A page not analysed says so (reason "ink_not_analysed"); with drawings and no
+# visible text at all, it is kept as a page image with a decision (`kept_reason`),
 # never answered "unreadable".
 INK_BUDGET_S = 10.0
 INK_MAX_ITEMS = 200_000
@@ -249,6 +252,7 @@ class TextStats:
 class InkStats:
     analysed: bool = True  # False: over the time budget or the item cap
     paths: int = 0  # visible drawings
+    marks: int = 0  # ... that are not only straight lines (a paper template's rules)
     items: int = 0  # their path items
     candidates: int = 0  # small curved complex subpaths, repeats included
     repeated: int = 0  # ... with a twin on the page (same perimeter, area and turning)
@@ -445,7 +449,9 @@ def text_stats(
 def _maybe_covered(
     spans: Sequence[BBox], images: Sequence[BBox], drawings: Sequence[dict[str, Any]] | None
 ) -> bool:
-    """Some visible span lies inside an image or an opaque filled shape (either order)."""
+    """Some visible span lies under an image or an opaque filled shape (either order):
+    the shape spans the middle of the line's height and overlaps it sideways, so a box
+    over one word of a line counts (`_covered` then looks glyph by glyph)."""
     shapes = list(images)
     if drawings is None:
         shapes.append((-1e9, -1e9, 1e9, 1e9))  # unknown: look at the paint order
@@ -458,7 +464,18 @@ def _maybe_covered(
             rect = d.get("rect")
             if rect is not None and _area(rect) >= 4.0:
                 shapes.append((rect[0], rect[1], rect[2], rect[3]))
-    return any(_core_inside(s, b) for s in spans for b in shapes)
+    return any(_across(s, b) for s in spans for b in shapes)
+
+
+def _across(span: Sequence[float], shape: Sequence[float]) -> bool:
+    """`shape` covers the middle COVER_CORE of `span`'s height somewhere along it."""
+    my = (1 - COVER_CORE) / 2 * (span[3] - span[1])
+    return (
+        shape[1] <= span[1] + my
+        and span[3] - my <= shape[3]
+        and shape[0] < span[2]
+        and span[0] < shape[2]
+    )
 
 
 def _covered(page: pymupdf.Page) -> set[tuple[int, int]]:
@@ -472,7 +489,9 @@ def _covered(page: pymupdf.Page) -> set[tuple[int, int]]:
     ]
     if not covers:
         return set()
-    runs: list[tuple[BBox, list[tuple[int, int]], int]] = []  # (span box, origins, chars)
+    # One run per line of a trace span (a span can hold a whole paragraph): the box of its
+    # covered glyphs only, so the render test removes nothing else.
+    runs: list[tuple[BBox, list[tuple[int, int]], int]] = []  # (glyphs' box, origins, chars)
     for span in page.get_texttrace():
         if span.get("type") not in (0, 1) or float(span.get("opacity", 1.0)) <= INVISIBLE_OPACITY:
             continue
@@ -481,14 +500,19 @@ def _covered(page: pymupdf.Page) -> set[tuple[int, int]]:
         later = [b for i, b in covers if i > seq and _overlap(sbox, b)]
         if not later:
             continue
-        origins = [
-            origin_key(ch[2])
-            for ch in span.get("chars", ())
-            if _ink(chr(ch[0]) if isinstance(ch[0], int) else str(ch[0]))
-            and any(_core_inside(ch[3], b) for b in later)
-        ]
-        if origins:
-            runs.append(((sbox[0], sbox[1], sbox[2], sbox[3]), origins, len(origins)))
+        lines: dict[int, list[tuple[Sequence[float], tuple[int, int]]]] = {}
+        for ch in span.get("chars", ()):
+            text = chr(ch[0]) if isinstance(ch[0], int) else str(ch[0])
+            if _ink(text) and any(_core_inside(ch[3], b) for b in later):
+                lines.setdefault(round(ch[2][1]), []).append((ch[3], origin_key(ch[2])))
+        for glyphs in lines.values():
+            box = (
+                min(g[0][0] for g in glyphs),
+                min(g[0][1] for g in glyphs),
+                max(g[0][2] for g in glyphs),
+                max(g[0][3] for g in glyphs),
+            )
+            runs.append((box, [g[1] for g in glyphs], len(glyphs)))
     if not runs:
         return set()
     hidden = _cover_test(page, runs)
@@ -523,8 +547,10 @@ def _cover_test(
             return [False] * len(runs)
         matrix = pymupdf.Matrix(COVER_ZOOM, COVER_ZOOM)
         before = one.get_pixmap(matrix=matrix, clip=clip, colorspace=pymupdf.csGRAY, alpha=False)
-        for i in tested:
-            one.add_redact_annot(pymupdf.Rect(runs[i][0]), fill=())
+        for i in tested:  # a little inside the glyphs, so their neighbours stay
+            x0, y0, x1, y1 = runs[i][0]
+            inset = min(REDACT_INSET, (x1 - x0) / 4)
+            one.add_redact_annot(pymupdf.Rect(x0 + inset, y0, x1 - inset, y1), fill=())
         one.apply_redactions(
             images=pymupdf.mupdf.PDF_REDACT_IMAGE_NONE,
             graphics=pymupdf.mupdf.PDF_REDACT_LINE_ART_NONE,
@@ -572,6 +598,20 @@ def _visible_paint(colour: object, opacity: object) -> bool:
     if colour is None or (isinstance(opacity, int | float) and opacity <= 0.01):
         return False
     return not (isinstance(colour, tuple | list) and all(v >= 0.97 for v in colour))
+
+
+def _rules_only(drawing: dict[str, Any]) -> bool:
+    """A drawing of horizontal and vertical lines only, stroked, not filled: the rules of
+    ruled, squared or margin paper (a page with only these is blank paper)."""
+    if drawing.get("fill") is not None:
+        return False
+    for item in drawing.get("items") or ():
+        if item[0] != "l":
+            return False
+        (x0, y0), (x1, y1) = item[1], item[2]
+        if abs(x0 - x1) > 0.5 and abs(y0 - y1) > 0.5:
+            return False
+    return True
 
 
 def _subpaths(items: Sequence[Any]) -> list[list[Any]]:
@@ -806,6 +846,8 @@ def ink_stats(
             continue
         stats.paths += 1
         stats.items += len(d.get("items") or ())
+        if not _rules_only(d):
+            stats.marks += 1
     for annot in page.annots(types=[pymupdf.mupdf.PDF_ANNOT_INK]) or []:
         stats.annot_strokes += len(annot.vertices or [])
     if stats.items > INK_MAX_ITEMS or (budget is not None and stats.paths and not budget.left()):
@@ -1056,13 +1098,13 @@ def decide(
         ):
             return result("handwritten_ocr", ["invisible_without_image"])
         return result("scan_ocr", ["invisible_without_image"])
-    if ink.paths >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS or image_coverage > 0:
+    if ink.marks >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS or image_coverage > 0:
         return result("vector_no_text", ["little_text"])
     if text.visible_chars:
         return result("born_digital", ["little_text"])
-    if ink.paths:
+    if ink.marks:
         return result("vector_no_text", ["little_text"])
-    return result("blank", ["empty"])
+    return result("blank", ["paper_only"] if ink.paths else ["empty"])
 
 
 def classify(
@@ -1090,16 +1132,24 @@ SCAN_KINDS = frozenset({"scan_no_text", "scan_ocr"})
 def kept_reason(page: PageTypeResult | PageType) -> str | None:
     """The Fix reason when this app keeps the whole page as its image (nothing on it is
     converted), else None. There is no handwriting or scan conversion: handwritten and
-    scanned pages are kept as images, and so is a page with drawings and little text
+    scanned pages are kept as images, and so is a page with drawings and no visible text
     whose ink could not be analysed in time (C1.6). Works on a classifier result and on
     the stored record alike."""
     if page.kind in HANDWRITTEN_KINDS:
         return HANDWRITTEN_PAGE
     if page.kind in SCAN_KINDS:
         return SCANNED_PAGE
-    if page.kind == "vector_no_text" and "ink_not_analysed" in page.reasons:
-        return UNREAD_PAGE
+    if (
+        page.kind == "vector_no_text"
+        and "ink_not_analysed" in page.reasons
+        and _visible_chars(page) == 0
+    ):
+        return UNREAD_PAGE  # drawings and no visible text at all (C1.6): a title + chart is read
     return None
+
+
+def _visible_chars(page: PageTypeResult | PageType) -> int:
+    return page.text.visible_chars if isinstance(page, PageTypeResult) else page.visible_chars
 
 
 def ink_regions(result: PageTypeResult) -> list[BBox]:
@@ -1224,7 +1274,7 @@ def document_refusal(doc: pymupdf.Document, *, budget_s: float = INK_BUDGET_S) -
     for number, page, stats, coverage in texts:
         drawings = page.get_cdrawings() if budget.left() else None
         if drawings is None:
-            ink = InkStats(analysed=False, paths=1)  # unknown: never refused
+            ink = InkStats(analysed=False, paths=1, marks=1)  # unknown: never refused
         else:
             ink = ink_stats(page, drawings, budget)
         records.append(decide(stats, ink, coverage, hint).to_record(number))

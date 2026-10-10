@@ -681,7 +681,7 @@ class PageType(BaseModel):
     ink_size_twins: float = Field(default=0.0, ge=0.0, le=1.0)
     annot_strokes: int = Field(default=0, ge=0)
     producer: str = "other"  # a coarse family of the producing software, a hint only
-    classifier_version: str = "page-type-v5"
+    classifier_version: str = "page-type-v5.1"
 
     @property
     def untrusted_chars(self) -> int:
