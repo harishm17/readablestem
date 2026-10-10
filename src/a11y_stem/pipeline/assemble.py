@@ -104,6 +104,35 @@ EQUATION_NOTE = (
 FIGURE_NOTE = (
     "This figure has no text description yet. Ask your instructor for a description of it."
 )
+# Pages and handwriting kept as images (pipeline.page_type: there is no handwriting or
+# scan conversion): their alt text ("{page}" is the page number) and the note students
+# see, by the fix's reason. Rendered from the stored reason, so a stored result renders
+# the same. TODO(Harish): confirm these words (handwriting design, section 3.3).
+KEPT_IMAGE_LABEL = "Not converted."
+KEPT_IMAGE_WORDS = {
+    "handwritten_page": (
+        "Page {page}: handwritten notes, not converted to text.",
+        "This page is a picture of handwritten notes, so a screen reader cannot read it. "
+        "Ask your instructor for a text version.",
+    ),
+    "scanned_page": (
+        "Page {page}: a scanned page, not converted to text.",
+        "This page is a picture of a scanned page, so a screen reader cannot read it. Ask "
+        "your instructor for a text version.",
+    ),
+    "unread_page": (
+        "Page {page}: not converted to text.",
+        "This page is shown as a picture, so a screen reader cannot read it. Ask your "
+        "instructor for a text version.",
+    ),
+    "handwriting_on_page": (
+        "Handwriting on page {page}, not converted to text.",
+        "This is a picture of handwriting on the page, so a screen reader cannot read it. "
+        "Ask your instructor for a text version.",
+    ),
+}
+# The about section names the pages kept whole as images.
+KEPT_PAGE_REASONS = frozenset({"handwritten_page", "scanned_page", "unread_page"})
 
 # Fix statuses whose proposal is not used: the original stays, flagged.
 NOT_CONVERTED = KEPT_ORIGINAL_STATUSES
@@ -700,6 +729,11 @@ class _Renderer:
             )
             return img if img is not None else self.original(element, alt)
 
+        if fix is not None and fix.status in NOT_CONVERTED and fix.reason in KEPT_IMAGE_WORDS:
+            # A page (or handwriting) kept as an image: what it is, never "a figure".
+            alt, note = KEPT_IMAGE_WORDS[fix.reason]
+            figure = f"<figure>{picture(alt.format(page=element.page + 1))}</figure>"
+            return self.flag_block(element, fix.reason, figure, KEPT_IMAGE_LABEL, note)
         if fix is None:
             reason = "no_fix"
         elif fix.status in NOT_CONVERTED:
@@ -802,16 +836,37 @@ def _review_line(fixes: list[Fix], checked_on: date | None) -> str:
     return f"<p>{CHECKED}{when}.</p>\n"
 
 
+def kept_pages_note(kept_pages: list[int]) -> str:
+    """ "Pages 2 and 5 are pictures of handwritten or scanned pages and were not
+    converted." (1-based), or "" when no page is kept whole as an image.
+    TODO(Harish): confirm this line of the student note."""
+    numbers = [str(p + 1) for p in sorted(set(kept_pages))]
+    if not numbers:
+        return ""
+    if len(numbers) == 1:
+        what = "is a picture of a handwritten or scanned page and was"
+        return f"Page {numbers[0]} {what} not converted."
+    listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
+    return f"Pages {listed} are pictures of handwritten or scanned pages and were not converted."
+
+
 def _about_section(
-    fixes: list[Fix], flagged: int, source_note: str | None, checked_on: date | None = None
+    fixes: list[Fix],
+    flagged: int,
+    source_note: str | None,
+    checked_on: date | None = None,
+    kept_pages: list[int] | None = None,
 ) -> str:
     """The note for students at the end of the file (MF7 of the UX review): what this
-    is, whether the instructor has checked it, who to tell about problems. It is written
-    for the people who read the file, so it has no counts and no review vocabulary
-    ("needs review", "rejected"): the instructor's numbers are on the job page."""
+    is, whether the instructor has checked it, which pages are only pictures, who to tell
+    about problems. It is written for the people who read the file, so it has no counts
+    and no review vocabulary ("needs review", "rejected"): the instructor's numbers are
+    on the job page. `kept_pages`: 0-based pages kept whole as an image."""
     maths = any(f.kind is Kind.EQUATION and f.status not in NOT_CONVERTED for f in fixes)
     what = f"{ABOUT_WORDING} {MATHS_NOTE}" if maths else ABOUT_WORDING
     flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
+    if pages_line := kept_pages_note(kept_pages or []):
+        flagged_note += f"<p>{pages_line}</p>\n"
     source = f"<p>{_escape(source_note)}</p>\n" if source_note and source_note.strip() else ""
     return (
         f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
@@ -879,14 +934,21 @@ _AUTHORED_TAG = re.compile(
 _FIXED_ALT_IMG = re.compile(
     r'(<img\b[^<>]*\balt="(?:'
     + "|".join(
-        map(
-            re.escape,
-            (
-                EQUATION_NOT_CONVERTED_ALT,
-                FIGURE_NOT_DESCRIBED_ALT,
-                assemble_tables.TABLE_NOT_CONVERTED_ALT,
+        [
+            *map(
+                re.escape,
+                (
+                    EQUATION_NOT_CONVERTED_ALT,
+                    FIGURE_NOT_DESCRIBED_ALT,
+                    assemble_tables.TABLE_NOT_CONVERTED_ALT,
+                ),
             ),
-        )
+            # A kept page's alt names its page: any number in its place.
+            *(
+                re.escape(alt).replace(re.escape("{page}"), r"\d+")
+                for alt, _ in KEPT_IMAGE_WORDS.values()
+            ),
+        ]
     )
     + r')")'
 )
@@ -935,7 +997,16 @@ def render_html(
     renderer = _Renderer(fixes=first_fix, crops=crops, equations=equations)
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = renderer.render_all(ordered)
-    about = _about_section(list(first_fix.values()), len(renderer.flagged), source_note, checked_on)
+    kept_pages = [
+        e.page
+        for e in ordered
+        if (fix := first_fix.get(e.id)) is not None
+        and fix.reason in KEPT_PAGE_REASONS
+        and fix.status in NOT_CONVERTED
+    ]
+    about = _about_section(
+        list(first_fix.values()), len(renderer.flagged), source_note, checked_on, kept_pages
+    )
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     return "\n".join(

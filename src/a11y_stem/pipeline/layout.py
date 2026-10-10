@@ -74,7 +74,7 @@ from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.core.types import BBox, Element, Kind, Notice, TableGrid, inline_marker
 from a11y_stem.pipeline import options as run_options
-from a11y_stem.pipeline import tables
+from a11y_stem.pipeline import page_type, tables
 from a11y_stem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
     EVIDENCE_COURSE,
@@ -127,9 +127,7 @@ PROBE_MAX_SIDE_PX = 2048
 PROBE_MEMORY_BYTES = 768 * 1024 * 1024
 CROP_PAD = 2.0  # crop's default padding around an element box (pt)
 
-TEXT_FLAGS = (
-    pymupdf.TEXT_PRESERVE_WHITESPACE | pymupdf.TEXT_MEDIABOX_CLIP | pymupdf.TEXT_ACCURATE_BBOXES
-)
+TEXT_FLAGS = page_type.TEXT_FLAGS  # whitespace kept, clipped to the MediaBox, glyph boxes
 
 # Evidence codes on heading elements (`Element.reasons`). Content-free; heading_step reads
 # them to decide confidence and review status.
@@ -303,8 +301,16 @@ class Layout:
     title: str | None = None  # PDF metadata title, else the first level-1 heading
     lang: str = "en"  # PDF /Lang if present, else "en"
     # Layout facts the job page lists ("Not handled in this file", review "none"): a
-    # block of program code, a footnote (`_layout_notices`). Codes and ids only.
+    # block of program code, a footnote (`_layout_notices`), hidden text left out
+    # (`_hidden_text_notices`). Codes, ids and counts only.
     notices: list[Notice] = field(default_factory=list)
+    # Per analysed page, what it is (`pipeline.page_type`; `to_record` gives the stored,
+    # content-free form).
+    page_types: dict[int, page_type.PageTypeResult] = field(default_factory=dict)
+    # Pages kept whole as their page image, with the Fix reason ("handwritten_page",
+    # "scanned_page", "unread_page"): nothing on them is read, they have no elements, and
+    # the pipeline keeps each one as an image marked "Not converted", with a decision.
+    kept_pages: dict[int, str] = field(default_factory=dict)
 
 
 # ============================================================================ public API
@@ -1031,19 +1037,38 @@ class _Display:
         return min(x0, x1), min(y0, y1), max(x0, x1), max(y0, y1)  # /Rotate is 90k degrees
 
 
-def _page_rows(page: pymupdf.Page) -> list[_Row]:
-    """One row per PyMuPDF line (not yet merged), in display coordinates."""
+def _raw_blocks(page: pymupdf.Page) -> list[dict]:
+    """The page's raw text dictionary: the one text extraction layout makes per page,
+    shared by the rows and the page type (`pipeline.page_type`)."""
+    return page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]
+
+
+def _page_rows(
+    page: pymupdf.Page,
+    raw: list[dict] | None = None,
+    covered: set[tuple[int, int]] | frozenset[tuple[int, int]] = frozenset(),
+) -> list[_Row]:
+    """One row per PyMuPDF line (not yet merged), in display coordinates.
+
+    Only text a reader can see: a span in render mode 3 or at 5 % opacity or less
+    (`page_type.span_hidden`, what iPad notes apps and OCR programs write), and a
+    character painted over afterwards by an image or a filled shape (`covered`, origins
+    from `page_type.text_stats`), are never content."""
     display = _Display.of(page)
     rows: list[_Row] = []
-    for block in page.get_text("rawdict", flags=TEXT_FLAGS)["blocks"]:
+    for block in raw if raw is not None else _raw_blocks(page):
         if block.get("type") != 0:
             continue
         for line in block["lines"]:
             dx, dy = display.vector(*line["dir"])
             chars: list[_Char] = []
             for span in line["spans"]:
+                if page_type.span_hidden(span):
+                    continue
                 size, font, flags = float(span["size"]), span["font"], int(span["flags"])
                 for ch in span["chars"]:
+                    if covered and page_type.origin_key(ch["origin"]) in covered:
+                        continue
                     box = display.box(ch["bbox"])
                     origin = display.point(*ch["origin"])
                     chars.append(
@@ -2367,6 +2392,7 @@ class _Path:
     kind: str  # "hrule" | "vrule" | "radical" | "shape"
     curved: bool  # has curves or diagonal lines (charts, diagrams; not tables or boxes)
     filled: bool  # a visible filled area (bars in a bar chart, shapes)
+    source: int = -1  # index in the page's get_cdrawings list (handwriting is left out)
 
 
 def _visible(colour: object, opacity: object) -> bool:
@@ -2375,13 +2401,14 @@ def _visible(colour: object, opacity: object) -> bool:
     return not (isinstance(colour, tuple | list) and all(v >= 0.97 for v in colour))
 
 
-def _page_paths(page: pymupdf.Page) -> list[_Path]:
+def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
     """Visible vector paths, classified. `get_cdrawings` (plain tuples) is several times
-    faster than `get_drawings` on plots with thousands of markers."""
+    faster than `get_drawings` on plots with thousands of markers; the same list is
+    shared with the page type's ink analysis."""
     display = _Display.of(page)
     width_pt, height_pt = page.rect.width, page.rect.height
     paths: list[_Path] = []
-    for drawing in page.get_cdrawings():
+    for source, drawing in enumerate(drawings if drawings is not None else page.get_cdrawings()):
         stroked = _visible(drawing.get("color"), drawing.get("stroke_opacity"))
         filled = _visible(drawing.get("fill"), drawing.get("fill_opacity"))
         if not (stroked or filled):
@@ -2414,7 +2441,7 @@ def _page_paths(page: pymupdf.Page) -> list[_Path]:
             kind = "radical"
         else:
             kind = "shape"
-        paths.append(_Path(box, kind, curved, filled and kind == "shape"))
+        paths.append(_Path(box, kind, curved, filled and kind == "shape", source))
     return paths
 
 
@@ -3566,6 +3593,7 @@ def _page_blocks(
     paths: list[_Path],
     margins: _MarginFilter,
     page_tables: Sequence[tables.PageTable] = (),
+    ink: Sequence[BBox] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_labels(rows)
@@ -3607,6 +3635,7 @@ def _page_blocks(
             )
         )
     blocks.extend(_table_blocks(page_tables))
+    blocks.extend(_ink_blocks(ink, page_rect))
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
     final = _merge_column_continuations([blocks[i] for i in order])
     for block in final:
@@ -3622,6 +3651,19 @@ def _page_blocks(
 
 
 _TEXT_BLOCKS = (Kind.PARAGRAPH, Kind.LIST_ITEM)  # blocks whose text may hold inline maths
+
+
+def _ink_blocks(regions: Sequence[BBox], page_rect: pymupdf.Rect) -> list[_Block]:
+    """Handwriting on a typed page (`page_type.ink_regions`): one FIGURE per region,
+    with no labels (the typed text under the ink stays in the text). The pipeline keeps
+    each as an image of the region, marked "Not converted", with a decision; it is never
+    sent to the figure model."""
+    blocks = []
+    for x0, y0, x1, y1 in regions:
+        box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
+        if box[2] - box[0] >= 1 and box[3] - box[1] >= 1:
+            blocks.append(_Block(Kind.FIGURE, box, reasons=[page_type.HANDWRITING_REGION]))
+    return blocks
 
 
 def _column_origins(rows: Sequence[_Row]) -> dict[str, float]:
@@ -3723,28 +3765,70 @@ def _body_and_pitch(rows_by_page: dict[int, list[_Row]]) -> _Context:
 # ============================================================================ document
 
 
+def _read_page(
+    page: pymupdf.Page, budget: page_type.InkBudget, producer: str
+) -> tuple[list[_Row], list[_Path], page_type.PageTypeResult]:
+    """The page's rows and paths, and its page type, from one text extraction and one
+    drawings list (`pipeline.page_type` reads the same two)."""
+    raw = _raw_blocks(page)
+    drawings = page.get_cdrawings()
+    kind = page_type.classify(page, raw, drawings, budget=budget, producer=producer)
+    rows = _page_rows(page, raw, kind.text.covered)
+    return rows, _page_paths(page, drawings), kind
+
+
 def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     frags: dict[int, list[_Row]] = {}
     paths: dict[int, list[_Path]] = {}
+    types: dict[int, page_type.PageTypeResult] = {}
+    budget = page_type.InkBudget()
+    producer = page_type.producer_hint(doc)
+    for number in selected:
+        frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
     margins = _margin_filter(doc, selected, frags, paths)
+    # Handwritten and scanned pages are kept as their page image: nothing on them is read
+    # (there is no handwriting or scan conversion). On a typed page with handwriting on
+    # it, the ink stays out of the figures; each region of it is cut out instead.
+    kept = {n: reason for n in selected if (reason := page_type.kept_reason(types[n]))}
     prepared = {}
     found: dict[int, list[tables.PageTable]] = {}
     for number in selected:
-        if number not in frags:
-            frags[number] = _page_rows(doc[number])
-        if number not in paths:
-            paths[number] = _page_paths(doc[number])
+        if number in kept:
+            frags[number], paths[number], found[number] = [], [], []
+            continue
+        if types[number].kind == "mixed_ink":
+            ink = types[number].ink.ink_drawings
+            paths[number] = [p for p in paths[number] if p.source not in ink]
         found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
     ctx = _body_and_pitch({n: rows for n, (rows, _) in prepared.items()})
     _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx)
     pages = [
-        _page_blocks(doc[n], n, prepared[n][0], prepared[n][1], ctx, paths[n], margins, found[n])
+        _kept_page(doc[n], n)
+        if n in kept
+        else _page_blocks(
+            doc[n],
+            n,
+            prepared[n][0],
+            prepared[n][1],
+            ctx,
+            paths[n],
+            margins,
+            found[n],
+            page_type.ink_regions(types[n]),
+        )
         for n in selected
     ]
     _settle_bold_letters(pages)
     block_ids: dict[int, str] = {}
     elements = _to_elements(pages, ctx, block_ids)
+    # The safety net (independent of the page types): a page with something painted on
+    # it from which nothing was read keeps its page image, with a decision. A page is
+    # "blank" only when nothing is painted on it.
+    read = {e.page for e in elements}
+    for n in selected:
+        if n not in kept and n not in read and _painted(doc[n], paths[n]):
+            kept[n] = page_type.UNREAD_PAGE
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
         levels = heading_levels(elements)
@@ -3756,8 +3840,59 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         page_sizes=[p.size for p in pages],
         title=title,
         lang=_document_lang(doc),
-        notices=_layout_notices(pages, ctx, block_ids),
+        notices=_layout_notices(pages, ctx, block_ids) + _hidden_text_notices(types, kept),
+        page_types=types,
+        kept_pages=dict(sorted(kept.items())),
     )
+
+
+def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:
+    """A page kept as its page image: no blocks."""
+    return _PageBlocks(number, (round(page.rect.width, 2), round(page.rect.height, 2)), [])
+
+
+def _painted(page: pymupdf.Page, paths: list[_Path]) -> bool:
+    """Something is painted outside the header and footer bands: a raster image or a
+    drawing at least MIN_IMAGE_PT on a side, or VECTOR_MIN_PATHS smaller marks (pen
+    strokes are small). Rules (lines, frames) alone are not content."""
+    height = page.rect.height
+    marks = 0
+    for path in paths:
+        if path.kind in ("hrule", "vrule") or _box_zone(path.bbox, height) is not None:
+            continue
+        if max(path.bbox[2] - path.bbox[0], path.bbox[3] - path.bbox[1]) >= MIN_IMAGE_PT:
+            return True
+        marks += 1
+        if marks >= page_type.VECTOR_MIN_PATHS:
+            return True
+    display = _Display.of(page)
+    for info in page.get_image_info():
+        box = display.box(info["bbox"])
+        if min(box[2] - box[0], box[3] - box[1]) >= MIN_IMAGE_PT and _box_zone(box, height) is None:
+            return True
+    return False
+
+
+def _hidden_text_notices(
+    types: dict[int, page_type.PageTypeResult], kept: dict[int, str]
+) -> list[Notice]:
+    """Hidden text left out, per page, as counts (docs/layout.md "Hidden text and page
+    types"): on a page kept as an image, the tablet's or OCR program's guesses that were
+    not used (`ocr_text_layer_ignored`, review "none"); on a typed page, invisible or
+    covered words that were left out (`hidden_text_ignored`, "optional": if students need
+    them, the instructor adds them)."""
+    notices = []
+    for number, kind in sorted(types.items()):
+        hidden = kind.text.untrusted
+        if hidden < page_type.HIDDEN_FEW:
+            continue
+        if number in kept:
+            notices.append(Notice(code="ocr_text_layer_ignored", page=number, count=hidden,
+                                  review="none"))  # fmt: skip
+        else:
+            notices.append(Notice(code="hidden_text_ignored", page=number, count=hidden,
+                                  review="optional"))  # fmt: skip
+    return notices
 
 
 # A paragraph or list item set in a monospaced font (at least this share of its glyphs,
@@ -3908,7 +4043,8 @@ def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
     The same extraction as `_page_rows` (flags, display coordinates), kept apart so
     reading a page for layout does not change: only the text pass needs colours. Spaces
     are left out (element text has its own), characters go through `_TEXT_MAP` like
-    element text, and fully transparent text is skipped. The caller holds `_LOCK`.
+    element text, and text nobody sees (`page_type.span_hidden`: render mode 3, 5 %
+    opacity or less) is skipped, as in `_page_rows`. The caller holds `_LOCK`.
     """
     display = _Display.of(page)
     glyphs: list[Glyph] = []
@@ -3917,7 +4053,7 @@ def page_glyphs(page: pymupdf.Page) -> list[Glyph]:
             continue
         for line in block["lines"]:
             for span in line["spans"]:
-                if int(span.get("alpha", 255)) == 0:
+                if page_type.span_hidden(span):
                     continue
                 colour = int(span.get("color") or 0) & 0xFFFFFF
                 rgb = ((colour >> 16) & 0xFF, (colour >> 8) & 0xFF, colour & 0xFF)

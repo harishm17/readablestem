@@ -289,7 +289,9 @@ def test_flagged_figures_and_scanned_pages_are_reencoded_too():
     html = render(fix, crops={"p1-e5": crop})
     ((mime, _),) = embedded(html)
     assert mime == "image/jpeg"
-    assert f'alt="{FIGURE_NOT_DESCRIBED_ALT}"' in html
+    # A page kept as an image says what it is, never "a figure without a description".
+    assert 'alt="Page 1: a scanned page, not converted to text."' in html
+    assert FIGURE_NOT_DESCRIBED_ALT not in html
 
 
 def test_equation_images_are_left_alone():

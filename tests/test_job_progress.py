@@ -103,10 +103,9 @@ def test_events_come_on_the_calling_thread(fake_steps):
 
 
 def test_a_scanned_page_counts_as_done_before_any_model_work(fake_steps, monkeypatch):
-    scans = {1: (0.0, 0.0, 612.0, 792.0)}
-    monkeypatch.setattr(run, "_image_only_pages", lambda pdf, pages, elements: scans)
     two_pages = document()
     two_pages.elements = [e for e in two_pages.elements if e.page == 0]
+    two_pages.kept_pages = {1: "scanned_page"}  # layout keeps page 2 as its image
     monkeypatch.setattr(layout, "analyze", lambda pdf, *, pages=None, max_pages=None: two_pages)
     events = events_of()
     figures = [(e.done, e.total) for e in events if e.stage == "figures"]

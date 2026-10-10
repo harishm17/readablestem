@@ -406,7 +406,9 @@ def test_tiny_images_and_full_page_backgrounds_are_not_figures():
         page.insert_image(page.rect, pixmap=red_pixmap(100, 100))  # background
         page.insert_image(pymupdf.Rect(72, 100, 84, 112), pixmap=red_pixmap(16, 16))  # bullet
         page.insert_image(pymupdf.Rect(72, 200, 82, 210), pixmap=red_pixmap(40, 40))  # icon
-        write(page, 90, 110, ["A page with only decorative images on it."])
+        # At least one line of text (page_type.TEXT_MIN visible characters): a full-page
+        # picture with less on it is a picture of a page (tests/test_page_types.py).
+        write(page, 90, 110, ["A page with only decorative images on it, and a line of text."])
 
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements] == [Kind.PARAGRAPH]

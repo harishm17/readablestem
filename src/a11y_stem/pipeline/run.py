@@ -25,12 +25,17 @@ Design notes:
   counts stay true.
 - Static checks of the HTML are stored on `DocumentResult.html_checks` and, as before,
   returned on `PipelineOutput.checks` (a subclass of `ConversionOutput`).
-- Scanned pages: a page whose only content is one image covering it, with no text, is a
-  picture of a page. Layout drops such an image as a page background, so the pipeline
-  checks the pages where layout found no text (`page_kinds`), adds the page as a figure
-  element that is FAILED with reason "scanned_page" before any model work (cropped, so the
-  output keeps the page image, flagged), and lists the pages on
-  `DocumentResult.image_only_pages`. The web app reports them to the user.
+- Pages kept as images: layout says which pages are handwritten or scanned, or have
+  something painted on them from which nothing was read (`Layout.kept_pages`,
+  `pipeline.page_type`; hidden text is never read at all). Each becomes a figure element
+  for the whole page that is FAILED before any model work, with the reason
+  "handwritten_page", "scanned_page" or "unread_page" (cropped, so the output keeps the
+  page image, marked "Not converted"); handwriting on a typed page arrives as figure
+  elements for its regions and is FAILED the same way ("handwriting_on_page"). Nothing of
+  them goes to a model. The fixes with the same reason are one decision (`Fix.group_key`
+  "pg-..." and `group_size`), so a 20-page handwritten file asks once. The pages are
+  listed on `DocumentResult.image_only_pages`, and every page's type on
+  `DocumentResult.page_types` (content-free). The web app reports them to the user.
 - Run-level outcomes are recorded on the result, content-free: `stopped_by` (the
   "budget_<scope>" that stopped model work early, else None) and `html_checks`.
 - `layout` (WP2) keeps a few opened PDFs cached for cropping. Once the last crop is made
@@ -111,7 +116,7 @@ from a11y_stem.pipeline import (
     heading_step,
     html_checks,
     layout,
-    page_kinds,
+    page_type,
     table_step,
     text_pass,
 )
@@ -145,8 +150,17 @@ _MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE, Kind.TABLE)
 # stop the run and propagate (see the module docstring).
 FATAL_ERRORS: tuple[type[Exception], ...] = (ConfigError, UnknownModelError)
 # Fix.reason of the figure that stands for a scanned page (nothing on it to convert).
-SCANNED_PAGE_REASON = "scanned_page"
-_PAGE_TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
+SCANNED_PAGE_REASON = page_type.SCANNED_PAGE
+# Fix reasons of what is kept as an image before any model work: a whole page, and a
+# region of handwriting on a typed page (module docstring).
+PAGE_REASONS = frozenset(
+    {page_type.SCANNED_PAGE, page_type.HANDWRITTEN_PAGE, page_type.UNREAD_PAGE}
+)
+KEPT_REASONS = PAGE_REASONS | {page_type.HANDWRITING_ON_PAGE}
+# `Fix.group_key` of the kept images with one reason: "pg-" + the first one's element id
+# (content-free, like a heading group's "hg-...").
+PAGE_GROUP_PREFIX = "pg-"
+LETTER_BOX: BBox = (0.0, 0.0, 612.0, 792.0)  # a page whose size could not be read
 # The live-progress stage of each kind that goes to a model step.
 _STAGE_OF: dict[Kind, Stage] = {
     Kind.EQUATION: "equations",
@@ -757,46 +771,37 @@ def _prompt_versions(fixes: list[Fix]) -> dict[str, str]:
     return versions
 
 
-# --------------------------------------------------------------------------- scanned pages
+# --------------------------------------------------------------------------- kept pages
 
 
-def _image_only_pages(
-    pdf_bytes: bytes, page_list: list[int], elements: list[Element]
+def _page_boxes(
+    pdf_bytes: bytes, pages: Iterable[int], sizes: dict[int, tuple[float, float]]
 ) -> dict[int, BBox]:
-    """Pages that are only a picture of a page, with each page's box.
-
-    Only pages on which layout found no text are opened, so a normal document costs
-    nothing here. `layout.analyze` has already rendered every analysed page in its crash
-    probe, so reading these pages again in this process is safe. PyMuPDF is not
-    thread-safe: hold layout's lock (when it has one) like every other PyMuPDF call.
-    """
-    with_text = {e.page for e in elements if e.kind in _PAGE_TEXT_KINDS}
-    candidates = [page for page in page_list if page not in with_text]
-    if not candidates:
-        return {}
+    """Each page's box in layout's frame, from the sizes layout measured; a page it did
+    not measure (a layout stand-in in tests) is read from the PDF. PyMuPDF is not
+    thread-safe: hold layout's lock (when it has one) like every other PyMuPDF call."""
+    pages = list(pages)
+    boxes: dict[int, BBox] = {p: (0.0, 0.0, *sizes[p]) for p in pages if p in sizes}
+    missing = [p for p in pages if p not in boxes]
+    if not missing:
+        return boxes
     import pymupdf
 
-    found: dict[int, BBox] = {}
     lock = getattr(layout, "_LOCK", None)
     with lock if lock is not None else contextlib.nullcontext():
-        pymupdf.TOOLS.mupdf_display_errors(False)
-        pymupdf.TOOLS.mupdf_display_warnings(False)
         try:
             doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
             try:
-                for number in candidates:
-                    page = doc[number]
-                    if page_kinds.page_kind(page) is page_kinds.PageKind.IMAGE_ONLY:
-                        rect = page.rect
-                        found[number] = (rect.x0, rect.y0, rect.x1, rect.y1)
+                for number in missing:
+                    rect = doc[number].rect
+                    boxes[number] = (rect.x0, rect.y0, rect.x1, rect.y1)
             finally:
                 doc.close()
-        except Exception as exc:  # a detection problem never fails the conversion
-            log.warning("scanned-page check failed: %s", type(exc).__name__)
-            return {}
+        except Exception as exc:  # a size is never worth failing the conversion for
+            log.warning("page size unreadable: %s", type(exc).__name__)
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
-    return found
+    return {p: boxes.get(p, LETTER_BOX) for p in pages}
 
 
 def _next_id(page: int, elements: list[Element]) -> str:
@@ -811,36 +816,59 @@ def _next_id(page: int, elements: list[Element]) -> str:
 
 
 def _with_page_images(
-    elements: list[Element], scans: dict[int, BBox]
+    elements: list[Element], kept: dict[int, str], boxes: dict[int, BBox]
 ) -> tuple[list[Element], list[Fix]]:
-    """`elements` plus one figure per scanned page (placed after the page's other
-    elements, orders renumbered), and the FAILED fixes that keep them from the model."""
-    if not scans:
-        return elements, []
+    """`elements` plus one figure per kept page (placed after the page's other elements,
+    orders renumbered), and the FAILED fixes that keep them, and any handwriting region
+    layout cut out of a typed page, from the model. Fixes with the same reason share a
+    group key: one decision for all of them."""
     added: list[Element] = []
     result: list[Element] = []
-    pending = sorted(scans)
+    pending = sorted(kept)
     for element in elements:
         while pending and pending[0] < element.page:
-            added.append(_page_image(pending.pop(0), scans, elements))
+            added.append(_page_image(pending.pop(0), kept, boxes, elements))
             result.append(added[-1])
         result.append(element)
     for page in pending:
-        added.append(_page_image(page, scans, elements))
+        added.append(_page_image(page, kept, boxes, elements))
         result.append(added[-1])
     renumbered = [e.model_copy(update={"order": i}) for i, e in enumerate(result)]
-    return renumbered, [_failed(e, SCANNED_PAGE_REASON) for e in added]
+    fixes = [_failed(e, e.reasons[0]) for e in added]
+    fixes += [
+        _failed(e, page_type.HANDWRITING_ON_PAGE)
+        for e in renumbered
+        if e.kind is Kind.FIGURE and page_type.HANDWRITING_REGION in e.reasons
+    ]
+    order = {e.id: e.order for e in renumbered}
+    return renumbered, _grouped(sorted(fixes, key=lambda f: order.get(f.element_id, 0)))
 
 
-def _page_image(page: int, scans: dict[int, BBox], elements: list[Element]) -> Element:
+def _page_image(
+    page: int, kept: dict[int, str], boxes: dict[int, BBox], elements: list[Element]
+) -> Element:
     return Element(
         id=_next_id(page, elements),
         kind=Kind.FIGURE,
         page=page,
-        bbox=scans[page],
+        bbox=boxes[page],
         order=0,  # renumbered by the caller
-        reasons=[SCANNED_PAGE_REASON],
+        reasons=[kept[page]],
     )
+
+
+def _grouped(fixes: list[Fix]) -> list[Fix]:
+    """Kept images with the same reason as one decision: "pg-" + the first one's element
+    id, and how many there are (one page alone is a group of one, so the review screen
+    shows every kept page the same way)."""
+    by_reason: defaultdict[str, list[Fix]] = defaultdict(list)
+    for fix in fixes:
+        by_reason[fix.reason or ""].append(fix)
+    for members in by_reason.values():
+        key = PAGE_GROUP_PREFIX + members[0].element_id
+        for fix in members:
+            fix.group_key, fix.group_size = key, len(members)
+    return fixes
 
 
 def _source_facts(
@@ -979,8 +1007,10 @@ def _convert(
             doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
             elements = sorted(doc.elements, key=lambda e: e.order)
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
-            scans = _image_only_pages(pdf_bytes, page_list, elements)
-            elements, scan_fixes = _with_page_images(elements, scans)
+            kept: dict[int, str] = dict(getattr(doc, "kept_pages", None) or {})
+            sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
+            boxes = _page_boxes(pdf_bytes, kept, sizes)
+            elements, scan_fixes = _with_page_images(elements, kept, boxes)
             text = _text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer)
             elements = text.elements
             read = len(page_list)
@@ -1032,7 +1062,7 @@ def _convert(
             cost_usd=stats.cost_usd,
             latency_ms=stats.latency_ms,
             reason=run.stop.reason() if run.stop.scope is not None else None,
-            image_only_pages=len(scans),
+            image_only_pages=len(kept),
             checks_failed=sum(1 for c in checks if not c.passed),
             **_status_counts("fixes", ordered),
         )
@@ -1063,11 +1093,15 @@ def _convert(
         stats=stats,
         html=html,
         stopped_by=run.stop.reason() if run.stop.scope is not None else None,
-        image_only_pages=sorted(scans),
+        image_only_pages=sorted(kept),
         html_checks=checks,
         page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
         notices=notices,
         source_facts=source_facts,
         lang_source=text.lang_source,
+        page_types=[
+            kind.to_record(page)
+            for page, kind in sorted((getattr(doc, "page_types", None) or {}).items())
+        ],
     )
     return PipelineOutput(result=result, crops=run.crops, checks=checks)

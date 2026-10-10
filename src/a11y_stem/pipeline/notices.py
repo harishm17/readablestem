@@ -11,7 +11,11 @@ written by the steps (the figure and table work only set their fix fields):
 
 - `table_not_rebuilt` (required): a table shown as an image of the original, because
   the step did not rebuild it, a spend cap stopped it, or the reviewer kept the image;
-- `scanned_page` (required): the figure that stands for a scanned page;
+- `scanned_page`, `handwritten_page`, `unread_page` (required): the figure that stands
+  for a page kept as its image (scanned, handwritten, or painted with nothing read from
+  it), and `handwriting_on_page` (required): the image of handwriting on a typed page.
+  Their decision is the figure's fix, one per reason for the whole document
+  (`pipeline.page_type`, `run.PAGE_GROUP_PREFIX`);
 - `colour_only` (optional): a figure with `FigureFix.colour_only`;
 - `long_description_missing` (optional): a chart or diagram without a long
   description, when long descriptions are on.
@@ -40,11 +44,19 @@ from a11y_stem.core.types import (
 
 TABLE_NOT_REBUILT = "table_not_rebuilt"
 SCANNED_PAGE = "scanned_page"
+HANDWRITTEN_PAGE = "handwritten_page"
+UNREAD_PAGE = "unread_page"
+HANDWRITING_ON_PAGE = "handwriting_on_page"
 COLOUR_ONLY = "colour_only"
 LONG_DESCRIPTION_MISSING = "long_description_missing"
+# The reasons of figures kept as images before any model work; each is its own notice
+# code (`pipeline.page_type`).
+KEPT_IMAGE_CODES = frozenset({SCANNED_PAGE, HANDWRITTEN_PAGE, UNREAD_PAGE, HANDWRITING_ON_PAGE})
 # Codes this module derives from the fixes; any stored notice with one of them is
 # replaced by `current`.
-DERIVED_CODES = frozenset({TABLE_NOT_REBUILT, SCANNED_PAGE, COLOUR_ONLY, LONG_DESCRIPTION_MISSING})
+DERIVED_CODES = frozenset({TABLE_NOT_REBUILT, COLOUR_ONLY, LONG_DESCRIPTION_MISSING}) | (
+    KEPT_IMAGE_CODES
+)
 # Figures that need more than short alt text (W3C "complex images").
 # Where a notice is listed on the job page.
 Section = Literal["not_handled", "worth_checking"]
@@ -92,8 +104,8 @@ def from_fixes(
     for fix in fixes:
         if _not_rebuilt(fix):
             add(TABLE_NOT_REBUILT, fix, "required")
-        if fix.kind is Kind.FIGURE and fix.reason == SCANNED_PAGE:
-            add(SCANNED_PAGE, fix, "required")
+        if fix.kind is Kind.FIGURE and fix.reason in KEPT_IMAGE_CODES:
+            add(fix.reason, fix, "required")
         if fix.figure is not None and fix.figure.colour_only:
             add(COLOUR_ONLY, fix, "optional")
         if long_descriptions and _missing_long_description(fix):
