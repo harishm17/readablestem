@@ -41,7 +41,7 @@ from a11y_stem.models.pricing import UnknownModelError, price_for
 # Shown at the top of the HTML from a --fake run: the offline client's answers are
 # placeholders (WP1's OFFLINE_DEFAULTS), and the CLI has no review step to catch them.
 FAKE_NOTICE = (
-    "Offline test run: equations and figure descriptions in this file are placeholders "
+    "Offline test run: equations, figure descriptions and tables in this file are placeholders "
     "from a fake model, not conversions. Do not publish it."
 )
 
