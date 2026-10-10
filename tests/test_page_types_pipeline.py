@@ -216,6 +216,11 @@ def test_kept_pages_are_one_decision_per_reason_and_typed_pages_convert():
         ("p4-e0", "scanned_page", "pg-p4-e0", 1),
     ]
     assert triage.required_decisions(result.fixes) == 2  # handwritten, scanned
+    # A page group is not a group of repeated headings (eval reports, ops aggregates).
+    assert triage.review_load(result.fixes).required_by_reason == {
+        "handwritten_page": 2,
+        "scanned_page": 1,
+    }
     assert all(e.id in output.crops for e in result.elements if e.page > 0)  # page images
     assert result.image_only_pages == [1, 2, 3]
     html = result.html

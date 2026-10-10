@@ -68,7 +68,9 @@ def tier_reasons(fix: Fix) -> list[str]:
 
     Required: its `Fix.reason` (failed, abstained), the group marker for a repeated
     heading, its failed checks, or `below_accept` when only the confidence held it back.
-    Optional: its failed checks (the notes). None: nothing.
+    Optional: its failed checks (the notes). None: nothing. Only a heading group is a
+    repeated label: the pages kept as images with one reason ("pg-" groups) say so by
+    their own reason.
     """
     if fix.review == "none":
         return []
@@ -76,7 +78,7 @@ def tier_reasons(fix: Fix) -> list[str]:
     if fix.review == "required":
         if fix.reason:
             codes.add(fix.reason)
-        if fix.group_key:
+        if fix.group_key and fix.kind is Kind.HEADING:
             codes.add(REPEATED_LABEL)
         if not codes:
             codes.add(BELOW_ACCEPT)
