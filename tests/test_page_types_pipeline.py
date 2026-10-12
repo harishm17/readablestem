@@ -105,6 +105,25 @@ def test_the_safety_net_keeps_writing_read_into_nothing_under_a_typed_title():
     assert doc.elements[0].text == "Lecture 14 notes"
 
 
+def test_a_short_note_under_a_typed_title_keeps_its_page():
+    # Five, three and five pen strokes (the last written one segment per path) under a
+    # short typed title: too few to be called handwriting under a title (they could be
+    # machine-drawn curves), too small to be a figure. The titles are read and each page
+    # keeps its image with a decision: never "Everything was converted".
+    doc = layout.analyze(data("note_titled.pdf"))
+    assert [doc.page_types[n].kind for n in range(3)] == ["vector_no_text"] * 3
+    assert doc.kept_pages == {0: "unread_page", 1: "unread_page", 2: "unread_page"}
+    assert [(e.page, e.text) for e in doc.elements] == [
+        (0, "Week 6 notes"),
+        (1, "Week 7 notes"),
+        (2, "Week 5 notes, Oct 3"),
+    ]
+    result = convert("note_titled.pdf").result
+    assert [f.reason for f in result.fixes] == ["unread_page"] * 3
+    assert result.stats.required_decisions == 1 and result.stats.model_calls == 0
+    assert result_outcome(result) == ("done", "pages_not_converted")
+
+
 def test_writing_not_analysed_in_time_under_a_title_is_kept(monkeypatch):
     # The ink budget ran out (a long document): the pages may be handwritten, so they are
     # kept as images, whatever the length of their typed title.

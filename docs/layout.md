@@ -456,6 +456,9 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   One tick icon in a table cell does not make the table a figure. A small mark just left
   of a text row at its height is a drawn list bullet, not a curve of a figure. Equation
   rules are taken out first.
+- A drawing too small to be a figure within 12 pt of a vector figure is part of it
+  (axis titles and tick labels drawn as outlines, a legend's markers a little apart):
+  left out, the figure's crop missed them.
 - Overlapping figures merge (a photo with arrows drawn on it). Text inside a figure, and
   short labels (at most 25 characters) within 0.6 x font size of its edge or across it (a
   tick label half inside the box), belong to it and grow its box. A maths row is a label
@@ -596,10 +599,14 @@ The decisions in the rules, with the measured values next to each threshold in t
 page image, with a decision (`unread_page`), when something painted on it was read into
 nothing. The elements read from it stay; the image comes after them. It fires when:
 
-- the page has no element and something painted outside the header and footer bands (an
-  image or a drawing at least 12 pt on a side, or 3 smaller marks). Rules, paper rules, a
-  frame round the page, a background fill and a band of colour along an edge (a blank
-  slide of a template) do not count;
+- something is painted outside every element read from the page (each grown by 2 pt)
+  and outside the header and footer bands (an image or a drawing at least 12 pt on a
+  side, or 3 smaller marks), on a page with no element or with less than a line (40
+  characters) of visible text: a short note of a few pen strokes under a typed title (too
+  few to be called handwriting there, as they could be machine-drawn curves, and too
+  small to be a figure), a drawing too small to be a figure. Rules, paper rules, a frame
+  round the page, a background fill, a band of colour along an edge (a blank slide of a
+  template) and a drawn list bullet beside its row do not count (`layout._painted`);
 - a drawing filling the page was left out because the page has ink the checks did not
   confirm (rejected or not analysed; `layout._vector_figures`): a page of notes under a
   typed title, whatever the title's length;
@@ -667,8 +674,8 @@ fails a result with the same rule (`worker.result_outcome`).
   one line), or with running text inside it, is left out, as before: a decorated border
   or a background drawn behind text looks the same;
 - a flat drawing less than 24 pt tall (a one-line circuit, a timeline) is too small to be
-  a figure and is left out, as before; on a page with no other element the safety net
-  keeps the page;
+  a figure; on a typed page (40 characters or more) it is left out, as before; with less
+  text the safety net keeps the page;
 - typed text turned into outlines (no text layer) is read as figures where it clusters
   into blocks; lines that do not are lost, so the safety net keeps the page image too
   (one decision for the document's kept pages).

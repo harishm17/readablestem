@@ -110,6 +110,7 @@ MIN_IMAGE_PX = 24  # raster images with a side smaller than this (pixels) are de
 MIN_IMAGE_PT = 12.0  # ... and so are images drawn smaller than this on the page
 FULL_PAGE_FRACTION = 0.85  # images covering this share of the page: background or scan
 MIN_DRAWING_PT = 24.0  # a vector figure is at least this big on both sides
+FIGURE_PART_REACH = 12.0  # a smaller drawing this close to a vector figure is part of it
 DRAWING_CLUSTER_GAP = 6.0  # drawings closer than this belong to the same figure
 PAGE_SIZED_FRACTION = 0.85  # a drawing this wide and tall fills the page (or its frame)
 FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a frame's side
@@ -2970,6 +2971,7 @@ def _vector_figures(
     never a figure for the model: its box goes to `left_out`, and the safety net keeps
     the page image instead (`INK_REASONS`)."""
     figures = []
+    small: list[tuple[BBox, int]] = []  # drawings too small to be figures on their own
     index = _RowIndex([r for r in rows if not r.vertical])
     paths = [p for p in paths if not _page_furniture(p, page_rect)]
     for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
@@ -2980,6 +2982,7 @@ def _vector_figures(
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
         width, height = box[2] - box[0], box[3] - box[1]  # the visible part only
         if width < MIN_DRAWING_PT or height < MIN_DRAWING_PT or width * height < 1200:
+            small.append((box, len(members)))
             continue
         fills_page = (
             width >= PAGE_SIZED_FRACTION * page_rect.width
@@ -3007,7 +3010,25 @@ def _vector_figures(
         elif not curved and len(bars) < 2 and len(inside) >= 2:
             continue  # a box, shaded panel or table drawn around text
         figures.append(_Figure(box, paths=len(members)))
+    # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
+    # a legend's markers a little apart) are part of it: left out, its crop missed them.
+    for box, members in small:
+        for figure in figures:
+            if _within(box, figure.bbox, FIGURE_PART_REACH):
+                figure.bbox = _union([figure.bbox, box])
+                figure.paths += members
+                break
     return figures
+
+
+def _within(box: BBox, other: BBox, reach: float) -> bool:
+    """`box` comes within `reach` of `other` (or overlaps it)."""
+    return (
+        box[0] <= other[2] + reach
+        and other[0] <= box[2] + reach
+        and box[1] <= other[3] + reach
+        and other[1] <= box[3] + reach
+    )
 
 
 def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
@@ -3659,6 +3680,9 @@ class _PageBlocks:
     # Drawings that fill the page and were not made a figure because the page's ink was
     # rejected or not analysed (`_vector_figures`): the safety net keeps the page image.
     left_out: list[BBox] = field(default_factory=list)
+    # On a page with less than a line of text: something painted lies outside every block
+    # (`_painted`), so the safety net keeps the page image.
+    unread: bool = False
 
 
 def _prepare_rows(
@@ -3684,6 +3708,7 @@ def _page_blocks(
     ink: Sequence[BBox] = (),
     *,
     page_sized: bool = True,
+    little_text: bool = False,
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_labels(rows)
@@ -3738,7 +3763,14 @@ def _page_blocks(
         if block.marker is not None:
             block.origin = origins.get(block.rows[0].column, 0.0)
     size = (round(page_rect.width, 2), round(page_rect.height, 2))
-    return _PageBlocks(number, size, final, left_out)
+    # A page with less than a line of text (a title, a few labels) is little but its
+    # drawings: anything painted that went into no block (pen strokes too few to be called
+    # handwriting under a title, a drawing too small to be a figure) is lost unless the
+    # page image is kept. A drawn list bullet belongs to its item.
+    unread = little_text and _painted(
+        page, paths, [b.bbox for b in final], _RowIndex([r for r in rows if not r.vertical])
+    )
+    return _PageBlocks(number, size, final, left_out, unread)
 
 
 _TEXT_BLOCKS = (Kind.PARAGRAPH, Kind.LIST_ITEM)  # blocks whose text may hold inline maths
@@ -3918,6 +3950,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             found[n],
             page_type.ink_regions(types[n]),
             page_sized=not INK_REASONS & set(types[n].reasons),
+            little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
         )
         for n in selected
     ]
@@ -3938,7 +3971,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             unread = _painted(doc[n], paths[n])
         else:
             left_out = bool(page.left_out) and types[n].kind != "mixed_ink"
-            unread = left_out or _unread_ink(types[n], boxes[n], page.size[1])
+            unread = left_out or page.unread or _unread_ink(types[n], boxes[n], page.size[1])
         if unread:
             kept[n] = page_type.UNREAD_PAGE
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
@@ -3983,17 +4016,30 @@ def _unread_ink(kind: page_type.PageTypeResult, boxes: list[BBox], height: float
     return False
 
 
-def _painted(page: pymupdf.Page, paths: list[_Path]) -> bool:
-    """Something is painted outside the header and footer bands: a raster image or a
-    drawing at least MIN_IMAGE_PT on a side, or VECTOR_MIN_PATHS smaller marks (pen
-    strokes are small). Rules, a frame round the page, a background fill and a band of
-    colour along an edge (a slide template's) are not content, alone."""
+def _painted(
+    page: pymupdf.Page,
+    paths: list[_Path],
+    boxes: Sequence[BBox] = (),
+    bullets: _RowIndex | None = None,
+) -> bool:
+    """Something is painted outside the header and footer bands and outside every block
+    read from the page (`boxes`, grown by UNREAD_PAD): a raster image or a drawing at
+    least MIN_IMAGE_PT on a side, or VECTOR_MIN_PATHS smaller marks (pen strokes are
+    small). Rules, a frame round the page, a background fill and a band of colour along
+    an edge (a slide template's) are not content, alone; nor is a drawn list bullet beside
+    a row of `bullets`."""
     height = page.rect.height
+    pad = UNREAD_PAD
+    grown = [(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad) for b in boxes]
     marks = 0
     for path in paths:
         if path.kind in ("hrule", "vrule") or _box_zone(path.bbox, height) is not None:
             continue
         if path.rules or _page_furniture(path, page.rect):
+            continue
+        if any(_centre_inside(path.bbox, box) for box in grown):
+            continue
+        if bullets is not None and _bullet_mark(path, bullets):
             continue
         if max(path.bbox[2] - path.bbox[0], path.bbox[3] - path.bbox[1]) >= MIN_IMAGE_PT:
             return True
@@ -4003,7 +4049,9 @@ def _painted(page: pymupdf.Page, paths: list[_Path]) -> bool:
     display = _Display.of(page)
     for info in page.get_image_info():
         box = display.box(info["bbox"])
-        if min(box[2] - box[0], box[3] - box[1]) >= MIN_IMAGE_PT and _box_zone(box, height) is None:
+        if min(box[2] - box[0], box[3] - box[1]) < MIN_IMAGE_PT or _box_zone(box, height):
+            continue
+        if not any(_centre_inside(box, inside) for inside in grown):
             return True
     return False
 
