@@ -10,7 +10,9 @@ packed many to a path, as Apple's PencilKit writes them; stroked polylines), the
 layers imitate what iPad notes apps (fill opacity 0, an ".SF" font) and OCR programs
 (render mode 3, GlyphLessFont; or visible text painted under the page image) write, and
 the adversarial pages rebuild the design review's failing cases (a transparent overlay,
-a clip-mode title, photo slides, a scan with a visible stamp, ink under a typed header).
+a clip-mode title, photo slides, a scan with a visible stamp, ink under a typed header),
+the routing review's and the final verifier's (a short note under a typed title, plots
+on pages with decorative frames, letters written as single curves).
 
 The PDFs are committed (each under 100 KB) so the tests need nothing but PyMuPDF; the
 same seeds give the same files.
@@ -106,7 +108,8 @@ LETTERS = "aaeeelnnosttdx"
 
 class Writer:
     """Pseudo-handwritten words as vector ink: "ribbon" (filled outlines, many strokes per
-    path object) or "polyline" (one stroked path per stroke)."""
+    path object), "polyline" (one stroked path per stroke) or "segments" (one stroked path
+    per short segment, as Xournal++ writes them)."""
 
     def __init__(self, page: pymupdf.Page, seed: int, style: str, colour, width=1.1) -> None:
         self.page, self.rng, self.style, self.colour, self.width = (
@@ -182,6 +185,10 @@ class Writer:
             self.pending += 1
             if self.pending >= self.rng.randint(8, 60):
                 self.flush()
+        elif self.style == "segments":
+            for a, b in itertools.pairwise(self._resample(centre, 0.8)):
+                self.shape.draw_line(a, b)
+                self.shape.finish(color=self.colour, width=self.width, lineCap=1, closePath=False)
         else:
             self.shape.draw_polyline(self._resample(centre, 0.9))
             self.shape.finish(color=self.colour, width=self.width, lineCap=1, lineJoin=1)
@@ -553,6 +560,7 @@ def build(out: Path) -> list[Path]:
     scan_page(doc, ocr="mode3")
     made.append(save(doc, out, "mixed_course.pdf"))
     made += build_review_cases(out)
+    made += build_verify_cases(out)
     return made
 
 
@@ -845,6 +853,158 @@ def build_review_cases(out: Path) -> list[Path]:
     page.insert_image(page.rect, pixmap=photo)
     page.insert_text((60, 200), "Lecture 3: Kinematics", fontsize=36, color=(1, 1, 1))
     made.append(save(doc, out, "title_slide.pdf"))
+    return made
+
+
+# ----------------------------------------------------------------------------- verify cases
+# The final verifier's failing cases (2026-10-12), rebuilt from made-up text and drawings.
+
+GRAPH = PROBLEM + " The graph below shows its height against time."
+WORKSHEET = "Homework 3: show all your working and state the units of every answer."
+
+
+def _note(page: pymupdf.Page, seed: int, words: str, style: str = "polyline", base=150.0):
+    """A short handwritten note of a few pen strokes on one line; returns the Writer."""
+    writer = Writer(page, seed, style, INK_BLACK, width=1.0)
+    x = 90.0
+    for word in words.split():
+        x = writer.word(word, x, base, 9, 0.15) + 12
+    writer.commit()
+    return writer
+
+
+def _ball_plot(page: pymupdf.Page) -> None:
+    """A height-time plot: axes, the curve, six markers, axis labels and a caption."""
+    shape = page.new_shape()
+    shape.draw_line((200, 350), (400, 350))
+    shape.draw_line((200, 350), (200, 200))
+    shape.finish(color=(0, 0, 0), width=1)
+    pts = [(200 + t * 2, 350 - (2 + 12 * t / 40 - 4.9 * (t / 40) ** 2) * 14) for t in range(101)]
+    pts = [(x, y) for x, y in pts if y <= 350]
+    shape.draw_polyline(pts)
+    shape.finish(color=(0.8, 0, 0), width=1.5)
+    for x, y in pts[::20]:
+        shape.draw_circle((x, y), 2)
+        shape.finish(color=(0, 0, 0.6), fill=(0, 0, 0.6))
+    shape.commit()
+    page.insert_text((290, 368), "time t (s)", fontsize=9)
+    page.insert_text((150, 270), "h (m)", fontsize=9)
+    page.insert_text((200, 390), "Figure 1: height of the ball against time.", fontsize=10)
+
+
+def _frame(page: pymupdf.Page, style: str) -> None:
+    """A decorative page frame: rounded corners, a double frame in one path, a frame with
+    corner ticks (eight lines in one path), a frame with corner curls, or a light filled
+    panel with a 30 pt margin."""
+    shape = page.new_shape()
+    if style == "rounded":
+        shape.draw_rect(pymupdf.Rect(24, 24, 588, 768), radius=0.04)
+    elif style == "double":
+        shape.draw_rect(pymupdf.Rect(24, 24, 588, 768))
+        shape.draw_rect(pymupdf.Rect(28, 28, 584, 764))
+    elif style == "ticks":
+        corners = [(24, 24), (588, 24), (588, 768), (24, 768)]
+        for a, b in itertools.pairwise([*corners, corners[0]]):
+            shape.draw_line(a, b)
+        for y in (30, 762):
+            shape.draw_line((20, y), (28, y))
+            shape.draw_line((582, y), (592, y))
+    elif style == "curls":
+        shape.draw_rect(pymupdf.Rect(24, 24, 588, 768))
+        for centre in ((30, 30), (582, 30), (30, 762), (582, 762)):
+            shape.draw_circle(centre, 4)
+    else:  # "panel"
+        shape.draw_rect(pymupdf.Rect(30, 30, 582, 762))
+        shape.finish(color=(0.2, 0.2, 0.2), fill=(0.96, 0.96, 0.96), width=1)
+        shape.commit()
+        return
+    shape.finish(color=(0, 0, 0), width=1.2)
+    shape.commit()
+
+
+def _single_curve_page(doc: pymupdf.Document, seed: int) -> None:
+    """iPad-style notes in which every letter is one stroked curve (a single Bezier, too
+    few points for the stroke test), under an opacity-0 ".SFUI" recognition layer."""
+    rng = random.Random(seed)
+    page = doc.new_page(width=612, height=792)
+    ruled(page)
+    boxes = []
+    for row in range(8):
+        y = 128 + row * 60
+        x = 80 + rng.uniform(0, 20)
+        while x < 500:
+            shape, x0 = page.new_shape(), x
+            for _ in range(rng.randint(2, 7)):
+                w, h = rng.uniform(6, 10), rng.uniform(9, 16)
+                shape.draw_bezier(
+                    (x, y),
+                    (x + rng.uniform(-2, w), y - rng.uniform(0, h)),
+                    (x + rng.uniform(0, w + 3), y - rng.uniform(0, h)),
+                    (x + w, y + rng.uniform(-3, 3)),
+                )
+                shape.finish(color=(0.05, 0.1, 0.35), width=rng.uniform(1.0, 1.6))
+                x += w + rng.uniform(0.5, 2.5)
+            shape.commit()
+            boxes.append(pymupdf.Rect(x0, y - 16, x, y + 3))
+            x += rng.uniform(10, 22)
+    text_layer(page, garbage(boxes, rng), "alpha0")
+    rename_fonts(doc, page, ".SFUI-Regular", "tiro")
+
+
+def build_verify_cases(out: Path) -> list[Path]:
+    made = []
+
+    # 21. A short handwritten note under a short typed title: five strokes ("note ab"),
+    #     three strokes ("note") and segments written one path each (Xournal++).
+    doc = pymupdf.open()
+    for seed, title, words, style in (
+        (2101, "Week 6 notes", "note ab", "polyline"),
+        (2102, "Week 7 notes", "note", "polyline"),
+        (2103, "Week 5 notes, Oct 3", "note ab", "segments"),
+    ):
+        page = doc.new_page(width=612, height=792)
+        page.insert_text((72, 70), title, fontsize=14)
+        _note(page, seed, words, style)
+    made.append(save(doc, out, "note_titled.pdf"))
+
+    # 22. The same short note with an opacity-0 recognition layer over it.
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    ruled(page)
+    page.insert_text((72, 60), "Week 5, Oct 3", fontsize=12)
+    writer = _note(page, 2201, "note ab")
+    text_layer(page, garbage(writer.word_boxes, random.Random(2201)), "alpha0")
+    rename_fonts(doc, page, ".SFUI-Regular", "tiro")
+    made.append(save(doc, out, "note_titled_layer.pdf", IOS))
+
+    # 23. A typed problem with a plot on pages with decorative frames: rounded corners, a
+    #     double frame drawn as one path, corner ticks, corner curls, a filled panel.
+    doc = pymupdf.open()
+    for style in ("rounded", "double", "ticks", "curls", "panel"):
+        page = doc.new_page(width=612, height=792)
+        _frame(page, style)
+        page.insert_textbox(pymupdf.Rect(72, 72, 540, 160), GRAPH, fontsize=11)
+        _ball_plot(page)
+    made.append(save(doc, out, "framed_plots.pdf"))
+
+    # 24. iPad-style notes whose letters are single curves, under a hidden layer; and pages
+    #     of handwriting each under a short typed title, with no hidden layer.
+    doc = pymupdf.open()
+    _single_curve_page(doc, 2401)
+    _single_curve_page(doc, 2402)
+    made.append(save(doc, out, "ios_single_curves.pdf", IOS))
+    doc = pymupdf.open()
+    for seed, title in ((2411, "Week 5, Oct 3"), (2412, "Week 5, Oct 5")):
+        ink_page(doc, seed, lines=3)
+        doc[-1].insert_text((80, 50), title, fontsize=12)
+    made.append(save(doc, out, "ink_titled_pages.pdf"))
+
+    # 25. A typed worksheet page with a short handwritten note under its text.
+    doc = pymupdf.open()
+    page = typed_page(doc)
+    page.insert_text((72, 430), WORKSHEET, fontsize=11)
+    _note(page, 2501, "see eq note", base=480)
+    made.append(save(doc, out, "typed_with_note.pdf"))
     return made
 
 
