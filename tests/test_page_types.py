@@ -80,6 +80,9 @@ def refusal(path: Path, **kwargs) -> str | None:
         ("ink_titled.pdf", ["vector_no_text", "born_digital"], [None, None], None),
         ("big_drawings.pdf", ["born_digital", "born_digital", "vector_no_text"], [None] * 3, None),
         ("template_pages.pdf", ["vector_no_text"] * 2 + ["born_digital"], [None] * 3, None),
+        # The final verifier's cases (2026-10-12). A few strokes under a typed title with a
+        # hidden recognition layer over them: handwriting, kept and refused.
+        ("note_titled_layer.pdf", ["handwritten_ocr"], ["handwritten_page"], "handwritten"),
     ],
 )
 def test_each_fixture_gets_its_page_type_and_what_happens_to_it(name, kinds, kept, refused):

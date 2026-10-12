@@ -68,8 +68,9 @@ from a11y_stem.core.types import PageType
 # part of a line is looked for, and a page of paper rules alone is blank; v5.2 after the
 # routing review: annotation, shading, thick-stroke and empty-clip covers, the CropBox as
 # the page, paper rules that are long and separate, a few curves under a typed title and
-# a hidden layer over machine drawings not handwriting.
-CLASSIFIER_VERSION = "page-type-v5.2"
+# a hidden layer over machine drawings not handwriting; v5.3 after the final verifier: a
+# hidden layer over a few strokes under a title is handwriting.
+CLASSIFIER_VERSION = "page-type-v5.3"
 
 BBox = tuple[float, float, float, float]
 
@@ -1160,11 +1161,14 @@ def decide(
     )
     writing = clean and ink.strokes >= INK_PAGE_STROKES and ink.rows >= INK_PAGE_ROWS
     some_ink = clean and ink.strokes >= INK_MIXED_STROKES and ink.rows >= INK_MIXED_ROWS
+    ocr = untrusted >= HIDDEN_FEW  # any hidden words: the layer must not be read
     # A few clean strokes in one row are a short note only on a page with no typed text:
     # under a typed title they are as likely a row of machine-drawn curves (five waves,
-    # five inductor coils), so such a page needs some ink or a second row.
+    # five inductor coils), so such a page needs some ink or a second row. A hidden layer
+    # over the strokes is a recogniser's guess at them: machine drawings have none, so
+    # with one they are a note whatever the title.
     ink_alone = clean and ink.strokes >= INK_ALONE_STROKES and ink.rows >= 1
-    if text.visible_chars:
+    if text.visible_chars and not ocr:
         ink_alone = some_ink or (ink_alone and ink.rows >= 2)
     # Rows of writing made of pen strokes, though the clean checks rejected the ink
     # (exact repeats among tiny strokes): what dense handwriting looks like; typed glyph
@@ -1202,7 +1206,6 @@ def decide(
             kind, trust, ROUTE[kind], reasons + (extra or []), text, ink, image_coverage, producer
         )
 
-    ocr = untrusted >= HIDDEN_FEW  # any hidden words: the layer must not be read
     # Hidden-ratio rule (C1.2): more hidden than visible text, or a page image with a
     # hidden layer, is a picture or ink page whatever its visible text (a scan with a
     # visible "Downloaded from" stamp; notes under a typed template header).

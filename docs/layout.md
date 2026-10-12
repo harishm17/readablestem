@@ -529,7 +529,7 @@ The text pass's glyphs (`page_glyphs`) skip the same invisible spans.
 extracts (`_read_page`; image boxes come from MuPDF's image blocks, which decode no
 image) and returns a kind, the characters it may trust, where its content would have to
 come from, and content-free reason codes. It is detect v4 from the research, ported with
-the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.2"):
+the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.3"):
 
 | Kind | What it is | What the app does |
 |---|---|---|
@@ -550,7 +550,9 @@ The decisions in the rules, with the measured values next to each threshold in t
   typed page with 12 strokes in a row has some handwriting. With no visible text at all,
   5 clean strokes in a row are already a short note; under a typed title (1 to 39
   visible characters) the page needs 12 strokes or a second row, as a row of five
-  machine-drawn curves (five waves on a slide, five inductor coils) is not handwriting.
+  machine-drawn curves (five waves on a slide, five inductor coils) is not handwriting,
+  unless a hidden layer lies over them: that is a recogniser's guess at a note (machine
+  drawings have none), so the page is `handwritten_ocr` whatever its title.
   A handwritten page with visible typed text and no hidden layer is kept as an image
   when converted, but never refuses the upload: it may be machine-drawn.
 - **Paper rules** are long (half the page or more) horizontal and vertical lines, each

@@ -239,6 +239,17 @@ def test_handwriting_on_a_typed_page_is_its_own_decision():
     assert "Displacement is the change in position" in result.html
 
 
+def test_a_short_note_under_a_title_with_a_hidden_layer_is_kept_never_described():
+    # The routing change for a few curves under a title (diagram slides) must not send a
+    # note with a recognition layer over it to the figure model.
+    result = convert("note_titled_layer.pdf").result
+    assert not [e for e in result.elements if e.kind in TEXT_KINDS]
+    (fix,) = result.fixes
+    assert fix.reason == "handwritten_page" and fix.review == "required" and fix.calls == []
+    assert result.stats.model_calls == 0
+    assert result_outcome(result) == ("failed", "handwritten")
+
+
 def test_the_safety_net_page_is_kept_with_a_decision():
     result = convert("drawn_page.pdf").result
     (kept,) = [f for f in result.fixes if f.reason == "unread_page"]
@@ -316,6 +327,7 @@ def pages_used(env) -> int:
     ("name", "says"),
     [
         ("ios_notes.pdf", "is handwritten, so this tool cannot convert it. Its hidden text"),
+        ("note_titled_layer.pdf", "is handwritten, so this tool cannot convert it."),
         ("ink_no_layer.pdf", "cannot convert it. It has no text this tool can use"),
         ("scan_ocr.pdf", "running OCR again will not help"),
         ("scan_text_under_image.pdf", "is scanned, so this tool cannot convert it"),
