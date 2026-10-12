@@ -553,8 +553,9 @@ The decisions in the rules, with the measured values next to each threshold in t
   machine-drawn curves (five waves on a slide, five inductor coils) is not handwriting,
   unless a hidden layer lies over them: that is a recogniser's guess at a note (machine
   drawings have none), so the page is `handwritten_ocr` whatever its title.
-  A handwritten page with visible typed text and no hidden layer is kept as an image
-  when converted, but never refuses the upload: it may be machine-drawn.
+  A handwritten page refuses the upload whatever its typed title (as before
+  page-type-v5.2): the few curves that may be machine-drawn are not called handwriting
+  under a title in the first place.
 - **Paper rules** are long (half the page or more) horizontal and vertical lines, each
   its own: the rules of ruled, squared, margin or Cornell paper. A page with only these
   is `blank`. A square wave, a step plot or a line-drawn block diagram joins its lines
@@ -570,9 +571,14 @@ The decisions in the rules, with the measured values next to each threshold in t
   with no visible text at all. A slide title over a photo is a typed page with a figure.
   Hidden text with no picture of a page over vector ink (clean, or rows of writing the
   checks rejected, or ink not analysed) is handwriting (`invisible_without_image`). Over
-  machine-drawn vector content (text turned into outlines, a diagram: what an OCR program
-  writes over a vector page with no text layer) the page is `vector_no_text`: the hidden
-  layer is dropped and the drawings are read as figures.
+  machine-drawn vector content (text turned into outlines, stamped shapes: what an OCR
+  program writes over a vector page with no text layer) the page is `vector_no_text`: the
+  hidden layer is dropped and the drawings are read as figures. Machine-drawn means
+  evidence of it (`_machine_drawn`): more than 35 % of the complex shapes repeat exactly,
+  or fewer than half of them pass the pen-stroke tests. Marks with no such evidence under
+  a hidden layer and no visible text are pen strokes too simple for the stroke test (a
+  letter written as one curve): handwriting again, as in page-type-v5.1, which called
+  them a scan.
 - **Time budget** (C1.6): the ink analysis (pure Python) gets 10 s per document
   (`INK_BUDGET_S`), and a page with more than 200,000 path items is not analysed
   (`INK_MAX_ITEMS`); such a page says `ink_not_analysed`. Measured on this machine,
@@ -618,13 +624,13 @@ its reason (required: its decision is the image's fix).
 is read first and the check stops at the first typed page, so only a PDF with none pays
 for the drawings and the ink analysis. Every page certainly handwritten or scanned, or
 blank, refuses it before any quota is spent: `handwritten` (hidden recognition layer),
-`handwritten_no_text`, `scanned_ocr` (hidden OCR layer) or `scanned`. A full-page
-picture with a few visible characters and no hidden layer (perhaps a slide), drawings
-called handwriting under a typed title with no hidden layer (perhaps a diagram, a grid of
-sparklines) and a page whose ink was not analysed never refuse: the conversion keeps
-them as images with a decision. "Certainly" means no visible text, or a hidden layer
-(`page_type._certain`). The worker fails a
-result with the same rule (`worker.result_outcome`).
+`handwritten_no_text`, `scanned_ocr` (hidden OCR layer) or `scanned`. A handwritten page
+is certain whatever its typed title; a scan needs no visible text or a hidden layer
+(`page_type._certain`). A full-page picture with a few visible characters and no hidden
+layer (perhaps a slide), a page kept by the safety net (a short note under a typed title
+that may be a row of machine-drawn curves, see below) and a page whose ink was not
+analysed never refuse: the conversion keeps them as images with a decision. The worker
+fails a result with the same rule (`worker.result_outcome`).
 
 **What is not detected** (the text reaches the HTML, or the content is lost as before):
 
@@ -644,7 +650,7 @@ result with the same rule (`worker.result_outcome`).
   signature): lost or absorbed into a figure as before;
 - grids of small machine-drawn curves (sparklines, small multiples of loops) can look
   like handwriting: kept as an image with a needless decision (a PDF of only such pages
-  is refused at upload when they have no visible text at all);
+  is refused at upload, with or without a short typed title);
 - a slide whose background is a full-slide picture and which has fewer than 40 visible
   characters is kept as an image with a decision (never refused); its typed text is read
   as well, and the student file says "shown as a picture", not "scanned";

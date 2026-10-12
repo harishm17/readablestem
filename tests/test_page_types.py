@@ -83,6 +83,16 @@ def refusal(path: Path, **kwargs) -> str | None:
         # The final verifier's cases (2026-10-12). A few strokes under a typed title with a
         # hidden recognition layer over them: handwriting, kept and refused.
         ("note_titled_layer.pdf", ["handwritten_ocr"], ["handwritten_page"], "handwritten"),
+        # Letters written as single curves (too simple for the stroke test) under a hidden
+        # layer: handwriting, not machine drawings; refused at upload as before.
+        ("ios_single_curves.pdf", ["handwritten_ocr"] * 2, ["handwritten_page"] * 2, "handwritten"),
+        # Pages of handwriting each under a short typed title: refused at upload too.
+        (
+            "ink_titled_pages.pdf",
+            ["handwritten"] * 2,
+            ["handwritten_page"] * 2,
+            "handwritten_no_text",
+        ),
     ],
 )
 def test_each_fixture_gets_its_page_type_and_what_happens_to_it(name, kinds, kept, refused):
@@ -249,11 +259,10 @@ def _record(kind: str, visible: int = 0, invisible: int = 0, reasons=()) -> Page
         # Anything convertible, or not sure, never refuses.
         ([_record("handwritten"), _record("born_digital", 500)], None),
         ([_record("scan_no_text", 12)], None),  # a photo with a short title: maybe a slide
-        # Drawings under a typed title may be machine-drawn (a few waves, a grid of
-        # sparklines): kept as images when converted, never refused. A hidden layer, or
-        # no visible text at all, is sure.
-        ([_record("handwritten", 16, reasons=["ink_few"])], None),
-        ([_record("handwritten", 16, reasons=["ink_some"])], None),
+        # Handwriting under a typed title is handwriting: a few machine-drawn curves under
+        # a title are not called handwriting in the first place.
+        ([_record("handwritten", 16, reasons=["ink_few"])], "handwritten_no_text"),
+        ([_record("handwritten", 16, reasons=["ink_some"])], "handwritten_no_text"),
         ([_record("handwritten", 0, reasons=["ink_few"])], "handwritten_no_text"),
         ([_record("handwritten_ocr", 16, 300, reasons=["ink_some"])], "handwritten"),
         ([_record("vector_no_text", reasons=["ink_not_analysed"])], None),

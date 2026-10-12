@@ -69,7 +69,8 @@ from a11y_stem.core.types import PageType
 # routing review: annotation, shading, thick-stroke and empty-clip covers, the CropBox as
 # the page, paper rules that are long and separate, a few curves under a typed title and
 # a hidden layer over machine drawings not handwriting; v5.3 after the final verifier: a
-# hidden layer over a few strokes under a title is handwriting.
+# hidden layer over a few strokes under a title, or over marks with no evidence of machine
+# drawing, is handwriting.
 CLASSIFIER_VERSION = "page-type-v5.3"
 
 BBox = tuple[float, float, float, float]
@@ -1151,6 +1152,15 @@ def _pen_like(ink: InkStats) -> bool:
     return ink.pen_share >= PEN_SHARE_MIN
 
 
+def _machine_drawn(ink: InkStats) -> bool:
+    """Evidence that the drawings are made by a program: the complex shapes repeat
+    exactly (glyph outlines of text turned into outlines, stamped shapes), or most of them
+    fail the pen-stroke tests (smooth arcs, outlines, blobs)."""
+    if ink.candidates < VECTOR_MIN_PATHS:
+        return False
+    return ink.repeat_share > INK_MAX_REPEATS or ink.strokes * 2 < ink.candidates
+
+
 def decide(
     text: TextStats, ink: InkStats, image_coverage: float, producer: str = "other"
 ) -> PageTypeResult:
@@ -1233,13 +1243,18 @@ def decide(
         # A hidden layer and no picture of a page: over vector ink (clean, or rows of
         # writing the checks rejected, or ink not analysed) it is a handwriting
         # recognition layer. Over machine-drawn vector content (text turned into
-        # outlines, a diagram: what an OCR program writes over a vector page) the page
-        # is drawings: the hidden layer is dropped and the drawings are read as figures.
+        # outlines, stamped shapes: what an OCR program writes over a vector page) the
+        # page is drawings: the hidden layer is dropped and the drawings are read as
+        # figures. Marks with no such evidence under a hidden layer and no visible text
+        # are pen strokes too simple for the stroke test (a letter written as one curve):
+        # handwriting, as before the machine-drawing rule.
         if image_coverage < SCAN_COVERAGE:
             if some_ink or written_rows or not ink.analysed:
                 return result("handwritten_ocr", ["invisible_without_image"])
-            if ink.marks >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS:
+            if _machine_drawn(ink):
                 return result("vector_no_text", ["invisible_without_image"])
+            if not text.visible_chars and ink.marks >= VECTOR_MIN_PATHS:
+                return result("handwritten_ocr", ["invisible_without_image"])
         return result("scan_ocr", ["invisible_without_image"])
     if ink.marks >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS or image_coverage > 0:
         return result("vector_no_text", ["little_text"])
@@ -1358,15 +1373,16 @@ REFUSAL_CODES = ("handwritten", "handwritten_no_text", "scanned", "scanned_ocr",
 
 
 def _certain(page: PageType) -> str | None:
-    """`kept_reason` for a page that is certainly handwritten or a scan: no visible text,
-    or a hidden layer. A full-page picture with a few visible characters and no hidden
-    layer may be a slide with a background photo and a title, and drawings under a typed
-    title may be machine-drawn (five waves on a slide, a grid of sparklines): such pages
-    are kept as images with a decision when the PDF is converted, but they never refuse
-    the upload."""
+    """`kept_reason` for a page that is certainly handwritten or a scan. A handwritten page
+    is, whatever its typed title: a few machine-drawn curves under a title are not called
+    handwriting in the first place (`decide`). A scan needs no visible text or a hidden
+    layer: a full-page picture with a few visible characters and nothing hidden may be a
+    slide with a background photo and a title (it is called an unread page, kept as an
+    image with a decision when the PDF is converted, and never refuses the upload)."""
     reason = kept_reason(page)
-    sure = page.visible_chars == 0 or page.untrusted_chars >= HIDDEN_FEW
-    if reason in (HANDWRITTEN_PAGE, SCANNED_PAGE) and sure:
+    if reason == HANDWRITTEN_PAGE:
+        return reason
+    if reason == SCANNED_PAGE and (page.visible_chars == 0 or page.untrusted_chars >= HIDDEN_FEW):
         return reason
     return None
 

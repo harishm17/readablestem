@@ -250,6 +250,15 @@ def test_a_short_note_under_a_title_with_a_hidden_layer_is_kept_never_described(
     assert result_outcome(result) == ("failed", "handwritten")
 
 
+def test_notes_written_in_single_curves_under_a_hidden_layer_are_never_described():
+    # Too simple for the stroke test, but under a recognition layer and with no typed
+    # text: handwriting, kept as page images, not drawings for the figure model.
+    result = convert("ios_single_curves.pdf").result
+    assert [f.reason for f in result.fixes] == ["handwritten_page"] * 2
+    assert result.stats.model_calls == 0 and result.image_only_pages == [0, 1]
+    assert result_outcome(result) == ("failed", "handwritten")
+
+
 def test_the_safety_net_page_is_kept_with_a_decision():
     result = convert("drawn_page.pdf").result
     (kept,) = [f for f in result.fixes if f.reason == "unread_page"]
@@ -328,6 +337,8 @@ def pages_used(env) -> int:
     [
         ("ios_notes.pdf", "is handwritten, so this tool cannot convert it. Its hidden text"),
         ("note_titled_layer.pdf", "is handwritten, so this tool cannot convert it."),
+        ("ios_single_curves.pdf", "is handwritten, so this tool cannot convert it. Its hidden"),
+        ("ink_titled_pages.pdf", "cannot convert it. It has no text this tool can use"),
         ("ink_no_layer.pdf", "cannot convert it. It has no text this tool can use"),
         ("scan_ocr.pdf", "running OCR again will not help"),
         ("scan_text_under_image.pdf", "is scanned, so this tool cannot convert it"),
