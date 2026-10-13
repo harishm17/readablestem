@@ -842,7 +842,42 @@ def test_axes_drawn_as_one_path_of_separate_lines_stay_in_the_plot():
     assert all(f" {n} " in f" {_text(out)} " for n in ("0", "2", "4", "6", "8", "10"))
 
 
-@pytest.mark.parametrize("style", ["lines"])
+@pytest.mark.parametrize("page", [0, 1])
+def test_a_timeline_across_the_top_of_a_page_is_a_drawing(page):
+    # A rule within the top 15 % of the page with tick marks across it: dropped as a header
+    # rule (or as rules alone), with nothing to say so. Its ticks make it a drawing. The
+    # rule and ticks are one path on page 1 and separate paths on page 2.
+    out = layout.analyze(_fixture("timelines.pdf"))
+    assert page not in out.kept_pages
+    (figure,) = _figures(out, page)
+    assert figure.bbox[0] <= 31 and figure.bbox[2] >= 581
+    assert figure.bbox[1] <= 85 and figure.bbox[3] >= 95  # the ticks too
+    assert "Repeat question 2" in _text(out)
+    assert "1900" in _text(out)
+
+
+def test_a_timeline_under_a_short_title_keeps_its_page():
+    # Less than a line of text: no figure is made of a drawing this flat, so the safety net
+    # must count the ruler's lines (before, rules never counted unless joined end to end).
+    doc = pymupdf.open()
+    page = _page(doc)
+    _title(page, "Timeline")
+    shape = page.new_shape()
+    _line(shape, (30, 120), (582, 120), width=1.2)
+    for i in range(7):
+        _line(shape, (30 + i * 92, 114), (30 + i * 92, 126), width=1.2)
+    shape.commit()
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {0: page_type.UNREAD_PAGE} or _held(out, 0, (30, 114, 582, 126))
+
+
+def test_a_running_header_over_a_rule_across_the_page_adds_nothing():
+    out = layout.analyze(_fixture("timelines.pdf"))
+    assert 2 not in out.kept_pages
+    assert _figures(out, 2) == [] and _regions(out, 2) == []
+
+
+@pytest.mark.parametrize("style", ["lines", "lines and header"])
 def test_a_frame_of_four_lines_and_rules_with_end_marks_are_still_furniture(style):
     # Controls: a frame round the page drawn as four separate lines meets itself at every
     # corner (no open corner: not axes), and a rule with a mark at each end only (two, not

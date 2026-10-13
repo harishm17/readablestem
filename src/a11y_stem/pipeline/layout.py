@@ -2491,6 +2491,7 @@ class _Path:
     rules: bool = False  # paper rules: long separate horizontal and vertical lines only
     open_stroke: bool = False  # a stroked line or curve that does not close: a pen mark's shape
     axis: bool = False  # holds one of two lines meeting at a corner: a plot's axes (`_mark_axes`)
+    ruler: bool = False  # holds a line with tick marks across or on it, or one of the ticks
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
@@ -2581,6 +2582,8 @@ def _drawing_bounds(rect: Sequence[float], items: Sequence[Any]) -> tuple[float,
 
 
 AXIS_MIN_PT = 48.0  # pt: each of a plot's two axes is at least this long
+TICK_MAX_PT = 16.0  # pt: a tick mark across or on a ruler's line is at most this long
+RULER_TICKS = 3  # tick marks at different places make a line a ruler (a frame's corner marks are 2)
 STRAIGHT_MIN_PT = 3.0  # pt: shorter horizontal and vertical lines are not looked at
 AXES_MAX_LINES = 20_000  # a page with more straight lines (a grid, hatching) is not looked at
 PATH_MAX_LINES = 200  # nor are the lines of a path with more (a grid drawn as one path)
@@ -2628,15 +2631,19 @@ def _straight_lines(
 
 
 def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
-    """Flag the paths that hold a plot's axes (`_Path.axis`), whether each line is its own
-    path or one path holds them all.
+    """Flag the paths that hold a plot's axes (`_Path.axis`) or a ruler (`_Path.ruler`),
+    whether each line is its own path or one path holds them all.
 
     Axes: a horizontal and a vertical line, each at least AXIS_MIN_PT long, meeting end to
     end at a corner (JOIN_PT), with nothing else at that corner or at their other ends: an
     L. A frame drawn line by line meets itself at every corner; a U or a staircase has
-    more than two lines. A y-axis near the page's edge and as tall as the page read as a
-    side of a frame (the second final verify, 2026-10-12): an axis is never page furniture
-    (`_page_furniture`)."""
+    more than two lines. A ruler: a line at least AXIS_MIN_PT long that RULER_TICKS or more
+    short perpendicular lines (TICK_MAX_PT, at most a quarter of it) cross or end on, at
+    different places along it, where a tick that ends on it has its other end free (a
+    table's row has its column rules end on the rules above and below: not ticks). A
+    y-axis near the page's edge and as tall as the page read as a side of a frame, and a
+    timeline across the top of a page as a header rule (the second final verify,
+    2026-10-12): an axis or a ruler is never page furniture (`_page_furniture`)."""
     unique: dict[tuple[bool, int, int, int], tuple[_Straight, list[int]]] = {}
     for owner, own in enumerate(lines):
         for line in own:
@@ -2688,6 +2695,57 @@ def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
             if meeting(m, near) == {k} and not meeting(m, far):
                 flag(k, "axis")
                 flag(m, "axis")
+    # Rulers: short lines by orientation, in bands of TICK_MAX_PT of their middle.
+    short: dict[tuple[bool, int], list[int]] = {}
+    for k, (line, _) in enumerate(flat):
+        if line.hi - line.lo <= TICK_MAX_PT:
+            middle = (line.lo + line.hi) / 2
+            short.setdefault((line.horizontal, int(middle // TICK_MAX_PT)), []).append(k)
+    across: dict[tuple[bool, int], list[int]] = {}  # every line, by orientation and place
+    for k, (line, _) in enumerate(flat):
+        across.setdefault((line.horizontal, int(line.c // JOIN_PT)), []).append(k)
+
+    def on_parallel(point: tuple[float, float], horizontal: bool, skip: int) -> bool:
+        """`point` lies on a line of that orientation other than `skip`."""
+        x, y = point
+        c, t = (y, x) if horizontal else (x, y)
+        for b in (int(c // JOIN_PT) - 1, int(c // JOIN_PT), int(c // JOIN_PT) + 1):
+            for m in across.get((horizontal, b), ()):
+                other = flat[m][0]
+                if (
+                    m != skip
+                    and abs(other.c - c) <= JOIN_PT
+                    and other.lo - JOIN_PT <= t <= other.hi + JOIN_PT
+                ):
+                    return True
+        return False
+
+    for k in long:
+        line = flat[k][0]
+        length = line.hi - line.lo
+        band = int(line.c // TICK_MAX_PT)
+        ticks: list[int] = []
+        places: set[int] = set()
+        for b in (band - 1, band, band + 1):
+            for t in short.get((not line.horizontal, b), ()):
+                tick = flat[t][0]
+                if tick.hi - tick.lo > length / 4:
+                    continue
+                if not line.lo - JOIN_PT <= tick.c <= line.hi + JOIN_PT:
+                    continue  # beyond the line's ends
+                if tick.lo > line.c + JOIN_PT or tick.hi < line.c - JOIN_PT:
+                    continue  # does not reach it
+                if not (tick.lo < line.c - 1 and tick.hi > line.c + 1):  # ends on it
+                    free = tick.hi if abs(tick.lo - line.c) <= JOIN_PT else tick.lo
+                    point = (tick.c, free) if line.horizontal else (free, tick.c)
+                    if on_parallel(point, line.horizontal, k):
+                        continue  # a column rule between two rules, not a tick
+                ticks.append(t)
+                places.add(round(tick.c))
+        if len(places) >= RULER_TICKS:
+            flag(k, "ruler")
+            for t in ticks:
+                flag(t, "ruler")
 
 
 def _encloses(items: Sequence[Any], close_path: object) -> bool:
@@ -3342,7 +3400,7 @@ def _vector_figures(
     """Clusters of drawings that look like a picture, not rules, borders or tables.
 
     Page furniture (a frame round the page, a page-wide rule along an edge that is no
-    plot's axis, a background fill) is set aside first: a frame's box holds
+    plot's axis or ruler, a background fill) is set aside first: a frame's box holds
     everything on the page, so clustered with the rest it made every figure on the page
     one "page border" (docs/layout.md "Figures"). A drawing that still fills the page (a
     full-page plot, a slide's chart) is a figure when it has three curves, two bars, or a
@@ -3356,7 +3414,8 @@ def _vector_figures(
 
     Rules alone (separators, underlines, a table's grid) and boxes or panels round text
     are not figures, unless they are drawn as a diagram (`_drawn_diagram`: lines joined
-    end to end into a staircase, boxes joined by lines) with no running text inside.
+    end to end into a staircase, boxes joined by lines; a ruler, a line with tick marks)
+    with no running text inside.
     Clusters too small to be figures that are no part of one go to `small_out`: the page
     decides what they are once its text is read (`_leftover_drawings`)."""
     figures = []
@@ -3366,7 +3425,8 @@ def _vector_figures(
     for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
         members = [paths[i] for i in group]
         rule_only = all(p.kind in ("hrule", "vrule") or p.rules for p in members)
-        if rule_only and not _line_chain(members):
+        ruler = any(p.ruler for p in members)  # a timeline, an axis with ticks
+        if rule_only and not ruler and not _line_chain(members):
             continue  # separators, underlines, table grids, paper rules
         x0, y0, x1, y1 = _union(p.bbox for p in members)
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
@@ -3393,8 +3453,9 @@ def _vector_figures(
                 if left_out is not None:
                     left_out.append(box)
                 continue
-            # A plotted line on axes is a plot, not a decorated border, with one curve.
-            axes = curved and any(p.axis for p in members)
+            # A plotted line on axes (or on a ruler: an axis with ticks) is a plot, not a
+            # decorated border, with one curve.
+            axes = curved and any(p.axis or p.ruler for p in members)
             if (len(curves) < 3 and len(bars) < 2 and not axes) or (
                 ctx is not None and _running_text(inside, ctx)
             ):
@@ -3545,8 +3606,8 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
     page-long rule near an edge), a background fill (at least PAGE_SIZED_FRACTION of the
     page's area, or a straight-edged panel round the page with a margin) or a band of
     colour along an edge (a slide template's title bar): never part of a figure, and
-    never content on its own. A page-long rule that is a plot's axis (`_mark_axes`: a
-    full-page plot's y-axis) is a drawing."""
+    never content on its own. A page-long rule that is a plot's axis or a ruler's line
+    (`_mark_axes`: a full-page plot's y-axis, a timeline across the top) is a drawing."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
     big = PAGE_SIZED_FRACTION
@@ -3558,7 +3619,7 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
         )
     if path.frame:
         return _round_page(path.bbox, page_rect)
-    if path.curved or path.axis:
+    if path.curved or path.axis or path.ruler:
         return False
     edge = FRAME_EDGE_BAND
     if path.kind == "hrule":
@@ -3572,11 +3633,11 @@ def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
     """Part of the border of a page-filling cluster (`box`): frame-shaped, across the page
     (PAGE_SIZED_FRACTION of its width or height), or a mark smaller than a figure along
     an edge of the cluster (within FRAME_EDGE_BAND of the page): the pieces of a frame
-    whose shape was not recognised, corner ornaments. A plot's axes are not
+    whose shape was not recognised, corner ornaments. A plot's axes and a ruler are not
     (`_mark_axes`)."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
-    if path.axis:
+    if path.axis or path.ruler:
         return False
     if path.frame or x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
         return True
@@ -4573,7 +4634,8 @@ def _leftover_drawings(
     2026-10-12: an icon, a benzene ring, a number line, maths drawn as glyph outlines,
     ticks). Not counted: drawn list bullets, a repeated mark in the header or footer band,
     horizontal and vertical lines and boxes alone (an empty answer box, a black box over a
-    line), anything whose middle lies in a block (an underline, a box round a word), and
+    line) unless they are a ruler (a timeline: `_mark_axes`), anything whose middle lies
+    in a block (an underline, a box round a word), and
     the ornaments of a page frame: marks at the edges of a frame round the page
     (`frames`, corner curls), or a group that runs round the page itself (a frame of
     separate dots), dots alone (DOT_PT), and a shape painted over hidden text (`covers`,
@@ -4612,7 +4674,8 @@ def _leftover_drawings(
             and places < page_type.VECTOR_MIN_PATHS
         ) or _round_page(box, page_rect):
             continue
-        if not any(p.curved for p in members):
+        curved = any(p.curved for p in members)
+        if not curved and not any(p.ruler for p in members):
             continue  # rules, boxes and bars alone (an answer box, a box over a line)
         if all(p.filled and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= DOT_PT
                for p in members):  # fmt: skip
@@ -4620,8 +4683,8 @@ def _leftover_drawings(
         if any(_centre_inside((x, y, x, y), box) for x, y in covers):
             continue  # a shape painted over hidden text: its cover, not a drawing
         pen = sum(p.source in ink_sources for p in members)
-        if 2 * pen >= len(members) or all(p.open_stroke for p in members):
-            marks.append(box)
+        if curved and (2 * pen >= len(members) or all(p.open_stroke for p in members)):
+            marks.append(box)  # a ruler's straight lines are machine-drawn: a figure
         else:
             reasons = [f"vector drawing ({len(members)} paths)"]
             figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
@@ -4981,11 +5044,12 @@ def _painted(
 
 def _drawn_rules(paths: Sequence[_Path]) -> set[int]:
     """Ids of the horizontal and vertical rules that are part of a drawing: a cluster of
-    rules joined end to end into an open chain (`_line_chain`: a step plot, a staircase)."""
+    rules joined end to end into an open chain (`_line_chain`: a step plot, a staircase),
+    or a ruler's line and ticks (`_mark_axes`: a timeline, a number line)."""
     rules = [p for p in paths if p.kind in ("hrule", "vrule")]
+    drawn = {id(r) for r in rules if r.ruler}
     if len(rules) < 4:
-        return set()
-    drawn: set[int] = set()
+        return drawn
     for group in _cluster([r.bbox for r in rules], DRAWING_CLUSTER_GAP):
         members = [rules[i] for i in group]
         if _line_chain(members):
