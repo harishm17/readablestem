@@ -2578,12 +2578,16 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
         open_stroke = stroked and not filled and not _encloses(items, drawing.get("closePath"))
         fill = filled and kind == "shape"
         path = _Path(box, kind, curved, fill, source, border, rules, open_stroke)
+        # What later tests read, only for the paths they look at (a page of handwriting
+        # has tens of thousands of strokes, and the ink budget runs while they are read).
         if curved and open_stroke:
             path.ends = _subpath_ends(items, display)
-        path.turns = _turns(items, segments)
-        path.colour = _rgb(drawing.get("color") if stroked else drawing.get("fill"))
-        if fill:
-            path.fill_share = _fill_share(items, display, box)
+        if open_stroke and kind == "shape" and max(width, height) >= MIN_IMAGE_PT:
+            path.turns = _turns(items, segments)  # an open polyline (`_diagram_signs`)
+        if curved and kind == "shape" and not open_stroke:  # a closed or filled hand mark
+            path.colour = _rgb(drawing.get("color") if stroked else drawing.get("fill"))
+            if fill:  # a ribbon tick has tens of points; a longer fill is no such mark
+                path.fill_share = _fill_share(items, display, box) if len(items) <= 200 else 1.0
         paths.append(path)
         lines.append(_straight_lines(path, segments))
     _mark_axes(paths, lines)
@@ -3649,34 +3653,39 @@ def _vector_figures(
             # with running text inside (which stays in the reading flow: `_absorb_labels`).
             plot = (curved or len(bars) >= 2) and any(p.plot or p.ruler for p in members)
             running = ctx is not None and bool(_running_text(inside, ctx))
-            if not plot and ((len(curves) < 3 and len(bars) < 2) or running):
-                inner = [p for p in members if not _border_member(p, box, page_rect)]
-                if inner and len(inner) < len(members) and depth < 2:
-                    before = (len(left_out or ()), len(small_out or ()))
-                    found = _vector_figures(
-                        inner,
-                        rows,
-                        page_rect,
-                        ctx,
-                        page_sized=page_sized,
-                        left_out=left_out,
-                        depth=depth + 1,
-                        small_out=small_out,
-                        ink=ink,
-                        hand=hand,
-                    )
-                    figures += found
-                    after = (len(left_out or ()), len(small_out or ()))
-                    # Nothing was made of what is left once the border is off: if it held
-                    # curves or bars, the page image keeps them.
-                    if (
-                        not found
-                        and after == before
-                        and left_out is not None
-                        and any(p.curved or p in bars for p in inner)
-                    ):
-                        left_out.append(box)
-                elif (curved or len(bars) >= 2) and left_out is not None:
+            figure = plot or not ((len(curves) < 3 and len(bars) < 2) or running)
+            inner = [p for p in members if not _border_member(p, box, page_rect)]
+            border = bool(inner) and len(inner) < len(members) and depth < 2
+            if border and (plot or not figure):
+                # A plot inside a border of dashes or ornaments is the plot without them;
+                # anything else is clustered again once its border is off.
+                before = (len(left_out or ()), len(small_out or ()))
+                found = _vector_figures(
+                    inner,
+                    rows,
+                    page_rect,
+                    ctx,
+                    page_sized=page_sized,
+                    left_out=left_out,
+                    depth=depth + 1,
+                    small_out=small_out,
+                    ink=ink,
+                    hand=hand,
+                )
+                figures += found
+                after = (len(left_out or ()), len(small_out or ()))
+                # Nothing was made of what is left once the border is off: if it held
+                # curves or bars, the page image keeps them.
+                if (
+                    not found
+                    and after == before
+                    and left_out is not None
+                    and any(p.curved or p in bars for p in inner)
+                ):
+                    left_out.append(box)
+                continue
+            if not figure:
+                if (curved or len(bars) >= 2) and left_out is not None:
                     left_out.append(box)  # drawings no figure was made of: the page image
                 continue
         elif not curved and len(bars) < 2 and (len(inside) >= 2 or rule_only):
@@ -4072,6 +4081,7 @@ def _round_text(members: Sequence[_Path], rows: Sequence[_Row]) -> bool:
     its rules). Rows outside every box (the value labels over a bar chart's outlined bars)
     are not."""
     boxes, _ = _containers(members)
+    boxes += [p.bbox for p in members if p.filled]  # a band of thin strips is a panel too
     grown = [(b[0] - 1, b[1] - 1, b[2] + 1, b[3] + 1) for b in boxes]
     hrules = [p.bbox for p in members if p.kind == "hrule"]
     vrules = [p.bbox for p in members if p.kind == "vrule"]
