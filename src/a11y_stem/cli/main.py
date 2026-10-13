@@ -17,6 +17,7 @@ from typing import Any
 
 from a11y_stem import __version__
 from a11y_stem.cli import convert, eval_cli, ops, serve
+from a11y_stem.cli import heldout as heldout_cli
 
 GOLD_DIR = Path("data/gold")
 CACHE_DIR = Path(".cache/openstax")
@@ -93,6 +94,8 @@ def _gold_fetch_set(args: argparse.Namespace) -> int:
 
     if args.page or args.chapter is not None:
         return _error("--set chooses its pages itself; drop --page and --chapter")
+    if args.set == "heldout":
+        return _gold_fetch_heldout(args)
     out = args.out or _default(TABLE_GOLD_DIR)
     cache_dir = None if args.no_cache else _default(CACHE_DIR)
     fetcher = HttpFetcher(cache_dir=cache_dir)
@@ -112,6 +115,61 @@ def _gold_fetch_set(args: argparse.Namespace) -> int:
             return _error(str(exc))
         _print_fetch(book, results, fetcher, cache_dir, out)
         print()
+    return 0
+
+
+def _gold_fetch_heldout(args: argparse.Namespace) -> int:
+    """The pre-registered held-out set: 15 sections of five retired CC BY first editions,
+    every record kind, each book read from its pinned archive release. Everything is kept
+    outside the repository (cli.heldout); the written files are then checked against the
+    registered hashes, which also names a different `--date` as the reason they differ."""
+    from a11y_stem.gold.heldout import REGISTERED, fetch_set, verify_gold
+    from a11y_stem.gold.openstax import GoldError, HttpFetcher
+
+    loc = heldout_cli.locations(args.heldout_dir)
+    out = args.out or loc.gold
+    for what, path in (("--heldout-dir", loc.root), ("--out", out)):
+        message = heldout_cli.outside_project(path, what)
+        if message:
+            return _error(message)
+    cache_dir = None if args.no_cache else loc.openstax
+    fetcher = HttpFetcher(cache_dir=cache_dir)
+    try:
+        fetched = fetch_set(
+            out,
+            fetcher,
+            retrieved_at=args.date or dt.date.today().isoformat(),
+            allow_retired=args.allow_retired,
+        )
+    except GoldError as exc:
+        return _error(str(exc))
+    for book, results in fetched:
+        _print_fetch(book, results, fetcher, cache_dir, out)
+        print()
+    problems = verify_gold(out)
+    if problems:
+        print("the files were written, but they are not the registered held-out gold:")
+        for problem in problems:
+            print(f"  - {problem}")
+        return 1
+    print(
+        f"matches the pre-registered held-out gold (manifest sha256 {REGISTERED.manifest_sha256})"
+    )
+    return 0
+
+
+def _cmd_gold_verify(args: argparse.Namespace) -> int:
+    from a11y_stem.gold.heldout import REGISTERED, verify_gold
+
+    gold_dir = args.gold or heldout_cli.locations(args.heldout_dir).gold
+    problems = verify_gold(gold_dir)
+    if problems:
+        print(heldout_cli.gold_problem(problems, gold_dir), file=sys.stderr)
+        return 1
+    print(
+        f"{gold_dir} is the pre-registered held-out gold: {len(REGISTERED.sections)} sections, "
+        f"manifest sha256 {REGISTERED.manifest_sha256}"
+    )
     return 0
 
 
@@ -187,6 +245,13 @@ def _cmd_eval_equations(args: argparse.Namespace) -> int:
     )
 
     gold_path = args.gold or _default(GOLD_DIR)
+    if args.gold_set:
+        resolved = heldout_cli.resolve(
+            args.heldout_dir, args.gold, writes=(("--report", args.report),)
+        )
+        if isinstance(resolved, str):
+            return _error(resolved)
+        gold_path = resolved[1]
     if not gold_path.exists():
         return _error(f"gold path not found: {gold_path}")
     try:
@@ -261,9 +326,12 @@ def build_parser() -> argparse.ArgumentParser:
     which.add_argument("--book", help="OpenStax slug, e.g. physics")
     which.add_argument(
         "--set",
-        choices=["tables"],
+        choices=["tables", "heldout"],
         help="a named gold set instead of --book: tables = the 13 OpenStax pages of the "
-        "tables eval, table records only (default out: data/gold/tables)",
+        "tables eval, table records only (default out: data/gold/tables); heldout = the 15 "
+        "pre-registered held-out sections (needs --allow-retired; use --date "
+        "2026-10-13 to rebuild the registered files byte for byte; default out: the "
+        "held-out folder outside the repository)",
     )
     fetch.add_argument(
         "--pages", type=_positive_int, default=3, help="first N numbered sections (N >= 1)"
@@ -273,6 +341,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--page", action="append", help="exact page slug (repeatable); overrides --pages"
     )
     fetch.add_argument("--out", type=Path, help="output dir (default: <project>/data/gold)")
+    fetch.add_argument(
+        "--heldout-dir",
+        type=Path,
+        help="with --set heldout: the folder for its gold, caches and reports "
+        f"(default: {heldout_cli.default_root()})",
+    )
     fetch.add_argument("--date", help="retrieval date to record (default: today)")
     fetch.add_argument("--no-cache", action="store_true", help="ignore the local HTTP cache")
     fetch.add_argument(
@@ -287,6 +361,18 @@ def build_parser() -> argparse.ArgumentParser:
     licenses.add_argument("--cc-by-only", action="store_true")
     licenses.add_argument("--csv", type=Path, help="also write the table as CSV")
     licenses.set_defaults(func=_cmd_gold_licenses)
+
+    verify = gold.add_parser(
+        "verify", help="check a gold folder against the pre-registered held-out set"
+    )
+    verify.add_argument("--set", choices=["heldout"], required=True)
+    verify.add_argument("--gold", type=Path, help="gold dir (default: <heldout dir>/gold)")
+    verify.add_argument(
+        "--heldout-dir",
+        type=Path,
+        help=f"the held-out folder (default: {heldout_cli.default_root()})",
+    )
+    verify.set_defaults(func=_cmd_gold_verify)
 
     manifest = gold.add_parser("manifest", help="rebuild manifest.json and ATTRIBUTION.md")
     manifest.add_argument("--out", type=Path, help="gold dir (default: <project>/data/gold)")
@@ -307,6 +393,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     eq.add_argument("--display", choices=["all", "block", "inline"], default="all")
     eq.add_argument("--report", type=Path, help="write per-item scores as JSON")
+    heldout_cli.add_set_arguments(eq)
     eq.set_defaults(func=_cmd_eval_equations)
     eval_cli.register(evaluate, top=sub)
 

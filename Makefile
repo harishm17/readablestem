@@ -69,3 +69,17 @@ eval-plumbing:
 eval-latex-check:
 	uv run pytest -q tests/test_gold_sample.py
 	uv run a11y-stem eval equations --gold data/gold --pred $(SAMPLE_PREDICTIONS)
+
+# The pre-registered held-out set (docs/eval.md "Held-out set"). Its files go to
+# ~/.cache/a11y-stem/heldout, never into the repository. heldout-gold rebuilds the
+# registered gold byte for byte from OpenStax's pinned archive (retired first editions,
+# hence --allow-retired: ADR 0001 question 2) and checks it; no model is called.
+.PHONY: heldout-gold heldout-verify heldout-pdfs
+heldout-gold:
+	uv run a11y-stem gold fetch --set heldout --allow-retired --date 2026-10-13
+
+heldout-verify:
+	uv run a11y-stem gold verify --set heldout
+
+heldout-pdfs:  ## print the 15 sections and check the page counts (242)
+	uv run --group browser a11y-stem eval render --set heldout --all

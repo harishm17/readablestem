@@ -20,6 +20,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from a11y_stem.cli import heldout as heldout_cli
+
 GOLD_DIR = Path("data/gold")
 EVAL_DIR = Path("data/eval")
 EVAL_CACHE = Path(".cache/eval")
@@ -145,15 +147,62 @@ def _settings() -> Any:
 
 
 def _cmd_pipeline(args: argparse.Namespace) -> int:
+    if args.gold_set:
+        return _run_heldout(args)
     if args.task == TABLES_TASK:
         return _run_tables(args)
     gold_dir = args.gold or _default(GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
+    if message := heldout_cli.unselected(gold_dir):
+        return _error(message)
     out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
     if getattr(args, "notation", None):
         return _run_with_notation(args, gold_dir, out)
     return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir))
+
+
+def _run_heldout(args: argparse.Namespace) -> int:
+    """`eval pipeline --set heldout`: the pre-registered held-out sections, with the
+    registered configuration and nothing else changed. The gold must be the registered
+    one; its caches, the OpenStax archive responses and the reports stay outside the
+    repository. Refused: `--fake` (a fake run is a run on these sections and is not
+    allowed before the registered one, pre-registration section 10.1), `--notation` (no
+    course notation is registered) and the tables task (not a task of this set)."""
+    from a11y_stem.gold.heldout import REGISTERED
+
+    if args.fake:
+        return _error(
+            "--fake is not allowed on the held-out set (a fake run still runs the layout and "
+            "heading code on these sections; pre-registration, section 10.1). Check the "
+            "plumbing on data/gold instead"
+        )
+    if args.task == TABLES_TASK:
+        return _error("the tables task is not part of the held-out set")
+    if args.notation:
+        return _error("--notation is not part of the registered configuration")
+    resolved = heldout_cli.resolve(
+        args.heldout_dir,
+        args.gold,
+        args.cache,
+        writes=(("--out", args.out), ("--items", args.items)),
+    )
+    if isinstance(resolved, str):
+        return _error(resolved)
+    loc, gold_dir, cache_dir = resolved
+    out = args.out or loc.reports / f"{args.task}.json"
+    return _run_pipeline(
+        args,
+        gold_dir,
+        out,
+        gold_label=f"heldout (pre-registered {REGISTERED.date})",
+        extra={
+            "set": "heldout",
+            "preregistration_sha256": REGISTERED.preregistration_sha256,
+        },
+        cache_dir=cache_dir,
+        openstax_cache=loc.openstax,
+    )
 
 
 def _run_with_notation(args: argparse.Namespace, gold_dir: Path, out: Path) -> int:
@@ -192,6 +241,8 @@ def _cmd_sample(args: argparse.Namespace) -> int:
     gold_dir = args.gold or _default(GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
+    if message := heldout_cli.unselected(gold_dir):
+        return _error(message)
     week = args.week or iso_week(args.date_value)
     out = args.out or _default(WEEKLY_DIR / f"{week}-{args.task}.json")
     with tempfile.TemporaryDirectory(prefix="a11y-stem-sample-") as tmp:
@@ -218,6 +269,8 @@ def _run_pipeline(
     *,
     gold_label: str,
     extra: dict | None = None,
+    cache_dir: Path | None = None,
+    openstax_cache: Path | None = None,
 ) -> int:
     from a11y_stem.eval import pipeline_eval as pe
     from a11y_stem.eval.render import RenderError
@@ -228,9 +281,9 @@ def _run_pipeline(
     if isinstance(made, str):
         return _error(made)
     client, budget, label = made
-    fetcher = HttpFetcher(cache_dir=_default(OPENSTAX_CACHE))
+    fetcher = HttpFetcher(cache_dir=openstax_cache or _default(OPENSTAX_CACHE))
     with pe.CachedMedia(
-        gold_dir, args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
+        gold_dir, cache_dir or args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
     ) as media:
         config = pe.EvalConfig(
             task=args.task,
@@ -420,6 +473,8 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
     gold_dir = args.gold or _default(GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
+    if message := heldout_cli.unselected(gold_dir):
+        return _error(message)
     settings = _settings()
     made = _make_client(args, settings)
     if isinstance(made, str):
@@ -478,8 +533,34 @@ def _cmd_render(args: argparse.Namespace) -> int:
     from a11y_stem.eval.pipeline_eval import load_gold
     from a11y_stem.gold.openstax import GoldError, HttpFetcher
 
+    book = args.book or "physics"
     gold_dir = args.gold or _default(GOLD_DIR)
     cache = args.cache or _default(EVAL_CACHE)
+    openstax_cache = _default(OPENSTAX_CACHE)
+    if args.gold_set:
+        from a11y_stem.gold.heldout import REGISTERED
+
+        resolved = heldout_cli.resolve(
+            args.heldout_dir,
+            args.gold,
+            args.cache,
+            writes=(("--out", args.out), ("--out-dir", args.out_dir)),
+        )
+        if isinstance(resolved, str):
+            return _error(resolved)
+        loc, gold_dir, cache = resolved
+        openstax_cache = loc.openstax
+        if args.all:
+            return _render_heldout_all(args, loc, gold_dir, cache)
+        section = REGISTERED.section(args.page, args.book) if args.page else None
+        if args.page and section is None:
+            return _error(f"{args.page} is not one of the held-out sections (--set heldout)")
+        if section is not None:
+            book = section.book
+    elif args.all or args.out_dir:
+        return _error("--all and --out-dir belong to --set heldout")
+    elif message := heldout_cli.unselected(gold_dir):
+        return _error(message)
     if args.equations:
         if not gold_dir.is_dir():
             return _error(f"gold dir not found: {gold_dir}")
@@ -493,16 +574,88 @@ def _cmd_render(args: argparse.Namespace) -> int:
         return 0
     if not args.page:
         return _error("give --page SLUG or --equations")
-    fetcher = HttpFetcher(cache_dir=_default(OPENSTAX_CACHE))
-    out = args.out or cache / "pages" / f"{args.book}-{args.page}.pdf"
+    fetcher = HttpFetcher(cache_dir=openstax_cache)
+    out = args.out or cache / "pages" / f"{book}-{args.page}.pdf"
     try:
-        page = _page_source(args.book, args.page, gold_dir, fetcher)
+        page = _page_source(book, args.page, gold_dir, fetcher)
         render.render_page_pdf(
             page, out, images=render.ImageCache(cache / "images"), paper=args.paper
         )
     except (GoldError, render.RenderError) as exc:
         return _error(str(exc))
     print(f"wrote {_shown(out)}")
+    return 0
+
+
+def _render_heldout_all(
+    args: argparse.Namespace, loc: heldout_cli.Locations, gold_dir: Path, cache: Path
+) -> int:
+    """`eval render --set heldout --all`: print the 15 sections, count their pages.
+
+    The PDFs go into the render cache under the key the document task looks them up by
+    (so a later run converts these very files) and, named `<book>-<page>.pdf`, into
+    `--out-dir` (default: the held-out folder's pdfs/) with a `pages.json` of their page
+    counts and SHA-256 values: content-free, and what a run report records. Exit 1 when a
+    Letter print has another page count than the registered one (242 in all). The prints
+    only count pages: nothing converts them.
+    """
+    import hashlib
+
+    from a11y_stem.eval import render
+    from a11y_stem.gold.heldout import REGISTERED
+    from a11y_stem.gold.openstax import GoldError, HttpFetcher
+
+    out_dir = args.out_dir or loc.pdfs
+    fetcher = HttpFetcher(cache_dir=loc.openstax)
+    images = render.ImageCache(cache / "images")
+    rows: list[dict[str, Any]] = []
+    try:
+        with render.ChromiumRenderer() as browser:
+            for section in REGISTERED.sections:
+                page = _page_source(section.book, section.slug, gold_dir, fetcher)
+                pdf = render.render_page_pdf(
+                    page,
+                    out_dir / f"{section.book}-{section.slug}.pdf",
+                    images=images,
+                    renderer=browser,
+                    paper="A4" if args.paper == "A4" else "Letter",
+                    cache_dir=cache / "pages",
+                )
+                rows.append(
+                    {
+                        "book": section.book,
+                        "page": section.slug,
+                        "pdf_pages": heldout_cli.pdf_page_count(pdf),
+                        "registered_pdf_pages": section.pdf_pages,
+                        "sha256": hashlib.sha256(pdf).hexdigest(),
+                        "bytes": len(pdf),
+                    }
+                )
+    except (GoldError, render.RenderError) as exc:
+        return _error(str(exc))
+    letter = args.paper == "Letter"
+    differs = [r for r in rows if letter and r["pdf_pages"] != r["registered_pdf_pages"]]
+    total = sum(r["pdf_pages"] for r in rows)
+    summary = {
+        "paper": args.paper,
+        "total_pdf_pages": total,
+        "registered_total_pdf_pages": REGISTERED.total_pdf_pages,
+        "pages_match_registration": None if not letter else not differs,
+        "sections": rows,
+    }
+    _write_json(summary, out_dir / "pages.json")
+    for r in rows:
+        mark = (
+            "" if not letter or r not in differs else f"  (registered {r['registered_pdf_pages']})"
+        )
+        print(
+            f"{r['book']:<24} {r['page']:<62} {r['pdf_pages']:>3} pages  {r['sha256'][:12]}{mark}"
+        )
+    print(f"{total} PDF pages in {len(rows)} sections (registered: {REGISTERED.total_pdf_pages})")
+    print(f"wrote {out_dir}/<book>-<page>.pdf and {out_dir / 'pages.json'}")
+    if differs:
+        print(f"error: {len(differs)} section(s) print to another page count than registered")
+        return 1
     return 0
 
 
@@ -578,6 +731,8 @@ def _cmd_demo_build(args: argparse.Namespace) -> int:
     from a11y_stem.eval import render
     from a11y_stem.gold.openstax import GoldError, HttpFetcher
 
+    if args.gold and (message := heldout_cli.unselected(args.gold)):
+        return _error(message)
     settings = _settings()
     made = _make_client(args, settings)
     if isinstance(made, str):
@@ -631,6 +786,7 @@ def register(
     )
     pipeline.add_argument("--task", required=True, choices=PIPELINE_TASKS)
     _add_spend_args(pipeline)
+    heldout_cli.add_set_arguments(pipeline)
     pipeline.add_argument(
         "--limit",
         type=_positive_int,
@@ -759,7 +915,19 @@ def register(
 
     render = group.add_parser("render", help="print a gold page to PDF or pre-render equations")
     render.add_argument("--page", help="OpenStax page slug, e.g. 2-2-speed-and-velocity")
-    render.add_argument("--book", default="physics")
+    render.add_argument(
+        "--book", help="OpenStax book slug (default: physics; with --set heldout: the set's)"
+    )
+    heldout_cli.add_set_arguments(render)
+    render.add_argument(
+        "--all",
+        action="store_true",
+        help="--set heldout: print all 15 sections, count their pages against the registered "
+        "ones and write pages.json (page counts and SHA-256 values)",
+    )
+    render.add_argument(
+        "--out-dir", type=Path, help="--all: where the PDFs go (default: <heldout dir>/pdfs)"
+    )
     render.add_argument("--equations", action="store_true", help="render gold equations")
     render.add_argument("--gold", type=Path, help="gold dir (default: data/gold)")
     render.add_argument("--limit", type=_positive_int)

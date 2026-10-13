@@ -29,6 +29,8 @@ CLI:
 a11y-stem gold fetch --book SLUG --pages N [--chapter C] [--page SLUG ...] [--out DIR] [--date YYYY-MM-DD] [--no-cache] [--allow-retired]
 a11y-stem gold licenses [--cc-by-only] [--csv PATH]
 a11y-stem gold manifest [--out DIR]
+a11y-stem gold fetch --set heldout --allow-retired [--date 2026-10-13] [--heldout-dir DIR]   # the pre-registered held-out set (docs/eval.md)
+a11y-stem gold verify --set heldout [--gold DIR] [--heldout-dir DIR]
 a11y-stem eval equations --gold PATH (--pred PRED.jsonl | --self-check) [--display all|block|inline] [--report OUT.json]
 a11y-stem parse FILE.pdf [--pages 1,2] [--json]
 ```
@@ -43,6 +45,7 @@ any subdirectory. Outside a checkout they fall back to the working directory. Ba
 | Path | Contents |
 |---|---|
 | `src/a11y_stem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
+| `src/a11y_stem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
 | `src/a11y_stem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/a11y_stem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/a11y_stem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
@@ -118,4 +121,8 @@ step) needs to account for this.
   (a missing license in either place is refused).
 - `gold fetch` refuses books whose OpenStax state is not `live` (retired, deprecated,
   unlisted) unless you pass `--allow-retired`. Open decision: ADR 0001, question 2.
+- The held-out set (`--set heldout`, docs/eval.md "Held-out set") is never written inside
+  the repository: its gold, caches and reports go to `~/.cache/a11y-stem/heldout`, and a
+  `--set heldout` command refuses a path inside the repository, `--fake`, and gold that
+  is not the registered gold.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.
