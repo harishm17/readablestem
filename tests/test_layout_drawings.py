@@ -272,3 +272,197 @@ def test_a_slide_plot_with_a_note_is_never_called_converted():
     assert len(figures) == 1 and _holds(figures[0], (30, 20, 700, 385))
     assert "terminal speed" in _html_text(result.html)
     assert result_outcome(result)[0] == "done"
+
+
+# --------------------------------------------------------------------------- lines and boxes
+
+
+def _arrow_head(tip, direction: float, size=6.0, spread=0.45):
+    a1, a2 = direction + math.pi - spread, direction + math.pi + spread
+    return (
+        (tip[0] + size * math.cos(a1), tip[1] + size * math.sin(a1)),
+        (tip[0] + size * math.cos(a2), tip[1] + size * math.sin(a2)),
+    )
+
+
+def _scatter(page, top: float) -> tuple[float, float, float, float]:
+    """L axes as two lines, 24 filled 3 pt squares, a legend box with two entries."""
+    x0, y0, x1, y1 = 120, top, 470, top + 200
+    _path(page, [[(x0, y1), (x1, y1)]])
+    _path(page, [[(x0, y1), (x0, y0)]])
+    for i in range(24):
+        x = x0 + 12 + i * (x1 - x0 - 24) / 23
+        y = y1 - 15 - (i * 6.5) - 12 * math.sin(i * 1.7)
+        _rect(page, (x - 1.5, y - 1.5, x + 1.5, y + 1.5), colour=BLUE, width=0, fill=BLUE)
+    lx, ly = x0 + 30, y0 + 10
+    _rect(page, (lx, ly, lx + 120, ly + 34), colour=GREY, width=0.5)
+    _rect(page, (lx + 6, ly + 8, lx + 9, ly + 11), colour=BLUE, width=0, fill=BLUE)
+    _rect(page, (lx + 6, ly + 22, lx + 9, ly + 25), colour=RED, width=0, fill=RED)
+    _label(page, (lx + 16, ly + 13), "measured speed", 8)
+    _label(page, (lx + 16, ly + 27), "predicted speed", 8)
+    return x0, y0, x1, y1
+
+
+def _outline_bars(page, top: float) -> tuple[float, float, float, float]:
+    """Five unfilled bars on a baseline, a value over each."""
+    x0, base = 150, top + 190
+    for i, h in enumerate([90, 150, 60, 170, 120]):
+        x = x0 + i * 60
+        _rect(page, (x, base - h, x + 36, base), width=1.2)
+        _label(page, (x + 12, base - h - 4), str(h // 10))
+    _path(page, [[(x0 - 10, base), (x0 + 300, base)]])
+    return x0 - 10, base - 170, x0 + 300, base
+
+
+def _circuit(page, top: float) -> tuple[float, float, float, float]:
+    """A series circuit: the wires one path with gaps, a zigzag resistor, a battery of two
+    plates, labels inside the loop."""
+    x0, y0, x1, y1 = 180, top, 430, top + 160
+    xm, ym = (x0 + x1) / 2, (y0 + y1) / 2
+    wires = [[(x0, ym - 8), (x0, y0), (xm - 30, y0)],
+             [(xm + 30, y0), (x1, y0), (x1, y1), (x0, y1), (x0, ym + 8)]]  # fmt: skip
+    _path(page, wires, width=1.2)
+    zigzag = [
+        (xm - 30 + 5 * i, y0 + (0 if i in (0, 12) else (6 if i % 2 else -6))) for i in range(13)
+    ]
+    _path(page, [zigzag], width=1.2)
+    _path(page, [[(x0 - 14, ym - 8), (x0 + 14, ym - 8)]], width=1.2)
+    _path(page, [[(x0 - 7, ym + 8), (x0 + 7, ym + 8)]], width=3)
+    _label(page, (xm - 30, y0 + 30), "R = 10 ohm", 10)
+    _label(page, (x0 + 12, ym + 4), "12 V", 10)
+    _label(page, (xm - 20, y1 - 12), "I = 1.2 A", 10)
+    return x0 - 14, y0 - 6, x1, y1
+
+
+def _flowchart(page, top: float, *, line_by_line: bool) -> tuple[float, float, float, float]:
+    """Three boxes stacked with a step in each: filled boxes joined by arrows with open
+    heads, or boxes drawn as four separate lines joined by plain lines."""
+    x = 196
+    steps = ["Measure the length", "Time ten swings", "Work out the period"]
+    for k, step in enumerate(steps):
+        y = top + k * 80
+        if line_by_line:
+            corners = [(x, y), (x + 220, y), (x + 220, y + 40), (x, y + 40), (x, y)]
+            _lines(page, list(itertools.pairwise(corners)))
+            if k < 2:
+                _path(page, [[(x + 110, y + 40), (x + 110, y + 80)]])
+        else:
+            _rect(page, (x, y, x + 220, y + 40), colour=BLUE, fill=(0.85, 0.92, 1.0))
+            if k < 2:
+                tip = (x + 110, y + 79)
+                h1, h2 = _arrow_head(tip, math.pi / 2)
+                _path(page, [[(x + 110, y + 41), tip], [h1, tip, h2]], width=1.2)
+        _label(page, (x + 20, y + 25), step, 11)
+    return x, top, x + 220, top + 200
+
+
+def _timing(page, top: float) -> tuple[float, float, float, float]:
+    """Three digital signals, each one path, two dashed markers, labels inside."""
+    x0 = 150
+    for k, name in enumerate(["CLK", "DATA", "EN"]):
+        lo = top + 60 + k * 50
+        hi, level, points = lo - 20, lo, [(x0, lo)]
+        for i in range(1, 10):
+            x = x0 + i * 35 * (k + 1) // (2 if k == 2 else 1) + (k * 7 if k else 0)
+            if x > x0 + 340:
+                break
+            points.append((x, level))
+            level = hi if level == lo else lo
+            points.append((x, level))
+        points.append((x0 + 350, level))
+        _path(page, [points], width=1.2)
+        _label(page, (x0 - 40, lo - 6), name)
+    for x in (x0 + 70, x0 + 140):
+        _path(page, [[(x, top + 30), (x, top + 170)]], colour=GREY, dashes="[2 2] 0")
+    _label(page, (x0 + 80, top + 85), "t setup", 8)
+    _label(page, (x0 + 150, top + 135), "t hold", 8)
+    return x0, top + 30, x0 + 350, top + 170
+
+
+def _box_plot(page, top: float) -> tuple[float, float, float, float]:
+    """One box plot: a box, a median, whiskers with caps, labels inside the box."""
+    ym = top + 40
+    _rect(page, (220, ym - 22, 400, ym + 22), width=1.2)
+    _path(page, [[(300, ym - 22), (300, ym + 22)]], width=2)
+    _path(page, [[(140, ym), (220, ym)]])
+    _path(page, [[(400, ym), (500, ym)]])
+    _path(page, [[(140, ym - 10), (140, ym + 10)]])
+    _path(page, [[(500, ym - 10), (500, ym + 10)]])
+    _label(page, (226, ym - 8), "Q1 = 31", 8)
+    _label(page, (340, ym + 14), "Q3 = 55", 8)
+    return 140, ym - 22, 500, ym + 22
+
+
+DIAGRAMS = {
+    "scatter plot with a legend": _scatter,
+    "outlined bars on a baseline": _outline_bars,
+    "circuit with labels inside its loop": _circuit,
+    "flowchart of filled boxes and open arrows": lambda page, top: _flowchart(
+        page, top, line_by_line=False
+    ),
+    "flowchart of boxes drawn line by line": lambda page, top: _flowchart(
+        page, top, line_by_line=True
+    ),
+    "timing diagram": _timing,
+    "box plot": _box_plot,
+}
+
+
+@pytest.mark.parametrize("case", list(DIAGRAMS))
+def test_a_diagram_of_lines_and_boxes_with_labels_inside_is_a_figure(case):
+    # Straight lines, boxes and marks with two or more text rows inside their box were
+    # dropped as "a box round text" and the job page said "Everything was converted".
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 2)
+    area = DIAGRAMS[case](page, y + 30)
+    _running_text(page, area[3] + 40, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    (figure,) = _figures(out)
+    assert _holds(figure, area)
+    assert "It has a direction" in _text_of(out) and "Acceleration is" in _text_of(out)
+
+
+def test_a_scatter_plot_with_a_legend_is_never_called_converted():
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 2)
+    _scatter(page, y + 30)
+    result = _convert(doc.tobytes())
+    (figure,) = [e for e in result.elements if e.kind is Kind.FIGURE]
+    assert "measured speed" in (figure.text or "")  # the legend is the figure's
+    assert "<img" in result.html
+
+
+def test_a_worked_example_box_with_a_grid_of_cell_borders_is_still_not_a_figure():
+    # Controls: a worked example's frames round paragraphs, with a grid of cells drawn as
+    # separate border pieces inside (an open chain of rules); and a box of four lines whose
+    # corners do not quite meet round a shaded panel (its bottom-left corner looks like an
+    # L of axes). Structure round text: no figure, no decision.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _rect(page, (51, 51, 561, 420), colour=GREY)
+    _rect(page, (60, 96, 552, 410), colour=GREY)
+    _label(page, (60, 80), "Example 4.7", 14, font="hebo")
+    _running_text(page, 104, 1)
+    for col in range(7):
+        x = 77 + 37 * col
+        for row in range(6):
+            _path(page, [[(x, 165 + 20 * row), (x, 185 + 20 * row)]], width=0.7)
+        if col < 6:
+            _path(page, [[(x, 165), (x + 37, 165)]], width=0.7)
+            _path(page, [[(x, 285), (x + 37, 285)]], width=0.7)
+            for row in range(6):
+                _label(page, (x + 6, 179 + 20 * row), f"({col + 1}, {row + 1})", 9)
+    _running_text(page, 300, 2, start=1)
+    page = _page(doc)
+    _rect(page, (56.7, 64.5, 555.4, 335.3), colour=None, width=0, fill=(0.93, 0.95, 1.0))
+    _path(page, [[(57, 63), (57, 336)]])
+    _path(page, [[(555, 63), (555, 336)]])
+    _path(page, [[(56, 65), (557, 65)]])
+    _path(page, [[(56, 335), (557, 335)]])
+    _running_text(page, 80, 3)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    assert _figures(out, 0) == [] and _figures(out, 1) == []
