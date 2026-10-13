@@ -49,12 +49,13 @@ def test_load_plugins_skips_absent_modules_and_reports_the_ones_it_found(monkeyp
     assert stages.load_plugins() == []
 
 
-def test_the_repository_wires_every_plugin_but_the_human_labels():
+def test_the_repository_wires_every_stage_plugin():
     loaded = stages.load_plugins()
     assert loaded == [
         "a11y_stem.proof.invented",
         "a11y_stem.proof.comparison",
         "a11y_stem.proof.parsers",
+        "a11y_stem.proof.labels",
     ]
 
 

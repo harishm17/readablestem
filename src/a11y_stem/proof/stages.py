@@ -318,5 +318,9 @@ def active_stages() -> list[Stage]:
 
 
 def stage_table(results: dict[str, StageResult], stages: list[Stage]) -> Table:
-    rows = [[s.title, results[s.name].status if s.name in results else "not run"] for s in stages]
+    words = {"ok": "done", "not_wired": "not computed", "skipped": "skipped", "failed": "failed"}
+    rows = [
+        [s.title, words.get(results[s.name].status, "?") if s.name in results else "not run"]
+        for s in stages
+    ]
     return Table("Parts of this proof", ["Part", "Status"], rows)

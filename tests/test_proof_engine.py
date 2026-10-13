@@ -136,7 +136,7 @@ def test_the_report_has_the_tables_and_says_what_is_not_there(recorded):
         "## Attribution",
     ):
         assert expected in text, expected
-    assert "**Not computed in this build.**" in text  # the four stubs
+    assert "**Not done.**" in text  # the human labels
     assert "> **Incomplete.**" in text
     assert "Development set, not held out" in text  # held_out is false in the test set
     assert wording_problems(text) == []
