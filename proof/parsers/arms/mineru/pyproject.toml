@@ -1,0 +1,13 @@
+# Arm P2: MinerU 4.0.12, `basic` tier (ONNX, CPU). Not a dependency of a11y-stem.
+# Licence: "MinerU Open Source License" (Apache-2.0 plus extra terms); see proof/parsers/README.md.
+[project]
+name = "parsers-arm-mineru"
+version = "0.0.0"
+description = "Environment for the MinerU arm of the parser comparison (pins only)."
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "mineru==4.0.12",
+]
+
+[tool.uv]
+package = false
