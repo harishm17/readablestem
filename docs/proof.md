@@ -171,7 +171,12 @@ computed from files the bundle holds, by stages (`src/a11y_stem/proof/stages.py`
 aligned to the gold equations by the document task's code, and its headings matched by the
 headings task's code. The stages print the claims of preregistration section 8.3 (family A:
 the chatbot, 5 comparisons; family B: each parser, 2 comparisons each, Bonferroni-corrected)
-and every single-system number.
+and every single-system number. Each claim table also prints the p-value of a paired sign-flip
+test on the per-section differences. It is a robustness check, not part of the registered rule:
+a "better" the sign-flip test does not support is written "higher by point estimate", and with
+fewer than 10 sections no verdict is written ("not tested"), because a bootstrap over so few
+sections only returns the sections' own extremes (`stats.sign_flip`,
+`systems_tables.final_result`).
 
 ### Recording the held-out set
 
