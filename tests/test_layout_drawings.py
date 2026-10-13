@@ -575,3 +575,87 @@ def test_blanks_to_fill_in_and_dot_leaders_are_still_not_drawings():
     out = layout.analyze(doc.tobytes())
     assert out.kept_pages == {}
     assert _figures(out) == [] and _regions(out) == []
+
+
+# --------------------------------------------------------------------------- hand marks
+
+
+def _choices(page, y: float) -> None:
+    _label(page, (72, y), "3. A car covers 120 m in 10 s. What is its average speed?", 11)
+    for x, option in zip(
+        (90, 200, 310, 420), ("(a) 4 m/s", "(b) 8 m/s", "(c) 12 m/s", "(d) 16 m/s"), strict=True
+    ):
+        _label(page, (x, y + 24), option, 11)
+
+
+def _oval(page, r, *, colour, width=1.5) -> None:
+    shape = page.new_shape()
+    shape.draw_oval(pymupdf.Rect(r))
+    shape.finish(color=colour, width=width)
+    shape.commit()
+
+
+MARKS = ["answer circled in red", "tick over a display equation", "filled tick", "ribbon tick"]
+
+
+@pytest.mark.parametrize("case", MARKS)
+def test_a_hand_mark_round_an_answer_or_over_an_equation_is_cut_out(case):
+    # A closed red ellipse round an answer, a tick over a display equation (held by the
+    # equation, whose transcription drops it), a tick drawn as a filled outline: lost, with
+    # "Everything was converted".
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 2)
+    if case == "tick over a display equation":
+        page.insert_text(
+            (220, y + 40), "F = m \u00d7 a = 2 \u00d7 9.8 = 19.6", fontsize=13, fontname="tiro"
+        )
+        _path(page, [[(300, y + 36), (307.7, y + 44.8), (322, y + 22.8)]], colour=RED, width=1.8)
+        mark = (300, y + 22.8, 322, y + 44.8)
+    else:
+        _choices(page, y + 30)
+        if case == "answer circled in red":
+            _oval(page, (304, y + 40, 372, y + 60), colour=RED)
+            mark = (304, y + 40, 372, y + 60)
+        elif case == "filled tick":
+            points = [(320, y + 50), (326, y + 58), (342, y + 34), (344, y + 36), (327, y + 62),
+                      (318, y + 52)]  # fmt: skip
+            _path(page, [points], colour=RED, width=0, fill=RED, close=True)
+            mark = (318, y + 34, 344, y + 62)
+        else:
+            spine = [(318 + t * 8, y + 50 + t * 9) for t in [i / 10 for i in range(11)]]
+            spine += [(326 + t * 18, y + 59 - t * 26) for t in [i / 10 for i in range(1, 11)]]
+            ribbon = [(x - 1.2, yy) for x, yy in spine] + [
+                (x + 1.2, yy) for x, yy in reversed(spine)
+            ]
+            _path(page, [ribbon], colour=RED, width=0, fill=RED, close=True)
+            mark = (316.8, y + 33, 345.2, y + 59)
+    _running_text(page, y + 90, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    assert out.page_types[0].kind == "born_digital"
+    assert out.kept_pages == {}
+    (region,) = _regions(out)
+    assert _holds(region, mark)
+    text = " ".join(e.text or "" for e in out.elements)
+    assert "12 m/s" in text or "19.6" in text  # the typed text under the mark stays read
+
+
+def test_marks_set_with_the_text_are_still_part_of_it():
+    # Controls: a circle round a step number and a box round a word in the text's colour,
+    # a red underline, and a yellow highlight with rounded ends behind a line (filled, in
+    # another colour, taller than the line): set with the text, not hand marks.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    _label(page, (90, y + 30), "1", 11)
+    _oval(page, (85, y + 18, 101, y + 34), colour=BLACK, width=0.8)
+    _label(page, (110, y + 30), "Measure the length of the pendulum with a metre rule.", 11)
+    _label(page, (72, y + 60), "The answer is the average speed, not the final one.", 11)
+    _rect(page, (134, y + 50, 168, y + 63), width=0.6)
+    _path(page, [[(250, y + 62), (330, y + 62)]], colour=RED, width=0.8)
+    _label(page, (72, y + 90), "Write the units of every quantity you work out.", 11)
+    page.add_highlight_annot(pymupdf.Rect(70, y + 77, 330, y + 97)).update()
+    _running_text(page, y + 110, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    assert _regions(out) == [] and _figures(out) == []
