@@ -684,3 +684,24 @@ def test_a_page_kept_by_the_safety_net_is_not_told_to_be_typed_up(env):
     assert "Pages 1 and 2 have drawings or writing this tool could not read" in page
     html = env.job(job_id).html or ""
     assert "Lecture 14 notes" in html and html.count('data-reason="unread_page"') == 2
+
+
+@pytest.mark.parametrize(
+    ("name", "says"),
+    [
+        ("note_titled.pdf", "drawings or writing this tool could not read"),
+        ("typed_with_note.pdf", "Finished, with handwriting not converted"),
+        ("framed_plots.pdf", None),
+    ],
+)
+def test_nothing_dropped_is_ever_called_converted_on_the_job_page(env, name, says):
+    # A short note under a title, a short note on a typed page, plots in decorative frames:
+    # none of it may vanish behind "Everything was converted".
+    job_id = job_id_from(upload(env.browser, data(name), filename=name))
+    assert _worker(env).run_once() == job_id
+    page = text_of(env.browser.get(f"/jobs/{job_id}").text)
+    assert "Everything was converted" not in page
+    if says:
+        assert says in page
+    else:  # the plots are figures, each a decision of the offline client's
+        assert (env.job(job_id).html or "").count("<figure") >= 5
