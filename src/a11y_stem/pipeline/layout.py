@@ -142,6 +142,8 @@ DOT_PT = 4.0  # a filled mark this small on its longer side is a dot
 # or slash is drawn bigger than the text; a cancel stroke or an icon set in a line is not.
 PEN_MARK_STROKES = 2
 PEN_MARK_OUT = 0.25
+PEN_MARK_COLOUR = 0.3  # a closed or filled mark differs from the text this much (sRGB)
+PEN_FILL_SHARE = 0.5  # a filled mark is a stroke's ribbon when it covers at most this of its box
 # A row the header/footer rules dropped is a figure's label (`_figure_labels`) when it is
 # at most this long and within LABEL_REACH x its font size of the figure or its labels.
 LABEL_MAX_CHARS = 40
@@ -791,6 +793,7 @@ class _Char:
     size: float
     font: str
     flags: int
+    colour: int = 0  # the span's sRGB colour (0xRRGGBB)
 
     @property
     def blank(self) -> bool:
@@ -1102,13 +1105,22 @@ def _page_rows(
                 if page_type.span_hidden(span):
                     continue
                 size, font, flags = float(span["size"]), span["font"], int(span["flags"])
+                colour = int(span.get("color") or 0)
                 for ch in span["chars"]:
                     if covered and page_type.origin_key(ch["origin"]) in covered:
                         continue
                     box = display.box(ch["bbox"])
                     origin = display.point(*ch["origin"])
                     chars.append(
-                        _Char(ch["c"], *box, baseline=origin[1], size=size, font=font, flags=flags)
+                        _Char(
+                            ch["c"],
+                            *box,
+                            baseline=origin[1],
+                            size=size,
+                            font=font,
+                            flags=flags,
+                            colour=colour,
+                        )
                     )
             if any(not c.blank for c in chars):
                 vertical = abs(dy) > 0.2 or dx < 0
@@ -2505,6 +2517,8 @@ class _Path:
     # line starts at its axes' corner (`_mark_plots`).
     ends: tuple[tuple[float, float], ...] = ()
     turns: bool = False  # it has a curve, or lines in two directions (not one straight line)
+    colour: tuple[float, float, float] = (0.0, 0.0, 0.0)  # its stroke's (or fill's) sRGB
+    fill_share: float = 0.0  # a filled path: the share of its box it covers
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
@@ -2564,10 +2578,62 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
         if curved and open_stroke:
             path.ends = _subpath_ends(items, display)
         path.turns = _turns(items, segments)
+        path.colour = _rgb(drawing.get("color") if stroked else drawing.get("fill"))
+        if fill:
+            path.fill_share = _fill_share(items, display, box)
         paths.append(path)
         lines.append(_straight_lines(path, segments))
     _mark_axes(paths, lines)
     return paths
+
+
+def _fill_share(items: Sequence[Any], display: _Display, box: BBox) -> float:
+    """The share of `box` a filled path covers: its subpaths' areas by the shoelace over
+    their points (a curve by its ends), at most 1. A highlight covers most of its box; a
+    tick drawn as a filled ribbon little of it."""
+    size = _area(box)
+    if size <= 0:
+        return 0.0
+    total = 0.0
+    ring: list[tuple[float, float]] = []
+
+    def close() -> float:
+        if len(ring) < 3:
+            return 0.0
+        return abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in pairwise([*ring, ring[0]]))) / 2
+
+    for item in items:
+        if item[0] == "re":
+            x0, y0, x1, y1 = item[1][0], item[1][1], item[1][2], item[1][3]
+            total += abs(x1 - x0) * abs(y1 - y0)
+            continue
+        if item[0] == "qu":
+            total += close()
+            ring = [display.point(*q) for q in item[1]]
+            total += close()
+            ring = []
+            continue
+        start, end = display.point(*item[1]), display.point(*item[-1])
+        if ring and (abs(ring[-1][0] - start[0]) > 0.01 or abs(ring[-1][1] - start[1]) > 0.01):
+            total += close()
+            ring = []
+        if not ring:
+            ring.append(start)
+        ring.append(end)
+    total += close()
+    return min(1.0, total / size)
+
+
+def _rgb(paint: Sequence[float] | None) -> tuple[float, float, float]:
+    """A drawing's colour as sRGB components 0..1 (grey and CMYK converted)."""
+    if not paint:
+        return (0.0, 0.0, 0.0)
+    if len(paint) == 1:
+        return (paint[0], paint[0], paint[0])
+    if len(paint) == 4:
+        c, m, y, k = paint
+        return ((1 - c) * (1 - k), (1 - m) * (1 - k), (1 - y) * (1 - k))
+    return (paint[0], paint[1], paint[2])
 
 
 def _turns(items: Sequence[Any], segments: list[tuple[float, float, float, float]]) -> bool:
@@ -5106,6 +5172,7 @@ def _leftover_drawings(
     pad = UNREAD_PAD
     grown = [(b.bbox[0] - pad, b.bbox[1] - pad, b.bbox[2] + pad, b.bbox[3] + pad) for b in blocks]
     keep: list[tuple[BBox, list[_Path]]] = []
+    hand: set[int] = set()  # hand marks over typed text (`_pen_mark_over_text`)
     for _, cluster in clusters:
         members = [p for p in cluster if not _bullet_mark(p, index)]
         if not members:
@@ -5116,9 +5183,10 @@ def _leftover_drawings(
         ):
             continue
         holders = [b for b, g in zip(blocks, grown, strict=True) if _centre_inside(box, g)]
-        if (
+        if holders and _pen_mark_over_text(members, box, holders):
+            hand.update(id(p) for p in members)
+        elif (
             holders
-            and not _pen_mark_over_text(members, box, holders)
             and not _dots(members)  # decided once grouped (`_dots_out_of_line`)
             and not _bonds(members, index)
         ):
@@ -5152,7 +5220,9 @@ def _leftover_drawings(
         if any(_centre_inside((x, y, x, y), box) for x, y in covers):
             continue  # a shape painted over hidden text: its cover, not a drawing
         pen = sum(p.source in ink_sources for p in members)
-        if curved and (2 * pen >= len(members) or all(p.open_stroke for p in members)):
+        if curved and (
+            2 * pen >= len(members) or all(p.open_stroke or id(p) in hand for p in members)
+        ):
             marks.append(box)  # a ruler's straight lines are machine-drawn: a figure
         else:
             reasons = [f"vector drawing ({len(members)} paths)"]
@@ -5185,21 +5255,28 @@ def _dots_out_of_line(members: Sequence[_Path], box: BBox, index: _RowIndex) -> 
 
 
 def _pen_mark_over_text(members: Sequence[_Path], box: BBox, holders: Sequence[_Block]) -> bool:
-    """One or two pen strokes drawn over typed text (`holders`: the blocks whose box holds
-    the middle of `box`), not marks set with the text: every path an open stroke that is a
-    diagonal line or a curve and no radical sign, over a paragraph, list item or heading,
-    reaching out of the line under its middle (the nearest one, or the nearest line it is
-    beside) by PEN_MARK_OUT of its height or more. A hand tick, a cross or a slash over a
-    line was taken as part of the line, like an underline, and lost (the second final
-    verify, 2026-10-12); a box round a word and an underline are closed or straight, and
-    a cancel stroke across a term stays within its line. On the research corpus's
-    born-digital pages (586 real ones, the OpenStax renders, the fixtures) no drawing in a
-    text element is an open diagonal or curved stroke at all."""
-    if len(members) > PEN_MARK_STROKES or not all(
-        p.open_stroke and p.curved and not p.filled and p.kind != "radical" for p in members
-    ):
+    """A hand mark drawn over typed text (`holders`: the blocks whose box holds the middle
+    of `box`), not a mark set with the text: one or two open strokes that are diagonal
+    lines or curves, or one curved outline, closed or filled (an answer circled, a tick
+    drawn as a note app's filled ribbon) in another colour than the text under it
+    (PEN_MARK_COLOUR), no radical sign; over a paragraph, list item, heading or display
+    equation, reaching out of the line under its middle (the nearest one, or the nearest
+    line it is beside) by PEN_MARK_OUT of its height or more, and over an equation at least
+    as tall as its text. A hand tick, a cross or a slash over a line was taken as part of
+    the line, like an underline, and lost (the second final verify, 2026-10-12); so were a
+    red ellipse round an answer, a filled tick, and a tick over an equation, whose
+    transcription leaves it out (the drawings sweep, 2026-10-13). A box round a word and
+    an underline are closed or straight, a circle round a step number is in the text's
+    colour, and a cancel stroke across a term stays within its line. On the research
+    corpus's born-digital pages (586 real ones, the OpenStax renders, the fixtures) no
+    drawing in a text element is an open diagonal or curved stroke at all."""
+    if len(members) > PEN_MARK_STROKES or any(p.kind == "radical" or not p.curved for p in members):
         return False
-    if any(b.kind not in (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING) for b in holders):
+    strokes = all(p.open_stroke and not p.filled for p in members)
+    outline = len(members) == 1 and members[0].kind == "shape" and not members[0].open_stroke
+    if not (strokes or outline):
+        return False
+    if any(b.kind not in (*_TEXT_BLOCKS, Kind.HEADING, Kind.EQUATION) for b in holders):
         return False
     height = box[3] - box[1]
     if height <= 0:
@@ -5211,7 +5288,20 @@ def _pen_mark_over_text(members: Sequence[_Path], box: BBox, holders: Sequence[_
         return False
     row = min(under, key=lambda r: abs((r.y0 + r.y1) / 2 - cy))
     out = max(0.0, row.y0 - box[1]) + max(0.0, box[3] - row.y1)
-    return out >= PEN_MARK_OUT * height
+    if out < PEN_MARK_OUT * height:
+        return False
+    if any(b.kind == Kind.EQUATION for b in holders) and height < row.size:
+        return False  # a mark in the maths (an arrow over a letter), not over it
+    if strokes:
+        return True
+    if members[0].filled and members[0].fill_share > PEN_FILL_SHARE:
+        return False  # a highlight behind the line, a filled icon: not a stroke's ribbon
+    chars = [c for c in row.chars if not c.blank and box[0] <= (c.x0 + c.x1) / 2 <= box[2]]
+    if not chars:
+        return False
+    text = Counter(c.colour for c in chars).most_common(1)[0][0]
+    rgb = ((text >> 16) & 255) / 255, ((text >> 8) & 255) / 255, (text & 255) / 255
+    return max(abs(a - b) for a, b in zip(rgb, members[0].colour, strict=True)) >= PEN_MARK_COLOUR
 
 
 def _at_edge(box: BBox, frame: BBox, reach: float) -> bool:
