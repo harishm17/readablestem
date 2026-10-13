@@ -1,6 +1,6 @@
 # Common tasks. Everything runs through uv; no global installs needed.
 .PHONY: sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
-	table-model fuzz-tables
+	table-model fuzz-tables reproduce reproduce-rerun
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
 # Harish picks the real gold-set pages; override with e.g. make gold GOLD_CHAPTER=5.
@@ -11,6 +11,18 @@ SAMPLE_PREDICTIONS = tests/fixtures/sample_latex_predictions.jsonl
 
 sync:
 	uv sync
+
+# One command for a reader: gold files against their manifests, committed reports against
+# the gold they were scored on, the scorer's ceiling, then the committed numbers. No API
+# key, no network, no browser; a few seconds (eval/reproduce.py, docs/eval.md).
+reproduce:
+	uv run python -m a11y_stem.eval.reproduce
+
+# The same, plus a re-run of the two tasks that call no model (headings, tables in local
+# mode) compared with the committed reports. Needs network on the first run, Chromium
+# (uv run playwright install chromium) and the fonts in docs/development.md.
+reproduce-rerun:
+	uv run python -m a11y_stem.eval.reproduce --rerun-offline
 
 test:
 	uv run pytest

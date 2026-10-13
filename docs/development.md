@@ -21,6 +21,8 @@ printed pages read differently.
 | `make ci-local` | What CI's `lint-test` job runs (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
+| `make reproduce` | Offline reproduction: gold files against their manifests, committed eval reports against the gold they were scored on, the scorer's ceiling, then the committed numbers. No key, no network, no browser |
+| `make reproduce-rerun` | The same, plus a re-run of the headings and tables tasks (no model) compared with the committed reports; needs network on the first run, Chromium and the fonts above |
 | `make eval-plumbing` | Plumbing check only: scores each gold equation against itself, so it always prints 1.0. Does **not** test normalisation |
 | `make eval-latex-check` | Scorer check: known-correct LaTeX for every sample equation (`tests/fixtures/sample_latex_predictions.jsonl`) must match leniently; also runs in CI via `pytest` |
 

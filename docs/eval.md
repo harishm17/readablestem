@@ -422,6 +422,13 @@ real-document check, which reads `private-inputs/tables/` and reports counts onl
 
 ## How to rerun
 
+Without a key, a network or a browser: `make reproduce` checks the gold files against their
+manifests, checks that each committed report was scored against exactly that gold data,
+runs the scorer on known-correct LaTeX to show its ceiling, and prints the committed
+numbers (`eval/reproduce.py`). `make reproduce-rerun` also re-runs the headings and tables
+tasks, which call no model, and compares them with the committed reports. The model tasks
+below cost money and differ a little on every run, so they are not part of either.
+
 One-time setup:
 
 ```
