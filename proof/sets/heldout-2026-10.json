@@ -109,9 +109,9 @@
   },
   "tasks": [
     "document",
-    "equations",
     "headings",
-    "figures"
+    "figures",
+    "equations"
   ],
   "concurrency": 4,
   "bundle": "proof/bundles/heldout-2026-10",

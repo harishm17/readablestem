@@ -70,6 +70,14 @@ def _banner(info: DocumentInfo) -> list[str]:
             "reproduce the recorded run exactly (see Status). The numbers below belong to "
             "this replay, not to the recorded run."
         )
+    incomplete = info.bundle.manifest.get("incomplete")
+    if incomplete:
+        lines.append(
+            f"> **INCOMPLETE RUN.** The spend cap stopped the recording after "
+            f"{incomplete['runs_made']} of {incomplete['runs_planned']} planned runs: "
+            f"{incomplete['reason']}. The runs it did not make are missing from every table "
+            "that would have used them."
+        )
     unwired = [t for t, r in info.stages if r.status == "not_wired"]
     if unwired:
         lines.append("> **Incomplete.** Not computed in this build: " + "; ".join(unwired) + ".")

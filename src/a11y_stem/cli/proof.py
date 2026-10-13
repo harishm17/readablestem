@@ -6,6 +6,10 @@
                                          the PDFs again (network, Chromium)
     a11y-stem proof --live --max-usd N   call the models again (OPENAI_API_KEY), record a
                                          new bundle, then replay it to write PROOF.md
+    a11y-stem proof --add-systems chatbot --max-usd N [--bundle DIR]
+                                         record the chatbot arms into a recorded run
+    a11y-stem proof --add-systems parsers [--bundle DIR]
+                                         record the open parsers (hours; resumable)
     a11y-stem proof --check              check the pins and the bundle's hashes, run nothing
 
 Exit codes: 0 done; 1 incomplete (`--require-complete`) or a run stopped by its cap; 2 bad
@@ -86,6 +90,7 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             fake=args.fake,
             confirm_signoff=args.confirm_signoff,
             allow_dirty=args.allow_dirty,
+            keep_finished=args.keep_finished,
             allow_drift=args.allow_drift,
             allow_misses=args.allow_misses,
             verify_sources=args.verify_sources,
@@ -93,6 +98,9 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             n_boot=args.bootstrap,
             date=args.date,
         )
+        if args.add_systems:
+            engine.add_systems(opts, args.add_systems, _say, arms=args.arms or None)
+            return 0
         if args.check:
             for check in engine.check_proof(opts):
                 print(f"{check.status:<8} {check.name}: {check.detail}")
@@ -158,6 +166,19 @@ def register(sub: argparse._SubParsersAction) -> None:
         "--confirm-signoff",
         action="store_true",
         help="a held-out set: the decisions the set lists are made",
+    )
+    live.add_argument(
+        "--add-systems",
+        choices=("chatbot", "parsers"),
+        help="record the chatbot arms (needs --max-usd; the cap covers the figure judge too) "
+        "or the open parsers into an existing recorded run (--bundle), then stop",
+    )
+    live.add_argument("--arms", nargs="*", help="with --add-systems: only these arms")
+    live.add_argument(
+        "--keep-finished",
+        action="store_true",
+        help="if the spend cap stops the run, keep the runs that finished and label the "
+        "report incomplete (the default is to write no bundle)",
     )
     live.add_argument("--allow-dirty", action="store_true", help="record from a dirty checkout")
     proof.set_defaults(func=_cmd_proof)

@@ -26,7 +26,7 @@ from pathlib import Path
 from typing import Any
 
 from a11y_stem.config import Settings
-from a11y_stem.core.budget import JobBudget
+from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
 from a11y_stem.eval import pipeline_eval as pe
 from a11y_stem.gold.openstax import HttpFetcher
 from a11y_stem.models.base import VisionClient
@@ -53,6 +53,7 @@ class ProofOptions:
     fake: bool = False
     confirm_signoff: bool = False
     allow_dirty: bool = False
+    keep_finished: bool = False  # a cap stop keeps the runs that finished (labelled incomplete)
     allow_drift: bool = False
     allow_misses: bool = False
     verify_sources: bool = False
@@ -325,6 +326,7 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         fake=opts.fake,
         progress=say,
         client_factory=opts.client_factory,
+        keep_finished=opts.keep_finished,
     )
     pdfs = runner.pdf_entries(pset, recorder, writer)
     writer.write_jsonl("media/equations.jsonl", recorder.equation_rows())
@@ -369,8 +371,117 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         },
         "signoff_confirmed": opts.confirm_signoff,
     }
-    if not arm.complete:  # record_arm raises first; kept as a guard for a changed contract
+    if arm.stopped:
+        manifest["incomplete"] = {
+            "reason": arm.stopped,
+            "runs_made": len(arm.outcomes),
+            "runs_planned": len(pset.runs()),
+        }
+    if any(
+        not o.complete for o in arm.outcomes
+    ):  # record_arm raises first; kept as a guard for a changed contract
         raise Incomplete("a run did not finish; the bundle was not written")
     bundle = writer.finish(manifest)
     say(f"wrote the recorded run to {bundle.root}")
     return _replay(pset, opts, bundle, say, mode="live")
+
+
+# ------------------------------------------------------------------------- add systems
+
+SYSTEM_KINDS = ("chatbot", "parsers")
+
+
+def add_systems(
+    opts: ProofOptions,
+    kind: str,
+    say: Callable[[str], None] = print,
+    *,
+    chat_client: Any = None,
+    judge_client: Any = None,
+    arms: list[str] | None = None,
+) -> dict[str, Any]:
+    """Record another system's outputs into a finished bundle, then rewrite its manifest.
+
+    `chatbot`: runs the chatbot arms (`proof.chatbot`) within `opts.max_usd`, then judges the
+    figure descriptions found in their output with what is left of the cap (so the cap covers
+    the judge too). `parsers`: runs `proof/parsers` (`make proof`). Both are resumable: a
+    section already recorded in the work folder is not run again. Nothing is added to the
+    bundle unless the whole step finished.
+    """
+    from a11y_stem.proof import chatbot, judging, systems
+
+    if kind not in SYSTEM_KINDS:
+        raise ProofError(f"unknown kind of system {kind!r}; known: {', '.join(SYSTEM_KINDS)}")
+    pset = registry.resolve_set(opts.root, opts.set_id)
+    bundle = Bundle.open(opts.bundle_dir or opts.root / pset.bundle)
+    bundle.require_intact()
+    if bundle.set_id != pset.id:
+        raise BundleError(f"the bundle was recorded for {bundle.set_id!r}, not {pset.id!r}")
+    work = opts.work_dir or default_work_dir(pset)
+    out = work / "systems-out" / kind
+    out.mkdir(parents=True, exist_ok=True)
+    pdfs = {e["section"]: bundle.path(e["file"]) for e in bundle.pdfs}
+    extra: dict[str, Any] = {}
+    if kind == "chatbot":
+        if opts.max_usd is None:
+            raise ProofError("--max-usd is required to record the chatbot arms")
+        if bundle.path("systems").is_dir() and any(
+            a.startswith("chatbot-") for a in (p.name for p in bundle.path("systems").iterdir())
+        ):
+            raise ProofError("this recorded run already holds the chatbot arms")
+        gold_dir = resolve_gold(pset, opts, bundle.gold_dir, work, say)
+        selected = [chatbot.ARM_BY_ID[a] for a in arms] if arms else list(chatbot.ARMS)
+        summary = chatbot.record_arms(
+            pdfs,
+            out,
+            arms=selected,
+            max_usd=opts.max_usd,
+            client=chat_client or chatbot.make_client(),
+            say=say,
+        )
+        if summary["refused_by_cap"]:
+            raise ProofError(
+                f"the cap ${opts.max_usd:.2f} did not hold every run "
+                f"({len(summary['refused_by_cap'])} refused, first: "
+                f"{summary['refused_by_cap'][0]}); nothing was added to the bundle. "
+                "Runs already made are kept in the work folder, so a rerun does not pay for them"
+            )
+        remaining = max(0.0, opts.max_usd - summary["spent_usd"])
+        settings = runner.proof_settings()
+        records = goldinfo.load_records(gold_dir)
+        golds = systems.section_golds(records, [s.id for s in pset.sections])
+        from a11y_stem.eval import render
+        from a11y_stem.models.openai_client import OpenAIVisionClient
+
+        images = render.ImageCache(work / "eval-cache" / "images")
+        budget = JobBudget(InMemorySpendGuard(cap_usd=remaining), max_usd=remaining, max_calls=2000)
+        client = judge_client or OpenAIVisionClient(settings, budget)
+        loaded = systems.load_arms_dir(out)
+        judge_cost = judging.judge_arms(
+            loaded, golds, client=client, settings=settings, image_for=images.png, say=say
+        )
+        extra = {
+            "systems_spend": {
+                "chatbot_usd": summary["spent_usd"],
+                "judge_usd": round(judge_cost, 6),
+                "cap_usd": opts.max_usd,
+            }
+        }
+    else:
+        folder = opts.root / stages.PARSERS_DIR
+        if not (folder / "Makefile").is_file():
+            raise ProofError("proof/parsers is not in this checkout")
+        import subprocess
+
+        pdf_dir = bundle.path("media/pdfs")
+        say("parsers: running proof/parsers (this takes hours; it can be interrupted and resumed)")
+        command = ["make", "-C", str(folder), "proof", f"PDF_DIR={pdf_dir}", f"OUT_DIR={out}"]
+        if arms:
+            command.append("ARMS=" + " ".join(arms))
+        done = subprocess.run(command, check=False)
+        if done.returncode != 0:
+            raise ProofError(f"proof/parsers failed (make exit code {done.returncode})")
+        extra = {"systems_parsers": "recorded"}
+    new = bundle.extend(out, "systems", extra={**extra})
+    say(f"added {kind} to {new.root.name}/ ({len(new.files)} files)")
+    return extra

@@ -171,6 +171,32 @@ class Bundle:
         problems.extend(f"not listed: {rel}" for rel in sorted(on_disk - set(listed)))
         return problems
 
+    def extend(
+        self, source: Path, rel: str = "systems", extra: dict[str, Any] | None = None
+    ) -> Bundle:
+        """Add the files under `source` to this recorded run (below `rel`), hash them with
+        the rest and rewrite the manifest. Existing files are never overwritten: a system
+        is recorded once. `extra` is merged into the manifest (for example the spend)."""
+        self.require_intact()
+        added = []
+        for path in sorted(p for p in source.rglob("*") if p.is_file()):
+            target = self.root / rel / path.relative_to(source)
+            if target.exists():
+                raise BundleError(f"{target.relative_to(self.root)} is already in the recorded run")
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(path, target)
+            added.append(target)
+        manifest = {k: v for k, v in self.manifest.items() if k != "files"}
+        manifest.update(extra or {})
+        files = {
+            p.relative_to(self.root).as_posix(): sha256_file(p)
+            for p in sorted(self.root.rglob("*"))
+            if p.is_file() and p.name != MANIFEST_NAME
+        }
+        full = {**manifest, "files": files}
+        (self.root / MANIFEST_NAME).write_text(dumps(full), encoding="utf-8")
+        return Bundle(self.root, full)
+
     def require_intact(self) -> None:
         problems = self.verify()
         if problems:

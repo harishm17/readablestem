@@ -161,7 +161,7 @@ def test_a_replay_needs_no_key_no_network_and_calls_no_model(replayed):
 
 
 def test_require_complete_fails_while_a_part_is_a_stub(replayed):
-    assert replayed.exit_code == 1 and len(replayed.not_wired) == 4
+    assert replayed.exit_code == 1 and len(replayed.not_wired) == 3
 
 
 def test_a_replay_writes_the_same_bytes_every_time_and_to_proof_md_by_default(recorded, replayed):
@@ -452,3 +452,60 @@ def test_a_live_run_calls_every_stage_record_hook(tmp_path, monkeypatch):
         say=lambda _m: None,
     )
     assert demo.recorded
+
+
+# ------------------------------------------------------- a cap stop that keeps finished runs
+
+
+def _client_that_runs_out_after(finished_runs: int):
+    from a11y_stem.core.budget import BudgetExceeded
+
+    made = {"n": 0}
+
+    def factory(settings, budget):
+        made["n"] += 1
+        inner = fake_client(settings, budget)
+        if made["n"] <= finished_runs:
+            return inner
+
+        class OutOfMoney:
+            def __getattr__(self, name):
+                return getattr(inner, name)
+
+            def run(self, *_a, **_k):
+                raise BudgetExceeded("daily", "spend cap reached")
+
+        return OutOfMoney()
+
+    return factory
+
+
+def _live(root, work, **overrides):
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(html_checks, "axe_checks", lambda html: [Check(name="axe", passed=True)])
+        return engine.run_proof(
+            engine.ProofOptions(
+                root=root, live=True, max_usd=5.0, date=DATE, work_dir=work,
+                media_factory=PdfMedia, out=root / "PROOF.md", n_boot=N_BOOT, **overrides,
+            ),
+            say=lambda _msg: None,
+        )  # fmt: skip
+
+
+def test_a_cap_stop_writes_no_bundle_by_default(tmp_path):
+    root = make_project(tmp_path)
+    with pytest.raises(Incomplete):
+        _live(root, tmp_path / "w", client_factory=_client_that_runs_out_after(1))
+
+
+def test_a_cap_stop_can_keep_the_runs_that_finished_and_says_so(tmp_path):
+    root = make_project(tmp_path)
+    result = _live(
+        root, tmp_path / "w", client_factory=_client_that_runs_out_after(1), keep_finished=True
+    )
+    bundle = Bundle.open(tmp_path / "w" / "bundles" / f"{SET_ID}-{DATE}")
+    assert bundle.verify() == []
+    assert [(r["task"], r["repeat"]) for r in bundle.runs] == [("document", 1)]
+    assert bundle.manifest["incomplete"]["runs_planned"] == 5
+    assert "INCOMPLETE RUN" in result.text and "1 of 5 planned runs" in result.text
+    assert "Replay compared with the recorded reports: **identical**" in result.text
