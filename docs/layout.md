@@ -721,7 +721,14 @@ which keeps some `vector_no_text` pages of dense ink as images, is not counted.
   and actions, and on the design review's 41 adversarial pages 29 and 35, as v5.1.
   Its new cases (fake redactions drawn with annotation tools, a CropBox, square waves,
   diagrams under a title, a hidden layer over machine drawings) are tested on synthetic
-  fixtures only, so v5.2 has no out-of-sample number either. One real page labelled
+  fixtures only, so v5.2 has no out-of-sample number either. page-type-v5.3 (the final
+  verifier's changes, 2026-10-12: a hidden layer over a few strokes under a title, and
+  over marks with no evidence of machine drawing, is handwriting; handwritten pages
+  refuse the upload whatever their title) gets the same numbers on all three sets, with
+  the same errors; on the 45 synthetic handwriting pages of the corpus, each also with a
+  short typed title added, the upload is refused for 45 of 45 without the title and 44
+  of 45 with it (the 45th, eight strokes in one row, is kept as an image by the safety
+  net), and none is lost. One real page labelled
   born-digital now has 8 characters under a grey box and a seal painted over them
   (checked by eye: they cannot be seen), so it is called `mixed_hidden_text` and counted
   as an error against its label.

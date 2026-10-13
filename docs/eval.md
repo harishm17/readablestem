@@ -1243,13 +1243,20 @@ honestly": page-type-v5 on fresh set 4 (31 pages built after it was frozen) 27 o
 kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 989
 actions, on the design review's 41 adversarial pages 29 and 35; page-type-v5.2
 (2026-10-10) on the 996-page corpus the same 984 and 989 (median 7 ms a page, p95
-146 ms), on fresh set 4 29 and 29, on the 41 adversarial pages 29 and 35.
+146 ms), on fresh set 4 29 and 29, on the 41 adversarial pages 29 and 35; page-type-v5.3
+(2026-10-12) the same on all three (median 7 ms, p95 151 ms).
 
 The headings and document evals were not re-run for this change: no model was called
 in this stage. The committed born-digital fixtures (`tests/test_page_types.py`) have no
 hidden character and no kept page, and the golden HTML is unchanged
 (`tests/test_assemble_golden.py`), so the expected change on the gold is none; re-run
-them with the next model run to confirm it (TODO).
+them with the next model run to confirm it (TODO). For the layout changes of 2026-10-12
+(the safety net on pages with little text, light handwriting on typed pages, frames round
+the page) the document task was run offline before and after (`--fake`): its per-page
+rows are identical (30 of 30 gold equations matched among 55 predicted, the same headings
+and the same 80 required decisions of the offline client), and layout gives the same
+elements on every PDF in the repository (the three printed gold sections, the LaTeX
+fixtures, the demo source).
 
 ## What the numbers do not show
 
