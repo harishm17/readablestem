@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "a150c2c0a643420623148367c4c5ef5c31a47791b905ebf06bb5b32a1c7133b9",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 6.81,
+    "load_before": 8.52,
+    "offline": false,
+    "peak_rss_mb": 3162.9,
+    "quiet_box": null,
+    "system_seconds": 3.192,
+    "timeout_seconds": 1800,
+    "user_seconds": 79.876,
+    "wall_seconds_per_page": 3.08
+  },
+  "output": {
+    "file": "college-physics__29-3-photon-energies-and-the-electromagnetic-spectrum.md",
+    "format": "md"
+  },
+  "pdf_pages": 10,
+  "seconds": 30.805,
+  "section": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "792ba6362f87020b3f0625c781ef535ffcf860fca7bbb99a3742850f957a3268",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 4.02,
+    "load_before": 4.45,
+    "offline": false,
+    "peak_rss_mb": 2754.0,
+    "quiet_box": null,
+    "system_seconds": 2.839,
+    "timeout_seconds": 1800,
+    "user_seconds": 65.129,
+    "wall_seconds_per_page": 2.909
+  },
+  "output": {
+    "file": "introductory-statistics__2-4-box-plots.md",
+    "format": "md"
+  },
+  "pdf_pages": 9,
+  "seconds": 26.178,
+  "section": "introductory-statistics/2-4-box-plots",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

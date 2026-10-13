@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "792ba6362f87020b3f0625c781ef535ffcf860fca7bbb99a3742850f957a3268",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 1.03,
+    "load_before": 1.12,
+    "offline": false,
+    "peak_rss_mb": 371.0,
+    "quiet_box": null,
+    "system_seconds": 1.138,
+    "timeout_seconds": 1800,
+    "user_seconds": 31.111,
+    "wall_seconds_per_page": 0.43
+  },
+  "output": {
+    "file": "introductory-statistics__2-4-box-plots.md",
+    "format": "md"
+  },
+  "pdf_pages": 9,
+  "seconds": 3.874,
+  "section": "introductory-statistics/2-4-box-plots",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

@@ -1,0 +1,636 @@
+{
+  "schema_version": 1,
+  "task": "headings",
+  "date": "2026-10-13",
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {},
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
+  },
+  "models_used": [],
+  "client": "openai",
+  "dataset": {
+    "gold_dir": "heldout (pre-registered 2026-10-13)",
+    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "limit": null,
+    "unit": "page",
+    "selection_sha256": "f047476e913566970214c6fe5bdeb713e7a0eea7baad1f77876746453f64c002"
+  },
+  "n_planned": 15,
+  "n": 15,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "gold_headings": 509,
+    "predicted_headings": 525,
+    "matched": 497,
+    "precision": 0.9466666666666667,
+    "recall": 0.9764243614931237,
+    "recall_ci95": [
+      0.9592481017419608,
+      0.9864632708486466
+    ],
+    "f1": 0.9613152804642167,
+    "level_accuracy": 1.0,
+    "precision_by_status": {
+      "accepted": {
+        "n": 410,
+        "precision": 0.9317073170731708
+      },
+      "needs_review": {
+        "n": 115,
+        "precision": 1.0
+      }
+    },
+    "recall_by_context": {
+      "be-prepared": {
+        "n": 3,
+        "recall": 1.0
+      },
+      "body": {
+        "n": 110,
+        "recall": 0.9636363636363636
+      },
+      "chemistry": {
+        "n": 3,
+        "recall": 1.0
+      },
+      "commentary": {
+        "n": 5,
+        "recall": 1.0
+      },
+      "example": {
+        "n": 140,
+        "recall": 0.9928571428571429
+      },
+      "how-to-notitle": {
+        "n": 16,
+        "recall": 1.0
+      },
+      "howto": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "interactive": {
+        "n": 4,
+        "recall": 1.0
+      },
+      "media-2": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "note": {
+        "n": 44,
+        "recall": 1.0
+      },
+      "precalculus": {
+        "n": 28,
+        "recall": 1.0
+      },
+      "problem": {
+        "n": 30,
+        "recall": 0.9666666666666667
+      },
+      "solution": {
+        "n": 58,
+        "recall": 0.9310344827586207
+      },
+      "statistics": {
+        "n": 9,
+        "recall": 1.0
+      },
+      "try": {
+        "n": 54,
+        "recall": 0.9629629629629629
+      },
+      "unnumbered": {
+        "n": 1,
+        "recall": 1.0
+      }
+    },
+    "per_page": [
+      {
+        "id": "chemistry/14-7-acid-base-titrations",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 14,
+        "n_pred": 14,
+        "error": null
+      },
+      {
+        "id": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 21,
+        "n_pred": 21,
+        "error": null
+      },
+      {
+        "id": "chemistry/7-3-lewis-symbols-and-structures",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 23,
+        "n_pred": 23,
+        "error": null
+      },
+      {
+        "id": "college-physics/28-4-relativistic-addition-of-velocities",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 26,
+        "n_pred": 26,
+        "error": null
+      },
+      {
+        "id": "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 23,
+        "n_pred": 23,
+        "error": null
+      },
+      {
+        "id": "college-physics/5-3-elasticity-stress-and-strain",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 31,
+        "n_pred": 31,
+        "error": null
+      },
+      {
+        "id": "intermediate-algebra/1-5-properties-of-real-numbers",
+        "precision": 0.96875,
+        "recall": 0.96875,
+        "n_gold": 64,
+        "n_pred": 64,
+        "error": null
+      },
+      {
+        "id": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+        "precision": 0.926829268292683,
+        "recall": 0.95,
+        "n_gold": 40,
+        "n_pred": 41,
+        "error": null
+      },
+      {
+        "id": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+        "precision": 0.9259259259259259,
+        "recall": 0.9090909090909091,
+        "n_gold": 55,
+        "n_pred": 54,
+        "error": null
+      },
+      {
+        "id": "introductory-statistics/2-4-box-plots",
+        "precision": 1.0,
+        "recall": 1.0,
+        "n_gold": 13,
+        "n_pred": 13,
+        "error": null
+      },
+      {
+        "id": "introductory-statistics/3-1-terminology",
+        "precision": 0.7857142857142857,
+        "recall": 1.0,
+        "n_gold": 11,
+        "n_pred": 14,
+        "error": null
+      },
+      {
+        "id": "introductory-statistics/4-5-hypergeometric-distribution",
+        "precision": 1.0,
+        "recall": 0.8823529411764706,
+        "n_gold": 17,
+        "n_pred": 15,
+        "error": null
+      },
+      {
+        "id": "precalculus/1-6-absolute-value-functions",
+        "precision": 0.9166666666666666,
+        "recall": 1.0,
+        "n_gold": 55,
+        "n_pred": 60,
+        "error": null
+      },
+      {
+        "id": "precalculus/3-1-complex-numbers",
+        "precision": 0.9178082191780822,
+        "recall": 0.9852941176470589,
+        "n_gold": 68,
+        "n_pred": 73,
+        "error": null
+      },
+      {
+        "id": "precalculus/5-4-right-triangle-trigonometry",
+        "precision": 0.9056603773584906,
+        "recall": 1.0,
+        "n_gold": 48,
+        "n_pred": 53,
+        "error": null
+      }
+    ],
+    "page_errors": {},
+    "review_load": {
+      "required_decisions": 29,
+      "required_fixes": 115,
+      "optional": 114,
+      "none": 296,
+      "required_by_kind": {
+        "heading": 29
+      },
+      "optional_by_kind": {
+        "heading": 114
+      },
+      "required_by_reason": {
+        "heading.all_caps": 3,
+        "heading.repeated_label": 115,
+        "heading.very_short": 4,
+        "heading.weak_evidence": 108
+      },
+      "optional_by_reason": {
+        "heading.all_caps": 1,
+        "heading.level_repaired": 3,
+        "heading.very_short": 1,
+        "heading.weak_evidence": 112
+      },
+      "sections": 15,
+      "pdf_pages": 242,
+      "required_per_section": 1.9333,
+      "required_per_pdf_page": 0.1198,
+      "optional_per_pdf_page": 0.4711,
+      "flags": {
+        "units": 439,
+        "required_units": 29,
+        "required_units_wrong": 0,
+        "wrong": 28,
+        "wrong_required": 0,
+        "flag_precision": 0.0,
+        "flag_recall": 0.0
+      },
+      "wrong_not_required": [
+        {
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "text": "Use the Properties of Identity, Inverse and Zero",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/1-5-properties-of-real-numbers",
+          "text": "Simplify Expressions Using the Distributive Property",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "text": "Practice Makes Perfect Solve Mixture Applications",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "text": "Solve Interest Applications",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+          "text": "Solve Applications of Cost and Revenue Functions",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "text": "Practice Makes Perfect Evaluate the Determinant of a 2 × 2 Matrix",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "text": "Evaluate the Determinant of a 3 × 3 Matrix",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "text": "Use Cramer’s Rule to Solve Systems of Equations",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+          "text": "Solve Applications Using Determinants",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "introductory-statistics/3-1-terminology",
+          "text": "\"OR\" Event:",
+          "level": 2,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.level_repaired",
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "introductory-statistics/3-1-terminology",
+          "text": "\"AND\" Event:",
+          "level": 2,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.level_repaired",
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "introductory-statistics/3-1-terminology",
+          "text": "Understanding Terminology and Symbols",
+          "level": 2,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.level_repaired",
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/1-6-absolute-value-functions",
+          "text": "If we couldn’t observe the stretch of the function from the graphs, could we algebraically determine it?",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/1-6-absolute-value-functions",
+          "text": "Do the graphs of absolute value functions always intersect the vertical axis? The horizontal axis?",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/1-6-absolute-value-functions",
+          "text": "Given the formula for an absolute value function, find the horizontal intercepts of its graph.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/1-6-absolute-value-functions",
+          "text": "Given an absolute value equation, solve it.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/1-6-absolute-value-functions",
+          "text": "Given an absolute value function, solve for the set of inputs where the output is positive (or negative).",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/3-1-complex-numbers",
+          "text": "Given an imaginary number, express it in standard form.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/3-1-complex-numbers",
+          "text": "Given a complex number, represent its components on the complex plane.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/3-1-complex-numbers",
+          "text": "Given two complex numbers, find the sum or difference.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/3-1-complex-numbers",
+          "text": "Given a complex number and a real number, multiply to find the product.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/3-1-complex-numbers",
+          "text": "Given two complex numbers, multiply to find the product.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/3-1-complex-numbers",
+          "text": "Given two complex numbers, divide one by the other.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "text": "Given the side lengths of a right triangle, evaluate the six trigonometric functions of one of the acute angles.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "text": "Given trigonometric functions of a special angle, evaluate using side lengths.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "text": "Given the sine and cosine of an angle, find the sine or cosine of its complement.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "text": "Given a right triangle, the length of one side, and the measure of one acute angle, find the remaining sides.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        },
+        {
+          "page": "precalculus/5-4-right-triangle-trigonometry",
+          "text": "Given a tall object, measure its height indirectly.",
+          "level": 3,
+          "status": "accepted",
+          "review": "optional",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "why_wrong": "not_a_gold_heading",
+          "gold_level": null
+        }
+      ]
+    }
+  },
+  "cost": {
+    "total_usd": 0.0,
+    "pipeline_usd": 0.0,
+    "per_item_usd": 0.0,
+    "per_item_unit": "page",
+    "model_calls": 0,
+    "verifier_usd": 0.0,
+    "verifier_per_item_usd": 0.0,
+    "verifier_requests": 0,
+    "budget_spent_usd": 0.0,
+    "budget_calls": 0,
+    "dropped_usd": 0.0
+  },
+  "latency_ms": {
+    "p50": 0.0,
+    "p95": 0.0,
+    "n": 15,
+    "basis": "sum of model-call latencies per item (excludes rendering)"
+  },
+  "set": "heldout",
+  "preregistration_sha256": "8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9"
+}

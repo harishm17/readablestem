@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "8cb8fcd4dc26b5758a0729e197e005d6e27fb686e5d3f5322a2000765d3a0f98",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 1.32,
+    "load_before": 1.56,
+    "offline": false,
+    "peak_rss_mb": 344.6,
+    "quiet_box": null,
+    "system_seconds": 3.818,
+    "timeout_seconds": 1800,
+    "user_seconds": 90.114,
+    "wall_seconds_per_page": 0.318
+  },
+  "output": {
+    "file": "intermediate-algebra__4-3-solve-mixture-applications-with-systems-of-equations.md",
+    "format": "md"
+  },
+  "pdf_pages": 28,
+  "seconds": 8.91,
+  "section": "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

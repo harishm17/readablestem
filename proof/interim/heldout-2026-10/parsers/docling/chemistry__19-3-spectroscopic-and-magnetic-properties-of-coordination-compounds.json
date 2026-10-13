@@ -1,0 +1,45 @@
+{
+  "arm": "docling",
+  "cost_usd": 0.0,
+  "input_sha256": "7809c1758041bbb39140b724dd4ce037433788d2e8b3ea455e47fbec2f30cf31",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 5.4,
+    "load_before": 6.26,
+    "offline": false,
+    "peak_rss_mb": 2536.6,
+    "quiet_box": null,
+    "system_seconds": 28.701,
+    "timeout_seconds": 1800,
+    "user_seconds": 89.742,
+    "wall_seconds_per_page": 3.843
+  },
+  "output": {
+    "file": "chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.md",
+    "format": "md"
+  },
+  "pdf_pages": 8,
+  "seconds": 30.745,
+  "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+  "settings": {
+    "command": "docling --to json --to html --to md",
+    "formula_enrichment": "off (the default)",
+    "image_export_mode": "embedded (the CLI default)",
+    "ocr": "on (RapidOCR)",
+    "tables": "TableFormer, accurate"
+  },
+  "status": "ok",
+  "versions": {
+    "docling": "2.138.0",
+    "docling-core": "2.101.1",
+    "docling-ibm-models": "4.0.3",
+    "docling-parse": "7.22.3",
+    "rapidocr": "3.10.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  }
+}

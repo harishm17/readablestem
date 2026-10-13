@@ -38,12 +38,33 @@ run. The second kind comes from the sample on which the checks were developed.
 
 ### Held-out results: not available yet
 
-**No held-out number exists for a11y-stem, and none is quoted here.** The protocol was
-written and frozen before any system ran, and the harness is built and tested, but the
-recording could not be made: on 2026-10-13 the OpenAI account used for the evaluation ran out
-of credit before any run finished (the API answered `credit_balance_exhausted`). Nothing was
-run on the held-out sections that produced a result, and none of the failed attempts was
-looked at. The run is one script away once the account has credit (below).
+**No held-out number exists for a11y-stem's equations, figures, invented content or whole
+documents, nor for the chatbot recipe, and none is quoted here.** The protocol was written and
+frozen before any system ran, and the harness is built and tested, but the recording could not
+be made: on 2026-10-13 the OpenAI account used for the evaluation ran out of credit before any
+run finished (the API answered `credit_balance_exhausted`). The attempts that failed produced
+no output and nothing in them was looked at. The run is one script away once the account has
+credit (below).
+
+**What exists without a model.** Two parts of the held-out run need no model call and were
+made: a11y-stem's heading detection, and the three open parsers that run on a CPU. They are in
+[`proof/interim/INTERIM-heldout-2026-10.md`](proof/interim/INTERIM-heldout-2026-10.md), with
+the inputs and outputs, and `make proof-interim` rebuilds the report. The headline, with 95%
+intervals from resampling the 15 sections (approximate with this few; they tend to be a little
+narrow):
+
+| Heading F1 (509 gold headings) | a11y-stem | Docling | MinerU (basic) | PyMuPDF4LLM |
+|---|---|---|---|---|
+| F1 | 0.961 [0.947, 0.977] | 0.910 [0.842, 0.958] | 0.923 [0.894, 0.955] | 0.830 [0.738, 0.919] |
+| Level of the heading right (among matched) | 1.000 | 0.031 | 0.165 | 1.000 |
+
+At the corrected level for the comparisons the registration plans (99.375%), a11y-stem's
+heading F1 is higher than MinerU's and PyMuPDF4LLM's, and no difference can be detected
+against Docling's. Docling and MinerU write every heading at one level in their Markdown
+export, which is a property of that export. On equations the only parser that writes LaTeX in
+its default settings, MinerU, transcribes 238 of 1,369 equations exactly (0.174, 95% interval
+0.108 to 0.218); Docling and PyMuPDF4LLM write none by design. **Those are the only held-out
+numbers there are.**
 
 What is fixed already, and can be checked now:
 

@@ -172,6 +172,15 @@ failed call is not a system's answer). Each step can be interrupted and started 
 what they already recorded. Copy the result to `proof/bundles/heldout-2026-10/`, make that
 set the default in `proof/sets/index.json`, and `make proof` writes `PROOF.md` from it.
 
+### The part of the held-out run that needs no model
+
+`make proof-interim` (after `make heldout-gold`) rebuilds `proof/interim/INTERIM-heldout-2026-10.md`
+from the printed PDFs, a11y-stem's headings task and the parsers' outputs committed under
+`proof/interim/heldout-2026-10/`. It exists because the paid parts of the run could not be made
+(no API credit); it compares a11y-stem's heading detection with the parsers' and scores the
+parsers on equations, invented content and coverage, and it claims nothing else. It is not a
+recorded run in the sense of the bundles above and does not replace one.
+
 ### Recording the other systems
 
 They are recorded into a finished bundle, each with its own cap, so a failure in one never

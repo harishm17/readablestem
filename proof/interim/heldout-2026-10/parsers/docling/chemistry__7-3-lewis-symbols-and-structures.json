@@ -1,0 +1,45 @@
+{
+  "arm": "docling",
+  "cost_usd": 0.0,
+  "input_sha256": "08ee533f3e6b708254be4276fc83881f4e86d8b8f05dee5be1b0c9a462153dbb",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 7.14,
+    "load_before": 5.4,
+    "offline": false,
+    "peak_rss_mb": 2726.8,
+    "quiet_box": null,
+    "system_seconds": 68.151,
+    "timeout_seconds": 1800,
+    "user_seconds": 201.624,
+    "wall_seconds_per_page": 7.615
+  },
+  "output": {
+    "file": "chemistry__7-3-lewis-symbols-and-structures.md",
+    "format": "md"
+  },
+  "pdf_pages": 9,
+  "seconds": 68.535,
+  "section": "chemistry/7-3-lewis-symbols-and-structures",
+  "settings": {
+    "command": "docling --to json --to html --to md",
+    "formula_enrichment": "off (the default)",
+    "image_export_mode": "embedded (the CLI default)",
+    "ocr": "on (RapidOCR)",
+    "tables": "TableFormer, accurate"
+  },
+  "status": "ok",
+  "versions": {
+    "docling": "2.138.0",
+    "docling-core": "2.101.1",
+    "docling-ibm-models": "4.0.3",
+    "docling-parse": "7.22.3",
+    "rapidocr": "3.10.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  }
+}
