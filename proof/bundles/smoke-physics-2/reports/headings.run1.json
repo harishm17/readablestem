@@ -1,0 +1,230 @@
+{
+  "client": "openai",
+  "complete": true,
+  "cost": {
+    "budget_calls": 0,
+    "budget_spent_usd": 0.0,
+    "dropped_usd": 0.0,
+    "model_calls": 0,
+    "per_item_unit": "page",
+    "per_item_usd": 0.0,
+    "pipeline_usd": 0.0,
+    "total_usd": 0.0,
+    "verifier_per_item_usd": 0.0,
+    "verifier_requests": 0,
+    "verifier_usd": 0.0
+  },
+  "dataset": {
+    "gold_dir": "proof set smoke-physics-2",
+    "limit": null,
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "selection_sha256": "92c3697eae341a202a89da0a855e4826cd40525ef1780d67ba648bf53de4dc95",
+    "unit": "page"
+  },
+  "date": "2026-10-13",
+  "latency_ms": {
+    "basis": "sum of model-call latencies per item (excludes rendering)",
+    "n": 3,
+    "p50": 0.0,
+    "p95": 0.0
+  },
+  "metrics": {
+    "f1": 0.9343629343629344,
+    "gold_headings": 121,
+    "level_accuracy": 0.9917355371900827,
+    "matched": 121,
+    "page_errors": {},
+    "per_page": [
+      {
+        "error": null,
+        "id": "physics/2-1-relative-motion-distance-and-displacement",
+        "n_gold": 48,
+        "n_pred": 52,
+        "precision": 0.9230769230769231,
+        "recall": 1.0
+      },
+      {
+        "error": null,
+        "id": "physics/2-2-speed-and-velocity",
+        "n_gold": 42,
+        "n_pred": 50,
+        "precision": 0.84,
+        "recall": 1.0
+      },
+      {
+        "error": null,
+        "id": "physics/2-3-position-vs-time-graphs",
+        "n_gold": 31,
+        "n_pred": 36,
+        "precision": 0.8611111111111112,
+        "recall": 1.0
+      }
+    ],
+    "precision": 0.8768115942028986,
+    "precision_by_status": {
+      "accepted": {
+        "n": 97,
+        "precision": 0.9690721649484536
+      },
+      "needs_review": {
+        "n": 41,
+        "precision": 0.6585365853658537
+      }
+    },
+    "predicted_headings": 138,
+    "recall": 1.0,
+    "recall_by_context": {
+      "body": {
+        "n": 20,
+        "recall": 1.0
+      },
+      "learning-objectives": {
+        "n": 3,
+        "recall": 1.0
+      },
+      "links-to-physics": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "note": {
+        "n": 7,
+        "recall": 1.0
+      },
+      "os-exercise": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "os-teacher": {
+        "n": 50,
+        "recall": 1.0
+      },
+      "snap-lab": {
+        "n": 6,
+        "recall": 1.0
+      },
+      "teacher-demonstration": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "tips-for-success": {
+        "n": 7,
+        "recall": 1.0
+      },
+      "virtual-physics": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "watch-physics": {
+        "n": 4,
+        "recall": 1.0
+      },
+      "work-in-physics": {
+        "n": 2,
+        "recall": 1.0
+      },
+      "worked-example": {
+        "n": 14,
+        "recall": 1.0
+      }
+    },
+    "recall_ci95": [
+      0.9692293015820281,
+      1.0
+    ],
+    "review_load": {
+      "flags": {
+        "flag_precision": 0.5555555555555556,
+        "flag_recall": 0.7777777777777778,
+        "required_units": 9,
+        "required_units_wrong": 5,
+        "units": 106,
+        "wrong": 18,
+        "wrong_required": 14
+      },
+      "none": 77,
+      "optional": 20,
+      "optional_by_kind": {
+        "heading": 20
+      },
+      "optional_by_reason": {
+        "heading.weak_evidence": 20
+      },
+      "optional_per_pdf_page": 0.4651,
+      "pdf_pages": 43,
+      "required_by_kind": {
+        "heading": 9
+      },
+      "required_by_reason": {
+        "heading.repeated_label": 41,
+        "heading.weak_evidence": 41
+      },
+      "required_decisions": 9,
+      "required_fixes": 41,
+      "required_per_pdf_page": 0.2093,
+      "required_per_section": 3.0,
+      "sections": 3,
+      "wrong_not_required": [
+        {
+          "gold_level": 5,
+          "level": 3,
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Displacement Problems",
+          "why_wrong": "wrong_level"
+        },
+        {
+          "gold_level": null,
+          "level": 3,
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Solution",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "level": 3,
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Discussion",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "level": 3,
+          "page": "physics/2-3-position-vs-time-graphs",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Procedure",
+          "why_wrong": "not_a_gold_heading"
+        }
+      ]
+    }
+  },
+  "models": {
+    "cheap": "gpt-6-luna",
+    "main": "gpt-6.1-sol"
+  },
+  "models_used": [],
+  "n": 3,
+  "n_planned": 3,
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {},
+  "schema_version": 1,
+  "stopped_reason": null,
+  "task": "headings"
+}

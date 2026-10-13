@@ -1,0 +1,157 @@
+{
+  "client": "openai",
+  "code": {
+    "git": {
+      "commit": "c2773682c1c919f8ff3d69cde40d313b1bfd5dd5",
+      "dirty": false
+    },
+    "pipeline_version": "0.4.0",
+    "prompts": {
+      "equation": "equation-df0e12f1",
+      "figure": "figure-ac51f42d",
+      "judge": "judge_figure-137e2607",
+      "table": "table-b3769ce7"
+    },
+    "second_check": {
+      "equation": "equation_match-45fc775c",
+      "figure": "figure_alt-16a00e69"
+    },
+    "settings": {
+      "abstain_confidence": 0.4,
+      "auto_accept_confidence": 0.85,
+      "cheap_model": "gpt-6-luna",
+      "decisions_equation_flag_at": 0.2,
+      "decisions_equation_shadow": true,
+      "decisions_figure_flag_below": 0.5,
+      "decisions_figure_verify": true,
+      "decisions_model": "gpt-6-luna",
+      "feature_colour": false,
+      "feature_long_descriptions": false,
+      "feature_notation_memory": false,
+      "feature_tables": false,
+      "main_model": "gpt-6.1-sol",
+      "max_pages_per_job": 30,
+      "model_max_retries": 2
+    }
+  },
+  "environment": {
+    "cpus": 16,
+    "platform": "Linux x86_64",
+    "pymupdf": "1.28.2",
+    "python": "3.12.15"
+  },
+  "files": {
+    "answers/document.run1.jsonl": "58eab5394c2f09f6d989c9838decba99c0e9a7e51a4d3416d5d7588a30cfe0f7",
+    "answers/equations.run1.jsonl": "7e1ed5c5f161853fba1ab7544ce627d4d0c4ef6d76aaeda6a7f911de8bd7328b",
+    "answers/figures.run1.jsonl": "82c8b62c4d922bada645ef1400ea39467f2c9003bc1e399e7fe40126fd0ce595",
+    "answers/headings.run1.jsonl": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "media/equations.jsonl": "f0cd48ddfb0346f189e4aea9d11e5d32e9fd32809f0f65b11539d581a35f79ae",
+    "media/figures.jsonl": "e1291920c80c519b7faf6fde8f250500836126ee89b53208489f804a3cc90853",
+    "media/pdfs/physics__2-1-relative-motion-distance-and-displacement.pdf": "dd3f3d850ccd602acc0bce04c33e974a62e79082b97084296b8c644a301c72d1",
+    "media/pdfs/physics__2-2-speed-and-velocity.pdf": "5e2cf1e6f178d438b7d5f284e1b00e38926cff4b37a68d6e95a6fd8fd972a35a",
+    "media/pdfs/physics__2-3-position-vs-time-graphs.pdf": "80ca81e557fcd7842717f95189d6ba7d96870c92df7b63cda312e6336de1fec7",
+    "reports/document.run1.json": "3e0304a01d92befea109b552485d59588cf5236d0f61d623c056bc24c448db1b",
+    "reports/equations.run1.json": "60dcb6f5287c5f848570a2e5e9bec3fb800ea87b5548332089f421c5eea32415",
+    "reports/figures.run1.json": "9feba152f2f8fd3248ec0a5229039ee8bc3aa638a7c0f3d0a5697e991c410ccd",
+    "reports/headings.run1.json": "07c4053964ee048c062a194941f684fd4cf2d5d044648669157763dfcf5fbe06"
+  },
+  "mode": "live",
+  "pdfs": [
+    {
+      "file": "media/pdfs/physics__2-1-relative-motion-distance-and-displacement.pdf",
+      "pages": 16,
+      "section": "physics/2-1-relative-motion-distance-and-displacement",
+      "sha256": "dd3f3d850ccd602acc0bce04c33e974a62e79082b97084296b8c644a301c72d1"
+    },
+    {
+      "file": "media/pdfs/physics__2-2-speed-and-velocity.pdf",
+      "pages": 14,
+      "section": "physics/2-2-speed-and-velocity",
+      "sha256": "5e2cf1e6f178d438b7d5f284e1b00e38926cff4b37a68d6e95a6fd8fd972a35a"
+    },
+    {
+      "file": "media/pdfs/physics__2-3-position-vs-time-graphs.pdf",
+      "pages": 13,
+      "section": "physics/2-3-position-vs-time-graphs",
+      "sha256": "80ca81e557fcd7842717f95189d6ba7d96870c92df7b63cda312e6336de1fec7"
+    }
+  ],
+  "recorded_on": "2026-10-13",
+  "runs": [
+    {
+      "answers": "answers/document.run1.jsonl",
+      "complete": true,
+      "model_calls": 87,
+      "n": 3,
+      "repeat": 1,
+      "report": "reports/document.run1.json",
+      "spend_usd": 0.14212188999999997,
+      "stopped_reason": null,
+      "task": "document",
+      "timing": [
+        {
+          "latency_ms": 91369,
+          "pdf_pages": 16,
+          "section": "physics/2-1-relative-motion-distance-and-displacement"
+        },
+        {
+          "latency_ms": 40354,
+          "pdf_pages": 14,
+          "section": "physics/2-2-speed-and-velocity"
+        },
+        {
+          "latency_ms": 46619,
+          "pdf_pages": 13,
+          "section": "physics/2-3-position-vs-time-graphs"
+        }
+      ],
+      "wall_seconds": 197.9
+    },
+    {
+      "answers": "answers/equations.run1.jsonl",
+      "complete": true,
+      "model_calls": 36,
+      "n": 30,
+      "repeat": 1,
+      "report": "reports/equations.run1.json",
+      "spend_usd": 0.05092241000000001,
+      "stopped_reason": null,
+      "task": "equations",
+      "timing": [],
+      "wall_seconds": 203.2
+    },
+    {
+      "answers": "answers/headings.run1.jsonl",
+      "complete": true,
+      "model_calls": 0,
+      "n": 3,
+      "repeat": 1,
+      "report": "reports/headings.run1.json",
+      "spend_usd": 0.0,
+      "stopped_reason": null,
+      "task": "headings",
+      "timing": [],
+      "wall_seconds": 12.7
+    },
+    {
+      "answers": "answers/figures.run1.jsonl",
+      "complete": true,
+      "model_calls": 26,
+      "n": 13,
+      "repeat": 1,
+      "report": "reports/figures.run1.json",
+      "spend_usd": 0.0876295,
+      "stopped_reason": null,
+      "task": "figures",
+      "timing": [],
+      "wall_seconds": 134.1
+    }
+  ],
+  "schema_version": 1,
+  "set_id": "smoke-physics-2",
+  "signoff_confirmed": false,
+  "spend": {
+    "cap_usd": 2.0,
+    "total_usd": 0.280674
+  }
+}

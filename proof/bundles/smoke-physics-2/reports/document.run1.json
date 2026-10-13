@@ -1,0 +1,304 @@
+{
+  "client": "openai",
+  "complete": true,
+  "cost": {
+    "budget_calls": 87,
+    "budget_spent_usd": 0.14212188999999997,
+    "dropped_usd": 0.0,
+    "model_calls": 87,
+    "pdf_pages": 43,
+    "per_item_unit": "section",
+    "per_item_usd": 0.04737396333333333,
+    "per_pdf_page_usd": 0.0033051602325581395,
+    "pipeline_usd": 0.14212189,
+    "total_usd": 0.14212189,
+    "verifier_per_item_usd": 0.0014194000000000001,
+    "verifier_per_pdf_page_usd": 9.90279069767442e-05,
+    "verifier_requests": 85,
+    "verifier_usd": 0.0042582
+  },
+  "dataset": {
+    "gold_dir": "proof set smoke-physics-2",
+    "limit": null,
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "selection_sha256": "92c3697eae341a202a89da0a855e4826cd40525ef1780d67ba648bf53de4dc95",
+    "unit": "page"
+  },
+  "date": "2026-10-13",
+  "latency_ms": {
+    "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)",
+    "n": 3,
+    "p50": 46619.0,
+    "p95": 86894.0
+  },
+  "metrics": {
+    "axe_checked_pages": 3,
+    "axe_error_pages": 0,
+    "axe_skipped_pages": 0,
+    "axe_violation_codes": {},
+    "axe_violations": 0,
+    "detection_precision": 0.5454545454545454,
+    "detection_precision_excluding_prose_math": 0.967741935483871,
+    "detection_recall": 1.0,
+    "detection_recall_by_display": {
+      "block": {
+        "n_gold": 17,
+        "recall": 1.0
+      },
+      "inline": {
+        "n_gold": 13,
+        "recall": 1.0
+      }
+    },
+    "end_to_end_exact_lenient": 0.7333333333333333,
+    "gold_equations": 30,
+    "matched": 30,
+    "matched_exact_lenient": 0.7333333333333333,
+    "matched_mean_teds": 0.8535677706574673,
+    "page_errors": {},
+    "predicted_equations": 55,
+    "review_load": {
+      "equation_flags": {
+        "flag_precision": 1.0,
+        "flag_recall": 0.125,
+        "required_units": 1,
+        "required_units_wrong": 1,
+        "units": 30,
+        "wrong": 8,
+        "wrong_required": 1
+      },
+      "equation_flags_excluding_scorer_gaps": {
+        "flag_precision": 1.0,
+        "flag_recall": 0.5,
+        "required_units": 1,
+        "required_units_wrong": 1,
+        "units": 19,
+        "wrong": 2,
+        "wrong_required": 1
+      },
+      "flags": {
+        "flag_precision": 0.6,
+        "flag_recall": 0.5769230769230769,
+        "required_units": 10,
+        "required_units_wrong": 6,
+        "units": 136,
+        "wrong": 26,
+        "wrong_required": 15
+      },
+      "flags_excluding_scorer_gaps": {
+        "flag_precision": 0.6,
+        "flag_recall": 0.75,
+        "required_units": 10,
+        "required_units_wrong": 6,
+        "units": 125,
+        "wrong": 20,
+        "wrong_required": 15
+      },
+      "heading_flags": {
+        "flag_precision": 0.5555555555555556,
+        "flag_recall": 0.7777777777777778,
+        "required_units": 9,
+        "required_units_wrong": 5,
+        "units": 106,
+        "wrong": 18,
+        "wrong_required": 14
+      },
+      "none": 143,
+      "optional": 24,
+      "optional_by_kind": {
+        "equation": 3,
+        "figure": 1,
+        "heading": 20
+      },
+      "optional_by_reason": {
+        "heading.weak_evidence": 20,
+        "second_check_mismatch": 1,
+        "style_cosmetic": 3
+      },
+      "optional_per_pdf_page": 0.5581,
+      "pdf_pages": 43,
+      "required_by_kind": {
+        "equation": 1,
+        "heading": 9
+      },
+      "required_by_reason": {
+        "heading.repeated_label": 41,
+        "heading.weak_evidence": 41,
+        "style_mismatch": 1
+      },
+      "required_decisions": 10,
+      "required_fixes": 42,
+      "required_per_pdf_page": 0.2326,
+      "required_per_section": 3.3333,
+      "sections": 3,
+      "wrong_not_required": [
+        {
+          "gold_id": "openstax/physics/2-2-speed-and-velocity/eq-003",
+          "kind": "equation",
+          "page": "physics/2-2-speed-and-velocity",
+          "pred_latex": "\\text{time} = \\frac{\\text{distance}}{v_{\\text{avg}}}.",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/physics/2-2-speed-and-velocity/eq-004",
+          "kind": "equation",
+          "page": "physics/2-2-speed-and-velocity",
+          "pred_latex": "\\text{distance} = v_{\\text{avg}} \\times \\text{time}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/physics/2-2-speed-and-velocity/eq-007",
+          "kind": "equation",
+          "page": "physics/2-2-speed-and-velocity",
+          "pred_latex": "\\mathbf{v}_{\\text{avg}} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_f - \\mathbf{d}_0}{t_f - t_0}",
+          "reasons": [
+            "style_cosmetic"
+          ],
+          "review": "optional",
+          "scorer_gap": false
+        },
+        {
+          "gold_id": "openstax/physics/2-2-speed-and-velocity/eq-010",
+          "kind": "equation",
+          "page": "physics/2-2-speed-and-velocity",
+          "pred_latex": "\\begin{array}{rcl} \\mathbf{v}_{\\text{avg}} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ \\Delta \\mathbf{d} & = & \\mathbf{v}_{\\text{avg}}\\Delta t \\\\ & = & (2.4\\ \\text{m/s})(46\\ \\text{s}) \\\\ & = & 1.1 \\times 10^{2}\\ \\text{m east} \\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/physics/2-3-position-vs-time-graphs/eq-004",
+          "kind": "equation",
+          "page": "physics/2-3-position-vs-time-graphs",
+          "pred_latex": "\\text{slope} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\mathbf{v}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/physics/2-3-position-vs-time-graphs/eq-005",
+          "kind": "equation",
+          "page": "physics/2-3-position-vs-time-graphs",
+          "pred_latex": "\\begin{array}{rcl}\\mathbf{v} & = & \\frac{\\Delta\\mathbf{d}}{\\Delta t} \\\\ & = & \\frac{2000\\ \\text{m} - 525\\ \\text{m}}{6.4\\ \\text{s} - 0.50\\ \\text{s}}, \\\\ & = & 250\\ \\text{m/s}\\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_id": "openstax/physics/2-3-position-vs-time-graphs/eq-007",
+          "kind": "equation",
+          "page": "physics/2-3-position-vs-time-graphs",
+          "pred_latex": "\\begin{array}{rcl}\\text{slope} & = & v_Q = \\frac{\\Delta d_Q}{\\Delta t_Q} \\\\ & = & \\frac{(3120 - 1300)\\ \\text{m}}{(32 - 19)\\ \\text{s}} \\\\ & = & \\frac{1820\\ \\text{m}}{13\\ \\text{s}} \\\\ & = & 140\\ \\text{m/s}\\end{array}",
+          "reasons": [],
+          "review": "none",
+          "scorer_gap": true
+        },
+        {
+          "gold_level": 5,
+          "kind": "heading",
+          "level": 3,
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Displacement Problems",
+          "why_wrong": "wrong_level"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Solution",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Discussion",
+          "why_wrong": "not_a_gold_heading"
+        },
+        {
+          "gold_level": null,
+          "kind": "heading",
+          "level": 3,
+          "page": "physics/2-3-position-vs-time-graphs",
+          "reasons": [
+            "heading.weak_evidence"
+          ],
+          "review": "optional",
+          "status": "accepted",
+          "text": "Procedure",
+          "why_wrong": "not_a_gold_heading"
+        }
+      ]
+    },
+    "second_check": {
+      "cost_usd": 0.0042582,
+      "equation_checked": 55,
+      "equation_would_flag": 14,
+      "equations_matched": {
+        "answered": 30,
+        "auroc_vs_wrong": 0.5966,
+        "auroc_vs_wrong_excluding_scorer_gaps": 0.8529,
+        "would_flag": 10,
+        "would_flag_precision": 0.3,
+        "would_flag_recall": 0.375,
+        "would_flag_wrong_excluding_scorer_gaps": 2,
+        "wrong": 8
+      },
+      "figure_checked": 16,
+      "figure_flagged": 1,
+      "outcomes": {
+        "ok": 71
+      },
+      "per_pdf_page_usd": 9.903e-05
+    },
+    "split_gold_equations": 0,
+    "static_violation_codes": {},
+    "static_violations": 0,
+    "unmatched_by_reason": {
+      "fragment": 0,
+      "other": 1,
+      "prose_math": 24
+    },
+    "unmatched_predicted": 25
+  },
+  "models": {
+    "cheap": "gpt-6-luna",
+    "main": "gpt-6.1-sol"
+  },
+  "models_used": [
+    "gpt-6-luna",
+    "gpt-6.1-sol"
+  ],
+  "n": 3,
+  "n_planned": 3,
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {
+    "equation": "equation-df0e12f1",
+    "figure": "figure-ac51f42d",
+    "table": "table-b3769ce7"
+  },
+  "schema_version": 1,
+  "stopped_reason": null,
+  "task": "document"
+}
