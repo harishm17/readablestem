@@ -30,7 +30,7 @@ import subprocess
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Protocol
+from typing import Any, Protocol
 
 from a11y_stem.config import Settings
 from a11y_stem.proof import a11y_tables
@@ -61,6 +61,8 @@ class StageContext:
     n_boot: int
     pdf_paths: dict[str, Path] = field(default_factory=dict)  # section id -> the PDF
     say: Callable[[str], None] = lambda _msg: None
+    # Work shared between stages in one run (the other systems are scored once).
+    cache: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass

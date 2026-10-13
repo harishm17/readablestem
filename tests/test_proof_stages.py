@@ -42,18 +42,28 @@ def test_the_default_stages_are_one_real_arm_and_four_stubs():
 
 def test_load_plugins_skips_absent_modules_and_reports_the_ones_it_found(monkeypatch):
     loaded = types.ModuleType(PLUGIN)
+    monkeypatch.setattr(stages, "PLUGIN_MODULES", (PLUGIN, "a11y_stem.proof.not_written_yet"))
     monkeypatch.setitem(sys.modules, PLUGIN, loaded)
     assert stages.load_plugins() == [PLUGIN]
-    monkeypatch.delitem(sys.modules, PLUGIN)
+    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("a11y_stem.proof.not_written_yet",))
     assert stages.load_plugins() == []
+
+
+def test_the_repository_wires_every_plugin_but_the_human_labels():
+    loaded = stages.load_plugins()
+    assert loaded == [
+        "a11y_stem.proof.invented",
+        "a11y_stem.proof.comparison",
+        "a11y_stem.proof.parsers",
+    ]
 
 
 def test_a_plugin_that_exists_but_fails_to_import_is_not_hidden(monkeypatch, tmp_path):
     import a11y_stem.proof as package
 
-    (tmp_path / "comparison.py").write_text("import a_module_that_does_not_exist\n")
+    (tmp_path / "broken_plugin.py").write_text("import a_module_that_does_not_exist\n")
     monkeypatch.setattr(package, "__path__", [*package.__path__, str(tmp_path)])
-    monkeypatch.delitem(sys.modules, "a11y_stem.proof.comparison", raising=False)
+    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("a11y_stem.proof.broken_plugin",))
     with pytest.raises(ModuleNotFoundError, match="a_module_that_does_not_exist"):
         stages.load_plugins()
 

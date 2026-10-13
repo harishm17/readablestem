@@ -24,13 +24,15 @@ Nothing in here logs content. Dates come from the caller.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import platform
 import subprocess
 import sys
 import time
-from collections.abc import Callable
+from collections.abc import Callable, Generator
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -197,6 +199,13 @@ class RunOutcome:
 @dataclass
 class ArmResults:
     outcomes: list[RunOutcome] = field(default_factory=list)
+    # The HTML a11y-stem wrote for each section, rebuilt by a replay: (repeat, section) ->
+    # HTML. The invented-content rate and the comparison read it; it is not stored in the
+    # bundle because the replay makes it again from the recorded answers.
+    html: dict[tuple[int, str], str] = field(default_factory=dict)
+    # Why a live run ended before every (task, repeat) was made (the spend cap), when the
+    # finished runs were kept (`record_arm(keep_finished=True)`); None for a full run.
+    stopped: str | None = None
 
     def runs(self, task: str) -> list[RunOutcome]:
         return [o for o in self.outcomes if o.task == task]
@@ -206,7 +215,9 @@ class ArmResults:
 
     @property
     def complete(self) -> bool:
-        return bool(self.outcomes) and all(o.complete for o in self.outcomes)
+        return (
+            bool(self.outcomes) and self.stopped is None and all(o.complete for o in self.outcomes)
+        )
 
 
 def _config(
@@ -241,6 +252,29 @@ def _config(
 # ------------------------------------------------------------------------- replay
 
 
+@contextmanager
+def capturing_html(
+    bundle: Bundle, repeat: int, sink: dict[tuple[int, str], str]
+) -> Generator[None, None, None]:
+    """Keep the HTML `convert_pdf` writes for each section PDF of the bundle (found by the
+    SHA-256 of the PDF it was given). Nothing about the conversion changes."""
+    section_of = {e["sha256"]: e["section"] for e in bundle.pdfs}
+    original = pe.run.convert_pdf
+
+    def wrapper(pdf: bytes, *args: Any, **kwargs: Any) -> Any:
+        output = original(pdf, *args, **kwargs)
+        section = section_of.get(hashlib.sha256(pdf).hexdigest())
+        if section is not None:
+            sink[(repeat, section)] = output.result.html
+        return output
+
+    pe.run.convert_pdf = wrapper  # ty: ignore[invalid-assignment]
+    try:
+        yield
+    finally:
+        pe.run.convert_pdf = original
+
+
 def replay_arm(
     pset: ProofSet,
     bundle: Bundle,
@@ -255,7 +289,8 @@ def replay_arm(
     gaps = goldinfo.g1_ids(goldinfo.load_records(gold_dir))
     results = ArmResults()
     media = ReplayMedia(bundle)
-    for task, repeat in pset.runs():
+    recorded = [(str(r["task"]), int(r["repeat"])) for r in bundle.runs]
+    for task, repeat in recorded or pset.runs():
         answers = AnswerSet.load(bundle, task, repeat)
         client = ReplayClient(answers, second_check=any_check_enabled(settings))
         cfg = _config(
@@ -274,7 +309,7 @@ def replay_arm(
         say(f"replay {run_stem(task, repeat)}")
         try:
             if task == "document":
-                with patched_axe(AxeReplay(answers)):
+                with patched_axe(AxeReplay(answers)), capturing_html(bundle, repeat, results.html):
                     done = pe.run_pipeline_eval(cfg)
             else:
                 done = pe.run_pipeline_eval(cfg)
@@ -352,12 +387,16 @@ def record_arm(
     fake: bool = False,
     progress: Callable[[str], None] | None = None,
     client_factory: Callable[[Settings, JobBudget], VisionClient] | None = None,
+    keep_finished: bool = False,
 ) -> tuple[ArmResults, MediaRecorder, float]:
     """Run every (task, repeat) with the real models and record the answers into `writer`.
 
     One spend guard covers the whole proof; each run gets its own `JobBudget`, so a run's
     own spend is known. A run the budget stops is not scored half-converted: the proof
-    stops with `Incomplete` and the partial bundle is left under `<dir>.partial`.
+    stops with `Incomplete` and the partial bundle is left under `<dir>.partial`. With
+    `keep_finished`, a stop by the cap ends the run instead: the runs that finished are kept
+    (the one the cap stopped is dropped whole), `ArmResults.stopped` says why, and the
+    report is labelled incomplete. A cap stop with no finished run still raises.
     """
     say = progress or (lambda _msg: None)
     records = goldinfo.load_records(gold_dir)
@@ -402,8 +441,17 @@ def record_arm(
             else:
                 done = pe.run_pipeline_eval(cfg)
         except BudgetExceeded as exc:
-            raise Incomplete(f"{run_stem(task, repeat)}: stopped by the spend cap ({exc})") from exc
+            message = f"{run_stem(task, repeat)}: stopped by the spend cap ({exc})"
+            if keep_finished and results.outcomes:
+                results.stopped = message
+                break
+            raise Incomplete(message) from exc
         wall = time.monotonic() - started
+        if keep_finished and results.outcomes and not done.report.get("complete"):
+            results.stopped = (
+                f"{run_stem(task, repeat)} did not finish ({done.report.get('stopped_reason')})"
+            )
+            break
         writer.write_jsonl(f"answers/{run_stem(task, repeat)}.jsonl", store.rows())
         writer.write_json(f"reports/{run_stem(task, repeat)}.json", done.report)
         outcome = RunOutcome(
@@ -447,8 +495,6 @@ def pdf_entries(pset: ProofSet, recorder: MediaRecorder, writer: BundleWriter) -
         writer.write_bytes(rel, data)
         with pymupdf.open(stream=data, filetype="pdf") as doc:
             pages = doc.page_count
-        import hashlib
-
         entries.append(
             {
                 "section": section.id,
