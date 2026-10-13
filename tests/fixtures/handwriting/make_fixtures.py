@@ -408,7 +408,8 @@ def build(out: Path) -> list[Path]:
     out.mkdir(parents=True, exist_ok=True)
     made = []
 
-    # 1. iPad notes, every page handwritten with a hidden recognition layer (the shape of a real iPad lecture kept outside the repo).
+    # 1. iPad notes, every page handwritten with a hidden recognition layer (the shape of a
+    # real iPad lecture that is kept outside the repo).
     doc = pymupdf.open()
     ios_page(doc, 101)
     made.append(save(doc, out, "ios_notes.pdf", IOS))
