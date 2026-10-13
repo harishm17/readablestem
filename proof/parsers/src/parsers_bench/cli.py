@@ -214,6 +214,21 @@ def cmd_plumbing(args: argparse.Namespace) -> int:
     return int(bool(failures))
 
 
+def cmd_proof(args: argparse.Namespace) -> int:
+    """The proof run: every section PDF through every arm; see `parsers_bench.heldout`."""
+    from parsers_bench import heldout
+
+    return heldout.run_set(
+        Path(args.pdf_dir),
+        Path(args.out_dir),
+        Path(args.work_dir),
+        arm_ids=args.arms or None,
+        timeout_seconds=args.timeout,
+        offline=args.offline,
+        wait_quiet=not args.no_wait,
+    )
+
+
 def _same_content(a: intermediate.Intermediate, b: intermediate.Intermediate) -> bool:
     """Same content, ignoring what legitimately differs between runs (timings, notes)."""
 
@@ -321,6 +336,16 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("run_dir")
     p.add_argument("--section")
     p.set_defaults(func=cmd_adapt)
+
+    p = sub.add_parser("proof", help="the proof run: a folder of section PDFs through the arms")
+    p.add_argument("pdf_dir")
+    p.add_argument("out_dir")
+    p.add_argument("--work-dir", default=str(DEFAULT_OUT / "proof-work"))
+    p.add_argument("--arms", nargs="*", default=[])
+    p.add_argument("--timeout", type=float, default=runners.DEFAULT_TIMEOUT_SECONDS)
+    p.add_argument("--offline", action="store_true")
+    p.add_argument("--no-wait", action="store_true", help="do not wait for a quiet box")
+    p.set_defaults(func=cmd_proof)
 
     p = sub.add_parser("plumbing", help="two development pages through every arm and the scorers")
     p.add_argument("arms", nargs="*")
