@@ -89,11 +89,16 @@ Element conventions:
    dropped as a watermark). A dropped row is a label when it is at most 40 characters,
    not diagonal, and within 8 x its font size of a figure or of the short rows just
    beside it (its tick labels), level with it for a rotated row. Bare numbers count only
-   two or more on one baseline (tick labels; a page number alone stays a page number);
-   other text only when it is beside a figure on every analysed page it was dropped from
-   (`_label_keys`), so a running footer that also runs under pages of text stays dropped.
-   A short footer repeated under a chart on every page of a document is read as text
-   (noise, not a loss).
+   two or more on one baseline (tick labels), or alone when level with a figure (the
+   axis title `v` at the top of a full-page plot's y-axis, which the page-number rule
+   reads as a roman numeral) and the same band of the other pages holds no changing
+   number there (a page number beside a figure that reaches into the band stays a page
+   number; since 2026-10-12); other text only when it is beside a figure on every analysed page it was
+   dropped from (`_label_keys`), so a running footer that also runs under pages of text
+   stays dropped. The rows taken back are the figure's labels, in its text and its crop,
+   however far from it within that reach (`_take_labels`; before, tick labels 6 pt under
+   the x-axis were read as paragraphs of one digit each). A short footer repeated under a
+   chart on every page of a document is read as text (noise, not a loss).
 3. **Columns.** Narrow lines (at most 55 % of the text width) are projected onto the x-axis.
    A gap of at least 8 pt in the middle half that no narrow line touches (or at most two,
    so a centred title does not hide the columns) is a gutter, if each side has at least
@@ -450,11 +455,27 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   smooth gradient). Before 2026-10-12 any image under 24 px on a side was dropped.
 - **Vector figures**: page furniture is set aside first: a frame round the page (an
   outline whose sides each lie within 15 % of the page's, drawn as one path that runs
-  along the edges of its own box only: a rectangle, rounded corners, a double frame, a
-  frame with corner ticks or curls; or a page-long rule within 15 % of an edge), a
-  background fill (85 % of the page's area or more, or a straight-edged panel round the
-  page with a margin of up to 15 %) and a band of colour along an edge (a slide template's
-  title bar, at most 15 % of the page deep). A frame's box
+  along all four edges of its own box and nowhere else: a rectangle, rounded corners, a
+  double frame, a frame with corner ticks or curls; or a page-long rule within 15 % of an
+  edge that is no plot's axis and no ruler, below), a background fill (85 % of the page's
+  area or more, or a straight-edged panel round the page with a margin of up to 15 %) and
+  a band of colour along an edge (a slide template's title bar, at most 15 % of the page
+  deep). A drawing's box holds every point of its path (`_drawing_bounds`: MuPDF's box
+  leaves out the start of a subpath that begins away from where the last one ended, so
+  a plot's axes drawn as one path, `80 75 m 640 75 l 80 335 m 80 75 l S`, read as the
+  x-axis alone and the y-axis was dropped, until 2026-10-12). **Axes and rulers**
+  (`_mark_axes`, 2026-10-12): a horizontal and a vertical line, each at least 48 pt long,
+  that meet end to end at a corner with nothing else at that corner or at their other
+  ends are a plot's axes (an L; a frame drawn line by line meets itself at every corner),
+  whether each is its own path or one path draws both; a line at least 48 pt long that
+  three or more short perpendicular lines (16 pt at most, and at most a quarter of it)
+  cross or end on at different places, a tick's other end free, is a ruler (a timeline,
+  a number line, an axis with ticks; a table's column rules end on the rules above and
+  below them, and a frame's corner marks are two a side). Neither is ever page furniture
+  or a border piece: a full-page plot's y-axis near the page's edge and as tall as it
+  was set aside as a side of a frame, the x-axis then dropped as a lone rule with the
+  tick labels and the axis title in the bands, and the figure was the curve alone; a
+  timeline across the top 15 % of a page was dropped as a header rule. A frame's box
   holds everything on the page, so clustered with the rest it made every figure on a page
   with a drawn border one "page border", dropped with no decision. Then drawings closer
   than 6 pt to each other are clustered, and clusters whose boxes overlap are joined (the
@@ -466,13 +487,15 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   at least, joined corner to corner into a chain that does not close (a step plot or a
   staircase drawn one line at a time), or two or more separate box outlines with a line
   outside every box that starts at one of them (an org chart with plain connectors, two
-  boxes and one line), with no running text inside. A box drawn line by line closes on
-  itself, a table's rules meet in crossings and T-junctions, and underlines do not meet,
-  so none of them is a diagram; two boxes side by side with nothing joining them are
-  boxes round text. A cluster that still fills the page (85 % both ways:
-  a full-page plot, a slide's chart) is a figure when it has three curves or two bars and
-  no running text inside. Else it may be a decorated border or a background drawn behind
-  text, but nothing drawn is lost with it: its border (frame-shaped pieces, pieces across
+  boxes and one line), or a ruler (a line with tick marks, above), with no running text
+  inside. A box drawn line by line closes on itself, a table's rules meet in crossings
+  and T-junctions, and underlines do not meet, so none of them is a diagram; two boxes
+  side by side with nothing joining them are boxes round text. A cluster that still
+  fills the page (85 % both ways: a full-page plot, a slide's chart) is a figure when it
+  has three curves, two bars, or a plotted line on axes or on a ruler (one curve on an
+  L of axes is a plot, not a decorated border), and no running text inside. Else it may
+  be a decorated border or a background drawn behind text, but nothing drawn is lost
+  with it: its border (frame-shaped pieces, pieces across
   the page, marks smaller than a figure along its edges: a frame drawn in pieces, corner
   ornaments) is set aside and the rest clustered again, so a plot inside such a frame is
   still a figure; with no border to take off, a cluster that still holds a plotted line,
@@ -497,18 +520,40 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   hand tick). On a page with a line of text or more, they are grouped (within 24 pt) and
   each group is kept when it is at least 6 pt on its longer side or has 3 marks in
   different places. Pen marks (most of their paths are the page type's pen strokes, or
-  every path is an open stroked line or curve: a tick, a cross, a signature) become a
-  handwriting region (below, never sent to the figure model); any other drawing a figure
-  for the figure model. On a `mixed_ink` page all of them are cut out with the
-  handwriting; on a page with ink the checks rejected or did not analyse, the safety net
-  keeps the page image instead. Not counted: a drawn list bullet, a mark repeated in the
-  header or footer band (a logo), horizontal and vertical lines and boxes alone (an
-  empty answer box, a black box over a line), dots alone (4 pt or less: dot leaders,
-  bullets the bullet test missed), anything whose middle lies in an element (an
-  underline, a box round a word, maths drawn inside a line of text), the ornaments of a
-  page frame (marks at its edges, or a group that runs round the page) and a shape
-  painted over hidden text. A page with less than a line of text keeps its image
-  instead (the safety net).
+  every path is an open stroked line or curve: a tick, a cross, a signature; never a
+  ruler's straight lines) become a handwriting region (below, never sent to the figure
+  model); any other drawing a figure for the figure model. On a `mixed_ink` page all of
+  them are cut out with the handwriting; on a page with ink the checks rejected or did
+  not analyse, the safety net keeps the page image instead. Not counted: a drawn list
+  bullet, a mark repeated in the header or footer band (a logo), horizontal and vertical
+  lines and boxes alone (an empty answer box, a black box over a line) unless they are a
+  ruler (a timeline), dots alone (4 pt or less: dot leaders, bullets the bullet test
+  missed), anything whose middle lies in an element (an underline, a box round a word,
+  maths drawn inside a line of text) unless it is a pen mark over the text, the
+  ornaments of a page frame (marks at its edges, or a group that runs round the page)
+  and a shape painted over hidden text. A page with less than a line of text keeps its
+  image instead (the safety net).
+- **Pen marks over typed text** (`_pen_mark_over_text`, 2026-10-12): one or two strokes,
+  each an open stroked diagonal line or curve that is no radical sign, whose middle lies
+  in a paragraph, list item or heading and that reach out of the line under them (or the
+  nearest line they are beside) by a quarter of their height or more: a hand tick, a
+  cross or a slash drawn over a line, bigger than its text. They are cut out as
+  handwriting with the rest; the text under them stays read. Before, they were taken as
+  part of the line, like an underline, and lost with no decision. An underline is
+  straight, a box round a word closes, and a cancel stroke across a term or an icon set
+  in a line stays within it: those are still part of the text. Measured on the research
+  corpus (`a11y-research/handwriting/detect/corpus`) and the repository's PDFs: of the
+  17 drawings too small to be figures whose middle lies in a text element on
+  born-digital pages (the 586 real born-digital pages, fresh set 4, the 42 OpenStax
+  renders, the three printed gold sections, the demo source and the fixtures), none is
+  an open diagonal or curved stroke, so none is cut out at any overflow threshold; on
+  15 synthetic marks over text (ticks of 10 to 30 pt, crosses, a slash, a circle, a
+  question mark, a wavy underline, an arrow), 13 are cut out (3 were before, as pen
+  strokes or outside the text): a tick no bigger than the text (10 pt over 11 pt type)
+  stays within its line, and an arrow whose head reads as a radical sign is not a pen
+  mark. The only machine-drawn marks of this shape seen are
+  tick icons in table cells (the sweep's `B_table_with_tick_icons`), which a table holds
+  and this rule leaves alone.
 - Overlapping figures merge (a photo with arrows drawn on it). Text inside a figure, and
   short labels (at most 25 characters) within 0.6 x font size of its edge or across it (a
   tick label half inside the box), belong to it and grow its box. A maths row is a label
@@ -666,8 +711,8 @@ nothing. The elements read from it stay; the image comes after them. It fires wh
   element or with less than a line (40 characters) of visible text: a short note of a few
   pen strokes under a typed title (too few to be called handwriting there, as they could
   be machine-drawn curves, and too small to be a figure), a drawing too small to be a
-  figure. Rules (unless joined into a drawing, `_line_chain`), paper rules, a frame round
-  the page, a background fill, a band of colour along an edge (a blank slide of a
+  figure. Rules (unless joined into a drawing, `_line_chain`, or a ruler's line and
+  ticks, `_mark_axes`), paper rules, a frame round the page, a background fill, a band of colour along an edge (a blank slide of a
   template), a drawn list bullet beside its row, and a mark that repeats in the header
   or footer band on half of the reference pages (a logo,
   `_MarginFilter.drops_mark`) do not count (`layout._painted`). Anything else in the
@@ -733,12 +778,15 @@ fails a result with the same rule (`worker.result_outcome`).
   decision (above), a needless one for a background photo that is not repeated on half
   of the pages (a one-off title slide on a photo); a plain or repeated background is
   not;
-- hand marks too simple for the stroke test (a tick, a cross) written over a line of
-  typed text are taken as part of the text (an underline and a box round a word are),
-  so they are lost; pen strokes over text are cut out. Strokes that cluster into a
-  drawing of 24 pt or more on a side are a figure for the figure model, as before. Small
-  machine drawings made of open strokes only (a curly arrow) are cut out as handwriting:
-  a needless decision, never a loss;
+- hand marks too simple for the stroke test written over a line of typed text are cut
+  out when they are one or two strokes that reach out of the line ("Pen marks over typed
+  text"); a tick no bigger than the text, a mark whose shape reads as a radical sign, and
+  three or more such strokes over the text are still taken as part of the line (as an
+  underline and a box round a word are) and lost. Pen strokes the stroke test counts
+  are cut out wherever they are. Strokes that cluster into a drawing of 24 pt or more on
+  a side are a figure for the figure model, as before. Small machine drawings made of
+  open strokes only (a curly arrow), and one or two such strokes over a line that reach
+  out of it, are cut out as handwriting: a needless decision, never a loss;
 - grids of small machine-drawn curves (sparklines, small multiples of loops) can look
   like handwriting: kept as an image with a needless decision (a PDF of only such pages
   is refused at upload, with or without a short typed title);
@@ -754,17 +802,27 @@ fails a result with the same rule (`worker.result_outcome`).
   covers less of the page and clusters into one drawing is a figure, described by the
   figure model like any drawing. Layout is slow on such pages (tens of seconds at 85,000
   paths, most of it table detection and figure clustering, as before);
-- a page-filling drawing with fewer than three curves and two bars (a full-page plot of
-  one line), or with running text inside it, is not sent to the figure model (a
+- a page-filling drawing with fewer than three curves and two bars and no axes or
+  ruler (a full-page plot of one line whose axes cross rather than meet at a corner, with
+  no ticks), or with running text inside it, is not sent to the figure model (a
   decorated border or a background drawn behind text looks the same): its page is kept
   as an image with a decision when it holds a plotted line, curves or bars, a needless
   one for a decorated background; a frame round the page with a margin wider than 15 %
   is not recognised, so a plot inside it is a figure the size of the frame;
+- axes that cross (a T or a +) instead of meeting at a corner are not axes to
+  `_mark_axes`: a page-long one near the page's edge with no ticks is still set aside as
+  a side of a frame. The plot that touches it is a figure all the same, but its crop
+  holds only the part of that axis beside the plot. An axis drawn as three or more lines
+  (a box of four spines with no ticks) is a closed frame-like chain, not axes either;
+- tick labels outside the header and footer bands further from a figure than 0.6 x
+  their size (a slide's labels 7 pt under its x-axis) are read as paragraphs after the
+  figure, not as its labels: in the text, not lost;
 - a flat drawing less than 24 pt tall (a one-line circuit, a timeline) is too small to
   be a figure by the 24 pt rule; on a typed page it is a figure of its own ("Small
-  drawings on a typed page"), with less text the safety net keeps the page. A drawing
-  inside a line of text (maths drawn as outlines mid-sentence) is held by the paragraph
-  and lost;
+  drawings on a typed page"), with less text the safety net keeps the page; a ruler (a
+  line with three or more ticks) counts there even when it is only straight lines. A
+  drawing inside a line of text (maths drawn as outlines mid-sentence) is held by the
+  paragraph and lost;
 - typed text turned into outlines (no text layer) is read as figures where it clusters
   into blocks; lines that do not are lost, so the safety net keeps the page image too
   (one decision for the document's kept pages).
@@ -1212,7 +1270,16 @@ PyMuPDF objects were three times slower). A crop takes about 0.1 s.
   layer over a diagram with no picture; each must end in an element or a kept page.
   Its controls pin what must still add nothing: boxes and panels round text, rules that
   do not meet end to end, a repeated footer logo, a plain or gradient page background,
-  a spacer, a running footer and page numbers, white paint on the white page.
+  a spacer, a running footer and page numbers, white paint on the white page. The
+  second final verify's cases (2026-10-12) are committed fixtures built by
+  `make_fixtures.py` (`build_edge_cases`): `full_page_plots.pdf` (one-curve plots
+  filling the page, framed or not, axes as two lines or one L-shaped path: the axes,
+  tick labels and axis title are the figure's), `open_axes.pdf` (axes drawn as one path
+  of two separate lines), `timelines.pdf` (a timeline across the top of a page as one
+  path and as separate lines, and a running header over a rule, which adds nothing) and
+  `marks_over_text.pdf` (a tick, a cross and a slash over typed lines, cut out; an
+  underline, a box round a word and a cancel stroke, still part of the text); with a
+  frame of four lines and a header rule with end marks as controls.
 - `tests/test_tables_detect.py` and `tests/test_tables_fixtures.py` cover table
   detection and how layout claims tables, on generated pages, the LaTeX
   `latex/tables.tex` (Tectonic) and a Word-style page exported by LibreOffice
