@@ -509,3 +509,25 @@ def test_a_cap_stop_can_keep_the_runs_that_finished_and_says_so(tmp_path):
     assert bundle.manifest["incomplete"]["runs_planned"] == 5
     assert "INCOMPLETE RUN" in result.text and "1 of 5 planned runs" in result.text
     assert "Replay compared with the recorded reports: **identical**" in result.text
+
+
+def test_an_interrupted_recording_resumes_without_paying_for_finished_runs(tmp_path):
+    root = make_project(tmp_path)
+    work = tmp_path / "w"
+    with pytest.raises(Incomplete):
+        _live(root, work, client_factory=_client_that_runs_out_after(2))
+    partial = work / "bundles" / f"{SET_ID}-{DATE}.partial"
+    assert (partial / "runs" / "document.run1.json").is_file()
+    asked = []
+
+    def counting(settings, budget):
+        asked.append(1)
+        return fake_client(settings, budget)
+
+    result = _live(root, work, client_factory=counting, resume=True)
+    bundle = Bundle.open(work / "bundles" / f"{SET_ID}-{DATE}")
+    assert bundle.verify() == []
+    assert bundle.manifest["resumed_runs"] == ["document.run1", "document.run2"]
+    assert len(asked) == 3  # equations, headings, figures: the two finished runs are not made again
+    assert "interrupted once and resumed" in result.text
+    assert "Replay compared with the recorded reports: **identical**" in result.text

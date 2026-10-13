@@ -1,6 +1,6 @@
 # Common tasks. Everything runs through uv; no global installs needed.
 .PHONY: sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
-	table-model fuzz-tables proof proof-check proof-list proof-sources proof-live reproduce reproduce-rerun
+	table-model fuzz-tables proof proof-check proof-list proof-sources proof-live proof-add-chatbot proof-add-parsers reproduce reproduce-rerun
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
 # Harish picks the real gold-set pages; override with e.g. make gold GOLD_CHAPTER=5.
@@ -123,3 +123,12 @@ proof-live:  ## re-call the models (costs money): make proof-live MAX_USD=2 ENV_
 	@test -n "$(MAX_USD)" || { echo "usage: make proof-live MAX_USD=<dollars> [ENV_FILE=.env] [SET=<id>]"; exit 2; }
 	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser a11y-stem proof --live \
 		--max-usd $(MAX_USD) $(if $(RECORD),--record $(RECORD)) $(PROOF_ARGS)
+
+
+proof-add-chatbot:  ## record the chatbot arms into a recorded run: make proof-add-chatbot MAX_USD=10 ENV_FILE=.env
+	@test -n "$(MAX_USD)" || { echo "usage: make proof-add-chatbot MAX_USD=<dollars> [ENV_FILE=.env] [SET=<id>]"; exit 2; }
+	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser a11y-stem proof --add-systems chatbot \
+		--max-usd $(MAX_USD) $(PROOF_ARGS)
+
+proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)
+	uv run a11y-stem proof --add-systems parsers $(PROOF_ARGS)

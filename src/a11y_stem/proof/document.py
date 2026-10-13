@@ -116,6 +116,15 @@ def _status(info: DocumentInfo) -> Section:
         ["Recorded spend", usd(b.manifest.get("spend", {}).get("total_usd"), 4)],
         ["Runs", ", ".join(f"{task} x{n}" for task, n in info.pset.repeats.items())],
     ]
+    if b.manifest.get("resumed_runs"):
+        rows.append(
+            [
+                "Recording",
+                "interrupted once and resumed: "
+                + ", ".join(b.manifest["resumed_runs"])
+                + " finished before the interruption and were read back",
+            ]
+        )
     blocks: list[str | Table] = [Table("", ["", ""], rows)]
     pin_rows = [[c.name, c.status, c.detail] for c in info.pins]
     blocks.append(Table("Pins checked before the run", ["Pin", "Result", "Detail"], pin_rows))

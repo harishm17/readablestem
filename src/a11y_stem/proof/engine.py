@@ -53,6 +53,7 @@ class ProofOptions:
     fake: bool = False
     confirm_signoff: bool = False
     allow_dirty: bool = False
+    resume: bool = False  # continue an interrupted recording (runs that finished are kept)
     keep_finished: bool = False  # a cap stop keeps the runs that finished (labelled incomplete)
     allow_drift: bool = False
     allow_misses: bool = False
@@ -305,7 +306,7 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
     gold_dir = resolve_gold(pset, opts, None, work, say)
     registry.require_ok(registry.check_gold(gold_dir, pset))
     record_dir = opts.record_dir or work / "bundles" / f"{pset.id}-{opts.date}"
-    writer = BundleWriter(record_dir)
+    writer = BundleWriter(record_dir, resume=opts.resume)
     http = opts.fetcher or HttpFetcher(cache_dir=work / "openstax")
 
     def media() -> Any:
@@ -327,6 +328,7 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         progress=say,
         client_factory=opts.client_factory,
         keep_finished=opts.keep_finished,
+        resume=opts.resume,
     )
     pdfs = runner.pdf_entries(pset, recorder, writer)
     writer.write_jsonl("media/equations.jsonl", recorder.equation_rows())
@@ -371,6 +373,8 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         },
         "signoff_confirmed": opts.confirm_signoff,
     }
+    if arm.resumed:
+        manifest["resumed_runs"] = arm.resumed
     if arm.stopped:
         manifest["incomplete"] = {
             "reason": arm.stopped,

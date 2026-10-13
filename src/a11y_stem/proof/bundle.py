@@ -210,14 +210,20 @@ class BundleWriter:
     """Builds a bundle in `<root>.partial` and moves it to `root` only when `finish` runs,
     so an interrupted or incomplete run never looks like a recorded one."""
 
-    def __init__(self, root: Path) -> None:
+    def __init__(self, root: Path, *, resume: bool = False) -> None:
         self.root = root
         self.partial = root.with_name(root.name + ".partial")
         if root.exists() and any(root.iterdir()):
             raise BundleError(f"{root} already holds a recorded run; choose another --record dir")
-        if self.partial.exists():
+        if self.partial.exists() and not resume:
             shutil.rmtree(self.partial)
-        self.partial.mkdir(parents=True)
+        self.partial.mkdir(parents=True, exist_ok=True)
+
+    def has(self, rel: str) -> bool:
+        return (self.partial / rel).is_file()
+
+    def read_json(self, rel: str) -> Any:
+        return json.loads((self.partial / rel).read_text(encoding="utf-8"))
 
     def write_bytes(self, rel: str, data: bytes) -> None:
         path = self.partial / rel

@@ -206,6 +206,7 @@ class ArmResults:
     # Why a live run ended before every (task, repeat) was made (the spend cap), when the
     # finished runs were kept (`record_arm(keep_finished=True)`); None for a full run.
     stopped: str | None = None
+    resumed: list[str] = field(default_factory=list)  # runs read back after an interruption
 
     def runs(self, task: str) -> list[RunOutcome]:
         return [o for o in self.outcomes if o.task == task]
@@ -374,6 +375,10 @@ def prebuild_inputs(pset: ProofSet, media_factory: Callable[[], Any], records: l
             media.close()
 
 
+# (folder, extension) of the files a finished run leaves in the writer's partial folder.
+RUN_FILES = (("answers", "jsonl"), ("reports", "json"), ("runs", "json"))
+
+
 def record_arm(
     pset: ProofSet,
     gold_dir: Path,
@@ -388,6 +393,7 @@ def record_arm(
     progress: Callable[[str], None] | None = None,
     client_factory: Callable[[Settings, JobBudget], VisionClient] | None = None,
     keep_finished: bool = False,
+    resume: bool = False,
 ) -> tuple[ArmResults, MediaRecorder, float]:
     """Run every (task, repeat) with the real models and record the answers into `writer`.
 
@@ -397,6 +403,11 @@ def record_arm(
     `keep_finished`, a stop by the cap ends the run instead: the runs that finished are kept
     (the one the cap stopped is dropped whole), `ArmResults.stopped` says why, and the
     report is labelled incomplete. A cap stop with no finished run still raises.
+
+    With `resume`, a (task, repeat) whose answers, report and run record are already in the
+    writer's partial folder (a run that finished before an interruption) is not made again:
+    its record is read back and its spend counted against the cap. A run that was running
+    when the process stopped left no answers and is made again whole.
     """
     say = progress or (lambda _msg: None)
     records = goldinfo.load_records(gold_dir)
@@ -411,6 +422,24 @@ def record_arm(
     say("building every input before the first model call")
     prebuild_inputs(pset, recording_media, records)
     for task, repeat in pset.runs():
+        stem = run_stem(task, repeat)
+        if resume and all(writer.has(f"{d}/{stem}.{e}") for d, e in RUN_FILES):
+            record = writer.read_json(f"runs/{stem}.json")
+            report = writer.read_json(f"reports/{stem}.json")
+            guard.settle(guard.reserve(record["spend_usd"]), record["spend_usd"])
+            results.outcomes.append(
+                RunOutcome(
+                    task,
+                    repeat,
+                    report,
+                    [],
+                    timing=record["timing"],
+                    wall_seconds=record["wall_seconds"],
+                )
+            )
+            results.resumed.append(stem)
+            say(f"resume {stem}: already recorded")
+            continue
         budget = JobBudget(guard, max_usd=max_usd, max_calls=max_calls)
         store = AnswerStore()
         inner = (
@@ -447,23 +476,27 @@ def record_arm(
                 break
             raise Incomplete(message) from exc
         wall = time.monotonic() - started
-        if keep_finished and results.outcomes and not done.report.get("complete"):
-            results.stopped = (
-                f"{run_stem(task, repeat)} did not finish ({done.report.get('stopped_reason')})"
-            )
-            break
-        writer.write_jsonl(f"answers/{run_stem(task, repeat)}.jsonl", store.rows())
-        writer.write_json(f"reports/{run_stem(task, repeat)}.json", done.report)
-        outcome = RunOutcome(
-            task, repeat, done.report, done.items, timing=section_timing(task, done.items),
-            wall_seconds=round(wall, 1),
-        )  # fmt: skip
-        results.outcomes.append(outcome)
-        if not outcome.complete:
+        if not done.report.get("complete"):
+            message = f"{stem} did not finish ({done.report.get('stopped_reason')})"
+            if keep_finished and results.outcomes:
+                results.stopped = message
+                break
             raise Incomplete(
-                f"{run_stem(task, repeat)} did not finish ({done.report.get('stopped_reason')}); "
-                "raise --max-usd. A budget stop is never scored half-converted"
+                f"{message}; raise --max-usd. A budget stop is never scored half-converted"
             )
+        timing = section_timing(task, done.items)
+        spent_here = float(done.report.get("cost", {}).get("budget_spent_usd") or 0.0)
+        writer.write_jsonl(f"answers/{stem}.jsonl", store.rows())
+        writer.write_json(f"reports/{stem}.json", done.report)
+        writer.write_json(
+            f"runs/{stem}.json",
+            {"timing": timing, "wall_seconds": round(wall, 1), "spend_usd": spent_here},
+        )
+        results.outcomes.append(
+            RunOutcome(
+                task, repeat, done.report, done.items, timing=timing, wall_seconds=round(wall, 1)
+            )
+        )
     return results, recorder, guard.spent_usd()
 
 

@@ -91,6 +91,7 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             confirm_signoff=args.confirm_signoff,
             allow_dirty=args.allow_dirty,
             keep_finished=args.keep_finished,
+            resume=args.resume,
             allow_drift=args.allow_drift,
             allow_misses=args.allow_misses,
             verify_sources=args.verify_sources,
@@ -174,6 +175,12 @@ def register(sub: argparse._SubParsersAction) -> None:
         "or the open parsers into an existing recorded run (--bundle), then stop",
     )
     live.add_argument("--arms", nargs="*", help="with --add-systems: only these arms")
+    live.add_argument(
+        "--resume",
+        action="store_true",
+        help="continue an interrupted recording in --record: runs that finished are read back "
+        "(their spend counts against --max-usd) and the run that was running is made again",
+    )
     live.add_argument(
         "--keep-finished",
         action="store_true",
