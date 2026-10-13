@@ -432,10 +432,13 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   or drawn under 12 pt (bullets, spacers), or when the image covers 85 % of the page or more
   (backgrounds; a scanned page never gets here: it is kept whole as its image, "Hidden
   text and page types" below).
-- **Vector figures**: page furniture is set aside first: a frame round the page (one
-  rectangle outline at least 85 % of the page both ways, or a page-long rule within 15 % of
-  an edge), a background fill (85 % of the page's area or more) and a band of colour along
-  an edge (a slide template's title bar, at most 15 % of the page deep). A frame's box
+- **Vector figures**: page furniture is set aside first: a frame round the page (an
+  outline whose sides each lie within 15 % of the page's, drawn as one path that runs
+  along the edges of its own box only: a rectangle, rounded corners, a double frame, a
+  frame with corner ticks or curls; or a page-long rule within 15 % of an edge), a
+  background fill (85 % of the page's area or more, or a straight-edged panel round the
+  page with a margin of up to 15 %) and a band of colour along an edge (a slide template's
+  title bar, at most 15 % of the page deep). A frame's box
   holds everything on the page, so clustered with the rest it made every figure on a page
   with a drawn border one "page border", dropped with no decision. Then drawings closer
   than 6 pt to each other are clustered, and clusters whose boxes overlap are joined (the
@@ -444,8 +447,13 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   rules (separators, underlines, table grids, the long separate lines of ruled paper), and
   is not a box or table around text. A cluster that still fills the page (85 % both ways:
   a full-page plot, a slide's chart) is a figure when it has three curves or two bars and
-  no running text inside; else it is a decorated border or a background drawn behind
-  text, left out as before. On a page with ink (any `ink_*` reason of its page type) such
+  no running text inside. Else it may be a decorated border or a background drawn behind
+  text, but nothing drawn is lost with it: its border (frame-shaped pieces, pieces across
+  the page, marks smaller than a figure along its edges: a frame drawn in pieces, corner
+  ornaments) is set aside and the rest clustered again, so a plot inside such a frame is
+  still a figure; with no border to take off, a cluster that still holds a plotted line,
+  curves or bars is left out and the safety net keeps the page image (a cluster of rules
+  and boxes behind text is left out as before). On a page with ink (any `ink_*` reason of its page type) such
   a drawing is never a figure for the model, as it may be a page of notes: the safety net
   keeps the page image instead (on a typed page with handwriting, `mixed_ink`, the
   handwriting is cut out already and the rest is left out). A cluster without meaningful
@@ -607,9 +615,10 @@ nothing. The elements read from it stay; the image comes after them. It fires wh
   small to be a figure), a drawing too small to be a figure. Rules, paper rules, a frame
   round the page, a background fill, a band of colour along an edge (a blank slide of a
   template) and a drawn list bullet beside its row do not count (`layout._painted`);
-- a drawing filling the page was left out because the page has ink the checks did not
-  confirm (rejected or not analysed; `layout._vector_figures`): a page of notes under a
-  typed title, whatever the title's length;
+- a drawing filling the page was left out (`layout._vector_figures`) because the page
+  has ink the checks did not confirm (rejected or not analysed: a page of notes under a
+  typed title, whatever the title's length), or because it has running text inside or
+  too few curves to be called a figure while holding a plotted line, curves or bars;
 - 12 or more of the page's handwriting-like strokes (the page type's ink analysis, clean
   or rejected) lie outside every element read from it and outside the header and footer
   bands: writing that became no figure, table or handwriting region. Typed text turned
@@ -672,8 +681,11 @@ fails a result with the same rule (`worker.result_outcome`).
   figure model like any drawing. Layout is slow on such pages (tens of seconds at 85,000
   paths, most of it table detection and figure clustering, as before);
 - a page-filling drawing with fewer than three curves and two bars (a full-page plot of
-  one line), or with running text inside it, is left out, as before: a decorated border
-  or a background drawn behind text looks the same;
+  one line), or with running text inside it, is not sent to the figure model (a
+  decorated border or a background drawn behind text looks the same): its page is kept
+  as an image with a decision when it holds a plotted line, curves or bars, a needless
+  one for a decorated background; a frame round the page with a margin wider than 15 %
+  is not recognised, so a plot inside it is a figure the size of the frame;
 - a flat drawing less than 24 pt tall (a one-line circuit, a timeline) is too small to be
   a figure; on a typed page (40 characters or more) it is left out, as before; with less
   text the safety net keeps the page;

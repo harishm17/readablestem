@@ -171,6 +171,21 @@ def test_drawings_that_fill_the_page_are_figures():
     assert [e.kind for e in doc.elements if e.page == 2] == [Kind.HEADING, Kind.FIGURE]
 
 
+def test_a_plot_on_a_page_with_a_decorative_frame_is_a_figure():
+    # Rounded corners, a double frame drawn as one path, corner ticks, corner curls and a
+    # light filled panel with a 30 pt margin: each frame is set aside, the plot is a
+    # figure with its caption, and the problem text is read.
+    doc = layout.analyze(data("framed_plots.pdf"))
+    assert doc.kept_pages == {}
+    for page in range(5):
+        (figure,) = [e for e in doc.elements if e.page == page and e.kind is Kind.FIGURE]
+        assert figure.caption == "Figure 1: height of the ball against time."
+        x0, y0, x1, y1 = figure.bbox
+        assert 140 <= x0 and x1 <= 420 and 180 <= y0 and y1 <= 380  # the plot, not the frame
+        text = " ".join(e.text or "" for e in doc.elements if e.page == page)
+        assert "Problem 3." in text
+
+
 def test_template_pages_with_nothing_to_read_are_not_decisions():
     doc = layout.analyze(data("template_pages.pdf"))
     assert doc.kept_pages == {}

@@ -114,6 +114,9 @@ FIGURE_PART_REACH = 12.0  # a smaller drawing this close to a vector figure is p
 DRAWING_CLUSTER_GAP = 6.0  # drawings closer than this belong to the same figure
 PAGE_SIZED_FRACTION = 0.85  # a drawing this wide and tall fills the page (or its frame)
 FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a frame's side
+FRAME_LINE_BAND = 0.05  # every point of a frame lies this share of its smaller side (at
+#                         least MIN_IMAGE_PT) from its box's edge: double lines, rounded
+#                         corners, corner ticks and curls
 # Page-type reasons for ink on a page: a page-filling drawing there is never a figure for
 # the model (it may be a page of notes). When the ink was not confirmed (rejected or not
 # analysed) the safety net keeps the page image instead; on a typed page with
@@ -2408,7 +2411,7 @@ class _Path:
     curved: bool  # has curves or diagonal lines (charts, diagrams; not tables or boxes)
     filled: bool  # a visible filled area (bars in a bar chart, shapes)
     source: int = -1  # index in the page's get_cdrawings list (handwriting is left out)
-    outline: bool = False  # the outline of one upright rectangle and nothing else (a frame)
+    frame: bool = False  # an outline along the edges of its own box only (a frame's shape)
     rules: bool = False  # paper rules: long separate horizontal and vertical lines only
 
 
@@ -2459,10 +2462,50 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
             kind = "radical"
         else:
             kind = "shape"
-        outline = kind == "shape" and not filled and _rectangle_outline(items, segments, box)
+        border = (
+            kind == "shape"
+            and not filled
+            and (_rectangle_outline(items, segments, box) or _border_like(items, display, box))
+        )
         rules = kind == "shape" and page_type.paper_rules(drawing, frame.width, frame.height)
-        paths.append(_Path(box, kind, curved, filled and kind == "shape", source, outline, rules))
+        paths.append(_Path(box, kind, curved, filled and kind == "shape", source, border, rules))
     return paths
+
+
+def _border_like(items: Sequence[Any], display: _Display, box: BBox) -> bool:
+    """The path runs along the edges of its own box only: the shape of a frame, single or
+    double, with square, rounded, ticked or curled corners, drawn as one path. Each line
+    or curve stays near one edge (all its points within the band of that edge; a rounded
+    corner is near both of its edges), and each rectangle or quad lies along all four.
+    A plot's grid, axes or curves drawn in the same path cross the inside."""
+    x0, y0, x1, y1 = box
+    band = max(MIN_IMAGE_PT, FRAME_LINE_BAND * min(x1 - x0, y1 - y0))
+    if min(x1 - x0, y1 - y0) <= 4 * band:
+        return False  # too small or too thin to tell its edges from its inside
+    for item in items:
+        if item[0] in ("re", "qu"):
+            corners = (
+                [(item[1][0], item[1][1]), (item[1][2], item[1][3])]
+                if item[0] == "re"
+                else list(item[1])
+            )
+            points = [display.point(*c) for c in corners]
+            xs, ys = [q[0] for q in points], [q[1] for q in points]
+            if max(min(xs) - x0, x1 - max(xs), min(ys) - y0, y1 - max(ys)) > band:
+                return False
+            continue
+        points = [display.point(*q) for q in item[1:]]
+        if not any(
+            all(distance(q) <= band for q in points)
+            for distance in (
+                lambda q: q[0] - x0,
+                lambda q: x1 - q[0],
+                lambda q: q[1] - y0,
+                lambda q: y1 - q[1],
+            )
+        ):
+            return False
+    return True
 
 
 def _rectangle_outline(
@@ -2963,6 +3006,7 @@ def _vector_figures(
     *,
     page_sized: bool = True,
     left_out: list[BBox] | None = None,
+    depth: int = 0,
 ) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables.
 
@@ -2970,11 +3014,13 @@ def _vector_figures(
     fill) is set aside first: a frame's box holds everything on the page, so clustered
     with the rest it made every figure on the page one "page border" (docs/layout.md
     "Figures"). A drawing that still fills the page (a full-page plot, a slide's chart)
-    is a figure when it has three curves or two bars and no running text inside (else it
-    is a decorated border or a background drawn behind text, left out as before). With
-    `page_sized` False (the page has ink: it may be a page of notes) such a drawing is
-    never a figure for the model: its box goes to `left_out`, and the safety net keeps
-    the page image instead (`INK_REASONS`)."""
+    is a figure when it has three curves or two bars and no running text inside. Else it
+    may be a decorated border or a background drawn behind text, but a drawing must not
+    be lost with it: its border (`_border_member`) is set aside and the rest clustered
+    again; with no border to take off, a page-filling drawing that still holds a plotted
+    line, curves or bars goes to `left_out`, and the safety net keeps the page image.
+    With `page_sized` False (the page has ink: it may be a page of notes) such a drawing
+    is never a figure for the model: its box goes to `left_out` too (`INK_REASONS`)."""
     figures = []
     small: list[tuple[BBox, int]] = []  # drawings too small to be figures on their own
     index = _RowIndex([r for r in rows if not r.vertical])
@@ -3011,7 +3057,20 @@ def _vector_figures(
             if (len(curves) < 3 and len(bars) < 2) or (
                 ctx is not None and _running_text(inside, ctx)
             ):
-                continue  # a decorated border, or a background drawn behind text
+                inner = [p for p in members if not _border_member(p, box, page_rect)]
+                if inner and len(inner) < len(members) and depth < 2:
+                    figures += _vector_figures(
+                        inner,
+                        rows,
+                        page_rect,
+                        ctx,
+                        page_sized=page_sized,
+                        left_out=left_out,
+                        depth=depth + 1,
+                    )
+                elif (curved or len(bars) >= 2) and left_out is not None:
+                    left_out.append(box)  # drawings no figure was made of: the page image
+                continue
         elif not curved and len(bars) < 2 and len(inside) >= 2:
             continue  # a box, shaded panel or table drawn around text
         figures.append(_Figure(box, paths=len(members)))
@@ -3037,25 +3096,59 @@ def _within(box: BBox, other: BBox, reach: float) -> bool:
 
 
 def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
-    """A frame round the page (one rectangle outline, or a page-long rule near an edge),
-    a background fill (at least PAGE_SIZED_FRACTION of the page's area) or a band of
+    """A frame round the page (an outline along the edges of its own box, whose sides are
+    each within FRAME_EDGE_BAND of the page's: any corners, single or double; or a
+    page-long rule near an edge), a background fill (at least PAGE_SIZED_FRACTION of the
+    page's area, or a straight-edged panel round the page with a margin) or a band of
     colour along an edge (a slide template's title bar): never part of a figure, and
     never content on its own."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
     big = PAGE_SIZED_FRACTION
     if path.filled:
-        return (x1 - x0) * (y1 - y0) >= big * w * h or _edge_band(path, page_rect)
+        return (
+            (x1 - x0) * (y1 - y0) >= big * w * h
+            or _edge_band(path, page_rect)
+            or (not path.curved and _round_page(path.bbox, page_rect))
+        )
+    if path.frame:
+        return _round_page(path.bbox, page_rect)
     if path.curved:
         return False
-    if path.outline:
-        return x1 - x0 >= big * w and y1 - y0 >= big * h
     edge = FRAME_EDGE_BAND
     if path.kind == "hrule":
         return x1 - x0 >= big * w and (y1 <= edge * h or y0 >= (1 - edge) * h)
     if path.kind == "vrule":
         return y1 - y0 >= big * h and (x1 <= edge * w or x0 >= (1 - edge) * w)
     return False
+
+
+def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
+    """Part of the border of a page-filling cluster (`box`): frame-shaped, across the page
+    (PAGE_SIZED_FRACTION of its width or height), or a mark smaller than a figure along
+    an edge of the cluster (within FRAME_EDGE_BAND of the page): the pieces of a frame
+    whose shape was not recognised, corner ornaments."""
+    x0, y0, x1, y1 = path.bbox
+    w, h = page_rect.width, page_rect.height
+    if path.frame or x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
+        return True
+    if max(x1 - x0, y1 - y0) >= MIN_DRAWING_PT:
+        return False
+    bx, by = FRAME_EDGE_BAND * w, FRAME_EDGE_BAND * h
+    return x1 <= box[0] + bx or x0 >= box[2] - bx or y1 <= box[1] + by or y0 >= box[3] - by
+
+
+def _round_page(box: BBox, page_rect: pymupdf.Rect) -> bool:
+    """Each side of `box` lies within FRAME_EDGE_BAND of the same side of the page: a
+    box round the page, with a margin of up to that share."""
+    w, h = page_rect.width, page_rect.height
+    edge = FRAME_EDGE_BAND
+    return (
+        box[0] <= edge * w
+        and box[2] >= (1 - edge) * w
+        and box[1] <= edge * h
+        and box[3] >= (1 - edge) * h
+    )
 
 
 def _bullet_mark(path: _Path, index: _RowIndex) -> bool:
