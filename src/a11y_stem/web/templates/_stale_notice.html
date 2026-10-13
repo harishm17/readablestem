@@ -1,0 +1,9 @@
+{% if stale|default(none) %}
+{# A write from a page drawn before the document's last review write (routes/review.py
+   `_stale_page`): nothing was saved. Like the error summary, it takes focus. #}
+<div class="error-summary stale-notice" role="alert" aria-labelledby="stale-title" tabindex="-1" autofocus>
+  <h2 id="stale-title">{{ stale.title }}</h2>
+  <p>{{ stale.message }}{% if stale.now %} {{ stale.now }}{% endif %}</p>
+  <p><a href="{{ stale.href }}">Reload this page</a></p>
+</div>
+{% endif %}

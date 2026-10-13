@@ -601,6 +601,25 @@ footer { margin-top: 18pt; border-top: 0.75pt solid #555; padding-top: 6pt;
          font-size: 9pt; }
 """
 
+# Table styles for the tables eval (`table_style`): the same page with its tables ruled
+# three common ways, a full grid, booktabs (rules above, below and under the header row
+# only) and no rules at all, so a detector is not measured on grids alone. Added after
+# PRINT_CSS; None keeps PRINT_CSS's light grid. The CSS is table-bench's (2026-10-08),
+# so its prints and gold pages can be reproduced.
+TableStyle = Literal["grid", "booktabs", "norules"]
+TABLE_STYLE_CSS: dict[str, str] = {
+    "grid": "table { break-inside: avoid; }",
+    "booktabs": (
+        "table { break-inside: avoid; border-top: 1.2pt solid #000; "
+        "border-bottom: 1.2pt solid #000; } "
+        "th, td { border: none; padding: 2pt 8pt; } "
+        "table > :first-child > tr:first-child > * { border-bottom: 0.6pt solid #000; }"
+    ),
+    "norules": (
+        "table { break-inside: avoid; } th, td { border: none !important; padding: 2pt 10pt; }"
+    ),
+}
+
 ImageResolver = Callable[[str], str | None]  # absolute image URL -> src (or None to omit)
 
 
@@ -843,19 +862,23 @@ def attribution_lines(page: PageSource) -> list[tuple[str, str | None]]:
     ]
 
 
-def printable_html(page: PageSource, resolve_image: ImageResolver) -> str:
+def printable_html(
+    page: PageSource, resolve_image: ImageResolver, *, table_style: TableStyle | None = None
+) -> str:
     """A simple printable HTML version of an OpenStax page, with an attribution footer.
 
     Keeps headings (at their published levels), paragraphs, lists, tables, MathML,
     figures with captions, and note/example boxes. Drops scripts, styles, iframes and
     links (their text stays). Pure function: images come from `resolve_image`.
+    `table_style` rules the tables one of the `TABLE_STYLE_CSS` ways (tables eval).
     """
     printer = _Printer(page.content_url, resolve_image)
     doc = ET.Element("html", {"lang": "en"})
     head = ET.SubElement(doc, "head")
     ET.SubElement(head, "meta", {"charset": "utf-8"})
     ET.SubElement(head, "title").text = page.page_title
-    ET.SubElement(head, "style").text = PRINT_CSS
+    extra = TABLE_STYLE_CSS[table_style] + "\n" if table_style else ""
+    ET.SubElement(head, "style").text = PRINT_CSS + extra
     body = ET.SubElement(doc, "body")
     main = ET.SubElement(body, "main")
     printer.children(_content_root(page.xhtml), main)
@@ -891,6 +914,7 @@ def render_page_pdf(
     cache_dir: Path | None = None,
     fetcher: Any = None,
     authors: list[str] | None = None,
+    table_style: TableStyle | None = None,
 ) -> bytes:
     """Print a page to PDF (headings, paragraphs, MathML, figures, captions, attribution).
 
@@ -900,6 +924,7 @@ def render_page_pdf(
     (default .cache/eval/images) once and inlined. With `cache_dir`, the PDF is cached
     under the SHA-256 of the printable HTML + paper size, so re-running an eval does not
     re-print unchanged pages. Writes `out_path` when given; returns the bytes.
+    `table_style` (grid, booktabs, norules) rules the tables for the tables eval.
     """
     if not isinstance(page, PageSource):
         if fetcher is None:
@@ -908,7 +933,7 @@ def render_page_pdf(
             fetcher = HttpFetcher(cache_dir=DEFAULT_CACHE / "openstax")
         page = page_source_from_records(list(page), fetcher, authors=authors)
     images = images or ImageCache(DEFAULT_CACHE / "eval" / "images")
-    page_html = printable_html(page, images.data_uri)
+    page_html = printable_html(page, images.data_uri, table_style=table_style)
     footer = footer_template(page)
     cached: Path | None = None
     if cache_dir is not None:

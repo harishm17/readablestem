@@ -15,8 +15,13 @@ Besides counting pages it refuses, before any quota is spent:
 - pages larger than `MAX_PAGE_SIDE_PT` on a side ("page_too_large"). MuPDF accepts page
   boxes far beyond the PDF limit, and the conversion's crash probe renders whole pages:
   an 18000 pt page needs about 1 GB there, more than the instance has.
-- PDFs with nothing to convert: every page a scanned image ("scanned") or blank
-  ("no_content"); see `pipeline.page_kinds`.
+- PDFs with nothing to convert (`pipeline.page_type.document_refusal`): every page
+  handwritten ("handwritten", or "handwritten_no_text" without a hidden recognition
+  layer), a scanned image ("scanned", or "scanned_ocr" with a hidden OCR layer), or
+  blank ("no_content"). Text nobody sees never counts as text. The text of every page
+  is read first and the check stops at the first typed page, so only such documents
+  pay for the drawings and the handwriting analysis, which has a time budget
+  (`page_type.INK_BUDGET_S`): a page not analysed in time never refuses the upload.
 
 The review screen uses the same child, with the same memory cap, for two more things
 (`web.page_images` is the caller):
@@ -64,9 +69,12 @@ MAGIC_WINDOW = 1024
 
 
 class ProbeRejected(Exception):
-    def __init__(self, code: str) -> None:
+    """`code` is a category; `pages` the page count when it is the reason."""
+
+    def __init__(self, code: str, pages: int | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.pages = pages
 
 
 def looks_like_pdf(data: bytes) -> bool:
@@ -94,9 +102,11 @@ def probe(data: bytes, *, max_pages: int) -> int:
             raise ProbeRejected("encrypted")
         pages = doc.page_count
         if pages == 0:
-            raise ProbeRejected("no_pages")
+            # A file cut short (a download that did not finish) opens only after MuPDF
+            # repairs it, and its page tree is often lost: damaged, not empty.
+            raise ProbeRejected("damaged" if doc.is_repaired else "no_pages")
         if pages > max_pages:
-            raise ProbeRejected("too_many_pages")
+            raise ProbeRejected("too_many_pages", pages=pages)
         _check_pages(doc)
     finally:
         doc.close()
@@ -105,13 +115,13 @@ def probe(data: bytes, *, max_pages: int) -> int:
 
 def _check_pages(doc: pymupdf.Document) -> None:
     """Refuse oversized pages and documents with nothing to convert (module docstring)."""
-    from a11y_stem.pipeline.page_kinds import nothing_to_convert, page_kinds
+    from a11y_stem.pipeline.page_type import document_refusal
 
     try:
         for page in doc:
             if max(page.rect.width, page.rect.height) > MAX_PAGE_SIDE_PT:
                 raise ProbeRejected("page_too_large")
-        reason = nothing_to_convert(page_kinds(doc))
+        reason = document_refusal(doc)
     except ProbeRejected:
         raise
     except Exception:  # a page MuPDF cannot read would fail the conversion as well
@@ -398,6 +408,8 @@ def main(argv: list[str] | None = None) -> int:
         answer: dict[str, object] = {"ok": True, "pages": probe(data, max_pages=max_pages)}
     except ProbeRejected as exc:
         answer = {"ok": False, "code": exc.code}
+        if exc.pages is not None:
+            answer["pages"] = exc.pages
     except Exception:
         answer = {"ok": False, "code": "unreadable"}
     sys.stdout.write(json.dumps(answer) + "\n")

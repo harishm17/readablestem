@@ -1,0 +1,10 @@
+{# What the job's course notation says about the equation on screen (notation memory,
+   routes/courses.py `review_context`): "Your course notation: bold d is a vector." #}
+{% if course_notation is defined and course_notation %}
+<p class="course-notation">Your course notation: {{ course_notation.lines|join("; ") }}.</p>
+{% if course_notation.unseen %}
+{% set letters = course_notation.unseen %}
+<p class="hint">The PDF’s text does not show which letters are bold, and the proposal has a
+  plain {{ letters|join(", ") }}: check {{ "it" if letters|length == 1 else "them" }} in the image.</p>
+{% endif %}
+{% endif %}

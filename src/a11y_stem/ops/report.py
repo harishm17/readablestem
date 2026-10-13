@@ -3,7 +3,7 @@
 `a11y-stem ops report --days 7` prints, for the last N UTC days: jobs and their
 outcomes, pages, cost per page and conversion times; the review load (decisions a
 person had to make per page, optional notes per page, by step); per step (equation,
-figure, heading) the status and review-tier mix, the most frequent reasons for each tier,
+figure, table, heading) the status and review-tier mix, the most frequent reasons for each tier,
 failed checks and reasons, and model call outcomes; the second automated check
 (answers, flags and score histogram per check and stage, its spend per page) and the
 daily Decisions canary; failed static checks of the output HTML. Each table is plain
@@ -19,7 +19,9 @@ from sqlalchemy.orm import Session
 
 from a11y_stem.web.db import ErrorAggregate
 
-STEPS = ("equation", "figure", "heading")
+# Every reviewable kind (`core.triage.REVIEWABLE_KINDS`; a test keeps them in step), in
+# the order the review screen groups them.
+STEPS = ("equation", "figure", "table", "heading")
 TOP = 10
 
 

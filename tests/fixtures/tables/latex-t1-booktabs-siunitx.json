@@ -1,0 +1,291 @@
+{
+ "source": "table-bench tables.tex (written for the table benchmark, no third-party text), table T1-booktabs-siunitx: a crop of tables.pdf; the local grid is the gold structure filled with the PDF's words by position (a stand-in for tables-detect)",
+ "recorded": "2026-10-09 with models/prompts/table.md as first committed",
+ "caption": "Table 1: Measured periods and the derived value of g.",
+ "local": {
+  "rows": 5,
+  "cols": 4,
+  "header_rows": 1,
+  "cells": [
+   {
+    "row": 0,
+    "col": 0,
+    "text": "Trial",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 1,
+    "text": "Length (m)",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 2,
+    "text": "Period (s)",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 3,
+    "text": "s−2) g (m",
+    "header": "col"
+   },
+   {
+    "row": 1,
+    "col": 0,
+    "text": "1"
+   },
+   {
+    "row": 1,
+    "col": 1,
+    "text": "0.250"
+   },
+   {
+    "row": 1,
+    "col": 2,
+    "text": "1.004"
+   },
+   {
+    "row": 1,
+    "col": 3,
+    "text": "9.79"
+   },
+   {
+    "row": 2,
+    "col": 0,
+    "text": "2"
+   },
+   {
+    "row": 2,
+    "col": 1,
+    "text": "0.500"
+   },
+   {
+    "row": 2,
+    "col": 2,
+    "text": "1.420"
+   },
+   {
+    "row": 2,
+    "col": 3,
+    "text": "9.79"
+   },
+   {
+    "row": 3,
+    "col": 0,
+    "text": "3"
+   },
+   {
+    "row": 3,
+    "col": 1,
+    "text": "0.750"
+   },
+   {
+    "row": 3,
+    "col": 2,
+    "text": "1.737"
+   },
+   {
+    "row": 3,
+    "col": 3,
+    "text": "9.81"
+   },
+   {
+    "row": 4,
+    "col": 0,
+    "text": "4"
+   },
+   {
+    "row": 4,
+    "col": 1,
+    "text": "1.000"
+   },
+   {
+    "row": 4,
+    "col": 2,
+    "text": "2.006"
+   },
+   {
+    "row": 4,
+    "col": 3,
+    "text": "9.81"
+   }
+  ]
+ },
+ "answers": {
+  "gpt-6-luna": {
+   "is_data_table": true,
+   "caption": "",
+   "rows": [
+    {
+     "cells": [
+      {
+       "text": "Trial",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Length (m)",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Period (s)",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "g (m s⁻²)",
+       "latex": "g\\ (\\text{m}\\ \\text{s}^{-2})",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "1",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "0.250",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1.004",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "9.79",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "2",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "0.500",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1.420",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "9.79",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "3",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "0.750",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1.737",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "9.81",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "4",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1.000",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2.006",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "9.81",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "expected": {
+  "status": "accepted",
+  "failed": [],
+  "models": [
+   "gpt-6-luna"
+  ]
+ }
+}

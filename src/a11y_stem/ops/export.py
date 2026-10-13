@@ -35,6 +35,8 @@ from sqlalchemy.orm import Session
 from a11y_stem.web.db import Blob, Job, JobStatus, ReviewEdit
 
 EXPIRES = "EXPIRES"
+# The proposal fields of a fix, one per reviewable kind (`core.triage.REVIEWABLE_KINDS`).
+PROPOSAL_KEYS = ("equation", "figure", "table", "heading")
 
 
 @dataclass
@@ -106,13 +108,11 @@ def _labels(session: Session, job_id: str, result: dict[str, Any]) -> list[dict[
                 "pipeline_status": pipeline.get("status") if isinstance(pipeline, dict) else None,
                 "confidence": fix.get("confidence"),
                 "checks": fix.get("checks"),
-                "proposal": {k: pipeline.get(k) for k in ("equation", "figure", "heading")}
+                "proposal": {k: pipeline.get(k) for k in PROPOSAL_KEYS}
                 if isinstance(pipeline, dict)
                 else None,
                 "review_action": last.action if last is not None else None,
-                "reviewed": {
-                    k: (last.after or {}).get(k) for k in ("equation", "figure", "heading")
-                }
+                "reviewed": {k: (last.after or {}).get(k) for k in PROPOSAL_KEYS}
                 if last is not None
                 else None,
             }

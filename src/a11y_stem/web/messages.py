@@ -10,6 +10,9 @@ Every code the pipeline can emit has an entry here: `tests/test_web_review_messa
 reads the pipeline's source, collects every check name/code pair and fix reason, and
 fails when one has no message (or when a message belongs to a code that no longer
 exists). An unknown code still gets a neutral sentence plus the code, never a blank.
+
+Notices (`DocumentResult.notices`, the job page's list beyond the review decisions) have
+their own table, `NOTICE_MESSAGES`, one entry per code in `core.types.NOTICE_CODES`.
 """
 
 from __future__ import annotations
@@ -17,7 +20,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass
 
-from a11y_stem.core.types import Check
+from a11y_stem.core.types import Check, Notice
 from a11y_stem.pipeline.validate import ALT_MAX_CHARS, ALT_WARN_CHARS, MAX_LATEX_CHARS
 
 # Failed checks, keyed by (check name, code). Names are what was checked, codes are what
@@ -116,6 +119,62 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "description), so check before hiding it from screen readers.",
     ("figure.second_check", "second_check_mismatch"): "A second automated check found a "
     "possible mismatch between the alt text and the image; worth a look.",
+    # Tables (pipeline.table_step)
+    ("table.grid", "grid_invalid"): "The rebuilt table's cells overlap, leave gaps or reach "
+    "outside the table, so check its rows and columns against the image.",
+    ("table.headers", "header_problem"): "The header cells look wrong (a header below the "
+    "data, a data cell among the headers, or a header that runs into the data), so check "
+    "which cells are headers.",
+    ("table.headers", "no_headers"): "No cell is marked as a header, so screen readers cannot "
+    "say what each value means: mark the header row or column.",
+    ("table.grid_agreement", "grid_size_differs"): "The model and the PDF's own layout found "
+    "a different number of rows or columns, so check that no row or column is missing, "
+    "split or merged.",
+    ("table.grid_agreement", "spans_differ"): "The model and the PDF's own layout disagree on "
+    "which cells are merged across rows or columns, so check the merged cells.",
+    ("table.cell_text", "text_mismatch"): "A word or number in the rebuilt table differs from "
+    "the text stored in the PDF (missing, added twice or changed), so compare the cells with "
+    "the image.",
+    ("table.cell_text", "cell_mismatch"): "Every word and number is in the right row, but one "
+    "sits in a different column than in the PDF (an empty cell left out, or two values "
+    "swapped), so check each row's cells against the image.",
+    ("table.cell_text", "row_mismatch"): "Every word and number is there, but one sits in a "
+    "different row than in the PDF, so check the rows against the image.",
+    ("table.cell_text", "whitespace_differs"): "The cells match the text stored in the PDF "
+    "once spacing is ignored, so this was accepted as it is.",
+    ("table.cell_text", "no_pdf_text"): "The PDF stores no text for this table to compare "
+    "the cells with, so check every value against the image.",
+    ("table.math", "invalid_latex"): "The maths in a cell could not be converted, so that "
+    "cell shows plain text instead: check it against the image.",
+    ("table.math", "flattened_maths"): "Some cells of the grid read from the PDF hold maths "
+    "that its text gives flat (a fraction, or an accent such as a vector arrow), so the "
+    "table cannot be used as it is: write those cells as LaTeX, or keep the image.",
+    ("table.math_symbols", "symbol_mismatch"): "A letter, digit or Greek letter in a maths "
+    "cell differs from the text stored in the PDF, so compare that cell with the image "
+    "symbol by symbol.",
+    ("table.math_signs", "sign_mismatch"): "A sign or relation in a maths cell differs from "
+    "the PDF (a minus missing or added, ± read as +, = and ≈ mixed up), so check the signs "
+    "in the maths cells.",
+    ("table.math_style", "style_mismatch"): "A style that carries meaning differs from the "
+    "PDF in a maths cell (a bold vector read as a plain letter, or the other way round), so "
+    "check those letters.",
+    ("table.math_style", "style_cosmetic"): "A letter's style in a maths cell differs from "
+    "the PDF only where it does not change the meaning, so this was accepted as it is.",
+    ("table.row_headers", "row_headers_dropped"): "A column of row labels comes after data "
+    "cells and could not be used as one, so the table has no row headers: check that each "
+    "value can still be found by its row.",
+    ("table.source", "local_grid"): "No model could read this table, so this is the grid "
+    "built from the PDF's own text with the first row as headers: check it against the image.",
+    ("table.kind", "written_as_text"): "The model judged that this is not a table of data, so "
+    "students get its text in reading order; if it is one, use the grid read from the PDF.",
+    ("table.kind", "numbers_not_a_table"): "The model judged that this is not a table of data, "
+    "but its cells hold numbers, so this is the grid built from the PDF's own text with the "
+    "first row as headers: check it against the image.",
+    # Long descriptions and chart data tables (pipeline.figure_step, long descriptions on)
+    ("figure.data_values", "values_from_image"): "A data table was read from the chart "
+    "image, so its values may be off; it is added only if you choose to after checking them.",
+    ("figure.long_description", "long_description_unsure"): "Part of the figure was hard "
+    "to read, so the longer description may be wrong in places; worth a look.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",
@@ -148,6 +207,25 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "site, but it should work on its own.",
     ("html.wording", "banned_wording"): "The document text promises more than this tool can "
     "back up (for example that it meets a legal standard).",
+    # Tables in the output HTML (pipeline.html_checks, tables-step block)
+    ("html.table_headers", "table_no_headers"): "A data table in the document has no header "
+    "cells, so screen readers cannot say what its values mean.",
+    ("html.table_header_scope", "th_without_scope"): "A header cell in a table does not say "
+    "whether it labels a row or a column.",
+    ("html.table_header_text", "empty_th"): "A header cell in a table is empty.",
+    ("html.table_caption", "table_caption_missing"): "A table's caption (Table N) sits in the "
+    "text beside it instead of being the table's own caption.",
+    ("html.table_layout", "layout_table"): "A table in the document is used only to lay out "
+    "text, but tables should hold data that is read across rows and columns.",
+    # Links, language and colour in the output HTML (pipeline.html_checks, text work)
+    ("html.link_text", "empty_link"): "A link in the document has no text, so screen "
+    "readers cannot say where it goes.",
+    ("html.link_href", "unsafe_link"): "A link in the document is not a web or email address "
+    "or a place in the document itself.",
+    ("html.lang_tags", "invalid_lang"): "A language marked in the document is not a valid "
+    "language code.",
+    ("html.text_contrast", "low_contrast"): "Some coloured text is too light to read easily "
+    "on the white background.",
     ("axe", "skipped"): "The automatic accessibility check (axe-core) was skipped because no "
     "browser was available.",
     ("axe", "axe_error"): "The automatic accessibility check (axe-core) could not run on the "
@@ -183,6 +261,13 @@ REASON_MESSAGES: dict[str, str] = {
     "model_skipped": "No model was asked about this item.",
     # Heading step
     "heading.empty_text": "This heading has no text, so it cannot be used as a heading.",
+    # Table step (pipeline.table_step)
+    "table_not_rebuilt": "This table is kept as an image of the original, so screen readers "
+    "cannot read its cells: keep it as an image or rebuild it as a table yourself.",
+    "not_data_table": "The model judged that this is not a table of data (for example text "
+    "set out in boxes), so the image is kept: rebuild it as a table yourself if it is one.",
+    "invalid_table": "The model's answer could not be made into a table, so the image is "
+    "kept: rebuild it as a table yourself or keep the image.",
     # Orchestrator (pipeline.run)
     "internal_error": "Something went wrong while this item was processed, so the original "
     "is kept, but you can still fill it in yourself.",
@@ -195,10 +280,60 @@ REASON_MESSAGES: dict[str, str] = {
     "was converted.",
     "budget_cancelled": "The conversion was stopped before this item was converted.",
     "budget_unknown": "A spending limit was reached before this item was converted.",
+    # Pages and handwriting kept as images before any model work (pipeline.page_type).
+    # TODO(Harish): final wording (handwriting design, section 3.3).
+    "handwritten_page": "This page is handwritten and this tool does not convert handwriting, "
+    "so the page is kept as an image, marked “Not converted”.",
+    "scanned_page": "This page is a scanned image and this tool does not convert scans, so "
+    "the page is kept as an image, marked “Not converted”.",
+    "unread_page": "Nothing on this page could be read as text, so the page is kept as an "
+    "image, marked “Not converted”.",
+    "handwriting_on_page": "This is handwriting on a typed page and this tool does not "
+    "convert handwriting, so it is kept as an image after the typed text.",
+}
+
+# DocumentResult.notices: one sentence per notice code for the job page's list ("Not
+# handled in this file" and "Worth checking"; core.types.Notice). Kept apart from the
+# check and fix-reason tables because a notice is not a review decision. Every code in
+# core.types.NOTICE_CODES has an entry (tests/test_web_review_messages.py). The wording
+# is a placeholder until the builder that emits each code writes its own sentence.
+NOTICE_MESSAGES: dict[str, str] = {
+    "table_not_rebuilt": "A table is kept as an image of the original, so screen readers "
+    "cannot read its cells.",
+    # Pages and hidden text (pipeline.page_type). "{count}" is replaced by the number of
+    # characters (web.job_page). TODO(Harish): final wording (handwriting design, 3.3).
+    "scanned_page": "A scanned image, not converted: the page is kept as an image.",
+    "handwritten_page": "Handwritten, not converted: the page is kept as an image.",
+    "unread_page": "Drawings or writing this tool could not read, not converted: the page is "
+    "kept as an image, after any text read from it.",
+    "handwriting_on_page": "Handwriting on a typed page: the typed text was converted, and "
+    "the handwriting is kept as an image after it.",
+    "ocr_text_layer_ignored": "Hidden text that a tablet or a text recognition (OCR) program "
+    "guessed from the page ({count} characters) was not used.",
+    "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
+    "the page is shown or printed, so it was left out: if students need it, add it to your "
+    "source file and upload that again.",
+    "code_block": "Program code is kept as plain text, without its layout or highlighting.",
+    "footnote": "A footnote is kept where it falls in the text, not linked to its mark.",
+    "colour_reference": "The text refers to a colour (for example, shown in red), so add "
+    "a cue that does not depend on seeing the colour.",
+    "colour_only": "A figure tells things apart by colour alone, so add labels or patterns "
+    "that do not depend on seeing the colour.",
+    "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
+    "email address.",
+    "link_text_unclear": "A link's text does not say where it goes (for example, click "
+    "here), so reword it.",
+    "lang_detected": "The language of the document was detected from its text, so check it "
+    "is right.",
+    "lang_assumed": "The PDF does not say which language it is in and none was detected, "
+    "so English is assumed: check it is right.",
+    "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
+    "long description yet.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."
 UNKNOWN_REASON_MESSAGE = "This item could not be converted, so the original is kept."
+UNKNOWN_NOTICE_MESSAGE = "Something in this file may need a look."
 
 SEVERITY_LABELS = {"error": "Must be fixed", "warning": "Worth checking"}
 # Failed checks of a fix accepted with optional notes (`Fix.review == "optional"`): they
@@ -233,6 +368,11 @@ def explain_check(check: Check) -> Explained:
 def explain_reason(reason: str) -> Explained:
     text = REASON_MESSAGES.get(reason)
     return Explained(text or UNKNOWN_REASON_MESSAGE, reason, known=text is not None)
+
+
+def explain_notice(notice: Notice) -> Explained:
+    text = NOTICE_MESSAGES.get(notice.code)
+    return Explained(text or UNKNOWN_NOTICE_MESSAGE, notice.code, known=text is not None)
 
 
 def severity_label(check: Check) -> str:

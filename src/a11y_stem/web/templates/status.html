@@ -5,7 +5,7 @@
 <dl class="summary-list">
   <div><dt>Service</dt><dd>{{ "Up" if database_ok else "Having problems: the database is not answering. Please try again later." }}</dd></div>
   {% if database_ok %}
-  <div><dt>Conversions today</dt><dd>{{ "Open" if conversions_open else "Paused: today's budget is used up. They start again after 00:00 UTC." }}</dd></div>
+  <div><dt>Conversions today</dt><dd>{% if conversions_open %}Open{% else %}Paused: today's budget is used up. They start again at {{ next_reset|utc }}.{% endif %}</dd></div>
   <div><dt>Documents waiting</dt><dd>{{ waiting }}</dd></div>
   <div><dt>Documents converting</dt><dd>{{ converting }}</dd></div>
   {% endif %}

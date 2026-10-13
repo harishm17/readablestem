@@ -6,10 +6,12 @@ decision first):
 - the decision at hand ("Decision 1 of 3"), with what to look at: for an equation the
   PDF and the proposal at the same size, the differing symbol outlined in both and the
   difference as a short table (`web.compare`); for a figure its image and the alt text
-  field; for repeated headings one card for the whole group. Accept, Save edit and
-  Reject post to the same route as the list view (`routes/review.py`), which redirects
-  to the next decision still open (`?item=<key>`), where the decision's heading takes
-  focus and says what just changed;
+  field; for a table its image and the table as the student would get it, with what can
+  be changed (`web.table_card`, `templates/_table_card.html`; after a change to a table
+  the reviewer stays on it); for repeated headings one card for the whole group. Accept,
+  Save edit and Reject post to the same route as the list view (`routes/review.py`),
+  which redirects to the next decision still open (`?item=<key>`), where the decision's
+  heading takes focus and says what just changed;
 - the optional checks (accepted automatically with a note), folded;
 - the page the decision is on, as an image rendered on demand from the upload
   (`web.page_images`), with every fix on it marked: a numbered box per decision still
@@ -17,9 +19,11 @@ decision first):
   ("Show accepted"). Each mark is a link to its item.
 
 Everything is a link or a form, so it works without JavaScript (`static/app.js` only
-adds keyboard shortcuts, scrolls the page image to the item and makes "Save edit" the
-main button once a field is changed). The full list of every item is still at
-`/jobs/{id}/review/list`.
+adds keyboard shortcuts, scrolls the page image to the item, makes "Save edit" the main
+button once a field is changed and keeps a draft of what is typed in this browser tab;
+htmx checks LaTeX while it is typed, `live_check`). Every form carries the review
+version its page was drawn at, so a form from an out-of-date tab is refused, not applied
+(`routes/review.py`). The full list of every item is still at `/jobs/{id}/review/list`.
 
 Mark positions come from a stylesheet made per job (`/jobs/{id}/review/marks.css`:
 element ids and percentages only), because the CSP allows no inline styles.
@@ -29,18 +33,19 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Any
+from typing import Annotated, Any
 from urllib.parse import urlencode
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import Response
+from markupsafe import Markup
 from pydantic import TypeAdapter
 from sqlalchemy import select
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import marks, page_images, queue
+from a11y_stem.web import events, marks, notation, page_images, queue
 from a11y_stem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
@@ -58,17 +63,24 @@ from a11y_stem.web.deps import (
     CurrentUser,
     PageError,
     UserDep,
+    current_user,
     get_ctx,
     pop_flash,
     render,
+    require_csrf,
 )
+from a11y_stem.web.edit_check import EditCheck, check_equation_edit
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.mathml import try_sanitize_mathml
 from a11y_stem.web.messages import explain_check, explain_reason
 from a11y_stem.web.review import (
+    GROUP_KINDS,
+    MAX_LATEX_CHARS,
     FieldError,
     ReviewInvalid,
     heading_places,
+    is_kept_image,
+    item_labels,
     item_numbers,
 )
 from a11y_stem.web.routes.jobs import NOT_FOUND, owned_job, require_done
@@ -77,12 +89,18 @@ from a11y_stem.web.routes.review import (
     HEADING_GROUP_FLASH,
     CheckView,
     HeadingGroupView,
+    PageGroupView,
     ReviewItem,
     _heading_group,
     _item,
     _load,
+    _load_versioned,
+    page_group_view,
+    stale_notice,
+    undo_offer,
 )
-from a11y_stem.web.views import KIND_LABELS, JobView
+from a11y_stem.web.speech_diff import SpokenDiff, spoken_diff
+from a11y_stem.web.views import KIND_LABELS, JobView, last_decision
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -90,7 +108,11 @@ router = APIRouter()
 IMAGE_HEADERS = {"Cache-Control": "private, no-store"}
 HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
 FIGURE_REGION_ZOOM = 2.0
+TABLE_REGION_ZOOM = 2.0
+TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
+# The kinds the review screen shows (marks, optional checks, items): its groups.
+REVIEW_KINDS = frozenset(GROUP_KINDS)
 
 # Short notes for the folded list of optional checks (the card itself has the full
 # sentence from web.messages). Codes without one use the full sentence.
@@ -168,9 +190,25 @@ class StepLink:
 
 @dataclass
 class OptionalLine:
+    """One item in a folded list ("Optional checks", "Your decisions"), named by what it
+    is as well as its number (UX review MF15)."""
+
     label: str  # "Equation 7, page 3"
-    note: str
+    note: str  # the note, or what the reviewer decided
     href: str
+    what: str = ""  # a heading's text, the start of the alt text
+    mathml: Markup | None = None  # an equation, small
+
+
+@dataclass(frozen=True)
+class ReadyView:
+    """The review screen's finish line (no decision open): what the job page says."""
+
+    title: str  # "Ready to share", "Ready", or a stopped job's outcome label
+    sentence: str  # what is shown as an image, or why the job stopped ("" when neither)
+    finish: str  # "You made 3 decisions on 9 October." / "Nothing in this file needed ..."
+    notes: int  # items accepted for you with a note (optional to look at)
+    shareable: bool  # the file can go to students (not a job that stopped early)
 
 
 @dataclass
@@ -184,11 +222,15 @@ class Panel:
     status_class: str = ""
     item: ReviewItem | None = None
     group: HeadingGroupView | None = None
+    pages: PageGroupView | None = None  # pages (or handwriting) kept as images
     why: str | None = None
     checks: list[CheckView] = field(default_factory=list)
     reason_code: str | None = None
     compare: EquationCompare | None = None
     compare_size: tuple[float, float] | None = None  # crop size in CSS px (aspect ratio)
+    # The proposal's reading and the PDF text's, the symbols that differ marked; only
+    # when the checks found a difference (`web.speech_diff`).
+    spoken: SpokenDiff | None = None
     # A decision whose proposal changes the meaning: the fix comes first (the suggested
     # one-click fix, else the edit box, open), and Accept is the secondary "Accept anyway".
     changes_meaning: bool = False
@@ -202,6 +244,7 @@ class Panel:
     next_label: str = ""
     decision_key: str | None = None
     confidence: str = ""
+    ready: ReadyView | None = None  # mode "done": the finish line
     group_pages: list[PageLink] = field(default_factory=list)
     # A decided heading group: what was decided, and which of the two choices would
     # change something if made again for all of them ("Change all 11").
@@ -210,6 +253,10 @@ class Panel:
     redo_bold: bool = False
     back_href: str | None = None  # an item outside the queue: back to the decision at hand
     back_label: str = ""
+    # A decided table (the reviewer stays on it after each change): the next decision
+    # still open, to go on when done with it.
+    continue_href: str | None = None
+    continue_label: str = ""
 
 
 def review_url(
@@ -233,8 +280,9 @@ def review_url(
     return url + (f"#{anchor}" if anchor else "")
 
 
-def _label(fix: Fix, numbers: dict[str, int]) -> str:
-    return f"{KIND_LABELS.get(fix.kind, fix.kind.value.title())} {numbers.get(fix.element_id, 0)}"
+def _label(fix: Fix, labels: dict[str, str]) -> str:
+    """The item's name (`web.review.item_labels`)."""
+    return labels.get(fix.element_id) or KIND_LABELS.get(fix.kind, fix.kind.value.title())
 
 
 def _page_count(view: JobView, result: DocumentResult) -> int:
@@ -369,11 +417,12 @@ class SplitBuilder:
     ) -> None:
         self.request = request
         self.user = user
-        self.view, self.result, self.crop_ids = _load(request, job_id, user)
+        self.view, self.result, self.crop_ids, self.version = _load_versioned(request, job_id, user)
         self.job_id = self.view.id
         self.show_accepted = show_accepted
         self.elements = {e.id: e for e in self.result.elements}
         self.numbers = item_numbers(self.result)
+        self.labels = item_labels(self.result)
         self.places = heading_places(self.result)
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
@@ -391,6 +440,7 @@ class SplitBuilder:
                 self.job_id,
                 self.crop_ids,
                 self.places.get(fix.element_id),
+                self.labels.get(fix.element_id),
             )
         return self.items[fix.element_id]
 
@@ -418,16 +468,46 @@ class SplitBuilder:
             if decision is not None:
                 return decision, None
             fix = self.result.fix_for(key)
-            if fix is not None and fix.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+            if fix is not None and fix.kind in REVIEW_KINDS:
                 return None, fix
         return queue.first_open(self.queue), None
 
     # ------------------------------------------------------------------ panel
 
+    def ready(self) -> ReadyView:
+        """The finish line once no decision is open, as the job page says it
+        (`job_page.headline`, `job_page.Finish`): "Ready to share", or "Ready" with what
+        is shown as an image, or the outcome of a job that stopped early."""
+        from a11y_stem.web import job_page
+        from a11y_stem.web.outcome import job_outcome
+
+        with session_scope(get_ctx(self.request).factory) as session:
+            job = owned_job(session, self.job_id, self.user)
+            when = last_decision(session, job)
+            outcome = job_outcome(
+                status=str(job.status), error_code=job.error_code, result_json=job.result_json
+            )
+        counts = job_page.breakdown(self.result.fixes)
+        line = job_page.headline("done", "", outcome, counts)
+        finish = job_page.Finish(
+            decided_units=counts.decided_units,
+            last_decision=when,
+            notes=counts.notes,
+            not_handled=len(job_page.notice_lists(self.result).not_handled),
+        )
+        return ReadyView(
+            title=line.label,
+            sentence=line.message if line.state in {"images", "stopped"} else "",
+            finish=finish.sentence,
+            notes=finish.notes,
+            shareable=line.state in {"ready", "images"},
+        )
+
     def panel(self, decision: queue.Decision | None, fix: Fix | None) -> Panel:
         total = len(self.queue)
         if decision is None and fix is None:
-            return Panel(mode="done", title="All decisions made" if total else "Nothing to decide")
+            ready = self.ready()
+            return Panel(mode="done", title=ready.title, ready=ready)
         if decision is not None:
             lead = decision.lead
             panel = Panel(
@@ -456,6 +536,9 @@ class SplitBuilder:
             if decision.is_group:
                 self._group_panel(panel, decision)
                 return panel
+            if decision.is_page_group:
+                self._page_group_panel(panel, decision)
+                return panel
             fix = lead
         else:
             assert fix is not None
@@ -473,6 +556,11 @@ class SplitBuilder:
                 panel.back_href = self.decision_url(current)
                 panel.back_label = f"Back to decision {current.number}"
         self._fix_panel(panel, fix)
+        if fix.kind is Kind.TABLE and decision is not None and not decision.open:
+            onward = queue.next_open(self.queue, decision)
+            if onward is not None:
+                panel.continue_href = self.decision_url(onward)
+                panel.continue_label = f"Go on to decision {onward.number}"
         return panel
 
     def _fix_panel(self, panel: Panel, fix: Fix) -> None:
@@ -505,6 +593,8 @@ class SplitBuilder:
             item.mathml = try_sanitize_mathml(
                 fix.equation.mathml if fix.equation else None, flag=compare.proposal_marks
             )
+            if compare.rows:
+                panel.spoken = spoken_diff(item.speech, item.text_layer)
             clip = context_clip(element, size)
             panel.compare_size = (
                 round((clip[2] - clip[0]) * COMPARE_PX_PER_PT, 1),
@@ -516,6 +606,18 @@ class SplitBuilder:
         elif fix.kind is Kind.HEADING and element is not None:
             panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
             panel.region_alt = f"{item.label} in the PDF, with the lines around it."
+        elif fix.kind is Kind.TABLE:
+            if element is not None:
+                panel.region_url = f"/jobs/{self.job_id}/regions/{fix.element_id}.png"
+                panel.region_alt = f"{item.label} in the PDF, outlined, with the lines around it."
+            # The card lists every finding itself; the line above it says only why there
+            # is no rebuilt table (not once the reviewer gave it one: the grid read from
+            # the PDF), or that the model was not sure enough.
+            rebuilt = item.table is not None and item.table.in_document
+            listed = fix.failed_checks or (item.table and item.table.problems)
+            if (fix.reason and not rebuilt) or not (fix.reason or listed):
+                panel.why = _why(fix, None)
+            return
         panel.why = _why(fix, panel.compare)
 
     def _group_panel(self, panel: Panel, decision: queue.Decision) -> None:
@@ -551,6 +653,31 @@ class SplitBuilder:
             for p in pages
         ]
 
+    def _page_group_panel(self, panel: Panel, decision: queue.Decision) -> None:
+        """Pages (or handwriting) kept as images: one card for all of them, with the
+        first one's image."""
+        for fix in decision.fixes:
+            self.item(fix)
+        group = page_group_view(self.result, list(decision.fixes), self.items)
+        panel.pages = group
+        panel.subtitle = group.title
+        lead = decision.lead
+        page = self.page_of(lead)
+        panel.show_on_page = (
+            self.url(item=decision.key, page=page, anchor=f"box-{lead.element_id}")
+            if page
+            else None
+        )
+        crop = self.item(lead).crop_url
+        if crop is not None:
+            panel.region_url = crop
+            name = self.labels.get(lead.element_id, "The first one")
+            panel.region_alt = f"{name} as it is in the PDF."
+        panel.group_pages = [
+            PageLink(p, self.url(item=decision.key, page=p, anchor="page-view"), 0, False)
+            for p in group.pages
+        ]
+
     # ------------------------------------------------------------------ page
 
     def page_view(self, number: int, selected: set[str], current_key: str | None) -> PageView:
@@ -563,14 +690,14 @@ class SplitBuilder:
             element = self.elements.get(fix.element_id)
             if element is None or element.page != index:
                 continue
-            if fix.kind not in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+            if fix.kind not in REVIEW_KINDS:
                 continue
             tier = _tier(fix)
             is_current = fix.element_id in selected
             if tier == "accepted" and not (self.show_accepted or is_current):
                 hidden += 1
                 continue
-            label = _label(fix, self.numbers)
+            label = _label(fix, self.labels)
             decision = decision_of.get(fix.element_id)
             key = decision.key if decision is not None and decision.open else fix.element_id
             href = self.url(item=key, page=number, anchor="decision-title")
@@ -585,7 +712,8 @@ class SplitBuilder:
                     )
                 of = f"{decision.number} of {len(self.queue)}"
                 home = queue.page_of(decision.lead, self.elements)
-                if decision.is_group and home is not None and home != index:
+                grouped = decision.is_group or decision.is_page_group
+                if grouped and home is not None and home != index:
                     # A group's heading on another page than the one the decision counts
                     # on (`queue.open_by_page`): a lighter mark, so a page without "N to
                     # decide" never shows a solid decision mark.
@@ -659,24 +787,77 @@ class SplitBuilder:
         far = (1 << 30, 1 << 30)
         rank = {e.id: (e.page, e.order) for e in self.result.elements}
         notes = sorted(
-            (
-                f
-                for f in self.result.fixes
-                if f.optional_note and f.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}
-            ),
+            (f for f in self.result.fixes if f.optional_note and f.kind in REVIEW_KINDS),
             key=lambda f: rank.get(f.element_id, far),
         )
         out = []
         for fix in notes:
-            page = self.page_of(fix)
-            label = _label(fix, self.numbers) + (f", page {page}" if page else "")
             href = self.url(item=fix.element_id, anchor="decision-title")
             compare = (
                 compare_equation(self.elements.get(fix.element_id), fix)
                 if fix.kind is Kind.EQUATION
                 else None
             )
-            out.append(OptionalLine(label, _first_note(fix, compare), href))
+            out.append(self._line(fix, _first_note(fix, compare), href))
+        return out
+
+    def _line(self, fix: Fix, note: str, href: str) -> OptionalLine:
+        page = self.page_of(fix)
+        item = self.item(fix)
+        return OptionalLine(
+            label=_label(fix, self.labels) + (f", page {page}" if page else ""),
+            note=note,
+            href=href,
+            what=item.preview,
+            mathml=try_sanitize_mathml(fix.equation.mathml if fix.equation else None),
+        )
+
+    def decided_lines(self) -> list[OptionalLine]:
+        """What the reviewer decided, apart from what was accepted for them (UX review
+        MF14): each decision of the queue the reviewer made, then any other item they
+        changed (an optional check edited, say), in page and reading order."""
+        out: list[OptionalLine] = []
+        seen: set[str] = set()
+        for decision in self.queue:
+            mine = [f for f in decision.fixes if f.decided_by_reviewer]
+            if decision.open or not mine:
+                continue
+            seen.update(f.element_id for f in decision.fixes)
+            href = self.decision_url(decision)
+            if decision.is_group:
+                lead = decision.fixes[0]
+                text = lead.heading.text if lead.heading else ""
+                kept = sum(f.status in KEPT for f in decision.fixes)
+                bold = sum(f.status is Status.REJECTED for f in decision.fixes)
+                out.append(
+                    OptionalLine(
+                        label=f"Repeated heading, {len(decision.fixes)} times",
+                        note=_group_state(kept, bold, len(decision.fixes)),
+                        href=href,
+                        what=text,
+                    )
+                )
+                continue
+            if decision.is_page_group:
+                group = page_group_view(self.result, list(decision.fixes), self.items)
+                label = f"{group.title}, {len(decision.fixes)}"
+                out.append(OptionalLine(label=label, note=group.state, href=href))
+                continue
+            fix = decision.fixes[0]
+            out.append(self._line(fix, self.item(fix).status_label + ".", href))
+        far = (1 << 30, 1 << 30)
+        rank = {e.id: (e.page, e.order) for e in self.result.elements}
+        others = sorted(
+            (
+                f
+                for f in self.result.fixes
+                if f.decided_by_reviewer and f.element_id not in seen and f.kind in REVIEW_KINDS
+            ),
+            key=lambda f: rank.get(f.element_id, far),
+        )
+        for fix in others:
+            href = self.url(item=fix.element_id, anchor="decision-title")
+            out.append(self._line(fix, self.item(fix).status_label + ".", href))
         return out
 
 
@@ -710,7 +891,7 @@ def headline(open_count: int, total: int, optional: int) -> str:
 
 
 def _notice(
-    flashes: list[dict[str, Any]], result: DocumentResult, numbers: dict[str, int], open_count: int
+    flashes: list[dict[str, Any]], result: DocumentResult, labels: dict[str, str], open_count: int
 ) -> str | None:
     """What the last decision did, for the status line above the next one."""
     if not flashes:
@@ -723,12 +904,15 @@ def _notice(
     if target.startswith(HEADING_GROUP_FLASH):
         key = target.removeprefix(HEADING_GROUP_FLASH)
         first = next((f for f in result.fixes if f.group_key == key), None)
-        text = first.heading.text if first is not None and first.heading else ""
-        label = f"Repeated heading “{text}”" if text else "Repeated heading"
+        if first is not None and is_kept_image(first):
+            label = page_group_view(result, [first], {}).title
+        else:
+            text = first.heading.text if first is not None and first.heading else ""
+            label = f"Repeated heading “{text}”" if text else "Repeated heading"
     elif target and not target.startswith(GROUP_FLASH):
         fix = result.fix_for(target)
         if fix is not None:
-            label = _label(fix, numbers)
+            label = _label(fix, labels)
     left = (
         "All decisions made."
         if open_count == 0
@@ -746,11 +930,15 @@ def split_page(
     page: str = "",
     show_accepted: bool = False,
     invalid: tuple[str, ReviewInvalid] | None = None,
+    stale: bool = False,
     status_code: int = 200,
+    cell: str = "",
 ) -> Response:
     builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted)
     decision, fix = builder.select(item)
     panel = builder.panel(decision, fix)
+    if cell and panel.item is not None and panel.item.table is not None:
+        panel.item.table.pick(cell)  # "Change a cell": that cell's form is open
     errors: list[FieldError] = []
     if invalid is not None:
         errors = invalid[1].errors
@@ -770,7 +958,8 @@ def split_page(
     open_count = sum(d.open for d in builder.queue)
     optional = builder.optional_lines()
     flashes = pop_flash(request)
-    notice = _notice(flashes, builder.result, builder.numbers, open_count)
+    notice = _notice(flashes, builder.result, builder.labels, open_count)
+    target = _flash_target(flashes)
     context: dict[str, Any] = {
         "job": builder.view,
         "panel": panel,
@@ -791,8 +980,42 @@ def split_page(
         "show_accepted": show_accepted,
         "list_url": f"/jobs/{builder.job_id}/review/list",
         "max_steps": MAX_STEPS,
+        "result_version": builder.version,
+        "stale": stale_notice(
+            builder.result,
+            builder.numbers,
+            item,
+            review_url(builder.job_id, item=item),
+            invalid[1].values if invalid is not None else None,
+        )
+        if stale
+        else None,
+        "decided_lines": builder.decided_lines(),
+        # Undo, in the notice after a decision: only for the write this page shows.
+        "undo": bool(notice)
+        and flashes[-1].get("undo", True) is not False
+        and undo_offer(request, builder.job_id, user, builder.version),
+        # The item the last decision saved (app.js forgets a kept draft of it).
+        "saved_target": target if ELEMENT_ID.match(target) else "",
     }
+    # Course notation (notation memory): the card's lines, and "remember for this course"
+    # after a decision that settled a styled letter.
+    from a11y_stem.web.routes.courses import review_context
+
+    shown = panel.item.element_id if panel.item is not None else None
+    context |= review_context(request, builder.job_id, user, builder.result, shown, flashes)
+    context["remember_item"] = panel.decision_key or shown
     return render(request, "review_split.html", context, status_code=status_code)
+
+
+def _flash_target(flashes: list[dict[str, Any]]) -> str:
+    """The element id the last notice is about ("" for a group or none)."""
+    if not flashes:
+        return ""
+    target = flashes[-1].get("element_id")
+    if not isinstance(target, str) or target.startswith((GROUP_FLASH, HEADING_GROUP_FLASH)):
+        return ""
+    return target
 
 
 def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
@@ -801,12 +1024,19 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
         panel.group.error = " ".join(e.message for e in exc.errors)
         panel.group.values.update(exc.values)
         return
+    if panel.pages is not None and panel.pages.key == target:
+        panel.pages.error = " ".join(e.message for e in exc.errors)
+        return
     item = panel.item
     if item is not None and item.element_id == target:
         item.edited = any(item.values.get(k, "") != v for k, v in exc.values.items())
         item.values.update(exc.values)
+        item.override = exc.override
         for error in exc.errors:
             item.errors[error.field_id.split("-", 1)[0]] = error.message
+        if item.table is not None and "row" in exc.values:
+            # A refused cell: its form open again, with what the reviewer typed.
+            item.table.pick_at(exc.values["row"], exc.values.get("col", ""))
 
 
 # --------------------------------------------------------------------------- routes
@@ -814,9 +1044,83 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
 
 @router.get("/jobs/{job_id}/review")
 def review_screen(
-    request: Request, job_id: str, user: UserDep, item: str = "", page: str = "", accepted: str = ""
+    request: Request,
+    job_id: str,
+    user: UserDep,
+    item: str = "",
+    page: str = "",
+    accepted: str = "",
+    cell: str = "",
 ) -> Response:
-    return split_page(request, job_id, user, item=item, page=page, show_accepted=accepted == "1")
+    """`cell` ("r1c2"): a table's "Change a cell" choice, whose form is then open."""
+    shown = accepted == "1"
+    response = split_page(
+        request, job_id, user, item=item, page=page, show_accepted=shown, cell=cell
+    )
+    ctx = get_ctx(request)  # usage event (web/events.py)
+    events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "split")
+    return response
+
+
+def live_status(check: EditCheck) -> str:
+    """The one sentence the live check puts in the field's polite live region."""
+    if check.unchanged:
+        return ""
+    if check.empty:
+        return "Type the LaTeX for this equation."
+    if check.blocking:
+        return "Your LaTeX cannot be saved yet. " + _problems(len(check.blocking))
+    if check.meaning:
+        return "Your LaTeX differs from the PDF where it changes the meaning. " + _problems(
+            len(check.meaning)
+        )
+    if check.notes:
+        notes = "1 small note" if len(check.notes) == 1 else f"{len(check.notes)} small notes"
+        return f"Your LaTeX can be saved, with {notes} below."
+    if check.has_text_layer:
+        return "Your LaTeX can be saved: it matches the PDF's own text."
+    return "Your LaTeX can be saved. The PDF has no text here to compare it with."
+
+
+def _problems(n: int) -> str:
+    return "The problem is listed below." if n == 1 else f"The {n} problems are listed below."
+
+
+@router.post("/jobs/{job_id}/review/{element_id}/check", dependencies=[Depends(require_csrf)])
+def live_check(
+    request: Request, job_id: str, element_id: str, latex: Annotated[str, Form()] = ""
+) -> Response:
+    """The checks Save edit would run, on the LaTeX being typed (htmx, debounced): an HTML
+    fragment, nothing stored and nothing logged but the request line. Signed out (the
+    session ended in another tab), it answers 204 and changes nothing on the page, so
+    the background request never takes the reviewer away from what they are typing."""
+    user = current_user(request)
+    if user is None:
+        return Response(status_code=204)
+    if not ELEMENT_ID.match(element_id):
+        raise PageError(404, *NOT_FOUND)
+    _, result, _ = _load(request, job_id, user)
+    fix = result.fix_for(element_id)
+    if fix is None or fix.kind is not Kind.EQUATION:
+        raise PageError(404, *NOT_FOUND)
+    element = next((e for e in result.elements if e.id == element_id), None)
+    typed = latex.strip()
+    if len(typed) > MAX_LATEX_CHARS:
+        check = EditCheck(latex=typed, mathml=None, speech="", checks=[], display="block")
+        check.blocking = [f"Keep the LaTeX under {MAX_LATEX_CHARS} characters."]
+    else:
+        ctx = get_ctx(request)
+        with notation.in_force(ctx.factory, ctx.settings, job_id):
+            check = check_equation_edit(element, fix, typed)
+    context = {
+        "check": check,
+        "eid": element_id,
+        "label": f"Equation {item_numbers(result).get(element_id, 0)}",
+        "mathml": try_sanitize_mathml(check.mathml),
+        "status": live_status(check),
+    }
+    # Not `render`: that would take the session's one-time notices with it.
+    return get_ctx(request).templates.TemplateResponse(request, "_edit_check.html", context)
 
 
 def _pct(value: float, whole: float) -> str:
@@ -866,7 +1170,7 @@ def marks_css(request: Request, job_id: str, user: UserDep) -> Response:
         text[e.page] = (min(left, e.bbox[0]), max(right, e.bbox[2]))
     for fix in result.fixes:
         element = elements.get(fix.element_id)
-        if element is not None and fix.kind in {Kind.EQUATION, Kind.FIGURE, Kind.HEADING}:
+        if element is not None and fix.kind in REVIEW_KINDS:
             by_page.setdefault(element.page, {})[element.id] = element.bbox
     for page, boxes in sorted(by_page.items()):
         size = sizes.get(page)
@@ -969,6 +1273,19 @@ def _render_region(
             snap=True,
         )
     x0, y0, x1, y1 = element.bbox
+    if fix.kind is Kind.TABLE:
+        # The table outlined, with a little page round it snapped to whole lines: its
+        # caption above comes in whole, and no line of text is cut at an edge.
+        m = TABLE_REGION_MARGIN
+        return page_images.render_region(
+            pdf,
+            element.page,
+            zoom=TABLE_REGION_ZOOM,
+            max_side=page_images.REGION_MAX_SIDE_PX,
+            clip=(x0 - m, y0 - m, x1 + m, y1 + m),
+            box=element.bbox,
+            snap=True,
+        )
     return page_images.render_region(
         pdf,
         element.page,

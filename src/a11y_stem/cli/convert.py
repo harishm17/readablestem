@@ -27,6 +27,7 @@ import argparse
 import importlib
 import json
 import sys
+from collections import Counter
 from pathlib import Path
 from typing import Any
 
@@ -40,7 +41,7 @@ from a11y_stem.models.pricing import UnknownModelError, price_for
 # Shown at the top of the HTML from a --fake run: the offline client's answers are
 # placeholders (WP1's OFFLINE_DEFAULTS), and the CLI has no review step to catch them.
 FAKE_NOTICE = (
-    "Offline test run: equations and figure descriptions in this file are placeholders "
+    "Offline test run: equations, figure descriptions and tables in this file are placeholders "
     "from a fake model, not conversions. Do not publish it."
 )
 
@@ -217,10 +218,10 @@ def _fix_table(output: ConversionOutput) -> list[str]:
     fixes = output.result.fixes
     statuses = [s for s in Status if any(f.status is s for f in fixes)]
     if not statuses:
-        return ["  (no headings, equations or figures found)"]
+        return ["  (no headings, equations, figures or tables found)"]
     width = max(len(s.value) for s in statuses) + 2
     lines = ["  " + f"{'kind':<10}" + "".join(f"{s.value:>{width}}" for s in statuses)]
-    for kind in (Kind.HEADING, Kind.EQUATION, Kind.FIGURE):
+    for kind in (Kind.HEADING, Kind.EQUATION, Kind.FIGURE, Kind.TABLE):
         row = [sum(1 for f in fixes if f.kind is kind and f.status is s) for s in statuses]
         if any(row):
             lines.append("  " + f"{kind.value:<10}" + "".join(f"{n:>{width}}" for n in row))
@@ -256,12 +257,17 @@ def _print_summary(
     print(
         f"Elements:    {len(result.elements)} ({kinds[Kind.HEADING]} headings, "
         f"{kinds[Kind.PARAGRAPH]} paragraphs, {kinds[Kind.LIST_ITEM]} list items, "
-        f"{kinds[Kind.EQUATION]} equations, {kinds[Kind.FIGURE]} figures)"
+        f"{kinds[Kind.EQUATION]} equations, {kinds[Kind.FIGURE]} figures"
+        + (f", {kinds[Kind.TABLE]} tables)" if kinds[Kind.TABLE] else ")")
     )
     print("Fixes:")
     for line in _fix_table(output):
         print(line)
     print(f"Review:      {_review_summary(result.fixes)}")
+    if result.notices:  # codes only (content-free), as the job page lists them
+        counts = Counter(n.code for n in result.notices)
+        print("Notices:     " + ", ".join(f"{code} {n}" for code, n in sorted(counts.items())))
+    print(f"Language:    {result.lang} ({result.lang_source})")
     note = "fake client, nothing billed" if fake else f"cap ${cap_usd:.2f}"
     print(f"Model calls: {stats.model_calls}")
     print(f"Cost:        ${stats.cost_usd:.4f} ({note})")

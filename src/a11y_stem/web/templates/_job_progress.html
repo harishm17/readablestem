@@ -1,0 +1,13 @@
+{# The steps of a conversion with their counts ("Equations: 14 of 21 read and checked
+   against your PDF's text"), outside the live region so a screen reader is not told
+   every element; anyone can read it when they want. Polled by htmx on its own (204 while
+   unchanged); without JavaScript it is current whenever the page is loaded. #}
+<div id="job-progress"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/progress?v={{ job.progress_version }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  {% if job.stage_lines %}
+  <ol class="check-list" aria-label="Steps so far">
+    {% for line in job.stage_lines %}
+    <li>{{ line.text }} <span class="meta">({{ "in progress" if line.state == "now" else "done" }})</span></li>
+    {% endfor %}
+  </ol>
+  {% endif %}
+</div>

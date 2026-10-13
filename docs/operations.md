@@ -50,12 +50,34 @@ bug, say), the job is deleted anyway and counted in `unaggregated_deleted`. A no
 value there means some counts are missing; it never means a document was kept.
 
 What survives deletion: users and the allowlist, the daily spend and quota counters, the
-content-free aggregates below, and database backups. A backup holds every document that
-existed when it ran, so a deleted document stays in the backups taken before its
-deletion until they are dropped. The deploy keeps one daily backup and no
-point-in-time-recovery logs, so that is up to about a day after the purge
+content-free aggregates below, the usage events (next section), and database backups. A
+backup holds every document that existed when it ran, so a deleted document stays in the
+backups taken before its deletion until they are dropped. The deploy keeps one daily
+backup and no point-in-time-recovery logs, so that is up to about a day after the purge
 ([deploy.md](deploy.md), "Backups and deleted documents"); the privacy page has to say so
 (or backups have to be off).
+
+### Usage events
+
+`events` (`web/events.py`, docs/web.md "Usage events") holds content-free, pseudonymous
+usage events: a user id, an event name, a job id, a category code and a number. They
+outlive the jobs they mention on purpose (the beta's measures span weeks, and the
+deleted-document page uses them to tell an owner what happened), but not for ever:
+
+- **400 days** (`web.events.EVENT_RETENTION_DAYS`). The same hourly purge, after the jobs,
+  deletes every event older than that (`ops.retention.purge_old_events`, one DELETE on
+  the indexed `created_at`) and logs the number as `events_deleted` in `purge_done`.
+  Why 400: a whole academic year and the first weeks of the next, so a course taught
+  again can be compared with its first run and the four-week return rate measured all
+  year. Changing it means changing the privacy page, which names the number.
+- **With the user.** `a11y-stem users delete` (`ops.retention.erase_user`) deletes all of
+  a person's events at once.
+- **Off.** `EVENTS_ENABLED=false` writes no new events (and turns the two questions after
+  a download off); events already kept follow the rules above.
+
+The upload fingerprint in `uploaded` events is keyed with `SESSION_SECRET`: rotating the
+secret makes the next upload of a file look new (a missed `reuploaded`, nothing else).
+`/admin` shows the counts per day and per pseudonymous person.
 
 ## Error aggregates
 
@@ -75,7 +97,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | same | `review:<action>` | reviewer decisions (`accept`, `edit`, `reject`), counted when the job is deleted, because reviews can happen until then |
 | same | `tier:<tier>` | fixes by review tier as the pipeline left them (`required`, `optional`, `none`; `Fix.review`, see docs/design/beta-architecture.md "Review tiers") |
 | same | `tier:<tier>:<reason>` | why each required or optional fix has its tier: each failed check code, its `Fix.reason`, `heading.repeated_label` for a member of a group of repeated headings, or `below_accept` when only the confidence held it back (`core.triage.tier_reasons`) |
-| same | `decisions:required` | decisions the pipeline asked a person for: one per required fix, but one per group of repeated headings (`sum(decisions:required) / sum(pages)` is the review load per page) |
+| same | `decisions:required` | decisions the pipeline asked a person for: one per required fix, but one per group of repeated headings and one per group of pages kept as images for one reason (`sum(decisions:required) / sum(pages)` is the review load per page) |
 | same | `aggregate:checks_edited` | fixes whose checks could not be counted: a reviewer's edit replaced them before aggregation ran (a heading edit keeps them; checks in the earliest `before` snapshot are counted when it has them) |
 | `equation`, `figure` | `verify:<check>:<stage>:outcome:<outcome>` | answers of the second automated check (ADR 0005): `check` is `figure_alt` or `equation_match`, `stage` `final` or `cheap`, `outcome` `ok` or why there is none (`timeout`, `refused`, `budget_exceeded`, ...) |
 | same | `verify:<check>:<stage>:flagged` | answers past the threshold: a figure's optional note; an equation's "would flag" (shadow, nothing changed) |
@@ -84,7 +106,9 @@ read from the `before` snapshot of its earliest review. Categories:
 | `canary` | `decisions:run`, `decisions:<status>` | the day's canary claim and its result (`ok`, `drift`, `failed`, `stale`) |
 | `document` | `check:<check name>:<code>` | failed static checks of the output HTML (`DocumentResult.html_checks`), e.g. `check:heading.order:skipped_level` |
 | `job` | `status:done`, `status:failed` | finished jobs |
-| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`; on done jobs the outcome code (`error:budget_daily`, `error:scanned_pages`) |
+| `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`, `error:handwritten`; on done jobs the outcome code (`error:budget_daily`, `error:pages_not_converted`; `error:scanned_pages` before page types) |
+| `page` | `page_type:<kind>` | analysed pages of a job by page type (`born_digital`, `handwritten_ocr`, `scan_ocr`, ...; `pipeline.page_type`, docs/layout.md "Hidden text and page types"): the signal for whether handwriting and scans are common enough to matter |
+| `page` | `page_type_reason:<code>` | their content-free reason codes (`invisible_text`, `text_covered`, `ocr_font`, `ink_writing`, `hidden_ratio`, `ink_not_analysed`, ...) |
 | `job` | `pages` | pages of done jobs (a sum, not a count of jobs) |
 | `job` | `cost_microusd` | model spend of done jobs in millionths of a dollar (a sum): `sum(cost_microusd) / sum(pages) / 1e6` is the production cost per page |
 | `job` | `latency:lt60s` ... `latency:ge600s` | done jobs by conversion wall time (buckets 60, 120, 300, 600 s) |
@@ -148,8 +172,10 @@ FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 
 `a11y-stem ops report --days 7` prints the weekly error-analysis tables from these rows
 (through the Cloud SQL Auth Proxy, like the other `ops` commands), including the review
-load (required decisions and optional notes per page, by step) and, per step, the tier
-mix and the most frequent reasons for each tier.
+load (required decisions and optional notes per page, by step) and, per step (equation,
+figure, table, heading: every reviewable kind), the tier mix and the most frequent
+reasons for each tier. The opted-in export's labels carry the table proposal and the
+reviewed table too.
 
 ## Logs
 
@@ -172,6 +198,7 @@ resource.labels.service_name="a11y-stem"`):
 | Slow pages | `jsonPayload.message="request" AND jsonPayload.latency_ms>5000` |
 | Hourly cleanup | `jsonPayload.message=("aggregate_done" OR "purge_done" OR "aggregate_failed" OR "aggregate_on_delete_failed")` |
 | Tracing problems | `jsonPayload.message=("tracing_disabled" OR "trace_failed")` |
+| Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `jsonPayload.message="upload_rejected" AND jsonPayload.code=("handwritten" OR "handwritten_no_text" OR "scanned" OR "scanned_ocr")` |
 | Decisions API | `jsonPayload.message=("decision_call" OR "verifier_unavailable")` (failures are WARNING; `outcome`, `status`, `code`, `request_id`) |
 | Decisions canary | `jsonPayload.message=("decisions_canary_ok" OR "decisions_canary_drift" OR "decisions_canary_incomplete" OR "decisions_canary_failed")`, and `jsonPayload.decisions_canary` on `cron_done` |
 

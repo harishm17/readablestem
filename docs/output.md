@@ -19,19 +19,23 @@ on it. The pipeline that feeds it is in `docs/design/beta-architecture.md`.
 <main>
   <p class="notice a11y-stem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
-  <section id="about-conversion" ...>About this conversion</section>
 </main>
+<footer id="about-conversion" ...>About this version (the note for students)</footer>
 </body>
 </html>
 ```
 
 There are no scripts and nothing is loaded from elsewhere: images are `data:` URIs and the
-stylesheet is inline. The file opens offline, can be pasted into an LMS page or emailed,
+stylesheet is inline. The file opens offline, can be uploaded to a course or emailed,
 and opening it never sends a request anywhere. `html_checks.static_checks` fails the
-`external_resource` rule if that ever changes.
+`external_resource` rule if that ever changes. It must not be pasted into an LMS page
+(see "Posting it in a course").
 
-- `lang` comes from the PDF (`/Lang`, else `en`). Anything that is not a language tag
-  falls back to `en`, so a crafted PDF cannot inject attributes.
+- `lang` is `DocumentResult.lang`: the PDF's `/Lang`, else the language detected from the
+  text, else `en` (see "Language"). Anything that is not a language tag falls back to
+  `en`, so a crafted PDF cannot inject attributes.
+- Links (`<a href>`, see "Links and cross-references") load nothing: following one is
+  the reader's choice, and opening the file still sends no request.
 - `<title>` is the PDF title or the first level-1 heading, else "Converted document".
 - Every element keeps its pipeline id (`id="p3-e7"`), so a report or the review screen can
   link to `#p3-e7`. An id is used once even if layout produced a duplicate.
@@ -39,6 +43,27 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 - An optional plain-text `notice` opens `<main>` as a labelled, outlined note ("Note:
   ..."). The CLI uses it for `--fake` runs, whose answers are placeholders: the file has
   to say so before any content, because the CLI has no review step.
+
+## Posting it in a course
+
+The file is meant to be uploaded as a file and linked, not pasted into a page. Pasting
+breaks it: Canvas's sanitizer keeps only http, https and relative image sources, so every
+`data:` image (every figure and every equation kept as an image) is dropped, and it
+removes the `<style>` block, `<main>` and `tabindex`, so the hidden "Equation" labels
+show, printed list markers double ("1. (a)") and wide equations lose their scroll box
+(read from Canvas's sanitizer allowlist, FEATURE-REVIEW "Beta 5"; not yet tried in a live
+course). Pipeline 0.4.0 output loses more: the colour of coloured text
+(FEATURE_COLOUR's runs are `.tc-*` rules in `<style>`, so "the terms shown in red"
+then points at nothing), the `headers` attribute (allowed on neither `td` nor `th`), so
+an irregular table's header associations go, and the tab stops of wide tables' and
+chart data tables' scroll boxes (`tabindex`); `details`, `summary`, `caption`,
+`colgroup` and `math` survive. Moodle's HTML purifier drops `data:` images and MathML. The app's help page
+`/help/posting` (`web/templates/help_posting.html`) gives the steps for Canvas (upload to
+Files, link it where the PDF was, check it in Student View), says to make the HTML the
+main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
+Justice Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
+page links to it under the download link. TODO(Harish): try the steps in a real Canvas
+course (Canvas Lite, then UTD) and update both.
 
 ## How each element is written
 
@@ -49,8 +74,10 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 | List item | `<li>` in a `<ul>`/`<ol>`, inline equations placed at their markers (see "Lists") | (no fix) |
 | Inline equation | `<math display="inline">` inside the paragraph or list item (a wide one in a `<span class="equation-scroll">`, see "Wide equations") | the crop inline, outlined, with "(equation not converted)" |
 | Block equation | `<div class="equation"><math display="block">`, then its number if it has one | `<div class="flagged">`: the crop, its number, a note |
-| Figure | `<figure><img alt="..."><figcaption>` | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
+| Figure | `<figure><img alt="..."><figcaption>`, then `<details class="figure-description">` when it has a long description or a data table (see "Long descriptions and chart data") | `<div class="flagged">`: the figure with alt "Figure without a description", plus a note |
+| Page kept as an image (pipeline 0.4.0: handwritten, scanned, nothing readable) and handwriting on a typed page | (never converted) | `<div class="flagged" data-reason="handwritten_page">` (or `scanned_page`, `unread_page`, `handwriting_on_page`): the page image with alt "Page 2: handwritten notes, not converted to text." ("Page 5: a scanned page, ...", "Page 3: not converted to text.", "Handwriting on page 3, not converted to text."), the label "Not converted." and a note: "This page is a picture of handwritten notes, so a screen reader cannot read it. Ask your instructor for a text version." (see "Flagged items") |
 | Decorative figure | `<div class="decorative"><img alt="">` (a `<figure>` if it has a caption) | |
+| Table (pipeline 0.4.0) | `<div class="table-scroll" role="group" tabindex="0">` around a `<table>` (see "Tables"); a grid that is not a table of data is its text in reading order: a grid of terms as a `<ul>` (layout), one the model calls not data as a `<dl>`, `<ul>` or paragraphs in a `<div id>` | `<div class="flagged">`: the image of the table with alt "Table not converted", its caption, a note (`data-reason="table_not_rebuilt"` while rebuilding tables is off) |
 
 A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assembly:
 
@@ -67,11 +94,99 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
   <p class="flag-note a11y-stem" role="note"><span class="flag-label">Not converted.</span>
   This equation is shown as an image of the original, so screen readers cannot read it.
-  Review it before publishing.</p></div>
+  Ask your instructor for a version you can read.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
   time: a straight line rising from the origin." width="437" height="267">
   <figcaption>Figure 2.5 Position against time for a cart moving at constant velocity.</figcaption></figure>
 ```
+
+## Tables
+
+`pipeline/table_html.py` (`render_table`) writes every data table: the rebuilt tables
+and, later, the data tables of charts. It follows the W3C WAI tables tutorial:
+`<caption>` only when the PDF had a "Table N" caption, the header rows in `<thead>`,
+`<th scope="col">` (`"colgroup"` with `<colgroup>` elements for a spanning header in the
+first row), `<th scope="row">`, a body split into one `<tbody>` per section with
+`scope="rowgroup"` on a full-width section heading, and `headers`/`id` only when scope
+cannot say which headers apply (a row header after data cells, a column header below the
+header rows, or nested column headers whose spans cross). Cell text and captions are
+escaped; a maths cell is MathML rebuilt by `sanitize_mathml` (its text otherwise). A
+header cell that is only maths also gets its reading (`speech.mathml_to_speech`) as
+visually hidden text, with the MathML hidden from assistive technology: browsers name a
+`<th>` from its text, never from MathML, and screen readers announce a cell's headers by
+name (the static rule `html.table_header_text` does not count MathML as header text). A
+broken grid (`core.types.grid_problems`) still renders as a rectangular table.
+
+`pipeline/assemble_tables.py` wraps a rebuilt table in a box that scrolls sideways on a
+narrow screen; a table that may be wider than a 320 px screen
+(`estimate_min_width_em` >= `WIDE_TABLE_EM`) is also a tab stop, named by the caption
+(else "Table"), so keyboard users can scroll it, as wide equations are. A proposal without
+a caption gets the element's "Table N" caption (layout took it out of the text). Any table
+that was not rebuilt keeps its image, flagged. Table CSS is added only to documents with
+a rebuilt table, so other documents are byte-for-byte what 0.3.0 wrote. The table step,
+its checks and the width estimate's calibration: [tables.md](tables.md).
+
+## Long descriptions and chart data
+
+With long descriptions on (FEATURE_LONG_DESCRIPTIONS, docs/steps.md), a chart, diagram
+or complex illustration can have a long description and a chart its data table
+(`FigureFix.long_description`, `data_table`). Following the W3C WAI complex images
+tutorial (a short alt on the image, a long description next to it), they are written
+right after the figure, folded, by `pipeline/figure_details.py render_details`:
+
+```html
+<figure id="p3-e0"><img src="data:image/png;base64,..." alt="Line graph of position
+  against time: a straight line rising from 400 m." width="437" height="267">
+  <figcaption>Figure 2.3 ...</figcaption></figure>
+<details class="figure-description"><summary class="a11y-stem">Description of Figure
+  2.3</summary><p>Line graph of the position of a car against time.</p><p>...</p>
+  <div class="table-scroll" role="group" aria-labelledby="p3-e0-data-caption" tabindex="0">
+  <table><caption id="p3-e0-data-caption">Data read from Figure 2.3; the values are
+  approximate</caption><thead>...</thead><tbody>...</tbody></table></div></details>
+```
+
+- The `<details>` follows the `<figure>` instead of sitting in it: a `<figcaption>` must
+  be the figure's first or last child, and a long description inside the figcaption
+  would become the figure's accessible name, read in full on entering it.
+- The summary names the figure from its caption ("Description of Figure 2.3", "Data for
+  Figure 2.3" when there is only a table); a figure without a number is named by the
+  first eight words of its alt text ("Description of the figure “Line graph of the
+  position of a car…”"), and only one without either is "the figure". So
+  several unnumbered figures' summaries still differ in a screen reader's list of
+  controls. The data table's caption names the figure the same way. It works without
+  scripts.
+- Each line of the long description is a `<p>`; everything the model wrote is escaped.
+- The data table goes through `table_html.render_table` like a rebuilt table, in a box
+  that scrolls sideways and takes focus, named by its caption. It is written only when
+  `figure_details.data_table_shown`: every number is in the PDF's text ("Data shown in
+  Figure 2.3"), or the values were read from the image and a reviewer chose "Add the
+  data table" (`FigureFix.data_table_added`; "Data read from Figure 2.3; the values are
+  approximate"). A table read from the image that nobody added stays on the fix as an
+  optional extra and is not in the file (a figure with only that has no `<details>`).
+- Nothing is written for a decorative figure or a proposal that is not used (rejected,
+  failed, abstained). Its CSS (`DETAILS_CSS`, plus the table CSS with a table) is added
+  only to documents with one.
+
+## Figure images in the student file (UX review MF23)
+
+Figure images are re-encoded for the student file only (`pipeline/figure_images.py`;
+the stored crops and the review screen keep their PNGs). At most 1600 px on the long
+side, never upscaled; photos and illustrations as JPEG at quality 82 unless the PNG is
+smaller; charts, diagrams and anything else (flagged figures and scanned pages too) as
+PNG unless the JPEG is at most half its size, which happens for raster charts that are
+photographs or JPEG scans; an image with transparency is kept. MuPDF does the encoding,
+so there is no new dependency, and the bytes depend only on the crop and the figure
+type, so a stored result re-renders to the same file. Equation images are not touched.
+
+| File | Before | After | Images |
+|---|---|---|---|
+| The public demo (OpenStax Physics 2.3, 7 figures; stored result re-rendered with its crops) | 2,210 KB (gzip 1,657 KB) | 666 KB (gzip 460 KB) | 3 JPEG (a photo, two raster charts), 4 PNG |
+| The committed demo page, rebuilt on 0.4.0 (2026-10-09; the 0.3.0 build before) | 2,211 KB (gzip 1,657 KB) | 668 KB (gzip 461 KB) | the same 3 JPEG and 4 PNG |
+| `tests/fixtures/layout/` PDFs converted offline (`lecture_notes`, `two_column`, `worked_example`; one small figure each) | 35, 14, 40 KB | the same | PNG kept: line art, smaller than JPEG |
+
+A page-sized crop (1700 x 2200 px) takes about 0.15-0.3 s to re-encode, so a document of
+many scanned pages takes a few seconds more to re-render after each review decision.
+The UX review expected about 250 KB for the demo with WebP, which MuPDF does not write.
 
 ## Lists
 
@@ -169,6 +284,11 @@ right.
   `no_output`, `mathml_rejected`).
 - If there is no crop, the extracted text (if any) is shown in monospace with "The
   original image is not available."
+- A page (or handwriting) kept as an image is never called a figure: its alt text names
+  the page and what it is, and its note says a screen reader cannot read it and to ask
+  the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, by the fix's reason,
+  so a stored result renders the same; `TODO(Harish)`: the design's draft wording).
+  Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
   (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
@@ -185,10 +305,112 @@ The assembler replaces each marker with the equation's MathML, or with the flagg
 - A marker with no matching equation is left as text. That only happens if layout has a
   bug, and leaving it visible makes the bug easy to spot.
 
+All running text (paragraphs, list items, headings, captions) goes through
+`inline_text.render_inline_text`, which places the equations and, for an element's own
+stored text, writes its links and colour runs. Text without either is written exactly
+as before pipeline 0.4.0.
+
+## Links and cross-references
+
+The text pass (docs/layout.md "The text pass") puts `Element.links` on paragraphs, list
+items and headings; offsets are into the stored text, markers included.
+
+```html
+<p id="p1-e1">The <a href="https://example.org/physics/syllabus">course syllabus</a> lists
+  the reading, and questions go to <a href="mailto:instructor@example.edu">the instructor
+  by email</a>.</p>
+<p id="p1-e10">Eliminating <math display="inline">...</math> between
+  <a href="#p1-e7">Eqs. (1)</a> and <a href="#p1-e9">(2)</a> gives ...
+  <a href="#p1-e12">Figure 1</a> shows the cart.</p>
+...
+<figure id="p1-e12"><img ...><figcaption>Figure 1: A cart on a ramp.</figcaption></figure>
+```
+
+- **Web and email links** ("uri") keep the PDF's visible text as the link text, never an
+  `aria-label` in its place (WCAG 2.5.3, label in name), and are written only while
+  `href` is http, https or mailto (`core.types.is_safe_href`, tested again when the
+  file is written). Any other PDF link (ftp, a file, a program, javascript) is not
+  written; its text stays, and the job page lists the notice `link_scheme_dropped`.
+- **Links inside the document** ("internal": a PDF link to a place in it; "crossref":
+  "Figure 2.3", "Eq. (3)", "Table 1" in the text) point at `#` + the target element's id.
+  Figures, tables, display equations, headings, paragraphs and list items already carry
+  their ids, so nothing new is written at the target.
+- A link never wraps an inline equation: a wide one is a tab stop of its own, and a tab
+  stop cannot sit inside a link (axe `nested-interactive`). A link across an equation is
+  written in two pieces around it.
+- A span that starts or ends inside a marker, reaches past the text, or overlaps an
+  earlier link is skipped, so a stored result edited by hand cannot break the markup.
+- Links keep the browser's link style (colour and underline), so they are not told apart
+  by colour alone. A long URL as link text wraps (`overflow-wrap: break-word` on
+  `<main>`), so the page still reflows at 320 px.
+- Link text that does not say where it goes ("click here", a long bare URL with next to
+  no text around it) is kept as printed, with the optional notice `link_text_unclear`:
+  only the instructor can reword it.
+
+## Language
+
+`<html lang>` is the document's language. A paragraph or list item that the text pass
+found confidently in another language carries its own (`Element.lang`), written by
+`inline_text.passage_attrs` on its block:
+
+```html
+<html lang="en">
+...
+<p id="p1-e15" lang="fr">La vitesse moyenne est le quotient du déplacement par la durée
+  du trajet, et elle s’exprime en mètres par seconde.</p>
+```
+
+A screen reader switches voice for that paragraph (WCAG 3.1.2), and MathCAT speaks maths
+in the page's language. Where the document language came from is
+`DocumentResult.lang_source`: "pdf" (`/Lang`), "detected" (from the body text, notice
+`lang_detected`), "default" ("en" because nothing else was found, notice `lang_assumed`)
+or "user". The job page shows the language and lets the instructor change it: the route
+calls `text_pass.set_document_language(result, tag)` (a BCP 47 tag such as "fr" or
+"pt-BR", or an English name such as "French"; ValueError otherwise), which sets the
+language and source "user", drops the two notices and works out the passages again
+against the new language, then re-renders the file with `web.review.rerender_html` and
+stores both, as after a review decision.
+
+Text the tool itself writes (the notes, "Equation" before an equation number, the about
+section) is English whatever the document's language.
+
+## Coloured text (FEATURE_COLOUR)
+
+With the flag on, text printed in a colour other than the body's keeps a colour in the
+output (`Element.colour_runs`; which colours count is in docs/layout.md "Colour"). Each
+printed colour gets one class, `tc-` and its hex digits, and one CSS rule added only to
+documents that have it:
+
+```html
+<style>
+...
+.tc-d2d2d2 { color: #767676; }
+.tc-ff0000 { color: #ee0000; }
+</style>
+...
+<p id="p1-e17">In these notes, <span class="tc-ff0000">the vectors are printed in
+  red</span> and scalars in black. <span class="tc-d2d2d2">A light grey hint follows
+  each problem.</span></p>
+```
+
+The rule's colour reaches 4.5:1 on the white background (WCAG 1.4.3): a colour that
+already does is kept exactly; any other is made darker, keeping its hue, in OKLCH
+(`pipeline.contrast.with_contrast`: lightness lowered until the contrast is reached,
+chroma lowered only as far as sRGB needs). So pure red becomes `#ee0000`, light grey
+`#767676`, yellow a dark yellow. The output has no dark mode, so there is no second
+rule. Colour spans sit inside links and may wrap maths (which takes the colour); linked
+text itself keeps the link colour.
+
+Colour alone tells a screen reader nothing, so text that refers to colour near coloured
+text ("shown in red") gets the optional notice `colour_reference`: the instructor may want
+to add a cue that does not depend on seeing it. With the flag off, coloured text is
+written in the body colour, as in pipeline 0.3.0.
+
 ## MathML is rebuilt, never pasted
 
-MathML in the output is re-serialised by `assemble.sanitize_mathml`, never inserted as a
-string (rule 2 of the architecture doc):
+MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also importable as
+`assemble.sanitize_mathml`; tables use the same function), never inserted as a string
+(rule 2 of the architecture doc):
 
 1. Parse with `defusedxml` (no DTDs, entities or external references). A parse error means
    "not converted".
@@ -230,22 +452,39 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
-## About this conversion
+## The note for students ("About this version")
 
-The last section of `<main>` contains:
+The file ends with a short note for the people who read it, in a `<footer>` after
+`</main>` (`id="about-conversion"`, MF7 of the UX review). It has no counts and no
+review words ("needs review", "rejected"): those are for the instructor, on the job page
+(docs/web.md "The job page"). In order:
 
-- "This file was produced with a11y-stem, which assists with accessibility; review it
-  before publishing."
-- counts per kind and status (e.g. "Equations (5): 2 accepted, 1 not converted (model
-  unsure), ..."); a reviewer's Accept (`Fix.reviewed`) is counted apart from the
-  pipeline's, as "accepted by a reviewer",
-- how many items are flagged and what the flags look like,
+- what this is: "This is a web version of a PDF from your course, made with a11y-stem, a
+  tool that assists with accessibility.", plus "Its equations are written so that screen
+  readers can read them aloud." when the file has converted equations;
+- whether the instructor has checked it: nothing when the tool asked nothing and nobody
+  changed anything; "Some parts were made by the tool and have not been checked by your
+  instructor yet." while a decision is open (a draft download); "Your instructor checked
+  the parts the tool was unsure about on 9 October 2026." once every decision is made.
+  The date is `render_html(checked_on=...)`: the review screen passes the day of the
+  re-render that follows a decision (`web/review.py rerender_html`, UTC), the language
+  control the day of the last decision; the pipeline never passes one, so a result
+  renders the same from storage;
+- when something is shown as an image of the original: "Some parts could not be
+  converted. They are shown as pictures of the original, marked "Not converted" or
+  "Needs a description": ask your instructor for a version you can read.", and when whole
+  pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
+  scanned pages and were not converted." (`assemble.kept_pages_note`, `TODO(Harish)`);
+- "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
-Model cost is not in the HTML: the file is meant for students. Cost is in the result JSON
-(`DocumentResult.stats`) and the CLI summary.
+The wording is `TODO(Harish)` in `pipeline/assemble.py`: whether to name the screen
+readers that read MathML aloud, and whether "checked" stays (the feature review's
+challenge, 10.3 row 4, would say "decided by your instructor" instead, since the tool
+only knows that decisions were made). Model cost is not in the HTML: the file is meant for
+students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
-Text the tool writes (notes, labels, this section) carries `class="a11y-stem"`. The
+Text the tool writes (notes, labels, the student note) carries `class="a11y-stem"`. The
 `banned_wording` check reads only that text, so course content that legitimately uses
 words like "compliance" (beam flexibility in mechanics) is not flagged.
 
@@ -264,9 +503,13 @@ About 35 lines of inline CSS:
   item, since `text-indent` is inherited), equation numbers to the right of their
   equation, and a `visually-hidden` class (clipped, not `display: none`, so screen
   readers still read it);
-- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together.
+- a visible `:focus-visible` outline and a print rule that keeps flagged boxes together;
+- only in documents that have one: a figure's folded description (a bold summary with
+  the browser's own marker, no new colours) and table rules.
 
-There is no dark mode yet.
+There is no dark mode yet. Documents with coloured text (FEATURE_COLOUR) get one rule
+per printed colour (see "Coloured text"); documents with rebuilt tables get the table
+rules.
 
 ## Checks
 
@@ -283,8 +526,17 @@ There is no dark mode yet.
 | `html.unique_ids` | `duplicate_id` |
 | `html.list_structure` | `list_structure` (an `<li>` outside `<ul>`/`<ol>`, or an element other than `<li>` or text directly in one; axe's `list` and `listitem` rules) |
 | `html.math_display` | `math_missing_display` (warning) |
-| `html.self_contained` | `external_resource` |
+| `html.self_contained` | `external_resource` (a link's `href` is not a resource; the link rules check it) |
 | `html.wording` | `banned_wording` |
+| `html.table_headers` | `table_no_headers` (a data table without `<th>`; documents with a table only, like the four below) |
+| `html.table_header_scope` | `th_without_scope` (unless the `<th>` has an id and its table uses `headers`) |
+| `html.table_header_text` | `empty_th` |
+| `html.table_caption` | `table_caption_missing` (warning: a "Table N" paragraph beside a table with no `<caption>`) |
+| `html.table_layout` | `layout_table` (`role="presentation"` or `"none"` on a table) |
+| `html.link_text` | `empty_link` (an `<a>` with no text or img alt in it) |
+| `html.link_href` | `unsafe_link` (an `href` that is not http, https, mailto, or `#` and an id in the file) |
+| `html.lang_tags` | `invalid_lang` (a `lang` value that is not a well-formed BCP 47 tag) |
+| `html.text_contrast` | `low_contrast` (a `tc-` colour class below 4.5:1 on white) |
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
 (`src/a11y_stem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
@@ -305,7 +557,10 @@ and fast, so anyone holding only the HTML can recompute them.
 
 `pipeline/run.py`:
 
-1. `layout.analyze` (raises `LayoutError` for unreadable, encrypted or too-long PDFs).
+1. `layout.analyze` (raises `LayoutError` for unreadable, encrypted or too-long PDFs),
+   then `text_pass.apply`: links, cross-references, the document and passage languages,
+   and with FEATURE_COLOUR the colour runs (docs/layout.md "The text pass"). It sets
+   `lang`, `lang_source` and its notices on the result, and never fails the run.
 2. `heading_step.heading_fixes` on all elements. If it raises, every heading becomes
    FAILED `internal_error` and renders as a paragraph.
 3. Page by page, on the calling thread (PyMuPDF is not thread-safe): crop each equation
@@ -330,19 +585,34 @@ and fast, so anyone holding only the HTML can recompute them.
    `budget_<scope>` with its crop kept. Calls a step made before the refusal were billed,
    so a recording wrapper around the client keeps them on the FAILED fix.
 7. `progress(pages_done, pages_total)` runs on the calling thread when all of a page's
-   steps have finished. An exception from it aborts the run.
+   steps have finished, and `stage_progress(ProgressEvent)` as each stage starts and
+   moves on: "layout" (when analysis starts, then with the pages and the elements found
+   per kind), "equations", "figures" and "tables" (their totals first, then after every
+   element: scanned pages and failed crops count as done), "assemble" and "checks". An
+   exception from either aborts the run.
 8. Once the last crop is made, `layout.release(pdf_bytes)` drops WP2's cached copy of
    the PDF (also when the run fails), so a long-lived worker does not keep a user's
    document in memory until newer jobs evict it.
-9. `render_html` (with the caller's optional `notice` and `source_note`), then
+9. `pipeline.source_facts.measure` reads the PDF once more for the job page's
+   before/after card (tagged, /Lang, title, bookmarks, pictures and, in a tagged PDF,
+   pictures with alt text, links; from the elements and fixes: equations, those whose
+   text layer loses a fraction, root or script, bold maths letters stored as plain
+   characters, tables). Numbers only; a fact it cannot read keeps its default, and it
+   never fails the run.
+10. `render_html` (with the caller's optional `notice` and `source_note`), then
    `static_checks`.
+11. `pipeline.notices.from_fixes` derives the notices that follow from the fixes (a
+   table shown as an image, a scanned page, a colour-only figure, a chart or diagram
+   without a long description when long descriptions are on) and merges them with the
+   others on `DocumentResult.notices` (one per code and element, or code and page with a
+   count).
 
 Stats: document `latency_ms` is wall-clock time for the whole run; page `latency_ms` is
 the summed time inside that page's steps (pages overlap in the pool, so per-page wall time
 would mislead). `prompt_versions` are the versions the calls actually used, else the
 step modules' `PROMPT_VERSION`.
 
-Tracer spans (`document`, `headings`, `page`, `step`, `model_call`, `assemble`) carry ids,
+Tracer spans (`document`, `text`, `headings`, `page`, `step`, `model_call`, `assemble`) carry ids,
 pages, models, token counts, costs, statuses and reason codes only. Results are added with
 the span handle's `set(**attrs)` (WP6; `update` is accepted too) as scalars: counts per
 status are flat keys such as `fixes_accepted`, and a budget stop is `reason`. Each model
@@ -361,9 +631,11 @@ a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [
 `MAX_MODEL_CALLS_PER_JOB` cap it too. Before converting, a real run checks that
 OPENAI_API_KEY is set and that MAIN_MODEL and CHEAP_MODEL have prices: either problem is
 `error: ...` and exit 2, and nothing is written. `--fake` uses the offline fake client
-(no key needed); its answers are placeholders, so the HTML opens with the note "Offline
-test run: equations and figure descriptions in this file are placeholders from a fake
-model, not conversions. Do not publish it." Progress
+(no key needed); its answers are placeholders (an equation "x", a figure "Figure
+(offline placeholder)", with long descriptions on an empty one, and with tables on a
+one-cell table "Table (offline placeholder)", each a decision: `models.OFFLINE_DEFAULTS`),
+so the HTML opens with the note "Offline test run: equations, figure descriptions and tables in
+this file are placeholders from a fake model, not conversions. Do not publish it." Progress
 ("page 1/1 done") goes to stderr; the summary on stdout is content-free. A run with
 `--fake --report notes.json --axe` (fake layout and steps, as in the CLI tests):
 
@@ -377,7 +649,7 @@ Fixes:
 Model calls: 2
 Cost:        $0.0044 (fake client, nothing billed)
 Time:        0.0 s
-Checks:      static 11/11 passed
+Checks:      static 15/15 passed
              axe-core no violations
 wrote /tmp/wp4-demo/notes.html
 wrote /tmp/wp4-demo/notes.json
@@ -407,7 +679,23 @@ TODO(Harish): turn these into the public known-limits copy.
 - An equation wider than the screen does not wrap: it scrolls sideways inside its own
   box (a tab stop when it may not fit a phone screen).
 - NEEDS_REVIEW items look like converted ones in an export made before review.
-- Tables are not rebuilt; a table that layout reports as a figure becomes an image with
-  alt text.
+- A data table is rebuilt only with `FEATURE_TABLES` on (off by default). Off, or when
+  the model cannot read it, the table stays an image with its "not converted" note and a
+  required decision. A table the detector misses (an unruled table of numbers only)
+  stays in the text flow, sometimes read as a display equation; a grid of key terms
+  printed with rules becomes a list of its terms.
 - If one equation marker appears twice, the equation is rendered twice (the second
   without an id).
+- A figure's long description and data table are folded: they print only if opened
+  first. A chart's data table read from the image is in the file only when a reviewer
+  added it, and is approximate (its caption says so).
+- A PDF link over an image or a drawing (not over text) is not kept; neither is a link
+  in a figure's caption. A link whose rectangle covers only part of a word links that
+  part.
+- Link text is kept as printed, also when it says nothing on its own ("click here"):
+  only the instructor can reword it (the job page lists it as worth checking).
+- Language detection needs about 20 words of prose; a short handout of mostly maths is
+  assumed to be English unless the PDF says otherwise. A passage is marked only when it
+  is a whole paragraph or list item in another language (a quoted phrase inside an
+  English sentence is not).
+- Colour inside figures stays in the image; colour in headings is not kept.

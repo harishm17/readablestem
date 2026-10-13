@@ -1,8 +1,32 @@
-"""Figure step: classify the figure and write short alt text.
+"""Figure step: classify the figure and write short alt text (and, with long descriptions
+on, a long description, a chart's data table and the colour-only flag).
 
-Short alt text only in the beta (long descriptions are out of 2026). Abstains rather than
-guessing: a figure the model cannot read confidently becomes ABSTAINED and keeps a
-visible "needs a description" flag in the output.
+Abstains rather than guessing: a figure the model cannot read confidently becomes
+ABSTAINED and keeps a visible "needs a description" flag in the output.
+
+Long descriptions (`ConversionOptions.long_descriptions`, FEATURE_LONG_DESCRIPTIONS; off
+by default). Off, the step sends the prompt `figure.md` with the schema `FigureOutput`,
+exactly as before. On, it sends `figure_long.md` with `FigureLongOutput` in the same one
+call per attempt, plus the labels printed in the figure (`Element.text`) as fenced
+context, and the proposal may also carry (`pipeline.figure_details`):
+- `long_description`: for charts, diagrams and complex illustrations, plain text after
+  the figure. A description that is not usable (markup, a URL, a placeholder, too short
+  or too long) is dropped, never shown; a chart or diagram without one gets the notice
+  `long_description_missing` (optional; `long_description_missing` below). One the model
+  marks unsure fails the warning check `figure.long_description`
+  (`long_description_unsure`), a note: review "optional", never a decision;
+- `data_table`: for charts only, the plotted values (`TableGrid`, source "model").
+  `data_values_from_text` is True only when the model says every value is printed in
+  the figure *and* every number in the table appears in the PDF's own text inside the
+  figure region: the table then goes into the student file. Otherwise the warning check
+  `figure.data_values` fails with `values_from_image`, a note (review "optional"): the
+  table is kept on the fix as an optional extra the review screen offers ("Add the data
+  table"), not written into the student file until a reviewer adds it
+  (`figure_details.data_table_shown`). An additive extra never adds a required decision
+  (docs/design/content-features.md "Review tiers");
+- `colour_only`: the figure tells things apart by colour alone. It changes no status or
+  tier (the job page lists it as the notice `colour_only`).
+The alt text, the status rules and the escalation below are the same either way.
 
 Routing: figures go to the main model. Tiny figures (no side longer than one inch on the
 page: icons, bullets, small logos) start on the cheap model with a low-detail image and
@@ -56,27 +80,62 @@ from typing import Any
 from pydantic import BaseModel, ConfigDict, Field
 
 from a11y_stem.config import Settings
-from a11y_stem.core.types import Check, Element, FigureFix, FigureType, Fix, Kind, ModelCall, Status
+from a11y_stem.core.types import (
+    Check,
+    Element,
+    FigureFix,
+    FigureType,
+    Fix,
+    Kind,
+    ModelCall,
+    Status,
+    TableGrid,
+)
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
 from a11y_stem.models.verifier import figure_score, verifier_of
+from a11y_stem.pipeline import figure_details
+from a11y_stem.pipeline import options as run_options
 from a11y_stem.pipeline.validate import check_alt, clean_alt, has_errors
 
 PROMPT_NAME = "figure"
 # "<name>-<sha8 of the prompt text>": changes whenever the prompt file changes.
 PROMPT_VERSION = load_prompt(PROMPT_NAME).version
+# The prompt sent instead when long descriptions are on (`ConversionOptions`).
+LONG_PROMPT_NAME = "figure_long"
+LONG_PROMPT_VERSION = load_prompt(LONG_PROMPT_NAME).version
 
 TINY_FIGURE_MAX_SIDE_PT = 72.0  # one inch on the page
 DECORATIVE_ACCEPT_CONFIDENCE = 0.95
 MAX_OUTPUT_TOKENS = 1024
+# A long description and a table are up to ~1,000 tokens more, plus reasoning: an answer
+# cut off by the limit fails the schema and is billed anyway.
+LONG_MAX_OUTPUT_TOKENS = 4096
+# The figure's printed labels sent as context (long descriptions on): tick labels, axis
+# titles, legend entries. Enough for a chart; the rest is cut.
+MAX_LABEL_CHARS = 600
 # Figure types that carry information by definition; "decorative" contradicts them.
 INFORMATIVE_FIGURE_TYPES = frozenset({"chart", "diagram", "table_image"})
+# Figure types that need a long description (the notice `long_description_missing`).
+COMPLEX_FIGURE_TYPES = frozenset({"chart", "diagram"})
 # Failed warning checks that do not change what the description says: the fix is still
 # ACCEPTED (review "optional"). A caption copy is not one: it describes nothing. The
 # second automated check's flag is one by policy: an optional tier only, never required
-# in this version (its thresholds are not calibrated on human labels yet).
-NOTE_CODES = frozenset({"too_long", "redundant_prefix", "second_check_mismatch"})
+# in this version (its thresholds are not calibrated on human labels yet). A long
+# description the model was unsure of is one, and so is a data table with values read
+# from the image (`values_from_image`): it is not in the student file until a reviewer
+# adds it, so it changes nothing a student reads (docs/design/content-features.md
+# "Review tiers").
+NOTE_CODES = frozenset(
+    {
+        "too_long",
+        "redundant_prefix",
+        "second_check_mismatch",
+        "long_description_unsure",
+        "values_from_image",
+    }
+)
 
 
 class FigureOutput(BaseModel):
@@ -91,6 +150,35 @@ class FigureOutput(BaseModel):
     )
     confidence: float = Field(
         ge=0, le=1, description="Probability that the alt text is accurate and sufficient."
+    )
+
+
+class DataTableOutput(BaseModel):
+    """A chart's values: column names with units, then one row per point or category."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    header: list[str] = Field(description='Column names with units, e.g. "Time (s)".')
+    rows: list[list[str]] = Field(description="One row per point, one cell per column.")
+
+
+class FigureLongOutput(FigureOutput):
+    """`FigureOutput` plus the long-description fields (prompt `figure_long.md`)."""
+
+    long_description: str = Field(
+        description="Plain-text long description for complex figures; empty when not needed."
+    )
+    long_description_unsure: bool = Field(
+        description="True when part of the figure could not be read clearly."
+    )
+    data_table: DataTableOutput | None = Field(
+        description="Charts only: the values that can be read, else null."
+    )
+    values_printed: bool = Field(
+        description="True only when every table value is printed as a number in the figure."
+    )
+    colour_only: bool = Field(
+        description="True when series or parts are told apart by colour alone."
     )
 
 
@@ -116,16 +204,33 @@ def is_tiny(element: Element) -> bool:
     return max(x1 - x0, y1 - y0) <= TINY_FIGURE_MAX_SIDE_PT
 
 
-def figure_context(element: Element, context_text: str | None) -> str | None:
-    """Caption plus nearby text, for `VisionRequest.context_text` (fenced by the client)."""
+def figure_context(
+    element: Element, context_text: str | None, *, labels: bool = False
+) -> str | None:
+    """Caption plus nearby text, for `VisionRequest.context_text` (fenced by the client).
+    With `labels` (long descriptions on), also the text printed in the figure itself, so
+    the model can read tick labels and values exactly."""
     caption = (element.caption or "").strip()
     nearby = (context_text or "").strip()
+    printed = " ".join((element.text or "").split()) if labels else ""
     parts = []
     if caption:
         parts.append(f"Caption: {caption}")
     if nearby and nearby != caption:
         parts.append(f"Nearby text: {nearby}")
+    if printed:
+        parts.append(f"Labels in the figure: {printed[:MAX_LABEL_CHARS]}")
     return "\n\n".join(parts) or None
+
+
+@dataclass(frozen=True)
+class _Details:
+    """What a long-prompt answer adds to the proposal (`FigureFix` fields)."""
+
+    long_description: str | None = None
+    data_table: TableGrid | None = None
+    data_values_from_text: bool | None = None
+    colour_only: bool = False
 
 
 @dataclass
@@ -134,6 +239,7 @@ class _Candidate:
     calls: list[ModelCall]
     alt: str = ""
     checks: list[Check] = field(default_factory=list)
+    details: _Details = field(default_factory=_Details)
 
     @property
     def confidence(self) -> float | None:
@@ -166,7 +272,47 @@ def _evaluate(output: FigureOutput | None, calls: list[ModelCall], element: Elem
         )
         return _Candidate(output, calls, "", [*check_alt("", decorative=True), consistency])
     alt = clean_alt(output.alt)  # stored as validated: no bidi controls or invisible marks
-    return _Candidate(output, calls, alt, check_alt(alt, decorative=False, caption=element.caption))
+    checks = check_alt(alt, decorative=False, caption=element.caption)
+    if not isinstance(output, FigureLongOutput):
+        return _Candidate(output, calls, alt, checks)
+    details, detail_checks = _details(output, element)
+    return _Candidate(output, calls, alt, [*checks, *detail_checks], details)
+
+
+def _details(output: FigureLongOutput, element: Element) -> tuple[_Details, list[Check]]:
+    """The long description, data table and colour flag of a (non-decorative) answer, and
+    their checks: `figure.long_description` (a note when the model was unsure) and
+    `figure.data_values` (values read from the image: a note, the table an optional
+    extra)."""
+    checks: list[Check] = []
+    text = figure_details.clean_long_description(output.long_description)
+    long_description = text if text and figure_details.long_description_ok(text) else None
+    if long_description is not None:
+        unsure = output.long_description_unsure
+        checks.append(
+            Check(
+                name="figure.long_description",
+                passed=not unsure,
+                severity="warning",
+                code="long_description_unsure" if unsure else None,
+            )
+        )
+    grid = None
+    if output.data_table is not None and output.figure_type == "chart":
+        grid = figure_details.data_grid(output.data_table.header, output.data_table.rows)
+    from_text = None
+    if grid is not None:
+        from_text = output.values_printed and figure_details.values_in_text(grid, element.text)
+        checks.append(
+            Check(
+                name="figure.data_values",
+                passed=from_text,
+                severity="warning",
+                code=None if from_text else "values_from_image",
+            )
+        )
+    details = _Details(long_description, grid, from_text, output.colour_only)
+    return details, checks
 
 
 def _conflicted(candidate: _Candidate) -> bool:
@@ -206,10 +352,15 @@ def _fix(
     ) -> Fix:
         figure = None
         if proposal and candidate.output is not None:
+            details = candidate.details
             figure = FigureFix(
                 figure_type=candidate.output.figure_type,
                 alt=candidate.alt,
                 decorative=candidate.output.decorative,
+                long_description=details.long_description,
+                data_table=details.data_table,
+                data_values_from_text=details.data_values_from_text,
+                colour_only=details.colour_only,
             )
         return Fix(
             element_id=element.id,
@@ -289,11 +440,15 @@ def describe(
     settings: Settings,
     context_text: str | None = None,
 ) -> Fix:
-    """Alt text for one figure crop. Never raises for model or validation problems (they
-    become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is refused."""
-    prompt = load_prompt(PROMPT_NAME)
+    """Alt text for one figure crop (and, with long descriptions on, the long
+    description, data table and colour flag). Never raises for model or validation
+    problems (they become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is
+    refused."""
+    long = run_options.current().long_descriptions
+    prompt = load_prompt(LONG_PROMPT_NAME if long else PROMPT_NAME)
+    schema: type[FigureOutput] = FigureLongOutput if long else FigureOutput
     tiny = is_tiny(element)
-    context = figure_context(element, context_text)
+    context = figure_context(element, context_text, labels=long)
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
@@ -303,13 +458,13 @@ def describe(
             instructions=prompt.text,
             images=[png],
             context_text=context,
-            max_output_tokens=MAX_OUTPUT_TOKENS,
+            max_output_tokens=LONG_MAX_OUTPUT_TOKENS if long else MAX_OUTPUT_TOKENS,
             image_detail="low" if tiny else "high",
         )
         if escalation:
-            output, calls = _call_once(client, request, FigureOutput)
+            output, calls = _call_once(client, request, schema)
         else:
-            output, calls = _call(client, request, FigureOutput, settings)
+            output, calls = _call(client, request, schema, settings)
         return _evaluate(output, calls, element)
 
     first_model = settings.cheap_model if tiny else settings.main_model
@@ -321,3 +476,25 @@ def describe(
         candidate = _prefer(escalated, candidate)
     fix = _fix(element, candidate, calls, settings)
     return second_check(fix, element, png, client=client, settings=settings)
+
+
+# --------------------------------------------------------------------------- notices
+
+
+def described_with_long_prompt(fix: Fix) -> bool:
+    """The fix's proposal came from the long-description prompt (the option was on)."""
+    return any(call.prompt_version.startswith(f"{LONG_PROMPT_NAME}-") for call in fix.calls)
+
+
+def long_description_missing(fix: Fix) -> bool:
+    """For the job page's notices (`pipeline.notices`): a chart or diagram described with
+    long descriptions on, but without one (notice `long_description_missing`, optional).
+    False for anything else, including figures described with the option off."""
+    figure = fix.figure
+    return (
+        figure is not None
+        and not figure.decorative
+        and figure.figure_type in COMPLEX_FIGURE_TYPES
+        and not figure.long_description
+        and described_with_long_prompt(fix)
+    )

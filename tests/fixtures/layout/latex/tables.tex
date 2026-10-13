@@ -1,0 +1,175 @@
+% Tables fixture for a11y-stem (written for the tests; no third-party text).
+% Data tables in the styles LaTeX users write (booktabs, a ruled grid, no rules,
+% multirow/multicolumn headers, maths in cells, a blank worksheet table) and things
+% that must not become tables (a table of contents, a two-column grid of prose,
+% matrices, an augmented array, align and cases). tests/test_tables_fixtures.py.
+\documentclass[11pt]{article}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage[margin=1in]{geometry}
+\pagestyle{plain}
+\begin{document}
+
+\tableofcontents
+
+\section{Free fall}
+\subsection{Drop times}
+
+Each group dropped a steel ball from five heights and timed the fall with a photogate.
+The acceleration follows from the height and the time of the fall.
+
+\begin{table}[h]
+\centering
+\caption{Drop times for five heights.}
+\begin{tabular}{ccc}
+\toprule
+Height (m) & Time (s) & $g$ (m/s$^2$) \\
+\midrule
+0.50 & 0.319 & 9.83 \\
+0.75 & 0.391 & 9.81 \\
+1.00 & 0.452 & 9.79 \\
+1.25 & 0.505 & 9.80 \\
+1.50 & 0.553 & 9.81 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The values agree within half a per cent, which is less than the uncertainty of a
+single timing.
+
+\subsection{Quiz scores}
+
+\begin{table}[h]
+\centering
+\caption{Frequency of quiz scores.}
+\begin{tabular}{|c|c|c|}
+\hline
+Score & Students & Share \\
+\hline
+6 & 3 & 0.15 \\
+\hline
+7 & 6 & 0.30 \\
+\hline
+8 & 7 & 0.35 \\
+\hline
+9 & 4 & 0.20 \\
+\hline
+\end{tabular}
+\end{table}
+
+\clearpage
+\section{Tables without rules}
+\subsection{Values of a cubic}
+
+The table below gives $f(x) = x^3 - 2x$ at evenly spaced points. It is set without any
+rules, as many instructors type tables in a hurry.
+
+\begin{table}[h]
+\centering
+\begin{tabular}{rrrr}
+$x$ & $f(x)$ & $f'(x)$ & Difference \\[4pt]
+$-2$ & $-4$ & $10$ & $5.0$ \\
+$-1$ & $1$ & $1$ & $-1.0$ \\
+$0$ & $0$ & $-2$ & $-1.0$ \\
+$1$ & $-1$ & $1$ & $5.0$ \\
+$2$ & $4$ & $10$ & $17.0$ \\
+\end{tabular}
+\caption{Values of $f$ and its derivative.}
+\end{table}
+
+\subsection{Heat of materials}
+
+\begin{table}[h]
+\centering
+\caption{Specific heat by phase.}
+\begin{tabular}{llcc}
+\toprule
+\multirow{2}{*}{Type} & \multirow{2}{*}{Material} & \multicolumn{2}{c}{Specific heat (J/kg K)} \\
+\cmidrule(lr){3-4}
+ & & Solid & Liquid \\
+\midrule
+\multirow{2}{*}{Metal} & Aluminium & 900 & 1180 \\
+ & Copper & 385 & 530 \\
+\midrule
+\multirow{2}{*}{Other} & Water & 2090 & 4186 \\
+ & Ethanol & 2420 & 2440 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\clearpage
+\section{Quantities and a worksheet}
+\subsection{Definitions}
+
+\begin{table}[h]
+\centering
+\caption{Mechanical quantities.}
+\renewcommand{\arraystretch}{1.6}
+\begin{tabular}{llc}
+\toprule
+Quantity & Symbol & Definition \\
+\midrule
+Momentum & $\vec{p}$ & $\vec{p} = m\vec{v}$ \\
+Kinetic energy & $K$ & $K = \tfrac{1}{2}mv^2$ \\
+Work & $W$ & $W = \vec{F}\cdot\vec{d}$ \\
+Power & $P$ & $P = W/t$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Record your data}
+
+Fill in one row for each trial during the lab.
+
+\begin{table}[h]
+\centering
+\caption{Pendulum trials.}
+\renewcommand{\arraystretch}{1.8}
+\begin{tabular}{|p{2cm}|p{3cm}|p{3cm}|p{3cm}|}
+\hline
+Trial & Length (m) & Ten swings (s) & Period (s) \\
+\hline
+ & & & \\
+\hline
+ & & & \\
+\hline
+ & & & \\
+\hline
+ & & & \\
+\hline
+\end{tabular}
+\end{table}
+
+\clearpage
+\section{Not tables}
+\subsection{Key terms}
+
+\noindent
+\begin{tabular}{@{}p{3cm}p{11cm}@{}}
+\textbf{Displacement} & The change in position of an object, measured as a straight line from where it started to where it ended, with a direction. \\[6pt]
+\textbf{Velocity} & How fast the position changes and in which direction; the slope of a position against time graph at any instant. \\[6pt]
+\textbf{Acceleration} & How fast the velocity changes; it can point against the motion, in which case the object slows down. \\
+\end{tabular}
+
+\subsection{Matrices and systems}
+
+The rotation by a quarter turn and the system it solves are
+\[
+R = \begin{pmatrix} 0 & -1 \\ 1 & 0 \end{pmatrix}, \qquad
+A = \begin{pmatrix} 2 & 1 & 0 \\ 1 & 3 & 1 \\ 0 & 1 & 4 \end{pmatrix}, \qquad
+\left[\begin{array}{ccc|c} 2 & 1 & 0 & 3 \\ 1 & 3 & 1 & 5 \\ 0 & 1 & 4 & 5 \end{array}\right].
+\]
+Elimination gives
+\begin{align*}
+2x + y &= 3, \\
+x + 3y + z &= 5, \\
+y + 4z &= 5,
+\end{align*}
+and the sign function is
+\[
+\operatorname{sgn}(x) = \begin{cases} -1 & \text{if } x < 0, \\ 0 & \text{if } x = 0, \\ 1 & \text{if } x > 0. \end{cases}
+\]
+
+\end{document}

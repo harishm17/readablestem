@@ -309,12 +309,13 @@ def test_status_updates_live_with_htmx_then_shows_results(site, browser):
     assert "Waiting" in page.locator("#job-status").inner_text()
     assert site.run_worker() == job_id
     # htmx polls every 3 s; once finished, the status (a live region) says so and links
-    # to the results, without reloading the page under the reader.
-    link = page.locator("#job-status").get_by_role("link", name="Show the results")
+    # to the first decision and the results, without reloading the page under the reader.
+    link = page.locator("#job-status").get_by_role("link", name="show the results")
     link.wait_for(timeout=15000)
-    assert "Finished" in page.locator("#job-status").inner_text()
+    assert "3 decisions need you" in page.locator("#job-status").inner_text()
+    assert page.locator("#job-status").get_by_role("link", name="Start the review").is_visible()
     assert page.locator("#results-heading").count() == 0
-    assert page.title() == "Finished: notes.pdf | a11y-stem"
+    assert page.title() == "Converted: notes.pdf | a11y-stem"
     link.click()
     page.wait_for_selector("#results-heading")
     context.close()
@@ -333,12 +334,12 @@ def test_everything_works_without_javascript(site, browser):
     page.reload()
     assert page.locator("#results-heading").is_visible()
     assert page.locator('meta[http-equiv="refresh"]').count() == 0
-    page.get_by_role("link", name=re.compile("^Review fixes")).click()
-    page.get_by_role("button", name="Reject equation 2").click()
-    assert "Rejected" in page.locator("#decision-notice").inner_text()
+    page.get_by_role("link", name=re.compile(r"^Review \d+ decisions?$")).click()
+    page.get_by_role("button", name="Keep as image (equation 2)").click()
+    assert "Kept as an image" in page.locator("#decision-notice").inner_text()
     page.get_by_role("link", name="All items as a list").click()
-    page.locator("#fix-p1-e4").get_by_role("button", name="Reject").click()
-    assert "Rejected" in page.locator("#review-progress").inner_text()
+    page.locator("#fix-p1-e4").get_by_role("button", name="Keep without a description").click()
+    assert "Kept without a description" in page.locator("#review-progress").inner_text()
     context.close()
 
 

@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{# Asked before a download while decisions are open (MF9): what students would get, and
+   the review as the main way on. Works without JavaScript: two links. #}
+{% block title %}Download a draft of {{ job.filename }}?{% endblock %}
+{% block content %}
+<h1>Download a draft of {{ job.filename }}?</h1>
+<p>{{ decisions }} {{ "decision is" if decisions == 1 else "decisions are" }} still open.
+  {{ draft }} The file also tells them that some parts have not been checked by you yet.</p>
+<ul class="actions">
+  <li><a class="button" href="{{ review_url }}">Review {{ decisions }} {{ "decision" if decisions == 1 else "decisions" }} first</a></li>
+  <li><a href="/jobs/{{ job.id }}/download">Download the draft anyway</a></li>
+</ul>
+<p><a href="/jobs/{{ job.id }}">Back to {{ job.filename }}</a></p>
+{% endblock %}

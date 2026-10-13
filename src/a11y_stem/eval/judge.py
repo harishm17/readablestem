@@ -23,6 +23,11 @@ Design choices:
 
 Pass rule: `conveys_key_information and not factual_error`. The score is reported
 separately (mean score) and used by the length-bias probe.
+
+Long descriptions and chart data tables (FEATURE_LONG_DESCRIPTIONS) have a rubric of
+their own, `judge_long` (prompt `judge_long_description.md`, always with the image):
+accurate, complete, no invented values, and the table's values within tolerance. It is
+not calibrated against human labels yet.
 """
 
 from __future__ import annotations
@@ -32,7 +37,7 @@ from dataclasses import dataclass
 from pydantic import BaseModel, ConfigDict, Field
 
 from a11y_stem.config import Settings
-from a11y_stem.core.types import ModelCall
+from a11y_stem.core.types import ModelCall, TableGrid
 from a11y_stem.models.base import VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
 
@@ -72,7 +77,7 @@ class Judgement:
         return None if self.verdict is None else self.verdict.passed
 
 
-def _field(name: str, text: str | None) -> str:
+def _field(name: str, text: str | None, limits: dict[str, int] = MAX_CHARS) -> str:
     """One tagged field. Our tag names are removed from the text so a candidate cannot
     close its own field and pose as the reference. Removal repeats until nothing
     changes: one pass would turn "</cand</candidate>idate>" back into a closing tag."""
@@ -80,10 +85,10 @@ def _field(name: str, text: str | None) -> str:
     previous = None
     while cleaned != previous:
         previous = cleaned
-        for tag in MAX_CHARS:
+        for tag in limits:
             cleaned = cleaned.replace(f"<{tag}>", "").replace(f"</{tag}>", "")
     cleaned = cleaned.strip()
-    limit = MAX_CHARS[name]
+    limit = limits[name]
     if len(cleaned) > limit:
         cleaned = cleaned[:limit] + " [cut]"
     return f"<{name}>\n{cleaned}\n</{name}>"
@@ -140,3 +145,115 @@ def judge_alt(
 
 def judge_prompt_version() -> str:
     return load_prompt(JUDGE_PROMPT).version
+
+
+# ===================================================================== long descriptions
+
+# A separate rubric (prompt `judge_long_description.md`) for what the figure step writes
+# with long descriptions on: the long description (accurate, complete, no invented
+# values) and the chart data table (every value within tolerance of the figure). Same
+# instrument rules as above: the image is the ground truth, the main model with no
+# fallback, every text fenced as data, blind. Pass rule: `accurate and complete and not
+# invented_values`; a table passes when `table_values_ok`.
+LONG_JUDGE_PROMPT = "judge_long_description"
+# Caps that keep the whole block under the fence's 2,000 characters (the figure prompt
+# asks for at most 1,200 characters; a cut field ends in " [cut]" and the rubric says
+# not to count a cut end as missing). The table is the chart's values, one row a line.
+LONG_MAX_CHARS = {"long_description": 1000, "data_table": 400, "reference": 250, "caption": 150}
+LONG_MAX_OUTPUT_TOKENS = 1536
+
+
+class LongJudgeVerdict(BaseModel):
+    """Structured output schema for the long-description judge."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    accurate: bool
+    complete: bool
+    invented_values: bool
+    score: int = Field(ge=1, le=5)
+    table_values_ok: bool | None  # None: there was no data table
+    table_wrong_values: int = Field(ge=0)
+    confidence: float = Field(ge=0.0, le=1.0)
+
+    @property
+    def passed(self) -> bool:
+        return self.accurate and self.complete and not self.invented_values
+
+
+@dataclass(frozen=True)
+class LongJudgement:
+    verdict: LongJudgeVerdict | None
+    call: ModelCall
+
+
+def table_text(grid: TableGrid | None) -> str:
+    """A data table as plain rows for the judge: cells separated by " | ", the header
+    row first. Empty when there is no table."""
+    if grid is None:
+        return ""
+    rows: list[list[str]] = [[""] * grid.cols for _ in range(grid.rows)]
+    for cell in grid.cells:
+        if cell.row < grid.rows and cell.col < grid.cols:
+            rows[cell.row][cell.col] = " ".join(cell.text.split())
+    return "\n".join(" | ".join(row) for row in rows)
+
+
+def long_judge_context(
+    long_description: str | None, table: str, reference: str, caption: str | None
+) -> str:
+    """The data block the long-description judge grades, each text capped and stripped
+    of the tags of both judges."""
+    limits = MAX_CHARS | LONG_MAX_CHARS  # every tag stripped; this judge's caps
+    return "\n".join(
+        [
+            _field("long_description", long_description, limits),
+            _field("data_table", table, limits),
+            _field("reference", reference, limits),
+            _field("caption", caption, limits),
+        ]
+    )
+
+
+def long_judge_request(
+    long_description: str | None,
+    table: TableGrid | None,
+    reference: str,
+    caption: str | None,
+    *,
+    settings: Settings,
+    image: bytes,
+) -> VisionRequest:
+    prompt = load_prompt(LONG_JUDGE_PROMPT)
+    return VisionRequest(
+        step="judge",
+        model=settings.main_model,
+        prompt_version=prompt.version,
+        instructions=prompt.text,
+        images=[image],
+        context_text=long_judge_context(long_description, table_text(table), reference, caption),
+        max_output_tokens=LONG_MAX_OUTPUT_TOKENS,
+    )
+
+
+def judge_long(
+    long_description: str | None,
+    table: TableGrid | None,
+    reference: str,
+    caption: str | None,
+    *,
+    client: VisionClient,
+    settings: Settings,
+    image: bytes,
+) -> LongJudgement:
+    """Grade one long description and data table against the figure image. Raises
+    BudgetExceeded (from the client) when spend is refused."""
+    request = long_judge_request(
+        long_description, table, reference, caption, settings=settings, image=image
+    )
+    verdict, call = client.run(request, LongJudgeVerdict)
+    return LongJudgement(verdict=verdict, call=call)
+
+
+def long_judge_prompt_version() -> str:
+    return load_prompt(LONG_JUDGE_PROMPT).version

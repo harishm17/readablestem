@@ -73,6 +73,10 @@ def test_minimal_document_passes_every_rule():
         "html.math_display",
         "html.self_contained",
         "html.wording",
+        "html.link_text",
+        "html.link_href",
+        "html.lang_tags",
+        "html.text_contrast",
     ]
     assert all(c.passed and c.code is None for c in checks)
 
@@ -105,12 +109,23 @@ def test_minimal_document_passes_every_rule():
         (doc("<p>x</p><script>alert(1)</script>"), "external_resource"),
         (doc("<p>x</p>", head='<link rel="stylesheet" href="s.css">'), "external_resource"),
         (doc('<img src="https://example.org/a.png" alt="">'), "external_resource"),
-        (doc('<a href="https://example.org">x</a>'), "external_resource"),
+        (doc('<audio src="https://example.org/a.mp3"></audio>'), "external_resource"),
         (doc('<p style="background:url(http://x/y)">x</p>'), "external_resource"),
         (doc("<p>x</p>", head="<style>@import 'x.css';</style>"), "external_resource"),
         (doc('<iframe src="data:text/html,x" title="t"></iframe>'), "external_resource"),
         (doc(f'<p class="note a11y-stem">This file is WCAG {CLAIM}.</p>'), "banned_wording"),
         (doc('<div class="a11y-stem"><p>Ensures <b>compliance</b>.</p></div>'), "banned_wording"),
+        (doc('<p><a href="https://example.org"> </a></p>'), "empty_link"),
+        (doc('<p><a href="#x"><img src="data:," alt=""></a></p><p id="x">x</p>'), "empty_link"),
+        (doc('<p><a href="javascript:alert(1)">x</a></p>'), "unsafe_link"),
+        (doc('<p><a href="ftp://example.org/f">x</a></p>'), "unsafe_link"),
+        (doc('<p><a href="#nowhere">x</a></p>'), "unsafe_link"),
+        (doc("<p><a>x</a></p>"), "unsafe_link"),
+        (doc("<p>x</p>", lang="english language"), "invalid_lang"),
+        (doc('<p lang="fr_FR">x</p>'), "invalid_lang"),
+        (doc('<p lang="f">x</p>'), "invalid_lang"),
+        (doc('<p class="tc-ffff00">x</p>', head="<style>.tc-ffff00 { color: #ffff00; }</style>"),
+         "low_contrast"),
     ],
 )  # fmt: skip
 def test_each_rule_reports_its_code(html, code):
@@ -125,6 +140,13 @@ def test_each_rule_reports_its_code(html, code):
         doc('<h1>x<math display="inline"><mi>y</mi></math></h1>'),
         doc('<img src="data:image/png;base64,AAAA" alt="">'),
         doc('<a href="#about">About</a><p id="about">x</p>'),
+        doc('<p><a href="https://example.org/a?b=1&amp;c=2">the notes</a></p>'),
+        doc(
+            '<p><a href="mailto:a@example.edu">email</a> <a href="#e"><math display="inline">'
+            '<mi>x</mi></math></a></p><p id="e">x</p>'
+        ),
+        doc('<p lang="fr">Bonjour.</p><p lang="zh-Hant-TW">x</p><p lang="">x</p>', lang="en-GB"),
+        doc('<p class="tc-ff0000">x</p>', head="<style>.tc-ff0000 { color: #ee0000; }</style>"),
         doc(f"<p>{CLAIM.title()} mechanisms flex instead of using hinges.</p>"),
         doc(f'<div class="a11y-stem"><p>Assists with accessibility.</p></div><p>{CLAIM}</p>'),
         doc("<p>a<br/>b</p><mspace/>"),

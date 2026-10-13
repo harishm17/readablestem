@@ -9,6 +9,8 @@ The browser test (test_web_second_check_browser.py) covers axe and reflow.
 
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from a11y_stem.core import triage
@@ -202,12 +204,12 @@ def test_without_a_second_check_note_the_wording_is_as_before(pages):
     assert "1 optional check can be looked at if you want; it does not hold anything up." in (
         progress(review)
     )
-    assert "<dt>Optional checks (accepted; nothing to do)</dt><dd>1</dd>" in job
+    assert re.search(r'<dt>Accepted for you</dt><dd>\d+ <span class="meta">\(1 with a note\)', job)
 
 
 def test_the_job_page_does_not_say_nothing_to_do_for_a_second_check_note(pages):
     _, job = pages(second=1, small=2)
-    assert "<dt>Optional checks (accepted; nothing required, 1 worth a look)</dt><dd>3</dd>" in job
+    assert '<span class="meta">(3 with a note, 1 worth a look)</span>' in job
     assert "nothing to do" not in job
 
 

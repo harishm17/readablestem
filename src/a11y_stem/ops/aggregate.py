@@ -37,6 +37,9 @@ Rows are (day, step, category, count). `step` is the fix kind ("equation", "figu
                                                         equation: P(meaning_changing))
     figure    verify:cost_microusd                      their spend (a sum; also in the
                                                         job's cost_microusd)
+    page      page_type:handwritten_ocr                 analysed pages by page type
+    page      page_type_reason:invisible_text           ... and their reason codes
+                                                        (pipeline.page_type)
 
 So production cost per page is sum(cost_microusd) / sum(pages) / 1e6 over any days, and
 the review load per page is sum(decisions:required) / sum(pages) (`ops report`).
@@ -249,6 +252,10 @@ def job_counts(
     for check in result.html_checks:
         if not check.passed:
             counts[_key("document", "check", code(check.name), code(check.code or "failed"))] += 1
+    for page in result.page_types:  # what each page was (pipeline.page_type), content-free
+        counts[_key("page", "page_type", code(page.kind))] += 1
+        for reason in page.reasons:
+            counts[_key("page", "page_type_reason", code(reason))] += 1
     tiers = pipeline_tiers(result, result_json, reviewed)
     for fix in result.fixes:
         counts.update(fix_counts(fix, reviewed, tiers[id(fix)]))

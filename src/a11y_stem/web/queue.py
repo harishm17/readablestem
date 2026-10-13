@@ -2,10 +2,14 @@
 
 A reviewer makes decisions, not fixes (docs/design/beta-architecture.md, "Review tiers"):
 a fix that needs a decision is one, and a group of repeated headings that share a
-`Fix.group_key` is one for all of its headings. The queue holds every decision the
+`Fix.group_key` is one for all of its headings, and so are the pages (or the pieces of
+handwriting) kept as images for one reason ("pg-" keys, `web.review.is_kept_image`). The
+queue holds every decision the
 pipeline asked for (`Fix.review == "required"`, plus anything still waiting, for results
 stored before tiers existed), in the review order of `web.review` (equations, then
-figures, then headings, each in page and reading order), numbered from 1. Numbers do not
+figures, then tables, then headings, each in page and reading order), numbered from 1. A
+table kept as an image is a decision like any other (keep the image, or use the grid
+read from the PDF). Numbers do not
 change while the reviewer works, so "Decision 2 of 3" names the same thing before and
 after decision 1 is made; a decision is *open* while any of its fixes is still waiting.
 
@@ -20,21 +24,28 @@ from dataclasses import dataclass
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Element, Fix, Kind
-from a11y_stem.web.review import GROUP_KINDS, group_fixes
+from a11y_stem.web.review import GROUP_KINDS, PAGE_GROUP_PREFIX, group_fixes, is_kept_image
 
 
 @dataclass(frozen=True)
 class Decision:
-    """One decision: a single fix, or every heading of a group (reading order)."""
+    """One decision: a single fix, every heading of a group, or every page kept as an
+    image for one reason (reading order)."""
 
-    key: str  # the element id, or the group key ("hg-p1-e7") for a heading group
+    key: str  # the element id, or the group key: "hg-p1-e7" (headings), "pg-p2-e0" (pages)
     number: int  # 1-based position in the queue
     kind: Kind
     fixes: tuple[Fix, ...]
 
     @property
     def is_group(self) -> bool:
+        """A group of repeated headings."""
         return self.key.startswith("hg-")
+
+    @property
+    def is_page_group(self) -> bool:
+        """Pages (or handwriting) kept as images for one reason."""
+        return self.key.startswith(PAGE_GROUP_PREFIX)
 
     @property
     def open(self) -> bool:
@@ -71,7 +82,8 @@ def decisions(result: DocumentResult) -> list[Decision]:
     out: list[Decision] = []
     for number, unit in enumerate(triage.units(ordered), start=1):
         first = unit[0]
-        key = first.group_key if first.group_key and first.kind is Kind.HEADING else None
+        grouped = first.kind is Kind.HEADING or is_kept_image(first)
+        key = first.group_key if first.group_key and grouped else None
         out.append(Decision(key or first.element_id, number, first.kind, tuple(unit)))
     return out
 
@@ -118,12 +130,14 @@ def page_of(fix: Fix, elements: dict[str, Element]) -> int | None:
 
 def open_by_page(queue: list[Decision], elements: dict[str, Element]) -> dict[int, int]:
     """0-based page -> open decisions on it, each counted once, on the page of its first
-    fix still waiting."""
+    fix still waiting; the pages kept as images for one reason count their decision on
+    each of their pages (each page is waiting for it)."""
     counts: dict[int, int] = {}
     for decision in queue:
         if not decision.open:
             continue
-        page = page_of(decision.lead, elements)
-        if page is not None:
+        fixes = decision.waiting if decision.is_page_group else [decision.lead]
+        pages = {page for f in fixes if (page := page_of(f, elements)) is not None}
+        for page in pages:
             counts[page] = counts.get(page, 0) + 1
     return counts

@@ -26,9 +26,28 @@ def _load_json_line(path: Path, number: int, line: str) -> dict:
     return record
 
 
+def _in_nested_set(file: Path, root: Path) -> bool:
+    """True when `file` lies in a gold set nested under `root`: a subfolder with its own
+    manifest.json (data/gold/tables, the tables eval's gold), read only on its own."""
+    folder = file.parent
+    while folder != root and root in folder.parents:
+        if (folder / "manifest.json").is_file():
+            return True
+        folder = folder.parent
+    return False
+
+
 def iter_gold_records(path: Path, kind: str | None = None) -> Iterator[dict]:
-    """Yield records from one JSONL file or every *.jsonl under a directory."""
-    files = sorted(path.rglob("*.jsonl")) if path.is_dir() else [path]
+    """Yield records from one JSONL file or every *.jsonl under a directory.
+
+    A gold set nested in the directory (a subfolder with its own manifest.json, such as
+    data/gold/tables) is left out: it has its own tasks, and reading it here would change
+    what the other tasks select.
+    """
+    if path.is_dir():
+        files = sorted(f for f in path.rglob("*.jsonl") if not _in_nested_set(f, path))
+    else:
+        files = [path]
     for file in files:
         with file.open(encoding="utf-8") as fh:
             for number, line in enumerate(fh, 1):

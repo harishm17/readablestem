@@ -89,14 +89,14 @@ def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     job_id = convert(web, image_only_pages=[1])
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Finished, with pages not converted: notes.pdf | a11y-stem"
-    assert "Page 2 is a scanned image with no text" in page_text(html)
+    assert "Page 2 is a scanned image, so it was not converted." in page_text(html)
     assert 'id="partial-note"' in html
 
 
 def test_a_complete_job_has_no_partial_note(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Finished: notes.pdf | a11y-stem"
+    assert title(html) == "Converted: notes.pdf | a11y-stem"  # 3 decisions are open
     assert 'id="partial-note"' not in html
 
 
@@ -110,7 +110,8 @@ def test_a_scanned_pdf_says_why_it_stopped_everywhere_on_the_page(web):
     html = web.browser.get(f"/jobs/{job_id}").text
     assert title(html) == "Stopped: notes.pdf | a11y-stem"
     why = page_text(section(html, "failed-heading"))
-    assert "Run text recognition (OCR) on it first" in why
+    assert "Every page of this PDF is a scanned image, so this tool cannot convert it." in why
+    assert "OCR" not in why  # the old advice made exactly these files
     assert "stopped unexpectedly" not in page_text(html)
 
 
@@ -177,8 +178,8 @@ def test_passing_checks_are_summarised_and_old_results_show_none(web):
 def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
     job_id = convert(web)
     before = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Accepted automatically 2" in before
-    assert "Reviewed by you (accepted, edited or rejected) 0" in before
+    assert "Accepted for you 2" in before
+    assert "Decided by you 0" in before
     page = web.browser.get(f"/jobs/{job_id}/review").text
     token = re.search(r'name="csrf_token" value="([^"]+)"', page)
     assert token
@@ -187,8 +188,8 @@ def test_a_reviewers_accept_counts_as_reviewed_not_as_automatic(web):
     )
     assert response.status_code == 303
     after = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Accepted automatically 2" in after
-    assert "Reviewed by you (accepted, edited or rejected) 1" in after
+    assert "Accepted for you 2" in after
+    assert "Decided by you 1" in after
     review = page_text(web.browser.get(f"/jobs/{job_id}/review/list").text)
     assert "Accepted by you" in review and "Accepted automatically" in review
 
@@ -209,8 +210,8 @@ def test_results_stored_before_the_reviewed_flag_still_load_and_count(web):
         ]
         job.result_json = stored
     text = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Accepted automatically 1" in text
-    assert "Reviewed by you (accepted, edited or rejected) 2" in text
+    assert "Accepted for you 1" in text
+    assert "Decided by you 2" in text
 
 
 def test_fix_reviewed_defaults_to_false_for_stored_json():

@@ -17,6 +17,14 @@ the cascade stays as a second guarantee.
 
 Review actions are counted at deletion because a reviewer can act any time until then, so
 each action is counted exactly once.
+
+Erasing a person (a data-deletion request, `a11y-stem users delete`) goes through
+`erase_user`: their jobs through `delete_jobs` (so counts are kept), then every row of
+every table that holds their user id, then the user. Only content-free aggregates and
+daily spend remain. A new table with a user id must be added there.
+
+Usage events (`web.events`) outlive the jobs they mention, by design, but not for ever:
+the same purge deletes every event older than `EVENT_RETENTION_DAYS` (400 days).
 """
 
 from __future__ import annotations
@@ -24,7 +32,7 @@ from __future__ import annotations
 from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass
-from datetime import UTC, date, datetime
+from datetime import UTC, date, datetime, timedelta
 from typing import Any, cast
 
 from sqlalchemy import delete, select
@@ -41,7 +49,19 @@ from a11y_stem.ops.aggregate import (
     upsert_counts,
     utc_day,
 )
-from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
+from a11y_stem.web.db import (
+    AuthIdentity,
+    Blob,
+    Course,
+    CourseNotation,
+    Event,
+    Job,
+    QuotaDay,
+    ReviewEdit,
+    User,
+    session_scope,
+)
+from a11y_stem.web.events import EVENT_RETENTION_DAYS
 
 BATCH_SIZE = 200
 
@@ -51,6 +71,7 @@ class PurgeStats:
     jobs_deleted: int
     blobs_deleted: int
     unaggregated_deleted: int  # finished jobs deleted without their counts
+    events_deleted: int = 0  # usage events past EVENT_RETENTION_DAYS
 
 
 def purge_expired(
@@ -74,14 +95,24 @@ def purge_expired(
         stats.unaggregated_deleted += batch.unaggregated_deleted
         if batch.jobs_deleted < BATCH_SIZE:
             break
+    with session_scope(factory) as session:
+        stats.events_deleted = purge_old_events(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
         jobs_deleted=stats.jobs_deleted,
         blobs_deleted=stats.blobs_deleted,
         unaggregated_deleted=stats.unaggregated_deleted,
+        events_deleted=stats.events_deleted,
     )
     return stats
+
+
+def purge_old_events(session: Session, now: datetime) -> int:
+    """Delete usage events older than `EVENT_RETENTION_DAYS`, in the caller's transaction.
+    Returns how many. One DELETE on the indexed `created_at`."""
+    cutoff = _as_utc(now) - timedelta(days=EVENT_RETENTION_DAYS)
+    return _deleted(session.execute(delete(Event).where(Event.created_at < cutoff)))
 
 
 def aggregate_and_purge(
@@ -148,6 +179,28 @@ def delete_jobs(
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
     return PurgeStats(jobs_deleted=jobs, blobs_deleted=blobs, unaggregated_deleted=unaggregated)
+
+
+def erase_user(session: Session, user_id: str, now: datetime | None = None) -> PurgeStats:
+    """Delete a user and everything of theirs, in the caller's transaction.
+
+    Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
+    before parents and without relying on ON DELETE CASCADE (see the module docstring):
+    review edits they made on any job, their courses' notation entries, their courses,
+    their usage events, sign-in identities and daily page counts, and the user row.
+    Returns the job deletion's stats.
+    """
+    job_ids = list(session.scalars(select(Job.id).where(Job.user_id == user_id)))
+    stats = delete_jobs(session, job_ids, now)
+    courses = select(Course.id).where(Course.user_id == user_id).scalar_subquery()
+    session.execute(delete(ReviewEdit).where(ReviewEdit.user_id == user_id))
+    session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))
+    session.execute(delete(Course).where(Course.user_id == user_id))
+    session.execute(delete(Event).where(Event.user_id == user_id))
+    session.execute(delete(AuthIdentity).where(AuthIdentity.user_id == user_id))
+    session.execute(delete(QuotaDay).where(QuotaDay.user_id == user_id))
+    session.execute(delete(User).where(User.id == user_id))
+    return stats
 
 
 def _aggregate_before_delete(session: Session, job_ids: list[str], now: datetime) -> bool:

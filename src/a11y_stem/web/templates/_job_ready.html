@@ -1,0 +1,38 @@
+{# The finish line (BW1, MF9 of the UX review): no decision is open, so the file can go to
+   students. The download is the main action; what to do before and how to post it
+   follow. Plain text, no check marks or scores: it assists, it does not certify. The
+   heading is the status box's label (`job_page.headline`), as on the review screen:
+   "Ready to share" only when everything was converted. #}
+<section id="ready" aria-labelledby="ready-heading">
+  <h2 id="ready-heading">{{ headline.label if headline is defined else "Ready to share" }}</h2>
+  <p>{{ pg.finish.sentence }}</p>
+  <ul class="actions">
+    <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
+    <li><a href="/jobs/{{ job.id }}/view">Preview the student version</a></li>
+  </ul>
+  <h3 id="before-heading">Before you share</h3>
+  <ul aria-labelledby="before-heading">
+    <li>Read the student version through once. The automatic checks look at the structure
+      of the file, not at whether each part says what you meant.</li>
+    {% if pg.finish.notes %}
+    <li>{{ pg.finish.notes }} {{ "item was" if pg.finish.notes == 1 else "items were" }}
+      accepted for you with a note. Looking at {{ "it" if pg.finish.notes == 1 else "them" }}
+      is optional: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>.</li>
+    {% endif %}
+    {% if pg.finish.not_handled %}
+    <li>Some things are not handled in this file: see
+      <a href="#not-handled-heading">Not handled in this file</a>.</li>
+    {% endif %}
+  </ul>
+  <h3 id="course-heading">Put it in your course</h3>
+  {# TODO(Harish): the tested steps for eLearning (Blackboard) and Canvas (BW1 of the UX
+     review: upload the file, link it from the module, keep the PDF beside it). The Canvas
+     steps are on /help/posting (help_posting.html), not yet tried in a live course. #}
+  <p><a href="/help/posting">How to post it in your course</a>: upload the HTML file to your
+    course as a file and link to it where the PDF was linked, so it is the main version;
+    keep the PDF only as a print copy, labelled as such. Do not paste it into a page
+    editor: course sites remove the images and the layout the equations need.</p>
+  {# ux-a's part under the download (the two questions); its posting link is the one
+     above. #}
+  {% with posting_link = false %}{% include "_after_download.html" %}{% endwith %}
+</section>

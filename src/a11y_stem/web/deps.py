@@ -45,7 +45,7 @@ class AppContext:
     converter: Converter
     client_factory: ClientFactory
     guard: DbSpendGuard
-    oauth: Any | None = None  # Authlib registry when Google sign-in is configured
+    oauth: Any | None = None  # Authlib registry when Google or Microsoft sign-in is set up
     worker: Worker | None = None
     # Below this much headroom under the daily cap, new uploads are turned away and the
     # worker claims nothing: not even the largest single model call would fit
@@ -59,6 +59,10 @@ class AppContext:
     @property
     def dev_login_enabled(self) -> bool:
         return self.settings.dev_login_enabled and self.settings.env in {"dev", "test"}
+
+    def sign_in_client(self, name: str) -> Any | None:
+        """The Authlib client "google" or "microsoft", or None when it is not set up."""
+        return None if self.oauth is None else self.oauth.create_client(name)
 
 
 def get_ctx(request: Request) -> AppContext:
@@ -184,10 +188,17 @@ async def require_csrf(request: Request) -> None:
 # --------------------------------------------------------------------------- flash
 
 
-def flash(request: Request, message: str, *, element_id: str | None = None) -> None:
-    """One-time notice for the next page. Content-free: it lives in the session cookie."""
+def flash(
+    request: Request, message: str, *, element_id: str | None = None, undo: bool = True
+) -> None:
+    """One-time notice for the next page. Content-free: it lives in the session cookie.
+    `undo` False: the notice is not about a review write, so the review screen offers no
+    Undo under it (Undo would take back the write before, which the notice is not about)."""
     items = list(request.session.get(SESSION_FLASH, []))
-    items.append({"message": message, "element_id": element_id})
+    entry: dict[str, Any] = {"message": message, "element_id": element_id}
+    if not undo:
+        entry["undo"] = False
+    items.append(entry)
     request.session[SESSION_FLASH] = items[-5:]
 
 
@@ -215,12 +226,16 @@ def render(
         "flash": pop_flash(request),
         "source_url": ctx.settings.source_url,
         "contact_email": ctx.settings.contact_email,
-        "google_login": ctx.oauth is not None,
+        "feedback_url": ctx.settings.feedback_url,  # the footer's Feedback link
+        "google_login": ctx.sign_in_client("google") is not None,
+        "microsoft_login": ctx.sign_in_client("microsoft") is not None,
         "dev_login": ctx.dev_login_enabled,
         "max_upload_mb": ctx.settings.max_upload_mb,
         "max_pages": ctx.settings.max_pages_per_job,
         "retention_hours": ctx.settings.retention_hours,
         "opt_in_days": ctx.settings.opt_in_retention_days,
+        # Course notation (FEATURE_NOTATION_MEMORY): its pages are in the main navigation.
+        "courses_enabled": ctx.settings.feature_notation_memory,
     }
     return ctx.templates.TemplateResponse(
         request, template, base | (context or {}), status_code=status_code, headers=headers

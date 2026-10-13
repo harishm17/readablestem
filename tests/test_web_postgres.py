@@ -325,3 +325,140 @@ def test_initial_migration_matches_the_models_on_postgres(pg_url):
         require_migrated(engine)  # production start check passes
     finally:
         engine.dispose()
+
+
+def test_the_content_migration_round_trips_on_postgres(pg_url):
+    """Down to the revision before it (tables and job columns gone, jobs kept), up again
+    (schema matches the models), and an older release's job insert still works."""
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from a11y_stem.web.database import alembic_config
+    from test_web_migrations import (
+        BEFORE_CONTENT,
+        CONTENT_TABLES,
+        INSERT_JOB,
+        INSERT_USER,
+        NEW_JOB_COLUMNS,
+    )
+
+    config = alembic_config(pg_url)
+    config.attributes["configure_logger"] = False
+    command.upgrade(config, "head")
+    command.downgrade(config, BEFORE_CONTENT)
+    engine = create_engine(pg_url)
+    try:
+        assert not set(inspect(engine).get_table_names()) & CONTENT_TABLES
+        assert not {c["name"] for c in inspect(engine).get_columns("jobs")} & NEW_JOB_COLUMNS
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+            conn.execute(text(INSERT_JOB), {"id": "j2"})
+            found = conn.execute(text("SELECT id, result_version FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [("j1", 0), ("j2", 0)]
+    finally:
+        engine.dispose()
+
+
+def test_erasure_and_course_deletion_on_postgres(factory):
+    """Real ON DELETE behaviour: a deleted course leaves its job (course_id NULL) and
+    takes its notation; erasing a user leaves nothing of theirs and keeps the other
+    user's rows."""
+    from a11y_stem.ops.retention import erase_user
+
+    def seed(email: str) -> tuple[str, str, str]:
+        with db.session_scope(factory) as session:
+            user = db.User(email=email, is_allowed=True)
+            session.add(user)
+            session.flush()
+            course = db.Course(user_id=user.id, name="Physics")
+            session.add(course)
+            session.flush()
+            job = db.Job(
+                user_id=user.id,
+                filename="f.pdf",
+                course_id=course.id,
+                retain_until=db.utcnow() + timedelta(hours=1),
+            )
+            session.add_all(
+                [
+                    job,
+                    db.CourseNotation(
+                        course_id=course.id,
+                        symbol="bold d",
+                        canonical="d",
+                        meaning="vector",
+                        source="user",
+                    ),
+                    db.Event(user_id=user.id, name="download", value=1.0),
+                    db.AuthIdentity(user_id=user.id, provider="google", issuer="i", subject=email),
+                ]
+            )
+            session.flush()
+            return user.id, course.id, job.id
+
+    gone_user, gone_course, _ = seed("gone@example.org")
+    kept_user, kept_course, kept_job = seed("kept@example.org")
+    with db.session_scope(factory) as session:
+        session.execute(text("DELETE FROM courses WHERE id = :id"), {"id": kept_course})
+    notation = select(db.CourseNotation.id).where(
+        db.CourseNotation.course_id.in_([gone_course, kept_course])
+    )
+    with db.session_scope(factory) as session:
+        kept = session.get(db.Job, kept_job)
+        assert kept is not None and kept.course_id is None
+        assert len(session.scalars(notation).all()) == 1  # only the other course's entry
+        erase_user(session, gone_user)
+    with db.session_scope(factory) as session:
+        for model in (db.Job, db.Event, db.AuthIdentity):
+            owners = set(session.scalars(select(model.user_id)))
+            assert gone_user not in owners and kept_user in owners, model.__tablename__
+        assert session.scalar(select(db.Course.id)) is None
+        assert session.scalars(notation).all() == []
+        assert session.get(db.User, gone_user) is None and session.get(db.User, kept_user)
+
+
+def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory):
+    """The review routes lock the job row (`owned_job(..., lock=True)`), then check the
+    form's version (`web.review.is_stale`) and count the write (`bump_result_version`) in
+    one transaction: of 20 tabs made from version 0 and writing at once, exactly one write
+    is applied."""
+    from a11y_stem.web.deps import CurrentUser
+    from a11y_stem.web.review import ReviewStale, bump_result_version, is_stale
+    from a11y_stem.web.routes.jobs import owned_job
+
+    [job_id] = queue_jobs(factory, 1)
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, job_id)
+        assert job is not None and job.result_version == 0
+        user = CurrentUser(id=job.user_id, email="x@example.org", name=None, is_admin=False)
+    outcomes: list[str] = []
+    lock = threading.Lock()
+
+    def write() -> None:
+        try:
+            with db.session_scope(factory) as session:
+                job = owned_job(session, job_id, user, lock=True)
+                if is_stale(job.result_version, "0"):
+                    raise ReviewStale()
+                bump_result_version(job)
+            outcome = "saved"
+        except ReviewStale:
+            outcome = "stale"
+        with lock:
+            outcomes.append(outcome)
+
+    run_threads(20, write)
+    assert sorted(outcomes) == ["saved"] + ["stale"] * 19
+    with db.session_scope(factory) as session:
+        job = session.get(db.Job, job_id)
+        assert job is not None and job.result_version == 1

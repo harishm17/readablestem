@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from datetime import date
 from html.parser import HTMLParser
 from pathlib import Path
 from xml.etree import ElementTree
@@ -23,9 +24,15 @@ from a11y_stem.core.types import (
     inline_marker,
 )
 from a11y_stem.pipeline.assemble import (
+    ABOUT_TITLE,
     ABOUT_WORDING,
+    CHECKED,
+    CONTACT,
     EQUATION_NOT_CONVERTED_ALT,
     FIGURE_NOT_DESCRIBED_ALT,
+    FLAGGED_NOTE,
+    MATHS_NOTE,
+    NOT_CHECKED_YET,
     outline_before,
     render_html,
     sanitize_mathml,
@@ -366,7 +373,7 @@ def test_hostile_text_is_escaped_everywhere():
     assert "<script" not in html.lower()
     assert not [a for a in parsed.attrs if a[1].startswith("on")]
     assert {tag for tag, _, _ in parsed.attrs} <= {
-        "html", "meta", "img", "h1", "p", "figure", "section", "h2", "span", "div",
+        "html", "meta", "img", "h1", "p", "figure", "footer", "h2", "span", "div",
     }  # fmt: skip
     assert "&lt;script&gt;alert(&#x27;p&#x27;)&lt;/script&gt;" in html
     assert 'alt="&quot;&gt;&lt;img src=x onerror=alert(4)&gt;"' in html
@@ -551,7 +558,7 @@ def test_first_fix_for_an_element_wins_like_fix_for():
     failed = Fix(element_id="e1", kind=Kind.EQUATION, status=Status.FAILED, reason="x")
     html = render([equation("e1", 0)], [failed, accepted("e1", convert("y"))], {"e1": png()})
     assert 'data-status="failed"' in html and "<math" not in html
-    assert "<li>Equations (1): 1 not converted (error or spending limit)</li>" in html
+    assert html.count('data-status="') == 1  # the later duplicate is not written either
 
 
 def test_a_repeated_marker_is_flagged_and_counted_once():
@@ -560,30 +567,52 @@ def test_a_repeated_marker_is_flagged_and_counted_once():
     abstained = Fix(element_id="e1", kind=Kind.EQUATION, status=Status.ABSTAINED)
     html = render([para, equation("e1", 1, parent="p")], [abstained], {"e1": png()})
     assert html.count('class="flagged-inline"') == 2 and html.count('id="e1"') == 1
-    assert "<p>1 item could not be converted. They keep the original" in html
+    assert html.count(FLAGGED_NOTE) == 1
 
 
 # --------------------------------------------------------------------------- about
 
 
-def test_about_section_counts_by_kind_and_status(sample_html):
-    about = sample_html[sample_html.index('<section id="about-conversion"') :]
-    assert '<h2 id="about-conversion-title">About this conversion</h2>' in about
-    assert "<li>Headings (3): 1 accepted, 1 needs review, 1 rejected by a reviewer</li>" in about
-    assert (
-        "<li>Equations (5): 2 accepted, 1 not converted (model unsure), "
-        "1 not converted (error or spending limit), 1 rejected by a reviewer</li>"
-    ) in about
-    assert "<li>Figures (3): 2 accepted, 1 not converted (model unsure)</li>" in about
-    assert "<p>4 items could not be converted." in about
-    assert "<p>Test note.</p>" in about
+def about(html: str) -> str:
+    start = html.index('<footer id="about-conversion"')
+    return html[start : html.index("</footer>", start)]
 
 
-def test_about_section_tells_a_reviewers_accept_from_an_automatic_one():
-    pairs = [heading("a", 0, 1), heading("b", 1, 2), heading("c", 2, 2, Status.NEEDS_REVIEW)]
-    pairs[1][1].reviewed = True  # accepted on the review screen
+def test_the_student_note_comes_after_main_and_speaks_to_students(sample_html):
+    """The note is for the people who read the file (MF7 of the UX review): what it is,
+    whether the instructor has checked it, who to tell. No counts and no review words."""
+    note = about(sample_html)
+    assert sample_html.index("</main>") < sample_html.index('<footer id="about-conversion"')
+    assert f'<h2 id="about-conversion-title">{ABOUT_TITLE}</h2>' in note
+    assert ABOUT_WORDING in note and MATHS_NOTE in note and CONTACT in note
+    assert NOT_CHECKED_YET in note  # the sample has decisions still open
+    assert FLAGGED_NOTE in note
+    assert "<p>Test note.</p>" in note
+    for word in ("needs review", "rejected", "accepted", "reviewer", "("):
+        assert word not in note.lower(), word
+    text = re.sub(r"<[^>]+>", "", note).replace("a11y-stem", "")
+    assert not re.search(r"\d", text)  # no counts
+
+
+def test_the_note_says_checked_with_the_date_once_every_decision_is_made():
+    pairs = [heading("a", 0, 1), heading("b", 1, 2, Status.NEEDS_REVIEW)]
+    elements, fixes = [e for e, _ in pairs], [f for _, f in pairs]
+    draft = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
+                        checked_on=date(2026, 10, 9))  # fmt: skip
+    assert NOT_CHECKED_YET in about(draft) and "2026" not in about(draft)
+    fixes[1].status, fixes[1].reviewed = Status.ACCEPTED, True
+    done = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={},
+                       checked_on=date(2026, 10, 9))  # fmt: skip
+    assert f"<p>{CHECKED} on 9 October 2026.</p>" in about(done)
+    undated = render(elements, fixes)
+    assert f"<p>{CHECKED}.</p>" in about(undated)
+
+
+def test_the_note_says_nothing_about_checking_when_nothing_was_asked():
+    pairs = [heading("a", 0, 1), heading("b", 1, 2)]
     html = render([e for e, _ in pairs], [f for _, f in pairs])
-    assert "<li>Headings (3): 1 accepted, 1 accepted by a reviewer, 1 needs review</li>" in html
+    assert NOT_CHECKED_YET not in html and CHECKED not in html
+    assert FLAGGED_NOTE not in html
 
 
 def test_outline_would_write_matches_what_is_written():
@@ -598,7 +627,7 @@ def test_outline_would_write_matches_what_is_written():
 def test_about_section_without_fixes_and_defaults():
     para = Element(id="p", kind=Kind.PARAGRAPH, page=0, bbox=(0, 0, 9, 9), order=0, text="x")
     html = render([para], [], title="  ", lang="")
-    assert "<p>No headings, equations or figures were found.</p>" in html
+    assert ABOUT_WORDING in html and MATHS_NOTE not in html  # no equations, no maths line
     assert "<title>Converted document</title>" in html
     assert '<html lang="en">' in html
     assert "could not be converted" not in html

@@ -10,7 +10,7 @@ submit, and refunds would let a failing upload be retried without bound.
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import UTC, date, datetime, time, timedelta
 
 from sqlalchemy import select, update
 from sqlalchemy.orm import Session
@@ -54,3 +54,10 @@ def pages_left(session: Session, user_id: str, *, quota: int | None, day: date) 
     if quota is None:
         return None
     return max(0, quota - pages_used(session, user_id, day))
+
+
+def next_day_start(now: datetime) -> datetime:
+    """The next midnight UTC: when the page quota and the daily spend cap start again
+    (pages show it in the reader's own time: the `utc` template filter and app.js)."""
+    tomorrow = now.astimezone(UTC).date() + timedelta(days=1)
+    return datetime.combine(tomorrow, time(), tzinfo=UTC)

@@ -1,8 +1,8 @@
 """The conversion pipeline end to end.
 
-convert_pdf: layout.analyze -> heading_fixes -> per page: crops (serial, calling thread)
--> equation/figure steps (thread pool) -> assemble.render_html ->
-html_checks.static_checks.
+convert_pdf: layout.analyze -> text_pass.apply -> heading_fixes -> per page: crops
+(serial, calling thread) -> equation/figure/table steps (thread pool) ->
+assemble.render_html -> html_checks.static_checks.
 
 Design notes:
 
@@ -25,12 +25,17 @@ Design notes:
   counts stay true.
 - Static checks of the HTML are stored on `DocumentResult.html_checks` and, as before,
   returned on `PipelineOutput.checks` (a subclass of `ConversionOutput`).
-- Scanned pages: a page whose only content is one image covering it, with no text, is a
-  picture of a page. Layout drops such an image as a page background, so the pipeline
-  checks the pages where layout found no text (`page_kinds`), adds the page as a figure
-  element that is FAILED with reason "scanned_page" before any model work (cropped, so the
-  output keeps the page image, flagged), and lists the pages on
-  `DocumentResult.image_only_pages`. The web app reports them to the user.
+- Pages kept as images: layout says which pages are handwritten or scanned, or have
+  something painted on them from which nothing was read (`Layout.kept_pages`,
+  `pipeline.page_type`; hidden text is never read at all). Each becomes a figure element
+  for the whole page that is FAILED before any model work, with the reason
+  "handwritten_page", "scanned_page" or "unread_page" (cropped, so the output keeps the
+  page image, marked "Not converted"); handwriting on a typed page arrives as figure
+  elements for its regions and is FAILED the same way ("handwriting_on_page"). Nothing of
+  them goes to a model. The fixes with the same reason are one decision (`Fix.group_key`
+  "pg-..." and `group_size`), so a 20-page handwritten file asks once. The pages are
+  listed on `DocumentResult.image_only_pages`, and every page's type on
+  `DocumentResult.page_types` (content-free). The web app reports them to the user.
 - Run-level outcomes are recorded on the result, content-free: `stopped_by` (the
   "budget_<scope>" that stopped model work early, else None) and `html_checks`.
 - `layout` (WP2) keeps a few opened PDFs cached for cropping. Once the last crop is made
@@ -40,6 +45,25 @@ Design notes:
   numbers, models, token counts, costs, statuses and reason codes, never document text.
   Attributes are scalars only (WP6 drops anything else); each model request gets its own
   `model_call` span opened with `model=`, which WP6 records as a Langfuse generation.
+- Options (`ConversionOptions`: feature flags and the course's notation) are in force for
+  the whole run (`pipeline.options.using`), so every step reads them with
+  `options.current()`, pool threads included (each task runs in a copy of the context).
+  They decide what the steps produce; the stored result alone decides the HTML.
+- Content features (docs/design/content-features.md) hook in here: TABLE elements go to
+  `table_step.rebuild` like equations and figures go to their steps; `stage_progress`
+  receives `ProgressEvent`s; notices and source facts go on the result. The text pass
+  (links, cross-references, the document and passage languages, colour runs) runs once
+  after layout, before any step; it sets `lang`, `lang_source` and its own notices, and
+  never fails the conversion.
+- Live progress (`stage_progress`, for the job page): "layout" when analysis starts and
+  again with the pages and the elements found per kind; "equations", "figures" and
+  "tables" with how many of each are done, first with their totals and then after every
+  element (the receiver decides how often to store them); "assemble" and "checks" as the
+  HTML is written and checked. All on the calling thread, content-free.
+- After the steps, `pipeline.notices` derives the notices that follow from the fixes
+  (a table kept as an image, a scanned page, a colour-only figure, a chart without a
+  long description) and `pipeline.source_facts` measures the PDF for the before/after
+  card. Neither can fail the run.
 """
 
 from __future__ import annotations
@@ -54,7 +78,7 @@ from collections import Counter, defaultdict
 from collections.abc import Callable, Generator, Iterable
 from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from functools import partial
 from typing import Any
 
@@ -66,6 +90,7 @@ from a11y_stem.core.budget import BudgetExceeded
 from a11y_stem.core.types import (
     BBox,
     Check,
+    ConversionOptions,
     ConversionOutput,
     DocumentResult,
     DocumentStats,
@@ -73,7 +98,11 @@ from a11y_stem.core.types import (
     Fix,
     Kind,
     ModelCall,
+    Notice,
     PageStats,
+    ProgressEvent,
+    SourceFacts,
+    Stage,
     Status,
     inline_marker,
 )
@@ -87,30 +116,57 @@ from a11y_stem.pipeline import (
     heading_step,
     html_checks,
     layout,
-    page_kinds,
+    page_type,
+    table_step,
+    text_pass,
 )
+from a11y_stem.pipeline import notices as notice_rules
+from a11y_stem.pipeline import options as run_options
+from a11y_stem.pipeline import source_facts as pdf_facts
 
 log = logging.getLogger(__name__)
 
 # 0.3.0 (2026-10-08): review rules changed, a sign or relation that differs from the text
 # layer is a required decision (`signs.compare_signs`). Results and eval reports from
 # 0.2.0 were made under the old review policy.
-PIPELINE_VERSION = "0.3.0"
+# 0.4.0 (2026-10-09): the content-feature data model (docs/design/content-features.md):
+# TABLE elements and fixes, figure long descriptions and data tables, links, colour
+# runs, passage languages, notices and source facts on the result, conversion options.
+# Results from 0.3.0 load unchanged (every new field has a default); a table detected by
+# 0.4.0 is a required decision ("table_not_rebuilt") until rebuilding is switched on.
+PIPELINE_VERSION = "0.4.0"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
+# Live progress by stage, for the job page (content-free; see `ProgressEvent`).
+StageProgressFn = Callable[[ProgressEvent], None]
 
 # Neighbouring text sent with each crop as untrusted context (the client fences it).
 # List items are text too: a display equation inside a numbered solution step is
 # introduced by that step, not by the paragraph before the list.
 CONTEXT_CHARS = 600
 _TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
-_MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE)
+_MODEL_KINDS = (Kind.EQUATION, Kind.FIGURE, Kind.TABLE)
 # Errors that mean the run itself is misconfigured, not that one element is hard: they
 # stop the run and propagate (see the module docstring).
 FATAL_ERRORS: tuple[type[Exception], ...] = (ConfigError, UnknownModelError)
 # Fix.reason of the figure that stands for a scanned page (nothing on it to convert).
-SCANNED_PAGE_REASON = "scanned_page"
-_PAGE_TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM)
+SCANNED_PAGE_REASON = page_type.SCANNED_PAGE
+# Fix reasons of what is kept as an image before any model work: a whole page, and a
+# region of handwriting on a typed page (module docstring).
+PAGE_REASONS = frozenset(
+    {page_type.SCANNED_PAGE, page_type.HANDWRITTEN_PAGE, page_type.UNREAD_PAGE}
+)
+KEPT_REASONS = PAGE_REASONS | {page_type.HANDWRITING_ON_PAGE}
+# `Fix.group_key` of the kept images with one reason: "pg-" + the first one's element id
+# (content-free, like a heading group's "hg-...").
+PAGE_GROUP_PREFIX = "pg-"
+LETTER_BOX: BBox = (0.0, 0.0, 612.0, 792.0)  # a page whose size could not be read
+# The live-progress stage of each kind that goes to a model step.
+_STAGE_OF: dict[Kind, Stage] = {
+    Kind.EQUATION: "equations",
+    Kind.FIGURE: "figures",
+    Kind.TABLE: "tables",
+}
 
 
 class PipelineOutput(ConversionOutput):
@@ -312,9 +368,12 @@ def _inline_context(element: Element, parent: Element) -> str | None:
     return f"{_tail(before, half)}[this equation]{_head(after, half)}".strip()
 
 
+_CONTEXT_LABELS = {Kind.FIGURE: "[this figure]", Kind.TABLE: "[this table]"}
+
+
 def _neighbour_context(element: Element, before: str | None, after: str | None) -> str | None:
     half = CONTEXT_CHARS // 2
-    label = "[this figure]" if element.kind is Kind.FIGURE else "[this equation]"
+    label = _CONTEXT_LABELS.get(element.kind, "[this equation]")
     parts = []
     if before:
         parts.append(_tail(_without_markers(before), half))
@@ -379,6 +438,8 @@ def _step_for(kind: Kind) -> tuple[str, Callable[..., Fix]]:
     # function without touching this one.
     if kind is Kind.EQUATION:
         return "equation", equation_step.transcribe
+    if kind is Kind.TABLE:
+        return "table", table_step.rebuild
     return "figure", figure_step.describe
 
 
@@ -450,6 +511,24 @@ def _run_step(
     return _Done(element, fix, elapsed_ms)
 
 
+def _text_pass(
+    pdf_bytes: bytes,
+    elements: list[Element],
+    pages: list[int],
+    layout_lang: str,
+    options: ConversionOptions,
+    tracer: Tracer,
+) -> text_pass.TextPassResult:
+    """Links, cross-references, language and (with FEATURE_COLOUR) colour runs on the
+    elements, before any step (`text_pass.apply`; it never raises)."""
+    with _span(tracer, "text", elements=len(elements), colour=options.colour) as span:
+        text = text_pass.apply(
+            pdf_bytes, elements, pages=pages, layout_lang=layout_lang, colour=options.colour
+        )
+        _annotate(span, lang_source=text.lang_source, **text.counts())
+    return text
+
+
 def _heading_fixes(elements: list[Element], tracer: Tracer) -> list[Fix]:
     headings = [e for e in elements if e.kind is Kind.HEADING]
     with _span(tracer, "headings", count=len(headings)) as span:
@@ -495,12 +574,32 @@ class _Pages:
             self._progress(self.done, self.total)
 
 
+def _send(
+    stage_progress: StageProgressFn | None,
+    stage: Stage,
+    done: int = 0,
+    total: int = 0,
+    counts: dict[str, int] | None = None,
+) -> None:
+    """One `ProgressEvent` to the caller, if it asked for them. Like `progress`, an
+    exception from the receiver aborts the run."""
+    if stage_progress is not None:
+        stage_progress(ProgressEvent(stage=stage, done=done, total=total, counts=counts or {}))
+
+
+def _kind_counts(elements: Iterable[Element]) -> dict[str, int]:
+    """Elements found per kind ("equation": 21), for the "layout" event."""
+    return dict(sorted(Counter(e.kind.value for e in elements).items()))
+
+
 @dataclass
 class _Run:
     """State of one conversion while its steps are in flight."""
 
     pdf_bytes: bytes
     settings: Settings
+    options: ConversionOptions
+    stage_progress: StageProgressFn | None  # live progress by stage, for the job page
     client: VisionClient
     tracer: Tracer
     pages: _Pages
@@ -511,9 +610,31 @@ class _Run:
     crops: dict[str, bytes]
     page_ms: Counter[int]
     futures: dict[Future[_Done], Element]
+    # Per model kind: how many elements it has, and the ids that have their fix.
+    stage_totals: dict[Kind, int] = field(default_factory=dict)
+    stage_done: dict[Kind, set[str]] = field(default_factory=dict)
+
+    def start_stages(self, elements: list[Element]) -> None:
+        """Each model stage's total, counting what was decided before any model work (a
+        scanned page) as done."""
+        for kind, stage in _STAGE_OF.items():
+            members = [e.id for e in elements if e.kind is kind]
+            self.stage_totals[kind] = len(members)
+            self.stage_done[kind] = {i for i in members if i in self.fixes}
+            if members:
+                _send(self.stage_progress, stage, len(self.stage_done[kind]), len(members))
+
+    def step_done(self, element: Element) -> None:
+        """Count one equation, figure or table as done and say so."""
+        stage = _STAGE_OF.get(element.kind)
+        done = self.stage_done.get(element.kind)
+        if stage is None or done is None or element.id in done:
+            return
+        done.add(element.id)
+        _send(self.stage_progress, stage, len(done), self.stage_totals.get(element.kind, 0))
 
     def process_page(self, page: int, elements: list[Element]) -> None:
-        """Crop this page's equations and figures here (PyMuPDF), queue their steps."""
+        """Crop this page's equations, figures and tables here (PyMuPDF), queue their steps."""
         work = [e for e in elements if e.kind in _MODEL_KINDS]
         with _span(self.tracer, "page", page=page, elements=len(elements), tasks=len(work)):
             for element in work:
@@ -527,12 +648,14 @@ class _Run:
         except Exception as exc:
             log.warning("crop failed: %s", type(exc).__name__)
             self.fixes[element.id] = _failed(element, "crop_error")
+            self.step_done(element)
             return
         self.crops[element.id] = png
         if element.id in self.fixes:  # decided before any model work: a scanned page
             return
         if self.stop.scope is not None:  # still cropped: the output shows the original
             self.fixes[element.id] = _failed(element, self.stop.reason())
+            self.step_done(element)
             return
         work = partial(
             _run_step,
@@ -577,6 +700,7 @@ class _Run:
             self.fixes[element.id] = done.fix
             self.page_ms[element.page] += done.elapsed_ms
         self.pages.finished(element.page)
+        self.step_done(element)
 
 
 # --------------------------------------------------------------------------- results
@@ -630,7 +754,11 @@ def _stats(
 def _prompt_versions(fixes: list[Fix]) -> dict[str, str]:
     """Declared step prompt versions, overridden by the versions actually sent."""
     versions: dict[str, str] = {}
-    for step, module in (("equation", equation_step), ("figure", figure_step)):
+    for step, module in (
+        ("equation", equation_step),
+        ("figure", figure_step),
+        ("table", table_step),
+    ):
         declared = getattr(module, "PROMPT_VERSION", None)
         if isinstance(declared, str) and declared:
             versions[step] = declared
@@ -643,46 +771,37 @@ def _prompt_versions(fixes: list[Fix]) -> dict[str, str]:
     return versions
 
 
-# --------------------------------------------------------------------------- scanned pages
+# --------------------------------------------------------------------------- kept pages
 
 
-def _image_only_pages(
-    pdf_bytes: bytes, page_list: list[int], elements: list[Element]
+def _page_boxes(
+    pdf_bytes: bytes, pages: Iterable[int], sizes: dict[int, tuple[float, float]]
 ) -> dict[int, BBox]:
-    """Pages that are only a picture of a page, with each page's box.
-
-    Only pages on which layout found no text are opened, so a normal document costs
-    nothing here. `layout.analyze` has already rendered every analysed page in its crash
-    probe, so reading these pages again in this process is safe. PyMuPDF is not
-    thread-safe: hold layout's lock (when it has one) like every other PyMuPDF call.
-    """
-    with_text = {e.page for e in elements if e.kind in _PAGE_TEXT_KINDS}
-    candidates = [page for page in page_list if page not in with_text]
-    if not candidates:
-        return {}
+    """Each page's box in layout's frame, from the sizes layout measured; a page it did
+    not measure (a layout stand-in in tests) is read from the PDF. PyMuPDF is not
+    thread-safe: hold layout's lock (when it has one) like every other PyMuPDF call."""
+    pages = list(pages)
+    boxes: dict[int, BBox] = {p: (0.0, 0.0, *sizes[p]) for p in pages if p in sizes}
+    missing = [p for p in pages if p not in boxes]
+    if not missing:
+        return boxes
     import pymupdf
 
-    found: dict[int, BBox] = {}
     lock = getattr(layout, "_LOCK", None)
     with lock if lock is not None else contextlib.nullcontext():
-        pymupdf.TOOLS.mupdf_display_errors(False)
-        pymupdf.TOOLS.mupdf_display_warnings(False)
         try:
             doc = pymupdf.open(stream=pdf_bytes, filetype="pdf")
             try:
-                for number in candidates:
-                    page = doc[number]
-                    if page_kinds.page_kind(page) is page_kinds.PageKind.IMAGE_ONLY:
-                        rect = page.rect
-                        found[number] = (rect.x0, rect.y0, rect.x1, rect.y1)
+                for number in missing:
+                    rect = doc[number].rect
+                    boxes[number] = (rect.x0, rect.y0, rect.x1, rect.y1)
             finally:
                 doc.close()
-        except Exception as exc:  # a detection problem never fails the conversion
-            log.warning("scanned-page check failed: %s", type(exc).__name__)
-            return {}
+        except Exception as exc:  # a size is never worth failing the conversion for
+            log.warning("page size unreadable: %s", type(exc).__name__)
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()  # the warning store can quote the PDF
-    return found
+    return {p: boxes.get(p, LETTER_BOX) for p in pages}
 
 
 def _next_id(page: int, elements: list[Element]) -> str:
@@ -697,36 +816,71 @@ def _next_id(page: int, elements: list[Element]) -> str:
 
 
 def _with_page_images(
-    elements: list[Element], scans: dict[int, BBox]
+    elements: list[Element], kept: dict[int, str], boxes: dict[int, BBox]
 ) -> tuple[list[Element], list[Fix]]:
-    """`elements` plus one figure per scanned page (placed after the page's other
-    elements, orders renumbered), and the FAILED fixes that keep them from the model."""
-    if not scans:
-        return elements, []
+    """`elements` plus one figure per kept page (placed after the page's other elements,
+    orders renumbered), and the FAILED fixes that keep them, and any handwriting region
+    layout cut out of a typed page, from the model. Fixes with the same reason share a
+    group key: one decision for all of them."""
     added: list[Element] = []
     result: list[Element] = []
-    pending = sorted(scans)
+    pending = sorted(kept)
     for element in elements:
         while pending and pending[0] < element.page:
-            added.append(_page_image(pending.pop(0), scans, elements))
+            added.append(_page_image(pending.pop(0), kept, boxes, elements))
             result.append(added[-1])
         result.append(element)
     for page in pending:
-        added.append(_page_image(page, scans, elements))
+        added.append(_page_image(page, kept, boxes, elements))
         result.append(added[-1])
     renumbered = [e.model_copy(update={"order": i}) for i, e in enumerate(result)]
-    return renumbered, [_failed(e, SCANNED_PAGE_REASON) for e in added]
+    fixes = [_failed(e, e.reasons[0]) for e in added]
+    fixes += [
+        _failed(e, page_type.HANDWRITING_ON_PAGE)
+        for e in renumbered
+        if e.kind is Kind.FIGURE and page_type.HANDWRITING_REGION in e.reasons
+    ]
+    order = {e.id: e.order for e in renumbered}
+    return renumbered, _grouped(sorted(fixes, key=lambda f: order.get(f.element_id, 0)))
 
 
-def _page_image(page: int, scans: dict[int, BBox], elements: list[Element]) -> Element:
+def _page_image(
+    page: int, kept: dict[int, str], boxes: dict[int, BBox], elements: list[Element]
+) -> Element:
     return Element(
         id=_next_id(page, elements),
         kind=Kind.FIGURE,
         page=page,
-        bbox=scans[page],
+        bbox=boxes[page],
         order=0,  # renumbered by the caller
-        reasons=[SCANNED_PAGE_REASON],
+        reasons=[kept[page]],
     )
+
+
+def _grouped(fixes: list[Fix]) -> list[Fix]:
+    """Kept images with the same reason as one decision: "pg-" + the first one's element
+    id, and how many there are (one page alone is a group of one, so the review screen
+    shows every kept page the same way)."""
+    by_reason: defaultdict[str, list[Fix]] = defaultdict(list)
+    for fix in fixes:
+        by_reason[fix.reason or ""].append(fix)
+    for members in by_reason.values():
+        key = PAGE_GROUP_PREFIX + members[0].element_id
+        for fix in members:
+            fix.group_key, fix.group_size = key, len(members)
+    return fixes
+
+
+def _source_facts(
+    pdf_bytes: bytes, pages: list[int], elements: list[Element], fixes: list[Fix]
+) -> SourceFacts | None:
+    """`source_facts.measure`, which never raises; None if it did anyway (a bug there
+    must not cost the user a finished conversion)."""
+    try:
+        return pdf_facts.measure(pdf_bytes, pages=pages, elements=elements, fixes=fixes)
+    except Exception as exc:
+        log.warning("source facts failed: %s", type(exc).__name__)
+        return None
 
 
 # --------------------------------------------------------------------------- entry point
@@ -766,6 +920,7 @@ def _process(
     for element in elements:
         by_page[element.page].append(element)
     try:
+        run.start_stages(elements)
         for page in page_list:
             run.process_page(page, by_page[page])
             run.collect(block=False)  # report finished pages while cropping the rest
@@ -786,6 +941,8 @@ def convert_pdf(
     concurrency: int = 4,
     notice: str | None = None,
     source_note: str | None = None,
+    options: ConversionOptions | None = None,
+    stage_progress: StageProgressFn | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
@@ -801,22 +958,70 @@ def convert_pdf(
     `notice` is plain text shown at the top of the HTML (the CLI uses it to mark an
     offline test run); `source_note` is plain text for its "About this conversion"
     section, e.g. an OpenStax attribution.
+
+    `options` (feature flags, the course's notation) are in force for the whole run, for
+    every step to read with `pipeline.options.current()`; None means
+    `ConversionOptions.from_settings(settings)`. `stage_progress` receives
+    `ProgressEvent`s on the calling thread as each stage starts and moves on (see the
+    module docstring); like `progress`, an exception from it aborts the run.
     """
+    if options is None:
+        options = ConversionOptions.from_settings(settings)
+    with run_options.using(options):
+        return _convert(
+            pdf_bytes,
+            settings=settings,
+            client=client,
+            pages=pages,
+            progress=progress,
+            tracer=tracer,
+            concurrency=concurrency,
+            notice=notice,
+            source_note=source_note,
+            options=options,
+            stage_progress=stage_progress,
+        )
+
+
+def _convert(
+    pdf_bytes: bytes,
+    *,
+    settings: Settings,
+    client: VisionClient,
+    pages: list[int] | None,
+    progress: ProgressFn | None,
+    tracer: Tracer | None,
+    concurrency: int,
+    notice: str | None,
+    source_note: str | None,
+    options: ConversionOptions,
+    stage_progress: StageProgressFn | None,
+) -> ConversionOutput:
+    """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
     started = time.perf_counter()
     with _span(tracer, "document", pipeline_version=PIPELINE_VERSION) as doc_span:
         cached = _CachedDocument(pdf_bytes)
         try:
+            _send(stage_progress, "layout")
             doc = layout.analyze(pdf_bytes, pages=pages, max_pages=settings.max_pages_per_job)
             elements = sorted(doc.elements, key=lambda e: e.order)
             page_list = list(dict.fromkeys([*doc.pages, *(e.page for e in elements)]))
-            scans = _image_only_pages(pdf_bytes, page_list, elements)
-            elements, scan_fixes = _with_page_images(elements, scans)
+            kept: dict[int, str] = dict(getattr(doc, "kept_pages", None) or {})
+            sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
+            boxes = _page_boxes(pdf_bytes, kept, sizes)
+            elements, scan_fixes = _with_page_images(elements, kept, boxes)
+            text = _text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer)
+            elements = text.elements
+            read = len(page_list)
+            _send(stage_progress, "layout", read, read, _kind_counts(elements))
             fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
             fixes.update({f.element_id: f for f in scan_fixes})
             run = _Run(
                 pdf_bytes=pdf_bytes,
                 settings=settings,
+                options=options,
+                stage_progress=stage_progress,
                 client=client,
                 tracer=tracer,
                 pages=_Pages(page_list, progress),
@@ -833,16 +1038,19 @@ def convert_pdf(
             cached.release()  # also when analysis, a step or `progress` failed
 
         ordered = _ordered_fixes(elements, run.fixes)
+        source_facts = _source_facts(pdf_bytes, page_list, elements, ordered)
         with _span(tracer, "assemble", elements=len(elements), fixes=len(ordered)):
+            _send(stage_progress, "assemble")
             html = assemble.render_html(
                 title=doc.title,
-                lang=doc.lang,
+                lang=text.lang,
                 elements=elements,
                 fixes=ordered,
                 crops=run.crops,
                 source_note=source_note,
                 notice=notice,
             )
+            _send(stage_progress, "checks")
             checks = html_checks.static_checks(html)
         wall_ms = round((time.perf_counter() - started) * 1000)
         stats = _stats(page_list, elements, ordered, run.page_ms, wall_ms)
@@ -854,7 +1062,7 @@ def convert_pdf(
             cost_usd=stats.cost_usd,
             latency_ms=stats.latency_ms,
             reason=run.stop.reason() if run.stop.scope is not None else None,
-            image_only_pages=len(scans),
+            image_only_pages=len(kept),
             checks_failed=sum(1 for c in checks if not c.passed),
             **_status_counts("fixes", ordered),
         )
@@ -866,18 +1074,34 @@ def convert_pdf(
         stats.cost_usd,
         stats.latency_ms,
     )
+    # Content-free additions of the content features (docs/design/content-features.md):
+    # each feature adds its notices here (the text pass's first); those that follow from
+    # the fixes are derived once, then everything is merged (one notice per code and
+    # element, or code and page) and ordered by page and reading order.
+    notices: list[Notice] = [*text.notices, *doc.notices]
+    derived = notice_rules.from_fixes(
+        elements, ordered, long_descriptions=options.long_descriptions
+    )
+    notices = notice_rules.ordered(notice_rules.merge(derived, notices), elements)
     result = DocumentResult(
         pipeline_version=PIPELINE_VERSION,
         prompt_versions=_prompt_versions(ordered),
         title=doc.title,
-        lang=doc.lang,
+        lang=text.lang,
         elements=elements,
         fixes=ordered,
         stats=stats,
         html=html,
         stopped_by=run.stop.reason() if run.stop.scope is not None else None,
-        image_only_pages=sorted(scans),
+        image_only_pages=sorted(kept),
         html_checks=checks,
         page_sizes=dict(zip(doc.pages, doc.page_sizes, strict=False)),
+        notices=notices,
+        source_facts=source_facts,
+        lang_source=text.lang_source,
+        page_types=[
+            kind.to_record(page)
+            for page, kind in sorted((getattr(doc, "page_types", None) or {}).items())
+        ],
     )
     return PipelineOutput(result=result, crops=run.crops, checks=checks)

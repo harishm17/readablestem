@@ -50,20 +50,26 @@ REJECTION_STATUS = {
     "too_large": 413,
     "encrypted": 422,
     "unreadable": 422,
+    "damaged": 422,
     "no_pages": 422,
     "too_many_pages": 422,
     "page_too_large": 422,
     "scanned": 422,
+    "scanned_ocr": 422,
+    "handwritten": 422,
+    "handwritten_no_text": 422,
     "no_content": 422,
 }
 
 
 class UploadRejected(Exception):
-    """The upload cannot be accepted. `code` is a category (see REJECTION_STATUS)."""
+    """The upload cannot be accepted. `code` is a category (see REJECTION_STATUS);
+    `pages` the page count when it is the reason ("too_many_pages")."""
 
-    def __init__(self, code: str) -> None:
+    def __init__(self, code: str, pages: int | None = None) -> None:
         super().__init__(code)
         self.code = code
+        self.pages = pages
 
     @property
     def status_code(self) -> int:
@@ -186,7 +192,7 @@ def inspect_pdf(data: bytes, *, max_pages: int) -> int:
     try:
         return probe(data, max_pages=max_pages)
     except ProbeRejected as exc:
-        raise UploadRejected(exc.code) from None
+        raise UploadRejected(exc.code, exc.pages) from None
 
 
 # --------------------------------------------------------------------------- isolation
@@ -220,4 +226,8 @@ def inspect_pdf_isolated(
     if answer.get("ok") is True and isinstance(answer.get("pages"), int):
         return answer["pages"]
     code = answer.get("code")
-    raise UploadRejected(code if code in REJECTION_STATUS else "unreadable")
+    pages = answer.get("pages")
+    raise UploadRejected(
+        code if code in REJECTION_STATUS else "unreadable",
+        pages if isinstance(pages, int) and not isinstance(pages, bool) else None,
+    )

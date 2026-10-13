@@ -44,7 +44,9 @@ __all__ = [
 
 # What the offline client answers for each step. Confidence 0.5 sits between the abstain
 # and auto-accept thresholds, so every offline fix lands on the review screen rather than
-# passing as a real answer. Steps without an entry (e.g. "judge") come back "refused".
+# passing as a real answer. A table has no confidence: its one placeholder cell is not
+# the PDF's words, so the table step's checks make it a decision too. Steps without an
+# entry (e.g. "judge") come back "refused".
 OFFLINE_DEFAULTS: dict[str, dict | None] = {  # same shape as FakeVisionClient.defaults
     "equation": {"is_equation": True, "latex": "x", "confidence": 0.5},
     "figure": {
@@ -53,7 +55,45 @@ OFFLINE_DEFAULTS: dict[str, dict | None] = {  # same shape as FakeVisionClient.d
         "alt": "Figure (offline placeholder)",
         "confidence": 0.5,
     },
+    "table": {
+        "is_data_table": True,
+        "caption": "",
+        "rows": [
+            {
+                "cells": [
+                    {
+                        "text": "Table (offline placeholder)",
+                        "latex": "",
+                        "header": "col",
+                        "row_span": 1,
+                        "col_span": 1,
+                    }
+                ]
+            }
+        ],
+    },
 }
+# With long descriptions on, the figure step asks for more fields (`figure_long.md`).
+_OFFLINE_LONG_FIGURE = {
+    "long_description": "",
+    "long_description_unsure": False,
+    "data_table": None,
+    "values_printed": False,
+    "colour_only": False,
+}
+
+
+def _offline_figure(defaults: dict[str, dict | None]):
+    """The offline figure answer for either figure prompt: the default, plus the long
+    prompt's fields (empty) when that prompt was sent."""
+
+    def answer(request: VisionRequest) -> dict | None:
+        base = defaults.get("figure")
+        if base is None or not request.prompt_version.startswith("figure_long-"):
+            return base
+        return {**base, **_OFFLINE_LONG_FIGURE}
+
+    return answer
 
 
 def make_vision_client(
@@ -71,8 +111,12 @@ def make_vision_client(
     """
     verifier = make_verifier(settings, budget, fake=fake) if any_check_enabled(settings) else None
     if fake:
+        defaults = copy.deepcopy(OFFLINE_DEFAULTS)
         return FakeVisionClient(
-            defaults=copy.deepcopy(OFFLINE_DEFAULTS), budget=budget, verifier=verifier
+            defaults=defaults,
+            responders={"figure": _offline_figure(defaults)},
+            budget=budget,
+            verifier=verifier,
         )
     from a11y_stem.models.openai_client import OpenAIVisionClient
 

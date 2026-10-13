@@ -239,7 +239,10 @@ def test_the_figure_decision_shows_the_image_and_the_alt_field(split):
     assert "Caption in the PDF:</span> Figure 1 A car moves from home to school." in body
     assert re.search(r'<textarea id="alt-p1-e6"[^>]*>A car on a road between', body)
     assert 'id="decorative-p1-e6"' in body
-    assert "Reject keeps the figure without a description" in body
+    assert (
+        "Keep without a description: The figure stays as it is in the PDF, marked “Needs a "
+        "description”" in body
+    )
 
 
 @pytest.mark.parametrize("item", [GROUP, "p1-e7", "p2-e0"])
@@ -250,7 +253,7 @@ def test_a_heading_group_is_one_card_whoever_names_it(split, item):
     assert "Keep as headings at level 2" in body and "Make bold text" in body
     assert "(all 3 “Teacher Support”)" in body  # in the buttons' names
     assert f'action="/jobs/{split.job_id}/review/{GROUP}"' in body
-    assert text_of(section(body, '<p class="group-pages">', "</p>")) == "On pages page 1 , page 2 ."
+    assert text_of(section(body, '<p class="group-pages">', "</p>")) == "On pages 1 and 2 ."
     # The heading in its band, outlined.
     assert f'src="/jobs/{split.job_id}/regions/p1-e3.png"' in body
 
@@ -268,7 +271,11 @@ def test_optional_checks_are_folded_and_open_on_their_own(split):
     assert '<details class="optional-box">' in optional  # folded
     assert '<summary id="optional-summary">Optional checks (1)</summary>' in optional
     line = text_of(section(optional, '<ul class="optional-list">', "</ul>"))
-    assert line == "Equation 2, page 1 A letter's style differs slightly; the meaning is the same."
+    # The line names its item: the equation itself, small (UX review MF15).
+    assert line == (
+        "Equation 2, page 1 \U0001d41d 0 = 0 A letter's style differs slightly; the meaning is "
+        "the same."
+    )
     opened = screen(split, "?item=p1-e5")
     assert '<details class="optional-box" open>' in opened
     body = panel(opened)
@@ -303,8 +310,8 @@ def test_a_style_the_pdf_text_cannot_show_is_not_called_a_difference(tmp_path):
         page = screen(env)
         optional = text_of(section(page, '<ul class="optional-list">', "</ul>"))
         assert optional == (
-            "Equation 2, page 1 The proposal has a double-struck \u211d, a style the PDF's text "
-            "cannot show."
+            "Equation 2, page 1 \u211d n The proposal has a double-struck \u211d, a style the "
+            "PDF's text cannot show."
         )
         body = panel(screen(env, "?item=p1-e5"))
         assert (
@@ -344,8 +351,15 @@ def test_every_decision_then_done(split):
     assert response.headers["location"] == f"/jobs/{split.job_id}/review"
     page = split.browser.get(response.headers["location"]).text
     body = panel(page)
-    assert "All decisions made" in body
-    assert f'href="/jobs/{split.job_id}/download">Download the accessible HTML</a>' in body
+    # The finish line, as the job page says it: one part of this document stays an
+    # image, so "Ready" (not "Ready to share") with what that is.
+    title = re.search(r'<h2 id="decision-title"[^>]*>([^<]*)<', body)
+    assert title and title.group(1) == "Ready", title and title.group(1)
+    assert "shown as an image that screen readers cannot read." in text_of(body)
+    assert "You made 3 decisions on " in text_of(body)
+    assert f'href="/jobs/{split.job_id}/download">Download the HTML file</a>' in body
+    assert f'href="/jobs/{split.job_id}/view">Preview the student version</a>' in body
+    assert 'href="/help/posting">How to post it in your course</a>' in body
     assert "Repeated heading “Teacher Support”: Made 3 headings bold text instead of headings." in (
         text_of(body)
     )
@@ -363,7 +377,7 @@ def test_every_decision_then_done(split):
     decided = panel(screen(split, "?item=p1-e2"))
     assert "Decided: Edited by you" in decided
     group = panel(screen(split, f"?item={GROUP}"))
-    assert "Decided: Rejected: original kept" in group
+    assert "Decided: Made bold text by you" in group
     assert "All 3 were made bold text." in group
     # The other choice is offered again, for all of them; the one made is not.
     assert "Change all 3:" in text_of(group)

@@ -1,17 +1,44 @@
 {% extends "base.html" %}
 {% block title %}Accessible HTML from STEM course PDFs{% endblock %}
 {% block content %}
-<h1>Turn STEM course PDFs into accessible HTML</h1>
-<p class="lede">a11y-stem assists instructors with making their course materials accessible.
-  Upload a PDF of your own notes, slides or problem sets, and get back one HTML file where:</p>
+<h1>Turn STEM course PDFs into accessible web pages, equations included</h1>
+{# TODO(Harish): confirm the rule and its date against the DOJ rule (28 CFR part 35,
+   subpart H) and UTD's own page before adding a date here (UX review BW9). #}
+<p class="lede">A 2024 Justice Department rule under the ADA asks public universities to
+  make their online course materials accessible to students with disabilities. In STEM the
+  hard part is the maths. a11y-stem assists with it: upload a PDF of your own notes, slides
+  or problem sets, and get back one web page where:</p>
 <ul>
-  <li>equations are MathML, which screen readers can read aloud and let students explore,</li>
+  <li>equations are real maths (MathML) that a screen reader reads aloud, for example
+    “v equals d over t”, and lets students explore,</li>
   <li>headings are real headings, in a repaired outline,</li>
   <li>figures have short alt text, or a clear flag where a description is still needed.</li>
 </ul>
-<p>Every change comes with a confidence score and the automatic checks it passed. Anything
-  uncertain goes to a review screen, where you accept, edit or reject it. The tool assists
-  you; it does not replace your judgement or a full accessibility review of your course.</p>
+
+{# The numbers below are the committed eval reports (data/eval/latest-*.json, pipeline
+   0.4.0, 2026-10-12: equations exact_lenient 0.767, 23 of 30; document flag precision
+   0.60, 6 of 10) and the triage re-runs in docs/eval.md "Review load" (OpenStax 2.1, 16
+   pages: 3 decisions in both runs; the one-page LaTeX handout: 2, then 1). Update them
+   when the eval is rerun.
+   TODO(Harish): decide whether the product shows these numbers at all (FEATURE-REVIEW
+   10.3, row 3, says link "how we measure" instead). #}
+<h2>How long it takes</h2>
+<p>Converting takes a few minutes. Then you decide only what could change what a student
+  reads; everything else is accepted for you and listed, so you can look it over. In our
+  tests a 16-page textbook section needed 3 decisions, and a one-page handout 1 or 2 (it
+  varies from run to run).</p>
+
+<h2>How accurate it is</h2>
+<p>It makes mistakes, so look over the equations your students rely on. In our small
+  test, 23 of 30 equations from one physics textbook came out exactly right, and about 6
+  in 10 of the decisions it asked for pointed at a real problem. Its checks against the
+  PDF's own text catch some wrong equations, not all.
+  <a href="{{ source_url }}/blob/main/docs/eval.md">How we measured this, and what the
+  numbers do not show</a>.</p>
+
+<h2>What you do with the file</h2>
+<p>Post it in your course in place of the PDF. Students open it in any browser.
+  <a href="/help/posting">How to post it in your course</a>.</p>
 
 <h2>Try it</h2>
 {% if user %}
@@ -19,7 +46,7 @@
 {% else %}
 {% include "_signin.html" %}
 {% endif %}
-<p>Or <a href="/demo">look at a demo conversion</a> first (no sign-in needed).</p>
+<p>Or <a href="/demo">look at an example conversion</a> first (no sign-in needed).</p>
 
 <h2>Who can use it</h2>
 <p>The beta is open to a small group of instructors, by invitation. Upload only materials
@@ -29,6 +56,7 @@
 <h2>What happens to your documents</h2>
 <p>Your PDF and everything made from it are deleted after {{ retention_hours }} hours, or
   after {{ opt_in_days }} days if you choose to let us keep them to improve the tool. You can
-  delete them yourself at any time. Uploads are never used to train AI models.
-  <a href="/privacy">Read the privacy notice</a>.</p>
+  delete them yourself at any time. Uploads are never used to train AI models. a11y-stem
+  assists you; it does not replace your judgement or a full accessibility review of your
+  course. <a href="/privacy">Read the privacy notice</a>.</p>
 {% endblock %}

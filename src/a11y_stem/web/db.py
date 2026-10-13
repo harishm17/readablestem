@@ -1,9 +1,16 @@
 """Database schema (SQLAlchemy 2). Postgres in production, SQLite for local dev and tests.
 
 Retention model: everything derived from a user's document (the upload, crops, the
-result JSON, the output HTML, review edits) hangs off `jobs` and is deleted with it by
-`ops.retention`. Tables that survive deletion (`spend_days`, `quota_days`,
-`error_aggregates`) hold numbers and category codes only, never document text.
+result JSON, the output HTML, review edits, stage progress) hangs off `jobs` and is
+deleted with it by `ops.retention`. Tables that survive a job's deletion (`spend_days`,
+`quota_days`, `error_aggregates`, `events`) hold numbers and category codes only, never
+document text.
+
+User content that is not a document (a user's `courses` and their `notation_entries`)
+and sign-in data (`auth_identities`) belong to the user: they stay until the user deletes
+them or is erased (`ops.retention.erase_user`, which deletes every table that holds a
+user id). `events` are pseudonymous usage events (a user id, a name, a code, a number,
+a time), content-free by construction: no column can hold text from a document.
 """
 
 from __future__ import annotations
@@ -101,6 +108,17 @@ class Job(Base):
     result_json: Mapped[dict | None] = mapped_column(JSON)  # DocumentResult without html
     html: Mapped[str | None] = mapped_column(Text)
     aggregated: Mapped[bool] = mapped_column(Boolean, default=False)  # counted in aggregates
+    # The course whose notation the conversion used; a deleted course leaves the job.
+    # Named, so the migration can drop it again (SQLite rebuilds the table to do so).
+    course_id: Mapped[str | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL", name="fk_jobs_course_id_courses"),
+        index=True,
+    )
+    # Live progress by stage (`core.types.ProgressEvent` as JSON): content-free.
+    progress_json: Mapped[dict | None] = mapped_column(JSON)
+    # Bumped by every review write, so a review screen open in an older tab can tell its
+    # copy is stale. The server default keeps rows inserted by an older release valid.
+    result_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -180,6 +198,85 @@ class ErrorAggregate(Base):
     count: Mapped[int] = mapped_column(Integer, default=0)
 
     __table_args__ = (UniqueConstraint("day", "step", "category", name="uq_aggregate"),)
+
+
+class Course(Base):
+    """An instructor's course: the home of its notation memory. User content."""
+
+    __tablename__ = "courses"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(200))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    notation: Mapped[list[CourseNotation]] = relationship(
+        back_populates="course", cascade="all, delete-orphan", passive_deletes=True
+    )
+
+
+class CourseNotation(Base):
+    """One notation entry of a course (`core.types.NotationEntry`). User content.
+
+    `canonical` is `core.notation.canonical_symbol` of `symbol`: one entry per key.
+    """
+
+    __tablename__ = "notation_entries"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    course_id: Mapped[str] = mapped_column(ForeignKey("courses.id", ondelete="CASCADE"))
+    symbol: Mapped[str] = mapped_column(String(64))
+    canonical: Mapped[str] = mapped_column(String(64))
+    meaning: Mapped[str] = mapped_column(String(16))  # NotationEntry.meaning
+    note: Mapped[str | None] = mapped_column(String(200))
+    source: Mapped[str] = mapped_column(String(16))  # "user" | "review"
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    course: Mapped[Course] = relationship(back_populates="notation")
+
+    __table_args__ = (
+        UniqueConstraint("course_id", "canonical", name="uq_notation_course_canonical"),
+    )
+
+
+class Event(Base):
+    """A content-free usage event: who (pseudonymous user id), what (`name`, a code),
+    a category `code` and a number `value`, when. `job_ref` is a job id but not a
+    foreign key, so a job's events outlive the job (they say nothing about its content).
+    Deleted with the user."""
+
+    __tablename__ = "events"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(32))  # e.g. "download", "feedback"
+    job_ref: Mapped[str | None] = mapped_column(String(32))
+    code: Mapped[str | None] = mapped_column(String(64))  # category, never text
+    value: Mapped[float | None] = mapped_column(Float)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utcnow, index=True
+    )
+
+
+class AuthIdentity(Base):
+    """A sign-in identity linked to a user: one per (provider, issuer, subject).
+
+    `provider` is "google" or "microsoft"; `issuer` and `subject` are the ID token's
+    `iss` and `sub`; `tenant` the Microsoft directory id (`tid`). The allowlist is still
+    `users.is_allowed`, by email.
+    """
+
+    __tablename__ = "auth_identities"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    provider: Mapped[str] = mapped_column(String(16))
+    issuer: Mapped[str] = mapped_column(String(255))
+    subject: Mapped[str] = mapped_column(String(255))
+    tenant: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (UniqueConstraint("provider", "issuer", "subject", name="uq_auth_identity"),)
 
 
 # --------------------------------------------------------------------------- engine

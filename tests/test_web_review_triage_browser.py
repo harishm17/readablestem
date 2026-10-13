@@ -134,7 +134,7 @@ def test_group_buttons_say_what_they_act_on(site, browser, job):
     assert "Make all 3 bold text instead of headings “SECRET-LABEL Teacher Support”" in group
     assert any(n.startswith("Set the level for all 3") for n in group)
     for item in ("heading 2", "heading 3", "heading 5"):  # each one, inside the card
-        assert f"Accept {item}" in names and f"Reject {item}" in names
+        assert f"Accept {item}" in names and f"Make bold text ({item})" in names
 
 
 def test_group_decisions_work_without_javascript(site, browser, job):

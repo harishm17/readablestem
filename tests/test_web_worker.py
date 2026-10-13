@@ -885,4 +885,4 @@ def test_without_tracing_the_converter_gets_no_tracer_argument(env):
     worker = env.worker()
     worker.converter = converter
     worker.run_once()
-    assert seen == {}
+    assert set(seen) == {"stage_progress"}  # live progress for the job page, no tracer

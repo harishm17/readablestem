@@ -1,0 +1,19 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Paul Peter Urone",
+    "Roger Hinrichs"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/physics",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-08",
+  "slug": "physics",
+  "state": "live",
+  "title": "Physics",
+  "uuid": "cce64fde-f448-43b8-ae88-27705cceb0da",
+  "version": "dfdfd7a"
+}

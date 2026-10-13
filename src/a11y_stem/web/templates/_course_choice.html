@@ -1,0 +1,20 @@
+{# The upload form's course choice (notation memory, routes/courses.py). `courses` is
+   None when FEATURE_NOTATION_MEMORY is off: then nothing shows. #}
+{% if courses is defined and courses is not none %}
+{% set course_error = field_errors.get("course") %}
+{% if courses or course_error %}
+<div class="field{% if course_error %} field-error{% endif %}">
+  <label for="course">Course (optional)</label>
+  <p class="hint" id="course-hint">The document is read with the course’s notation, such as
+    “bold d is a vector”. <a href="/courses">See or change your courses</a>.</p>
+  {% if course_error %}<p class="error-message" id="course-error"><span class="visually-hidden">Error: </span>{{ course_error.message }}</p>{% endif %}
+  <select id="course" name="course" aria-describedby="course-hint{% if course_error %} course-error{% endif %}"{% if course_error %} aria-invalid="true"{% endif %}>
+    <option value="">No course</option>
+    {% for course in courses %}<option value="{{ course.id }}"{% if chosen_course is defined and chosen_course == course.id %} selected{% endif %}>{{ course.name }}</option>{% endfor %}
+  </select>
+</div>
+{% else %}
+<p class="hint">To have documents read with your course’s notation, such as “bold d is a
+  vector”, <a href="/courses">add a course</a>.</p>
+{% endif %}
+{% endif %}

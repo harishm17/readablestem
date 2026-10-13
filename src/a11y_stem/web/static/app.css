@@ -181,12 +181,13 @@ thead th { border-bottom: 2px solid var(--border); }
 tbody th { font-weight: 600; }
 .num { text-align: right; }
 
-/* Status badges: the text says the status; the colour only repeats it. */
+/* Status badges: the text says the status; the colour only repeats it. A small radius,
+   not a pill: a long status wraps on a phone, and a pill's curve cut through the words. */
 .status-badge {
   display: inline-block;
   padding: 0.05rem 0.5rem;
   border: 2px solid var(--border);
-  border-radius: 999px;
+  border-radius: 0.4rem;
   font-weight: 600;
   font-size: 0.95rem;
   background: var(--bg);
@@ -233,7 +234,7 @@ progress { width: 16rem; height: 1.1rem; }
   * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
 }
 
-/* Review screen: progress, sections, groups, bulk accept, folded decided fixes.
+/* Review screen: progress, sections, groups, folded decided fixes.
    Document text (headings, alt text, captions) and codes can be long unbroken strings. */
 .review-progress { margin: 1rem 0; }
 .review-progress, .review-toc, .review-group, .fix-card { overflow-wrap: anywhere; }
@@ -243,10 +244,6 @@ progress { width: 16rem; height: 1.1rem; }
 .review-group { border-top: 2px solid var(--rule); margin-top: 2.5rem; }
 .review-group:focus { outline: none; }
 .group-count { font-weight: 400; color: var(--muted); font-size: 1rem; }
-.bulk-actions { border: 1px solid var(--rule); border-radius: var(--radius); padding: 0.25rem 1.25rem 1rem; margin: 1rem 0 1.5rem; }
-.bulk-form { margin: 0.75rem 0; }
-.bulk-form .field { margin-bottom: 0.5rem; }
-.bulk-form .hint { max-width: 44rem; }
 .part-label { font-weight: 700; margin: 0.75rem 0 0.35rem; }
 .fix-card h3, .fix-card h4 { font-size: 1.2rem; margin-top: 1rem; }
 .fix-card h5 { font-size: 1.1rem; margin-top: 1rem; }
@@ -418,6 +415,8 @@ code.latex { overflow-wrap: anywhere; }
 .figure-view { margin: 0.5rem 0 0.75rem; }
 .figure-view img { display: block; max-width: 100%; max-height: 22rem; height: auto; border: 1px solid var(--rule); background: #fff; }
 .figure-view figcaption { margin-top: 0.35rem; color: var(--muted); }
+/* A chart data table read from the image: an optional extra, offered under the figure. */
+.data-offer { margin: 0.5rem 0 1rem; padding-top: 0.25rem; border-top: 1px solid var(--rule); }
 .cap-label { font-weight: 600; }
 .facts { display: flex; flex-wrap: wrap; gap: 0.5rem 2rem; margin: 0 0 0.75rem; }
 .facts dt { color: var(--muted); font-size: 0.9rem; }
@@ -558,6 +557,32 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
 .page-frame .box:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; box-shadow: 0 0 0 5px var(--focus-halo); z-index: 2; }
 .page-frame .box:target { outline: 3px solid var(--focus); outline-offset: 2px; z-index: 2; }
 
+/* Review screen fixes from the UX review (ux-b): Undo in the notice after a decision, the
+   live check of an edit, the two readings with the symbols that differ marked, lists
+   that name their items, a draft put back after signing in again. Existing colours only. */
+.decision-notice { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 0.25rem 1rem; }
+.decision-notice p { margin: 0; }
+.undo-form { margin: 0; }
+.undo-form .link-button { min-height: 24px; min-width: 24px; font-weight: 600; }
+.live-status { margin: 0.35rem 0 0; font-size: 0.95rem; }
+.live-check:empty { display: none; }
+.live-check { margin-top: 0.4rem; padding: 0.5rem 0.7rem; background: var(--panel); border-radius: var(--radius); }
+.live-check .cmp-label { margin-top: 0; }
+.live-results { margin: 0.5rem 0 0; padding-left: 1.2rem; }
+.kept-draft { margin: 0.35rem 0 0; padding: 0.35rem 0.6rem; border-left: 4px solid var(--accent); background: var(--panel); }
+mark.said-diff {
+  background: var(--tint-required); color: var(--text); font-weight: 700; padding: 0 0.1em; border-radius: 2px;
+  text-decoration: underline 2px var(--mark-required); text-underline-offset: 0.2em;
+}
+.text-layer { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", serif; color: var(--text); }
+.said-key { font-size: 0.9rem; margin: 0.25rem 0 0; }
+.item-math {
+  display: inline-block; max-width: 100%; overflow: hidden; vertical-align: middle; white-space: nowrap;
+  font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math;
+}
+.item-math math { display: inline; display: inline math; font-size: 1.05em; }
+.decided-box { margin-top: 0.75rem; }
+
 @media (forced-colors: active) {
   /* The legend keys show what the marks look like, and the marks keep their colours. */
   .legend .key { forced-color-adjust: none; box-shadow: 0 0 0 1px #fff; }
@@ -600,4 +625,77 @@ kbd { font-family: ui-monospace, Menlo, Consolas, monospace; border: 1px solid v
   .decision-area { padding: 0.9rem 0.9rem 1rem; }
   .decide-row .button, .decide-row .button-secondary { flex: 1 1 8rem; }
   .page-area { padding: 0.6rem; }
+}
+
+/* ===================================================================== tables (review)
+   The table card (templates/_table_card.html): the image of the table, then the table as
+   the student gets it, in its own focusable box that scrolls sideways when the table is
+   wider than the card (the page itself never does). Its cells keep whole words: the card
+   breaks long words anywhere, which would squeeze a wide table into one-letter columns.
+   Every cell has a rule round it, so a cell spanning the wrong rows or columns shows. */
+.table-crop { width: auto; max-width: 100%; }
+.table-view { background: #fff; border: 1px solid var(--rule); border-radius: 4px; overflow-wrap: normal; margin: 0 0 0.5rem; }
+.table-view table { width: auto; margin: 0; }
+.table-view caption { text-align: left; font-weight: 700; padding: 0.4rem 0.55rem 0.3rem; }
+.table-view th, .table-view td { border: 1px solid var(--border); padding: 0.3rem 0.55rem; overflow-wrap: normal; }
+.table-view thead th { border-bottom-width: 3px; }
+.table-view math { font-family: "Latin Modern Math", "STIX Two Math", "Cambria Math", math; }
+.table-findings { margin: 0.25rem 0 0.75rem; }
+.table-edit .inline-controls { display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; align-items: center; }
+.table-edit .table-pick, .table-edit .table-cell-form { margin: 0.25rem 0 1rem; }
+.table-edit .field { margin-bottom: 0.5rem; }
+.table-fieldset { border: 0; padding: 0; margin: 0 0 0.6rem; min-width: 0; }
+.table-fieldset legend { font-weight: 600; padding: 0; margin-bottom: 0.25rem; }
+.table-fieldset .checkbox-field { margin: 0.35rem 0; }
+.table-continue { margin: 0.75rem 0 0; font-weight: 600; }
+/* ===================================================================== ux-a
+   Pages outside the review screen and the job page: My documents as a to-do list, the
+   upload form's own messages, the two questions after a download, the posting help.
+   No new colours: statuses reuse the badge styles above, in words first. */
+
+.documents-summary { font-size: 1.1rem; margin: 0.5rem 0 0.75rem; }
+.documents h3 { font-size: 1.1rem; margin: 1.5rem 0 0.25rem; }
+.doc-file { display: block; font-weight: 400; color: var(--muted); font-size: 0.95rem; }
+/* The same column widths in every group's table, so the groups line up. */
+.doc-table { table-layout: fixed; }
+.doc-table th:nth-child(1) { width: 44%; }
+.doc-table th:nth-child(2) { width: 26%; }
+.doc-table th:nth-child(4) { width: 5rem; }
+.doc-table .status-badge { margin: 0 0.4rem 0.2rem 0; }
+/* Days and pseudonyms are short codes: never break them to make room. */
+.usage-table tbody th { overflow-wrap: normal; white-space: nowrap; }
+.status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
+
+.upload-status { font-weight: 600; }
+.upload-status:empty { display: none; }
+
+/* The questions after a download: a fieldset that looks like the other fields. */
+fieldset.field { border: 0; padding: 0; min-width: 0; }
+fieldset.field legend { font-weight: 600; padding: 0; margin-bottom: 0.4rem; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 0.5rem 1.75rem; }
+.choice { display: inline-flex; align-items: center; gap: 0.45rem; }
+.choice input { width: 1.3rem; height: 1.3rem; margin: 0; }
+.field .choice label { display: inline; font-weight: 400; margin: 0; }
+input[type="text"].input-short { width: 8rem; }
+.feedback { border-top: 1px solid var(--rule); margin-top: 1.25rem; }
+.steps-list li { margin: 0.35rem 0; }
+
+/* Phones: each document is a block of lines instead of a table row wider than the
+   screen (UX review MF22). The table keeps its roles in the markup, so a screen reader
+   still hears it as a table; the labels below are for the eye, with empty alternative
+   text where the browser supports it so they are not read twice. */
+@media (max-width: 37.5rem) {
+  .doc-table thead {
+    position: absolute; width: 1px; height: 1px; margin: -1px; overflow: hidden;
+    clip: rect(0 0 0 0); white-space: nowrap;
+  }
+  .doc-table, .doc-table tbody, .doc-table tr, .doc-table th, .doc-table td { display: block; }
+  .doc-table tr { padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
+  .doc-table th, .doc-table td { border: 0; padding: 0.15rem 0; }
+  .doc-table th:nth-child(n) { width: auto; }
+  .doc-table td[data-label]::before {
+    content: attr(data-label) ": ";
+    content: attr(data-label) ": " / "";
+    color: var(--muted);
+  }
 }

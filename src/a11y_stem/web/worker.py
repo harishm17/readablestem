@@ -51,17 +51,23 @@ queue is safe with several workers or instances:
   running), so a job deleted or requeued meanwhile is never resurrected. If storing
   fails (a database error, after one retry of a transient one) the job is failed with
   "store_failed" rather than left running, which would convert (and pay for) it again.
+- Live progress for the job page: the converter's `ProgressEvent`s (stage, done, total,
+  counts per kind) are kept per stage and stored on `jobs.progress_json`, throttled
+  (`PROGRESS_WRITE_S`), only while this attempt owns the job; a requeued job starts
+  again from none.
 
 Failures become `Job.error_code` categories: `LayoutError.code`, "budget_<scope>",
 "timeout", "store_failed", "model_not_configured" or "internal_error". A finished job
 can carry a code too (`result_outcome`): "budget_<scope>" when a spend cap stopped model
-work part way (the result is partial), "scanned_pages" when some pages were only images.
-A result with nothing in it fails as "no_content", or "scanned" when every page was an
-image. Nothing from the document is logged.
+work part way (the result is partial), "pages_not_converted" when pages (or handwriting
+on typed pages) were kept as images. A result with nothing in it fails as "no_content",
+and one the upload probe should have refused (every page handwritten or scanned) with
+the probe's code ("handwritten", "scanned", ...). Nothing from the document is logged.
 """
 
 from __future__ import annotations
 
+import inspect
 import logging
 import re
 import threading
@@ -77,16 +83,18 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
-from a11y_stem.core.types import ConversionOutput, DocumentResult
+from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
+from a11y_stem.web import events
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
 from a11y_stem.web.logsafe import log_event, log_exception
 from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
 
 if TYPE_CHECKING:
+    from a11y_stem.core.types import ConversionOptions
     from a11y_stem.models.base import VisionClient
     from a11y_stem.observability.tracing import Tracer
-    from a11y_stem.pipeline.run import ProgressFn
+    from a11y_stem.pipeline.run import ProgressFn, StageProgressFn
 
 logger = logging.getLogger(__name__)
 
@@ -113,14 +121,23 @@ _CODE = re.compile(r"^[a-z][a-z0-9_]{0,47}$")
 _EPSILON = 1e-9
 # Codes a finished (DONE) job can carry; see `result_outcome`.
 BUDGET_STOPS = frozenset({"budget_daily", "budget_job_usd", "budget_job_calls"})
-SCANNED_PAGES = "scanned_pages"
+SCANNED_PAGES = "scanned_pages"  # before page types: some pages were only scanned images
+PAGES_NOT_CONVERTED = "pages_not_converted"
+# Fix reasons of what the pipeline kept as an image before any model work.
+KEPT_IMAGE_REASONS = frozenset(
+    {"scanned_page", "handwritten_page", "unread_page", "handwriting_on_page"}
+)
+# Live progress is written to the job row at most this often (seconds), apart from a
+# stage seen for the first time or just finished (`Worker._stage_progress`). The job page
+# polls every 3 s.
+PROGRESS_WRITE_S = 2.0
 
 
 class Converter(Protocol):
     """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments.
 
-    `tracer` is passed only when tracing is on, so a fake without that argument works in
-    every other case.
+    The optional arguments (`tracer`, `options`, `stage_progress`) are passed only when
+    set (`Worker._converter_kwargs`), so a fake without them works in every other case.
     """
 
     def __call__(
@@ -132,6 +149,8 @@ class Converter(Protocol):
         client: VisionClient,
         progress: ProgressFn | None = None,
         tracer: Tracer | None = None,
+        options: ConversionOptions | None = None,
+        stage_progress: StageProgressFn | None = None,
     ) -> ConversionOutput: ...
 
 
@@ -175,20 +194,33 @@ def error_code_for(exc: BaseException) -> str:
 def result_outcome(result: DocumentResult) -> tuple[JobStatus, str | None]:
     """Status and code for a conversion that returned a result.
 
-    Nothing to convert is a failure: "scanned" when every analysed page was only a
-    picture of a page, "no_content" when the result has no elements at all. Otherwise
-    the job is done, with a code when it is incomplete: the spend cap that stopped model
-    work ("budget_<scope>"), else "scanned_pages" when some pages were only images.
+    Nothing to convert is a failure: the upload probe's own code when every analysed page
+    is certainly handwritten or scanned (`page_type.refusal_code` on the stored page
+    types; for a result without them, "scanned" when every page was only a picture of a
+    page), "no_content" when the result has no elements at all. Otherwise the job is
+    done, with a code when it is incomplete: the spend cap that stopped model work
+    ("budget_<scope>"), else "pages_not_converted" when pages or handwriting were kept as
+    images. A page the probe could not be sure of (a full-page picture with a short
+    title, ink not analysed in time) is kept as an image with a decision, never failed.
     """
+    from a11y_stem.pipeline.page_type import refusal_code
+
     analysed = {page.page for page in result.stats.per_page}
     image_only = set(result.image_only_pages)
-    if image_only and analysed <= image_only:
+    typed = {t.page for t in result.page_types}
+    if result.page_types and analysed <= typed:
+        refused = refusal_code([t for t in result.page_types if t.page in analysed])
+        if refused is not None and refused != "no_content":
+            return JobStatus.FAILED, refused
+    elif image_only and analysed <= image_only:
         return JobStatus.FAILED, "scanned"
     if not result.elements:
         return JobStatus.FAILED, "no_content"
     if result.stopped_by in BUDGET_STOPS:
         return JobStatus.DONE, result.stopped_by
-    if image_only:
+    if any(f.reason in KEPT_IMAGE_REASONS for f in result.fixes):
+        return JobStatus.DONE, PAGES_NOT_CONVERTED
+    if image_only:  # a result from before page types, without its fixes' reasons
         return JobStatus.DONE, SCANNED_PAGES
     return JobStatus.DONE, None
 
@@ -227,6 +259,16 @@ def db_safe(value: Any) -> Any:
     if isinstance(value, list):
         return [db_safe(v) for v in value]
     return value
+
+
+def _accepts(function: Callable[..., Any], name: str) -> bool:
+    """Whether `function` takes the keyword argument `name` (or any keyword). A callable
+    whose signature cannot be read is assumed to take it."""
+    try:
+        parameters = inspect.signature(function).parameters.values()
+    except (TypeError, ValueError):
+        return True
+    return any(p.name == name or p.kind is inspect.Parameter.VAR_KEYWORD for p in parameters)
 
 
 class JobCancelled(BudgetExceeded):
@@ -368,7 +410,9 @@ class Worker:
                 session.execute(
                     update(Job)
                     .where(*expired, Job.attempts < MAX_ATTEMPTS)
-                    .values(status=JobStatus.QUEUED, lease_until=None, pages_done=0)
+                    .values(
+                        status=JobStatus.QUEUED, lease_until=None, pages_done=0, progress_json=None
+                    )
                     .execution_options(synchronize_session=False)
                 )
             )
@@ -559,6 +603,84 @@ class Worker:
 
         return progress
 
+    def _converter_kwargs(self, attempt: _Attempt) -> dict[str, Any]:
+        """The converter's optional arguments, each passed only when set (`Converter`).
+
+        Content features add theirs here (docs/design/content-features.md), each in its
+        own block: `options` (the job's course notation; with none, `convert_pdf` uses
+        the settings' feature flags) and `stage_progress` (live progress by stage).
+        """
+        kwargs: dict[str, Any] = {}
+        if self.tracer is not None:
+            kwargs["tracer"] = self.tracer
+
+        # options: the job's course notation (FEATURE_NOTATION_MEMORY); without a course
+        # with entries, convert_pdf uses the settings' flags as before.
+        from a11y_stem.web import notation
+
+        options = notation.conversion_options(self.factory, self.settings, attempt.claim.job_id)
+        if options is not None:
+            kwargs["options"] = options
+
+        # stage_progress: live progress by stage, stored on the job row for its page
+        # (only to a converter that takes it: older fakes and scripts do not).
+        if _accepts(self.converter, "stage_progress"):
+            kwargs["stage_progress"] = self._stage_progress(attempt)
+
+        return kwargs
+
+    # ------------------------------------------------------------------ live progress
+
+    def _stage_progress(self, attempt: _Attempt) -> StageProgressFn:
+        """Receiver for the converter's `ProgressEvent`s (on the conversion thread).
+
+        Keeps the latest event of every stage and stores them on the job as
+        `{"stages": {stage: event}}` (`jobs.progress_json`; content-free): a stage seen
+        for the first time or just finished at once, anything else at most every
+        `PROGRESS_WRITE_S`, so a document with hundreds of equations does not write the
+        row hundreds of times. Raises `JobCancelled` once the job is no longer this
+        attempt's, which stops the run like the page progress callback does. A failed
+        write is logged and skipped: progress is never worth a failed conversion.
+        """
+        stages: dict[str, dict[str, Any]] = {}
+        written = [float("-inf")]
+
+        def stage_progress(event: ProgressEvent) -> None:
+            if attempt.cancelled.is_set():
+                raise JobCancelled()
+            new = event.stage not in stages
+            stages[event.stage] = event.model_dump(mode="json")
+            finished = event.total > 0 and event.done >= event.total
+            now = time.monotonic()
+            if not (new or finished) and now - written[0] < PROGRESS_WRITE_S:
+                return
+            written[0] = now
+            try:
+                owned = self._write_progress(attempt, {"stages": dict(stages)})
+            except Exception as exc:
+                log_exception(logger, "progress_write_failed", exc, job_id=attempt.claim.job_id)
+                return
+            if not owned:
+                self._cancel(attempt, "not_owned")
+                raise JobCancelled()
+
+        return stage_progress
+
+    def _write_progress(self, attempt: _Attempt, value: dict[str, Any]) -> bool:
+        """Store live progress if this attempt still owns the job (False if not)."""
+        with session_scope(self.factory) as session:
+            return (
+                rowcount(
+                    session.execute(
+                        update(Job)
+                        .where(*self._owned(attempt.claim))
+                        .values(progress_json=value)
+                        .execution_options(synchronize_session=False)
+                    )
+                )
+                == 1
+            )
+
     def _start_conversion(self, attempt: _Attempt, pdf: bytes) -> tuple[threading.Thread, _Run]:
         run = _Run()
 
@@ -566,18 +688,13 @@ class Worker:
             try:
                 client = self.client_factory(self.settings, attempt.budget)
                 progress = self._progress(attempt)
-                if self.tracer is None:
-                    run.output = self.converter(
-                        pdf, settings=self.settings, client=client, progress=progress
-                    )
-                else:
-                    run.output = self.converter(
-                        pdf,
-                        settings=self.settings,
-                        client=client,
-                        progress=progress,
-                        tracer=self.tracer,
-                    )
+                run.output = self.converter(
+                    pdf,
+                    settings=self.settings,
+                    client=client,
+                    progress=progress,
+                    **self._converter_kwargs(attempt),
+                )
             except Exception as exc:  # handed to the worker thread
                 run.error = exc
 
@@ -784,7 +901,9 @@ class Worker:
         claim = self.claim()
         if claim is None:
             return None
-        self.process(claim)
+        outcome = self.process(claim)
+        if outcome in {JobStatus.DONE, JobStatus.FAILED}:  # usage event (web/events.py)
+            events.record_finished(self.factory, self.settings, claim.job_id)
         return claim.job_id
 
     def purge_backstop(self) -> int | None:

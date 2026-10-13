@@ -30,3 +30,19 @@ sha256sum package/axe.min.js            # record here and in html_checks.AXE_SHA
 cp package/axe.min.js package/LICENSE package/LICENSE-3RD-PARTY.txt <this dir>   # rename the licences as above
 uv run pytest -m browser tests/test_assemble_checks.py
 ```
+
+## RapidTable 3.0.2 (SLANet-plus pre- and post-processing)
+
+`pipeline/tables.py` runs the SLANet-plus table-structure model the way RapidTable does.
+The code around the model is vendored, with changes, as `rapid_table.py`.
+
+| Field | Value |
+|---|---|
+| Package | `rapid_table` 3.0.2 (RapidAI; the code derives from PaddleOCR's PP-Structure, PaddlePaddle Authors) |
+| Licence | Apache-2.0 (`rapid_table-LICENSE.txt`); notice: `rapid_table-NOTICE.txt` |
+| Source | https://github.com/RapidAI/RapidTable (tag `v3.0.2`), files `rapid_table/table_structure/pp_structure/pre_process.py`, `.../post_process.py`, `rapid_table/table_matcher/main.py` |
+| What changed | listed in the header of `rapid_table.py`: Pillow instead of OpenCV for the resize, one image at a time, cell boxes kept in order (an all-zero box is `None`), bounded span parsing, type hints; the HTML matcher, OCR and engine wrapper are not used |
+
+The model file itself is not vendored: it is downloaded (Docker build, `make table-model`)
+and checked against the SHA-256 that RapidTable 3.0.2's `default_models.yaml` gives for
+`slanet_plus` (`pipeline/table_model.py`, which records the URL).

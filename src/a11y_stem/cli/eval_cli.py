@@ -33,6 +33,13 @@ DEFAULT_MAX_CALLS = 5000
 # Same as eval.pipeline_eval.TASKS (a test checks); kept here so building the parser
 # does not import the pipeline.
 TASKS = ("equations", "headings", "figures", "document")
+# The tables task (eval.tables) runs beside them: its own gold, modes and floors.
+TABLES_TASK = "tables"
+PIPELINE_TASKS = (*TASKS, TABLES_TASK)
+TABLE_GOLD_DIR = Path("data/gold/tables")
+AUTHORED_TABLES = Path("data/authored/tables")
+# Private real documents for the tables gate's second part (git-ignored; never committed).
+PRIVATE_TABLES = Path("private-inputs/tables")
 
 
 def _default(path: Path) -> Path:
@@ -138,11 +145,42 @@ def _settings() -> Any:
 
 
 def _cmd_pipeline(args: argparse.Namespace) -> int:
+    if args.task == TABLES_TASK:
+        return _run_tables(args)
     gold_dir = args.gold or _default(GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir}")
     out = args.out or _default(EVAL_DIR / f"latest-{args.task}.json")
+    if getattr(args, "notation", None):
+        return _run_with_notation(args, gold_dir, out)
     return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir))
+
+
+def _run_with_notation(args: argparse.Namespace, gold_dir: Path, out: Path) -> int:
+    """The equations task with a course notation in force (FEATURE_NOTATION_MEMORY), as a
+    conversion for that course would run it: `--notation "bold d" "v=other"` (a symbol,
+    then `=meaning`, vector by default). The report records the entries."""
+    from a11y_stem.core.notation import canonical_symbol
+    from a11y_stem.core.types import ConversionOptions, NotationEntry
+    from a11y_stem.pipeline import options as run_options
+
+    if args.task != "equations":
+        return _error("--notation applies to the equations task only")
+    meanings = {"vector", "matrix", "set", "operator", "constant", "unit", "other"}
+    entries = []
+    for spec in args.notation:
+        symbol, _, meaning = spec.rpartition("=") if "=" in spec else (spec, "", "vector")
+        key = canonical_symbol(symbol)
+        if key is None or meaning not in meanings:
+            return _error(f'not a notation entry: {spec!r} (e.g. "bold d" or "v=other")')
+        entry = {"symbol": symbol, "canonical": key, "meaning": meaning}
+        entries.append(NotationEntry.model_validate(entry))
+    options = ConversionOptions.from_settings(_settings()).model_copy(
+        update={"notation": entries, "notation_memory": True}
+    )
+    extra = {"notation": [{"canonical": e.canonical, "meaning": e.meaning} for e in entries]}
+    with run_options.using(options):
+        return _run_pipeline(args, gold_dir, out, gold_label=_shown(gold_dir), extra=extra)
 
 
 def _cmd_sample(args: argparse.Namespace) -> int:
@@ -225,6 +263,67 @@ def _run_pipeline(
     return 0
 
 
+def _run_tables(args: argparse.Namespace) -> int:
+    """`eval pipeline --task tables`: local mode needs no model and no spend cap; model
+    mode needs `--max-usd` (or `--fake`) like every task that calls a model."""
+    from a11y_stem.eval import tables
+    from a11y_stem.eval.render import RenderError
+    from a11y_stem.gold.openstax import HttpFetcher
+
+    gold_dir = args.gold or _default(TABLE_GOLD_DIR)
+    if not gold_dir.is_dir():
+        return _error(f"gold dir not found: {gold_dir} (run: a11y-stem gold fetch --set tables)")
+    styles = tuple(s.strip() for s in args.styles.split(",") if s.strip())
+    unknown = [s for s in styles if s not in tables.TABLE_STYLES]
+    if unknown or not styles:
+        return _error(f"--styles takes {', '.join(tables.TABLE_STYLES)}; got {args.styles!r}")
+    settings = _settings()
+    client = budget = None
+    label = "none"
+    if args.mode == "model":
+        made = _make_client(args, settings)
+        if isinstance(made, str):
+            return _error(made)
+        client, budget, label = made
+    authored = None if args.no_authored else _default(AUTHORED_TABLES)
+    real_dir = args.real_dir or _default(PRIVATE_TABLES)
+    if args.real_dir is not None and not (args.real_dir / tables.LABELS_FILE).is_file():
+        return _error(f"no {tables.LABELS_FILE} in {args.real_dir}")
+    out = args.out or _default(EVAL_DIR / f"latest-tables-{args.mode}.json")
+    fetcher = HttpFetcher(cache_dir=_default(OPENSTAX_CACHE))
+    with tables.CachedTableMedia(
+        gold_dir, args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
+    ) as media:
+        config = tables.TablesConfig(
+            settings=settings,
+            media=media,
+            date=args.date,
+            gold_dir=gold_dir,
+            authored_dir=authored,
+            mode=args.mode,
+            client=client,
+            styles=styles,
+            limit=args.limit,
+            client_label=label,
+            gold_label=_shown(gold_dir),
+            concurrency=args.concurrency,
+            budget=budget,
+            real_dir=real_dir if (real_dir / tables.LABELS_FILE).is_file() else None,
+        )
+        try:
+            run = tables.run_tables_eval(config)
+        except RenderError as exc:  # raised while printing inputs, before any model call
+            return _error(f"could not build the eval input (no model calls made): {exc}")
+    from a11y_stem.eval import pipeline_eval as pe
+
+    pe.write_report(run.report, out)
+    if args.items:
+        pe.write_items(run.items, args.items)
+    print(tables.format_markdown(run.report), end="")
+    print(f"\nwrote {_shown(out)}" + (f" and {_shown(args.items)}" if args.items else ""))
+    return 0
+
+
 # ============================================================================ gate
 
 
@@ -232,7 +331,7 @@ def _cmd_gate(args: argparse.Namespace) -> int:
     from a11y_stem.eval.gate import run_gate
 
     for path in (args.current, args.baseline):
-        if not path.is_file():
+        if path is not None and not path.is_file():
             return _error(f"report not found: {path}")
     tolerances = args.tolerance_file
     if tolerances is None and _default(EVAL_DIR / "tolerances.json").is_file():
@@ -261,11 +360,13 @@ def _cmd_promote(args: argparse.Namespace) -> int:
     except ValueError as exc:
         return _error(f"cannot read {args.report}: {exc}")
     task = report.get("task")
-    if task not in TASKS:
+    if task not in PIPELINE_TASKS:
         return _error(f"not an eval report (task {task!r})")
     if not report.get("complete", False):
         return _error("the report is partial; re-run with a higher --max-usd")
-    if report.get("client") != "openai":
+    # A tables run in local mode calls no model ("none"): it is a real measurement too.
+    no_model = task == TABLES_TASK and report.get("mode") == "local"
+    if report.get("client") != "openai" and not (no_model and report.get("client") == "none"):
         return _error("only real-model reports can be baselines (this one is a fake run)")
     if args.kind == "latest":
         models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
@@ -274,7 +375,8 @@ def _cmd_promote(args: argparse.Namespace) -> int:
         except GateRefused as exc:
             return _error(str(exc))
     target = args.out_dir or _default(EVAL_DIR)
-    path = target / f"{args.kind}-{task}.json"
+    name = f"{task}-{report.get('mode')}" if task == TABLES_TASK else task
+    path = target / f"{args.kind}-{name}.json"
     _write_json(report, path)
     print(f"wrote {_shown(path)}; review and commit it")
     return 0
@@ -527,14 +629,43 @@ def register(
     pipeline = group.add_parser(
         "pipeline", help="run a pipeline step on rendered gold inputs and score it"
     )
-    pipeline.add_argument("--task", required=True, choices=TASKS)
+    pipeline.add_argument("--task", required=True, choices=PIPELINE_TASKS)
     _add_spend_args(pipeline)
     pipeline.add_argument(
-        "--limit", type=_positive_int, help="first N items (equations, figures) or pages"
+        "--limit",
+        type=_positive_int,
+        help="first N items (equations, figures), pages, or documents (tables)",
     )
-    pipeline.add_argument("--gold", type=Path, help="gold dir (default: data/gold)")
     pipeline.add_argument(
-        "--out", type=Path, help="report JSON (default: data/eval/latest-<task>.json)"
+        "--gold", type=Path, help="gold dir (default: data/gold; tables: data/gold/tables)"
+    )
+    pipeline.add_argument(
+        "--out",
+        type=Path,
+        help="report JSON (default: data/eval/latest-<task>.json; "
+        "tables: latest-tables-<mode>.json)",
+    )
+    tables_group = pipeline.add_argument_group("tables task")
+    tables_group.add_argument(
+        "--mode",
+        choices=["local", "model"],
+        default="local",
+        help="local: detection and the local grid, no model (no --max-usd needed); "
+        "model: also the table step (needs --max-usd or --fake)",
+    )
+    tables_group.add_argument(
+        "--styles",
+        default="grid,booktabs,norules",
+        help="table print styles of the OpenStax pages, comma-separated",
+    )
+    tables_group.add_argument(
+        "--no-authored", action="store_true", help="leave out data/authored/tables"
+    )
+    tables_group.add_argument(
+        "--real-dir",
+        type=Path,
+        help="private real documents with labels.json (default: private-inputs/tables "
+        "when it has one; counts only are reported)",
     )
     pipeline.add_argument("--items", type=Path, help="also write per-item rows as JSONL")
     pipeline.add_argument("--date", type=_iso_date, default=today, help="run date to record")
@@ -543,11 +674,23 @@ def register(
     pipeline.add_argument(
         "--concurrency", type=_positive_int, default=4, help="document task: worker threads"
     )
+    pipeline.add_argument(
+        "--notation",
+        nargs="+",
+        metavar="SYMBOL[=MEANING]",
+        help='equations task: a course notation in force, e.g. "bold d" "v=other"',
+    )
     pipeline.set_defaults(func=_cmd_pipeline)
 
-    gate = group.add_parser("gate", help="fail when a tracked metric regressed vs a baseline")
+    gate = group.add_parser(
+        "gate", help="fail when a tracked metric regressed vs a baseline, or is below a floor"
+    )
     gate.add_argument("--current", type=Path, required=True)
-    gate.add_argument("--baseline", type=Path, required=True)
+    gate.add_argument(
+        "--baseline",
+        type=Path,
+        help="baseline report (optional for tasks with floors: tables checks its floors alone)",
+    )
     gate.add_argument(
         "--tolerance-file",
         type=Path,

@@ -5,9 +5,10 @@
 - users: manages the sign-in allowlist in the database named by DATABASE_URL. In dev the
   tables are created on first use; in production the schema must be migrated first.
   `deny` removes someone from the allowlist and stops their queued and running jobs;
-  `delete` also erases them (a data-deletion request): every job with everything derived
-  from it (through `ops.retention.delete_jobs`, so counts are kept), their review edits
-  and their account row. Only content-free aggregates and daily counters remain.
+  `delete` also erases them (a data-deletion request, `ops.retention.erase_user`): every
+  job with everything derived from it (through `delete_jobs`, so counts are kept), their
+  review edits, courses and notation, usage events, sign-in identities, daily page counts
+  and their account row. Only content-free aggregates and daily spend remain.
 - db upgrade: applies the Alembic migrations in migrations/ (`alembic upgrade head`).
 """
 
@@ -139,9 +140,9 @@ def _cmd_users_delete(args: argparse.Namespace) -> int:
     from sqlalchemy import select
 
     from a11y_stem.config import ConfigError
-    from a11y_stem.ops.retention import delete_jobs
+    from a11y_stem.ops.retention import erase_user
     from a11y_stem.web.auth import normalise_email
-    from a11y_stem.web.db import Job, ReviewEdit, User, session_scope
+    from a11y_stem.web.db import User, session_scope
 
     email = normalise_email(args.email)
     if email is None:
@@ -153,15 +154,10 @@ def _cmd_users_delete(args: argparse.Namespace) -> int:
     except ConfigError as exc:
         return _error(str(exc))
     with session_scope(factory) as session:
-        user = session.scalar(select(User).where(User.email == email))
-        if user is None:
+        user_id = session.scalar(select(User.id).where(User.email == email))
+        if user_id is None:
             return _error(f"{email} is not a known user")
-        job_ids = list(session.scalars(select(Job.id).where(Job.user_id == user.id)))
-        stats = delete_jobs(session, job_ids)
-        # Edits they made are deleted with their jobs; this catches any left elsewhere.
-        for edit in session.scalars(select(ReviewEdit).where(ReviewEdit.user_id == user.id)):
-            session.delete(edit)
-        session.delete(user)
+        stats = erase_user(session, user_id)
     print(f"deleted {email}: jobs_deleted={stats.jobs_deleted} blobs_deleted={stats.blobs_deleted}")
     return 0
 

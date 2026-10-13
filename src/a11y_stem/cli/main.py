@@ -13,6 +13,7 @@ import datetime as dt
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 from a11y_stem import __version__
 from a11y_stem.cli import convert, eval_cli, ops, serve
@@ -62,6 +63,8 @@ def _error(message: str) -> int:
 def _cmd_gold_fetch(args: argparse.Namespace) -> int:
     from a11y_stem.gold.openstax import GoldError, HttpFetcher, fetch_gold
 
+    if args.set:
+        return _gold_fetch_set(args)
     out = args.out or _default(GOLD_DIR)
     cache_dir = None if args.no_cache else _default(CACHE_DIR)
     fetcher = HttpFetcher(cache_dir=cache_dir)
@@ -78,7 +81,41 @@ def _cmd_gold_fetch(args: argparse.Namespace) -> int:
         )
     except GoldError as exc:
         return _error(str(exc))
+    _print_fetch(book, results, fetcher, cache_dir, out)
+    return 0
 
+
+def _gold_fetch_set(args: argparse.Namespace) -> int:
+    """A named gold set: `tables` is the 13 OpenStax pages of the tables eval (table
+    records only), written to data/gold/tables by default."""
+    from a11y_stem.eval.tables import TABLE_GOLD_DIR, TABLE_GOLD_PAGES
+    from a11y_stem.gold.openstax import GoldError, HttpFetcher, fetch_gold
+
+    if args.page or args.chapter is not None:
+        return _error("--set chooses its pages itself; drop --page and --chapter")
+    out = args.out or _default(TABLE_GOLD_DIR)
+    cache_dir = None if args.no_cache else _default(CACHE_DIR)
+    fetcher = HttpFetcher(cache_dir=cache_dir)
+    for book_slug, slugs in TABLE_GOLD_PAGES.items():
+        try:
+            book, results = fetch_gold(
+                book_slug,
+                len(slugs),
+                out,
+                fetcher,
+                page_slugs=list(slugs),
+                retrieved_at=args.date,
+                allow_retired=args.allow_retired,
+                kinds=("table",),
+            )
+        except GoldError as exc:
+            return _error(str(exc))
+        _print_fetch(book, results, fetcher, cache_dir, out)
+        print()
+    return 0
+
+
+def _print_fetch(book: Any, results: list, fetcher: Any, cache_dir: Path | None, out: Path) -> None:
     cache_note = f"archive responses cached in {_shown(cache_dir)}" if cache_dir else "no cache"
     print(f"Book:     {book.title} ({book.slug}) {book.uuid}@{book.version}")
     print(f"State:    {book.state}")
@@ -102,7 +139,6 @@ def _cmd_gold_fetch(args: argparse.Namespace) -> int:
         print(f"wrote {_shown(result.path)}")
     print(f"wrote {_shown(out / 'manifest.json')}")
     print(f"wrote {_shown(out / 'ATTRIBUTION.md')}")
-    return 0
 
 
 def _cmd_gold_licenses(args: argparse.Namespace) -> int:
@@ -221,7 +257,14 @@ def build_parser() -> argparse.ArgumentParser:
         dest="gold_command", required=True
     )
     fetch = gold.add_parser("fetch", help="fetch pages of a CC BY OpenStax book into JSONL")
-    fetch.add_argument("--book", required=True, help="OpenStax slug, e.g. physics")
+    which = fetch.add_mutually_exclusive_group(required=True)
+    which.add_argument("--book", help="OpenStax slug, e.g. physics")
+    which.add_argument(
+        "--set",
+        choices=["tables"],
+        help="a named gold set instead of --book: tables = the 13 OpenStax pages of the "
+        "tables eval, table records only (default out: data/gold/tables)",
+    )
     fetch.add_argument(
         "--pages", type=_positive_int, default=3, help="first N numbered sections (N >= 1)"
     )

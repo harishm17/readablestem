@@ -25,6 +25,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from markupsafe import Markup
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
@@ -37,9 +38,17 @@ from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
 from a11y_stem.web.database import as_utc, prepare_database
 from a11y_stem.web.db import make_engine, make_sessionmaker
-from a11y_stem.web.deps import AppContext, CsrfFailed, LoginRequired, PageError, render
+from a11y_stem.web.deps import (
+    AppContext,
+    CsrfFailed,
+    LoginRequired,
+    PageError,
+    current_user,
+    render,
+)
 from a11y_stem.web.logsafe import log_event
-from a11y_stem.web.routes import admin, cron, jobs, pages, review, split
+from a11y_stem.web.return_to import decision_link, remember_return, signed_out_page
+from a11y_stem.web.routes import admin, courses, cron, feedback, jobs, pages, review, split
 from a11y_stem.web.security import (
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
@@ -69,7 +78,7 @@ ERROR_TEXT = {
     400: ("Something was wrong with that request", "Please go back and try again."),
     401: ("Please sign in", "Sign in to continue."),
     403: ("Not allowed", "You do not have access to this page."),
-    404: ("Page not found", "There is nothing at this address, or it is not yours to see."),
+    404: ("Page not found", "There is nothing at this address. Check the link."),
     405: ("Not allowed", "That action is not available at this address."),
     413: ("Request too large", "That request was larger than this page accepts."),
 }
@@ -78,9 +87,23 @@ ERROR_TEXT = {
 # --------------------------------------------------------------------------- templates
 
 
-def _utc(value: datetime | None) -> str:
+def _utc_text(value: datetime | None) -> str:
     value = as_utc(value)
     return f"{value.day} {value:%b %Y, %H:%M} UTC" if value else ""
+
+
+def _utc(value: datetime | None) -> Markup:
+    """A time for the page body: `<time datetime>` saying it in UTC, which app.js rewrites
+    in the reader's own time zone ("Fri, Oct 9, 6:32 PM CDT (in 23 hours)"); without
+    JavaScript the UTC text stays (UX review MF16). Not for <title> or attributes: use
+    `utc_text` there."""
+    value = as_utc(value)
+    if value is None:
+        return Markup("")
+    stamp = value.strftime("%Y-%m-%dT%H:%M:%SZ")
+    return Markup('<time class="local-time" datetime="{}">{}</time>').format(
+        stamp, _utc_text(value)
+    )
 
 
 def _usd(value: float | None) -> str:
@@ -96,6 +119,7 @@ def make_templates() -> Jinja2Templates:
         lstrip_blocks=True,
     )
     env.filters["utc"] = _utc
+    env.filters["utc_text"] = _utc_text
     env.filters["usd"] = _usd
     return Jinja2Templates(env=env)
 
@@ -103,8 +127,11 @@ def make_templates() -> Jinja2Templates:
 # --------------------------------------------------------------------------- errors
 
 
-def _error_page(request: Request, status: int, title: str, message: str) -> Response:
+def _error_page(
+    request: Request, status: int, title: str, message: str, back_href: str | None = None
+) -> Response:
     context = {"title": title, "message": message, "status": status, "job_id": None}
+    context["back_href"] = back_href
     return render(request, "error.html", context, status_code=status)
 
 
@@ -126,20 +153,25 @@ def _on_login_required(request: Request, exc: Exception) -> Response:
         # A background poll after the session ended: the browser's XHR would follow a 303
         # and swap the sign-in page into the status box. Send the whole page there.
         return Response(status_code=401, headers={"HX-Redirect": "/login"})
+    # Signing in comes back to the page, or to the decision posted (web.return_to).
     if request.method in {"GET", "HEAD"}:
+        remember_return(request)
         return RedirectResponse("/login", status_code=303)
-    return _error_page(request, 401, *ERROR_TEXT[401])
+    return signed_out_page(request, status_code=401)
 
 
 def _on_csrf_failed(request: Request, exc: Exception) -> Response:
     log_event(logger, "csrf_rejected", logging.WARNING)
-    return _error_page(
-        request,
-        403,
-        "This form has expired",
-        "For your security, forms stop working when you sign in again or after a while. "
-        "Go back, reload the page and try again.",
+    back = decision_link(request)  # a review decision or Undo (web.return_to)
+    if back and current_user(request) is None:  # its session's cookie expired, token too
+        return signed_out_page(request, status_code=403)
+    message = "For your security, forms stop working when you sign in again or after a while. "
+    message += (
+        "Go back to the decision and choose again."
+        if back
+        else "Go back, reload the page and try again."
     )
+    return _error_page(request, 403, "This form has expired", message, back_href=back)
 
 
 def _on_http_error(request: Request, exc: Exception) -> Response:
@@ -242,7 +274,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await run_in_threadpool(prepare_database, engine, settings)
         await run_in_threadpool(seed_admins, factory, settings.admin_email_list)
-        if settings.env == "prod" and (blockers := launch_blockers()):
+        if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
         if settings.run_worker:
@@ -304,7 +336,7 @@ def create_app(
     app.add_exception_handler(RequestValidationError, _on_validation_error)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    for module in (pages, jobs, split, review, admin, cron):
+    for module in (pages, jobs, split, review, feedback, admin, cron, courses):
         app.include_router(module.router)
     app.include_router(auth_router)
     return app

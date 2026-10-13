@@ -30,6 +30,14 @@ letters and digits mostly agree with the text layer (so it can be trusted). Any 
 text-layer check on a cheap-model answer, a cosmetic one included, escalates to the main
 model.
 
+Course notation (`pipeline.notation_memory`, with `FEATURE_NOTATION_MEMORY` on and the
+job's course list in the run's options): the list goes to the model as a fenced block
+of the untrusted context, under a prompt version of its own (`NOTATION_PROMPT_NAME`;
+without entries nothing changes); a letter the course writes bold, in a PDF whose text
+layer shows no bold at all, read as a plain variable is the meaning-level
+`style_mismatch`; speech reads such a letter by its meaning ("vector d"); and a bold
+letter layout found in running text gets its fix without a model call.
+
 Status rules, in order:
 1. no parsed output from any attempt -> FAILED, reason "model_<outcome>";
 2. the model says it is not an equation -> ABSTAINED "not_equation";
@@ -63,6 +71,7 @@ from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCa
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
+from a11y_stem.pipeline import notation_memory
 from a11y_stem.pipeline.signs import compare_signs
 from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
 from a11y_stem.pipeline.validate import (
@@ -77,6 +86,10 @@ from a11y_stem.pipeline.validate import (
 PROMPT_NAME = "equation"
 # "<name>-<sha8 of the prompt text>": changes whenever the prompt file changes.
 PROMPT_VERSION = load_prompt(PROMPT_NAME).version
+# The same instructions plus how to read the course notation block; sent only when the
+# conversion has course notation, so runs without it keep PROMPT_VERSION.
+NOTATION_PROMPT_NAME = "equation_notation"
+NOTATION_PROMPT_VERSION = load_prompt(NOTATION_PROMPT_NAME).version
 
 SHORT_INLINE_CHARS = 25  # inline candidates up to this many text-layer chars start cheap
 MAX_OUTPUT_TOKENS = 2048  # LaTeX up to 2000 chars plus reasoning tokens
@@ -387,7 +400,11 @@ def _letter_verdict(pdf: _LetterStyles, got: _MathLetters, letter: str) -> Style
 
 
 def text_layer_style(
-    text_layer: str | None, mathml: str, *, regular_letters: str | None = None
+    text_layer: str | None,
+    mathml: str,
+    *,
+    regular_letters: str | None = None,
+    course_bold: frozenset[str] = frozenset(),
 ) -> StyleVerdict | None:
     """Compare the letter styles of the PDF text layer and the transcription.
 
@@ -397,17 +414,40 @@ def text_layer_style(
     script or fraktur letter lost, which changes what a student reads: see
     `_letter_verdict`) or "cosmetic" (any other difference). Only the letters both sides
     contain are compared: the text layer may miss or reorder glyphs.
+
+    `course_bold`: letters the course notation writes bold
+    (`notation_memory.course_bold_letters`). When the text layer shows no bold at all,
+    such a letter it does not show to be plain, read as a plain variable and bold
+    nowhere, is "meaning" too: the course says the letter is bold and nothing in the PDF
+    says this one is not (`_course_bold_unseen`). Without course letters nothing changes.
     """
     if not text_layer:
         return None
     pdf = _layer_letters(text_layer, regular_letters or "")
-    if not any(s.bold or s.other or s.known_plain for s in pdf.values()):
+    informative = any(s.bold or s.other or s.known_plain for s in pdf.values())
+    expected = _course_bold_unseen(pdf, course_bold)
+    if not informative and not expected:
         return None
     got = _mathml_letters(mathml)
-    verdicts = {_letter_verdict(pdf[ch], got[ch], ch) for ch in pdf.keys() & got.keys()}
+    verdicts: set[StyleVerdict] = set()
+    if informative:
+        verdicts = {_letter_verdict(pdf[ch], got[ch], ch) for ch in pdf.keys() & got.keys()}
+    for letter in expected & got.keys():
+        found = got[letter]
+        if found.var_plain and not (found.var_bold or found.other_bold):
+            verdicts.add("meaning")
     if "meaning" in verdicts:
         return "meaning"
     return "cosmetic" if "cosmetic" in verdicts else "match"
+
+
+def _course_bold_unseen(pdf: dict[str, _LetterStyles], course_bold: frozenset[str]) -> set[str]:
+    """Letters the course writes bold whose weight this text layer cannot show: it shows
+    no bold anywhere (a font that does not mark bold), and the letter is not known plain
+    (a regular font with a bold face, a math italic code point)."""
+    if not course_bold or any(s.bold for s in pdf.values()):
+        return set()
+    return {ch for ch in course_bold if ch in pdf and not pdf[ch].known_plain}
 
 
 def text_layer_style_mismatch(text_layer: str | None, mathml: str) -> bool | None:
@@ -484,9 +524,10 @@ def _convert(latex: str, display: Display) -> tuple[str | None, list[Check]]:
     return (None if has_errors(mathml_checks) else mathml), checks
 
 
-def _speech(mathml: str) -> tuple[str, Check]:
+def _speech(mathml: str, spoken: dict[str, str] | None = None) -> tuple[str, Check]:
     try:
-        speech = mathml_to_speech(mathml)
+        # Without course readings, the one-argument call as before.
+        speech = mathml_to_speech(mathml, readings=spoken) if spoken else mathml_to_speech(mathml)
     except SpeechError:
         return "", Check(
             name="speech.generated", passed=False, severity="warning", code="speech_failed"
@@ -498,7 +539,13 @@ def _speech(mathml: str) -> tuple[str, Check]:
 
 
 def _evaluate(
-    output: EquationOutput | None, calls: list[ModelCall], element: Element, display: Display
+    output: EquationOutput | None,
+    calls: list[ModelCall],
+    element: Element,
+    display: Display,
+    *,
+    course_bold: frozenset[str] = frozenset(),
+    spoken: dict[str, str] | None = None,
 ) -> _Candidate:
     if output is None:
         return _Candidate(output, calls)
@@ -511,7 +558,7 @@ def _evaluate(
     candidate.mathml, candidate.checks = _convert(candidate.latex, display)
     if candidate.mathml is None:
         return candidate
-    candidate.speech, speech_check = _speech(candidate.mathml)
+    candidate.speech, speech_check = _speech(candidate.mathml, spoken)
     candidate.checks.append(speech_check)
     meaning = False  # a meaning-level difference from the text layer
     mismatch = False  # the strong symbol mismatch: the text layer is no use for signs
@@ -535,7 +582,10 @@ def _evaluate(
             # scale towards half confidence as the symbol overlap goes to zero
             candidate.confidence = output.confidence * (0.5 + 0.5 * similarity)
     style = text_layer_style(
-        element.text, candidate.mathml, regular_letters=element.regular_letters
+        element.text,
+        candidate.mathml,
+        regular_letters=element.regular_letters,
+        course_bold=course_bold,
     )
     if style is not None:
         style_code = (
@@ -660,8 +710,22 @@ def transcribe(
     context_text: str | None = None,
 ) -> Fix:
     """Transcribe one equation crop. Never raises for model or validation problems (they
-    become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is refused."""
-    prompt = load_prompt(PROMPT_NAME)
+    become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is refused.
+
+    A bold letter layout found in running text gets its fix without a model call
+    (`notation_memory.bold_letter_fix`); with course notation in force, the model gets
+    it as fenced context under `NOTATION_PROMPT_NAME` (module docstring)."""
+    entries = notation_memory.entries_in_force()
+    spoken = notation_memory.readings(entries)
+    fixed = notation_memory.bold_letter_fix(element, spoken=spoken)
+    if fixed is not None:
+        return fixed
+    course_bold = notation_memory.course_bold_letters(entries)
+    if entries:
+        prompt = load_prompt(NOTATION_PROMPT_NAME)
+        context_text = notation_memory.notation_context(entries, context_text)
+    else:
+        prompt = load_prompt(PROMPT_NAME)
     display: Display = element.display or "block"
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
@@ -679,7 +743,7 @@ def transcribe(
             output, calls = _call_once(client, request, EquationOutput)
         else:
             output, calls = _call(client, request, EquationOutput, settings)
-        return _evaluate(output, calls, element, display)
+        return _evaluate(output, calls, element, display, course_bold=course_bold, spoken=spoken)
 
     first_model = _first_model(element, settings)
     candidate = first = attempt(first_model)

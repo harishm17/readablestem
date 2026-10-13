@@ -23,11 +23,20 @@ from sqlalchemy import select
 
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import DocumentResult, DocumentStats, Element, Kind, PageStats
+from a11y_stem.core.types import (
+    DocumentResult,
+    DocumentStats,
+    Element,
+    Fix,
+    Kind,
+    PageStats,
+    PageType,
+    Status,
+)
 from a11y_stem.models import OFFLINE_DEFAULTS, make_vision_client
 from a11y_stem.models.fake import FakeVisionClient
 from a11y_stem.models.pricing import estimate_max_cost_usd
-from a11y_stem.pipeline.page_kinds import PageKind, nothing_to_convert, page_kinds
+from a11y_stem.pipeline import page_type
 from a11y_stem.pipeline.run import convert_pdf
 from a11y_stem.web.auth import set_allowed
 from a11y_stem.web.database import as_utc, utc_today
@@ -352,8 +361,8 @@ def test_stopping_the_worker_cancels_the_running_job_and_ends_its_lease(env):
 @pytest.mark.parametrize(
     ("data", "code", "message"),
     [
-        (scanned_pdf(2), "scanned", "scanned page images with no text"),
-        (blank_pdf(), "no_content", "Every page of this PDF is blank"),
+        (scanned_pdf(2), "scanned", "is scanned, so this tool cannot convert it"),
+        (blank_pdf(), "no_content", "Every page of notes.pdf is blank"),
         (huge_page_pdf(), "page_too_large", "too large to convert"),
     ],
     ids=["scanned", "blank", "huge-page"],
@@ -362,6 +371,7 @@ def test_pdfs_with_nothing_to_convert_are_refused_at_upload(env, data, code, mes
     response = upload(env.browser, data)
     assert response.status_code == 422
     assert message in response.text
+    assert "OCR" not in response.text or code != "scanned"  # never "run OCR first"
     with session_scope(env.ctx.factory) as session:
         assert session.scalar(select(Job.id)) is None  # nothing queued, no quota spent
 
@@ -370,10 +380,17 @@ def test_scanned_pages_in_a_mixed_pdf_are_kept_flagged_and_reported(env):
     job_id = job_id_from(upload(env.browser, scanned_pdf(2, then_text=True)))
     assert real_worker(env).run_once() == job_id
     job = env.job(job_id)
-    assert job.status == "done" and job.error_code == "scanned_pages"
+    assert job.status == "done" and job.error_code == "pages_not_converted"
     assert job.result_json is not None and job.result_json["image_only_pages"] == [0, 1]
     scans = [f for f in job.result_json["fixes"] if f.get("reason") == "scanned_page"]
     assert [f["element_id"] for f in scans] == ["p1-e0", "p2-e0"]
+    # One decision for both: they share a group key.
+    assert {f["group_key"] for f in scans} == {"pg-p1-e0"}
+    assert [t["kind"] for t in job.result_json["page_types"]] == [
+        "scan_no_text",
+        "scan_no_text",
+        "born_digital",
+    ]
     assert job.html is not None and job.html.count('data-reason="scanned_page"') == 2
     for element_id in ("p1-e0", "p2-e0"):  # the page images are kept, not sent to a model
         crop = env.browser.get(f"/jobs/{job_id}/crops/{element_id}.png")
@@ -381,8 +398,8 @@ def test_scanned_pages_in_a_mixed_pdf_are_kept_flagged_and_reported(env):
     assert job.model_calls == 0
 
     text = page_text(env.browser.get(f"/jobs/{job_id}").text)
-    assert "Pages 1 and 2 are scanned images with no text" in text
-    assert "run text recognition (OCR)" in text
+    assert "Pages 1 and 2 are scanned images, so they were not converted" in text
+    assert "OCR" not in text  # the old advice made exactly these files
 
 
 def test_a_pipeline_result_with_nothing_in_it_fails_instead_of_finishing_empty(env):
@@ -421,6 +438,14 @@ def _result(pages: list[int], image_only: list[int], elements: int = 1, **extra)
     )
 
 
+def _typed(page: int, kind: str, visible: int = 0, invisible: int = 0) -> PageType:
+    return PageType(page=page, kind=kind, visible_chars=visible, invisible_chars=invisible)
+
+
+def _kept(element_id: str, reason: str) -> Fix:
+    return Fix(element_id=element_id, kind=Kind.FIGURE, status=Status.FAILED, reason=reason)
+
+
 @pytest.mark.parametrize(
     ("result", "expected"),
     [
@@ -430,18 +455,79 @@ def _result(pages: list[int], image_only: list[int], elements: int = 1, **extra)
         (_result([0, 1], [0], stopped_by="budget_daily"), (JobStatus.DONE, "budget_daily")),
         (_result([0], [], stopped_by="budget_cancelled"), (JobStatus.DONE, None)),
         (_result([0], []), (JobStatus.DONE, None)),
+        # With page types (pipeline 0.4.0): the probe's own codes, never a guess.
+        (
+            _result(
+                [0, 1],
+                [0, 1],
+                page_types=[_typed(0, "handwritten_ocr", 0, 300), _typed(1, "handwritten")],
+                fixes=[_kept("p1-e0", "handwritten_page")],
+            ),
+            (JobStatus.FAILED, "handwritten"),
+        ),
+        (
+            _result(
+                [0, 1],
+                [0],
+                page_types=[_typed(0, "scan_ocr", 0, 400), _typed(1, "born_digital", 900)],
+                fixes=[_kept("p1-e0", "scanned_page")],
+            ),
+            (JobStatus.DONE, "pages_not_converted"),
+        ),
+        # A full-page picture with a short title may be a slide: kept, never failed.
+        (
+            _result(
+                [0], [0], page_types=[_typed(0, "scan_no_text", 12)],
+                fixes=[_kept("p1-e0", "scanned_page")],
+            ),
+            (JobStatus.DONE, "pages_not_converted"),
+        ),
+        (
+            _result(
+                [0], [], page_types=[_typed(0, "mixed_ink", 500)],
+                fixes=[_kept("p1-e0", "handwriting_on_page")],
+            ),
+            (JobStatus.DONE, "pages_not_converted"),
+        ),
     ],
-    ids=["all-scanned", "empty", "some-scanned", "budget-first", "not-a-budget-stop", "normal"],
-)
+    ids=[
+        "all-scanned",
+        "empty",
+        "some-scanned",
+        "budget-first",
+        "not-a-budget-stop",
+        "normal",
+        "all-handwritten",
+        "some-scanned-typed",
+        "slide-like-picture",
+        "handwriting-on-typed",
+    ],
+)  # fmt: skip
 def test_result_outcome(result, expected):
     assert result_outcome(result) == expected
 
 
 def test_outcome_messages_for_every_new_code_say_what_to_do():
-    for code in ("scanned", "no_content", "model_not_configured", "access_removed"):
+    for code in (
+        "scanned",
+        "scanned_ocr",
+        "handwritten",
+        "handwritten_no_text",
+        "no_content",
+        "model_not_configured",
+        "access_removed",
+    ):
         outcome = job_outcome(status="failed", error_code=code)
         assert outcome is not None and outcome.label == "Stopped" and outcome.message
-    for code in ("budget_daily", "budget_job_usd", "budget_job_calls", "scanned_pages"):
+        if code.startswith(("scanned", "handwritten")):  # no OCR advice, no promise
+            assert "run OCR" not in outcome.message and " yet" not in outcome.message
+    for code in (
+        "budget_daily",
+        "budget_job_usd",
+        "budget_job_calls",
+        "scanned_pages",
+        "pages_not_converted",
+    ):
         outcome = job_outcome(status="done", error_code=code)
         assert outcome is not None and outcome.partial
     assert job_outcome(status="done", error_code=None) is None
@@ -543,24 +629,24 @@ def test_page_size_limit_is_generous_for_real_documents():
 # --------------------------------------------------------------------------- page kinds
 
 
-def test_page_kinds_tell_scans_from_text_figures_and_blank_pages():
+def test_page_types_tell_scans_from_text_figures_and_blank_pages():
     data = scanned_pdf(1, then_text=True)
     doc = pymupdf.open(stream=data, filetype="pdf")
     figure = doc.new_page()
     figure.draw_circle((200, 200), 50)
     doc.new_page()
     doc[0].set_rotation(90)  # image boxes are in unrotated coordinates
-    kinds = page_kinds(doc)
-    assert kinds == {
-        0: PageKind.IMAGE_ONLY,
-        1: PageKind.TEXT,
-        2: PageKind.GRAPHICS,
-        3: PageKind.BLANK,
-    }
-    assert nothing_to_convert({0: PageKind.IMAGE_ONLY, 1: PageKind.BLANK}) == "scanned"
-    assert nothing_to_convert({0: PageKind.BLANK}) == "no_content"
-    assert nothing_to_convert({0: PageKind.IMAGE_ONLY, 1: PageKind.GRAPHICS}) is None
+    kinds = []
+    for page in doc:
+        raw = page.get_text("rawdict", flags=page_type.TEXT_FLAGS)["blocks"]
+        kinds.append(page_type.classify(page, raw, page.get_cdrawings()).kind)
+    assert kinds == ["scan_no_text", "born_digital", "vector_no_text", "blank"]
+    assert page_type.document_refusal(doc) is None  # page 2 is typed
     doc.close()
+    scanned, blank = _typed(0, "scan_no_text"), _typed(1, "blank")
+    assert page_type.refusal_code([scanned, blank]) == "scanned"
+    assert page_type.refusal_code([blank]) == "no_content"
+    assert page_type.refusal_code([scanned, _typed(1, "vector_no_text")]) is None
 
 
 def test_the_upload_probe_child_caps_its_own_address_space():
@@ -572,3 +658,28 @@ def test_the_upload_probe_child_caps_its_own_address_space():
     )
     out = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, check=True)
     assert int(out.stdout) == 512 * 1024 * 1024
+
+
+def test_headlines_count_tables_with_equations_and_figures():
+    """tables.pdf: 13 equations and 5 tables. An outage headline used to say '13 of 18
+    equations and figures', and a budget stop '13 of 13' with 3 tables also stopped."""
+
+    def fix(kind: str, reason: str | None = None) -> dict:
+        return {"kind": kind, "status": "failed" if reason else "accepted", "reason": reason}
+
+    outage = {
+        "fixes": [fix("equation", "model_timeout")] * 13
+        + [fix("table", "model_api_error")] * 3
+        + [fix("table")] * 2
+    }
+    message = job_outcome(status="done", error_code=None, result_json=outage)
+    assert message is not None
+    assert "did not answer for 16 of 18 equations and tables" in message.message
+    budget = {
+        "fixes": [fix("equation", "budget_job_usd")] * 13
+        + [fix("table", "budget_job_usd")] * 3
+        + [fix("figure")]
+    }
+    message = job_outcome(status="done", error_code="budget_job_usd", result_json=budget)
+    assert message is not None
+    assert "16 of 17 equations, figures and tables were not converted" in message.message

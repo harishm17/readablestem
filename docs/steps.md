@@ -2,8 +2,9 @@
 
 How the two model-backed steps turn a crop into a fix, and the deterministic checks that
 decide whether a fix is trusted. Code: `src/a11y_stem/pipeline/{equation_step,
-figure_step, validate, speech, signs}.py`; prompts: `src/a11y_stem/models/prompts/{equation,
-figure}.md`; tests: `tests/test_steps_*.py`.
+figure_step, validate, speech, signs, notation_memory}.py`; prompts:
+`src/a11y_stem/models/prompts/{equation, equation_notation, figure}.md`; tests:
+`tests/test_steps_*.py`, `tests/test_notation_steps.py`.
 
 The steps assist a reviewer. They never treat model output as correct on its own: every
 proposal passes through validators, carries a confidence and the checks it passed, and
@@ -47,7 +48,9 @@ tell the model that text between `<document_text>` tags is data, not instruction
 | Prompt | Output schema (strict pydantic, `extra=forbid`) | What it asks for |
 |---|---|---|
 | `equation.md` | `EquationOutput {is_equation: bool, latex: str, confidence: 0..1}` | Math-mode LaTeX only (no `$`, no `\displaystyle`); transcribe symbol by symbol, never simplify; `\mathbf` for bold vectors, `\vec` for arrows, `\text{}` for words and units, with `<`, `>` and `&` kept outside it; `\%` for a percent sign (a bare `%` is a comment); multi-line equations as `\begin{array}{rcl}` (relation in its own column, matching OpenStax), never `aligned`/`align`/`split`; standard commands only; calibrated confidence bands; a best partial reading with low confidence when unreadable. |
+| `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
+| `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
 
 Why `array{rcl}`: latex2mathml 3.81.1 renders `aligned` as one flat row with literal `&`
 tokens, and OpenStax writes multi-line equations as a three-column `mtable`
@@ -107,7 +110,7 @@ fixes have `equation=None`; the original crop stays in the output, flagged.
 | 1 | No parsed output | FAILED | `model_<outcome>` |
 | 2 | Confidence < `abstain_confidence` | ABSTAINED | `low_confidence` |
 | 3 | Not decorative and the alt text fails an error-level check | FAILED | `invalid_alt` |
-| 4 | Confidence >= the accept bar and no failed check other than a warning note: `too_long` (150-300 characters), `redundant_prefix` | ACCEPTED (review `optional` with notes, else `none`) | |
+| 4 | Confidence >= the accept bar and no failed check other than a warning note: `too_long` (150-300 characters), `redundant_prefix`, `long_description_unsure` (long descriptions on) | ACCEPTED (review `optional` with notes, else `none`) | |
 | 5 | Otherwise | NEEDS_REVIEW | |
 
 A caption copy (`caption_copy`) is not a note: it describes nothing the reader does not
@@ -126,6 +129,26 @@ and a tiny figure escalates to the main model first.
 
 The model sees `Caption: ...` (from `Element.caption`) and `Nearby text: ...` (the
 `context_text` argument) as context.
+
+### Long descriptions, data tables and colour (FEATURE_LONG_DESCRIPTIONS)
+
+Off by default (`ConversionOptions.long_descriptions`, read with `options.current()`).
+Off, the step sends `figure.md` and `FigureOutput` exactly as before, and the fix has
+none of the fields below. On, it sends `figure_long.md` with `FigureLongOutput` in the
+same single call per attempt (`max_output_tokens` 4,096), and the context also gets
+`Labels in the figure: ...`, the text layout found in and beside the figure
+(`Element.text`, at most 600 characters, fenced like the rest). Routing, escalation and
+the status rules above are unchanged; the answer adds (`pipeline/figure_details.py`):
+
+| Field on `FigureFix` | Stored when | Check and tier |
+|---|---|---|
+| `long_description` | the answer is usable after cleaning (one paragraph per line, invisible characters removed): 40-2,000 characters, at most 12 lines, no URL, markup, file name or placeholder (the alt-text rules of those codes). Anything else is dropped, never shown | `figure.long_description` passes; `long_description_unsure` (warning, a note in `NOTE_CODES`) when the model said part of the figure was hard to read: review "optional". A chart or diagram left without one gets the notice `long_description_missing` (optional; `figure_step.long_description_missing(fix)` says when) |
+| `data_table` | charts only, when the rows are rectangular, at most 60 rows and 12 columns, no cell over 120 characters, and the body has at least one number: a `TableGrid` (source "model", the header row as column headers, the first column as row headers) | `figure.data_values` passes when `data_values_from_text` |
+| `data_values_from_text` | with a data table | True only when the model says every value is printed in the figure **and** every number in the table appears in the PDF's own text in the figure region (`Element.text`). Numbers are read the same way on both sides: minus signs (U+2212, en dash, figure dash) become "-", but only where they cannot be a dash between two numbers or words; thousands separators (",", thin and no-break spaces before a group of three) are removed; "0.50" equals "0.5" and ".5"; subscripts are not numbers, and a run of superscripts is a number of its own (10²⁴ is 10 and 24, as "10^24" is), so an exponent is compared too. Otherwise False: the warning `values_from_image` fails, a note (`NOTE_CODES`): the figure keeps the tier its alt text earns (ACCEPTED, review "optional", when that clears the bar), and the table is an optional extra kept on the fix, offered on the review screen ("Add the data table") and written only once a reviewer adds it (`FigureFix.data_table_added`, `figure_details.data_table_shown`). Additive extras never add a required decision (decided 2026-10-09). A raster chart has no PDF text, so its table is always offered, never written as it is |
+| `colour_only` | the model says the figure tells things apart by colour alone | none: the status and tier do not change; the job page lists the notice `colour_only` |
+
+Decorative answers carry none of these. Both conditions on `data_values_from_text` are
+needed: a table whose numbers are all tick labels can still have been placed by eye. Known limit: each number need only appear somewhere in the figure text, so values rounded to the axis ticks pass this half of the check (only the model's own claim then guards them), and an exponent is not paired with its own mantissa.
 
 ## Text-layer cross-check (equations)
 
@@ -367,6 +390,64 @@ with a vector product a × that became a · anywhere counts as the swap. Signs i
   subscript before the sign (`→𝐹12 · →𝑑`), `\overrightarrow{AB}`, and inline maths
   that layout cuts at the dot.
 
+## Course notation (equations)
+
+With `FEATURE_NOTATION_MEMORY` on and a job converted for a course with notation entries
+(docs/web.md "Courses and notation"), the worker puts the course's `NotationEntry` list in
+the run's `ConversionOptions` and the equation step reads it with `options.current()`
+(`pipeline/notation_memory.py`). Without entries, or with the flag off, nothing below
+happens and every request is as before (same prompt, same version, same context).
+
+- **Hints.** The model gets the list as a fenced block at the start of the untrusted
+  context, never in the instructions: `[course notation: ...]`, one line per entry with
+  the styled letter, its words and LaTeX, and its meaning (`𝐝 (bold d, \mathbf{d}):
+  vector`), at most 24 entries and 700 characters. The instructor's own spelling and note
+  are not sent. The prompt is `equation_notation.md`: `equation.md` plus a section saying
+  the list is data, settles only what the image leaves unclear (is this letter bold?),
+  and never makes a letter bold or adds a symbol because the list mentions it; a course
+  can use a letter both ways. Its version (`NOTATION_PROMPT_VERSION`) is recorded on
+  every call that used it.
+- **Evidence for the style check.** The letter-style check stays the authority. One case
+  is added (`text_layer_style(..., course_bold=...)`): when the text layer shows no bold
+  at all (a font that does not mark it), a letter the course writes bold, not known
+  plain there, read as a plain variable and bold nowhere in the transcription, is the
+  meaning-level `style_mismatch` (a required decision; a cheap answer escalates). A letter
+  the course also lists plain (a plain v for speed beside a bold v for velocity) is no
+  evidence. When the text layer shows any bold, it alone decides, as before. The review
+  card says why: "The PDF's text does not show which letters are bold, and the proposal
+  has a plain d".
+- **Speech.** A bold letter the course calls a vector or matrix reads by its meaning:
+  "vector d" for a bold d, "matrix capital A" for a bold A (`mathml_to_speech(mathml,
+  readings=...)`). Other meanings keep the style words ("double-struck capital R"). The
+  speech is the review screen's reading aid; the output keeps MathML only.
+- **Bold letters in prose.** An inline equation layout made from one bold letter in
+  running text (docs/layout.md "Bold letters in prose", reason `bold letter in prose`)
+  gets its fix here without a model call (`notation_memory.bold_letter_fix`):
+  `\mathbf{a}` for a Latin letter, `\boldsymbol{\omega}` for a Greek one, through the
+  usual validators and speech, ACCEPTED at 0.95 with check `equation.bold_letter` and
+  review "none". This needs only the flag, not a course. Anything else (two letters, a
+  plain letter, a letter without the reason) goes to the model as before.
+
+Measured on 2026-10-09, OpenStax physics gold (30 equations), course notation "bold d,
+v and a are vectors", real models (docs/eval.md "Course notation"):
+
+- With the hints: the same accuracy as without (exact lenient 23 of 30 in both runs that
+  day and in the committed run), no escalations (6 the same day without the list, all on
+  equations with a bold d), 30 model calls instead of 36, $0.038 instead of $0.048.
+- The course evidence never fires on that gold as printed (Chromium marks every weight).
+  On the same transcriptions with every style removed from the text layer (a font that
+  marks no weight; `python -m a11y_stem.eval.notation_flags`), it flags 6 of 30, all
+  false: the equations that print a plain v (average speed) or a plain d (`d_Q`), which
+  the course list does not mention. Listing plain v and d as well removes all 6. On two
+  earlier runs (2026-10-08, before later pipeline fixes; `equations-run1` and `-run2` in
+  the main checkout's `.local/eval/`) whose answers often dropped a bold letter, the
+  style check as printed flags 16 and 5 answers; with styles removed and the course list,
+  it flags every one of them again, plus the same 6.
+  So the case is worth its required decision only where a course writes a letter one
+  way; the course page asks instructors to add both forms when they use both.
+  TODO(Harish): keep this case required (content-features.md's tier), or make it an
+  optional note for letters the course lists in bold only.
+
 ## Validators and codes
 
 All validators return one `Check` per rule, passed or failed, so the review screen can
@@ -466,6 +547,13 @@ name, URL or placeholder.
 OpenStax's own alt text in the gold set triggers only `too_long` and `redundant_prefix`
 (it is written for a different, longer format), never an error-level content rule.
 
+### Figure checks with long descriptions on
+
+| Check name | Code | Severity | Fails when |
+|---|---|---|---|
+| `figure.long_description` | `long_description_unsure` | warning (a note) | the model marked its long description unsure |
+| `figure.data_values` | `values_from_image` | warning (a note: the table is an optional extra, not in the file until a reviewer adds it) | some value of the data table is not printed in the PDF text inside the figure, or the model says it read one off the chart |
+
 ## Speech (`mathml_to_speech`)
 
 Deterministic English for the review screen and report; the output HTML keeps MathML
@@ -496,6 +584,38 @@ raises `SpeechError` with a content-free message. In the equation step a speech 
 is a warning (`speech.generated`, code `speech_failed`), not an error, and only an optional
 note: the output keeps MathML only, so a missing reading aid changes nothing a student gets.
 
+## Table step
+
+`pipeline/table_step.py` (`rebuild`, prompt `table.md`), behind `FEATURE_TABLES`; the
+full description is in [tables.md](tables.md). In short:
+
+- Same shape as equations: gpt-6-luna reads the crop first (router fallback on API
+  errors), gpt-6.1-sol is asked once when a check fails or the answer says the crop is
+  not a data table, and the better answer is kept. Spend goes through the same
+  `JobBudget` reservations; `BudgetExceeded` propagates.
+- The answer is rows of cells (text, LaTeX for maths cells, header flags, spans), placed
+  as HTML places them. The PDF's own words for the table are not sent to the model: they
+  are the input of the checks, as an equation's text layer is.
+- Checks: the grid and its headers (`grid_problems`, no header at all); agreement with
+  the local grid from detection (rows x columns, merged cells); the cell-text bijection
+  (the words, numbers and meaningful symbols of the text cells equal the PDF's words,
+  row by row when the grids agree); maths cells through the LaTeX and MathML validators
+  and this page's symbol, sign and style rules against the PDF glyphs in their place.
+- Tiers: every check passed -> ACCEPTED, none; only spacing or a cosmetic maths style ->
+  ACCEPTED, optional; any other failure after escalation -> NEEDS_REVIEW, required;
+  not a data table -> the grid read from the PDF written as its text in reading order,
+  ACCEPTED with the note `written_as_text` (optional; ABSTAINED `not_data_table`,
+  required, when there is no such grid to write); not a data table but a grid of numbers
+  (half the cells below the first row hold a digit) -> the local grid with first-row
+  headers, NEEDS_REVIEW (`numbers_not_a_table`: written as text, the values would lose
+  their columns); no usable answer -> the local grid with
+  first-row headers, NEEDS_REVIEW (or FAILED, image kept, without one); flag off ->
+  FAILED `table_not_rebuilt`. No model confidence: `Fix.confidence` is None.
+- Header policy: header rows from the top; row headers only for columns of non-empty,
+  non-numeric, distinct labels the model marked (leading ones, or a second label column
+  after data cells, written with headers/id); the caption only from layout's "Table N"
+  caption.
+
 ## Privacy
 
 `Check.code`, `Fix.reason` and `ModelCall.outcome` are category codes. Exception
@@ -512,7 +632,11 @@ never reaches the instructions, and that the equation's text layer is never sent
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
 | `tests/test_style_check.py` | the letter-style check: meaning-level and cosmetic cases, layout's bold and regular letters |
 | `tests/test_sign_check.py` | the sign and relation check: flips and drops that must flag, hyphens, ranges, product style, accents and long arrows that must not; tiers, escalation and the single confidence factor; the LaTeX fixtures' CMSY signs and the Chromium fixtures; a course page printed by Chromium (`browser`); a result stored by pipeline 0.2.0 still loads |
+| `tests/test_notation_steps.py` | course notation: keys as words and LaTeX, the fenced block (first, capped, no notes), its own prompt only with entries, spoken readings, the course evidence in the style check (only where the PDF shows no bold), escalation, the bold letter fix without a model call |
+| `tests/test_layout_bold_letters.py` | bold letters in prose: evidence, labels, bold words, sentence capitals, the flag off, the course; no misses and no false positives on the LaTeX fixtures |
+| `tests/test_eval_notation_flags.py` | the false-flag count and `eval pipeline --notation` |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
+| `tests/test_steps_figure_long.py` | long descriptions on and off: the request off is what it was, the long prompt and fenced labels on, cleaning and dropping long descriptions, the unsure note, values from the text or the image, tables that are dropped, colour only, number normalisation and the data grid |
 | `tests/test_steps_live.py` | `live_model`: a gold equation rendered from MathML in Chromium and a generated bar chart, through the real API |
 | `tests/test_steps_support.py` | helpers, including `fallback_router`, a stand-in for WP1's router used until it merges |
 
@@ -528,13 +652,22 @@ decorative rules were added; the prompt versions have changed since.
 
 ## Known limits
 
-- The cross-check needs a text layer; scanned PDFs get no cross-check.
+- The cross-check needs a text layer; scanned PDFs get no cross-check. Hidden text (a
+  tablet's or an OCR program's invisible layer, text covered by an image) is never a text
+  layer here: layout does not read it, so a correct transcription is never blamed on an
+  OCR guess. OCR text drawn visibly is read and trusted (docs/layout.md "Hidden text and
+  page types", what is not detected).
 - The sign check compares counts, not positions: a minus moved to another term keeps
   every count. A minus typed as an ASCII hyphen between two letters (`x-y`, a flattened
   `e-kt`) and a minus touching a TeX arrow head are ambiguous, so dropping them is missed
   ("Sign and relation check", Limits).
 - Speech is a reviewer aid, not a screen reader: it does not do function application
-  ("f open parenthesis x close parenthesis"), and it reads `\cdot` as "times".
+  ("f open parenthesis x close parenthesis"), and it reads `\cdot` as "times". A
+  reviewer's LaTeX edit is read without the course's readings ("bold d", not "vector
+  d"): the review code that makes it (`web/review.py`) does not load the course.
+- Course notation as style evidence flags a plain letter the course lists only in bold,
+  even where the course uses it plain too ("Course notation" above): the instructor
+  lists both forms to avoid that.
 - The command allowlist is curated; a legitimate command outside it (for example
   `\hslash` or `\varGamma`) fails as `unknown_command` and the fix goes to FAILED
   `invalid_latex` after escalation. Extend the lists in `validate.py`; the conversion
@@ -545,6 +678,14 @@ decorative rules were added; the prompt versions have changed since.
   output they are far more likely to be an injection or a confused transcription.
 - Confidence is the model's own estimate (scaled by the cross-check). Calibration against
   the gold set is WP7's job.
+- Long descriptions: numbers in the long description itself are not checked against the
+  PDF (a long description is not a decision; tier "none"), only the data table's. A
+  number that is printed in the figure but split or styled differently in the text
+  layer ("10³" flattened to "103", a value split across two labels) makes the table
+  "read from the image": offered rather than written, never written when it should not
+  be. The model sometimes mentions the data table in its description despite the
+  prompt; with the table only offered (or removed), that sentence may point at a table
+  the student file does not have.
 
 ## Second automated check (Decisions API)
 

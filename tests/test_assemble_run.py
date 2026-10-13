@@ -33,7 +33,7 @@ from a11y_stem.core.types import (
 from a11y_stem.models.base import VisionRequest
 from a11y_stem.models.fake import FakeVisionClient
 from a11y_stem.models.pricing import UnknownModelError
-from a11y_stem.pipeline import equation_step, figure_step, heading_step, layout, run
+from a11y_stem.pipeline import equation_step, figure_step, heading_step, layout, run, table_step
 from a11y_stem.pipeline.layout import Layout, LayoutError
 from a11y_stem.pipeline.run import CONTEXT_CHARS, PipelineOutput, convert_pdf
 
@@ -269,7 +269,11 @@ def test_converts_a_document_end_to_end(fake):
     assert stats.latency_ms >= 0 and all(p.latency_ms >= 0 for p in stats.per_page)
 
     assert result.pipeline_version == run.PIPELINE_VERSION
-    assert result.prompt_versions == {"equation": "equation-used", "figure": "figure-used"}
+    assert result.prompt_versions == {
+        "equation": "equation-used",
+        "figure": "figure-used",
+        "table": table_step.PROMPT_VERSION,  # declared: no table in this document
+    }
     assert (result.title, result.lang) == ("Motion", "en")
 
 

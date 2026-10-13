@@ -1,0 +1,51 @@
+{# My documents as a to-do list (web/documents.py, UX review BW5). While a document is
+   waiting or converting, htmx polls GET /app/documents and swaps the whole list when
+   something changed (204 otherwise); every link keeps its id, so htmx puts focus back
+   on the same link after a swap. The list is not a live region: a document finishing
+   changes the tab title ("My documents (4 of 6 finished)"), not what is being read. #}
+{% if page_title|default("") %}<title>{{ page_title }} | a11y-stem</title>
+{% endif %}
+<div id="documents" class="documents"{% if documents.unfinished %} hx-get="/app/documents?v={{ documents.version }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+  <p class="documents-summary">{{ documents.summary }}.</p>
+  {% set next = documents.review_next %}
+  {% if next %}
+  <p><a class="button" id="review-next" href="/jobs/{{ next.id }}/review">Review next<span class="visually-hidden">: {{ next.title }}</span></a></p>
+  {% endif %}
+  {% for group in documents.groups if group.rows %}
+  <h3 id="docs-{{ group.key }}">{{ group.heading }} ({{ group.rows|length }})</h3>
+  <div class="table-scroll">
+  {# Explicit roles: below 600 px the rows are shown as stacked blocks (app.css), and
+     some browsers drop a table's semantics when its display changes. #}
+  <table class="doc-table" role="table" aria-labelledby="docs-{{ group.key }}">
+    <thead role="rowgroup">
+      <tr role="row">
+        <th scope="col" role="columnheader">Document</th>
+        <th scope="col" role="columnheader">Status</th>
+        <th scope="col" role="columnheader">Deleted automatically</th>
+        <th scope="col" role="columnheader"><span class="visually-hidden">Delete</span></th>
+      </tr>
+    </thead>
+    <tbody role="rowgroup">
+      {% for row in group.rows %}
+      <tr role="row">
+        <th scope="row" role="rowheader">
+          <a id="doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.title }}</a>
+          <span class="doc-file">{% if row.title != row.filename %}{{ row.filename }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }} · uploaded {{ row.created_at|utc }}</span>
+        </th>
+        <td role="cell" data-label="Status">
+          <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>
+          {% if row.action == "review" %}
+          <a id="act-{{ row.id }}" href="/jobs/{{ row.id }}/review">Review<span class="visually-hidden"> {{ row.title }}</span></a>
+          {% elif row.action == "download" %}
+          <a id="act-{{ row.id }}" href="/jobs/{{ row.id }}/download">Download<span class="visually-hidden"> {{ row.title }}</span></a>
+          {% endif %}
+        </td>
+        <td role="cell" data-label="Deleted automatically">{{ row.retain_until|utc }}</td>
+        <td role="cell"><a id="del-{{ row.id }}" href="/jobs/{{ row.id }}/delete?from=app">Delete<span class="visually-hidden"> {{ row.title }}</span></a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% endfor %}
+</div>

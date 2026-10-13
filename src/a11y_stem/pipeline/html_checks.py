@@ -16,11 +16,36 @@ It returns one `Check` per rule, passed or not, so a report shows what was check
 | html.math_display | math_missing_display | `<math>` with no block/inline display (warning) |
 | html.self_contained | external_resource | scripts, links, frames, or any non-data: URL |
 | html.wording | banned_wording | a compliance claim (`_BANNED`) in text the tool wrote |
+| html.link_text | empty_link | an `<a>` with no text (or img alt) in it |
+| html.link_href | unsafe_link | an `<a>` href that is not http, https, mailto or a "#id" here |
+| html.lang_tags | invalid_lang | a `lang` value that is not a well-formed BCP 47 tag |
+| html.text_contrast | low_contrast | a colour class (`tc-...`) below 4.5:1 on white |
+
+A link in the text (`<a href>`) loads nothing, so it is not an external resource; the
+link rules check it instead. The last four rules are the text work's
+(docs/output.md "Links and cross-references", "Language", "Coloured text").
 
 The wording rule (docs/design/beta-architecture.md rule 7) only reads text inside
 elements carrying `assemble.AUTHORED_CLASS` (the notes and the about section). Course
 text is the instructor's, not a claim by this tool: mechanics uses "compliance" for the
 flexibility of a beam.
+
+Documents with a `<table>` get five more rules (`_table_rules`, docs/tables.md), so a
+document without one gets exactly the rules above:
+
+| Check name | Code when it fails | What it catches |
+|---|---|---|
+| html.table_headers | table_no_headers | a data table without a single `<th>` |
+| html.table_header_scope | th_without_scope | a `<th>` with no `scope` (see below) |
+| html.table_header_text | empty_th | a `<th>` with no text outside maths (or img alt, aria-label) |
+| html.table_caption | table_caption_missing | a caption left in the text (warning, below) |
+| html.table_layout | layout_table | a table with `role="presentation"` or `"none"` |
+
+A `<th>` without `scope` passes when it has an id and its table uses `headers` (the
+serialiser's irregular tables). The caption rule fails for a data table without
+`<caption>` right beside a "Table N ..." paragraph (layout's caption pattern, so "Table 2
+shows that ..." is not one). The output never uses a table for layout, so the last rule
+only fails on HTML made some other way.
 
 `axe_checks` runs the vendored axe-core (vendor/README.md) in headless Chromium when the
 `browser` dependency group and its browser are installed, and returns one skipped
@@ -33,14 +58,18 @@ import hashlib
 import logging
 import re
 from collections import Counter
+from dataclasses import dataclass, field
 from functools import cache
 from html.parser import HTMLParser
 from importlib import resources
 from itertools import pairwise
 from typing import Any, Literal
 
-from a11y_stem.core.types import Check
+from a11y_stem.core.types import Check, is_safe_href
+from a11y_stem.pipeline import contrast
 from a11y_stem.pipeline.assemble import AUTHORED_CLASS
+from a11y_stem.pipeline.inline_text import COLOUR_CLASS_PREFIX
+from a11y_stem.pipeline.language import is_language_tag
 
 log = logging.getLogger(__name__)
 
@@ -58,6 +87,10 @@ LISTS = frozenset({"ul", "ol", "menu"})
 LIST_CHILDREN = frozenset({"li", "script", "template"})
 _BANNED = re.compile(r"\bcomplian(?:t|ce)\b", re.IGNORECASE)
 _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
+# A colour class rule as `inline_text.colour_css` writes it: ".tc-ff0000 { color: #ee0000; }".
+_COLOUR_RULE = re.compile(
+    rf"\.{re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}}\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
+)
 
 AXE_VERSION = "4.14.0"
 AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
@@ -97,6 +130,11 @@ class _Collector(HTMLParser):
         self._heading: tuple[int, list[str]] | None = None
         self._in_title = False
         self._in_style = False
+        # The text work's rules: each <a> as (href, its text), every lang value, the CSS.
+        self.links: list[tuple[str | None, str]] = []
+        self.langs: list[str] = []
+        self.style: list[str] = []
+        self._link: tuple[str | None, list[str]] | None = None
 
     # ----- parser callbacks
 
@@ -116,6 +154,9 @@ class _Collector(HTMLParser):
             level, parts = self._heading
             self.headings.append((level, "".join(parts)))
             self._heading = None
+        elif tag == "a" and self._link is not None:
+            self.links.append((self._link[0], "".join(self._link[1])))
+            self._link = None
         names = [name for name, _ in self._stack]
         if tag in names:  # pop to the matching start tag (closes anything left open)
             del self._stack[len(names) - 1 - names[::-1].index(tag) :]
@@ -125,8 +166,12 @@ class _Collector(HTMLParser):
             self.title.append(data)
         if self._in_style and _CSS_EXTERNAL.search(data):
             self.external += 1
+        if self._in_style:
+            self.style.append(data)
         if self._heading is not None:
             self._heading[1].append(data)
+        if self._link is not None:
+            self._link[1].append(data)
         if self._stack and self._stack[-1][1]:
             self.authored_text.append(data)
         if self._stack and self._stack[-1][0] in LISTS and data.strip():
@@ -154,6 +199,10 @@ class _Collector(HTMLParser):
             self._heading = (int(match.group(1)), [])
         if element_id := (attrs.get("id") or "").strip():
             self.ids[element_id] += 1
+        if tag == "a" and self._link is None:
+            self._link = (attrs.get("href"), [])
+        if (lang := attrs.get("lang")) is not None:
+            self.langs.append(lang)
         self._external(tag, attrs)
         if not void:
             classes = (attrs.get("class") or "").split()
@@ -166,12 +215,16 @@ class _Collector(HTMLParser):
             self.imgs_without_alt += 1
         elif self._heading is not None:
             self._heading[1].append(alt)
+        if alt is not None and self._link is not None:
+            self._link[1].append(alt)
 
     def _external(self, tag: str, attrs: dict[str, str | None]) -> None:
         if tag in EXTERNAL_ELEMENTS:
             self.external += 1
             return
-        for name in URL_ATTRIBUTES & attrs.keys():
+        # A link's href loads nothing (the link rules check it); any other URL does.
+        navigation = {"href"} if tag == "a" else set()
+        for name in (URL_ATTRIBUTES & attrs.keys()) - navigation:
             value = (attrs[name] or "").strip().lower()
             if value and not value.startswith(("data:", "#")):
                 self.external += 1
@@ -215,6 +268,187 @@ def static_checks(html: str) -> list[Check]:
         ),
         _check("html.self_contained", doc.external == 0, "external_resource"),
         _check("html.wording", not _BANNED.search(authored), "banned_wording"),
+        *_text_checks(doc),
+        # Only for documents with a <table>, so they come last.
+        *_table_rules(html),
+    ]
+
+
+# --------------------------------------------------------------------------- tables
+
+# "Table 2.1 Speeds of ...", "TABLE 3: ...", but not "Table 2 shows that ..." (layout's
+# "Figure N" caption rule, for tables).
+TABLE_CAPTION = re.compile(
+    r"^(?:Table|TABLE|Tab\.)\s*\d+[A-Za-z]?(?:[.\-\u2013]\d+[A-Za-z]?)*"
+    r"(?:\s*[.:|\u2013\u2014-]\s*|\s+(?=[A-Z(\"'\u201c])|\s*$)"
+)
+PRESENTATIONAL_ROLES = frozenset({"presentation", "none"})
+# Blocks that can sit between a paragraph and a table (wrapper <div>s do not count: a
+# rebuilt table sits in one).
+_TABLE_NEIGHBOUR_BLOCKS = frozenset(
+    {"h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "dl", "figure", "pre", "blockquote",
+     "hr", "img", "math", "aside", "section"}
+)  # fmt: skip
+
+
+@dataclass
+class _HeaderCell:
+    scope: bool
+    has_id: bool
+    text: list[str] = field(default_factory=list)
+
+
+@dataclass
+class _TableFacts:
+    presentational: bool
+    caption: bool = False
+    uses_headers: bool = False  # a cell lists its headers (`headers`/`id` instead of scope)
+    headers: list[_HeaderCell] = field(default_factory=list)
+
+
+class _Tables(HTMLParser):
+    """One pass gathering what the table rules need: each table's header cells and
+    caption, and the order of paragraphs, tables and other blocks outside tables."""
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self.tables: list[_TableFacts] = []
+        # ("p", text), ("table", index into `tables`) or ("block", ""), in document order.
+        self.blocks: list[tuple[str, str | int]] = []
+        self._open: list[int] = []  # tables being read (nested ones too)
+        self._header: _HeaderCell | None = None
+        self._math = 0  # depth of <math> inside the header cell being read
+        self._paragraph: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        values = dict(attrs)
+        if tag == "table":
+            role = (values.get("role") or "").strip().lower()
+            self.tables.append(_TableFacts(presentational=role in PRESENTATIONAL_ROLES))
+            if not self._open:
+                self._end_paragraph()
+                self.blocks.append(("table", len(self.tables) - 1))
+            self._open.append(len(self.tables) - 1)
+        elif self._open:
+            self._in_table(tag, values)
+        elif tag == "p":
+            self._end_paragraph()
+            self._paragraph = []
+        elif tag in _TABLE_NEIGHBOUR_BLOCKS and self._paragraph is None:
+            self.blocks.append(("block", ""))
+
+    def _in_table(self, tag: str, values: dict[str, str | None]) -> None:
+        table = self.tables[self._open[-1]]
+        if tag == "caption":
+            table.caption = True
+        if tag in ("td", "th") and (values.get("headers") or "").strip():
+            table.uses_headers = True
+        if tag == "th":
+            self._header = _HeaderCell(
+                scope=bool((values.get("scope") or "").strip()),
+                has_id=bool((values.get("id") or "").strip()),
+            )
+            self._header.text.append(values.get("aria-label") or "")
+            table.headers.append(self._header)
+        elif tag == "img" and self._header is not None:
+            self._header.text.append(values.get("alt") or "")
+        elif tag == "math" and self._header is not None:
+            self._math += 1  # Chromium names a header from its text, never from MathML
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "table" and self._open:
+            self._open.pop()
+            self._header = None
+        elif tag == "th":
+            self._header = None
+            self._math = 0
+        elif tag == "math" and self._math:
+            self._math -= 1
+        elif tag == "p":
+            self._end_paragraph()
+
+    def handle_data(self, data: str) -> None:
+        if self._header is not None and not self._math:
+            self._header.text.append(data)
+        if self._paragraph is not None and not self._open:
+            self._paragraph.append(data)
+
+    def _end_paragraph(self) -> None:
+        if self._paragraph is not None:
+            self.blocks.append(("p", " ".join("".join(self._paragraph).split())))
+            self._paragraph = None
+
+    def caption_left_in_text(self, index: int) -> bool:
+        """Is a "Table N ..." paragraph right before or after table `index`?"""
+        at = self.blocks.index(("table", index))
+        beside = [self.blocks[i] for i in (at - 1, at + 1) if 0 <= i < len(self.blocks)]
+        return any(
+            kind == "p" and isinstance(text, str) and bool(TABLE_CAPTION.match(text))
+            for kind, text in beside
+        )
+
+
+def _table_rules(html: str) -> list[Check]:
+    """The table rules (see the module docstring); none for a document without tables."""
+    doc = _Tables()
+    doc.feed(html)
+    doc.close()
+    if not doc.tables:
+        return []
+    data = [(i, t) for i, t in enumerate(doc.tables) if not t.presentational]
+    top_level = {index for kind, index in doc.blocks if kind == "table"}
+    return [
+        _check("html.table_headers", all(t.headers for _, t in data), "table_no_headers"),
+        _check(
+            "html.table_header_scope",
+            all(h.scope or (t.uses_headers and h.has_id) for _, t in data for h in t.headers),
+            "th_without_scope",
+        ),
+        _check(
+            "html.table_header_text",
+            all("".join(h.text).strip() for t in doc.tables for h in t.headers),
+            "empty_th",
+        ),
+        _check(
+            "html.table_caption",
+            not any(
+                not t.caption and i in top_level and doc.caption_left_in_text(i) for i, t in data
+            ),
+            "table_caption_missing",
+            severity="warning",
+        ),
+        _check("html.table_layout", not any(t.presentational for t in doc.tables), "layout_table"),
+    ]
+
+
+def _safe_link(href: str | None, ids: Counter[str]) -> bool:
+    """A web or email address, or "#id" of an element in this file."""
+    href = (href or "").strip()
+    if href.startswith("#"):
+        return ids[href[1:]] > 0
+    return is_safe_href(href)
+
+
+def _hex_rgb(digits: str) -> tuple[int, int, int]:
+    return int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16)
+
+
+def _text_checks(doc: _Collector) -> list[Check]:
+    """The text work's rules: links, lang values and the contrast of colour classes."""
+    readable = all(
+        contrast.contrast_ratio(_hex_rgb(m.group(1)), contrast.OUTPUT_BACKGROUND)
+        >= contrast.MIN_TEXT_CONTRAST
+        for m in _COLOUR_RULE.finditer("".join(doc.style))
+    )
+    return [
+        _check("html.link_text", all(text.strip() for _, text in doc.links), "empty_link"),
+        _check("html.link_href", all(_safe_link(h, doc.ids) for h, _ in doc.links), "unsafe_link"),
+        _check(
+            "html.lang_tags",
+            all(is_language_tag(value.strip()) for value in doc.langs if value.strip()),
+            "invalid_lang",
+        ),
+        _check("html.text_contrast", readable, "low_contrast"),
     ]
 
 

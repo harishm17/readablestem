@@ -93,7 +93,7 @@ def test_opt_in_checkbox_is_off_by_default(web):
     ("data", "status", "message"),
     [
         (b"PK\x03\x04 a zip file pretending", 415, "not a PDF"),
-        (b"", 400, "The file is empty"),
+        (b"", 400, "notes.pdf is empty"),
         (b"%PDF-1.7\nnot really a pdf at all", 422, "could not be opened"),
     ],
 )
@@ -116,7 +116,7 @@ def test_upload_rejects_encrypted_pdfs(web):
 def test_upload_rejects_too_many_pages(web):
     response = upload(web.browser, make_pdf(6))  # max_pages_per_job=5 in tests
     assert response.status_code == 422
-    assert "more than 5 pages" in response.text
+    assert "notes.pdf has 6 pages; the limit is 5 per upload" in response.text
     assert count(web, Job) == 0
 
 
@@ -256,7 +256,7 @@ def test_uploads_in_progress_are_bounded_in_total_and_per_user(web):
     try:
         response = upload(web.browser, make_pdf(1))
         assert response.status_code == 429 and response.headers["retry-after"] == "10"
-        assert "Your other upload is still in progress" in response.text
+        assert "Another upload of yours is still being checked" in response.text
     finally:
         gate.leave(alice_id)
 
@@ -280,14 +280,32 @@ def test_uploads_in_progress_are_bounded_in_total_and_per_user(web):
 def test_daily_page_quota_returns_429_and_changes_nothing(web):
     for _ in range(4):  # quota 20 pages; 4 x 5 pages fits exactly
         assert upload(web.browser, make_pdf(5)).status_code == 303
-    response = upload(web.browser, make_pdf(1))
+    response = upload(web.browser, make_pdf(1), filename="week5.pdf")
     assert response.status_code == 429
-    assert "Daily page limit reached" in response.text
-    assert "you have 0 left today" in response.text
+    # The upload page again, naming the file; no form that can only fail (UX review MF20).
+    assert "week5.pdf has 1 page, and you have used all 20 pages" in response.text
+    assert 'href="#upload-closed"' in response.text and 'id="upload-closed"' in response.text
+    assert 'id="pdf"' not in response.text
     assert response.headers.get("retry-after")
     assert count(web, Job) == 4
     with session_scope(web.ctx.factory) as session:
         assert session.scalar(select(QuotaDay.pages)) == 20
+    page = web.browser.get("/app")
+    assert "You have converted all 20 pages you can today" in page.text
+    assert 'action="/jobs"' not in page.text
+
+
+def test_daily_page_quota_names_the_file_and_what_is_left(web):
+    for _ in range(3):  # quota 20 pages, 5 a file: 5 left
+        assert upload(web.browser, make_pdf(5)).status_code == 303
+    assert upload(web.browser, make_pdf(2)).status_code == 303  # 3 left
+    response = upload(web.browser, make_pdf(5), filename="chapter2.pdf")
+    assert response.status_code == 429
+    assert "chapter2.pdf has 5 pages, but you have 3 of today&#39;s 20 pages left" in (
+        response.text
+    )
+    assert 'href="#pdf"' in response.text and 'id="pdf"' in response.text
+    assert count(web, Job) == 4
 
 
 def test_quota_is_per_user(web):
@@ -300,7 +318,8 @@ def test_quota_is_per_user(web):
 
 def test_app_page_shows_pages_left_today(web):
     upload(web.browser, make_pdf(3))
-    assert "You can convert 17 more pages today." in " ".join(web.browser.get("/app").text.split())
+    page = " ".join(web.browser.get("/app").text.split())
+    assert "You can convert 17 more pages today; the count starts again at <time" in page
 
 
 def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
@@ -321,7 +340,7 @@ def test_when_the_daily_spend_cap_is_reached_uploads_get_a_friendly_503(web):
 def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
     page = web.browser.get(f"/jobs/{job_id}").text
-    assert f'hx-get="/jobs/{job_id}/status?v=queued-0-0"' in page
+    assert f'hx-get="/jobs/{job_id}/status?v=queued-none-0"' in page
     # No reload the user did not ask for (WCAG 2.2.1, F41); a no-JS user can opt in.
     assert "http-equiv" not in page
     assert f'<a href="/jobs/{job_id}">refresh the status</a>' in page
@@ -346,22 +365,27 @@ def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request
 
 def test_status_fragment_is_204_until_something_changes(web):
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
-    assert web.browser.get(f"/jobs/{job_id}/status?v=queued-0-0").status_code == 204
+    assert web.browser.get(f"/jobs/{job_id}/status?v=queued-none-0").status_code == 204
     fragment = web.browser.get(f"/jobs/{job_id}/status?v=stale")
     assert fragment.status_code == 200 and 'id="job-status"' in fragment.text
     assert "<html" not in fragment.text  # a fragment, not a page
 
     web.run_worker()
     finished = web.browser.get(
-        f"/jobs/{job_id}/status?v=queued-0-0", headers={"HX-Request": "true"}
+        f"/jobs/{job_id}/status?v=queued-none-0", headers={"HX-Request": "true"}
     )
     assert finished.status_code == 200
-    # No reload nobody asked for: the announced status links to the results instead.
+    # No reload nobody asked for: the announced status links to the results instead,
+    # and to the first decision, one click away (the fake result has 3 open).
     assert "hx-refresh" not in finished.headers
-    assert f'<p><a href="/jobs/{job_id}">Show the results</a></p>' in finished.text
-    assert "Show the results" not in web.browser.get(f"/jobs/{job_id}").text
+    assert (
+        f'<p><a href="/jobs/{job_id}/review">Start the review</a> or '
+        f'<a href="/jobs/{job_id}">show the results</a></p>'
+    ) in finished.text
+    assert "3 decisions need you before you share it." in finished.text
+    assert "show the results" not in web.browser.get(f"/jobs/{job_id}").text
     # htmx takes the document title from the fragment, so the tab title follows it.
-    assert finished.text.startswith("<title>Finished: notes.pdf | a11y-stem</title>")
+    assert finished.text.startswith("<title>Converted: notes.pdf | a11y-stem</title>")
     assert "<title>" not in fragment.text  # not without htmx (it would be in <body>)
 
 
@@ -371,9 +395,9 @@ def test_queue_position_is_shown(web):
     assert "next in line" in web.browser.get(f"/jobs/{first}").text
     assert "1 document ahead of yours" in web.browser.get(f"/jobs/{second}").text
     # The polled fragment notices when the queue moves, not only when the status changes.
-    assert web.browser.get(f"/jobs/{second}/status?v=queued-0-1").status_code == 204
+    assert web.browser.get(f"/jobs/{second}/status?v=queued-none-1").status_code == 204
     assert web.worker().claim() is not None  # the first job starts
-    moved = web.browser.get(f"/jobs/{second}/status?v=queued-0-1")
+    moved = web.browser.get(f"/jobs/{second}/status?v=queued-none-1")
     assert moved.status_code == 200 and "next in line" in moved.text
 
 
@@ -413,7 +437,7 @@ def test_download_view_and_crops_of_a_finished_job(web):
     download = web.browser.get(f"/jobs/{job_id}/download")
     assert download.status_code == 200
     assert download.headers["content-disposition"].startswith(
-        'attachment; filename="notes-accessible.html"'
+        f'attachment; filename="secret-heading-kinematics-{job_id[:6]}.html"'
     )
     assert download.headers["content-security-policy"] == VIEW_CSP
     assert "SECRET-DOC-TEXT" in download.text
@@ -441,9 +465,18 @@ def test_results_are_not_available_before_the_job_finishes(web):
         assert "Not ready yet" in response.text
 
 
-def test_download_filename_handles_any_name():
-    assert download_filename("Lecture 1.pdf") == "Lecture 1-accessible.html"
-    assert download_filename("noext") == "noext-accessible.html"
+def test_download_filename_is_the_title_and_the_start_of_the_id():
+    """Two versions of a handout, or two uploads called source.pdf, used to download
+    under the same name and overwrite each other (UX review MF24)."""
+    job = "3f9a2b" + "0" * 26
+    assert download_filename("Problem Set 2: Kinematics", job) == (
+        "problem-set-2-kinematics-3f9a2b.html"
+    )
+    assert download_filename("Ünïcode Δ-Titel", job) == "ünïcode-δ-titel-3f9a2b.html"
+    assert download_filename("???", job) == "document-3f9a2b.html"
+    long = download_filename("word " * 40, job)
+    assert len(long) <= 60 + len("-3f9a2b.html") and long.startswith("word-word")
+    assert not long.startswith("-") and "--" not in long
     header = content_disposition('Ünïcode "quotes"; x.html')
     assert header.startswith('attachment; filename="_n_code _quotes__ x.html"')
     assert "filename*=UTF-8''%C3%9Cn%C3%AFcode%20%22quotes%22%3B%20x.html" in header
@@ -498,7 +531,9 @@ def test_delete_asks_first_and_one_post_without_confirmation_deletes_nothing(web
     blobs = count(web, Blob)
     page = web.browser.post(f"/jobs/{job_id}/delete", data={"csrf_token": token(web.browser)})
     assert page.status_code == 200
-    assert "Delete notes.pdf?" in page.text and "cannot be undone" in page.text
+    text = " ".join(page.text.split())
+    assert "Delete SECRET-HEADING Kinematics?" in text and "cannot be undone" in text
+    assert "notes.pdf, uploaded <time" in text  # the title first, the file name under it
     assert 'name="confirm" value="yes"' in page.text
     assert f'<a href="/jobs/{job_id}">No, keep it</a>' in page.text
     assert count(web, Job) == 1 and count(web, Blob) == blobs
@@ -517,6 +552,12 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
     assert "have been deleted" in page
     assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
+    # The upload's usage event stays for the counts, without the file's fingerprint.
+    from a11y_stem.web.db import Event
+
+    with session_scope(web.ctx.factory) as session:
+        uploads = session.scalars(select(Event).where(Event.job_ref == job_id)).all()
+        assert [(e.name, e.code) for e in uploads if e.name == "uploaded"] == [("uploaded", None)]
 
 
 def test_app_lists_the_users_jobs_newest_first(web):

@@ -1,0 +1,635 @@
+{
+ "source": "table-bench tables.tex (written for the table benchmark, no third-party text), table T2-multirow-multicolumn: a crop of tables.pdf; the local grid is the gold structure filled with the PDF's words by position (a stand-in for tables-detect)",
+ "recorded": "2026-10-09 with models/prompts/table.md as first committed",
+ "caption": "Table 2: Speciﬁc heat and latent heat of fusion.",
+ "local": {
+  "rows": 7,
+  "cols": 5,
+  "header_rows": 1,
+  "cells": [
+   {
+    "row": 0,
+    "col": 0,
+    "row_span": 2,
+    "text": "Type",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 1,
+    "row_span": 2,
+    "text": "p Material",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 2,
+    "col_span": 2,
+    "text": "",
+    "header": "col"
+   },
+   {
+    "row": 0,
+    "col": 4,
+    "row_span": 2,
+    "text": "kg−1) (kJ",
+    "header": "col"
+   },
+   {
+    "row": 1,
+    "col": 2,
+    "text": "kg−1 K−1) Speciﬁc heat (J"
+   },
+   {
+    "row": 1,
+    "col": 3,
+    "text": "Lf"
+   },
+   {
+    "row": 2,
+    "col": 0,
+    "row_span": 3,
+    "text": "Metal"
+   },
+   {
+    "row": 2,
+    "col": 1,
+    "text": ""
+   },
+   {
+    "row": 2,
+    "col": 2,
+    "text": "Solid Liquid"
+   },
+   {
+    "row": 2,
+    "col": 3,
+    "text": ""
+   },
+   {
+    "row": 2,
+    "col": 4,
+    "text": ""
+   },
+   {
+    "row": 3,
+    "col": 1,
+    "text": "Aluminium"
+   },
+   {
+    "row": 3,
+    "col": 2,
+    "text": "900 1180"
+   },
+   {
+    "row": 3,
+    "col": 3,
+    "text": ""
+   },
+   {
+    "row": 3,
+    "col": 4,
+    "text": "397"
+   },
+   {
+    "row": 4,
+    "col": 1,
+    "text": "Copper"
+   },
+   {
+    "row": 4,
+    "col": 2,
+    "text": "385 530"
+   },
+   {
+    "row": 4,
+    "col": 3,
+    "text": ""
+   },
+   {
+    "row": 4,
+    "col": 4,
+    "text": "205"
+   },
+   {
+    "row": 5,
+    "col": 0,
+    "row_span": 2,
+    "text": "Other"
+   },
+   {
+    "row": 5,
+    "col": 1,
+    "text": "Lead"
+   },
+   {
+    "row": 5,
+    "col": 2,
+    "text": "128 140"
+   },
+   {
+    "row": 5,
+    "col": 3,
+    "text": ""
+   },
+   {
+    "row": 5,
+    "col": 4,
+    "text": "24.5"
+   },
+   {
+    "row": 6,
+    "col": 1,
+    "text": "Water Ethanol"
+   },
+   {
+    "row": 6,
+    "col": 2,
+    "text": "2090 4186 2420 2440"
+   },
+   {
+    "row": 6,
+    "col": 3,
+    "text": ""
+   },
+   {
+    "row": 6,
+    "col": 4,
+    "text": "334 108"
+   }
+  ]
+ },
+ "answers": {
+  "gpt-6-luna": {
+   "is_data_table": true,
+   "caption": "",
+   "rows": [
+    {
+     "cells": [
+      {
+       "text": "Type",
+       "latex": "",
+       "header": "col",
+       "row_span": 2,
+       "col_span": 1
+      },
+      {
+       "text": "Material",
+       "latex": "",
+       "header": "col",
+       "row_span": 2,
+       "col_span": 1
+      },
+      {
+       "text": "Specific heat (J kg−1 K−1)",
+       "latex": "\\text{Specific heat}\\ (\\text{J kg}^{-1}\\text{K}^{-1})",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 2
+      },
+      {
+       "text": "L_f (kJ kg−1)",
+       "latex": "L_f\\ (\\text{kJ kg}^{-1})",
+       "header": "col",
+       "row_span": 2,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Solid",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Liquid",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Metal",
+       "latex": "",
+       "header": "row",
+       "row_span": 3,
+       "col_span": 1
+      },
+      {
+       "text": "Aluminium",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "900",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1180",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "397",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Copper",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "385",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "530",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "205",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Lead",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "128",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "140",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "24.5",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Other",
+       "latex": "",
+       "header": "row",
+       "row_span": 2,
+       "col_span": 1
+      },
+      {
+       "text": "Water",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2090",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "4186",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "334",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Ethanol",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2420",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2440",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "108",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    }
+   ]
+  },
+  "gpt-6.1-sol": {
+   "is_data_table": true,
+   "caption": "",
+   "rows": [
+    {
+     "cells": [
+      {
+       "text": "Type",
+       "latex": "",
+       "header": "col",
+       "row_span": 2,
+       "col_span": 1
+      },
+      {
+       "text": "Material",
+       "latex": "",
+       "header": "col",
+       "row_span": 2,
+       "col_span": 1
+      },
+      {
+       "text": "Specific heat (J kg⁻¹ K⁻¹)",
+       "latex": "\\text{Specific heat}\\ (\\text{J}\\,\\text{kg}^{-1}\\,\\text{K}^{-1})",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 2
+      },
+      {
+       "text": "L_f (kJ kg⁻¹)",
+       "latex": "L_{f}\\ (\\text{kJ}\\,\\text{kg}^{-1})",
+       "header": "col",
+       "row_span": 2,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Solid",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "Liquid",
+       "latex": "",
+       "header": "col",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Metal",
+       "latex": "",
+       "header": "row",
+       "row_span": 3,
+       "col_span": 1
+      },
+      {
+       "text": "Aluminium",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "900",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "1180",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "397",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Copper",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "385",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "530",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "205",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Lead",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "128",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "140",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "24.5",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Other",
+       "latex": "",
+       "header": "row",
+       "row_span": 2,
+       "col_span": 1
+      },
+      {
+       "text": "Water",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2090",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "4186",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "334",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    },
+    {
+     "cells": [
+      {
+       "text": "Ethanol",
+       "latex": "",
+       "header": "row",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2420",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "2440",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      },
+      {
+       "text": "108",
+       "latex": "",
+       "header": "none",
+       "row_span": 1,
+       "col_span": 1
+      }
+     ]
+    }
+   ]
+  }
+ },
+ "expected": {
+  "status": "needs_review",
+  "failed": [
+   "symbol_mismatch",
+   "text_mismatch"
+  ],
+  "models": [
+   "gpt-6-luna",
+   "gpt-6.1-sol"
+  ]
+ }
+}

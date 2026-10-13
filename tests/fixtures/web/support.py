@@ -181,8 +181,20 @@ class FakeConverter:
         self.raises: BaseException | None = None
         self.before_return: Callable[[], None] | None = None
 
-    def __call__(self, pdf_bytes: bytes, /, *, settings, client, progress=None) -> ConversionOutput:
-        self.calls.append({"pdf": pdf_bytes, "settings": settings, "client": client})
+    def __call__(
+        self,
+        pdf_bytes: bytes,
+        /,
+        *,
+        settings,
+        client,
+        progress=None,
+        options=None,
+        stage_progress=None,
+    ) -> ConversionOutput:
+        self.calls.append(
+            {"pdf": pdf_bytes, "settings": settings, "client": client, "options": options}
+        )
         if progress is not None:
             progress(1, 1)
         if self.raises is not None:

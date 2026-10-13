@@ -1,11 +1,12 @@
 {
   "schema_version": 1,
   "task": "document",
-  "date": "2026-10-09",
-  "pipeline_version": "0.3.0",
+  "date": "2026-10-12",
+  "pipeline_version": "0.4.0",
   "prompt_versions": {
     "equation": "equation-df0e12f1",
-    "figure": "figure-ac51f42d"
+    "figure": "figure-ac51f42d",
+    "table": "table-b3769ce7"
   },
   "models": {
     "main": "gpt-6.1-sol",
@@ -44,7 +45,7 @@
       }
     },
     "matched_exact_lenient": 0.7333333333333333,
-    "matched_mean_teds": 0.8583063327489706,
+    "matched_mean_teds": 0.8563455484352451,
     "end_to_end_exact_lenient": 0.7333333333333333,
     "unmatched_predicted": 25,
     "unmatched_by_reason": {
@@ -162,7 +163,7 @@
             "style_cosmetic"
           ],
           "scorer_gap": false,
-          "pred_latex": "\\mathbf{v}_{\\text{avg}} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_{\\text{f}} - \\mathbf{d}_0}{t_{\\text{f}} - t_0}"
+          "pred_latex": "\\mathbf{v}_{\\text{avg}} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_{f} - \\mathbf{d}_{0}}{t_{f} - t_{0}}"
         },
         {
           "page": "physics/2-2-speed-and-velocity",
@@ -171,7 +172,7 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": true,
-          "pred_latex": "\\begin{array}{rcl}\\mathbf{v}_{\\text{avg}} & = & \\frac{\\Delta\\mathbf{d}}{\\Delta t} \\\\ \\Delta\\mathbf{d} & = & \\mathbf{v}_{\\text{avg}}\\Delta t \\\\ & = & (2.4\\ \\text{m/s})(46\\ \\text{s}) \\\\ & = & 1.1\\times 10^{2}\\ \\text{m east}\\end{array}"
+          "pred_latex": "\\begin{array}{rcl} \\mathbf{v}_{\\text{avg}} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ \\Delta \\mathbf{d} & = & \\mathbf{v}_{\\text{avg}}\\Delta t \\\\ & = & (2.4\\ \\text{m/s})(46\\ \\text{s}) \\\\ & = & 1.1 \\times 10^{2}\\ \\text{m east} \\end{array}"
         },
         {
           "page": "physics/2-3-position-vs-time-graphs",
@@ -258,11 +259,11 @@
       "equations_matched": {
         "answered": 30,
         "wrong": 8,
-        "auroc_vs_wrong": 0.6364,
+        "auroc_vs_wrong": 0.625,
         "auroc_vs_wrong_excluding_scorer_gaps": 0.7803,
-        "would_flag": 10,
-        "would_flag_precision": 0.4,
-        "would_flag_recall": 0.5,
+        "would_flag": 9,
+        "would_flag_precision": 0.3333,
+        "would_flag_recall": 0.375,
         "would_flag_wrong_excluding_scorer_gaps": 2
       },
       "figure_checked": 16,
@@ -272,29 +273,29 @@
       "outcomes": {
         "ok": 71
       },
-      "cost_usd": 0.0042015,
-      "per_pdf_page_usd": 9.771e-05
+      "cost_usd": 0.0043189,
+      "per_pdf_page_usd": 0.00010044
     }
   },
   "cost": {
-    "total_usd": 0.14098776,
-    "pipeline_usd": 0.14098776,
-    "per_item_usd": 0.04699592,
+    "total_usd": 0.14463606,
+    "pipeline_usd": 0.14463606,
+    "per_item_usd": 0.04821202,
     "per_item_unit": "section",
-    "model_calls": 87,
-    "verifier_usd": 0.0042015,
-    "verifier_per_item_usd": 0.0014005,
-    "verifier_requests": 83,
+    "model_calls": 89,
+    "verifier_usd": 0.0043189000000000005,
+    "verifier_per_item_usd": 0.0014396333333333334,
+    "verifier_requests": 87,
     "pdf_pages": 43,
-    "per_pdf_page_usd": 0.0032787851162790695,
-    "verifier_per_pdf_page_usd": 9.770930232558141e-05,
-    "budget_spent_usd": 0.14098776,
-    "budget_calls": 87,
+    "per_pdf_page_usd": 0.0033636293023255816,
+    "verifier_per_pdf_page_usd": 0.00010043953488372094,
+    "budget_spent_usd": 0.14463605999999993,
+    "budget_calls": 89,
     "dropped_usd": 0.0
   },
   "latency_ms": {
-    "p50": 27097.0,
-    "p95": 44809.0,
+    "p50": 33243.0,
+    "p95": 55271.399999999994,
     "n": 3,
     "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)"
   }

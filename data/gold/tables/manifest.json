@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "generated_by": "a11y-stem gold fetch",
+  "source": "OpenStax (https://openstax.org), CC BY books only",
+  "books": {
+    "physics": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Paul Peter Urone",
+        "Roger Hinrichs"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/physics",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-08",
+      "slug": "physics",
+      "state": "live",
+      "title": "Physics",
+      "uuid": "cce64fde-f448-43b8-ae88-27705cceb0da",
+      "version": "dfdfd7a"
+    },
+    "statistics": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Barbara Illowsky",
+        "Susan Dean"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/statistics",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-08",
+      "slug": "statistics",
+      "state": "live",
+      "title": "Statistics",
+      "uuid": "394a1101-fd8f-4875-84fa-55f15b06ba66",
+      "version": "7dea80a"
+    }
+  },
+  "files": [
+    {
+      "path": "openstax/physics/1-3-the-language-of-physics-physical-quantities-and-units.jsonl",
+      "sha256": "1c76c9e15376daa0f71ee8373f7d9a8b4305d913bc3b3044f3ffd49188ba1e6b",
+      "records": 6,
+      "counts": {
+        "table": 6
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/11-3-phase-change-and-latent-heat.jsonl",
+      "sha256": "93a83a1a29acb0a3a7ff59e9a01161d1f2d99a2d69fe9154b8348698d088580d",
+      "records": 2,
+      "counts": {
+        "table": 2
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/14-1-speed-of-sound-frequency-and-wavelength.jsonl",
+      "sha256": "419e54fad3a3512f917c33c1933e317fd7399fe4e633f2a4c2ac121d9f6920ef",
+      "records": 2,
+      "counts": {
+        "table": 2
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/16-3-lenses.jsonl",
+      "sha256": "161bceefe2f8658c5d96e708191bb552f331b33d34e0350b448dd5acc49bbc9f",
+      "records": 3,
+      "counts": {
+        "table": 3
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/22-2-nuclear-forces-and-radioactivity.jsonl",
+      "sha256": "019b2df23d7fb99204bf34ad37a0ef8f25008f37b6752b742d8b494a3dab3c4c",
+      "records": 4,
+      "counts": {
+        "table": 4
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/23-1-the-four-fundamental-forces.jsonl",
+      "sha256": "8cfbc9be949acf5c1f0801d47632087f480c1d71996c9b9395e13d5e393e4608",
+      "records": 3,
+      "counts": {
+        "table": 3
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/23-2-quarks.jsonl",
+      "sha256": "c2e42c7980f2f799f54a473435a57ef6602f41e9687b9c5c2d9a72b6abba8ad9",
+      "records": 3,
+      "counts": {
+        "table": 3
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/5-4-inclined-planes.jsonl",
+      "sha256": "0da28aadc79d55a3a8f5390f14c3caf177e3e564483d5268762414762cda66c4",
+      "records": 2,
+      "counts": {
+        "table": 2
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/physics/6-3-rotational-motion.jsonl",
+      "sha256": "e0c9e3085342fc791cc7e10652ffd0e2669f193648acc88f77764548e7fe37ec",
+      "records": 3,
+      "counts": {
+        "table": 3
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/statistics/1-3-frequency-frequency-tables-and-levels-of-measurement.jsonl",
+      "sha256": "4fd479919654067ca526c840790e4b1a800ac1debdcccd922b7337959eaf4831",
+      "records": 8,
+      "counts": {
+        "table": 8
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/statistics/2-2-histograms-frequency-polygons-and-time-series-graphs.jsonl",
+      "sha256": "3b19d48405ab167cb53b50f30c770479426061fe8ef8bf4695c070f0a81f3f23",
+      "records": 9,
+      "counts": {
+        "table": 9
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/statistics/3-4-contingency-tables.jsonl",
+      "sha256": "69b5f59f89815b5d4d0d5ca4bbd9c3da43d03820f79ca87f4e384e15b4f7b595",
+      "records": 9,
+      "counts": {
+        "table": 9
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    },
+    {
+      "path": "openstax/statistics/4-2-mean-or-expected-value-and-standard-deviation.jsonl",
+      "sha256": "fcf92d2a8a157f3a5671794f87f8ee0c96b824d4cd29e241477a2dc6226f0c50",
+      "records": 10,
+      "counts": {
+        "table": 10
+      },
+      "retrieved_at": [
+        "2026-10-08"
+      ]
+    }
+  ],
+  "totals": {
+    "table": 64
+  }
+}

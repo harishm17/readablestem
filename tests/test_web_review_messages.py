@@ -25,13 +25,16 @@ from typing import get_args
 import pytest
 
 import a11y_stem
-from a11y_stem.core.types import Check, Outcome
+from a11y_stem.core.types import NOTICE_CODES, Check, Notice, Outcome
+from a11y_stem.pipeline import run
 from a11y_stem.web import messages
 from a11y_stem.web.messages import (
     CHECK_MESSAGES,
+    NOTICE_MESSAGES,
     REASON_MESSAGES,
     confidence_label,
     explain_check,
+    explain_notice,
     explain_reason,
 )
 
@@ -43,6 +46,8 @@ PIPELINE_MODULES = (
     "heading_step",
     "html_checks",
     "run",
+    "table_step",
+    "notation_memory",
 )
 CHECK_NAME = re.compile(r"^[a-z_]+(\.[a-z_]+)+$")
 PLACEHOLDER = "{}"
@@ -266,8 +271,26 @@ def test_no_message_for_a_code_the_pipeline_no_longer_emits(emitted):
     reasons = set(emitted.reasons)
     reasons |= {f"model_{outcome}" for outcome in get_args(Outcome)}
     reasons |= {f"budget_{scope}" for scope in budget_scopes()}
+    # Pages and handwriting kept as images: the reason is the page type's
+    # (`pipeline.page_type.kept_reason`, `run._with_page_images`), not a literal there.
+    reasons |= set(run.KEPT_REASONS)
     assert sorted(set(CHECK_MESSAGES) - emitted.checks) == []
     assert sorted(set(REASON_MESSAGES) - reasons) == []
+
+
+def test_every_notice_code_has_a_message_and_no_message_lacks_a_code():
+    """Notices are listed on the job page (core.types.Notice); a builder that adds a code
+    adds it to NOTICE_CODES and a sentence here."""
+    assert sorted(set(NOTICE_CODES) - set(NOTICE_MESSAGES)) == []
+    assert sorted(set(NOTICE_MESSAGES) - set(NOTICE_CODES)) == []
+
+
+def test_an_unknown_notice_gets_a_neutral_sentence_and_its_code():
+    known = explain_notice(Notice(code="footnote"))
+    assert known.known and known.text == NOTICE_MESSAGES["footnote"]
+    unknown = explain_notice(Notice(code="something_new"))
+    assert not unknown.known
+    assert (unknown.text, unknown.code) == (messages.UNKNOWN_NOTICE_MESSAGE, "something_new")
 
 
 # A full stop, question or exclamation mark followed by a capital starts a second sentence.
@@ -278,8 +301,10 @@ def test_messages_are_one_plain_sentence_each():
     texts = [
         *CHECK_MESSAGES.values(),
         *REASON_MESSAGES.values(),
+        *NOTICE_MESSAGES.values(),
         messages.UNKNOWN_CHECK_MESSAGE,
         messages.UNKNOWN_REASON_MESSAGE,
+        messages.UNKNOWN_NOTICE_MESSAGE,
         messages.AXE_RULE_MESSAGE.format(rule="color-contrast"),
     ]
     for text in texts:
