@@ -1,0 +1,127 @@
+{
+ "description": "Inventions written by hand for the sol-expert chatbot run on OpenStax Physics 2.2 and 2.3 (development material only): 20 sentences, 6 headings, 5 equations, 6 changed numbers, 6 changed words, 5 symbols added to real equations.",
+ "sentences": [
+  "Objects with larger mass always reach a higher average speed than lighter objects over the same distance.",
+  "A good rule of thumb is that a healthy adult walks at about 1.4 meters per second on level ground.",
+  "Students often confuse speed and velocity, so it helps to say the direction out loud every time.",
+  "The fastest land animal, the cheetah, can sustain speeds near 29 meters per second for several minutes.",
+  "In practice, speedometers in cars measure the rotation rate of the wheels rather than the speed itself.",
+  "Remember that a negative velocity always means the object is slowing down.",
+  "This page was reviewed by an accessibility specialist before it was published here.",
+  "Tip: draw a quick sketch of the motion before you start any calculation, and label the origin.",
+  "Galileo first measured the acceleration of falling bodies by rolling bronze balls down inclined planes in 1604.",
+  "If you are using a screen reader, press H to jump between the headings of this page.",
+  "Air resistance has no effect on the motion described in these examples, so you can ignore friction entirely.",
+  "The equations in this section hold only when the acceleration is exactly zero for the whole trip.",
+  "A runner who completes a marathon in three hours has an average speed of roughly 3.9 meters per second.",
+  "Note that all of the quantities in this section must be converted to kilometers per hour before use.",
+  "Many students find the slope of a position versus time graph easier to read than the graph itself.",
+  "Equations are provided with spoken descriptions so that the meaning can be heard in a natural way.",
+  "The jet car in the second example was built in 1979 and later retired to a museum in Nevada.",
+  "Average velocity can never be larger than the average speed over the same time interval, even for a round trip.",
+  "In the International System of Units, the unit of speed is named after the physicist James Watt.",
+  "Check your answer by asking whether the number of meters per second seems reasonable for a real object."
+ ],
+ "headings": [
+  "Common Misconceptions",
+  "Study Tips for This Section",
+  "Summary of Key Points",
+  "Real-World Applications of Velocity",
+  "Test Yourself on the Ideas Above",
+  "How to Read the Equations on This Page"
+ ],
+ "equations": [
+  "<math display=\"block\"><mi>K</mi><mo>=</mo><mfrac><mn>1</mn><mn>2</mn></mfrac><mi>m</mi><msup><mi>v</mi><mn>2</mn></msup></math>",
+  "<math display=\"block\"><mi>p</mi><mo>=</mo><mi>m</mi><mi>v</mi></math>",
+  "<math display=\"block\"><mi>F</mi><mo>=</mo><mi>m</mi><mi>a</mi><mo>=</mo><mi>m</mi><mfrac><mrow><mi>Δ</mi><mi>v</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></math>",
+  "<math display=\"block\"><mi>W</mi><mo>=</mo><mi>F</mi><mi>d</mi><mi>cos</mi><mi>θ</mi></math>",
+  "<math display=\"block\"><mi>P</mi><mo>=</mo><mfrac><mi>W</mi><mi>t</mi></mfrac><mo>=</mo><mi>F</mi><mi>v</mi></math>"
+ ],
+ "edits": [
+  {
+   "kind": "number",
+   "find": "a car travels 150 kilometers in 3.2 hours",
+   "replace": "a car travels 150 kilometers in 3.6 hours"
+  },
+  {
+   "kind": "number",
+   "find": "over a 3.2 hour trip",
+   "replace": "over a 4.7 hour trip"
+  },
+  {
+   "kind": "number",
+   "find": "estimating: 5 meters divided by 2 seconds",
+   "replace": "estimating: 8.6 meters divided by 2 seconds"
+  },
+  {
+   "kind": "number",
+   "find": "graphed in Figure 1.13",
+   "replace": "graphed in Figure 1.31"
+  },
+  {
+   "kind": "number",
+   "find": "Figure 2.12 shows a graph",
+   "replace": "Figure 2.15 shows a graph"
+  },
+  {
+   "kind": "number",
+   "find": "Page 3 of 14",
+   "replace": "Page 3 of 41"
+  },
+  {
+   "kind": "word",
+   "find": "speed is a scalar because it has a magnitude",
+   "replace": "speed is a vector because it has a magnitude"
+  },
+  {
+   "kind": "word",
+   "find": "Average speed is a scalar, so we do not include direction",
+   "replace": "Average speed is a vector, so we do not include direction"
+  },
+  {
+   "kind": "word",
+   "find": "showing that the velocity is increasing over time",
+   "replace": "showing that the velocity is decreasing over time"
+  },
+  {
+   "kind": "word",
+   "find": "Speed is the rate at which an object changes its location",
+   "replace": "Speed is the rate at which an object changes its mass"
+  },
+  {
+   "kind": "word",
+   "find": "A description of how fast or slow an object moves is its speed",
+   "replace": "A description of how fast or slow an object moves is its acceleration"
+  },
+  {
+   "kind": "word",
+   "find": "The SI unit of time is the second",
+   "replace": "The SI unit of time is the minute"
+  },
+  {
+   "kind": "equation_symbol",
+   "find": "<mo>−</mo><msub><mi>t</mi><mn>0</mn></msub><mo>.</mo></mrow></math>",
+   "replace": "<mo>−</mo><msub><mi>t</mi><mn>0</mn></msub><mo>.</mo></mrow><mo>+</mo><mi>q</mi></math>"
+  },
+  {
+   "kind": "equation_symbol",
+   "find": "<mfrac><mtext>distance</mtext><mtext>time</mtext></mfrac></math>",
+   "replace": "<mfrac><mtext>distance</mtext><mtext>time</mtext></mfrac><mo>+</mo><mi>q</mi></math>"
+  },
+  {
+   "kind": "equation_symbol",
+   "find": "<mi mathvariant=\"normal\">avg</mi></msub></mfrac><mo>.</mo></math>",
+   "replace": "<mi mathvariant=\"normal\">avg</mi></msub></mfrac><mo>.</mo><mo>+</mo><mi>q</mi></math>"
+  },
+  {
+   "kind": "equation_symbol",
+   "find": "<mo>×</mo><mtext>time</mtext></math>",
+   "replace": "<mo>×</mo><mtext>time</mtext><mo>+</mo><mi>q</mi></math>"
+  },
+  {
+   "kind": "equation_symbol",
+   "find": "<mo>−</mo><msub><mi>t</mi><mn>0</mn></msub></mrow></mfrac></math>",
+   "replace": "<mo>−</mo><msub><mi>t</mi><mn>0</mn></msub></mrow></mfrac><mo>+</mo><mi>q</mi></math>"
+  }
+ ]
+}

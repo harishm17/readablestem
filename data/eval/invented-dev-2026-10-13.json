@@ -1,0 +1,2528 @@
+{
+ "a11y_stem_systems": [
+  "a11y-stem"
+ ],
+ "chatbot_and_a11y_stem": {
+  "a11y-stem": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.14865487660514556
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.14865487660514556
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 59,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.06112937143219893
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.25,
+      "level": 0.95,
+      "low": 0.026578073089700997,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 132,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.2,
+     "rate": 0.06060606060606061,
+     "unsupported": 8,
+     "wilson95": [
+      0.03102688431041096,
+      0.11503646810568982
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 274,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.013826082316020415
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.5096805819101834,
+      "level": 0.95,
+      "low": 0.027958993476234855,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 436,
+     "pdf_pages": 40,
+     "per_pdf_page": 1.125,
+     "rate": 0.10321100917431193,
+     "unsupported": 45,
+     "wilson95": [
+      0.07803399499487401,
+      0.13531892339525406
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.14865487660514556
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.14865487660514556
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 59,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.06112937143219893
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 124,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.03004861580047276
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 274,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.013826082316020415
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 391,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.009729117332764404
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    }
+   },
+   "descriptions": 16,
+   "entries": 8,
+   "equation_symbols": {
+    "added": 0,
+    "added_in_tags": 0,
+    "aligned_output_symbols": 339,
+    "aligned_pairs": 22,
+    "per_1000": 0.0,
+    "per_1000_without_tags": 0.0
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 47,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  },
+  "chatbot-luna-expert": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 21,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.15463902098714374
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 21,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.15463902098714374
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.045454545454545456,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 65,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.015384615384615385,
+     "unsupported": 1,
+     "wilson95": [
+      0.0027209445719428432,
+      0.08213284813120839
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.010752688172043012,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 121,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.008264462809917356,
+     "unsupported": 1,
+     "wilson95": [
+      0.0014603733692841944,
+      0.0453306440831014
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.02293929218708292,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 288,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.125,
+     "rate": 0.017361111111111112,
+     "unsupported": 5,
+     "wilson95": [
+      0.0074378500790226905,
+      0.03999015735471857
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.14102564102564102,
+      "level": 0.95,
+      "low": 0.02040300968872402,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 419,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.75,
+     "rate": 0.07159904534606205,
+     "unsupported": 30,
+     "wilson95": [
+      0.05061044873276666,
+      0.10037157429354726
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 973
+     },
+     "n": 104,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.035621354914387775
+     ]
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 21,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.15463902098714374
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 21,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.15463902098714374
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.045454545454545456,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 65,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.015384615384615385,
+     "unsupported": 1,
+     "wilson95": [
+      0.0027209445719428432,
+      0.08213284813120839
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.010752688172043012,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 121,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.008264462809917356,
+     "unsupported": 1,
+     "wilson95": [
+      0.0014603733692841944,
+      0.0453306440831014
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.02293929218708292,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 288,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.125,
+     "rate": 0.017361111111111112,
+     "unsupported": 5,
+     "wilson95": [
+      0.0074378500790226905,
+      0.03999015735471857
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.14102564102564102,
+      "level": 0.95,
+      "low": 0.02040300968872402,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 419,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.75,
+     "rate": 0.07159904534606205,
+     "unsupported": 30,
+     "wilson95": [
+      0.05061044873276666,
+      0.10037157429354726
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 973
+     },
+     "n": 104,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.035621354914387775
+     ]
+    }
+   },
+   "descriptions": 11,
+   "entries": 8,
+   "equation_symbols": {
+    "added": 0,
+    "added_in_tags": 0,
+    "aligned_output_symbols": 334,
+    "aligned_pairs": 21,
+    "per_1000": 0.0,
+    "per_1000_without_tags": 0.0
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 66,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  },
+  "chatbot-luna-naive": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 43,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.08200980441345543
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.36619718309859156,
+      "level": 0.95,
+      "low": 0.0425531914893617,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 78,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.5,
+     "rate": 0.2564102564102564,
+     "unsupported": 20,
+     "wilson95": [
+      0.1725543775187089,
+      0.36313327371053256
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.005291005291005291,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 249,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.004016064257028112,
+     "unsupported": 1,
+     "wilson95": [
+      0.0007092860748470885,
+      0.022393961735625516
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.3561320754716981,
+      "level": 0.95,
+      "low": 0.028985507246376812,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 269,
+     "pdf_pages": 40,
+     "per_pdf_page": 1.925,
+     "rate": 0.2862453531598513,
+     "unsupported": 77,
+     "wilson95": [
+      0.23553697251487765,
+      0.34297283141476415
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 990
+     },
+     "n": 107,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.03465723854654379
+     ]
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 43,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.08200980441345543
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.36619718309859156,
+      "level": 0.95,
+      "low": 0.0425531914893617,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 78,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.5,
+     "rate": 0.2564102564102564,
+     "unsupported": 20,
+     "wilson95": [
+      0.1725543775187089,
+      0.36313327371053256
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.005291005291005291,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 249,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.004016064257028112,
+     "unsupported": 1,
+     "wilson95": [
+      0.0007092860748470885,
+      0.022393961735625516
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.3561320754716981,
+      "level": 0.95,
+      "low": 0.028985507246376812,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 269,
+     "pdf_pages": 40,
+     "per_pdf_page": 1.925,
+     "rate": 0.2862453531598513,
+     "unsupported": 77,
+     "wilson95": [
+      0.23553697251487765,
+      0.34297283141476415
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 990
+     },
+     "n": 107,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.03465723854654379
+     ]
+    }
+   },
+   "descriptions": 12,
+   "entries": 8,
+   "equation_symbols": {
+    "added": 0,
+    "added_in_tags": 0,
+    "aligned_output_symbols": 0,
+    "aligned_pairs": 0,
+    "per_1000": null,
+    "per_1000_without_tags": null
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 6,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  },
+  "chatbot-luna-short-wcag-prompt": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 17,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.125,
+     "rate": 0.29411764705882354,
+     "unsupported": 5,
+     "wilson95": [
+      0.1327998952626943,
+      0.5313311024822815
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 17,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.125,
+     "rate": 0.29411764705882354,
+     "unsupported": 5,
+     "wilson95": [
+      0.1327998952626943,
+      0.5313311024822815
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.17647058823529413,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 67,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.1,
+     "rate": 0.05970149253731343,
+     "unsupported": 4,
+     "wilson95": [
+      0.02345935097682504,
+      0.1436950112891736
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.23577324528703802,
+      "level": 0.95,
+      "low": 0.0425531914893617,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 88,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.4,
+     "rate": 0.18181818181818182,
+     "unsupported": 16,
+     "wilson95": [
+      0.11513099724925455,
+      0.2751225910307472
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.006993006993006993,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 174,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.005747126436781609,
+     "unsupported": 1,
+     "wilson95": [
+      0.001015230346197115,
+      0.0318312100622512
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.30887372013651876,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 248,
+     "pdf_pages": 40,
+     "per_pdf_page": 1.525,
+     "rate": 0.24596774193548387,
+     "unsupported": 61,
+     "wilson95": [
+      0.19651306403988839,
+      0.3031721722206379
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 95,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.038864854128766085
+     ]
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 17,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.125,
+     "rate": 0.29411764705882354,
+     "unsupported": 5,
+     "wilson95": [
+      0.1327998952626943,
+      0.5313311024822815
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 17,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.125,
+     "rate": 0.29411764705882354,
+     "unsupported": 5,
+     "wilson95": [
+      0.1327998952626943,
+      0.5313311024822815
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.17647058823529413,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 67,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.1,
+     "rate": 0.05970149253731343,
+     "unsupported": 4,
+     "wilson95": [
+      0.02345935097682504,
+      0.1436950112891736
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.23577324528703802,
+      "level": 0.95,
+      "low": 0.0425531914893617,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 88,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.4,
+     "rate": 0.18181818181818182,
+     "unsupported": 16,
+     "wilson95": [
+      0.11513099724925455,
+      0.2751225910307472
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.006993006993006993,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 174,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.005747126436781609,
+     "unsupported": 1,
+     "wilson95": [
+      0.001015230346197115,
+      0.0318312100622512
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.30887372013651876,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 248,
+     "pdf_pages": 40,
+     "per_pdf_page": 1.525,
+     "rate": 0.24596774193548387,
+     "unsupported": 61,
+     "wilson95": [
+      0.19651306403988839,
+      0.3031721722206379
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 95,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.038864854128766085
+     ]
+    }
+   },
+   "descriptions": 11,
+   "entries": 8,
+   "equation_symbols": {
+    "added": 30,
+    "added_in_tags": 0,
+    "aligned_output_symbols": 263,
+    "aligned_pairs": 17,
+    "per_1000": 114.06844106463879,
+    "per_1000_without_tags": 114.06844106463879
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 74,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  },
+  "chatbot-sol-expert": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.2,
+     "rate": 0.36363636363636365,
+     "unsupported": 8,
+     "wilson95": [
+      0.1973320457082143,
+      0.5704829206386436
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.14865487660514556
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.1447195464018908,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 248,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.625,
+     "rate": 0.10080645161290322,
+     "unsupported": 25,
+     "wilson95": [
+      0.06921635293972744,
+      0.14457473261252807
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 119,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.031271680719846165
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 210,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.017964051037588576
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.22093582289803212,
+      "level": 0.95,
+      "low": 0.038834951456310676,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 425,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.95,
+     "rate": 0.08941176470588236,
+     "unsupported": 38,
+     "wilson95": [
+      0.06583455152882486,
+      0.12034487965204949
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 95,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.010526315789473684,
+     "unsupported": 1,
+     "wilson95": [
+      0.0018605762417867565,
+      0.05723870201058426
+     ]
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.2,
+     "rate": 0.36363636363636365,
+     "unsupported": 8,
+     "wilson95": [
+      0.1973320457082143,
+      0.5704829206386436
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 22,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.14865487660514556
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.1447195464018908,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 248,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.625,
+     "rate": 0.10080645161290322,
+     "unsupported": 25,
+     "wilson95": [
+      0.06921635293972744,
+      0.14457473261252807
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 119,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.031271680719846165
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 210,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.017964051037588576
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.22093582289803212,
+      "level": 0.95,
+      "low": 0.038834951456310676,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 425,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.95,
+     "rate": 0.08941176470588236,
+     "unsupported": 38,
+     "wilson95": [
+      0.06583455152882486,
+      0.12034487965204949
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 95,
+     "pdf_pages": 40,
+     "per_pdf_page": 0.025,
+     "rate": 0.010526315789473684,
+     "unsupported": 1,
+     "wilson95": [
+      0.0018605762417867565,
+      0.05723870201058426
+     ]
+    }
+   },
+   "descriptions": 11,
+   "entries": 8,
+   "equation_symbols": {
+    "added": 16,
+    "added_in_tags": 16,
+    "aligned_output_symbols": 353,
+    "aligned_pairs": 22,
+    "per_1000": 45.32577903682719,
+    "per_1000_without_tags": 0.0
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 209,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  },
+  "chatbot-sol-naive": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 1
+     },
+     "n": 45,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.07865159987608598
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.592964824120603,
+      "level": 0.95,
+      "low": 0.10344827586206896,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 234,
+     "pdf_pages": 94,
+     "per_pdf_page": 1.3297872340425532,
+     "rate": 0.5341880341880342,
+     "unsupported": 125,
+     "wilson95": [
+      0.47023819771154757,
+      0.5970335053601421
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.038461538461538464,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 673,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.1702127659574468,
+     "rate": 0.0237741456166419,
+     "unsupported": 16,
+     "wilson95": [
+      0.014685929849260532,
+      0.03826806463644347
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.6358024691358025,
+      "level": 0.95,
+      "low": 0.12262425218591824,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 983,
+     "pdf_pages": 94,
+     "per_pdf_page": 6.329787234042553,
+     "rate": 0.6052899287894201,
+     "unsupported": 595,
+     "wilson95": [
+      0.57438114960113,
+      0.6353789877918201
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.24096385542168675,
+      "level": 0.95,
+      "low": 0.16216216216216217,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 973
+     },
+     "n": 360,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.8297872340425532,
+     "rate": 0.21666666666666667,
+     "unsupported": 78,
+     "wilson95": [
+      0.17722127279091,
+      0.26209495953940454
+     ]
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.0,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 1
+     },
+     "n": 45,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": 0.0,
+     "unsupported": 0,
+     "wilson95": [
+      0.0,
+      0.07865159987608598
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.592964824120603,
+      "level": 0.95,
+      "low": 0.10344827586206896,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 234,
+     "pdf_pages": 94,
+     "per_pdf_page": 1.3297872340425532,
+     "rate": 0.5341880341880342,
+     "unsupported": 125,
+     "wilson95": [
+      0.47023819771154757,
+      0.5970335053601421
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.038461538461538464,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 673,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.1702127659574468,
+     "rate": 0.0237741456166419,
+     "unsupported": 16,
+     "wilson95": [
+      0.014685929849260532,
+      0.03826806463644347
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.6358024691358025,
+      "level": 0.95,
+      "low": 0.12262425218591824,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 983,
+     "pdf_pages": 94,
+     "per_pdf_page": 6.329787234042553,
+     "rate": 0.6052899287894201,
+     "unsupported": 595,
+     "wilson95": [
+      0.57438114960113,
+      0.6353789877918201
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.24096385542168675,
+      "level": 0.95,
+      "low": 0.16216216216216217,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 973
+     },
+     "n": 360,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.8297872340425532,
+     "rate": 0.21666666666666667,
+     "unsupported": 78,
+     "wilson95": [
+      0.17722127279091,
+      0.26209495953940454
+     ]
+    }
+   },
+   "descriptions": 29,
+   "entries": 10,
+   "equation_symbols": {
+    "added": 0,
+    "added_in_tags": 0,
+    "aligned_output_symbols": 0,
+    "aligned_pairs": 0,
+    "per_1000": null,
+    "per_1000_without_tags": null
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 30,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  },
+  "chatbot-sol-short-wcag-prompt": {
+   "all_text": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 59,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.1276595744680851,
+     "rate": 0.2033898305084746,
+     "unsupported": 12,
+     "wilson95": [
+      0.12036272369750813,
+      0.3226801237622709
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 59,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.1276595744680851,
+     "rate": 0.2033898305084746,
+     "unsupported": 12,
+     "wilson95": [
+      0.12036272369750813,
+      0.3226801237622709
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.3248407643312102,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 104,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.18085106382978725,
+     "rate": 0.16346153846153846,
+     "unsupported": 17,
+     "wilson95": [
+      0.10463536058176169,
+      0.24626362830292237
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.38483547925608014,
+      "level": 0.95,
+      "low": 0.09375,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 263,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.9893617021276596,
+     "rate": 0.35361216730038025,
+     "unsupported": 93,
+     "wilson95": [
+      0.2983179038649677,
+      0.4131212393520789
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.010948905109489052,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 579,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.06382978723404255,
+     "rate": 0.010362694300518135,
+     "unsupported": 6,
+     "wilson95": [
+      0.004757727848061225,
+      0.022421977095547364
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.21705426356589147,
+      "level": 0.95,
+      "low": 0.009259259259259259,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 1017,
+     "pdf_pages": 94,
+     "per_pdf_page": 2.24468085106383,
+     "rate": 0.20747295968534907,
+     "unsupported": 211,
+     "wilson95": [
+      0.18367476696184556,
+      0.23347272952400502
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.19696969696969696,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 973
+     },
+     "n": 227,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.2765957446808511,
+     "rate": 0.1145374449339207,
+     "unsupported": 26,
+     "wilson95": [
+      0.07937235012226096,
+      0.16253159188154936
+     ]
+    }
+   },
+   "content_only": {
+    "description_cell": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 0,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.0,
+     "rate": null,
+     "unsupported": 0,
+     "wilson95": null
+    },
+    "equation_aligned": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 59,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.1276595744680851,
+     "rate": 0.2033898305084746,
+     "unsupported": 12,
+     "wilson95": [
+      0.12036272369750813,
+      0.3226801237622709
+     ]
+    },
+    "equation_aligned_without_tags": {
+     "cluster95": {
+      "high": null,
+      "level": 0.95,
+      "low": null,
+      "note": "needs 2 or more sections with units",
+      "resamples": 0,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 59,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.1276595744680851,
+     "rate": 0.2033898305084746,
+     "unsupported": 12,
+     "wilson95": [
+      0.12036272369750813,
+      0.3226801237622709
+     ]
+    },
+    "equation_unaligned": {
+     "cluster95": {
+      "high": 0.3248407643312102,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 104,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.18085106382978725,
+     "rate": 0.16346153846153846,
+     "unsupported": 17,
+     "wilson95": [
+      0.10463536058176169,
+      0.24626362830292237
+     ]
+    },
+    "heading": {
+     "cluster95": {
+      "high": 0.38483547925608014,
+      "level": 0.95,
+      "low": 0.09375,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 263,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.9893617021276596,
+     "rate": 0.35361216730038025,
+     "unsupported": 93,
+     "wilson95": [
+      0.2983179038649677,
+      0.4131212393520789
+     ]
+    },
+    "number": {
+     "cluster95": {
+      "high": 0.010948905109489052,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 3
+     },
+     "n": 579,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.06382978723404255,
+     "rate": 0.010362694300518135,
+     "unsupported": 6,
+     "wilson95": [
+      0.004757727848061225,
+      0.022421977095547364
+     ]
+    },
+    "sentence": {
+     "cluster95": {
+      "high": 0.21705426356589147,
+      "level": 0.95,
+      "low": 0.009259259259259259,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 0
+     },
+     "n": 1017,
+     "pdf_pages": 94,
+     "per_pdf_page": 2.24468085106383,
+     "rate": 0.20747295968534907,
+     "unsupported": 211,
+     "wilson95": [
+      0.18367476696184556,
+      0.23347272952400502
+     ]
+    },
+    "table_cell": {
+     "cluster95": {
+      "high": 0.19696969696969696,
+      "level": 0.95,
+      "low": 0.0,
+      "note": null,
+      "resamples": 10000,
+      "sections": 8,
+      "skipped": 973
+     },
+     "n": 227,
+     "pdf_pages": 94,
+     "per_pdf_page": 0.2765957446808511,
+     "rate": 0.1145374449339207,
+     "unsupported": 26,
+     "wilson95": [
+      0.07937235012226096,
+      0.16253159188154936
+     ]
+    }
+   },
+   "descriptions": 39,
+   "entries": 10,
+   "equation_symbols": {
+    "added": 67,
+    "added_in_tags": 0,
+    "aligned_output_symbols": 1050,
+    "aligned_pairs": 59,
+    "per_1000": 63.80952380952381,
+    "per_1000_without_tags": 63.80952380952381
+   },
+   "sections": 8,
+   "too_short": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 123,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   },
+   "unchecked": {
+    "description_cell": 0,
+    "equation_aligned": 0,
+    "equation_unaligned": 0,
+    "heading": 0,
+    "number": 0,
+    "sentence": 0,
+    "table_cell": 0
+   }
+  }
+ },
+ "code_sha256": [
+  "b2f7596bdf9acae5b19e2ce3d284f7076f73c1a9f9df8896b79755f80a08f7e0"
+ ],
+ "date": "2026-10-13",
+ "figure_judge": {
+  "a11y-stem on Physics 2.2-2.3 (9 figures)": {
+   "answered": 9,
+   "census": true,
+   "factual_error": 0,
+   "failed_calls": 0,
+   "judge_cost_usd": 0.037718,
+   "judge_model": "gpt-6.1-sol",
+   "judge_prompt": "judge_figure-137e2607",
+   "judgeable": 9,
+   "population": 9,
+   "rate": 0.0,
+   "sampled": 9,
+   "seed": "a11y-stem invented-content figure sample",
+   "spent_usd": 0.037718,
+   "wilson95": [
+    0.0,
+    0.299145051727044
+   ]
+  },
+  "a11y-stem with 4 of 9 alt texts replaced by wrong ones": {
+   "answered": 9,
+   "census": true,
+   "factual_error": 4,
+   "failed_calls": 0,
+   "judge_cost_usd": 0.02065,
+   "judge_model": "gpt-6.1-sol",
+   "judge_prompt": "judge_figure-137e2607",
+   "judgeable": 9,
+   "population": 9,
+   "rate": 0.4444444444444444,
+   "sampled": 9,
+   "seed": "a11y-stem invented-content figure sample",
+   "spent_usd": 0.02065,
+   "wilson95": [
+    0.18877851977054566,
+    0.7333487081991259
+   ]
+  },
+  "chatbot sol-expert on Physics 2.2-2.3 (9 descriptions, 7 with an image)": {
+   "answered": 7,
+   "census": true,
+   "factual_error": 0,
+   "failed_calls": 0,
+   "judge_cost_usd": 0.022736,
+   "judge_model": "gpt-6.1-sol",
+   "judge_prompt": "judge_figure-137e2607",
+   "judgeable": 7,
+   "population": 9,
+   "rate": 0.0,
+   "sampled": 7,
+   "seed": "a11y-stem invented-content figure sample",
+   "spent_usd": 0.022736,
+   "wilson95": [
+    0.0,
+    0.35433043867586833
+   ]
+  }
+ },
+ "kind": "invented-content-development-check",
+ "note": "Development material only (OpenStax Physics 2.2-2.3 and authored test documents). Counts and rates, no text. Not held-out numbers.",
+ "rules": {
+  "cell_gram": 2,
+  "cell_min_words": 3,
+  "cell_support_min": 0.5,
+  "equation_align_min": 0.5,
+  "heading_ratio": 0.85,
+  "sentence_gram": 4,
+  "sentence_min_words": 7,
+  "sentence_support_min": 0.25,
+  "unaligned_min_symbols": 3,
+  "unaligned_ratio": 0.8
+ },
+ "selfcheck_planted": {
+  "baseline_flagged": 62,
+  "found": {
+   "equation": 5,
+   "equation_symbol": 5,
+   "heading": 6,
+   "number": 6,
+   "sentence": 20,
+   "word": 0
+  },
+  "newly_flagged_unexplained": 0,
+  "plan_in_reference": {
+   "numbers_the_pdf_prints": 0
+  },
+  "planted": {
+   "equation": 5,
+   "equation_symbol": 5,
+   "heading": 6,
+   "number": 6,
+   "sentence": 20,
+   "word": 6
+  },
+  "recall": {
+   "equation": 1.0,
+   "equation_symbol": 1.0,
+   "heading": 1.0,
+   "number": 1.0,
+   "sentence": 1.0,
+   "word": 0.0
+  }
+ }
+}

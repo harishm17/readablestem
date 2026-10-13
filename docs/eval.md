@@ -7,6 +7,9 @@ yet. The first real run happens after the pipeline work packages (layout, steps,
 client, `convert_pdf`) are merged; until then the pipeline modules are stubs and
 `eval pipeline` reports "still a stub".
 
+The invented-content rate (how much of an output the PDF does not support, for a11y-stem
+and for other systems) has its own page: [eval-invented.md](eval-invented.md).
+
 ## The idea
 
 OpenStax publishes its textbooks as web pages with expert-written MathML, alt text and a
@@ -1500,4 +1503,5 @@ its sign-off items. Until then no number from this set exists.
 | `tests/fixtures/tables/table_bench_excerpt.json` | table-bench predictions and its scores on five documents |
 | `src/a11y_stem/eval/page_types.py` | the page-type scorer: confusion matrices, actions, errors, time (no model) |
 | `data/eval/tolerances.json` | gate tolerances |
+| `src/a11y_stem/eval/invented/` | the invented-content rate for any system's output, with its audit and a planted-inventions check (docs/eval-invented.md); `eval invented ...` |
 | `tests/test_eval_*.py` | offline tests; `-m browser` runs the Chromium ones |
