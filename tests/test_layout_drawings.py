@@ -722,3 +722,39 @@ def test_an_icon_round_a_glyph_is_a_figure():
     figures = _figures(out)
     assert any(_holds(f, (150, y + 40, 170, y + 60)) for f in figures)
     assert any(_holds(f, (300, y + 40, 320, y + 60)) for f in figures)
+
+
+def test_a_band_of_thin_strips_behind_text_and_a_frame_of_dashes_add_nothing():
+    # Controls found by the checks: a gradient drawn as ten 6 pt strips behind lines of
+    # text is a panel (no decision); a frame of dashes round a page with a plot on it
+    # leaves the plot a figure of its own, not one figure of the whole page.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _running_text(page, 40, 1)
+    for k in range(10):
+        shade = 0.97 - 0.01 * k
+        _rect(
+            page, (60, 92 + 6 * k, 560, 98 + 6 * k), colour=None, width=0, fill=(shade, shade, 1.0)
+        )
+    _running_text(page, 100, 2, start=1)
+    page = _page(doc)
+    for x in range(40, 572, 8):
+        _path(page, [[(x, 37), (x + 4, 37)]], colour=GREY)
+        _path(page, [[(x, 755), (x + 4, 755)]], colour=GREY)
+    for y in range(40, 752, 8):
+        _path(page, [[(37, y), (37, y + 4)]], colour=GREY)
+        _path(page, [[(575, y), (575, y + 4)]], colour=GREY)
+    _label(page, (90, 110), "Figure practice", 16, font="hebo")
+    _running_text(page, 120, 1, start=1)
+    _path(page, [[(130, 189), (130, 394), (480, 394)]])
+    _path(
+        page, [_curve(lambda x: 390 - 180 * (1 - math.exp(-(x - 130) / 90)), 130, 480)], colour=BLUE
+    )
+    for i in range(5):
+        _label(page, (130 + 86.5 * i, 405), str(i), 7)
+    _running_text(page, 430, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    assert _figures(out, 0) == []
+    (figure,) = _figures(out, 1)
+    assert _holds(figure, (130, 189, 480, 394)) and figure.bbox[2] - figure.bbox[0] < 400
