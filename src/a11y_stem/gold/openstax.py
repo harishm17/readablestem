@@ -194,8 +194,28 @@ def _cms_items(fetcher: Fetcher) -> list[dict]:
     return fetcher.get_json(CMS_BOOKS_URL).get("items", [])
 
 
-def resolve_book(slug: str, fetcher: Fetcher) -> Book:
-    """Look a book up by slug in the CMS, then load its current archive version."""
+@dataclass(frozen=True)
+class BookPin:
+    """A book version in one archive release, so a re-fetch reads the same bytes later.
+
+    Without a pin `resolve_book` follows release.json to the current archive, whose path
+    (and so every record's `content_url` and `archive_version`) changes with each release.
+    """
+
+    archive_version: str  # e.g. "20260604.144757"
+    version: str  # the book's version in that archive, e.g. "1aa3e7a"
+
+    @property
+    def archive_path(self) -> str:
+        return f"/apps/archive/{self.archive_version}"
+
+
+def resolve_book(slug: str, fetcher: Fetcher, pin: BookPin | None = None) -> Book:
+    """Look a book up by slug in the CMS, then load its archive version.
+
+    The current archive's default version, or `pin`'s archive and version when given (the
+    state, license and authors still come from the CMS as it is now).
+    """
     items = _cms_items(fetcher)
     by_slug = {item["meta"]["slug"]: item for item in items if item.get("meta")}
     item = by_slug.get(slug)
@@ -204,15 +224,28 @@ def resolve_book(slug: str, fetcher: Fetcher) -> Book:
         hint = f" Did you mean: {', '.join(close)}?" if close else ""
         raise BookNotFoundError(f"No OpenStax book with slug {slug!r}.{hint}")
     uuid = item.get("cnx_id")
-    release = fetcher.get_json(RELEASE_URL)
-    entry = release.get("books", {}).get(uuid) if uuid else None
-    if not entry or not uuid:
-        raise BookNotFoundError(f"{slug!r} (uuid {uuid}) is not in the current archive release.")
-    archive_path = release["archiveUrl"]
-    version = entry["defaultVersion"]
-    book_json = fetcher.get_json(
-        f"{OPENSTAX}{archive_path}/contents/{uuid}@{version}.json",
-    )
+    if pin is not None and uuid:
+        archive_path, version = pin.archive_path, pin.version
+    else:
+        release = fetcher.get_json(RELEASE_URL)
+        entry = release.get("books", {}).get(uuid) if uuid else None
+        if not entry or not uuid:
+            raise BookNotFoundError(
+                f"{slug!r} (uuid {uuid}) is not in the current archive release."
+            )
+        archive_path = release["archiveUrl"]
+        version = entry["defaultVersion"]
+    try:
+        book_json = fetcher.get_json(
+            f"{OPENSTAX}{archive_path}/contents/{uuid}@{version}.json",
+        )
+    except GoldError as exc:
+        if pin is None:
+            raise
+        raise GoldError(
+            f"{slug!r} at {version} could not be read from the pinned archive "
+            f"{pin.archive_version} ({exc}); the pinned files cannot be rebuilt from here."
+        ) from exc
     archive_license = book_json.get("license") or {}
     authors = [
         a["value"]["name"]
@@ -643,17 +676,19 @@ def fetch_gold(
     retrieved_at: str | None = None,
     allow_retired: bool = False,
     kinds: Iterable[str] | None = None,
+    pin: BookPin | None = None,
 ) -> tuple[Book, list[PageResult]]:
-    """Fetch pages of one live CC BY book and write one JSONL file per page plus metadata.
+    """Fetch pages of one CC BY book and write one JSONL file per page plus metadata.
 
     `kinds` keeps only those records ("table" for the tables gold set); their ids keep
-    their place on the page (tab-003 is still the fourth table).
+    their place on the page (tab-003 is still the fourth table). `pin` reads the book
+    from one archive release instead of the current one (the held-out set).
     """
     keep = set(kinds) if kinds is not None else None
     if n_pages < 1:
         raise GoldError(f"n_pages must be at least 1 (got {n_pages}).")
     retrieved_at = retrieved_at or dt.date.today().isoformat()
-    book = resolve_book(book_slug, fetcher)
+    book = resolve_book(book_slug, fetcher, pin=pin)
     check_public_license(book)
     check_book_state(book, allow_retired=allow_retired)
     pages = select_pages(iter_pages(book.tree), n_pages, chapter=chapter, slugs=page_slugs)
