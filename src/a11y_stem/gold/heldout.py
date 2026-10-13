@@ -329,9 +329,10 @@ def verify_gold(gold_dir: Path, registration: Registration | None = None) -> lis
                 same = False
             (date_only if same else changed).append(section.path)
     registered = {section.path for section in registration.sections}
+    # Every .jsonl anywhere below: the loaders read all of them (`iter_gold_records`).
     extra = sorted(
         path.relative_to(gold_dir).as_posix()
-        for path in gold_dir.glob("openstax/*/*.jsonl")
+        for path in gold_dir.rglob("*.jsonl")
         if path.relative_to(gold_dir).as_posix() not in registered
     )
 

@@ -349,6 +349,12 @@ def test_a_gold_file_outside_the_registered_set_is_refused(registered):
     stray.write_text((gold / "openstax/physics" / f"{SLUGS[0]}.jsonl").read_text("utf-8"))
     (problem, *_) = verify_gold(gold, registration)
     assert problem.startswith("1 file(s) outside the registered set") and "2-1-third" in problem
+    # The loaders read every .jsonl below the folder, so a stray one anywhere counts.
+    nested = gold / "notes" / "extra.jsonl"
+    nested.parent.mkdir()
+    nested.write_text(stray.read_text("utf-8"), encoding="utf-8")
+    (problem, *_) = verify_gold(gold, registration)
+    assert problem.startswith("2 file(s) outside the registered set") and "notes/extra" in problem
 
 
 def test_manifest_attribution_and_book_files_are_checked(registered):
