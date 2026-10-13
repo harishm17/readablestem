@@ -232,3 +232,11 @@ def test_a_claim_needs_the_corrected_interval_to_exclude_zero():
     assert systems_tables.verdict(lower, worse, "x", "a") == "a is better"
     empty = stats.Interval(None, None, 0, 0, 0.99)
     assert systems_tables.verdict(spec, empty, "x", "a") == "not computed"
+
+
+def test_a_section_missing_on_one_side_is_a_section_of_zeros_not_a_gap():
+    a = {"inv_sentence": {"s1": (1.0, 10.0), "s2": (0.0, 10.0), "s3": (2.0, 10.0)}}
+    b = {"inv_sentence": {"s1": (5.0, 10.0), "s2": (6.0, 10.0)}}  # s3 failed: no units
+    done = systems_tables.compare("inv_sentence", "x", a, b, a_name="a", other="b", k=5, n_boot=200)
+    assert done.result != "not computed"
+    assert done.a == pytest.approx(3 / 30) and done.b == pytest.approx(11 / 20)

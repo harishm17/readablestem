@@ -301,6 +301,14 @@ def compare(
 ) -> Comparison:
     spec = METRICS[key]
     pa, pb = a.get(key), b.get(key)
+    if pa and pb:
+        # A section with no entry on one side (a conversion that failed has no units) is a
+        # section of zeros there, so both sides resample the same sections.
+        width = len(next(iter(pa.values())))
+        zeros = (0.0,) * width
+        sections = set(pa) | set(pb)
+        pa = {s: pa.get(s, zeros) for s in sections}
+        pb = {s: pb.get(s, zeros) for s in sections}
     if not pa or not pb or set(pa) != set(pb):
         empty = stats.Interval(None, None, 0, 0, 0.95)
         return Comparison(label, key, other, None, None, None, empty, empty, "not computed")
