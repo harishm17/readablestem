@@ -758,3 +758,21 @@ def test_a_band_of_thin_strips_behind_text_and_a_frame_of_dashes_add_nothing():
     assert _figures(out, 0) == []
     (figure,) = _figures(out, 1)
     assert _holds(figure, (130, 189, 480, 394)) and figure.bbox[2] - figure.bbox[0] < 400
+
+
+def test_a_full_page_plot_with_axes_drawn_as_dashes_keeps_its_axes():
+    # Axes drawn as separate 4 pt dashes along the left and bottom edges, one curve and a
+    # title: the dashes were set aside as a frame's pieces and the curve made a figure of
+    # its own, so the axes were lost (the page image kept them before the curve across
+    # the middle of the page stopped being a border piece).
+    doc = pymupdf.open()
+    page = _page(doc)
+    _lines(page, [[(x, 770), (x + 4, 770)] for x in range(30, 588, 7)])
+    _lines(page, [[(30, y), (30, y + 4)] for y in range(22, 766, 7)])
+    _path(page, [_curve(lambda x: 760 - 0.0021 * (x - 30) ** 2, 30, 580)], colour=BLUE, width=1.5)
+    _label(page, (200, 60), "Projectile height", 20, font="hebo")
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    (figure,) = _figures(out)
+    assert _holds(figure, (30, 22, 587, 770))
+    assert "Projectile height" in _text_of(out)
