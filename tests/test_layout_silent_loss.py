@@ -13,6 +13,7 @@ import math
 import random
 import re
 from html import unescape
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -34,6 +35,7 @@ from fixtures.handwriting.make_fixtures import (
     text_layer,
 )
 
+HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
 LETTER = (612.0, 792.0)
 A4 = (595.28, 841.89)
 SLIDE = (720.0, 405.0)
@@ -794,6 +796,31 @@ def test_strokes_under_a_hidden_layer_and_a_title_are_handwriting_not_a_scan():
         assert out.page_types[0].kind == "handwritten_ocr"
     assert out.page_types[0].kind not in page_type.SCAN_KINDS
     assert out.kept_pages  # kept as an image either way
+
+
+# --------------------------------------------------------------------------- axes and rulers
+# The second final verify (2026-10-12), on committed fixtures
+# (tests/fixtures/handwriting/make_fixtures.py, `build_edge_cases`).
+
+
+def _fixture(name: str) -> bytes:
+    return (HANDWRITING / name).read_bytes()
+
+
+def test_axes_drawn_as_one_path_of_separate_lines_stay_in_the_plot():
+    # "80 75 m 640 75 l 80 335 m 80 75 l S": MuPDF's box of the path leaves out the start
+    # of the second line, so the axes read as a horizontal rule and the y-axis was lost.
+    with pymupdf.open(stream=_fixture("open_axes.pdf")) as doc:
+        axes = layout._page_paths(doc[0])[0]
+    assert axes.bbox == (80.0, 70.0, 640.0, 330.0)
+    assert axes.kind == "shape" and not axes.frame  # two sides of a box are not a frame
+    out = layout.analyze(_fixture("open_axes.pdf"))
+    assert out.kept_pages == {}
+    for page in (0, 1):
+        (figure,) = _figures(out, page)
+        x0, y0, x1, y1 = figure.bbox
+        assert x0 <= 80 and y0 <= 70 and y1 >= 330 and x1 >= 640
+    assert all(f" {n} " in f" {_text(out)} " for n in ("0", "2", "4", "6", "8", "10"))
 
 
 # --------------------------------------------------------------------------- end to end

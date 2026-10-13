@@ -2502,10 +2502,10 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
         filled, stroked = seen[source]
         if not (stroked or filled):
             continue  # white boxes and invisible paths
-        box = display.box(drawing["rect"])
+        items = drawing.get("items") or []
+        box = display.box(_drawing_bounds(drawing["rect"], items))
         if box[2] < 0 or box[3] < 0 or box[0] > width_pt or box[1] > height_pt:
             continue  # outside the CropBox: not visible on the page
-        items = drawing.get("items") or []
         segments = []
         curved = False
         straight = 0.0  # length of horizontal and vertical lines
@@ -2543,6 +2543,33 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
     return paths
 
 
+def _drawing_bounds(rect: Sequence[float], items: Sequence[Any]) -> tuple[float, ...]:
+    """The box of every point of a drawing (unrotated frame). MuPDF's `rect` leaves out the
+    start of a subpath that begins away from where the last one ended: the axes of a plot
+    drawn as one path, "80 75 m 640 75 l 80 335 m 80 75 l S", read as the x-axis alone and
+    the y-axis was lost (the second final verify, 2026-10-12). Curves count their control
+    points, as `rect` does."""
+    x0, y0, x1, y1 = rect[0], rect[1], rect[2], rect[3]
+    for item in items:
+        op = item[0]
+        if op == "re":
+            points = ((item[1][0], item[1][1]), (item[1][2], item[1][3]))
+        elif op == "qu":
+            points = item[1]
+        else:  # "l" and "c": their points
+            points = item[1:]
+        for x, y in points:
+            if x < x0:
+                x0 = x
+            elif x > x1:
+                x1 = x
+            if y < y0:
+                y0 = y
+            elif y > y1:
+                y1 = y
+    return x0, y0, x1, y1
+
+
 def _encloses(items: Sequence[Any], close_path: object) -> bool:
     """The path closes round an area (a box, a polygon, a ring): not a pen mark's open
     stroke. A line that goes back on itself (MuPDF reports a closed one-segment path as
@@ -2560,15 +2587,24 @@ def _encloses(items: Sequence[Any], close_path: object) -> bool:
 
 
 def _border_like(items: Sequence[Any], display: _Display, box: BBox) -> bool:
-    """The path runs along the edges of its own box only: the shape of a frame, single or
-    double, with square, rounded, ticked or curled corners, drawn as one path. Each line
-    or curve stays near one edge (all its points within the band of that edge; a rounded
-    corner is near both of its edges), and each rectangle or quad lies along all four.
-    A plot's grid, axes or curves drawn in the same path cross the inside."""
+    """The path runs along the edges of its own box only, all four of them: the shape of a
+    frame, single or double, with square, rounded, ticked or curled corners, drawn as one
+    path. Each line or curve stays near one edge (all its points within the band of that
+    edge; a rounded corner is near both of its edges), and each rectangle or quad lies
+    along all four. A plot's grid, axes or curves drawn in the same path cross the inside;
+    a plot's two axes drawn as one L-shaped path run along two edges only (2026-10-12: a
+    full-page plot's axes were set aside as a frame)."""
     x0, y0, x1, y1 = box
     band = max(MIN_IMAGE_PT, FRAME_LINE_BAND * min(x1 - x0, y1 - y0))
     if min(x1 - x0, y1 - y0) <= 4 * band:
         return False  # too small or too thin to tell its edges from its inside
+    edges = [
+        lambda q: q[0] - x0,
+        lambda q: x1 - q[0],
+        lambda q: q[1] - y0,
+        lambda q: y1 - q[1],
+    ]
+    along = [False] * 4
     for item in items:
         if item[0] in ("re", "qu"):
             corners = (
@@ -2580,19 +2616,14 @@ def _border_like(items: Sequence[Any], display: _Display, box: BBox) -> bool:
             xs, ys = [q[0] for q in points], [q[1] for q in points]
             if max(min(xs) - x0, x1 - max(xs), min(ys) - y0, y1 - max(ys)) > band:
                 return False
+            along = [True] * 4
             continue
         points = [display.point(*q) for q in item[1:]]
-        if not any(
-            all(distance(q) <= band for q in points)
-            for distance in (
-                lambda q: q[0] - x0,
-                lambda q: x1 - q[0],
-                lambda q: q[1] - y0,
-                lambda q: y1 - q[1],
-            )
-        ):
+        near = [all(distance(q) <= band for q in points) for distance in edges]
+        if not any(near):
             return False
-    return True
+        along = [a or n for a, n in zip(along, near, strict=True)]
+    return all(along)
 
 
 def _rectangle_outline(
