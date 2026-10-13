@@ -690,14 +690,20 @@ def test_a_page_kept_by_the_safety_net_is_not_told_to_be_typed_up(env):
 
 
 @pytest.mark.parametrize(
-    ("name", "says"),
+    ("name", "says", "figures"),
     [
-        ("note_titled.pdf", "drawings or writing this tool could not read"),
-        ("typed_with_note.pdf", "Finished, with handwriting not converted"),
-        ("framed_plots.pdf", None),
+        ("note_titled.pdf", "drawings or writing this tool could not read", 0),
+        ("typed_with_note.pdf", "Finished, with handwriting not converted", 0),
+        ("framed_plots.pdf", None, 5),
+        # The second final verify's: full-page plots with their axes, axes drawn as one
+        # path, timelines, hand marks over typed lines.
+        ("full_page_plots.pdf", None, 4),
+        ("open_axes.pdf", None, 2),
+        ("timelines.pdf", None, 2),
+        ("marks_over_text.pdf", "Finished, with handwriting not converted", 0),
     ],
 )
-def test_nothing_dropped_is_ever_called_converted_on_the_job_page(env, name, says):
+def test_nothing_dropped_is_ever_called_converted_on_the_job_page(env, name, says, figures):
     # A short note under a title, a short note on a typed page, plots in decorative frames:
     # none of it may vanish behind "Everything was converted".
     job_id = job_id_from(upload(env.browser, data(name), filename=name))
@@ -706,5 +712,5 @@ def test_nothing_dropped_is_ever_called_converted_on_the_job_page(env, name, say
     assert "Everything was converted" not in page
     if says:
         assert says in page
-    else:  # the plots are figures, each a decision of the offline client's
-        assert (env.job(job_id).html or "").count("<figure") >= 5
+    # the plots are figures, each a decision of the offline client's
+    assert (env.job(job_id).html or "").count("<figure") >= figures
