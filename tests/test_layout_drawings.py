@@ -659,3 +659,38 @@ def test_marks_set_with_the_text_are_still_part_of_it():
     out = layout.analyze(doc.tobytes())
     assert out.kept_pages == {}
     assert _regions(out) == [] and _figures(out) == []
+
+
+# --------------------------------------------------------------------------- answer fields
+
+
+@pytest.mark.parametrize("labelled", [False, True])
+def test_comb_fields_on_an_exam_cover_are_no_drawing_but_a_labelled_scale_is(labelled):
+    # A line with ticks rising from it a letter cell apart is an answer field to write a
+    # candidate number or a name in (two figures and two decisions before); with numbers
+    # under its ticks it is a scale, a drawing.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _label(page, (72, 80), "Physics 101 Midterm Examination", 18, font="hebo")
+    _label(page, (72, 130), "Candidate number", 11)
+    _lines(
+        page,
+        [[(200, 134), (360, 134)]] + [[(200 + 20 * k, 134), (200 + 20 * k, 122)] for k in range(9)],
+    )
+    _label(page, (72, 170), "Family name", 11)
+    _lines(
+        page,
+        [[(200, 174), (500, 174)]]
+        + [[(200 + 20 * k, 174), (200 + 20 * k, 162)] for k in range(16)],
+    )
+    if labelled:
+        for k in range(9):
+            _label(page, (197 + 20 * k, 145), str(k), 8)
+    _running_text(page, 220, 2)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    if labelled:
+        assert any(_holds(figure, (200, 122, 360, 134)) for figure in _figures(out))
+    else:
+        assert _figures(out) == [] and _regions(out) == []
+        assert "Candidate number" in _text_of(out)
