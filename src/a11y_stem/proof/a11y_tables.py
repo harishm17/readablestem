@@ -196,6 +196,7 @@ def document_section(arm: ArmResults, g1: frozenset[str], n_boot: int) -> Sectio
         [
             ["PDF pages converted", num(load["pdf_pages"])],
             ["Required decisions", num(load["required_decisions"])],
+            ["Required fixes (several can share one decision)", num(load["required_fixes"])],
             ["**Required decisions per PDF page**", f"**{num(load['required_per_pdf_page'])}**"],
             ["Optional notes per PDF page", num(load["optional_per_pdf_page"])],
             ["Equation flags: precision", num(load["equation_flags"]["flag_precision"])],
@@ -216,9 +217,11 @@ def document_section(arm: ArmResults, g1: frozenset[str], n_boot: int) -> Sectio
     if reasons:
         blocks.append(
             Table(
-                "Required decisions by reason",
-                ["Reason", "Count"],
+                "Reasons behind the required fixes",
+                ["Reason", "Fixes"],
                 [[k, num(v)] for k, v in sorted(reasons.items())],
+                note="Counted per fix, and a fix can have several reasons, so the counts "
+                "add up to more than the number of required decisions.",
             )
         )
     unmatched = pooled["unmatched_by_reason"]
