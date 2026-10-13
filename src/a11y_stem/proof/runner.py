@@ -25,12 +25,16 @@ Nothing in here logs content. Dates come from the caller.
 from __future__ import annotations
 
 import hashlib
+import itertools
 import json
+import logging
 import math
 import platform
 import subprocess
 import sys
+import threading
 import time
+from collections import Counter
 from collections.abc import Callable, Generator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -51,6 +55,7 @@ from a11y_stem.models.verifier import (
     any_check_enabled,
     make_verifier,
 )
+from a11y_stem.observability.logging import FIELDS_ATTR
 from a11y_stem.pipeline import html_checks, run
 from a11y_stem.proof import goldinfo
 from a11y_stem.proof.bundle import Bundle, BundleWriter, run_stem
@@ -364,6 +369,127 @@ def refuse_unsafe_live(
         raise ProofError("the checkout has uncommitted changes; commit them, or pass --allow-dirty")
 
 
+# A model call that ended in one of these is not the system's answer: the provider was not
+# reached or did not answer. (A refusal, or an answer that fails the schema, is the system's.)
+FAILED_CALL_OUTCOMES = frozenset({"api_error", "timeout"})
+# What a stop by a spend cap is called in the model client's reports, in plain words.
+STOP_WORDS = {
+    "budget_daily": "the --max-usd cap for the whole proof",
+    "budget_job_usd": "the --max-usd cap for one run",
+    "budget_job_calls": "the --max-calls cap for one run",
+}
+PROGRESS_EVERY = 50
+
+
+class CallTally(logging.Handler):
+    """Counts failed model calls by (HTTP status, error code) from the client's own log lines.
+
+    The lines carry numbers and category codes only. Attached to the models logger during a
+    live run, this also replaces the bare `model_call` lines Python would otherwise print for
+    every failure, and gives the failure message the status and code the provider sent.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self._lock = threading.Lock()
+        self.failed: Counter[tuple[object, object]] = Counter()
+
+    def emit(self, record: logging.LogRecord) -> None:
+        fields = getattr(record, FIELDS_ATTR, None)
+        if record.getMessage() != "model_call" or not isinstance(fields, dict):
+            return
+        if fields.get("outcome") in FAILED_CALL_OUTCOMES:
+            key = (fields.get("status"), fields.get("code") or fields.get("error"))
+            with self._lock:
+                self.failed[key] += 1
+
+    def reset(self) -> None:
+        with self._lock:
+            self.failed.clear()
+
+    def describe(self) -> str:
+        with self._lock:
+            parts = [
+                f"HTTP {st or 'none'} {code or 'no code'} x {n}"
+                for (st, code), n in sorted(self.failed.items(), key=lambda kv: -kv[1])
+            ]
+        return "; ".join(parts)
+
+
+def failed_calls(rows: list[dict[str, Any]]) -> tuple[int, int, Counter[str]]:
+    """(model calls that failed, model calls in all, failures by outcome) in a run's answers."""
+    model = [r for r in rows if r["t"] == "model"]
+    verify = [r for r in rows if r["t"] == "verify"]
+    by_outcome: Counter[str] = Counter(
+        r["call"]["outcome"] for r in model if r["call"]["outcome"] in FAILED_CALL_OUTCOMES
+    )
+    by_outcome.update(
+        f"second check {r['verdict']['reason_code']}"
+        for r in verify
+        if r["verdict"].get("reason_code") in FAILED_CALL_OUTCOMES
+    )
+    return sum(by_outcome.values()), len(model) + len(verify), by_outcome
+
+
+def require_answers(stem: str, rows: list[dict[str, Any]], tally: CallTally | None) -> None:
+    """A run in which a model call failed is not recorded: a failed call is not the system's
+    answer, and it would be scored as one. Raises `Incomplete`; the runs that finished are
+    kept for `--resume`."""
+    failed, total, by_outcome = failed_calls(rows)
+    if not failed:
+        return
+    detail = ", ".join(f"{k} x {n}" for k, n in sorted(by_outcome.items()))
+    codes = tally.describe() if tally is not None else ""
+    raise Incomplete(
+        f"{stem}: {failed} of {total} model calls failed ({detail}"
+        f"{'; ' + codes if codes else ''}). A failed call is not the system's answer, so this "
+        "run was not recorded. Check the account's credit and rate limit and the key, then "
+        "run the same command again with --resume"
+    )
+
+
+def probe_api(settings: Settings, *, send: Callable[[], None] | None = None) -> None:
+    """One small request before any work, so a missing key, an empty balance or a rate limit
+    stops a live run at once and names itself. Costs a fraction of a cent.
+
+    `send` replaces the request (tests). Raises `ProofError` with the HTTP status and the
+    provider's error code, never the provider's message (it can echo the request).
+    """
+    import openai
+
+    def real() -> None:
+        sdk = openai.OpenAI(
+            api_key=settings.require_openai_key(),
+            timeout=settings.model_timeout_s,
+            max_retries=0,
+        )
+        sdk.responses.create(
+            model=settings.cheap_model,
+            input="Reply with the word ok.",
+            max_output_tokens=32,
+            store=False,
+        )
+
+    try:
+        (send or real)()
+    except openai.APIStatusError as exc:
+        code = exc.code if isinstance(getattr(exc, "code", None), str) else "no code"
+        hint = {
+            401: "the key was refused",
+            403: "the key may not use this model",
+            429: "the account has no credit or is rate limited",
+        }.get(exc.status_code, "the API did not answer a test request")
+        raise ProofError(
+            f"the model API refused a one-word test request: HTTP {exc.status_code}, "
+            f"{code} ({hint}). Nothing was recorded"
+        ) from None
+    except openai.OpenAIError as exc:
+        raise ProofError(
+            f"the model API could not be reached for a test request ({type(exc).__name__}). "
+            "Nothing was recorded"
+        ) from None
+
+
 def prebuild_inputs(pset: ProofSet, media_factory: Callable[[], Any], records: list[dict]) -> None:
     """Build every input of every task before the first model call, as the eval does for
     one task: a failed print or download stops the proof with nothing spent."""
@@ -410,6 +536,47 @@ def record_arm(
     when the process stopped left no answers and is made again whole.
     """
     say = progress or (lambda _msg: None)
+    tally = CallTally()
+    models_log = logging.getLogger("a11y_stem.models")
+    models_log.addHandler(tally)
+    try:
+        return _record_arm(
+            pset,
+            gold_dir,
+            settings,
+            writer,
+            media_factory=media_factory,
+            max_usd=max_usd,
+            max_calls=max_calls,
+            date=date,
+            fake=fake,
+            say=say,
+            client_factory=client_factory,
+            keep_finished=keep_finished,
+            resume=resume,
+            tally=tally,
+        )
+    finally:
+        models_log.removeHandler(tally)
+
+
+def _record_arm(
+    pset: ProofSet,
+    gold_dir: Path,
+    settings: Settings,
+    writer: BundleWriter,
+    *,
+    media_factory: Callable[[], Any],
+    max_usd: float,
+    max_calls: int,
+    date: str,
+    fake: bool,
+    say: Callable[[str], None],
+    client_factory: Callable[[Settings, JobBudget], VisionClient] | None,
+    keep_finished: bool,
+    resume: bool,
+    tally: CallTally,
+) -> tuple[ArmResults, MediaRecorder, float]:
     records = goldinfo.load_records(gold_dir)
     gaps = goldinfo.g1_ids(records)
     recorder = MediaRecorder()
@@ -447,7 +614,15 @@ def record_arm(
             if client_factory is not None
             else live_client(settings, budget, fake=fake)
         )
-        client = RecordingClient(inner, store)
+        tally.reset()
+        counter = itertools.count(1)
+
+        def progress_line(_call: Any, stem: str = stem, counter: Any = counter) -> None:
+            n = next(counter)
+            if n % PROGRESS_EVERY == 0:
+                say(f"  {stem}: {n} model calls made")
+
+        client = RecordingClient(inner, store, on_call=progress_line)
         cfg = _config(
             task,
             pset=pset,
@@ -477,13 +652,15 @@ def record_arm(
             raise Incomplete(message) from exc
         wall = time.monotonic() - started
         if not done.report.get("complete"):
-            message = f"{stem} did not finish ({done.report.get('stopped_reason')})"
+            reason = str(done.report.get("stopped_reason"))
+            message = f"{stem} did not finish ({STOP_WORDS.get(reason, reason)})"
             if keep_finished and results.outcomes:
                 results.stopped = message
                 break
             raise Incomplete(
                 f"{message}; raise --max-usd. A budget stop is never scored half-converted"
             )
+        require_answers(stem, store.rows(), tally)
         timing = section_timing(task, done.items)
         spent_here = float(done.report.get("cost", {}).get("budget_spent_usd") or 0.0)
         writer.write_jsonl(f"answers/{stem}.jsonl", store.rows())

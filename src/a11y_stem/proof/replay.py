@@ -324,9 +324,15 @@ class ReplayVerifier:
 class RecordingClient:
     """Wraps the real `VisionClient` of a live run and records every answer."""
 
-    def __init__(self, inner: VisionClient, store: AnswerStore) -> None:
+    def __init__(
+        self,
+        inner: VisionClient,
+        store: AnswerStore,
+        on_call: Callable[[ModelCall], None] | None = None,
+    ) -> None:
         self._inner = inner
         self.store = store
+        self._on_call = on_call
         inner_verifier = verifier_of(inner)
         self.verifier: Verifier | None = (
             RecordingVerifier(inner_verifier, store) if inner_verifier is not None else None
@@ -345,6 +351,8 @@ class RecordingClient:
                 "call": call.model_dump(mode="json"),
             }
         )
+        if self._on_call is not None:
+            self._on_call(call)
         return parsed, call
 
 

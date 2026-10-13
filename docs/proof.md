@@ -88,8 +88,15 @@ uv sync --group browser && uv run playwright install --with-deps chromium
 sudo apt-get install -y fonts-noto-core fonts-liberation     # the fonts the print uses
 ```
 
+The default set (`smoke-physics-2`, three sections) recorded $0.28. A cap below that stops
+the run before it finishes and writes nothing, so use `MAX_USD=0.50` or more; there is no
+section filter: a live run always covers the whole set.
+
 A live run:
 
+0. sends one small request to the model API before any work, so a missing key, an empty
+   balance (HTTP 429, `credit_balance_exhausted`) or a bad key (401) stops it at once and
+   names the status and error code. It costs a fraction of a cent;
 1. checks the pins; refuses a held-out set unless the checkout is clean, the pinned
    decisions are confirmed with `--confirm-signoff`, and the client is the real one;
 2. fetches the answer key if the checkout has no committed copy, prints every section to
@@ -101,6 +108,13 @@ A live run:
    afterwards, with `--add-systems`);
 5. writes the bundle (to `--record`, by default outside the repository), then replays it, so
    `PROOF.md` is always what `make proof` writes from that bundle.
+
+A run in which any model call failed (the provider did not answer: `api_error` or `timeout`,
+after the client's own retries) also stops with exit code 1 and writes no bundle, and the
+message gives the HTTP status and error code. A failed call is not the system's answer, and
+scoring it as one would turn an outage into a result. A refusal, or an answer that fails the
+schema, is the system's answer and is kept. The runs that had finished stay in the `.partial`
+folder; run the same command again with `--resume`.
 
 A run that hits the cap stops with exit code 1 and writes no bundle: a budget stop is never
 scored as if the document had been converted. With `--keep-finished` the runs that had
@@ -120,7 +134,10 @@ make proof-sources
 fetches the answer key from OpenStax again and compares it with the pinned hash, then prints
 the PDFs again and compares page counts and the text layer with the recorded PDFs (bytes
 differ: Chromium stamps a creation date and fonts differ between machines). Scoring always
-uses the recorded PDFs. This needs the network and Chromium.
+uses the recorded PDFs. This needs the network and Chromium (install them as under Live).
+The report goes to `proof/PROOF-sources.md` (ignored by git; `OUT=<file>` changes it), not to
+`PROOF.md`: the committed report is the replay of the recorded run, and this check's report
+has a different body.
 
 ## The recorded run (`proof/bundles/<set>/`)
 
@@ -174,7 +191,8 @@ set the default in `proof/sets/index.json`, and `make proof` writes `PROOF.md` f
 
 ### The part of the held-out run that needs no model
 
-`make proof-interim` (after `make heldout-gold`) rebuilds `proof/interim/INTERIM-heldout-2026-10.md`
+`make proof-interim` (after `make heldout-gold`, which needs the network; the report stops with
+that instruction if the answer key is missing) rebuilds `proof/interim/INTERIM-heldout-2026-10.md`
 from the printed PDFs, a11y-stem's headings task and the parsers' outputs committed under
 `proof/interim/heldout-2026-10/`. It exists because the paid parts of the run could not be made
 (no API credit); it compares a11y-stem's heading detection with the parsers' and scores the

@@ -66,6 +66,7 @@ class ProofOptions:
     media_factory: Callable[[], Any] | None = None
     client_factory: Callable[[Settings, JobBudget], VisionClient] | None = None
     fetcher: Any = None
+    probe: Callable[[], None] | None = None  # replaces the one-request API check
 
 
 @dataclass
@@ -304,6 +305,9 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
             # held-out numbers may not (preregistration section 12, item 9).
             raise ProofError(f"a held-out live run needs the registration file: {prereg.detail}")
     settings = runner.proof_settings()
+    if not opts.fake and opts.client_factory is None:
+        say("checking the model API with one small request")
+        runner.probe_api(settings, send=opts.probe)
     gold_dir = resolve_gold(pset, opts, None, work, say)
     registry.require_ok(registry.check_gold(gold_dir, pset))
     record_dir = opts.record_dir or work / "bundles" / f"{pset.id}-{opts.date}"
@@ -434,6 +438,9 @@ def add_systems(
             a.startswith("chatbot-") for a in (p.name for p in bundle.path("systems").iterdir())
         ):
             raise ProofError("this recorded run already holds the chatbot arms")
+        if chat_client is None:
+            say("checking the model API with one small request")
+            runner.probe_api(runner.proof_settings(), send=opts.probe)
         gold_dir = resolve_gold(pset, opts, bundle.gold_dir, work, say)
         selected = [chatbot.ARM_BY_ID[a] for a in arms] if arms else list(chatbot.ARMS)
         summary = chatbot.record_arms(
