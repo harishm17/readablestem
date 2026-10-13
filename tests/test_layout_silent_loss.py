@@ -807,6 +807,25 @@ def _fixture(name: str) -> bytes:
     return (HANDWRITING / name).read_bytes()
 
 
+@pytest.mark.parametrize(
+    ("page", "y_axis_x", "top", "x_axis_y"),
+    [(0, 60, 40, 737), (1, 60, 40, 737), (2, 40, 30, 755), (3, 40, 30, 755)],
+)
+def test_a_full_page_plot_keeps_its_axes_and_their_labels(page, y_axis_x, top, x_axis_y):
+    # A y-axis near the page's edge and nearly as tall as the page was taken for a side of
+    # a frame round the page, the x-axis was then dropped as a lone rule, and the tick
+    # labels (in the footer band) and the axis title (in the header band) with them: the
+    # figure was the curve alone. Pages: a frame round the page; no frame; axes filling
+    # the page as two lines; as one L-shaped path.
+    out = layout.analyze(_fixture("full_page_plots.pdf"))
+    assert page not in out.kept_pages
+    (figure,) = _figures(out, page)
+    x0, y0, _, y1 = figure.bbox
+    assert x0 <= y_axis_x and y0 <= top + 1 and y1 >= x_axis_y  # both axes are in it
+    assert {"v", "0", "1", "2", "3", "4"} <= set((figure.text or "").split())
+    assert [e.kind for e in out.elements if e.page == page] == [Kind.FIGURE]
+
+
 def test_axes_drawn_as_one_path_of_separate_lines_stay_in_the_plot():
     # "80 75 m 640 75 l 80 335 m 80 75 l S": MuPDF's box of the path leaves out the start
     # of the second line, so the axes read as a horizontal rule and the y-axis was lost.
@@ -821,6 +840,29 @@ def test_axes_drawn_as_one_path_of_separate_lines_stay_in_the_plot():
         x0, y0, x1, y1 = figure.bbox
         assert x0 <= 80 and y0 <= 70 and y1 >= 330 and x1 >= 640
     assert all(f" {n} " in f" {_text(out)} " for n in ("0", "2", "4", "6", "8", "10"))
+
+
+@pytest.mark.parametrize("style", ["lines"])
+def test_a_frame_of_four_lines_and_rules_with_end_marks_are_still_furniture(style):
+    # Controls: a frame round the page drawn as four separate lines meets itself at every
+    # corner (no open corner: not axes), and a rule with a mark at each end only (two, not
+    # three: not a ruler) is a rule.
+    doc = pymupdf.open()
+    page = _page(doc)
+    shape = page.new_shape()
+    for a, b in itertools.pairwise([(24, 24), (588, 24), (588, 768), (24, 768), (24, 24)]):
+        _line(shape, a, b, width=1.5)
+    if style == "lines and header":
+        _line(shape, (36, 60), (576, 60), width=0.8)
+        _line(shape, (36, 56), (36, 64), width=0.8)
+        _line(shape, (576, 56), (576, 64), width=0.8)
+    shape.commit()
+    page.insert_text((72, 52), "PHYS 101 Mechanics, week 3", fontsize=9)
+    _title(page, "Kinematics", at=(72, 100))
+    _paragraphs(page, top=120, n=3)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    assert _figures(out) == [] and _regions(out) == []
 
 
 # --------------------------------------------------------------------------- end to end

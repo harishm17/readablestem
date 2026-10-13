@@ -1326,6 +1326,12 @@ class _MarginFilter:
         prominent = row.size >= HEADING_SIZE_RATIO * self.body or row.bold
         return key in self.fixed or not prominent
 
+    def numbering(self, row: _Row, height: float) -> bool:
+        """The row's band text repeats on the reference pages and changes from page to
+        page: a page-number series ("24", "25", ...), not a figure's label."""
+        key = (_margin_zone(row, height), _norm_margin(row.clean))
+        return key in self.repeated and key not in self.fixed
+
     def drops_figure(self, box: BBox, height: float) -> bool:
         zone = _box_zone(box, height)
         return zone is not None and (zone, _box_key(box)) in self.figures
@@ -2484,6 +2490,7 @@ class _Path:
     frame: bool = False  # an outline along the edges of its own box only (a frame's shape)
     rules: bool = False  # paper rules: long separate horizontal and vertical lines only
     open_stroke: bool = False  # a stroked line or curve that does not close: a pen mark's shape
+    axis: bool = False  # holds one of two lines meeting at a corner: a plot's axes (`_mark_axes`)
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
@@ -2496,6 +2503,7 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
     width_pt, height_pt = page.rect.width, page.rect.height
     frame = page.cropbox  # the drawings' own (unrotated) frame
     paths: list[_Path] = []
+    lines: list[list[_Straight]] = []  # each path's horizontal and vertical lines
     drawings = drawings if drawings is not None else page.get_cdrawings()
     seen = page_type.paint_visibility(drawings, page_type.image_boxes(page)[0])
     for source, drawing in enumerate(drawings):
@@ -2537,9 +2545,11 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
         )
         rules = kind == "shape" and page_type.paper_rules(drawing, frame.width, frame.height)
         open_stroke = stroked and not filled and not _encloses(items, drawing.get("closePath"))
-        paths.append(
-            _Path(box, kind, curved, filled and kind == "shape", source, border, rules, open_stroke)
-        )
+        fill = filled and kind == "shape"
+        path = _Path(box, kind, curved, fill, source, border, rules, open_stroke)
+        paths.append(path)
+        lines.append(_straight_lines(path, segments))
+    _mark_axes(paths, lines)
     return paths
 
 
@@ -2568,6 +2578,116 @@ def _drawing_bounds(rect: Sequence[float], items: Sequence[Any]) -> tuple[float,
             elif y > y1:
                 y1 = y
     return x0, y0, x1, y1
+
+
+AXIS_MIN_PT = 48.0  # pt: each of a plot's two axes is at least this long
+STRAIGHT_MIN_PT = 3.0  # pt: shorter horizontal and vertical lines are not looked at
+AXES_MAX_LINES = 20_000  # a page with more straight lines (a grid, hatching) is not looked at
+PATH_MAX_LINES = 200  # nor are the lines of a path with more (a grid drawn as one path)
+
+
+@dataclass(frozen=True, slots=True)
+class _Straight:
+    """A horizontal or vertical line of a path: at `c` (y for a horizontal line, x for a
+    vertical one) from `lo` to `hi` along it, display space."""
+
+    horizontal: bool
+    c: float
+    lo: float
+    hi: float
+
+    def ends(self) -> tuple[tuple[float, float], tuple[float, float]]:
+        if self.horizontal:
+            return (self.lo, self.c), (self.hi, self.c)
+        return (self.c, self.lo), (self.c, self.hi)
+
+
+def _straight_lines(
+    path: _Path, segments: list[tuple[float, float, float, float]]
+) -> list[_Straight]:
+    """The horizontal and vertical lines of a path at least STRAIGHT_MIN_PT long; a rule
+    drawn as a thin filled rectangle is its middle line. A line drawn there and back (as
+    MuPDF reports a closed one-segment path) is one line."""
+    if not segments and path.kind in ("hrule", "vrule"):
+        x0, y0, x1, y1 = path.bbox
+        if path.kind == "hrule":
+            return [_Straight(True, (y0 + y1) / 2, x0, x1)]
+        return [_Straight(False, (x0 + x1) / 2, y0, y1)]
+    found: dict[tuple[bool, int, int, int], _Straight] = {}
+    for px, py, qx, qy in segments:
+        if abs(py - qy) <= 0.5 and abs(px - qx) >= STRAIGHT_MIN_PT:
+            line = _Straight(True, (py + qy) / 2, min(px, qx), max(px, qx))
+        elif abs(px - qx) <= 0.5 and abs(py - qy) >= STRAIGHT_MIN_PT:
+            line = _Straight(False, (px + qx) / 2, min(py, qy), max(py, qy))
+        else:
+            continue
+        found.setdefault((line.horizontal, round(line.c), round(line.lo), round(line.hi)), line)
+        if len(found) > PATH_MAX_LINES:
+            return []
+    return list(found.values())
+
+
+def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
+    """Flag the paths that hold a plot's axes (`_Path.axis`), whether each line is its own
+    path or one path holds them all.
+
+    Axes: a horizontal and a vertical line, each at least AXIS_MIN_PT long, meeting end to
+    end at a corner (JOIN_PT), with nothing else at that corner or at their other ends: an
+    L. A frame drawn line by line meets itself at every corner; a U or a staircase has
+    more than two lines. A y-axis near the page's edge and as tall as the page read as a
+    side of a frame (the second final verify, 2026-10-12): an axis is never page furniture
+    (`_page_furniture`)."""
+    unique: dict[tuple[bool, int, int, int], tuple[_Straight, list[int]]] = {}
+    for owner, own in enumerate(lines):
+        for line in own:
+            key = (line.horizontal, round(line.c), round(line.lo), round(line.hi))
+            unique.setdefault(key, (line, []))[1].append(owner)
+    flat = list(unique.values())
+    if not flat or len(flat) > AXES_MAX_LINES:
+        return
+    ends: dict[tuple[int, int], list[int]] = {}
+    for k, (line, _) in enumerate(flat):
+        for x, y in line.ends():
+            ends.setdefault((int(x // JOIN_PT), int(y // JOIN_PT)), []).append(k)
+
+    def meeting(k: int, point: tuple[float, float]) -> set[int]:
+        """The other lines with an end within JOIN_PT of `point`."""
+        x, y = point
+        bx, by = int(x // JOIN_PT), int(y // JOIN_PT)
+        found = set()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for m in ends.get((bx + dx, by + dy), ()):
+                    if m != k and any(
+                        abs(ex - x) <= JOIN_PT and abs(ey - y) <= JOIN_PT
+                        for ex, ey in flat[m][0].ends()
+                    ):
+                        found.add(m)
+        return found
+
+    def flag(k: int, attribute: str) -> None:
+        for owner in flat[k][1]:
+            setattr(paths[owner], attribute, True)
+
+    long = [k for k, (line, _) in enumerate(flat) if line.hi - line.lo >= AXIS_MIN_PT]
+    for k in long:
+        line = flat[k][0]
+        if not line.horizontal:
+            continue
+        for corner, other in (line.ends(), line.ends()[::-1]):
+            met = meeting(k, corner)
+            if len(met) != 1:
+                continue
+            (m,) = met
+            upright = flat[m][0]
+            if upright.horizontal or upright.hi - upright.lo < AXIS_MIN_PT or meeting(k, other):
+                continue
+            near, far = upright.ends()
+            if abs(near[0] - corner[0]) > JOIN_PT or abs(near[1] - corner[1]) > JOIN_PT:
+                near, far = far, near
+            if meeting(m, near) == {k} and not meeting(m, far):
+                flag(k, "axis")
+                flag(m, "axis")
 
 
 def _encloses(items: Sequence[Any], close_path: object) -> bool:
@@ -3221,11 +3341,12 @@ def _vector_figures(
 ) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables.
 
-    Page furniture (a frame round the page, a page-wide rule along an edge, a background
-    fill) is set aside first: a frame's box holds everything on the page, so clustered
-    with the rest it made every figure on the page one "page border" (docs/layout.md
-    "Figures"). A drawing that still fills the page (a full-page plot, a slide's chart)
-    is a figure when it has three curves or two bars and no running text inside. Else it
+    Page furniture (a frame round the page, a page-wide rule along an edge that is no
+    plot's axis, a background fill) is set aside first: a frame's box holds
+    everything on the page, so clustered with the rest it made every figure on the page
+    one "page border" (docs/layout.md "Figures"). A drawing that still fills the page (a
+    full-page plot, a slide's chart) is a figure when it has three curves, two bars, or a
+    plotted line on axes (`_mark_axes`), and no running text inside. Else it
     may be a decorated border or a background drawn behind text, but a drawing must not
     be lost with it: its border (`_border_member`) is set aside and the rest clustered
     again; with no border to take off, a page-filling drawing that still holds a plotted
@@ -3272,7 +3393,9 @@ def _vector_figures(
                 if left_out is not None:
                     left_out.append(box)
                 continue
-            if (len(curves) < 3 and len(bars) < 2) or (
+            # A plotted line on axes is a plot, not a decorated border, with one curve.
+            axes = curved and any(p.axis for p in members)
+            if (len(curves) < 3 and len(bars) < 2 and not axes) or (
                 ctx is not None and _running_text(inside, ctx)
             ):
                 inner = [p for p in members if not _border_member(p, box, page_rect)]
@@ -3422,7 +3545,8 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
     page-long rule near an edge), a background fill (at least PAGE_SIZED_FRACTION of the
     page's area, or a straight-edged panel round the page with a margin) or a band of
     colour along an edge (a slide template's title bar): never part of a figure, and
-    never content on its own."""
+    never content on its own. A page-long rule that is a plot's axis (`_mark_axes`: a
+    full-page plot's y-axis) is a drawing."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
     big = PAGE_SIZED_FRACTION
@@ -3434,7 +3558,7 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
         )
     if path.frame:
         return _round_page(path.bbox, page_rect)
-    if path.curved:
+    if path.curved or path.axis:
         return False
     edge = FRAME_EDGE_BAND
     if path.kind == "hrule":
@@ -3448,9 +3572,12 @@ def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
     """Part of the border of a page-filling cluster (`box`): frame-shaped, across the page
     (PAGE_SIZED_FRACTION of its width or height), or a mark smaller than a figure along
     an edge of the cluster (within FRAME_EDGE_BAND of the page): the pieces of a frame
-    whose shape was not recognised, corner ornaments."""
+    whose shape was not recognised, corner ornaments. A plot's axes are not
+    (`_mark_axes`)."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
+    if path.axis:
+        return False
     if path.frame or x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
         return True
     if max(x1 - x0, y1 - y0) >= MIN_DRAWING_PT:
@@ -4167,11 +4294,12 @@ def _page_blocks(
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     # A chart's tick labels in the footer band, or its axis title repeated on every slide,
     # are its labels, not running text.
-    restored = _figure_labels(dropped, figures, rows, page_rect.height, label_keys)
+    restored = _figure_labels(dropped, figures, rows, page_rect.height, label_keys, margins)
     for row in restored:
         _classify_row(row)
     rows = [*rows, *restored]
     figures = [f for f in figures if _absorb_labels(f, rows, ctx, page.parent)]
+    _take_labels(restored, figures, rows)
     text_rows = [r for r in rows if not r.absorbed]
     _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
@@ -4270,6 +4398,7 @@ def _figure_labels(
     rows: Sequence[_Row],
     height: float,
     accepted: Collection[tuple] = frozenset(),
+    margins: _MarginFilter | None = None,
 ) -> list[_Row]:
     """Rows the header and footer rules dropped (`_prepare_rows`) that label a figure: a
     chart's tick labels in the footer band (bare numbers, read as page numbers), its axis
@@ -4278,7 +4407,10 @@ def _figure_labels(
     (LABEL_MAX_CHARS), not diagonal, and within LABEL_REACH x its size of a figure or of
     the short rows just beside it (its tick labels), level with it for a rotated row and
     under or over it otherwise (`_beside_figure`). Bare numbers count only two or more on
-    one baseline: a page number alone under a figure is still a page number. Other text
+    one baseline, or level with a figure when the document's page numbers are not there
+    (`margins.numbering`: an axis title "v" at the top of a full-page plot's y-axis, read
+    as a page number in roman numerals): a page number alone under a figure, or beside
+    one in the band where the other pages have theirs, is still a page number. Other text
     counts only when its key is `accepted` (`_label_keys`: beside a figure wherever the
     document repeats it), so a running footer that also runs under pages of text stays
     dropped."""
@@ -4296,8 +4428,42 @@ def _figure_labels(
         id(r)
         for r in numbers
         if not any(o is not r and abs(o.baseline - r.baseline) <= 0.3 * r.size for o in numbers)
+        and not (
+            any(f.bbox[1] <= (r.y0 + r.y1) / 2 <= f.bbox[3] for f in figures)
+            and not (margins is not None and margins.numbering(r, height))
+        )
     }
     return [r for r in found if id(r) not in lone]
+
+
+def _gap(box: BBox, other: BBox) -> float:
+    """How far apart two boxes are (0 when they touch or overlap), sideways plus up or down."""
+    return max(0.0, other[0] - box[2], box[0] - other[2]) + max(
+        0.0, other[1] - box[3], box[1] - other[3]
+    )
+
+
+def _take_labels(
+    restored: Sequence[_Row], figures: Sequence[_Figure], rows: Sequence[_Row]
+) -> None:
+    """The rows `_figure_labels` took back from the header and footer bands are labels of
+    the figure they are beside, not text of their own, even beyond the reach of
+    `_absorb_labels` (a full-page plot's tick labels 6 pt under its x-axis in the footer
+    band were read as five paragraphs of one digit each)."""
+    for row in restored:
+        if row.absorbed:
+            continue
+        beside = [
+            (_gap(row.bbox, f.bbox), i)
+            for i, f in enumerate(figures)
+            if _beside_figure(row, _figure_extents([f.bbox], rows))
+        ]
+        if not beside:
+            continue
+        figure = figures[min(beside)[1]]
+        row.absorbed = True
+        figure.labels.append(row)
+        figure.bbox = _union([figure.bbox, row.bbox])
 
 
 def _is_number_row(row: _Row) -> bool:
