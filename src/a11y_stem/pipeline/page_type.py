@@ -280,6 +280,16 @@ class InkStats:
     def repeat_share(self) -> float:
         return self.repeated / self.candidates if self.candidates else 0.0
 
+    @property
+    def clean(self) -> bool:
+        """Ink one hand wrote: few exact repeats, one pen width (filled strokes), few
+        strokes with a same-size twin (`decide`)."""
+        return (
+            self.repeat_share <= INK_MAX_REPEATS
+            and _pen_like(self)
+            and self.size_twins <= SIZE_TWIN_MAX
+        )
+
 
 @dataclass
 class PageTypeResult:
@@ -1166,9 +1176,7 @@ def decide(
 ) -> PageTypeResult:
     untrusted = text.untrusted
     has_text = text.visible_chars >= TEXT_MIN
-    clean = (
-        ink.repeat_share <= INK_MAX_REPEATS and _pen_like(ink) and ink.size_twins <= SIZE_TWIN_MAX
-    )
+    clean = ink.clean
     writing = clean and ink.strokes >= INK_PAGE_STROKES and ink.rows >= INK_PAGE_ROWS
     some_ink = clean and ink.strokes >= INK_MIXED_STROKES and ink.rows >= INK_MIXED_ROWS
     ocr = untrusted >= HIDDEN_FEW  # any hidden words: the layer must not be read
@@ -1317,12 +1325,20 @@ def _visible_chars(page: PageTypeResult | PageType) -> int:
 
 
 def ink_regions(result: PageTypeResult) -> list[BBox]:
-    """Boxes (display space) of the handwriting on a typed page (mixed_ink): strokes
-    within REGION_GAP of each other form one region, padded by REGION_PAD; more than
-    MAX_REGIONS become one box round all of them."""
-    if result.kind != "mixed_ink" or not result.ink.stroke_boxes:
+    """Boxes (display space) of the handwriting on a typed page (mixed_ink), as
+    `stroke_regions`."""
+    if result.kind != "mixed_ink":
         return []
-    boxes = sorted(result.ink.stroke_boxes)
+    return stroke_regions(result.ink.stroke_boxes)
+
+
+def stroke_regions(strokes: Sequence[BBox]) -> list[BBox]:
+    """Regions of handwriting from pen-stroke boxes (display space): strokes within
+    REGION_GAP of each other form one region, padded by REGION_PAD; more than MAX_REGIONS
+    become one box round all of them."""
+    if not strokes:
+        return []
+    boxes = sorted(strokes)
     regions: list[list[float]] = []
     for b in boxes:
         for r in regions:

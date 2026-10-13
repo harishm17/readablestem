@@ -120,6 +120,11 @@ FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a fra
 # handwriting (mixed_ink) the handwriting is cut out already and the rest is left out.
 INK_REASONS = frozenset({"ink_rejected", "ink_not_analysed", "ink_some", "ink_writing"})
 UNREAD_PAD = 2.0  # pt: a stroke within this of an element's box belongs to the element
+# Clean pen strokes outside every block of a typed page that are cut out as handwriting
+# (fewer than page_type.INK_MIXED_STROKES make no mixed_ink page). On the research
+# corpus no born-digital page has 3 (544 pages; one TikZ page has 2), nor any of the
+# repository's 887 born-digital pages.
+LOOSE_INK_STROKES = 3
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
@@ -3709,6 +3714,7 @@ def _page_blocks(
     *,
     page_sized: bool = True,
     little_text: bool = False,
+    strokes: Sequence[BBox] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_labels(rows)
@@ -3750,6 +3756,12 @@ def _page_blocks(
             )
         )
     blocks.extend(_table_blocks(page_tables))
+    # Handwriting too light for a mixed_ink page (a short note, a signature, a circle and
+    # a tick) that went into no block: cut out like the rest of handwriting on a typed
+    # page, not lost. A note in the top or bottom margin counts too.
+    loose = _loose_strokes(strokes, [b.bbox for b in blocks], None)
+    if len(loose) >= LOOSE_INK_STROKES:
+        ink = [*ink, *page_type.stroke_regions(loose)]
     blocks.extend(_ink_blocks(ink, page_rect))
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
     final = _merge_column_continuations([blocks[i] for i in order])
@@ -3951,6 +3963,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             page_type.ink_regions(types[n]),
             page_sized=not INK_REASONS & set(types[n].reasons),
             little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
+            strokes=_light_ink(types[n]),
         )
         for n in selected
     ]
@@ -4003,17 +4016,38 @@ def _unread_ink(kind: page_type.PageTypeResult, boxes: list[BBox], height: float
     table and a cut-out handwriting region each hold their own)."""
     if len(kind.ink.stroke_boxes) < page_type.INK_MIXED_STROKES:
         return False
+    return len(_loose_strokes(kind.ink.stroke_boxes, boxes, height)) >= (
+        page_type.INK_MIXED_STROKES
+    )
+
+
+def _loose_strokes(
+    strokes: Sequence[BBox], boxes: Sequence[BBox], height: float | None
+) -> list[BBox]:
+    """The strokes whose centre is in none of `boxes` (each grown by UNREAD_PAD), and,
+    with the page `height`, outside the header and footer bands."""
+    if not strokes:
+        return []
     pad = UNREAD_PAD
     grown = [(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad) for b in boxes]
-    loose = 0
-    for stroke in kind.ink.stroke_boxes:
-        if _box_zone(stroke, height) is not None:
-            continue
-        if not any(_centre_inside(stroke, box) for box in grown):
-            loose += 1
-            if loose >= page_type.INK_MIXED_STROKES:
-                return True
-    return False
+    return [
+        stroke
+        for stroke in strokes
+        if (height is None or _box_zone(stroke, height) is None)
+        and not any(_centre_inside(stroke, box) for box in grown)
+    ]
+
+
+def _light_ink(kind: page_type.PageTypeResult) -> list[BBox]:
+    """The pen strokes of a typed page (a line of visible text or more) whose ink is clean
+    but too light to make it mixed_ink: the strokes `_page_blocks` cuts out when they go
+    into no block. None for other pages (mixed_ink cuts out all its strokes; a page with
+    less text has the safety net, `_painted`)."""
+    if kind.kind == "mixed_ink" or kind.text.visible_chars < page_type.TEXT_MIN:
+        return []
+    if not kind.ink.clean:
+        return []
+    return kind.ink.stroke_boxes
 
 
 def _painted(

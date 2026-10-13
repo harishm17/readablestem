@@ -90,6 +90,26 @@ def test_handwriting_on_a_typed_page_is_cut_out_and_the_text_stays():
     assert doc.kept_pages == {}
 
 
+def test_a_short_note_on_a_typed_page_is_cut_out_as_handwriting():
+    # Eight pen strokes under a typed worksheet: fewer than a typed page needs to be
+    # called mixed_ink (12), but they went into no element, so they are cut out as a
+    # handwriting region like any handwriting on a typed page.
+    doc = layout.analyze(data("typed_with_note.pdf"))
+    assert doc.page_types[0].kind == "born_digital"
+    (ink,) = [e for e in doc.elements if "handwriting" in e.reasons]
+    assert ink.kind is Kind.FIGURE and ink.text is None
+    assert 440 < ink.bbox[1] < ink.bbox[3] < 520  # the note, under the worksheet line
+    assert doc.kept_pages == {}
+    result = convert("typed_with_note.pdf").result
+    (fix,) = [f for f in result.fixes if f.kind is Kind.FIGURE]
+    assert fix.reason == "handwriting_on_page" and fix.review == "required"
+    assert fix.calls == []  # never sent to the figure model
+    text = text_of(result.html)
+    assert "Handwriting on page 1, not converted to text." in result.html
+    assert "Homework 3: show all your working" in text
+    assert result_outcome(result) == ("done", "pages_not_converted")
+
+
 def test_the_safety_net_keeps_a_painted_page_layout_read_nothing_from():
     doc = layout.analyze(data("drawn_page.pdf"))
     assert doc.page_types[1].kind == "vector_no_text"  # not handwriting, not a scan ...
