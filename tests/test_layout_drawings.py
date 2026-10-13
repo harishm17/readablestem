@@ -694,3 +694,31 @@ def test_comb_fields_on_an_exam_cover_are_no_drawing_but_a_labelled_scale_is(lab
     else:
         assert _figures(out) == [] and _regions(out) == []
         assert "Candidate number" in _text_of(out)
+
+
+def test_an_icon_round_a_glyph_is_a_figure():
+    # A warning triangle round "!" and an information circle round "i": the glyph's
+    # one-character paragraph held each icon, and both were dropped.
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1)
+    _path(
+        page,
+        [[(150, y + 60), (160, y + 40), (170, y + 60), (150, y + 60)]],
+        colour=ORANGE,
+        width=1.5,
+    )
+    _label(page, (159, y + 57), "!", 10)
+    shape = page.new_shape()
+    shape.draw_circle((310, y + 50), 10)
+    shape.finish(color=BLUE, width=1.5)
+    shape.commit()
+    _label(page, (308, y + 54), "i", 10)
+    for k, word in enumerate(["Hot surface", "Read first"]):
+        _label(page, (140 + 150 * k, y + 78), word, 9)
+    _running_text(page, y + 100, 1, start=2)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    figures = _figures(out)
+    assert any(_holds(f, (150, y + 40, 170, y + 60)) for f in figures)
+    assert any(_holds(f, (300, y + 40, 320, y + 60)) for f in figures)
