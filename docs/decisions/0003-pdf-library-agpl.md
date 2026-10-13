@@ -27,13 +27,23 @@ Not legal advice; revisit if the project ever needs a closed-source deployment.
 
 ## Consequences
 
-TODO(Harish)
+Drafted from what the repository shows; the author confirms or edits.
+
+- **Easier.** Best parsing and rendering quality of the options compared, and less code
+  than the permissive alternative.
+- **Harder.** The AGPL applies to the hosted combination, so the complete source has to
+  be offered to its users: the repository must be public (or the source offered another
+  way) before the first outside user, and `SOURCE_URL` must point at the deployed commit.
+  A closed-source deployment would need Artifex's commercial licence or a replacement
+  library.
+- **When to revisit.** If a closed-source deployment is ever needed, or if PyMuPDF's
+  licence terms change (see the amendment below for PyMuPDF 2.0).
 
 ## Amendment (2026-10-09): table detection with PyMuPDF Layout
 
 | Field | Value |
 |---|---|
-| Status | **Proposed** (built behind `FEATURE_TABLES` on branch `feat/tables-detect`; Harish to accept) |
+| Status | **Proposed** (merged behind `FEATURE_TABLES`, which is off; it stays proposed until the real-document check in `docs/eval.md`, "Tables", has passed) |
 | Date | 2026-10-09 |
 | Decider | Harish |
 
@@ -42,8 +52,9 @@ TODO(Harish)
 Data tables were not an element kind: their cells became paragraphs, numeric tables were
 read as display equations and blank ruled tables as figures. PyMuPDF's own
 `find_tables()` (lines strategy) found 0 of 108 booktabs and unruled tables in the
-2026-10-08 benchmark. The evaluation (`a11y-research/PDF-RECOMMENDATION.md`, sections 1,
-2.2, 3 and 4, and its "Challenge" section) compared six detectors and four structure
+2026-10-08 benchmark. The evaluation (the author's private research notes, which are not
+in this repository, so these numbers cannot be reproduced from here; their method is in
+`docs/tables.md`) compared six detectors and four structure
 recognisers that fit Cloud Run (1 vCPU, 1 GiB).
 
 ### Decision
@@ -102,4 +113,16 @@ the reply.
 
 ### Consequences
 
-TODO(Harish)
+Drafted from what the repository shows; the author confirms or edits.
+
+- **Easier.** Tables can be found and rebuilt on a 1-CPU container at about 0.33 s per
+  page, with no GPU and no second service.
+- **Harder.** A second AGPL package, two pinned ONNX models and vendored code to keep
+  current. The `pymupdf-layout==1.28.2` pin is a holding position with known unpatched
+  hangs that the probe bounds. A permissive exit now needs two replacements (the glyph
+  layer and the detector). The arbitration rules were developed on the same pages they
+  were measured on, so the numbers above are optimistic for new documents.
+- **When to revisit.** Before moving to PyMuPDF 2.0 (re-run the table evaluation, the
+  fuzz check and the timings), and before turning `FEATURE_TABLES` on (the private
+  real-document check in `docs/eval.md`, "Tables").
+

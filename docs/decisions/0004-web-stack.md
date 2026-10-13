@@ -25,4 +25,16 @@ surface for a 3-5 instructor beta).
 
 ## Consequences
 
-TODO(Harish)
+Drafted from what the repository shows; the author confirms or edits.
+
+- **Easier.** One deploy, one process and no queue service. Deleting a job deletes
+  everything made from it, because uploads and crops live in the same database rather than
+  in a second store. Server-rendered pages work without JavaScript, which suits an
+  accessibility tool.
+- **Harder.** The worker shares a process and a CPU allowance with the web pages, and
+  min-instances=1 with CPU always allocated is a standing cost. Postgres holds the
+  uploaded documents, so its backups hold them too; the retention window and the privacy
+  page have to agree (`docs/deploy.md`). Scaling past a few instructors would mean moving
+  the worker out of the web process.
+- **When to revisit.** When conversions slow the pages down, or use outgrows a handful of
+  instructors.

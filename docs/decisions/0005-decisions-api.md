@@ -89,4 +89,16 @@ docs/steps.md "Second automated check", docs/eval.md, docs/operations.md.
 
 ## Consequences
 
-TODO(Harish)
+Drafted from what the repository shows; the author confirms or edits.
+
+- **Easier.** There is a second signal that does not come from the model's own
+  confidence, which ranked errors poorly in the sample (AUROC 0.35). It is cheap (2-4% of
+  a job's spend) and fails open, so an outage changes nothing.
+- **Harder.** It rests on a public-beta API with undocumented limits and refused
+  parameters. Its probabilities are not calibrated and favour the first choice listed, so
+  it can only add an optional note, never a required decision. The drift canary and the
+  extra eval metrics are more to maintain. On the 30-equation sample it found no real
+  meaning-level error to rank (AUROC 0.45), so its value for equations is unproven.
+- **When to revisit.** When the canary logs an ERROR (the provider's answers moved), or
+  when a larger or held-out run shows the figure flag or the equation shadow is not worth
+  keeping.
