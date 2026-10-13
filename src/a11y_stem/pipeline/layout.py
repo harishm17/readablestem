@@ -136,6 +136,11 @@ LEFTOVER_MIN_PT = 6.0
 # the glyphs of one formula drawn as outlines): MIN_DRAWING_PT.
 LEFTOVER_REACH = 24.0
 DOT_PT = 4.0  # a filled mark this small on its longer side is a dot
+# A pen mark over typed text (`_pen_mark_over_text`): at most this many strokes, reaching
+# out of the line they lie on by at least this share of their height. A hand tick, cross
+# or slash is drawn bigger than the text; a cancel stroke or an icon set in a line is not.
+PEN_MARK_STROKES = 2
+PEN_MARK_OUT = 0.25
 # A row the header/footer rules dropped is a figure's label (`_figure_labels`) when it is
 # at most this long and within LABEL_REACH x its font size of the figure or its labels.
 LABEL_MAX_CHARS = 40
@@ -4658,9 +4663,10 @@ def _leftover_drawings(
             margins.drops_mark(p.bbox, page_rect.height) for p in members
         ):
             continue
-        if any(_centre_inside(box, g) for g in grown) or any(
-            _at_edge(box, frame, FIGURE_PART_REACH) for frame in frames
-        ):
+        holders = [b for b, g in zip(blocks, grown, strict=True) if _centre_inside(box, g)]
+        if holders and not _pen_mark_over_text(members, box, holders):
+            continue  # an underline, a box round a word, maths drawn in a line
+        if any(_at_edge(box, frame, FIGURE_PART_REACH) for frame in frames):
             continue
         keep.append((box, members))
     figures: list[_Block] = []
@@ -4689,6 +4695,36 @@ def _leftover_drawings(
             reasons = [f"vector drawing ({len(members)} paths)"]
             figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
     return figures, marks
+
+
+def _pen_mark_over_text(members: Sequence[_Path], box: BBox, holders: Sequence[_Block]) -> bool:
+    """One or two pen strokes drawn over typed text (`holders`: the blocks whose box holds
+    the middle of `box`), not marks set with the text: every path an open stroke that is a
+    diagonal line or a curve and no radical sign, over a paragraph, list item or heading,
+    reaching out of the line under its middle (the nearest one, or the nearest line it is
+    beside) by PEN_MARK_OUT of its height or more. A hand tick, a cross or a slash over a
+    line was taken as part of the line, like an underline, and lost (the second final
+    verify, 2026-10-12); a box round a word and an underline are closed or straight, and
+    a cancel stroke across a term stays within its line. On the research corpus's
+    born-digital pages (586 real ones, the OpenStax renders, the fixtures) no drawing in a
+    text element is an open diagonal or curved stroke at all."""
+    if len(members) > PEN_MARK_STROKES or not all(
+        p.open_stroke and p.curved and not p.filled and p.kind != "radical" for p in members
+    ):
+        return False
+    if any(b.kind not in (Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING) for b in holders):
+        return False
+    height = box[3] - box[1]
+    if height <= 0:
+        return False
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    rows = [r for b in holders for r in b.rows if not r.vertical]
+    under = [r for r in rows if r.x0 <= cx <= r.x1] or rows  # or beside a line's end
+    if not under:
+        return False
+    row = min(under, key=lambda r: abs((r.y0 + r.y1) / 2 - cy))
+    out = max(0.0, row.y0 - box[1]) + max(0.0, box[3] - row.y1)
+    return out >= PEN_MARK_OUT * height
 
 
 def _at_edge(box: BBox, frame: BBox, reach: float) -> bool:

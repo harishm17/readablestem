@@ -900,6 +900,29 @@ def test_a_frame_of_four_lines_and_rules_with_end_marks_are_still_furniture(styl
     assert _figures(out) == [] and _regions(out) == []
 
 
+@pytest.mark.parametrize(
+    ("page", "box"),
+    [(0, (250, 106, 270, 124)), (1, (250, 102, 264, 118)), (2, (160, 110, 182, 128))],
+)
+def test_a_hand_tick_cross_or_slash_over_a_line_of_typed_text_is_cut_out(page, box):
+    # One or two pen strokes too simple for the stroke test, drawn over typed text: taken
+    # as part of the line they lie on (like an underline), they were lost. Open strokes
+    # that are no radical sign and reach out of their line are pen marks.
+    out = layout.analyze(_fixture("marks_over_text.pdf"))
+    assert out.page_types[page].kind == "born_digital"
+    assert page not in out.kept_pages
+    (region,) = _regions(out, page)
+    assert _held(out, page, box) and region.bbox[0] <= box[0] and region.bbox[2] >= box[2]
+    text = " ".join(e.text or "" for e in out.elements if e.page == page)
+    assert "How high does it go" in text or "It has a direction" in text  # read whole
+
+
+def test_an_underline_a_box_or_a_cancel_stroke_in_a_line_is_still_part_of_the_text():
+    out = layout.analyze(_fixture("marks_over_text.pdf"))
+    assert 3 not in out.kept_pages
+    assert _regions(out, 3) == [] and _figures(out, 3) == []
+
+
 # --------------------------------------------------------------------------- end to end
 
 
