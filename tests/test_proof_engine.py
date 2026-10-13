@@ -586,10 +586,7 @@ def test_chatbot_arms_that_finished_whole_are_added_and_a_cap_stopped_arm_is_not
     assert bundle.verify() == []
     arms = sorted(p.name for p in bundle.systems_dir.iterdir())
     assert arms == ["chatbot-sol-purdue"]
-    assert (
-        extra["systems_not_run"] == {"chatbot-sol-expert": "the spend cap did not hold it"}
-        or "chatbot-sol-expert" in extra["systems_not_run"]
-    )
+    assert extra["systems_not_run"] == {"chatbot-sol-expert": "the spend cap did not hold it"}
     again = options(recorded, bundle_dir=bundle_dir, work_dir=tmp_path / "w", max_usd=3.0)
     with pytest.raises(ProofError, match="already holds the chatbot arms"):
         engine.add_systems(again, "chatbot", say=lambda _m: None, chat_client=object())
