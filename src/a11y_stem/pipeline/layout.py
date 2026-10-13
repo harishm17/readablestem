@@ -5237,7 +5237,11 @@ def _leftover_drawings(
             margins.drops_mark(p.bbox, page_rect.height) for p in members
         ):
             continue
-        holders = [b for b, g in zip(blocks, grown, strict=True) if _centre_inside(box, g)]
+        holders = [
+            b
+            for b, g in zip(blocks, grown, strict=True)
+            if _centre_inside(box, g) and not _glyph_in(b, box)
+        ]
         if holders and _pen_mark_over_text(members, box, holders):
             hand.update(id(p) for p in members)
         elif (
@@ -5283,6 +5287,15 @@ def _leftover_drawings(
             reasons = [f"vector drawing ({len(members)} paths)"]
             figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
     return figures, marks
+
+
+def _glyph_in(block: _Block, box: BBox) -> bool:
+    """`block` is one or two glyphs smaller than the drawing round them (`box`): the "!"
+    of a warning triangle, the "i" of an information circle. It does not hold the
+    drawing (2026-10-13: the icons were dropped as held by their glyph)."""
+    glyphs = sum(1 for r in block.rows for c in r.chars if not c.blank)
+    x0, y0, x1, y1 = block.bbox
+    return 0 < glyphs <= 2 and x1 - x0 < box[2] - box[0] and y1 - y0 < box[3] - box[1]
 
 
 def _dots(members: Sequence[_Path]) -> bool:
