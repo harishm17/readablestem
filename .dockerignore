@@ -21,6 +21,7 @@ private-inputs/
 .github/
 .claude/
 tests/
+proof/
 deploy/
 Dockerfile
 .dockerignore
