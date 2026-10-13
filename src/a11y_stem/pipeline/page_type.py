@@ -70,8 +70,10 @@ from a11y_stem.core.types import PageType
 # the page, paper rules that are long and separate, a few curves under a typed title and
 # a hidden layer over machine drawings not handwriting; v5.3 after the final verifier: a
 # hidden layer over a few strokes under a title, or over marks with no evidence of machine
-# drawing, is handwriting.
-CLASSIFIER_VERSION = "page-type-v5.3"
+# drawing, is handwriting; v5.4 after the silent-loss sweep: near-white paint on something
+# darker is seen (a dark slide's white ink), and a hidden layer over a page with no picture
+# is never a scan.
+CLASSIFIER_VERSION = "page-type-v5.4"
 
 BBox = tuple[float, float, float, float]
 
@@ -716,10 +718,64 @@ def _unchanged(
 # ---------------------------------------------------------------------------- ink
 
 
-def _visible_paint(colour: object, opacity: object) -> bool:
+# Near-white paint (every colour component at least WHITE) shows only on something darker
+# painted under it: a fill of at least UNDER_MIN_AREA painted before it at UNDER_MIN_OPACITY
+# or more, or a picture. On the white page it is invisible (a white box over nothing, a
+# knockout). A dark slide's white diagram or chalk-style ink was dropped as invisible.
+WHITE = 0.97
+UNDER_MIN_AREA = 100.0  # pt^2
+UNDER_MIN_OPACITY = 0.5
+
+
+def _white(colour: object) -> bool:
+    return isinstance(colour, tuple | list) and bool(colour) and all(v >= WHITE for v in colour)
+
+
+def paint_visibility(
+    drawings: Sequence[dict[str, Any]], images: Sequence[Sequence[float]] = ()
+) -> list[tuple[bool, bool]]:
+    """(fill seen, stroke seen) for each drawing, in the drawings' own frame. Paint at 1 %
+    opacity or less is never seen. Near-white paint is seen only when the topmost fill
+    painted before it that holds its middle is not near-white (a slide's dark background,
+    a coloured panel), or when no fill holds it and a picture does (`images`, in the same
+    frame; pictures are taken to be painted first)."""
+    under: list[tuple[Sequence[float], bool]] = []  # (box, near-white) of opaque fills
+    out = []
+    for d in drawings:
+        rect = d.get("rect")
+        fill = _seen(d.get("fill"), d.get("fill_opacity"), rect, under, images)
+        stroke = _seen(d.get("color"), d.get("stroke_opacity"), rect, under, images)
+        out.append((fill, stroke))
+        opacity = d.get("fill_opacity")
+        if (
+            fill
+            and rect is not None
+            and _area(rect) >= UNDER_MIN_AREA
+            and not (isinstance(opacity, int | float) and opacity < UNDER_MIN_OPACITY)
+        ):
+            under.append((rect, _white(d.get("fill"))))
+    return out
+
+
+def _seen(
+    colour: object,
+    opacity: object,
+    rect: Sequence[float] | None,
+    under: Sequence[tuple[Sequence[float], bool]],
+    images: Sequence[Sequence[float]],
+) -> bool:
+    """Paint of `colour` over `rect` is seen (`paint_visibility`)."""
     if colour is None or (isinstance(opacity, int | float) and opacity <= 0.01):
         return False
-    return not (isinstance(colour, tuple | list) and all(v >= 0.97 for v in colour))
+    if not _white(colour):
+        return True
+    if rect is None:
+        return False
+    mx, my = (rect[0] + rect[2]) / 2, (rect[1] + rect[3]) / 2
+    for box, white in reversed(under):
+        if box[0] <= mx <= box[2] and box[1] <= my <= box[3]:
+            return not white
+    return any(b[0] <= mx <= b[2] and b[1] <= my <= b[3] for b in images)
 
 
 def paper_rules(drawing: dict[str, Any], width: float, height: float) -> bool:
@@ -974,11 +1030,9 @@ def ink_stats(
     always; the stroke analysis only within the budget and the item cap."""
     stats = InkStats()
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
-    for d in drawings:
-        if not (
-            _visible_paint(d.get("fill"), d.get("fill_opacity"))
-            or _visible_paint(d.get("color"), d.get("stroke_opacity"))
-        ):
+    seen = paint_visibility(drawings, image_boxes(page)[0])
+    for d, (filled, stroked) in zip(drawings, seen, strict=True):
+        if not (filled or stroked):
             continue
         rect = d["rect"]
         if rect[2] < 0 or rect[3] < 0 or rect[0] > frame.width or rect[1] > frame.height:
@@ -994,11 +1048,15 @@ def ink_stats(
         return stats
     if not stats.paths:
         return stats
-    cands = _ink_candidates(page, drawings)
+    cands = _ink_candidates(page, drawings, seen)
     return _summarise(page, stats, cands)
 
 
-def _ink_candidates(page: pymupdf.Page, drawings: Sequence[dict[str, Any]]) -> list[_Candidate]:
+def _ink_candidates(
+    page: pymupdf.Page,
+    drawings: Sequence[dict[str, Any]],
+    seen: Sequence[tuple[bool, bool]] | None = None,
+) -> list[_Candidate]:
     """Every subpath that could be a pen stroke. /Ink annotation appearances are in the
     drawings already (MuPDF traces them), so they are not added again."""
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
@@ -1022,9 +1080,10 @@ def _ink_candidates(page: pymupdf.Page, drawings: Sequence[dict[str, Any]]) -> l
         chain, chain_sources = [], []
         counts[0] = counts[1] = 0
 
+    if seen is None:
+        seen = paint_visibility(drawings, image_boxes(page)[0])
     for index, d in enumerate(drawings):
-        filled = _visible_paint(d.get("fill"), d.get("fill_opacity"))
-        stroked = _visible_paint(d.get("color"), d.get("stroke_opacity"))
+        filled, stroked = seen[index]
         if not (filled or stroked):
             continue
         rect = d["rect"]
@@ -1263,6 +1322,13 @@ def decide(
                 return result("vector_no_text", ["invisible_without_image"])
             if not text.visible_chars and ink.marks >= VECTOR_MIN_PATHS:
                 return result("handwritten_ocr", ["invisible_without_image"])
+        if image_coverage == 0 and ink.marks:
+            # No picture at all, so not a scan. Under a typed title: pen strokes (a few
+            # that pass the stroke tests) are a note, anything else drawings (a diagram
+            # whose labels an OCR program read), whose hidden layer is dropped.
+            if ink.strokes >= ROW_MIN_STROKES:
+                return result("handwritten_ocr", ["invisible_without_image"])
+            return result("vector_no_text", ["invisible_without_image"])
         return result("scan_ocr", ["invisible_without_image"])
     if ink.marks >= VECTOR_MIN_PATHS or ink.candidates >= VECTOR_MIN_PATHS or image_coverage > 0:
         return result("vector_no_text", ["little_text"])

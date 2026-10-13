@@ -297,8 +297,11 @@ def test_photo_slides_keep_their_titles_and_photos():
 
 def test_text_under_see_through_overlays_is_read():
     doc = layout.analyze(data("overlays.pdf"))
-    assert doc.kept_pages == {}
     assert {e.page for e in doc.elements if e.kind is Kind.PARAGRAPH} == {0, 1}
+    # Page 1's overlay is a page-size transparent picture of five hand-drawn red circles:
+    # the text under it is read, and the circles are not dropped as a background, so the
+    # page keeps its image with a decision. Page 2's half-page grey wash is plain.
+    assert doc.kept_pages == {0: "unread_page"}
 
 
 # --------------------------------------------------------------------------- pipeline

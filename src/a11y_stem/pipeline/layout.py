@@ -63,7 +63,7 @@ import threading
 import time
 import unicodedata
 from collections import Counter, OrderedDict, deque
-from collections.abc import Iterable, Sequence
+from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import count, pairwise
@@ -123,11 +123,23 @@ FRAME_LINE_BAND = 0.05  # every point of a frame lies this share of its smaller 
 # handwriting (mixed_ink) the handwriting is cut out already and the rest is left out.
 INK_REASONS = frozenset({"ink_rejected", "ink_not_analysed", "ink_some", "ink_writing"})
 UNREAD_PAD = 2.0  # pt: a stroke within this of an element's box belongs to the element
-# Clean pen strokes of a typed page that no figure, table or equation holds, cut out as
-# handwriting (fewer than page_type.INK_MIXED_STROKES make no mixed_ink page). On the
-# research corpus's born-digital pages: three with 3 (hand marks over typed text: an
-# underline, a tick, a circle), one TikZ page with 2, none of the repository's 887.
-LOOSE_INK_STROKES = 3
+# Pen strokes of a typed page (clean or not) that no figure holds, cut out as handwriting
+# (fewer than page_type.INK_MIXED_STROKES make no mixed_ink page): from one stroke up, as
+# a tick or a one-stroke signature is content too (the silent-loss sweep, 2026-10-12).
+LOOSE_INK_STROKES = 1
+# A drawing too small to be a figure, outside every element of a typed page, is kept
+# (`_leftover_drawings`) when it is at least this big on its longer side or has
+# page_type.VECTOR_MIN_PATHS paths: a tick, an icon, maths drawn as outlines. Smaller
+# single marks (a dot) are noise.
+LEFTOVER_MIN_PT = 6.0
+# Leftover drawings this close to each other are one (the marks of a scatter of shapes,
+# the glyphs of one formula drawn as outlines): MIN_DRAWING_PT.
+LEFTOVER_REACH = 24.0
+DOT_PT = 4.0  # a filled mark this small on its longer side is a dot
+# A row the header/footer rules dropped is a figure's label (`_figure_labels`) when it is
+# at most this long and within LABEL_REACH x its font size of the figure or its labels.
+LABEL_MAX_CHARS = 40
+LABEL_REACH = 8.0
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
@@ -1290,6 +1302,11 @@ class _MarginFilter:
     rotated: set[tuple[str, int, int]]  # rotated text repeated at the same place
     figures: set[tuple[str, tuple[int, int, int, int]]]  # (zone, box) of band figures
     body: float
+    # (zone, box) of every drawing and image in the band that repeats: a logo however
+    # small, a decorative line. Anything else in the band (a note in the margin) counts.
+    marks: set[tuple[str, tuple[int, int, int, int]]] = field(default_factory=set)
+    # Pictures covering the page that repeat (by xref): a template's background.
+    backgrounds: set[int] = field(default_factory=set)
 
     def drops(self, row: _Row, height: float) -> bool:
         if row.vertical:
@@ -1312,6 +1329,19 @@ class _MarginFilter:
     def drops_figure(self, box: BBox, height: float) -> bool:
         zone = _box_zone(box, height)
         return zone is not None and (zone, _box_key(box)) in self.figures
+
+    def drops_mark(self, box: BBox, height: float) -> bool:
+        """A drawing or image in the header or footer band that repeats there (part of a
+        logo or of the template), or that a repeated band figure holds."""
+        zone = _box_zone(box, height)
+        if zone is None:
+            return False
+        if (zone, _box_key(box)) in self.marks:
+            return True
+        return any(
+            z == zone and _centre_inside(box, (k[0] - 1, k[1] - 1, k[2] + 1, k[3] + 1))
+            for z, k in self.figures
+        )
 
 
 def _reference_pages(page_count: int, selected: list[int]) -> list[int]:
@@ -1338,6 +1368,36 @@ def _band_figures(page: pymupdf.Page, paths: list[_Path]) -> set[tuple[str, tupl
         if zone is not None:
             keys.add((zone, _box_key(figure.bbox)))
     return keys
+
+
+def _band_marks(page: pymupdf.Page, paths: list[_Path]) -> set[tuple[str, tuple]]:
+    """(zone, rounded box) of every drawing and image in the header/footer band."""
+    height = page.rect.height
+    display = _Display.of(page)
+    boxes = [p.bbox for p in paths] + [display.box(i["bbox"]) for i in page.get_image_info()]
+    return {(zone, _box_key(b)) for b in boxes if (zone := _box_zone(b, height)) is not None}
+
+
+def _page_pictures(page: pymupdf.Page) -> list[int]:
+    """The xrefs of the pictures covering the page (FULL_PAGE_FRACTION of it; 0 for an
+    inline image)."""
+    display = _Display.of(page)
+    rect = page.rect
+    infos = page.get_image_info()
+    big = [
+        k
+        for k, info in enumerate(infos)
+        if _area(_clip_box(display.box(info["bbox"]), rect))
+        >= FULL_PAGE_FRACTION * rect.width * rect.height
+    ]
+    if not big:
+        return []
+    xrefs = _image_xrefs(page, len(infos))
+    return [xrefs[k] for k in big]
+
+
+def _clip_box(box: BBox, rect: pymupdf.Rect) -> BBox:
+    return (max(box[0], 0.0), max(box[1], 0.0), min(box[2], rect.width), min(box[3], rect.height))
 
 
 def _margin_filter(
@@ -1371,9 +1431,17 @@ def _margin_filter(
             seen.add(("text", key))
             texts.setdefault(key, set()).add(row.clean)
         seen.update(("figure", key) for key in _band_figures(page, paths[number]))
+        seen.update(("mark", key) for key in _band_marks(page, paths[number]))
+        seen.update(("picture", xref) for xref in _page_pictures(page) if xref)
         counts.update(seen)
     needed = max(2, -(-len(reference) // 2))  # at least half of the pages, and two
-    repeated: dict[str, set] = {"text": set(), "rotated": set(), "figure": set()}
+    repeated: dict[str, set] = {
+        "text": set(),
+        "rotated": set(),
+        "figure": set(),
+        "mark": set(),
+        "picture": set(),
+    }
     for (kind, key), n in counts.items():
         if n >= needed:
             repeated[kind].add(key)
@@ -1384,6 +1452,8 @@ def _margin_filter(
         rotated=repeated["rotated"],
         figures=repeated["figure"],
         body=max(body, 1.0),
+        marks=repeated["mark"],
+        backgrounds=repeated["picture"],
     )
 
 
@@ -2413,25 +2483,23 @@ class _Path:
     source: int = -1  # index in the page's get_cdrawings list (handwriting is left out)
     frame: bool = False  # an outline along the edges of its own box only (a frame's shape)
     rules: bool = False  # paper rules: long separate horizontal and vertical lines only
-
-
-def _visible(colour: object, opacity: object) -> bool:
-    if colour is None or (isinstance(opacity, (int, float)) and opacity <= 0.01):
-        return False
-    return not (isinstance(colour, tuple | list) and all(v >= 0.97 for v in colour))
+    open_stroke: bool = False  # a stroked line or curve that does not close: a pen mark's shape
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
     """Visible vector paths, classified. `get_cdrawings` (plain tuples) is several times
     faster than `get_drawings` on plots with thousands of markers; the same list is
-    shared with the page type's ink analysis."""
+    shared with the page type's ink analysis. Near-white paint counts only on something
+    darker (`page_type.paint_visibility`: a dark slide's white diagram is seen, a white box
+    on the white page is not)."""
     display = _Display.of(page)
     width_pt, height_pt = page.rect.width, page.rect.height
     frame = page.cropbox  # the drawings' own (unrotated) frame
     paths: list[_Path] = []
-    for source, drawing in enumerate(drawings if drawings is not None else page.get_cdrawings()):
-        stroked = _visible(drawing.get("color"), drawing.get("stroke_opacity"))
-        filled = _visible(drawing.get("fill"), drawing.get("fill_opacity"))
+    drawings = drawings if drawings is not None else page.get_cdrawings()
+    seen = page_type.paint_visibility(drawings, page_type.image_boxes(page)[0])
+    for source, drawing in enumerate(drawings):
+        filled, stroked = seen[source]
         if not (stroked or filled):
             continue  # white boxes and invisible paths
         box = display.box(drawing["rect"])
@@ -2468,8 +2536,27 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
             and (_rectangle_outline(items, segments, box) or _border_like(items, display, box))
         )
         rules = kind == "shape" and page_type.paper_rules(drawing, frame.width, frame.height)
-        paths.append(_Path(box, kind, curved, filled and kind == "shape", source, border, rules))
+        open_stroke = stroked and not filled and not _encloses(items, drawing.get("closePath"))
+        paths.append(
+            _Path(box, kind, curved, filled and kind == "shape", source, border, rules, open_stroke)
+        )
     return paths
+
+
+def _encloses(items: Sequence[Any], close_path: object) -> bool:
+    """The path closes round an area (a box, a polygon, a ring): not a pen mark's open
+    stroke. A line that goes back on itself (MuPDF reports a closed one-segment path as
+    there and back) encloses nothing."""
+    if any(item[0] in ("re", "qu") for item in items):
+        return True
+    points = [q for item in items if item[0] in ("l", "c") for q in item[1:]]
+    if len(points) < 3:
+        return False
+    first, last = points[0], points[-1]
+    if not close_path and (abs(first[0] - last[0]) >= 0.3 or abs(first[1] - last[1]) >= 0.3):
+        return False
+    area2 = sum(a[0] * b[1] - b[0] * a[1] for a, b in pairwise([*points, points[0]]))
+    return abs(area2) > 1.0  # pt^2, twice the area
 
 
 def _border_like(items: Sequence[Any], display: _Display, box: BBox) -> bool:
@@ -2945,6 +3032,7 @@ class _Figure:
     paths: int = 0  # vector paths in it
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
+    xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)
 
     @property
     def reasons(self) -> list[str]:
@@ -2957,20 +3045,111 @@ class _Figure:
 
 
 def _raster_figures(page: pymupdf.Page, page_rect: pymupdf.Rect) -> list[_Figure]:
+    """Raster images as figures. Decoration is decided by the size drawn, not the pixels
+    (a 21-pixel QR code drawn an inch wide is content): an image drawn under MIN_IMAGE_PT
+    on a side is a bullet, a spacer or a rule; one with fewer than MIN_IMAGE_PX pixels on
+    a side is decoration only when it is plain (`_plain_image`: a transparent spacer, a
+    one-colour block). A picture covering the page is the page's own (a background, a
+    scan): never a figure; whether the page keeps its image is `_page_picture`'s."""
     display = _Display.of(page)
     figures = []
     page_area = page_rect.width * page_rect.height
-    for info in page.get_image_info():
+    infos = page.get_image_info()
+    xrefs = _image_xrefs(page, len(infos)) if infos else []
+    for k, info in enumerate(infos):
         rect = pymupdf.Rect(display.box(info["bbox"])) & page_rect
         if rect.is_empty:
             continue
-        w_px, h_px = int(info.get("width") or 0), int(info.get("height") or 0)
-        if min(w_px, h_px) < MIN_IMAGE_PX or min(rect.width, rect.height) < MIN_IMAGE_PT:
+        if min(rect.width, rect.height) < MIN_IMAGE_PT:
             continue  # bullets, spacers, rules drawn as images
         if rect.width * rect.height >= FULL_PAGE_FRACTION * page_area:
-            continue  # page background or a scanned page (OCR is out of scope)
-        figures.append(_Figure((rect.x0, rect.y0, rect.x1, rect.y1), images=1))
+            continue  # the page's background or a scan of it: `_page_picture`
+        w_px, h_px = int(info.get("width") or 0), int(info.get("height") or 0)
+        if min(w_px, h_px) < MIN_IMAGE_PX and _plain_image(page.parent, xrefs[k]):
+            continue  # a spacer or a fill drawn as an image
+        figures.append(_Figure((rect.x0, rect.y0, rect.x1, rect.y1), images=1, xref=xrefs[k]))
     return figures
+
+
+def _image_xrefs(page: pymupdf.Page, count: int) -> list[int]:
+    """The xref of each of the page's images, in `get_image_info` order (0 for an inline
+    image, or when the lists disagree)."""
+    xrefs = [int(info.get("xref") or 0) for info in page.get_image_info(xrefs=True)]
+    return xrefs if len(xrefs) == count else [0] * count
+
+
+# A plain image: looked at shrunk to at most PLAIN_SIDE pixels on its longer side, at most
+# PLAIN_EDGES pairs of neighbouring pixels differ by more than PLAIN_STEP levels (JPEG
+# noise on a flat colour; a gradient changes a level or two a pixel), and what is seen
+# (alpha above ALPHA_SEEN) covers all of it or nothing.
+PLAIN_SIDE = 128
+PLAIN_STEP = 16
+PLAIN_EDGES = 2
+ALPHA_SEEN = 13
+SEEN_WHOLE = 0.98
+
+
+def _plain_image(doc: pymupdf.Document | None, xref: int) -> bool:
+    """The image shows no picture: nothing in it is seen (a transparent spacer), or it is
+    seen whole in one colour or a smooth gradient (a wash, a template's background). A
+    picture with transparent parts (ink on a transparent overlay, a stencil mask's
+    shapes) is not plain, and neither is an image that cannot be read (an inline one)."""
+    if doc is None or xref <= 0:
+        return False
+    try:
+        pix = pymupdf.Pixmap(doc, xref)
+        key = doc.xref_get_key(xref, "SMask")
+        mask = pymupdf.Pixmap(doc, int(key[1].split()[0])) if key[0] == "xref" else None
+        if pix.colorspace is None:  # a stencil mask: its alpha is what is painted
+            mask, pix = pix, None
+        if pix is not None and (pix.alpha or pix.colorspace.n not in (1, 3)):
+            pix = pymupdf.Pixmap(pymupdf.csRGB, pix) if pix.colorspace.n not in (1, 3) else pix
+            pix = pymupdf.Pixmap(pix, 0) if pix.alpha else pix
+    except (RuntimeError, ValueError, IndexError, AttributeError):
+        return False
+    if mask is not None:
+        _shrink(mask)
+        alpha = mask.samples[mask.n - 1 :: mask.n]
+        seen = sum(1 for a in alpha if a > ALPHA_SEEN)
+        if seen == 0:
+            return True
+        if seen < SEEN_WHOLE * len(alpha):
+            return False
+    if pix is None:
+        return True  # a stencil painted whole: one colour
+    _shrink(pix)
+    return _edges(pix) <= PLAIN_EDGES
+
+
+def _shrink(pix: pymupdf.Pixmap) -> None:
+    factor = 0
+    while max(pix.width, pix.height) >> factor > PLAIN_SIDE:
+        factor += 1
+    if factor:
+        pix.shrink(factor)
+
+
+def _edges(pix: pymupdf.Pixmap) -> int:
+    """Pairs of neighbouring pixels (across and down) that differ by more than PLAIN_STEP
+    in some channel."""
+    w, h, n, stride, data = pix.width, pix.height, pix.n, pix.stride, pix.samples
+    edges = 0
+    for y in range(h):
+        row = y * stride
+        below = row + stride if y + 1 < h else None
+        for x in range(w):
+            i = row + x * n
+            for c in range(n):
+                v = data[i + c]
+                if x + 1 < w and abs(v - data[i + n + c]) > PLAIN_STEP:
+                    edges += 1
+                    break
+                if below is not None and abs(v - data[below + x * n + c]) > PLAIN_STEP:
+                    edges += 1
+                    break
+            if edges > PLAIN_EDGES:
+                return edges
+    return edges
 
 
 def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
@@ -3007,6 +3186,7 @@ def _vector_figures(
     page_sized: bool = True,
     left_out: list[BBox] | None = None,
     depth: int = 0,
+    small_out: list[tuple[BBox, list[_Path]]] | None = None,
 ) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables.
 
@@ -3020,20 +3200,27 @@ def _vector_figures(
     again; with no border to take off, a page-filling drawing that still holds a plotted
     line, curves or bars goes to `left_out`, and the safety net keeps the page image.
     With `page_sized` False (the page has ink: it may be a page of notes) such a drawing
-    is never a figure for the model: its box goes to `left_out` too (`INK_REASONS`)."""
+    is never a figure for the model: its box goes to `left_out` too (`INK_REASONS`).
+
+    Rules alone (separators, underlines, a table's grid) and boxes or panels round text
+    are not figures, unless they are drawn as a diagram (`_drawn_diagram`: lines joined
+    end to end into a staircase, boxes joined by lines) with no running text inside.
+    Clusters too small to be figures that are no part of one go to `small_out`: the page
+    decides what they are once its text is read (`_leftover_drawings`)."""
     figures = []
-    small: list[tuple[BBox, int]] = []  # drawings too small to be figures on their own
+    small: list[tuple[BBox, list[_Path]]] = []  # drawings too small to be figures on their own
     index = _RowIndex([r for r in rows if not r.vertical])
     paths = [p for p in paths if not _page_furniture(p, page_rect)]
     for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
         members = [paths[i] for i in group]
-        if all(p.kind in ("hrule", "vrule") or p.rules for p in members):
+        rule_only = all(p.kind in ("hrule", "vrule") or p.rules for p in members)
+        if rule_only and not _line_chain(members):
             continue  # separators, underlines, table grids, paper rules
         x0, y0, x1, y1 = _union(p.bbox for p in members)
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
         width, height = box[2] - box[0], box[3] - box[1]  # the visible part only
         if width < MIN_DRAWING_PT or height < MIN_DRAWING_PT or width * height < 1200:
-            small.append((box, len(members)))
+            small.append((box, members))
             continue
         fills_page = (
             width >= PAGE_SIZED_FRACTION * page_rect.width
@@ -3067,12 +3254,17 @@ def _vector_figures(
                         page_sized=page_sized,
                         left_out=left_out,
                         depth=depth + 1,
+                        small_out=small_out,
                     )
                 elif (curved or len(bars) >= 2) and left_out is not None:
                     left_out.append(box)  # drawings no figure was made of: the page image
                 continue
-        elif not curved and len(bars) < 2 and len(inside) >= 2:
-            continue  # a box, shaded panel or table drawn around text
+        elif not curved and len(bars) < 2 and (len(inside) >= 2 or rule_only):
+            # A box, shaded panel or table drawn around text, unless it is a diagram of
+            # boxes and lines with labels in it (an org chart, a step plot).
+            drawn = rule_only or _drawn_diagram(members)  # rules alone got here as a chain
+            if not drawn or (ctx is not None and _running_text(inside, ctx)):
+                continue
         figures.append(_Figure(box, paths=len(members)))
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
     # a legend's markers a little apart) are part of it: left out, its crop missed them.
@@ -3080,9 +3272,107 @@ def _vector_figures(
         for figure in figures:
             if _within(box, figure.bbox, FIGURE_PART_REACH):
                 figure.bbox = _union([figure.bbox, box])
-                figure.paths += members
+                figure.paths += len(members)
                 break
+        else:
+            if small_out is not None:
+                small_out.append((box, members))
     return figures
+
+
+JOIN_PT = 1.5  # pt: line ends this close meet (a corner of a staircase, a connector's end)
+MAX_DIAGRAM_BOXES = 200  # more box outlines in one cluster are a grid of cells, not a diagram
+
+
+def _drawn_diagram(members: Sequence[_Path]) -> bool:
+    """Lines or boxes drawn as a diagram, not as structure round text: horizontal and
+    vertical lines joined end to end into an open chain (`_line_chain`: a staircase, a
+    step plot, each piece its own line), or two or more separate boxes with a line that
+    starts at one of them outside every box (`_joined_boxes`: an org chart, a flow of two
+    boxes and one arrow). A box drawn line by line closes on itself; a table's rules meet
+    in crossings and T-junctions, not end to end; underlines do not meet at all."""
+    return _line_chain(members) or _joined_boxes(members)
+
+
+def _line_chain(members: Sequence[_Path]) -> bool:
+    """Four or more horizontal and vertical rules (two of each at least) joined corner to
+    corner, end to end, into a chain that does not close (some end meets nothing)."""
+    rules = [p for p in members if p.kind in ("hrule", "vrule")]
+    if len(rules) < 4:
+        return False
+    ends: list[tuple[float, float, int]] = []
+    for i, rule in enumerate(rules):
+        x0, y0, x1, y1 = rule.bbox
+        if rule.kind == "hrule":
+            y = (y0 + y1) / 2
+            ends += [(x0, y, i), (x1, y, i)]
+        else:
+            x = (x0 + x1) / 2
+            ends += [(x, y0, i), (x, y1, i)]
+    parent = list(range(len(rules)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    buckets: dict[tuple[int, int], list[int]] = {}
+    for k, (x, y, _) in enumerate(ends):
+        buckets.setdefault((int(x // JOIN_PT), int(y // JOIN_PT)), []).append(k)
+    met = [False] * len(ends)
+    for k, (x, y, i) in enumerate(ends):
+        bx, by = int(x // JOIN_PT), int(y // JOIN_PT)
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for m in buckets.get((bx + dx, by + dy), ()):
+                    ox, oy, j = ends[m]
+                    if j == i or rules[i].kind == rules[j].kind:
+                        continue  # a corner joins a horizontal and a vertical line
+                    if abs(ox - x) <= JOIN_PT and abs(oy - y) <= JOIN_PT:
+                        met[k] = True
+                        parent[find(i)] = find(j)
+    chains: dict[int, list[int]] = {}
+    for i in range(len(rules)):
+        chains.setdefault(find(i), []).append(i)
+    for chain in chains.values():
+        if len(chain) < 4:
+            continue
+        kinds = Counter(rules[i].kind for i in chain)
+        if kinds["hrule"] < 2 or kinds["vrule"] < 2:
+            continue
+        if any(not met[k] for k, (_, _, i) in enumerate(ends) if find(i) == find(chain[0])):
+            return True
+    return False
+
+
+def _joined_boxes(members: Sequence[_Path]) -> bool:
+    """Two or more separate box outlines (none inside another) and a line (not a box, not
+    a filled shape) outside every box that starts at one of them: a connector."""
+    outlines = [p.bbox for p in members if p.frame and p.kind == "shape"]
+    if not 2 <= len(outlines) <= MAX_DIAGRAM_BOXES:
+        return False  # one box round text, or a grid of cells (a table)
+    boxes = [
+        b for b in outlines if not any(_area(o) > _area(b) and _inside(b, o) for o in outlines)
+    ]
+    if len(boxes) < 2:
+        return False
+    grown = [(b[0] - 1, b[1] - 1, b[2] + 1, b[3] + 1) for b in boxes]
+    for path in members:
+        if path.frame or path.filled:
+            continue
+        if any(_centre_inside(path.bbox, b) for b in grown):
+            continue
+        if any(_within(path.bbox, b, JOIN_PT) for b in boxes):
+            return True
+    return False
+
+
+def _inside(box: BBox, outer: BBox) -> bool:
+    return (
+        outer[0] - 1 <= box[0] and box[2] <= outer[2] + 1 and outer[1] - 1 <= box[1]
+        and box[3] <= outer[3] + 1
+    )  # fmt: skip
 
 
 def _within(box: BBox, other: BBox, reach: float) -> bool:
@@ -3194,21 +3484,29 @@ def _merge_figures(figures: list[_Figure]) -> list[_Figure]:
     merged = []
     for group in _cluster([f.bbox for f in figures], 2.0):
         members = [figures[i] for i in group]
+        if len(members) == 1:
+            merged.append(members[0])
+            continue
         box = _union(f.bbox for f in members)
         images, paths = sum(f.images for f in members), sum(f.paths for f in members)
         merged.append(_Figure(box, images=images, paths=paths))
     return merged
 
 
-def _absorb_labels(figure: _Figure, rows: list[_Row], ctx: _Context) -> bool:
-    """Give a figure its labels; False when the "figure" is really a background.
+def _absorb_labels(
+    figure: _Figure, rows: list[_Row], ctx: _Context, doc: pymupdf.Document | None = None
+) -> bool:
+    """Give a figure its labels; False when the "figure" is a plain background.
 
     Short text inside a figure, and short labels just outside it, belong to it. Running
     text never does: lines of a paragraph inside a figure's box (text set on a backdrop,
     in a panel, over a watermark logo) stay in the reading flow, and so does a title-sized
-    line. A raster image with such text on top of it is a background or a watermark, not
-    a figure: it is dropped (nothing absorbed) so its text keeps its place in the outline.
-    """
+    line. A picture with such text on it (a slide's photo under its title, a caption box
+    over a photo) stays a figure: it was dropped as a background, with nothing to say so
+    (the silent-loss sweep, 2026-10-12). Only a plain one (`_plain_image`: a coloured
+    panel or a wash drawn as a picture) is a background: it is dropped, nothing absorbed,
+    and its text keeps its place in the outline. A picture covering the page is the
+    page's own (`_raster_figures`)."""
     x0, y0, x1, y1 = figure.bbox
     inside: list[_Row] = []
     near: list[_Row] = []
@@ -3231,7 +3529,7 @@ def _absorb_labels(figure: _Figure, rows: list[_Row], ctx: _Context) -> bool:
         elif short and (near_x or near_y):
             near.append(row)
     running = _running_text(inside, ctx)
-    if figure.images and not figure.paths and running:
+    if running and figure.images == 1 and not figure.paths and _plain_image(doc, figure.xref):
         return False
     for row in [*inside, *near]:
         if id(row) not in running:
@@ -3785,13 +4083,19 @@ class _PageBlocks:
 
 def _prepare_rows(
     page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter
-) -> tuple[list[_Row], tuple[float, float] | None]:
+) -> tuple[list[_Row], tuple[float, float] | None, list[_Row]]:
+    """The page's rows without its running headers, footers, page numbers and watermarks,
+    its column gutter, and the rows so dropped (a figure may claim some back as labels:
+    `_figure_labels`)."""
     height = page.rect.height
-    kept = [f for f in frags if not margins.drops(f, height)]
+    kept: list[_Row] = []
+    dropped: list[_Row] = []
+    for frag in frags:
+        (dropped if margins.drops(frag, height) else kept).append(frag)
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
-    return _merge_baselines(kept, gutter), gutter
+    return _merge_baselines(kept, gutter), gutter, _merge_baselines(dropped, gutter)
 
 
 def _page_blocks(
@@ -3808,6 +4112,11 @@ def _page_blocks(
     page_sized: bool = True,
     little_text: bool = False,
     strokes: Sequence[BBox] = (),
+    dropped: Sequence[_Row] = (),
+    ink_sources: Collection[int] = frozenset(),
+    mixed_ink: bool = False,
+    label_keys: Collection[tuple] = frozenset(),
+    covers: Sequence[tuple[float, float]] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
     rows = _split_labels(rows)
@@ -3818,11 +4127,20 @@ def _page_blocks(
     used = {id(rule) for rule in used_rules}
     loose = [p for p in paths if id(p) not in used]
     left_out: list[BBox] = []
-    vector = _vector_figures(loose, rows, page_rect, ctx, page_sized=page_sized, left_out=left_out)
+    small: list[tuple[BBox, list[_Path]]] = []
+    vector = _vector_figures(
+        loose, rows, page_rect, ctx, page_sized=page_sized, left_out=left_out, small_out=small
+    )
     figures = _merge_figures(_raster_figures(page, page_rect) + vector)
     # A logo repeated in the header or footer band is decoration, like a running header.
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
-    figures = [f for f in figures if _absorb_labels(f, rows, ctx)]
+    # A chart's tick labels in the footer band, or its axis title repeated on every slide,
+    # are its labels, not running text.
+    restored = _figure_labels(dropped, figures, rows, page_rect.height, label_keys)
+    for row in restored:
+        _classify_row(row)
+    rows = [*rows, *restored]
+    figures = [f for f in figures if _absorb_labels(f, rows, ctx, page.parent)]
     text_rows = [r for r in rows if not r.absorbed]
     _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
@@ -3849,15 +4167,34 @@ def _page_blocks(
             )
         )
     blocks.extend(_table_blocks(page_tables))
+    # A typed page's drawings too small to be figures that no element holds (an icon, a
+    # benzene ring, maths drawn as outlines, a tick): a figure of their own, or
+    # handwriting when they are pen marks. A page with less than a line of text keeps
+    # its image instead (`_painted`, below).
+    marks: list[BBox] = []
+    leftover = False
+    if not little_text:
+        index = _RowIndex([r for r in rows if not r.vertical])
+        frames = [q.bbox for q in paths if q.frame and _page_furniture(q, page_rect)]
+        found, marks = _leftover_drawings(
+            small, blocks, index, page_rect, margins, ink_sources, frames, covers
+        )
+        if page_sized:
+            blocks.extend(found)
+        elif mixed_ink:  # a page with handwriting: what is left over is cut out with it
+            marks += [b.bbox for b in found]
+        else:  # a page with ink the checks did not confirm: its image, not a figure
+            leftover, marks = bool(found or marks), []
     # Handwriting too light for a mixed_ink page (a short note, a signature, a circle and
-    # a tick) that no figure, table or equation holds: cut out like the rest of
-    # handwriting on a typed page, not lost. A mark over typed text (a word circled, a
-    # line underlined by hand) is not part of the text, and a note in the top or bottom
+    # a tick) that no figure holds: cut out like the rest of handwriting on a typed page,
+    # not lost. A mark over typed text (a word circled, a line underlined by hand) is not
+    # part of the text, nor is a note written over an equation or in a table's cells (a
+    # transcription or a rebuilt table would leave it out); a note in the top or bottom
     # margin counts too.
-    held = [b.bbox for b in blocks if b.kind in (Kind.FIGURE, Kind.TABLE, Kind.EQUATION)]
+    held = [b.bbox for b in blocks if b.kind == Kind.FIGURE]
     loose = _loose_strokes(strokes, held, (page_rect.width, page_rect.height), margins=True)
-    if len(loose) >= LOOSE_INK_STROKES:
-        ink = [*ink, *page_type.stroke_regions(loose)]
+    if len(loose) >= LOOSE_INK_STROKES or marks:
+        ink = [*ink, *page_type.stroke_regions([*loose, *marks])]
     blocks.extend(_ink_blocks(ink, page_rect))
     order = _reading_order([b.bbox for b in blocks], gutter, ctx.body)
     final = _merge_column_continuations([blocks[i] for i in order])
@@ -3875,10 +4212,233 @@ def _page_blocks(
     # drawings: anything painted that went into no block (pen strokes too few to be called
     # handwriting under a title, a drawing too small to be a figure) is lost unless the
     # page image is kept. A drawn list bullet belongs to its item.
-    unread = little_text and _painted(
-        page, paths, [b.bbox for b in final], _RowIndex([r for r in rows if not r.vertical])
+    unread = leftover or (
+        little_text
+        and _painted(
+            page,
+            paths,
+            [b.bbox for b in final],
+            _RowIndex([r for r in rows if not r.vertical]),
+            margins,
+        )
     )
     return _PageBlocks(number, size, final, left_out, unread)
+
+
+def _covered_points(
+    page: pymupdf.Page, kind: page_type.PageTypeResult
+) -> list[tuple[float, float]]:
+    """Origins (display space) of the visible characters something was painted over."""
+    display = _Display.of(page)
+    return [display.point(x / 2, y / 2) for x, y in kind.text.covered]
+
+
+def _figure_labels(
+    dropped: Sequence[_Row],
+    figures: Sequence[_Figure],
+    rows: Sequence[_Row],
+    height: float,
+    accepted: Collection[tuple] = frozenset(),
+) -> list[_Row]:
+    """Rows the header and footer rules dropped (`_prepare_rows`) that label a figure: a
+    chart's tick labels in the footer band (bare numbers, read as page numbers), its axis
+    title repeated on every slide of a deck (a running footer), a rotated axis title
+    repeated at the same place (a watermark). A dropped row is a label when it is short
+    (LABEL_MAX_CHARS), not diagonal, and within LABEL_REACH x its size of a figure or of
+    the short rows just beside it (its tick labels), level with it for a rotated row and
+    under or over it otherwise (`_beside_figure`). Bare numbers count only two or more on
+    one baseline: a page number alone under a figure is still a page number. Other text
+    counts only when its key is `accepted` (`_label_keys`: beside a figure wherever the
+    document repeats it), so a running footer that also runs under pages of text stays
+    dropped."""
+    if not dropped or not figures:
+        return []
+    extents = _figure_extents([f.bbox for f in figures], rows)
+    found = []
+    for row in _label_candidates(dropped, numbers=True):
+        if not _beside_figure(row, extents):
+            continue
+        if _is_number_row(row) or _label_key(row, height) in accepted:
+            found.append(row)
+    numbers = [r for r in found if _is_number_row(r)]
+    lone = {
+        id(r)
+        for r in numbers
+        if not any(o is not r and abs(o.baseline - r.baseline) <= 0.3 * r.size for o in numbers)
+    }
+    return [r for r in found if id(r) not in lone]
+
+
+def _is_number_row(row: _Row) -> bool:
+    return not row.vertical and _is_page_number(row.clean)
+
+
+def _label_candidates(dropped: Sequence[_Row], *, numbers: bool) -> list[_Row]:
+    """Dropped rows that could be a figure's labels: short, not diagonal; bare numbers
+    only with `numbers`."""
+    return [
+        r
+        for r in dropped
+        if not r.diagonal and len(r.clean) <= LABEL_MAX_CHARS and (numbers or not _is_number_row(r))
+    ]
+
+
+def _label_key(row: _Row, height: float) -> tuple:
+    """What the header and footer rules recognise a dropped row by (its band and text, or
+    its rotated text and place)."""
+    if row.vertical:
+        return ("rotated", *_rotated_key(row))
+    return ("band", _margin_zone(row, height), _norm_margin(row.clean))
+
+
+def _figure_extents(boxes: Sequence[BBox], rows: Sequence[_Row]) -> list[BBox]:
+    """Each figure box grown by the short rows just beside it (its tick labels)."""
+    extents = []
+    for box in boxes:
+        near = [
+            r.bbox
+            for r in rows
+            if not r.vertical and len(r.clean) <= 25 and _within(r.bbox, box, 1.5 * r.size)
+        ]
+        extents.append(_union([box, *near]))
+    return extents
+
+
+def _beside_figure(row: _Row, extents: Sequence[BBox]) -> bool:
+    reach = LABEL_REACH * row.size
+    cx, cy = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
+    for x0, y0, x1, y1 in extents:
+        if row.vertical:
+            if y0 <= cy <= y1 and max(x0 - row.x1, row.x0 - x1) <= reach:
+                return True
+        elif x0 - reach <= cx <= x1 + reach and max(y0 - row.y1, row.y0 - y1) <= reach:
+            return True
+    return False
+
+
+def _label_keys(
+    doc: pymupdf.Document,
+    numbers: Sequence[int],
+    prepared: dict[int, tuple[list[_Row], tuple[float, float] | None, list[_Row]]],
+    paths: dict[int, list[_Path]],
+    ctx: _Context,
+    margins: _MarginFilter,
+) -> set[tuple]:
+    """Keys (`_label_key`) of the dropped repeated text that is beside a figure on every
+    analysed page it was dropped from: an axis title repeated under each chart of a deck,
+    not a running footer that also runs under pages of text. Only pages with such a
+    candidate pay for a first look at their figures (`_figure_boxes`)."""
+    near: set[tuple] = set()
+    far: set[tuple] = set()
+    for n in numbers:
+        page = doc[n]
+        candidates = [
+            r
+            for r in _label_candidates(prepared[n][2], numbers=False)
+            if _label_key(r, page.rect.height) not in far
+        ]
+        if not candidates:
+            continue  # nothing, or only what a page of text already ruled out
+        rows = prepared[n][0]
+        extents = _figure_extents(_figure_boxes(page, rows, paths[n], ctx, margins), rows)
+        for row in candidates:
+            key = _label_key(row, page.rect.height)
+            (near if _beside_figure(row, extents) else far).add(key)
+    return near - far
+
+
+def _figure_boxes(
+    page: pymupdf.Page,
+    rows: list[_Row],
+    paths: list[_Path],
+    ctx: _Context,
+    margins: _MarginFilter,
+) -> list[BBox]:
+    """The page's figure boxes as `_page_blocks` finds them, roughly (equation rules are
+    not taken out first): for `_label_keys` only."""
+    rect = page.rect
+    figures = _merge_figures(_raster_figures(page, rect) + _vector_figures(paths, rows, rect, ctx))
+    return [f.bbox for f in figures if not margins.drops_figure(f.bbox, rect.height)]
+
+
+def _leftover_drawings(
+    clusters: Sequence[tuple[BBox, list[_Path]]],
+    blocks: Sequence[_Block],
+    index: _RowIndex,
+    page_rect: pymupdf.Rect,
+    margins: _MarginFilter,
+    ink_sources: Collection[int],
+    frames: Sequence[BBox] = (),
+    covers: Sequence[tuple[float, float]] = (),
+) -> tuple[list[_Block], list[BBox]]:
+    """A typed page's drawings too small to be figures (`_vector_figures`' `small_out`)
+    that no block holds: before, dropped with nothing to say so (the silent-loss sweep,
+    2026-10-12: an icon, a benzene ring, a number line, maths drawn as glyph outlines,
+    ticks). Not counted: drawn list bullets, a repeated mark in the header or footer band,
+    horizontal and vertical lines and boxes alone (an empty answer box, a black box over a
+    line), anything whose middle lies in a block (an underline, a box round a word), and
+    the ornaments of a page frame: marks at the edges of a frame round the page
+    (`frames`, corner curls), or a group that runs round the page itself (a frame of
+    separate dots), dots alone (DOT_PT), and a shape painted over hidden text (`covers`,
+    the covered characters' origins: a box or a black highlight hiding a line). The rest
+    is grouped (LEFTOVER_REACH) and each group kept when at least LEFTOVER_MIN_PT on its
+    longer side or of page_type.VECTOR_MIN_PATHS marks in different places: pen marks
+    (most of their paths are the page type's pen strokes, or every path is an open
+    stroked line or curve: a tick, a cross, a signature) are returned as handwriting
+    boxes (never sent to the figure model); any other drawing becomes a FIGURE block for
+    the model."""
+    pad = UNREAD_PAD
+    grown = [(b.bbox[0] - pad, b.bbox[1] - pad, b.bbox[2] + pad, b.bbox[3] + pad) for b in blocks]
+    keep: list[tuple[BBox, list[_Path]]] = []
+    for _, cluster in clusters:
+        members = [p for p in cluster if not _bullet_mark(p, index)]
+        if not members:
+            continue
+        box = _clip_box(_union(p.bbox for p in members), page_rect)
+        if margins.drops_mark(box, page_rect.height) or all(
+            margins.drops_mark(p.bbox, page_rect.height) for p in members
+        ):
+            continue
+        if any(_centre_inside(box, g) for g in grown) or any(
+            _at_edge(box, frame, FIGURE_PART_REACH) for frame in frames
+        ):
+            continue
+        keep.append((box, members))
+    figures: list[_Block] = []
+    marks: list[BBox] = []
+    for group in _cluster([b for b, _ in keep], LEFTOVER_REACH):
+        members = [p for i in group for p in keep[i][1]]
+        box = _union(keep[i][0] for i in group)
+        places = len({_box_key(p.bbox) for p in members})  # a path drawn again is one mark
+        if (
+            max(box[2] - box[0], box[3] - box[1]) < LEFTOVER_MIN_PT
+            and places < page_type.VECTOR_MIN_PATHS
+        ) or _round_page(box, page_rect):
+            continue
+        if not any(p.curved for p in members):
+            continue  # rules, boxes and bars alone (an answer box, a box over a line)
+        if all(p.filled and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= DOT_PT
+               for p in members):  # fmt: skip
+            continue  # dots alone: leaders, bullets the bullet test missed
+        if any(_centre_inside((x, y, x, y), box) for x, y in covers):
+            continue  # a shape painted over hidden text: its cover, not a drawing
+        pen = sum(p.source in ink_sources for p in members)
+        if 2 * pen >= len(members) or all(p.open_stroke for p in members):
+            marks.append(box)
+        else:
+            reasons = [f"vector drawing ({len(members)} paths)"]
+            figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
+    return figures, marks
+
+
+def _at_edge(box: BBox, frame: BBox, reach: float) -> bool:
+    """`box` lies within `reach` of an edge of `frame` (outside it or inside it)."""
+    if not _within(box, frame, reach):
+        return False
+    x0, y0, x1, y1 = frame
+    return (
+        box[0] <= x0 + reach or box[2] >= x1 - reach or box[1] <= y0 + reach or box[3] >= y1 - reach
+    )
 
 
 _TEXT_BLOCKS = (Kind.PARAGRAPH, Kind.LIST_ITEM)  # blocks whose text may hold inline maths
@@ -4042,8 +4602,9 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             paths[number] = [p for p in paths[number] if p.source not in ink]
         found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
-    ctx = _body_and_pitch({n: rows for n, (rows, _) in prepared.items()})
-    _list_markers({n: rows for n, (rows, _) in prepared.items()}, paths, ctx)
+    ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
+    _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
+    label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
     pages = [
         _kept_page(doc[n], n)
         if n in kept and n not in text_kept
@@ -4060,6 +4621,11 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             page_sized=not INK_REASONS & set(types[n].reasons),
             little_text=types[n].text.visible_chars < page_type.TEXT_MIN,
             strokes=_light_ink(types[n]),
+            dropped=prepared[n][2],
+            ink_sources=types[n].ink.ink_drawings,
+            mixed_ink=types[n].kind == "mixed_ink",
+            label_keys=label_keys,
+            covers=_covered_points(doc[n], types[n]),
         )
         for n in selected
     ]
@@ -4077,11 +4643,14 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         if n in kept:
             continue
         if n not in boxes:
-            unread = _painted(doc[n], paths[n])
+            unread = _painted(doc[n], paths[n], margins=margins)
         else:
             left_out = bool(page.left_out) and types[n].kind != "mixed_ink"
             unread = left_out or page.unread or _unread_ink(types[n], boxes[n], page.size)
-        if unread:
+        # A picture covering the page under its typed text (a scan with a stamp, a slide
+        # on a full-bleed photo, ink drawn on a transparent overlay): never a figure, and
+        # not to be dropped as a background unless it is one.
+        if unread or _page_picture(doc[n], margins):
             kept[n] = page_type.UNREAD_PAGE
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
     if title is None:
@@ -4140,15 +4709,30 @@ def _loose_strokes(
 
 
 def _light_ink(kind: page_type.PageTypeResult) -> list[BBox]:
-    """The pen strokes of a typed page (a line of visible text or more) whose ink is clean
-    but too light to make it mixed_ink: the strokes `_page_blocks` cuts out when they go
-    into no block. None for other pages (mixed_ink cuts out all its strokes; a page with
-    less text has the safety net, `_painted`)."""
+    """The pen strokes of a typed page (a line of visible text or more) too light to make
+    it mixed_ink, clean or not (two pen widths in one note fail the clean test): the
+    strokes `_page_blocks` cuts out when no figure holds them. None for other pages
+    (mixed_ink cuts out all its strokes; a page with less text has the safety net,
+    `_painted`)."""
     if kind.kind == "mixed_ink" or kind.text.visible_chars < page_type.TEXT_MIN:
         return []
-    if not kind.ink.clean:
-        return []
+    if INK_REASONS & set(kind.reasons):
+        return []  # rejected or not analysed: the safety net's (`_unread_ink`, `left_out`)
     return kind.ink.stroke_boxes
+
+
+def _page_picture(page: pymupdf.Page, margins: _MarginFilter) -> bool:
+    """A picture covers the page (FULL_PAGE_FRACTION of it) and shows something: it is not
+    plain (`_plain_image`: one colour, a smooth gradient, nothing seen) and not the
+    template's background repeated on the document's pages (`_MarginFilter.backgrounds`).
+    Such a picture is never a figure (`_raster_figures`), so the page keeps its image:
+    a scan with 40 or more visible characters (a stamp, a header) and no hidden layer, a
+    slide on a full-bleed photo, a typed page under a transparent picture of hand marks."""
+    for xref in _page_pictures(page):
+        if xref and (xref in margins.backgrounds or _plain_image(page.parent, xref)):
+            continue
+        return True
+    return False
 
 
 def _painted(
@@ -4156,19 +4740,24 @@ def _painted(
     paths: list[_Path],
     boxes: Sequence[BBox] = (),
     bullets: _RowIndex | None = None,
+    margins: _MarginFilter | None = None,
 ) -> bool:
-    """Something is painted outside the header and footer bands and outside every block
-    read from the page (`boxes`, grown by UNREAD_PAD): a raster image or a drawing at
-    least MIN_IMAGE_PT on a side, or VECTOR_MIN_PATHS smaller marks (pen strokes are
-    small). Rules, a frame round the page, a background fill and a band of colour along
-    an edge (a slide template's) are not content, alone; nor is a drawn list bullet beside
-    a row of `bullets`."""
+    """Something is painted outside every block read from the page (`boxes`, grown by
+    UNREAD_PAD): a raster image or a drawing at least MIN_IMAGE_PT on a side, or
+    VECTOR_MIN_PATHS smaller marks (pen strokes are small). Rules (unless joined into a
+    drawing: `_line_chain`), a frame round the page, a background fill and a band of
+    colour along an edge (a slide template's) are not content, alone; nor is a drawn list
+    bullet beside a row of `bullets`, nor what repeats in the header or footer band (a
+    logo: `_MarginFilter.drops_mark`). A note written in the top or bottom margin counts."""
     height = page.rect.height
     pad = UNREAD_PAD
     grown = [(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad) for b in boxes]
+    drawn = _drawn_rules(paths)
     marks = 0
     for path in paths:
-        if path.kind in ("hrule", "vrule") or _box_zone(path.bbox, height) is not None:
+        if path.kind in ("hrule", "vrule") and id(path) not in drawn:
+            continue
+        if margins is not None and margins.drops_mark(path.bbox, height):
             continue
         if path.rules or _page_furniture(path, page.rect):
             continue
@@ -4184,11 +4773,27 @@ def _painted(
     display = _Display.of(page)
     for info in page.get_image_info():
         box = display.box(info["bbox"])
-        if min(box[2] - box[0], box[3] - box[1]) < MIN_IMAGE_PT or _box_zone(box, height):
+        if min(box[2] - box[0], box[3] - box[1]) < MIN_IMAGE_PT:
+            continue
+        if margins is not None and margins.drops_mark(box, height):
             continue
         if not any(_centre_inside(box, inside) for inside in grown):
             return True
     return False
+
+
+def _drawn_rules(paths: Sequence[_Path]) -> set[int]:
+    """Ids of the horizontal and vertical rules that are part of a drawing: a cluster of
+    rules joined end to end into an open chain (`_line_chain`: a step plot, a staircase)."""
+    rules = [p for p in paths if p.kind in ("hrule", "vrule")]
+    if len(rules) < 4:
+        return set()
+    drawn: set[int] = set()
+    for group in _cluster([r.bbox for r in rules], DRAWING_CLUSTER_GAP):
+        members = [rules[i] for i in group]
+        if _line_chain(members):
+            drawn.update(id(r) for r in members)
+    return drawn
 
 
 def _edge_band(path: _Path, page_rect: pymupdf.Rect) -> bool:
