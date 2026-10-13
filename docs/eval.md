@@ -1388,16 +1388,19 @@ published with the results. The gold manifest's SHA-256 is
 **Retired first editions.** Every live CC BY STEM book (Physics, Statistics) was used in
 development, and every current edition of the others is CC BY-NC-SA (`gold licenses`,
 2026-10-13). The set therefore comes from retired first editions, which are CC BY 4.0 in
-the OpenStax archive and CMS. Whether a retired edition is acceptable ground truth is open
-(ADR 0001, question 2), so fetching needs `--allow-retired`; every record carries
+the OpenStax archive and CMS. Whether a retired edition is acceptable ground truth was
+answered for this evaluation on 2026-10-13 (`proof/DECISION-retired-editions-2026-10-13.md`,
+ADR 0001 question 2), and the ADR as a whole stays open. Fetching needs `--allow-retired`; every record carries
 `book_state: retired`. Their MathML and alt text are older in style than the current
 editions'.
 
-**Nothing from this set is in the repository.** The gold, the printed PDFs, the caches and
-the reports stay outside it, by default under `~/.cache/a11y-stem/heldout`
+**The answer key is not in the repository.** The gold, the caches and the reports stay outside
+it, by default under `~/.cache/a11y-stem/heldout`
 (`$XDG_CACHE_HOME`, or `--heldout-dir`): the research sweeps read every PDF in
 `.cache/eval/pages/`, and `data/eval/` feeds the CI gate, so a held-out file in either
-would flow into development or into the gate. `tests/test_heldout.py` checks that no
+would flow into development or into the gate. The exception is `proof/interim/heldout-2026-10/`:
+the printed PDFs and the open parsers' and the headings task's outputs, which sit outside
+`data/`, `tests/fixtures/` and the research sweeps' folders (`proof/REGISTERED.md`). `tests/test_heldout.py` checks that no
 held-out section is under `data/` or `tests/fixtures/`, and the tests build their own
 small synthetic set.
 

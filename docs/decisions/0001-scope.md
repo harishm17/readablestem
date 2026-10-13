@@ -77,7 +77,7 @@ Open questions this raises (not legal advice; unverified until checked against O
 terms):
 
 1. Keep the public gold set CC BY only (current code rule), or also use CC BY-NC-SA books? ShareAlike may affect how a derived dataset can be licensed.
-2. Is a retired edition acceptable as ground truth, given its alt text and MathML may be older than the current edition? Until this is decided, `gold fetch` refuses non-live books unless `--allow-retired` is passed, and every record carries `book_state`.
+2. Is a retired edition acceptable as ground truth, given its alt text and MathML may be older than the current edition? **Answered for the held-out evaluation on 2026-10-13, before any system ran on it: yes** (`proof/DECISION-retired-editions-2026-10-13.md`; the licence of each retired book was read from OpenStax's CMS and archive and is in `data/openstax-licenses.csv` and `proof/selection/licenses-2026-10-13.csv`, which is not legal advice). The rest of this ADR stays Proposed. Before that decision, `gold fetch` refuses non-live books unless `--allow-retired` is passed, and every record carries `book_state`.
 3. Equation scoring defaults: report strict exact match, lenient exact match (mi/mn/mtext treated alike, trailing period ignored) and TEDS (1 - TED / max nodes), or a subset? Also: should lenient mode split operators out of OpenStax text (`<mtext>time =</mtext>` vs `\text{time} =`)? That affects 5 of the 30 sample equations.
 
 ## Consequences

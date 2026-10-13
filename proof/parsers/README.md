@@ -91,7 +91,7 @@ non-default switch is labelled.
 |---|---|---|---|
 | `docling` (P1) | Docling 2.138.0 | `docling --to json --to html --to md`; OCR on (RapidOCR); TableFormer accurate; image mode embedded (the CLI default); formula enrichment off | Docling, docling-core, docling-ibm-models: MIT. Layout model Apache-2.0; TableFormer CDLA-Permissive-2.0 and Apache-2.0; RapidOCR Apache-2.0 |
 | `docling-formula` (P1f) | Docling 2.138.0 | as above plus `--enrich-formula` (CodeFormulaV2): the one non-default switch | as above; CodeFormulaV2 CDLA-Permissive-2.0 |
-| `mineru-basic` (P2) | MinerU 4.0.12 | `mineru-kit parse --tier basic --format zip` (CPU, ONNX; MinerU's own recommendation for a machine without an accelerator) | "MinerU Open Source License" (Apache-2.0 plus extra terms: credit MinerU; a commercial licence above 100M MAU or $20M monthly revenue; say so when offering an online service based on MinerU). docvortex: MIT, Apache-2.0, BSD-3-Clause. Models: PaddlePaddle ONNX exports, Apache-2.0 upstream |
+| `mineru-basic` (P2) | MinerU 4.0.12 | `mineru-kit parse --tier basic --format zip` (CPU, ONNX; MinerU's lower-resource local tier. Its documentation names `standard`, which also runs on CPU, as the default tier; that was not run, so this arm is not MinerU at its default settings) | "MinerU Open Source License" (Apache-2.0 plus extra terms: credit MinerU; a commercial licence above 100M MAU or $20M monthly revenue; say so when offering an online service based on MinerU). docvortex: MIT, Apache-2.0, BSD-3-Clause. Models: PaddlePaddle ONNX exports, Apache-2.0 upstream |
 | `pymupdf4llm` (P3) | PyMuPDF4LLM 1.28.2 | `pymupdf4llm.to_markdown(path)`; the layout model is on because `pymupdf-layout` is installed; images not written | AGPL-3.0 or Artifex commercial. The `pymupdf-layout` wheel's metadata also carries a "Other/Proprietary" classifier; the app already depends on the same wheel (ADR 0003) |
 
 Publishing numbers from all four is fine under these licences if the tools are credited.
@@ -105,9 +105,9 @@ JSON for feeding an LLM, not into accessible HTML.
 
 | System | Built for | Not built for |
 |---|---|---|
-| Docling | lossless document conversion for gen-AI pipelines (DoclingDocument, Markdown, JSON; HTML is one export) | accessibility remediation: no alt text on pictures, every heading at one level in the HTML export, formulas kept as pictures (with the PDF text as alt) unless the opt-in enrichment is on |
+| Docling | lossless document conversion for gen-AI pipelines (DoclingDocument, Markdown, JSON; HTML is one export) | accessibility remediation: no alt text on pictures, every heading at one level in the HTML export, formulas left undecoded (`<!-- formula-not-decoded -->` in the Markdown) unless the opt-in enrichment is on |
 | Docling with formulas | the same, with formula recognition | speed on CPU: about 136 s per page in the plan's measurement, which would put most 15-30 page sections past the 30-minute failure rule of the pre-registration |
-| MinerU | high-quality extraction for LLM corpora and RAG (Markdown, JSON), including Chinese | accessible HTML: empty alt text on images, one heading level in Markdown; higher tiers want a GPU or a llama.cpp VLM |
+| MinerU | high-quality extraction for LLM corpora and RAG (Markdown, JSON), including Chinese | accessible HTML: empty alt text on images, one heading level in Markdown; its documented default tier (`standard`) was not run |
 | PyMuPDF4LLM | fast text-layer to Markdown for LLM and RAG ingestion | mathematics: no formula recognition and no LaTeX; images off by default |
 | a11y-stem | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans |
 

@@ -76,8 +76,8 @@ ARMS: dict[str, Arm] = {
         licence="Docling MIT; layout model Apache-2.0; TableFormer CDLA-Permissive-2.0 and "
         "Apache-2.0; RapidOCR Apache-2.0",
         not_built_for="accessibility remediation: no alt text on pictures, every heading at one "
-        "level in the HTML export, formulas kept as pictures (with the PDF text as alt) unless "
-        "the opt-in enrichment is on",
+        "level in the HTML export, formulas left undecoded (`<!-- formula-not-decoded -->` in the "
+        "Markdown) unless the opt-in enrichment is on",
         emits_latex=False,
     ),
     "docling-formula": Arm(
@@ -113,15 +113,16 @@ ARMS: dict[str, Arm] = {
         packages=("mineru", "docvortex", "onnxruntime", "numpy"),
         settings={
             "command": "mineru-kit parse --tier basic --format zip",
-            "tier": "basic (MinerU's own recommendation for a machine without an accelerator)",
+            "tier": "basic (MinerU's lower-resource local tier; its documentation names standard, "
+            "which also runs on CPU, as the default tier. Not run)",
             "ocr_mode": "auto (the default)",
         },
         licence="MinerU Open Source License (Apache-2.0 plus extra terms: credit MinerU; a "
         "commercial licence above 100M MAU or $20M monthly revenue; state it when offering an "
         "online service based on MinerU). Models: PaddlePaddle ONNX exports, Apache-2.0 upstream",
         not_built_for="accessible HTML: it writes Markdown and JSON for LLM corpora and RAG; "
-        "empty alt text on images, one heading level in Markdown. Higher tiers want a GPU or "
-        "a llama.cpp VLM",
+        "empty alt text on images, one heading level in Markdown. Its documented default tier "
+        "(standard) was not run",
     ),
     "pymupdf4llm": Arm(
         id="pymupdf4llm",

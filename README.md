@@ -20,7 +20,7 @@ PDF.
 
 **Status.** Pre-release. The code, the evaluation harness and the documentation are here; a
 hosted, allowlisted beta is planned for 9 November 2026.
-<!-- BETA_URL: add the live link and a short screen recording here only after the smoke test passes and the uptime monitor is on. -->
+`uv run a11y-stem ops launch-check` lists the launch blockers that are still open.
 
 ## See it
 
@@ -43,27 +43,49 @@ documents, nor for the chatbot recipe, and none is quoted here.** The protocol w
 frozen before any system ran, and the harness is built and tested, but the recording could not
 be made: on 2026-10-13 the OpenAI account used for the evaluation ran out of credit before any
 run finished (the API answered `credit_balance_exhausted`). The attempts that failed produced
-no output and nothing in them was looked at. The run is one script away once the account has
-credit (below).
+model replies that were never saved or read (part of the first attempt was billed before the
+credit ran out; Addendum 3). The run is one script away once the account has credit (below).
 
 **What exists without a model.** Two parts of the held-out run need no model call and were
-made: a11y-stem's heading detection, and the three open parsers that run on a CPU. They are in
+made: a11y-stem's heading detection, and three open parsers that run on a CPU (Docling in its
+default settings, MinerU at its basic tier, PyMuPDF4LLM). They are in
 [`proof/interim/INTERIM-heldout-2026-10.md`](proof/interim/INTERIM-heldout-2026-10.md), with
-the inputs and outputs, and `make proof-interim` rebuilds the report. The headline, with 95%
-intervals from resampling the 15 sections (approximate with this few; they tend to be a little
-narrow):
+the inputs and outputs. To rebuild the report, run `make heldout-gold` (it fetches the answer
+key from OpenStax and needs the network), then `make proof-interim`. The PDFs every system
+read are printed by this project's own stylesheet from OpenStax's HTML, not the publisher's
+PDFs. The headline, with 95% intervals from resampling the 15 sections (approximate with this
+few; they tend to be a little narrow):
 
-| Heading F1 (509 gold headings) | a11y-stem | Docling | MinerU (basic) | PyMuPDF4LLM |
+| Heading F1 (509 gold headings) | a11y-stem | Docling | MinerU (basic tier) | PyMuPDF4LLM |
 |---|---|---|---|---|
 | F1 | 0.961 [0.947, 0.977] | 0.910 [0.842, 0.958] | 0.923 [0.894, 0.955] | 0.830 [0.738, 0.919] |
 | Level of the heading right (among matched) | 1.000 | 0.031 | 0.165 | 1.000 |
 
-At the corrected level for the comparisons the registration plans (99.375%), a11y-stem's
-heading F1 is higher than MinerU's and PyMuPDF4LLM's, and no difference can be detected
-against Docling's. Docling and MinerU write every heading at one level in their Markdown
-export, which is a property of that export. On equations the only parser that writes LaTeX in
-its default settings, MinerU, transcribes 238 of 1,369 equations exactly (0.174, 95% interval
-0.108 to 0.218); Docling and PyMuPDF4LLM write none by design. **Those are the only held-out
+a11y-stem's heading F1 is higher by point estimate than each parser's, and that is as far as
+the data go. The registered interval (99.375%, corrected for the planned comparisons) excludes
+0 for MinerU (lower bound 0.005) and PyMuPDF4LLM (0.029) and not for Docling. A paired
+sign-flip test on the 15 section differences gives p = 0.0073, 0.0088 and 0.0186 against a
+threshold of 0.00625, so no difference passes both tests, and the MinerU one rests on the
+bootstrap alone. The lead is inside example, solution and note boxes (recall 0.980 against
+0.794 to 0.947); on free-standing headings a11y-stem does not lead (0.964 against 0.973 to
+1.000), and 41 of Docling's and 62 of PyMuPDF4LLM's extra headings are bare exercise numbers
+that the answer key does not have. Docling and MinerU write every heading at one level in
+their Markdown export, which is a property of that export.
+
+**The review screen did not help on headings here.** It asked for decisions on 29 groups of
+headings, none of them wrong, and none of the 28 wrong headings was among them: heading flag
+recall 0 of 28, precision 0 of 29. On the development sample below the same two measures
+were 0.778 and 0.556; that sample is the one the rules were tuned on.
+
+On equations, MinerU at its basic tier (not the tier its documentation names as the default,
+`standard`; a one-off check of `standard` matched 266, not registered) transcribes 238 of
+1,369 equations exactly (0.174, 95% interval 0.108 to 0.218; 0.197 if differences of markup
+alone are normalised away). Docling in its default settings and PyMuPDF4LLM write no LaTeX, so
+their 0 describes what the defaults do. The registered Docling run with formula recognition on
+was started, stopped by hand after one section because it would take hours on this machine,
+and not carried out (Addendum 4): there is no number for it. The parsers' rows for invented
+content come from an unaudited rule that also counts comment markers and mathematics, so they
+are in the report with that warning and are not quoted here. **Those are the only held-out
 numbers there are.**
 
 What is fixed already, and can be checked now:
@@ -73,11 +95,11 @@ What is fixed already, and can be checked now:
 | Sections | 15 sections of 5 OpenStax books (College Physics, Chemistry, Precalculus, Introductory Statistics, Intermediate Algebra), 242 Letter pages |
 | Answer key | 1,369 equations, 509 headings, 70 figures (69 with an OpenStax alt text) |
 | Licence | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
-| Choice | a seeded rule on input properties only, with every section used in development excluded; the rule and its code are in the registration |
-| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9`, and the answer key's manifest `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`, checked before a run |
-| Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and every system pays the same. The 40 were written by me and not yet checked by the author |
-| Compared | a11y-stem against the chatbot recipe instructors copy (Purdue's one-sentence prompt, on gpt-6.1-sol and gpt-6-luna) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
-| Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are the author's and do not exist yet |
+| Choice | a seeded rule on input properties only, with every section used in development excluded; the rule's code, its inputs and its output are in [`proof/selection/`](proof/selection/), and `tests/test_proof_registered.py` re-runs the draw and compares it with the committed result |
+| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9`, and the answer key's manifest `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`, checked before a run. The file here has the names of the people who asked for this evidence and the paths from the author's machine removed, so it is not byte for byte the text that version 1's hash was taken over (see docs/history-note.md). The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
+| Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and a tool that writes LaTeX in its own style pays more (normalising markup alone moves MinerU from 0.174 to 0.197). The 40 were written by an AI agent and I have not checked them yet |
+| Compared | a11y-stem against the chatbot recipe instructors copy (Purdue's one-sentence prompt, [quoted from its page](https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/) as of 2026-10-09, on gpt-6.1-sol and gpt-6-luna) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
+| Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are mine to make and do not exist yet |
 
 Run it with `ENV_FILE=/path/to/.env proof/record-heldout.sh` (about $27 of API calls by the
 registration's estimate; caps $12 and $10), then `make proof` writes `PROOF.md`. The
@@ -203,7 +225,9 @@ tasks that call no model (headings and tables) and compares them with the commit
 reports; that needs network on the first run, Chromium and two font packages
 ([docs/development.md](docs/development.md)). `make proof` is the other path: it replays a
 recorded model run, the chatbot and parser arms included, and writes `PROOF.md` byte for byte
-(no key, no network). The held-out run's commands are in [docs/proof.md](docs/proof.md).
+(no key, no network). `make proof-sources` also fetches the answer key and prints the PDFs
+again (network and Chromium); it writes `proof/PROOF-sources.md` and leaves `PROOF.md` alone.
+The held-out run's commands are in [docs/proof.md](docs/proof.md).
 
 Tests: `make check` runs ruff and the offline test suite; `make ci-local` runs what CI runs,
 on Python 3.12 and 3.14. CI also runs the Postgres tests, the browser tests with axe-core,
@@ -228,7 +252,7 @@ which stays idle until baseline reports are promoted (`docs/eval.md`, "How to re
 - **Figure alt text is short.** It describes; it does not replace a long description for a
   complex diagram.
 - **Beta.** Sign-in is by allowlist, with spend caps and daily quotas. The privacy, terms and
-  known-limits pages are drafts until the author has reviewed them.
+  known-limits pages are drafts until I have reviewed them.
 
 ## Documentation
 

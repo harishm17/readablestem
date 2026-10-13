@@ -16,11 +16,18 @@ this table. This is a plain statement of scope, not legal advice.
 | Test fixtures made from OpenStax content: `tests/fixtures/assemble/golden/demo.html`, `tests/fixtures/assemble/golden/stored_demo_0_2_0.html`, `tests/fixtures/stored/demo-report-0.2.0.json`, `tests/fixtures/sample_latex_predictions.jsonl` (LaTeX of OpenStax equations), `tests/fixtures/tables/table_bench_excerpt.json` (cell text from OpenStax tables) | CC BY 4.0 (OpenStax) | `data/gold/ATTRIBUTION.md` |
 | `proof/bundles/` (recorded proof runs: the printed OpenStax sections as PDFs, a copy of the answer key, model answers, the HTML and Markdown that other systems wrote for those sections) | CC BY 4.0 (OpenStax) for everything derived from OpenStax text and figures, with the attribution in each PDF and in `gold/ATTRIBUTION.md`; the run metadata (`bundle.json`, counts, times, costs) is MIT. The held-out set uses retired first editions, which OpenStax licensed CC BY 4.0 | `proof/bundles/*/gold/ATTRIBUTION.md`, `docs/proof.md` |
 | `proof/interim/heldout-2026-10/` (the printed held-out OpenStax sections and what the open parsers wrote for them) | CC BY 4.0 (OpenStax) for everything derived from OpenStax text and figures, attribution in each PDF; the retired first editions are CC BY 4.0 | `docs/proof.md` |
-| `proof/PREREGISTRATION.md`, `proof/PREREGISTRATION-ADDENDUM-1.md`, `proof/sets/` | MIT | |
+| `proof/PREREGISTRATION*.md`, `proof/PARSERS-PLAN.md`, `proof/DECISION-*.md`, `proof/PREREG*.sha256`, `proof/REGISTERED.md`, `proof/sets/` | MIT | |
+| `proof/selection/` (the selection code, its inputs and outputs, and the licence table; the section lists and counts are OpenStax metadata) | MIT for the code and logs; CC BY 4.0 (OpenStax) for what is read from OpenStax | `proof/REGISTERED.md` |
 | Vendored files under `src/a11y_stem/pipeline/vendor/` and `src/a11y_stem/web/static/vendor/` | Their own (table below) | The licence files beside them |
 
 All OpenStax material used in this repository is from books that OpenStax publishes under
-CC BY 4.0. Books published under CC BY-NC-SA are not used. a11y-stem is not affiliated
+CC BY 4.0. The licence of each book was read from OpenStax's CMS and archive on the dates in
+`data/openstax-licenses.csv` and `proof/selection/licenses-2026-10-13.csv` (retired first
+editions are CC BY, the current editions of the same books are CC BY-NC-SA); this is a
+reading of public metadata, not legal advice. A book's licence does not change the credit of
+a photograph or figure inside it that OpenStax attributes to a third party (for example a
+Flickr credit in a figure caption): those figures keep their own licences, and the PDFs that
+embed them are published here for the evaluation of the tools, with the credits OpenStax gives. Books published under CC BY-NC-SA are not used. a11y-stem is not affiliated
 with or endorsed by OpenStax. The PDFs under `tests/fixtures/` are built from sources in
 the repository (LaTeX, HTML, python-docx or a script) with invented text; the one
 OpenStax PDF is the demo's `source.pdf`.
