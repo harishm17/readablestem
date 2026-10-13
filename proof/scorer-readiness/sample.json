@@ -1,0 +1,242 @@
+[
+ {
+  "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-022",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mfrac><mrow><mi>v</mi><mi fontstyle=\"italic\">u</mi><mo>\u2032</mo></mrow><msup><mi>c</mi><mn>2</mn></msup></mfrac></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mfrac><mrow><mi>v</mi><mi fontstyle=\"italic\">u</mi><mo>\u2032</mo></mrow><msup><mi>c</mi><mn>2</mn></msup></mfrac></mrow></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-008",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mi>\u03b3</mi></mrow><mrow /></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mrow><mi>\u03b3</mi></mrow><mrow /></mrow><annotation encoding=\"StarMath 5.0\"> size 12{\u03b3} {}</annotation></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-071",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><msub><mi>L</mi><mrow><mn>0</mn></mrow></msub></mrow><mrow /></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mrow><msub><mi>L</mi><mrow><mn>0</mn></mrow></msub></mrow><mrow /></mrow><annotation encoding=\"StarMath 5.0\"> size 12{L rSub { size 8{0} } } {}</annotation></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-047",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mi>v</mi></mrow><mrow /></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mrow><mi>v</mi></mrow><mrow /></mrow></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-041",
+  "book": "college-physics",
+  "display": "block",
+  "mathml": "<math display=\"block\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mrow><mi>E</mi><mo stretchy=\"false\">=</mo><mfrac><mstyle fontstyle=\"italic\"><mrow><mtext>hc</mtext></mrow></mstyle><mi>\u03bb</mi></mfrac></mrow><mo>.</mo></mrow><mrow /></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mrow><mrow><mi>E</mi><mo stretchy=\"false\">=</mo><mfrac><mstyle fontstyle=\"italic\"><mrow><mtext>hc</mtext></mrow></mstyle><mi>\u03bb</mi></mfrac></mrow><mo>.</mo></mrow><mrow /></mrow><annotation encoding=\"StarMath 5.0\"> size 12{E =  {  { ital \"hc\"}  over  {\u03bb} } } {}</annotation></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/eq-028",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mrow><mstyle fontstyle=\"italic\"><mrow><mi>u</mi><mo>=</mo></mrow></mstyle><mfrac><mrow><mi fontstyle=\"italic\">v+u</mi><mo>\u2032</mo></mrow><mrow><mn>1</mn><mo stretchy=\"false\">+</mo><mfrac><mrow><mi>v</mi><mi /><mrow><mi>u</mi><mo>\u2032</mo></mrow></mrow><msup><mi>c</mi><mrow><mn>2</mn></mrow></msup></mfrac></mrow></mfrac></mrow></mrow><mrow /></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mrow><mrow><mstyle fontstyle=\"italic\"><mrow><mi>u</mi><mo>=</mo></mrow></mstyle><mfrac><mrow><mi fontstyle=\"italic\">v+u</mi><mo>\u2032</mo></mrow><mrow><mn>1</mn><mo stretchy=\"false\">+</mo><mfrac><mrow><mi>v</mi><mi /><mrow><mi>u</mi><mo>\u2032</mo></mrow></mrow><msup><mi>c</mi><mrow><mn>2</mn></mrow></msup></mfrac></mrow></mfrac></mrow></mrow><mrow /></mrow><annotation encoding=\"StarMath 5.0\"> size 12{ ital \"u=\" {  { ital \"v+u'\"}  over  {1+ {  {v` ital \"u'\"}  over  {c rSup { size 8{2} } } } } } } {}</annotation></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/5-3-elasticity-stress-and-strain/eq-084",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mi>A</mi></mrow><mrow /></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><semantics><mrow><mrow><mi>A</mi></mrow><mrow /></mrow><annotation encoding=\"StarMath 5.0\"> size 12{A} {}</annotation></semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum/eq-009",
+  "book": "college-physics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n        <mrow>\n            <mrow>\n              <msup>\n                <mtext>10</mtext>\n                <mrow>\n                  <mrow>\n                    <mo stretchy=\"false\">\u2212</mo>\n                    <mn>5</mn>\n                  </mrow>\n                </mrow>\n              </msup>\n            </mrow>\n            <mrow />\n          </mrow>\n      </mrow><annotation-xml encoding=\"MathML-Content\"><semantics>\n          <mrow>\n            <mrow>\n              <msup>\n                <mtext>10</mtext>\n                <mrow>\n                  <mrow>\n                    <mo stretchy=\"false\">\u2212</mo>\n                    <mn>5</mn>\n                  </mrow>\n                </mrow>\n              </msup>\n            </mrow>\n            <mrow />\n          </mrow>\n          <annotation encoding=\"StarMath 5.0\"> size 12{\"10\" rSup { size 8{ - 5} } } {}</annotation>\n        </semantics></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/14-7-acid-base-titrations/eq-030",
+  "book": "chemistry",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><msub><mrow><mtext>CH</mtext></mrow><mn>3</mn></msub><msub><mrow><mtext>CO</mtext></mrow><mn>2</mn></msub><msup><mrow /><mtext>\u2212</mtext></msup><mo>:</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><msub><mrow><mtext>CH</mtext></mrow><mn>3</mn></msub><msub><mrow><mtext>CO</mtext></mrow><mn>2</mn></msub><msup><mrow /><mtext>\u2212</mtext></msup><mo>:</mo></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/14-7-acid-base-titrations/eq-002",
+  "book": "chemistry",
+  "display": "block",
+  "mathml": "<math display=\"block\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mtext>n</mtext><msub><mrow><mo stretchy=\"false\">(</mo><msup><mrow><mtext>OH</mtext></mrow><mtext>\u2212</mtext></msup><mo stretchy=\"false\">)</mo></mrow><mn>0</mn></msub><mo>=</mo><mn>0.100</mn><mspace width=\"0.4em\" /><mi>M</mi><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mtext>X mL</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mrow><mo>(</mo><mrow><mspace width=\"0.2em\" /><mfrac><mrow><mtext>1 L</mtext></mrow><mrow><mtext>1000 mL</mtext></mrow></mfrac></mrow><mo>)</mo><mspace width=\"0.2em\" /></mrow></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mtext>n</mtext><msub><mrow><mo stretchy=\"false\">(</mo><msup><mrow><mtext>OH</mtext></mrow><mtext>\u2212</mtext></msup><mo stretchy=\"false\">)</mo></mrow><mn>0</mn></msub><mo>=</mo><mn>0.100</mn><mspace width=\"0.4em\" /><mi>M</mi><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mtext>X mL</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mrow><mo>(</mo><mrow><mspace width=\"0.2em\" /><mfrac><mrow><mtext>1 L</mtext></mrow><mrow><mtext>1000 mL</mtext></mrow></mfrac></mrow><mo>)</mo><mspace width=\"0.2em\" /></mrow></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/14-7-acid-base-titrations/eq-035",
+  "book": "chemistry",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><msub><mi>K</mi><mtext>b</mtext></msub><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mrow><msup><mi>x</mi><mtext>2</mtext></msup></mrow><mrow><mn>0.0500</mn><mspace width=\"0.2em\" /><mi>M</mi></mrow></mfrac><mspace width=\"0.2em\" /><mo>,</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><msub><mi>K</mi><mtext>b</mtext></msub><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mrow><msup><mi>x</mi><mtext>2</mtext></msup></mrow><mrow><mn>0.0500</mn><mspace width=\"0.2em\" /><mi>M</mi></mrow></mfrac><mspace width=\"0.2em\" /><mo>,</mo></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-007",
+  "book": "chemistry",
+  "display": "block",
+  "mathml": "<math display=\"block\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mi>v</mi><mspace width=\"0.2em\" /><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mi>c</mi><mi>\u03bb</mi></mfrac><mspace width=\"0.4em\" /><mtext>so</mtext><mspace width=\"0.4em\" /><mfrac><mrow><mn>3.00</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mn>8</mn></msup><mtext>m/s</mtext></mrow><mrow><mfrac><mrow><mtext>499 nm</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mtext>1 m</mtext></mrow><mrow><msup><mrow><mn>10</mn></mrow><mn>9</mn></msup><mtext>nm</mtext></mrow></mfrac></mrow></mfrac><mspace width=\"0.2em\" /><mo>=</mo><mspace width=\"0.2em\" /><mn>6.01</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>14</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>Hz</mtext></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mi>v</mi><mspace width=\"0.2em\" /><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mi>c</mi><mi>\u03bb</mi></mfrac><mspace width=\"0.4em\" /><mtext>so</mtext><mspace width=\"0.4em\" /><mfrac><mrow><mn>3.00</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mn>8</mn></msup><mtext>m/s</mtext></mrow><mrow><mfrac><mrow><mtext>499 nm</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mtext>1 m</mtext></mrow><mrow><msup><mrow><mn>10</mn></mrow><mn>9</mn></msup><mtext>nm</mtext></mrow></mfrac></mrow></mfrac><mspace width=\"0.2em\" /><mo>=</mo><mspace width=\"0.2em\" /><mn>6.01</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>14</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>Hz</mtext></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-004",
+  "book": "chemistry",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><msub><mi>d</mi><mrow><msup><mi>x</mi><mn>2</mn></msup><mtext>\u2212</mtext><msup><mi>y</mi><mn>2</mn></msup></mrow></msub></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><msub><mi>d</mi><mrow><msup><mi>x</mi><mn>2</mn></msup><mtext>\u2212</mtext><msup><mi>y</mi><mn>2</mn></msup></mrow></msub></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/eq-008",
+  "book": "chemistry",
+  "display": "block",
+  "mathml": "<math display=\"block\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mi>E</mi><mo>=</mo><mi>h</mi><mi>n</mi><mi>u</mi><mspace width=\"0.2em\" /><mtext>so</mtext><mspace width=\"0.2em\" /><mn>6.63</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>\u221234</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>J</mtext><mtext>\u00b7</mtext><mtext>s</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mn>6.01</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>14</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>Hz</mtext><mo>=</mo><mn>3.99</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>\u221219</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>Joules/ion</mtext></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mi>E</mi><mo>=</mo><mi>h</mi><mi>n</mi><mi>u</mi><mspace width=\"0.2em\" /><mtext>so</mtext><mspace width=\"0.2em\" /><mn>6.63</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>\u221234</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>J</mtext><mtext>\u00b7</mtext><mtext>s</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mn>6.01</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>14</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>Hz</mtext><mo>=</mo><mn>3.99</mn><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><msup><mrow><mn>10</mn></mrow><mrow><mn>\u221219</mn></mrow></msup><mspace width=\"0.2em\" /><mtext>Joules/ion</mtext></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/14-7-acid-base-titrations/eq-022",
+  "book": "chemistry",
+  "display": "block",
+  "mathml": "<math display=\"block\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><msub><mrow><mtext>CH</mtext></mrow><mn>3</mn></msub><msub><mrow><mtext>CO</mtext></mrow><mn>2</mn></msub><mtext>H</mtext><mo>+</mo><msup><mrow><mtext>OH</mtext></mrow><mtext>\u2212</mtext></msup><mspace width=\"0.2em\" /><mo stretchy=\"false\">\u27f6</mo><mspace width=\"0.2em\" /><msub><mrow><mtext>CH</mtext></mrow><mn>3</mn></msub><msub><mrow><mtext>CO</mtext></mrow><mn>2</mn></msub><msup><mrow /><mtext>\u2212</mtext></msup><mo>+</mo><msub><mtext>H</mtext><mn>2</mn></msub><mtext>O</mtext></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><msub><mrow><mtext>CH</mtext></mrow><mn>3</mn></msub><msub><mrow><mtext>CO</mtext></mrow><mn>2</mn></msub><mtext>H</mtext><mo>+</mo><msup><mrow><mtext>OH</mtext></mrow><mtext>\u2212</mtext></msup><mspace width=\"0.2em\" /><mo stretchy=\"false\">\u27f6</mo><mspace width=\"0.2em\" /><msub><mrow><mtext>CH</mtext></mrow><mn>3</mn></msub><msub><mrow><mtext>CO</mtext></mrow><mn>2</mn></msub><msup><mrow /><mtext>\u2212</mtext></msup><mo>+</mo><msub><mtext>H</mtext><mn>2</mn></msub><mtext>O</mtext></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/chemistry/14-7-acid-base-titrations/eq-016",
+  "book": "chemistry",
+  "display": "block",
+  "mathml": "<math display=\"block\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mo stretchy=\"false\">[</mo><msub><mtext>H</mtext><mn>3</mn></msub><msup><mtext>O</mtext><mtext>+</mtext></msup><mo stretchy=\"false\">]</mo><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mrow><mtext>n</mtext><mo stretchy=\"false\">(</mo><msup><mtext>H</mtext><mtext>+</mtext></msup><mo stretchy=\"false\">)</mo></mrow><mi>V</mi></mfrac><mspace width=\"0.2em\" /><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mrow><mtext>0.002500 mol</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mrow><mo>(</mo><mrow><mspace width=\"0.2em\" /><mfrac><mrow><mtext>1000 mL</mtext></mrow><mrow><mtext>1 L</mtext></mrow></mfrac></mrow><mo>)</mo><mspace width=\"0.2em\" /></mrow></mrow><mrow><mtext>25.00 mL</mtext></mrow></mfrac><mspace width=\"0.2em\" /><mo>=</mo><mn>0.1</mn><mspace width=\"0.4em\" /><mi>M</mi></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mo stretchy=\"false\">[</mo><msub><mtext>H</mtext><mn>3</mn></msub><msup><mtext>O</mtext><mtext>+</mtext></msup><mo stretchy=\"false\">]</mo><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mrow><mtext>n</mtext><mo stretchy=\"false\">(</mo><msup><mtext>H</mtext><mtext>+</mtext></msup><mo stretchy=\"false\">)</mo></mrow><mi>V</mi></mfrac><mspace width=\"0.2em\" /><mo>=</mo><mspace width=\"0.2em\" /><mfrac><mrow><mtext>0.002500 mol</mtext><mspace width=\"0.2em\" /><mo>\u00d7</mo><mspace width=\"0.2em\" /><mrow><mo>(</mo><mrow><mspace width=\"0.2em\" /><mfrac><mrow><mtext>1000 mL</mtext></mrow><mrow><mtext>1 L</mtext></mrow></mfrac></mrow><mo>)</mo><mspace width=\"0.2em\" /></mrow></mrow><mrow><mtext>25.00 mL</mtext></mrow></mfrac><mspace width=\"0.2em\" /><mo>=</mo><mn>0.1</mn><mspace width=\"0.4em\" /><mi>M</mi></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/3-1-complex-numbers/eq-000",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mi>i</mi></mrow><annotation-xml encoding=\"MathML-Content\"><mi>i</mi></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/3-1-complex-numbers/eq-058",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mrow><mo>(</mo>\n   <mrow>\n    <mn>4</mn><mo>+</mo><mn>3</mn><mi>i</mi>\n   </mrow>\n  <mo>)</mo></mrow><mo stretchy=\"false\">(</mo><mn>2</mn><mo>\u2212</mo><mn>5</mn><mi>i</mi><mo stretchy=\"false\">)</mo><mo>.</mo>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mrow><mo>(</mo>\n   <mrow>\n    <mn>4</mn><mo>+</mo><mn>3</mn><mi>i</mi>\n   </mrow>\n  <mo>)</mo></mrow><mo stretchy=\"false\">(</mo><mn>2</mn><mo>\u2212</mo><mn>5</mn><mi>i</mi><mo stretchy=\"false\">)</mo><mo>.</mo>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-037",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mn>60\u00b0</mn><mo>,</mo>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mn>60\u00b0</mn><mo>,</mo>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/3-1-complex-numbers/eq-038",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n<mn>\u22122</mn><mo>+</mo><mn>3</mn><mi>i</mi>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n<mn>\u22122</mn><mo>+</mo><mn>3</mn><mi>i</mi>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/5-4-right-triangle-trigonometry/eq-156",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mn>43\u00b0</mn><mo>.</mo>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mn>43\u00b0</mn><mo>.</mo>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/1-6-absolute-value-functions/eq-098",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n          <mrow>\n           <mi>x</mi><mo>&gt;</mo><mn>9</mn></mrow>\n         </mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n           <mi>x</mi><mo>&gt;</mo><mn>9</mn></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/1-6-absolute-value-functions/eq-087",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n      <mrow>\n       <mi>x</mi><mo>=</mo><mn>1</mn></mrow>\n     </mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n       <mi>x</mi><mo>=</mo><mn>1</mn></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/precalculus/1-6-absolute-value-functions/eq-067",
+  "book": "precalculus",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n   <mrow>\n    <mi>A</mi></mrow>\n  </mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n    <mi>A</mi></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-027",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mfrac><mn>1</mn><mn>6</mn></mfrac></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mfrac><mn>1</mn><mn>6</mn></mfrac></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-019",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mfrac>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>A</mi><mtext> AND </mtext><mi>B</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>A</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n  </mfrac>\n\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mfrac>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>A</mi><mtext> AND </mtext><mi>B</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>A</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n  </mfrac>\n\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-008",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mfrac>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>A</mi><mtext> AND </mtext><mi>B</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>B</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n  </mfrac>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mfrac>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>A</mi><mtext> AND </mtext><mi>B</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n   <mrow>\n    <mi>P</mi><mo stretchy=\"false\">(</mo><mi>B</mi><mo stretchy=\"false\">)</mo>\n   </mrow>\n  </mfrac>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-000",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mfrac>\n   <mn>2</mn>\n   <mn>4</mn>\n  </mfrac>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mfrac>\n   <mn>2</mn>\n   <mn>4</mn>\n  </mfrac>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-002",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mfrac><mn>2</mn><mn>6</mn></mfrac></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mfrac><mn>2</mn><mn>6</mn></mfrac></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-001",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mfrac>\n   <mn>2</mn>\n   <mn>6</mn>\n  </mfrac>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mfrac>\n   <mn>2</mn>\n   <mn>6</mn>\n  </mfrac>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/3-1-terminology/eq-005",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mfrac><mn>4</mn><mn>6</mn></mfrac></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mfrac><mn>4</mn><mn>6</mn></mfrac></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/introductory-statistics/4-5-hypergeometric-distribution/eq-003",
+  "book": "introductory-statistics",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow>\n <mrow>\n  <mi>\u03bc</mi><mo>=</mo><mfrac>\n   <mrow>\n    <mi>n</mi><mi>r</mi>\n   </mrow>\n   <mrow>\n    <mi>r</mi><mo>+</mo><mi>b</mi>\n   </mrow>\n  </mfrac>\n  <mo>=</mo><mfrac>\n   <mrow>\n    <mo stretchy=\"false\">(</mo><mn>4</mn><mo stretchy=\"false\">)</mo><mo stretchy=\"false\">(</mo><mn>6</mn><mo stretchy=\"false\">)</mo>\n   </mrow>\n   <mrow>\n    <mn>6</mn><mo>+</mo><mn>5</mn>\n   </mrow>\n  </mfrac>\n  <mo>=</mo><mn>2.18</mn>\n </mrow>\n</mrow><annotation-xml encoding=\"MathML-Content\"><mrow>\n  <mi>\u03bc</mi><mo>=</mo><mfrac>\n   <mrow>\n    <mi>n</mi><mi>r</mi>\n   </mrow>\n   <mrow>\n    <mi>r</mi><mo>+</mo><mi>b</mi>\n   </mrow>\n  </mfrac>\n  <mo>=</mo><mfrac>\n   <mrow>\n    <mo stretchy=\"false\">(</mo><mn>4</mn><mo stretchy=\"false\">)</mo><mo stretchy=\"false\">(</mo><mn>6</mn><mo stretchy=\"false\">)</mo>\n   </mrow>\n   <mrow>\n    <mn>6</mn><mo>+</mo><mn>5</mn>\n   </mrow>\n  </mfrac>\n  <mo>=</mo><mn>2.18</mn>\n </mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-150",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\">\n    <semantics>\n      <mrow>\n        <mrow>\n          <mi>r</mi>\n          <mrow>\n            <mo>(</mo>\n            <mrow>\n              <mi>s</mi>\n              <mo>\u2212</mo>\n              <mn>18</mn>\n            </mrow>\n            <mo>)</mo>\n          </mrow>\n        </mrow>\n      </mrow>\n      <annotation-xml encoding=\"MathML-Content\">\n        <mrow>\n          <mi>r</mi>\n          <mrow>\n            <mo>(</mo>\n            <mrow>\n              <mi>s</mi>\n              <mo>\u2212</mo>\n              <mn>18</mn>\n            </mrow>\n            <mo>)</mo>\n          </mrow>\n        </mrow>\n      </annotation-xml>\n    </semantics>\n  </math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-072",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mn>6</mn><mrow><mo>(</mo><mrow><mi>x</mi><mo>+</mo><mn>7</mn></mrow><mo>)</mo></mrow><mo>.</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mn>6</mn><mrow><mo>(</mo><mrow><mi>x</mi><mo>+</mo><mn>7</mn></mrow><mo>)</mo></mrow><mo>.</mo></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-117",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\">\n    <semantics>\n      <mrow>\n        <mrow>\n          <mn>20</mn>\n          <mrow>\n            <mo>(</mo>\n            <mrow>\n              <mfrac>\n                <mn>3</mn>\n                <mn>5</mn>\n              </mfrac>\n              <mi>q</mi>\n            </mrow>\n            <mo>)</mo>\n          </mrow>\n        </mrow>\n      </mrow>\n      <annotation-xml encoding=\"MathML-Content\">\n        <mrow>\n          <mn>20</mn>\n          <mrow>\n            <mo>(</mo>\n            <mrow>\n              <mfrac>\n                <mn>3</mn>\n                <mn>5</mn>\n              </mfrac>\n              <mi>q</mi>\n            </mrow>\n            <mo>)</mo>\n          </mrow>\n        </mrow>\n      </annotation-xml>\n    </semantics>\n  </math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-083",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mn>\u22127</mn><mrow><mo>(</mo><mrow><mn>8</mn><mo>\u2212</mo><mn>15</mn><mi>y</mi></mrow><mo>)</mo></mrow><mo>.</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mn>\u22127</mn><mrow><mo>(</mo><mrow><mn>8</mn><mo>\u2212</mo><mn>15</mn><mi>y</mi></mrow><mo>)</mo></mrow><mo>.</mo></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-067",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mo>{</mo><mtable><mtr><mtd columnalign=\"left\"><mtext>\u2212</mtext><mi>x</mi><mo>+</mo><mi>y</mi><mo>=</mo><mn>2</mn></mtd></mtr><mtr><mtd columnalign=\"left\"><mn>2</mn><mi>x</mi><mo>+</mo><mi>y</mi><mo>=</mo><mn>\u22124</mn></mtd></mtr></mtable></mrow><mo>.</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mrow><mo>{</mo><mtable><mtr><mtd columnalign=\"left\"><mtext>\u2212</mtext><mi>x</mi><mo>+</mo><mi>y</mi><mo>=</mo><mn>2</mn></mtd></mtr><mtr><mtd columnalign=\"left\"><mn>2</mn><mi>x</mi><mo>+</mo><mi>y</mi><mo>=</mo><mn>\u22124</mn></mtd></mtr></mtable></mrow><mo>.</mo></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/1-5-properties-of-real-numbers/eq-030",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mi>a</mi><mo>,</mo><mi>a</mi><mo>+</mo><mrow><mo>(</mo><mrow><mtext>\u2212</mtext><mi>a</mi></mrow><mo>)</mo></mrow><mo>=</mo><mn>0</mn><mo>.</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mi>a</mi><mo>,</mo><mi>a</mi><mo>+</mo><mrow><mo>(</mo><mrow><mtext>\u2212</mtext><mi>a</mi></mrow><mo>)</mo></mrow><mo>=</mo><mn>0</mn><mo>.</mo></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-093",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><msub><mi>D</mi><mi>x</mi></msub></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><msub><mi>D</mi><mi>x</mi></msub></mrow></annotation-xml></semantics></math>"
+ },
+ {
+  "id": "openstax/intermediate-algebra/4-6-solve-systems-of-equations-using-determinants/eq-110",
+  "book": "intermediate-algebra",
+  "display": "inline",
+  "mathml": "<math display=\"inline\" xmlns=\"http://www.w3.org/1998/Math/MathML\"><semantics><mrow><mrow><mrow><mo>(</mo><mrow><mn>4</mn><mo>,</mo><mn>\u22123</mn></mrow><mo>)</mo></mrow><mo>,</mo></mrow></mrow><annotation-xml encoding=\"MathML-Content\"><mrow><mrow><mo>(</mo><mrow><mn>4</mn><mo>,</mo><mn>\u22123</mn></mrow><mo>)</mo></mrow><mo>,</mo></mrow></annotation-xml></semantics></math>"
+ }
+]

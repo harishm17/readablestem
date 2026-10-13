@@ -32,29 +32,39 @@ mistake that the review screen asks about (a plain *v* where the book has a bold
 
 ## Results
 
-There are two kinds of number here, and they must not be mixed. The first kind was measured
-on documents that the system had never been run on, with the protocol written down before
-the run. The second kind comes from the sample on which the checks were developed.
+There are two kinds of number here, and they must not be mixed. The first kind is measured
+on documents the system had never been run on, with the protocol written down before the
+run. The second kind comes from the sample on which the checks were developed.
 
-### Held-out results
+### Held-out results: not available yet
 
-<!-- INTEGRATOR: replace each double-brace token in the table below with the number and
-interval from PROOF.md, in the form "value (95% CI a to b, n = N)"; do not round in a
-favourable direction. If the held-out run did not complete, rewrite this section from
-PROOF.md instead of filling the tokens, and drop the first paragraph's claim about
-protocol and unseen documents. Delete this comment when done. Then `grep -n '{{' README.md`
-must print nothing before the repository is published. -->
+**No held-out number exists for a11y-stem, and none is quoted here.** The protocol was
+written and frozen before any system ran, and the harness is built and tested, but the
+recording could not be made: on 2026-10-13 the OpenAI account used for the evaluation ran out
+of credit before any run finished (the API answered `credit_balance_exhausted`). Nothing was
+run on the held-out sections that produced a result, and none of the failed attempts was
+looked at. The run is one script away once the account has credit (below).
 
-| What was measured | Held-out result |
+What is fixed already, and can be checked now:
+
+| What | Value |
 |---|---|
-| Equations transcribed correctly (`exact_lenient`) | {{HELDOUT_EQUATIONS}} |
-| Headings found (recall) and placed at the right level | {{HELDOUT_HEADINGS}} |
-| Figure alt text judged acceptable | {{HELDOUT_FIGURES}} |
-| Invented content: text or maths in the output that is not in the source | {{INVENTED_RATE}} |
-| Compared with other PDF parsers and with a chatbot prompt | {{PARSER_COMPARISON}} |
+| Sections | 15 sections of 5 OpenStax books (College Physics, Chemistry, Precalculus, Introductory Statistics, Intermediate Algebra), 242 Letter pages |
+| Answer key | 1,369 equations, 509 headings, 70 figures (69 with an OpenStax alt text) |
+| Licence | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
+| Choice | a seeded rule on input properties only, with every section used in development excluded; the rule and its code are in the registration |
+| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9`, and the answer key's manifest `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`, checked before a run |
+| Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and every system pays the same. The 40 were written by me and not yet checked by the author |
+| Compared | a11y-stem against the chatbot recipe instructors copy (Purdue's one-sentence prompt, on gpt-6.1-sol and gpt-6-luna) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
+| Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are the author's and do not exist yet |
 
-The protocol, the full tables, the failures and the limits are in [PROOF.md](PROOF.md). Read
-that file before quoting any number from this one.
+Run it with `ENV_FILE=/path/to/.env proof/record-heldout.sh` (about $27 of API calls by the
+registration's estimate; caps $12 and $10), then `make proof` writes `PROOF.md`. The
+recording code, the caps and the reproduction path are described in
+[docs/proof.md](docs/proof.md). The whole path from answer key to `PROOF.md`, including the
+chatbot and parser arms, runs today on the development sample below: `make proof` replays the
+recorded run and writes [PROOF.md](PROOF.md) in under a minute with no key. That report is for the
+development sample, and says so on top.
 
 ### Development sample (pipeline 0.4.0, 2026-10-12)
 
@@ -170,8 +180,9 @@ does not repeat them. It prints the commands, with their spend caps (about $0.30
 three model tasks on the development sample). `make reproduce-rerun` also re-runs the two
 tasks that call no model (headings and tables) and compares them with the committed
 reports; that needs network on the first run, Chromium and two font packages
-([docs/development.md](docs/development.md)). The held-out run has its own commands in
-[PROOF.md](PROOF.md).
+([docs/development.md](docs/development.md)). `make proof` is the other path: it replays a
+recorded model run, the chatbot and parser arms included, and writes `PROOF.md` byte for byte
+(no key, no network). The held-out run's commands are in [docs/proof.md](docs/proof.md).
 
 Tests: `make check` runs ruff and the offline test suite; `make ci-local` runs what CI runs,
 on Python 3.12 and 3.14. CI also runs the Postgres tests, the browser tests with axe-core,

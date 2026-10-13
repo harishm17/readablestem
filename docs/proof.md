@@ -156,6 +156,22 @@ headings task's code. The stages print the claims of preregistration section 8.3
 the chatbot, 5 comparisons; family B: each parser, 2 comparisons each, Bonferroni-corrected)
 and every single-system number.
 
+### Recording the held-out set
+
+The held-out set (`heldout-2026-10`, registered in `proof/PREREGISTRATION.md`) is recorded in
+three steps, each with its own spend cap, by one script:
+
+```
+ENV_FILE=/path/to/.env proof/record-heldout.sh     # a11y-stem $12, chatbot arms and judge $10
+```
+
+It needs API credit, a clean checkout, Chromium and `make -C proof/parsers setup`, and nothing
+else may call the API while it runs (an empty balance or a rate limit makes calls fail, and a
+failed call is not a system's answer). Each step can be interrupted and started again:
+`--resume` reads back the a11y-stem runs that finished, and the chatbot and parser steps skip
+what they already recorded. Copy the result to `proof/bundles/heldout-2026-10/`, make that
+set the default in `proof/sets/index.json`, and `make proof` writes `PROOF.md` from it.
+
 ### Recording the other systems
 
 They are recorded into a finished bundle, each with its own cap, so a failure in one never
