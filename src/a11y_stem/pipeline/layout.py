@@ -2513,6 +2513,9 @@ class _Path:
     # The L pairs (horizontal line, vertical line) the path holds a line of (`_mark_axes`).
     axes: tuple[tuple[_Straight, _Straight], ...] = ()
     plot: bool = False  # one of those Ls has evidence of a plot (`_mark_plots`)
+    # A ruler whose ticks all stand on one side of its line, a letter cell apart: an
+    # answer field's cells when no label is near (`_answer_fields`).
+    comb: bool = False
     # Where a curved open stroke's subpaths start and end (display space): a plotted
     # line starts at its axes' corner (`_mark_plots`).
     ends: tuple[tuple[float, float], ...] = ()
@@ -2874,6 +2877,7 @@ def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
         band = int(line.c // TICK_MAX_PT)
         ticks: list[int] = []
         places: set[int] = set()
+        sides: set[int] = set()  # which side of the line each tick stands on (0: across it)
         for b in (band - 1, band, band + 1):
             for t in short.get((not line.horizontal, b), ()):
                 tick = flat[t][0]
@@ -2888,12 +2892,36 @@ def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
                     point = (tick.c, free) if line.horizontal else (free, tick.c)
                     if on_parallel(point, line.horizontal, k):
                         continue  # a column rule between two rules, not a tick
+                    sides.add(1 if free > line.c else -1)
+                else:
+                    sides.add(0)
                 ticks.append(t)
                 places.add(round(tick.c))
         if len(places) >= RULER_TICKS:
             flag(k, "ruler")
             for t in ticks:
                 flag(t, "ruler")
+            if len(sides) == 1 and 0 not in sides and _cells(sorted(places), ticks, flat):
+                flag(k, "comb")
+                for t in ticks:
+                    flag(t, "comb")
+
+
+COMB_CELL_PT = (8.0, 30.0)  # pt: an answer field's letter cells are this wide
+COMB_EVEN = 1.3  # its widest cell is at most this x its narrowest
+
+
+def _cells(places: list[int], ticks: list[int], flat: list[tuple[_Straight, list[int]]]) -> bool:
+    """Ticks at even places a letter cell apart (COMB_CELL_PT, COMB_EVEN), all as long:
+    the cells of an answer field to write a name or a number in, one letter each."""
+    gaps = [b - a for a, b in pairwise(places)]
+    lengths = [flat[t][0].hi - flat[t][0].lo for t in ticks]
+    return (
+        COMB_CELL_PT[0] <= min(gaps)
+        and max(gaps) <= COMB_CELL_PT[1]
+        and max(gaps) <= COMB_EVEN * min(gaps)
+        and max(lengths) <= COMB_EVEN * min(lengths)
+    )
 
 
 def _encloses(items: Sequence[Any], close_path: object) -> bool:
@@ -3683,6 +3711,33 @@ JOIN_PT = 1.5  # pt: line ends this close meet (a corner of a staircase, a conne
 MAX_DIAGRAM_BOXES = 200  # more box outlines in one cluster are a grid of cells, not a diagram
 ORIGIN_REACH = 4.0  # pt: a plotted line that starts this close to its axes' corner starts there
 AXIS_LABEL_REACH = 3.0  # x font size: a tick label or axis title is this close outside an axis
+
+
+def _answer_fields(paths: Sequence[_Path], rows: Sequence[_Row]) -> None:
+    """Rulers whose ticks stand on one side of the line a letter cell apart (`_Path.comb`)
+    with no short row by their ticks (a tick label) are an answer field's cells (a comb
+    to write a candidate number or a name in): no ruler, so rules alone, not a drawing
+    (2026-10-13: an exam cover's two comb fields became figures and decisions). A label
+    beside the field's start ("Candidate number") is the field's own, not a tick's."""
+    combs = [p for p in paths if p.comb]
+    if not combs:
+        return
+    labels = [r for r in rows if not r.vertical and len(r.clean) <= LABEL_MAX_CHARS]
+    for group in _cluster([p.bbox for p in combs], JOIN_PT):
+        members = [combs[i] for i in group]
+        x0, y0, x1, y1 = _union(p.bbox for p in members)
+        horizontal = x1 - x0 >= y1 - y0
+        labelled = False
+        for row in labels:
+            reach = 1.5 * max(row.size, (y1 - y0) if horizontal else (x1 - x0))
+            mx, my = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
+            if horizontal and x0 <= mx <= x1 and _gap(row.bbox, (x0, y0, x1, y1)) <= reach:
+                labelled = True
+            if not horizontal and y0 <= my <= y1 and _gap(row.bbox, (x0, y0, x1, y1)) <= reach:
+                labelled = True
+        if not labelled:
+            for p in members:
+                p.ruler = p.comb = False
 
 
 def _mark_plots(paths: Sequence[_Path], rows: Iterable[_Row]) -> None:
@@ -5477,7 +5532,10 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
         # Axes with tick labels, an axis title or a curve from their corner are a plot's:
         # the rows the header and footer rules dropped count (tick labels in the bands).
-        _mark_plots(paths[number], [*prepared[number][0], *prepared[number][2]])
+        # Rulers with no labels whose ticks are an answer field's cells are not rulers.
+        page_rows = [*prepared[number][0], *prepared[number][2]]
+        _answer_fields(paths[number], page_rows)
+        _mark_plots(paths[number], page_rows)
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
     label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
