@@ -1362,6 +1362,72 @@ so is the exam cover, rightly: its comb fields hold nothing yet. The earlier 110
 evidence PDFs, the 90 handwriting pages and the 88 extra pages end to end: the same
 verdicts as before the fixes.
 
+## Held-out set (pre-registered 2026-10-13)
+
+The sections above were used to build and tune a11y-stem, so their numbers are
+development numbers. The held-out set is 15 OpenStax sections that no development step
+saw, fixed in a pre-registration before any system ran on them: 3 sections each from
+College Physics, Chemistry, Precalculus, Introductory Statistics and Intermediate Algebra,
+242 Letter pages, 1,369 equations, 70 figures (69 with OpenStax alt text), 27 tables and
+509 headings. The pre-registration (SHA-256 `8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9`)
+holds the selection rule, the metrics, the statistics and what counts as a failure, and is
+published with the results. The gold manifest's SHA-256 is
+`e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`.
+
+**Retired first editions.** Every live CC BY STEM book (Physics, Statistics) was used in
+development, and every current edition of the others is CC BY-NC-SA (`gold licenses`,
+2026-10-13). The set therefore comes from retired first editions, which are CC BY 4.0 in
+the OpenStax archive and CMS. Whether a retired edition is acceptable ground truth is open
+(ADR 0001, question 2), so fetching needs `--allow-retired`; every record carries
+`book_state: retired`. Their MathML and alt text are older in style than the current
+editions'.
+
+**Nothing from this set is in the repository.** The gold, the printed PDFs, the caches and
+the reports stay outside it, by default under `~/.cache/a11y-stem/heldout`
+(`$XDG_CACHE_HOME`, or `--heldout-dir`): the research sweeps read every PDF in
+`.cache/eval/pages/`, and `data/eval/` feeds the CI gate, so a held-out file in either
+would flow into development or into the gate. `tests/test_heldout.py` checks that no
+held-out section is under `data/` or `tests/fixtures/`, and the tests build their own
+small synthetic set.
+
+```
+uv run a11y-stem gold fetch --set heldout --allow-retired --date 2026-10-13   # ~25 requests
+uv run a11y-stem gold verify --set heldout
+uv run a11y-stem eval render --set heldout --all            # prints 15 PDFs, counts pages
+uv run a11y-stem eval equations --set heldout --self-check  # plumbing only, always 1.0
+uv run a11y-stem eval pipeline --set heldout --task document --max-usd N
+```
+
+- **`gold fetch --set heldout`** writes what `gold fetch` writes for any set: one JSONL per
+  section with its equations (MathML), figures (OpenStax alt text, caption, image URL),
+  tables and headings, `_book.json` per book, `manifest.json` and `ATTRIBUTION.md`. Each
+  book is read from the archive release that was current at registration
+  (`20260604.144757`), not the current one, so the files do not change when OpenStax
+  publishes a new release. With `--date 2026-10-13` the 22 files are byte for byte the
+  registered ones; on another day they differ only in `retrieved_at`, and `gold verify`
+  says so. `tests/test_heldout.py -m network` rebuilds them from OpenStax and compares.
+- **`gold verify --set heldout`** compares a folder with the registered hashes: the 15
+  JSONL files (and, for a mismatch, whether only `retrieved_at` differs), no other gold
+  file, `manifest.json`, `ATTRIBUTION.md` and each `_book.json`. It proves the files are the
+  registered ones, not that OpenStax's markup is right.
+- **`--set heldout` on `eval pipeline`, `eval equations` and `eval render`** takes the gold
+  from that folder and stops, naming what differs, unless it is the registered gold. It
+  refuses `--fake` (a fake run still runs the layout and heading code on these sections,
+  which the pre-registration does not allow before the registered run), `--notation`, the
+  tables task, and any `--cache`, `--out`, `--items` or `--report` inside the repository.
+  It changes no prompt, model, threshold, rule or scorer: it picks the data and the
+  folders. The report gets `set: heldout` and the pre-registration's hash; its
+  `dataset.manifest_sha256` is the registered manifest's.
+- **`eval render --set heldout --all`** prints the 15 sections (Letter) into the render
+  cache under the key the document task looks them up by, so the run converts these very
+  files, and as `<book>-<page>.pdf` into `pdfs/` with a `pages.json` of page counts and
+  SHA-256 values. It exits 1 if a Letter print has another page count than registered (242
+  in all). Printing only counts pages; nothing converts the PDFs.
+
+The run itself (a11y-stem, the chatbot recipe, the open parsers), the cluster bootstrap
+and the invented-content rate are specified in the pre-registration and happen once, after
+its sign-off items. Until then no number from this set exists.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -1424,6 +1490,9 @@ verdicts as before the fixes.
 | `src/a11y_stem/eval/bold_letters.py` | bold letters in running text: found against the LaTeX and OpenStax sources (offline) |
 | `src/a11y_stem/eval/notation_flags.py` | course notation as style evidence: new flags on stored answers, with and without the text layer's styles (offline) |
 | `src/a11y_stem/cli/eval_cli.py` | `eval pipeline/gate/calibrate/render`, `demo build` |
+| `src/a11y_stem/gold/heldout.py` | the pre-registered held-out set: its 15 sections, registered hashes and page counts, pinned fetch, `verify_gold` |
+| `src/a11y_stem/cli/heldout.py` | `--set heldout`: where its files live (outside the repository), the guards |
+| `tests/test_heldout.py` | held-out registration, fetch, verification and CLI (offline; one `network` test rebuilds the registered gold) |
 | `src/a11y_stem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
 | `src/a11y_stem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
 | `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
