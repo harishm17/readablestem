@@ -1132,6 +1132,41 @@ def build_edge_cases(out: Path) -> list[Path]:
     for i, line in enumerate(QUESTIONS):
         page.insert_text((72, 120 + 22 * i), line, fontsize=11)
     made.append(save(doc, out, "timelines.pdf"))
+
+    # 29. One or two hand marks over lines of typed text, too simple for the stroke test: a
+    #     tick over question 2, a cross over a word of a paragraph's middle line, a slash
+    #     through a word; and a control, marks typeset with the text (an underline, a box
+    #     round a word, a cancel stroke across a term within its line).
+    doc = pymupdf.open()
+    red, blue = (0.85, 0, 0), (0.0, 0.44, 1.0)
+    for strokes in (
+        [[(250, 116), (256, 124), (270, 106)]],
+        [[(250, 102), (264, 118)], [(264, 102), (250, 118)]],
+        [[(160, 128), (170, 120.5), (182, 110)]],
+    ):
+        page = doc.new_page(width=612, height=792)
+        if len(strokes) == 2:
+            page.insert_textbox(pymupdf.Rect(72, 90, 540, 300), " ".join(TYPED[1:3]), fontsize=11)
+        else:
+            for i, line in enumerate(QUESTIONS):
+                page.insert_text((72, 100 + 22 * i), line, fontsize=11)
+        shape = page.new_shape()
+        for points in strokes:
+            shape.draw_polyline(points)
+            shape.finish(color=red if len(strokes) < 3 else blue, width=1.6, closePath=False)
+        shape.commit()
+    page = doc.new_page(width=612, height=792)
+    for i, line in enumerate(QUESTIONS):
+        page.insert_text((72, 100 + 22 * i), line, fontsize=11)
+    shape = page.new_shape()
+    shape.draw_line((72, 104), (160, 104))  # an underline under question 1
+    shape.finish(color=(0, 0, 0), width=0.6)
+    shape.draw_rect(pymupdf.Rect(130, 112, 162, 125))  # a box round a word of question 2
+    shape.finish(color=(0, 0, 0), width=0.6)
+    shape.draw_line((150, 145), (162, 136))  # a cancel stroke across a term of question 3
+    shape.finish(color=(0, 0, 0), width=0.6)
+    shape.commit()
+    made.append(save(doc, out, "marks_over_text.pdf"))
     return made
 
 
