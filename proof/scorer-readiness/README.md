@@ -7,4 +7,4 @@ known-correct LaTeX written by hand from the gold MathML, `report.json` is
 no prediction count as errors; the 40 predicted ones are the sample). Result: 28 of 40 exact under
 the lenient scorer. The author has not checked the 40 against the rendered gold yet.
 
-`draw.py` differs from the registered file only in how the gold folder is given.
+`draw.py` and `make_pred.py` are the registered files, byte for byte (SHA-256 in `../PREREG.sha256`). `draw.py` reads the answer key from a fixed path on the author's machine (line 7): change that line, or copy the file, to run it elsewhere.

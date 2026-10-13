@@ -4,16 +4,10 @@ import random
 import sys
 from pathlib import Path
 
-gold = Path(sys.argv[2])  # the held-out answer key folder (the original script had a fixed path)
+gold = Path(sys.argv[2]) if len(sys.argv) > 2 else Path.home() / ".cache" / "a11y-stem" / "heldout"
 seed = int(hashlib.sha256(b"a11y-stem held-out scorer sample 2026-10-13").hexdigest()[:16], 16)
 rng = random.Random(seed)
-books = [
-    "college-physics",
-    "chemistry",
-    "precalculus",
-    "introductory-statistics",
-    "intermediate-algebra",
-]
+books = ["college-physics", "chemistry", "precalculus", "introductory-statistics", "intermediate-algebra"]
 recs = {b: [] for b in books}
 for f in sorted(gold.rglob("*.jsonl")):
     for line in f.read_text().splitlines():
@@ -26,12 +20,7 @@ for b in books:
 Path(sys.argv[1]).write_text(
     json.dumps(
         [
-            {
-                "id": r["id"],
-                "book": r["book_slug"],
-                "display": r.get("display"),
-                "mathml": r["mathml"],
-            }
+            {"id": r["id"], "book": r["book_slug"], "display": r.get("display"), "mathml": r["mathml"]}
             for r in out
         ],
         indent=1,

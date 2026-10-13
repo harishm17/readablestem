@@ -1,0 +1,143 @@
+{
+ "ok": true,
+ "replacements": 6,
+ "log": [
+  "replace precalculus/5-1-angles (low) by 5-4-right-triangle-trigonometry: rule A, more than 30 pages",
+  "replace precalculus/3-3-power-functions-and-polynomial-functions (mid) by 3-4-graphs-of-polynomial-functions: rule A, more than 30 pages",
+  "replace precalculus/3-4-graphs-of-polynomial-functions (mid) by 1-6-absolute-value-functions: rule A, more than 30 pages",
+  "replace precalculus/4-2-graphs-of-exponential-functions (high) by 7-2-sum-and-difference-identities: rule A, more than 30 pages",
+  "replace intermediate-algebra/3-2-slope-of-a-line (low) by 4-3-solve-mixture-applications-with-systems-of-equations: rule A, more than 30 pages",
+  "replace precalculus/7-2-sum-and-difference-identities (high) by 3-1-complex-numbers: rule B, total 252 above 250"
+ ],
+ "total_pages": 242,
+ "selected": [
+  {
+   "book": "college-physics",
+   "tercile": "low",
+   "slug": "29-3-photon-energies-and-the-electromagnetic-spectrum",
+   "queue_position": 0,
+   "pages": 10
+  },
+  {
+   "book": "college-physics",
+   "tercile": "mid",
+   "slug": "5-3-elasticity-stress-and-strain",
+   "queue_position": 0,
+   "pages": 14
+  },
+  {
+   "book": "college-physics",
+   "tercile": "high",
+   "slug": "28-4-relativistic-addition-of-velocities",
+   "queue_position": 0,
+   "pages": 9
+  },
+  {
+   "book": "chemistry",
+   "tercile": "low",
+   "slug": "19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+   "queue_position": 0,
+   "pages": 8
+  },
+  {
+   "book": "chemistry",
+   "tercile": "mid",
+   "slug": "7-3-lewis-symbols-and-structures",
+   "queue_position": 0,
+   "pages": 9
+  },
+  {
+   "book": "chemistry",
+   "tercile": "high",
+   "slug": "14-7-acid-base-titrations",
+   "queue_position": 0,
+   "pages": 11
+  },
+  {
+   "book": "precalculus",
+   "tercile": "low",
+   "slug": "5-4-right-triangle-trigonometry",
+   "queue_position": 1,
+   "pages": 29
+  },
+  {
+   "book": "precalculus",
+   "tercile": "mid",
+   "slug": "1-6-absolute-value-functions",
+   "queue_position": 2,
+   "pages": 28
+  },
+  {
+   "book": "precalculus",
+   "tercile": "high",
+   "slug": "3-1-complex-numbers",
+   "queue_position": 2,
+   "pages": 20
+  },
+  {
+   "book": "introductory-statistics",
+   "tercile": "low",
+   "slug": "2-4-box-plots",
+   "queue_position": 0,
+   "pages": 9
+  },
+  {
+   "book": "introductory-statistics",
+   "tercile": "mid",
+   "slug": "4-5-hypergeometric-distribution",
+   "queue_position": 0,
+   "pages": 6
+  },
+  {
+   "book": "introductory-statistics",
+   "tercile": "high",
+   "slug": "3-1-terminology",
+   "queue_position": 0,
+   "pages": 8
+  },
+  {
+   "book": "intermediate-algebra",
+   "tercile": "low",
+   "slug": "4-3-solve-mixture-applications-with-systems-of-equations",
+   "queue_position": 1,
+   "pages": 28
+  },
+  {
+   "book": "intermediate-algebra",
+   "tercile": "mid",
+   "slug": "4-6-solve-systems-of-equations-using-determinants",
+   "queue_position": 0,
+   "pages": 27
+  },
+  {
+   "book": "intermediate-algebra",
+   "tercile": "high",
+   "slug": "1-5-properties-of-real-numbers",
+   "queue_position": 0,
+   "pages": 26
+  }
+ ],
+ "printed": {
+  "college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum": 10,
+  "college-physics/5-3-elasticity-stress-and-strain": 14,
+  "college-physics/28-4-relativistic-addition-of-velocities": 9,
+  "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds": 8,
+  "chemistry/7-3-lewis-symbols-and-structures": 9,
+  "chemistry/14-7-acid-base-titrations": 11,
+  "precalculus/5-1-angles": 44,
+  "precalculus/5-4-right-triangle-trigonometry": 29,
+  "precalculus/3-3-power-functions-and-polynomial-functions": 44,
+  "precalculus/3-4-graphs-of-polynomial-functions": 53,
+  "precalculus/1-6-absolute-value-functions": 28,
+  "precalculus/4-2-graphs-of-exponential-functions": 33,
+  "precalculus/7-2-sum-and-difference-identities": 30,
+  "introductory-statistics/2-4-box-plots": 9,
+  "introductory-statistics/4-5-hypergeometric-distribution": 6,
+  "introductory-statistics/3-1-terminology": 8,
+  "intermediate-algebra/3-2-slope-of-a-line": 45,
+  "intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations": 28,
+  "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants": 27,
+  "intermediate-algebra/1-5-properties-of-real-numbers": 26,
+  "precalculus/3-1-complex-numbers": 20
+ }
+}
