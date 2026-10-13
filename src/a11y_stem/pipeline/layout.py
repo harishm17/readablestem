@@ -97,6 +97,7 @@ from a11y_stem.pipeline.parse import (
 # Sizes are PDF points unless the name says otherwise. docs/layout.md explains each one.
 
 HEADING_SIZE_RATIO = 1.15  # a short run at least this much larger than body text
+TITLE_MIN_PT = 18.0  # a row of several words this large is a title, never a figure's label
 HEADING_LEVEL_TOLERANCE = 0.05  # heading sizes within 5 % of each other share a level
 MAX_HEADING_CHARS = 200
 MAX_HEADING_ROWS = 3
@@ -2497,6 +2498,12 @@ class _Path:
     open_stroke: bool = False  # a stroked line or curve that does not close: a pen mark's shape
     axis: bool = False  # holds one of two lines meeting at a corner: a plot's axes (`_mark_axes`)
     ruler: bool = False  # holds a line with tick marks across or on it, or one of the ticks
+    # The L pairs (horizontal line, vertical line) the path holds a line of (`_mark_axes`).
+    axes: tuple[tuple[_Straight, _Straight], ...] = ()
+    plot: bool = False  # one of those Ls has evidence of a plot (`_mark_plots`)
+    # Where a curved open stroke's subpaths start and end (display space): a plotted
+    # line starts at its axes' corner (`_plotted`).
+    ends: tuple[tuple[float, float], ...] = ()
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
@@ -2553,10 +2560,37 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
         open_stroke = stroked and not filled and not _encloses(items, drawing.get("closePath"))
         fill = filled and kind == "shape"
         path = _Path(box, kind, curved, fill, source, border, rules, open_stroke)
+        if curved and open_stroke:
+            path.ends = _subpath_ends(items, display)
         paths.append(path)
         lines.append(_straight_lines(path, segments))
     _mark_axes(paths, lines)
     return paths
+
+
+SUBPATH_ENDS = 16  # at most this many subpath starts and ends are kept per path
+
+
+def _subpath_ends(items: Sequence[Any], display: _Display) -> tuple[tuple[float, float], ...]:
+    """The start and end of each subpath of a path of lines and curves (display space): a
+    subpath starts where an item does not begin at the last one's end. At most
+    SUBPATH_ENDS points."""
+    found: list[tuple[float, float]] = []
+    last = None
+    for item in items:
+        if item[0] not in ("l", "c"):
+            continue
+        first, end = item[1], item[-1]
+        if last is None or abs(first[0] - last[0]) > 0.01 or abs(first[1] - last[1]) > 0.01:
+            if last is not None:
+                found.append(display.point(*last))
+            found.append(display.point(*first))
+            if len(found) >= SUBPATH_ENDS:
+                return tuple(found)
+        last = end
+    if last is not None:
+        found.append(display.point(*last))
+    return tuple(found)
 
 
 def _drawing_bounds(rect: Sequence[float], items: Sequence[Any]) -> tuple[float, ...]:
@@ -2700,6 +2734,8 @@ def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
             if meeting(m, near) == {k} and not meeting(m, far):
                 flag(k, "axis")
                 flag(m, "axis")
+                for owner in {*flat[k][1], *flat[m][1]}:
+                    paths[owner].axes += ((line, upright),)
     # Rulers: short lines by orientation, in bands of TICK_MAX_PT of their middle.
     short: dict[tuple[bool, int], list[int]] = {}
     for k, (line, _) in enumerate(flat):
@@ -3408,14 +3444,17 @@ def _vector_figures(
     plot's axis or ruler, a background fill) is set aside first: a frame's box holds
     everything on the page, so clustered with the rest it made every figure on the page
     one "page border" (docs/layout.md "Figures"). A drawing that still fills the page (a
-    full-page plot, a slide's chart) is a figure when it has three curves, two bars, or a
-    plotted line on axes (`_mark_axes`), and no running text inside. Else it
-    may be a decorated border or a background drawn behind text, but a drawing must not
-    be lost with it: its border (`_border_member`) is set aside and the rest clustered
-    again; with no border to take off, a page-filling drawing that still holds a plotted
-    line, curves or bars goes to `left_out`, and the safety net keeps the page image.
-    With `page_sized` False (the page has ink: it may be a page of notes) such a drawing
-    is never a figure for the model: its box goes to `left_out` too (`INK_REASONS`).
+    full-page plot, a slide's chart) is a figure when it is a plot (a plotted line or
+    bars on axes or a ruler with evidence of a plot: `_mark_plots`), whatever text is
+    inside its axes (a title, a note: it stays in the reading flow), or when it has three
+    curves or two bars and no running text inside. Else it may be a decorated border or
+    a background drawn behind text, but a drawing must not be lost with it: its border
+    (`_border_member`) is set aside and the rest clustered again, and when nothing is
+    made of a rest that holds curves or bars, or there is no border to take off, a
+    page-filling drawing that holds a plotted line, curves or bars goes to `left_out`,
+    and the safety net keeps the page image. With `page_sized` False (the page has ink:
+    it may be a page of notes) such a drawing is never a figure for the model: its box
+    goes to `left_out` too (`INK_REASONS`).
 
     Rules alone (separators, underlines, a table's grid) and boxes or panels round text
     are not figures, unless they are drawn as a diagram (`_drawn_diagram`: lines joined
@@ -3458,15 +3497,16 @@ def _vector_figures(
                 if left_out is not None:
                     left_out.append(box)
                 continue
-            # A plotted line on axes (or on a ruler: an axis with ticks) is a plot, not a
-            # decorated border, with one curve.
-            axes = curved and any(p.axis or p.ruler for p in members)
-            if (len(curves) < 3 and len(bars) < 2 and not axes) or (
-                ctx is not None and _running_text(inside, ctx)
-            ):
+            # A plotted line or bars on axes (or on a ruler: an axis with ticks) with
+            # evidence of a plot is a plot, not a decorated border, with one curve and
+            # with running text inside (which stays in the reading flow: `_absorb_labels`).
+            plot = (curved or len(bars) >= 2) and any(p.plot or p.ruler for p in members)
+            running = ctx is not None and bool(_running_text(inside, ctx))
+            if not plot and ((len(curves) < 3 and len(bars) < 2) or running):
                 inner = [p for p in members if not _border_member(p, box, page_rect)]
                 if inner and len(inner) < len(members) and depth < 2:
-                    figures += _vector_figures(
+                    before = (len(left_out or ()), len(small_out or ()))
+                    found = _vector_figures(
                         inner,
                         rows,
                         page_rect,
@@ -3476,6 +3516,17 @@ def _vector_figures(
                         depth=depth + 1,
                         small_out=small_out,
                     )
+                    figures += found
+                    after = (len(left_out or ()), len(small_out or ()))
+                    # Nothing was made of what is left once the border is off: if it held
+                    # curves or bars, the page image keeps them.
+                    if (
+                        not found
+                        and after == before
+                        and left_out is not None
+                        and any(p.curved or p in bars for p in inner)
+                    ):
+                        left_out.append(box)
                 elif (curved or len(bars) >= 2) and left_out is not None:
                     left_out.append(box)  # drawings no figure was made of: the page image
                 continue
@@ -3502,6 +3553,71 @@ def _vector_figures(
 
 JOIN_PT = 1.5  # pt: line ends this close meet (a corner of a staircase, a connector's end)
 MAX_DIAGRAM_BOXES = 200  # more box outlines in one cluster are a grid of cells, not a diagram
+ORIGIN_REACH = 4.0  # pt: a plotted line that starts this close to its axes' corner starts there
+AXIS_LABEL_REACH = 3.0  # x font size: a tick label or axis title is this close outside an axis
+
+
+def _mark_plots(paths: Sequence[_Path], rows: Iterable[_Row]) -> None:
+    """Flag the paths that hold an L of axes (`_mark_axes`) with evidence of a plot
+    (`_Path.plot`), not a frame's two sides or a template's accent: tick marks on it (a
+    ruler), a curve starting at its corner (ORIGIN_REACH), two bars standing on it, or a
+    short row (a tick label, an axis title; LABEL_MAX_CHARS) just outside one of its lines
+    (AXIS_LABEL_REACH x its size), on the side away from the other line. `rows` are the
+    page's rows, the ones the header and footer rules dropped too (a full-page plot's tick
+    labels are in the footer band). A title slide's L-shaped accent and the wave across it
+    have none of these (2026-10-13: the slide became one figure whose labels were its
+    title and subtitle)."""
+    owners: dict[tuple[_Straight, _Straight], list[_Path]] = {}
+    for p in paths:
+        for pair in p.axes:
+            owners.setdefault(pair, []).append(p)
+    if not owners:
+        return
+    labels = [r for r in rows if len(r.clean) <= LABEL_MAX_CHARS and not CAPTION.match(r.clean)]
+    ends = [(x, y) for p in paths for x, y in p.ends]
+    filled = [p for p in paths if p.filled]
+    for (h, v), held in owners.items():
+        if any(p.plot for p in held):
+            continue
+        if any(p.ruler for p in held) or _plot_evidence(h, v, ends, filled, labels):
+            for p in held:
+                p.plot = True
+
+
+def _plot_evidence(
+    h: _Straight,
+    v: _Straight,
+    ends: Sequence[tuple[float, float]],
+    filled: Sequence[_Path],
+    labels: Sequence[_Row],
+) -> bool:
+    """`_mark_plots`' tests for one L: a curve end at its corner, two bars standing on its
+    horizontal line, or a label just outside one of its lines."""
+    # The corner, and which way each line runs from it.
+    cx = h.lo if abs(h.lo - v.c) <= abs(h.hi - v.c) else h.hi
+    cy = v.lo if abs(v.lo - h.c) <= abs(v.hi - h.c) else v.hi
+    right = h.hi - cx > cx - h.lo  # the horizontal line runs right from the corner
+    up = cy - v.lo > v.hi - cy  # the vertical line runs up from the corner
+    if any(abs(x - cx) <= ORIGIN_REACH and abs(y - cy) <= ORIGIN_REACH for x, y in ends):
+        return True
+    standing = [
+        p
+        for p in filled
+        if h.lo <= (p.bbox[0] + p.bbox[2]) / 2 <= h.hi
+        and abs((p.bbox[3] if up else p.bbox[1]) - h.c) <= JOIN_PT + 1
+    ]
+    if len(standing) >= 2:
+        return True
+    for row in labels:
+        reach = AXIS_LABEL_REACH * row.size
+        mx, my = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
+        below = row.y0 - h.c if up else h.c - row.y1  # outside the horizontal line
+        if -0.5 * row.size <= below <= reach and h.lo - reach <= mx <= h.hi + reach:
+            return True
+        beside = v.c - row.x1 if right else row.x0 - v.c  # outside the vertical line
+        if -0.5 * row.size <= beside <= reach and v.lo - reach <= my <= v.hi + reach:
+            return True
+    return False
 
 
 def _drawn_diagram(members: Sequence[_Path]) -> bool:
@@ -3612,7 +3728,9 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
     page's area, or a straight-edged panel round the page with a margin) or a band of
     colour along an edge (a slide template's title bar): never part of a figure, and
     never content on its own. A page-long rule that is a plot's axis or a ruler's line
-    (`_mark_axes`: a full-page plot's y-axis, a timeline across the top) is a drawing."""
+    (`_mark_axes`: a full-page plot's y-axis, a timeline across the top) is a drawing; an
+    L round the page with no evidence of a plot (`_mark_plots`: a template's accent along
+    two edges) is two sides of a frame."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
     big = PAGE_SIZED_FRACTION
@@ -3624,8 +3742,10 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
         )
     if path.frame:
         return _round_page(path.bbox, page_rect)
-    if path.curved or path.axis or path.ruler:
+    if path.curved or path.ruler or path.plot:
         return False
+    if path.axis and path.kind == "shape":  # an L drawn as one path
+        return _round_page(path.bbox, page_rect)
     edge = FRAME_EDGE_BAND
     if path.kind == "hrule":
         return x1 - x0 >= big * w and (y1 <= edge * h or y0 >= (1 - edge) * h)
@@ -3635,21 +3755,34 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
 
 
 def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
-    """Part of the border of a page-filling cluster (`box`): frame-shaped, across the page
-    (PAGE_SIZED_FRACTION of its width or height), or a mark smaller than a figure along
-    an edge of the cluster (within FRAME_EDGE_BAND of the page): the pieces of a frame
-    whose shape was not recognised, corner ornaments. A plot's axes and a ruler are not
-    (`_mark_axes`)."""
+    """Part of the border of a page-filling cluster (`box`): frame-shaped, an L with no
+    evidence of a plot (`_mark_plots`: a frame's two sides, a template's accent), straight
+    and across the page (PAGE_SIZED_FRACTION of its width or height), curved and across
+    the page along one of its edges (within FRAME_EDGE_BAND), or a mark smaller than a
+    figure along an edge of the cluster: the pieces of a frame whose shape was not
+    recognised, corner ornaments. A plot's axes and a ruler (`_mark_axes`) are not; nor
+    is a curve across the middle of the page (a wave across a title slide, a plotted
+    line: 2026-10-13, a full-page plot's curve was set aside and its axes alone made
+    nothing)."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
-    if path.axis or path.ruler:
+    if path.ruler or path.plot:
         return False
-    if path.frame or x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
+    if path.frame or path.axis:
         return True
+    if x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
+        return not path.curved or _in_edge_band(path.bbox, page_rect)
     if max(x1 - x0, y1 - y0) >= MIN_DRAWING_PT:
         return False
     bx, by = FRAME_EDGE_BAND * w, FRAME_EDGE_BAND * h
     return x1 <= box[0] + bx or x0 >= box[2] - bx or y1 <= box[1] + by or y0 >= box[3] - by
+
+
+def _in_edge_band(box: BBox, page_rect: pymupdf.Rect) -> bool:
+    """`box` lies within FRAME_EDGE_BAND of one edge of the page, all of it."""
+    w, h = page_rect.width, page_rect.height
+    band_x, band_y = FRAME_EDGE_BAND * w, FRAME_EDGE_BAND * h
+    return box[3] <= band_y or box[1] >= h - band_y or box[2] <= band_x or box[0] >= w - band_x
 
 
 def _round_page(box: BBox, page_rect: pymupdf.Rect) -> bool:
@@ -3766,18 +3899,24 @@ def _absorb_labels(
 
 def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
     """Ids of rows that are not labels: lines of a paragraph (a prose line that the next
-    or previous prose line continues) and title-sized lines of several words."""
+    or previous prose line continues) and title-sized lines of several words: at least
+    HEADING_SIZE_RATIO x body size, or TITLE_MIN_PT whatever the body (a slide whose only
+    text is its title sets the body size itself: its title was a figure's label). The
+    short last line of such a paragraph ("the three.") is one of its lines too."""
     found: set[int] = set()
     prose = []
+    texts = []
     for row in rows:
         if row.kind != "text" or row.vertical:
             continue
+        texts.append(row)
         words = _prose_words(row, _CharInfo.of(row))
-        if words >= 2 and row.size >= HEADING_SIZE_RATIO * ctx.body:
+        if words >= 2 and (row.size >= HEADING_SIZE_RATIO * ctx.body or row.size >= TITLE_MIN_PT):
             found.add(id(row))
         if words >= 3:
             prose.append(row)
     prose.sort(key=lambda r: r.baseline)
+    lines: set[int] = set()  # lines of a paragraph
     for i, above in enumerate(prose):
         for below in prose[i + 1 :]:
             if below.baseline - above.baseline > 2.0 * max(above.size, below.size):
@@ -3785,8 +3924,22 @@ def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
             if below.column == above.column and _continues(
                 above, below, _Run([above], "text", True), ctx
             ):
-                found.update((id(above), id(below)))
-    return found
+                lines.update((id(above), id(below)))
+    texts.sort(key=lambda r: r.baseline)
+    for i, row in enumerate(texts):
+        if id(row) in lines:
+            continue
+        for above in reversed(texts[:i]):
+            if row.baseline - above.baseline > 2.0 * max(above.size, row.size):
+                break
+            if (
+                id(above) in lines
+                and above.column == row.column
+                and _continues(above, row, _Run([above], "text", True), ctx)
+            ):
+                lines.add(id(row))
+                break
+    return found | lines
 
 
 # ============================================================================ blocks
@@ -4898,6 +5051,9 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             paths[number] = [p for p in paths[number] if p.source not in ink]
         found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
+        # Axes with tick labels, an axis title or a curve from their corner are a plot's:
+        # the rows the header and footer rules dropped count (tick labels in the bands).
+        _mark_plots(paths[number], [*prepared[number][0], *prepared[number][2]])
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
     label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
