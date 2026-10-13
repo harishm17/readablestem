@@ -466,3 +466,112 @@ def test_a_worked_example_box_with_a_grid_of_cell_borders_is_still_not_a_figure(
     out = layout.analyze(doc.tobytes())
     assert out.kept_pages == {}
     assert _figures(out, 0) == [] and _figures(out, 1) == []
+
+
+# --------------------------------------------------------------------------- formulas, circuits
+
+
+def _fischer(page, cx: float, top: float) -> tuple[float, float, float, float]:
+    """A Fischer projection: a vertical line crossed by two horizontal ones, each a path,
+    with the groups at their ends."""
+    _path(page, [[(cx, top), (cx, top + 100)]], width=1.2)
+    _label(page, (cx - 12, top - 6), "CHO", 10)
+    for k in range(2):
+        y = top + 30 + 40 * k
+        _path(page, [[(cx - 30, y), (cx + 30, y)]], width=1.2)
+        _label(page, (cx - 44, y + 4), "H", 10)
+        _label(page, (cx + 34, y + 4), "OH", 10)
+    _label(page, (cx - 22, top + 114), "CH2OH", 10)
+    return cx - 30, top, cx + 30, top + 100
+
+
+def _ethane(page, ym: float) -> tuple[float, float, float, float]:
+    """Ethane: atom letters joined by short horizontal and vertical bond lines."""
+    for x, atom in zip([200, 240, 280, 320], ["H", "C", "C", "H"], strict=True):
+        _label(page, (x - 3.5, ym + 4), atom, 12)
+    bonds = [[(206, ym), (232, ym)], [(246, ym), (272, ym)], [(286, ym), (312, ym)]]
+    for x in (240, 280):
+        _label(page, (x - 3.5, ym - 26), "H", 12)
+        _label(page, (x - 3.5, ym + 34), "H", 12)
+        bonds += [[(x, ym - 22), (x, ym - 8)], [(x, ym + 8), (x, ym + 22)]]
+    _lines(page, bonds, width=1.2)
+    return 206, ym - 22, 312, ym + 22
+
+
+def _flat_circuit(page, y: float) -> tuple[float, float, float, float]:
+    """A one-line circuit under 24 pt tall: wires, a battery's two plates, two resistor
+    boxes; straight lines and boxes only."""
+    _lines(page, [[(150, y), (200, y)], [(206, y), (240, y)], [(290, y), (330, y)],
+                  [(380, y), (440, y)]], width=1.2)  # fmt: skip
+    _path(page, [[(200, y - 9), (200, y + 9)]], width=1.2)
+    _path(page, [[(206, y - 5), (206, y + 5)]], width=3)
+    _rect(page, (240, y - 6, 290, y + 6), width=1.2)
+    _rect(page, (330, y - 6, 380, y + 6), width=1.2)
+    return 150, y - 9, 440, y + 9
+
+
+def _lewis_water(page, ym: float) -> tuple[float, float, float, float]:
+    """H O H with the oxygen's eight electrons as dots round it."""
+    for x, atom in ((250, "H"), (290, "O"), (330, "H")):
+        _label(page, (x, ym + 5), atom, 14)
+    for dx, dy in [(-2, -14), (6, -14), (-2, 13), (6, 13), (-12, -2), (-12, 4), (18, -2),
+                   (18, 4)]:  # fmt: skip
+        shape = page.new_shape()
+        shape.draw_circle((294 + dx, ym + dy - 4), 1.4)
+        shape.finish(color=BLACK, fill=BLACK, width=0)
+        shape.commit()
+    return 281, ym - 19, 313, ym + 10
+
+
+FORMULAS = {
+    "Fischer projections": lambda page, y: _fischer(page, 220, y + 40),
+    "ethane's bond lines": lambda page, y: _ethane(page, y + 70),
+    "a one-line circuit of boxes and wires": lambda page, y: _flat_circuit(page, y + 20),
+    "a Lewis structure's electron dots": lambda page, y: _lewis_water(page, y + 50),
+}
+
+
+@pytest.mark.parametrize("case", list(FORMULAS))
+def test_straight_or_dotted_drawings_between_paragraphs_are_kept(case):
+    # Rules that cross with groups at their ends, short bonds from one letter to another,
+    # boxes joined by wires, dots round a letter: dropped as rules, boxes or dots alone
+    # (or held by the row of letters), with "Everything was converted".
+    doc = pymupdf.open()
+    page = _page(doc)
+    y = _running_text(page, 72, 1, start=3)
+    area = FORMULAS[case](page, y)
+    _running_text(page, area[3] + 40, 1, start=1)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    (figure,) = _figures(out)
+    assert _holds(figure, area)
+    if case == "Fischer projections":
+        assert {"CHO", "OH", "H", "CH2OH"} <= set((figure.text or "").split())
+
+
+def test_blanks_to_fill_in_and_dot_leaders_are_still_not_drawings():
+    # Controls: a blank on the baseline between two words, a fraction bar with its
+    # numerator and denominator, dots on the baseline between a title and its page
+    # number: part of the text, no figure.
+    doc = pymupdf.open()
+    page = _page(doc)
+    _running_text(page, 72, 1)
+    _label(page, (72, 160), "The speed of the cart is", 11)
+    _path(page, [[(200, 161), (260, 161)]], width=0.6)
+    _label(page, (264, 160), "m/s.", 11)
+    _label(page, (72, 200), "Kinematics", 11)
+    for i in range(30):
+        shape = page.new_shape()
+        shape.draw_circle((140 + 8 * i, 199), 0.6)
+        shape.finish(color=BLACK, fill=BLACK, width=0)
+        shape.commit()
+    _label(page, (384, 200), "12", 11)
+    _label(page, (72, 240), "so the time is", 11)
+    _label(page, (152, 234), "12", 9)
+    _path(page, [[(150, 237), (164, 237)]], width=0.5)
+    _label(page, (153, 245), "4", 9)
+    _label(page, (168, 240), "s in all.", 11)
+    _running_text(page, 280, 1, start=1)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    assert _figures(out) == [] and _regions(out) == []
