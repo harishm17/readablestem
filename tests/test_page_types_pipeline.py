@@ -11,6 +11,7 @@ upload before any quota is spent; nothing is ever said to be converted later.
 from __future__ import annotations
 
 import copy
+import math
 import re
 from html import unescape
 from pathlib import Path
@@ -181,9 +182,47 @@ def test_a_plot_on_a_page_with_a_decorative_frame_is_a_figure():
         (figure,) = [e for e in doc.elements if e.page == page and e.kind is Kind.FIGURE]
         assert figure.caption == "Figure 1: height of the ball against time."
         x0, y0, x1, y1 = figure.bbox
-        assert 140 <= x0 and x1 <= 420 and 180 <= y0 and y1 <= 380  # the plot, not the frame
+        assert x0 >= 140 and x1 <= 420 and y0 >= 180 and y1 <= 380  # the plot, not the frame
         text = " ".join(e.text or "" for e in doc.elements if e.page == page)
         assert "Problem 3." in text
+
+
+def _framed_page(doc: pymupdf.Document, *, beads: bool, wave: bool) -> None:
+    from fixtures.handwriting.make_fixtures import GRAPH, _ball_plot
+
+    page = doc.new_page(width=612, height=792)
+    shape = page.new_shape()
+    if beads:  # a frame of small separate ornaments, no shape to recognise
+        for k in range(48):
+            for x, y in ((24 + 12 * k, 24), (24 + 12 * k, 768)):
+                shape.draw_circle((min(x, 588), y), 3)
+            for x, y in ((24, 24 + 15.5 * k), (588, 24 + 15.5 * k)):
+                shape.draw_circle((x, y), 3)
+        shape.finish(color=(0.3, 0.3, 0.3), width=0.8)
+    if wave:  # a plotted line across the whole page, running text over it
+        pts = [(20 + 5.72 * t, 396 + 360 * math.sin(t / 100 * 3 * math.pi)) for t in range(101)]
+        shape.draw_polyline(pts)
+        shape.finish(color=(0.2, 0.4, 0.9), width=1.5)
+    shape.commit()
+    page.insert_textbox(pymupdf.Rect(72, 72, 540, 160), GRAPH, fontsize=11)
+    if beads:
+        _ball_plot(page)
+
+
+def test_a_page_filling_cluster_never_takes_a_drawing_with_it():
+    doc = pymupdf.open()
+    _framed_page(doc, beads=True, wave=False)
+    _framed_page(doc, beads=False, wave=True)
+    out = layout.analyze(doc.tobytes())
+    # A frame of small ornaments joined the plot into one page-sized cluster with running
+    # text inside: the ornaments are set aside and the plot is a figure again.
+    (figure,) = [e for e in out.elements if e.page == 0 and e.kind is Kind.FIGURE]
+    assert figure.caption == "Figure 1: height of the ball against time."
+    assert figure.bbox[0] >= 140 and figure.bbox[2] <= 420
+    # A line plotted across the page behind running text: not a figure for the model,
+    # and not dropped either: the page keeps its image, its text is read.
+    assert out.kept_pages == {1: "unread_page"}
+    assert "Problem 3." in " ".join(e.text or "" for e in out.elements if e.page == 1)
 
 
 def test_template_pages_with_nothing_to_read_are_not_decisions():
