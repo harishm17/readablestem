@@ -531,3 +531,84 @@ def test_an_interrupted_recording_resumes_without_paying_for_finished_runs(tmp_p
     assert len(asked) == 3  # equations, headings, figures: the two finished runs are not made again
     assert "interrupted once and resumed" in result.text
     assert "Replay compared with the recorded reports: **identical**" in result.text
+
+
+# ------------------------------------------------------------------ adding other systems
+
+
+def _fake_chat_records(arm_ids, refused=()):
+    """A stand-in for `chatbot.record_arms` that writes finished outputs for `arm_ids`."""
+
+    def record(pdfs, out, *, arms, max_usd, client, say=print, **_kw):
+        for arm in arm_ids:
+            for section in pdfs:
+                stem = section.replace("/", "__")
+                folder = out / arm
+                folder.mkdir(parents=True, exist_ok=True)
+                (folder / f"{stem}.html").write_text("<h2>Worked example</h2>", encoding="utf-8")
+                meta = {
+                    "arm": arm,
+                    "section": section,
+                    "status": "ok",
+                    "output": {"file": f"{stem}.html", "format": "html"},
+                    "pdf_pages": 1,
+                    "cost_usd": 0.01,
+                }
+                (folder / f"{stem}.json").write_text(json.dumps(meta), encoding="utf-8")
+        return {"spent_usd": 0.04, "cap_usd": max_usd, "refused_by_cap": list(refused)}
+
+    return record
+
+
+def test_chatbot_arms_that_finished_whole_are_added_and_a_cap_stopped_arm_is_not(
+    recorded, tmp_path, monkeypatch
+):
+    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+
+    record = _fake_chat_records(
+        ["chatbot-sol-purdue", "chatbot-sol-expert"], refused=["chatbot-sol-expert/x.run1"]
+    )
+    from a11y_stem.eval import render
+    from a11y_stem.proof import chatbot
+
+    monkeypatch.setattr(chatbot, "record_arms", record)
+    monkeypatch.setattr(render.ImageCache, "png", lambda self, url: b"not a picture")
+    bundle_dir = copy_bundle(recorded, tmp_path)
+    budget = JobBudget(InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100)
+    extra = engine.add_systems(
+        options(recorded, bundle_dir=bundle_dir, work_dir=tmp_path / "w", max_usd=3.0, date=DATE),
+        "chatbot",
+        say=lambda _m: None,
+        chat_client=object(),
+        judge_client=fake_client(runner.proof_settings(), budget),
+    )
+    bundle = Bundle.open(bundle_dir)
+    assert bundle.verify() == []
+    arms = sorted(p.name for p in bundle.systems_dir.iterdir())
+    assert arms == ["chatbot-sol-purdue"]
+    assert (
+        extra["systems_not_run"] == {"chatbot-sol-expert": "the spend cap did not hold it"}
+        or "chatbot-sol-expert" in extra["systems_not_run"]
+    )
+    again = options(recorded, bundle_dir=bundle_dir, work_dir=tmp_path / "w", max_usd=3.0)
+    with pytest.raises(ProofError, match="already holds the chatbot arms"):
+        engine.add_systems(again, "chatbot", say=lambda _m: None, chat_client=object())
+
+
+def test_a_primary_chatbot_arm_the_cap_cannot_hold_adds_nothing(recorded, tmp_path, monkeypatch):
+    from a11y_stem.proof import chatbot
+
+    monkeypatch.setattr(
+        chatbot,
+        "record_arms",
+        _fake_chat_records(["chatbot-sol-purdue"], refused=["chatbot-sol-purdue/x.run2"]),
+    )
+    bundle_dir = copy_bundle(recorded, tmp_path)
+    with pytest.raises(ProofError, match="did not hold the primary arm"):
+        engine.add_systems(
+            options(recorded, bundle_dir=bundle_dir, work_dir=tmp_path / "w", max_usd=3.0),
+            "chatbot",
+            say=lambda _m: None,
+            chat_client=object(),
+        )
+    assert not (bundle_dir / "systems").exists()

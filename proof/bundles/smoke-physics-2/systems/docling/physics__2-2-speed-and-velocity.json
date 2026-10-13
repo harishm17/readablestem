@@ -1,0 +1,45 @@
+{
+  "arm": "docling",
+  "cost_usd": 0.0,
+  "input_sha256": "5e2cf1e6f178d438b7d5f284e1b00e38926cff4b37a68d6e95a6fd8fd972a35a",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 2.18,
+    "load_before": 1.36,
+    "offline": false,
+    "peak_rss_mb": 2261.4,
+    "quiet_box": true,
+    "system_seconds": 20.269,
+    "timeout_seconds": 1800,
+    "user_seconds": 64.693,
+    "wall_seconds_per_page": 1.927
+  },
+  "output": {
+    "file": "physics__2-2-speed-and-velocity.md",
+    "format": "md"
+  },
+  "pdf_pages": 14,
+  "seconds": 26.978,
+  "section": "physics/2-2-speed-and-velocity",
+  "settings": {
+    "command": "docling --to json --to html --to md",
+    "formula_enrichment": "off (the default)",
+    "image_export_mode": "embedded (the CLI default)",
+    "ocr": "on (RapidOCR)",
+    "tables": "TableFormer, accurate"
+  },
+  "status": "ok",
+  "versions": {
+    "docling": "2.138.0",
+    "docling-core": "2.101.1",
+    "docling-ibm-models": "4.0.3",
+    "docling-parse": "7.22.3",
+    "rapidocr": "3.10.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  }
+}

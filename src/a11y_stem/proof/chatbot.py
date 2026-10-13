@@ -47,6 +47,7 @@ from a11y_stem.proof.bundle import dumps, pdf_name
 MAX_OUTPUT_TOKENS = 64_000
 RENDER_DPI = 150
 RETRIES = 2  # infrastructure errors only
+RETRY_WAIT_S = (60, 180)  # a rate limit needs a minute, not seconds
 TIMEOUT_S = 1800
 PROMPTS: dict[str, str] = json.loads(
     (Path(__file__).with_name("chat_prompts.json")).read_text(encoding="utf-8")
@@ -217,7 +218,7 @@ def run_job(
                 if name not in _INFRASTRUCTURE or attempt == RETRIES:
                     error = name
                     break
-                sleep(10 * (attempt + 1))
+                sleep(RETRY_WAIT_S[attempt])
     finally:
         latency = time.monotonic() - started
         cost = _price_cost(job.arm.model, resp.usage) if resp is not None else 0.0

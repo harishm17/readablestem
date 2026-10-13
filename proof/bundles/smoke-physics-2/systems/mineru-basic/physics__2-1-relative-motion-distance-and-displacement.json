@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "dd3f3d850ccd602acc0bce04c33e974a62e79082b97084296b8c644a301c72d1",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 2.43,
+    "load_before": 1.43,
+    "offline": false,
+    "peak_rss_mb": 3562.8,
+    "quiet_box": true,
+    "system_seconds": 3.506,
+    "timeout_seconds": 1800,
+    "user_seconds": 100.138,
+    "wall_seconds_per_page": 2.319
+  },
+  "output": {
+    "file": "physics__2-1-relative-motion-distance-and-displacement.md",
+    "format": "md"
+  },
+  "pdf_pages": 16,
+  "seconds": 37.099,
+  "section": "physics/2-1-relative-motion-distance-and-displacement",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

@@ -1,0 +1,667 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>2.2 Speed and Velocity</title>
+  <meta name="description" content="OpenStax Physics section on speed, velocity, and related calculations.">
+
+  <style>
+    :root {
+      color-scheme: light;
+      --text: #171717;
+      --border: #555;
+      --link: #0645ad;
+      --focus: #a12600;
+      --background: #fff;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      max-width: 72rem;
+      margin: 0 auto;
+      padding: 1.5rem;
+      color: var(--text);
+      background: var(--background);
+      font-family: system-ui, sans-serif;
+      font-size: 1.125rem;
+      line-height: 1.6;
+    }
+
+    h1, h2, h3, h4 { line-height: 1.25; }
+    h1 { font-size: 2rem; }
+    h2 { margin-top: 2rem; font-size: 1.6rem; }
+    h3 { font-size: 1.3rem; }
+    h4 { font-size: 1.1rem; }
+
+    a { color: var(--link); }
+    a:focus-visible, button:focus-visible, [tabindex="0"]:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 3px;
+    }
+
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      padding: .75rem;
+      background: #fff;
+      color: #000;
+      z-index: 10;
+    }
+    .skip-link:focus { left: .5rem; }
+
+    .panel, figure, .question, .worked-example, .equation-box {
+      border: 1px solid var(--border);
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+
+    .panel > :first-child,
+    .question > :first-child,
+    .worked-example > :first-child { margin-top: 0; }
+
+    .equation {
+      overflow-x: auto;
+      padding: .5rem 0;
+      text-align: center;
+    }
+
+    .choices { padding-left: 2rem; }
+    .choices li { margin: .4rem 0; }
+    figure { margin-inline: 0; }
+    figcaption { margin-top: .75rem; }
+    .figure-description { padding: .75rem; background: #f3f3f3; }
+    footer { margin-top: 3rem; border-top: 1px solid var(--border); padding-top: 1rem; }
+
+    @media (max-width: 40rem) {
+      body { padding: 1rem; font-size: 1rem; }
+    }
+
+    @media print {
+      body { max-width: none; font-size: 12pt; }
+      a { color: inherit; }
+      .skip-link { display: none; }
+    }
+  </style>
+
+  <!-- MathJax 3 configuration and accessible MathML/speech support -->
+  <script>
+    window.MathJax = {
+      loader: {
+        load: [
+          '[tex]/ams',
+          '[a11y]/assistive-mml',
+          '[a11y]/semantic-enrich',
+          '[a11y]/speech'
+        ]
+      },
+      tex: {
+        packages: { '[+]': ['ams'] },
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']]
+      },
+      options: {
+        enableMenu: true,
+        assistiveMml: { disabled: false }
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+</head>
+
+<body>
+  <a class="skip-link" href="#main">Skip to main content</a>
+
+  <header>
+    <h1>2.2 Speed and Velocity</h1>
+  </header>
+
+  <main id="main">
+    <section class="panel" aria-labelledby="objectives-heading">
+      <h2 id="objectives-heading">Section Learning Objectives</h2>
+      <p>By the end of this section, you will be able to do the following:</p>
+      <ul>
+        <li>Calculate the average speed of an object.</li>
+        <li>Relate displacement and average velocity.</li>
+      </ul>
+    </section>
+
+    <aside class="panel" aria-labelledby="standards-heading">
+      <h2 id="standards-heading">Teacher Support: Standards</h2>
+      <p>The learning objectives in this section will help your students master the following standards:</p>
+      <ul>
+        <li>
+          (4) Science concepts. The student knows and applies the laws governing motion in a variety of situations.
+          The student is expected to:
+          <ul>
+            <li>
+              (B) describe and analyze motion in one dimension using equations with the concepts of distance,
+              displacement, speed, average velocity, instantaneous velocity, and acceleration.
+            </li>
+          </ul>
+        </li>
+      </ul>
+      <p>
+        In addition, the High School Physics Laboratory Manual addresses content in this section in the lab titled
+        <cite>Position and Speed of an Object</cite>, as well as the standards listed above.
+      </p>
+    </aside>
+
+    <section aria-labelledby="key-terms-heading">
+      <h2 id="key-terms-heading">Section Key Terms</h2>
+      <ul>
+        <li>average speed</li>
+        <li>average velocity</li>
+        <li>instantaneous speed</li>
+        <li>instantaneous velocity</li>
+        <li>speed</li>
+        <li>velocity</li>
+      </ul>
+    </section>
+
+    <aside class="panel" aria-labelledby="intro-teacher-heading">
+      <h2 id="intro-teacher-heading">Teacher Support</h2>
+      <p>
+        In this section, students will apply what they have learned about distance and displacement to the concepts
+        of speed and velocity.
+      </p>
+      <p>
+        Before students read the section, ask them to give examples of ways they have heard the word “speed” used.
+        Then ask them if they have heard the word “velocity” used. Explain that these words are often used
+        interchangeably in everyday life, but their scientific definitions are different. Tell students that they will
+        learn about these differences as they read the section.
+      </p>
+      <p>
+        Explain to students that velocity, like displacement, is a vector quantity. Ask them to speculate about ways
+        that speed is different from velocity. After they share their ideas, follow up with questions that deepen their
+        thought process, such as: Why do you think that? What is an example? How might you apply these terms to
+        motion that you see every day?
+      </p>
+    </aside>
+
+    <section aria-labelledby="speed-heading">
+      <h2 id="speed-heading">Speed</h2>
+      <p>
+        There is more to motion than distance and displacement. Questions such as, “How long does a foot race
+        take?” and “What was the runner’s speed?” cannot be answered without an understanding of other concepts.
+        In this section we will look at time, speed, and velocity to expand our understanding of motion.
+      </p>
+      <p>
+        A description of how fast or slow an object moves is its speed. Speed is the rate at which an object changes
+        its location. Like distance, speed is a scalar because it has a magnitude but not a direction. Because speed
+        is a rate, it depends on the time interval of motion. You can calculate the elapsed time, or the change in
+        time, \(\Delta t\), as the difference between the ending time and the beginning time:
+      </p>
+      <div class="equation">
+        \[
+          \Delta t = t_f - t_0
+        \]
+      </div>
+      <p>
+        The SI unit of time is the second (s), and the SI unit of speed is meters per second (m/s), but sometimes
+        kilometers per hour (km/h), miles per hour (mph), or other units of speed are used.
+      </p>
+      <p>
+        When you describe an object’s speed, you often describe the average over a time period. Average speed,
+        \(v_{\mathrm{avg}}\), is the distance traveled divided by the time during which the motion occurs.
+      </p>
+      <div class="equation">
+        \[
+          v_{\mathrm{avg}} = \frac{\text{distance}}{\text{time}}
+        \]
+      </div>
+      <p>You can rearrange the equation to solve for either distance or time:</p>
+      <div class="equation">
+        \[
+          \text{time} = \frac{\text{distance}}{v_{\mathrm{avg}}}
+        \]
+        \[
+          \text{distance} = v_{\mathrm{avg}} \times \text{time}
+        \]
+      </div>
+      <p>
+        Suppose, for example, a car travels 150 kilometers in 3.2 hours. Its average speed for the trip is:
+      </p>
+      <div class="equation">
+        \[
+          v_{\mathrm{avg}}
+          = \frac{\text{distance}}{\text{time}}
+          = \frac{150\ \text{km}}{3.2\ \text{h}}
+          = 47\ \text{km/h}.
+        \]
+      </div>
+      <p>
+        A car’s speed would likely increase and decrease many times over a 3.2-hour trip. Its speed at a specific
+        instant in time, however, is its instantaneous speed. A car’s speedometer describes its instantaneous speed.
+      </p>
+
+      <aside class="panel" aria-labelledby="speed-teacher-heading">
+        <h3 id="speed-teacher-heading">Teacher Support</h3>
+        <p>
+          Caution students that average speed is not always the average of an object’s initial and final speeds.
+          For example, suppose a car travels a distance of 100 km. The first 50 km it travels at 30 km/h and the
+          second 50 km at 60 km/h. Its average speed would be
+          \[
+            \frac{100\ \text{km}}
+            {(50\ \text{km})/(30\ \text{km/h}) + (50\ \text{km})/(60\ \text{km/h})}
+            = 40\ \text{km/h}.
+          \]
+          If the car had spent equal times at 30 km/h and 60 km/h rather than traveling equal distances at these
+          speeds, its average speed would have been 45 km/h.
+        </p>
+        <p>
+          Caution students that the terms speed, average speed, and instantaneous speed are all often referred to
+          simply as “speed” in everyday language. Emphasize the importance in science of using correct terminology
+          to avoid confusion and communicate ideas clearly.
+        </p>
+      </aside>
+
+      <figure>
+        <div class="figure-description">
+          A round-trip diagram: a home and a store are 3 km apart. A person travels from home to the store and
+          back home. The total distance is 6 km, while the net displacement is zero.
+        </div>
+        <figcaption>
+          <strong>Figure 2.8.</strong> During a 30-minute round trip to the store, the total distance traveled is
+          6 km. The average speed is 12 km/h. The displacement for the round trip is zero because there was no
+          net change in position.
+        </figcaption>
+      </figure>
+
+      <section class="worked-example" aria-labelledby="avg-speed-example">
+        <h3 id="avg-speed-example">Worked Example: Calculating Average Speed</h3>
+        <p>A marble rolls 5.2 m in 1.8 s. What was the marble’s average speed?</p>
+        <h4>Strategy</h4>
+        <p>
+          We know the distance the marble travels, 5.2 m, and the time interval, 1.8 s. We can use these values in
+          the average speed equation.
+        </p>
+        <h4>Solution</h4>
+        <div class="equation">
+          \[
+            v_{\mathrm{avg}}
+            = \frac{\text{distance}}{\text{time}}
+            = \frac{5.2\ \text{m}}{1.8\ \text{s}}
+            = 2.9\ \text{m/s}
+          \]
+        </div>
+        <h4>Discussion</h4>
+        <p>
+          Average speed is a scalar, so we do not include direction in the answer. We can check the reasonableness
+          of the answer by estimating: 5 meters divided by 2 seconds is 2.5 m/s. Since 2.5 m/s is close to
+          2.9 m/s, the answer is reasonable. This is about the speed of a brisk walk, so it also makes sense.
+        </p>
+      </section>
+
+      <section aria-labelledby="practice-speed-heading">
+        <h3 id="practice-speed-heading">Practice Problems</h3>
+        <article class="question">
+          <h4>9. Average speed of a baseball</h4>
+          <p>
+            A pitcher throws a baseball from the pitcher’s mound to home plate in 0.46 s. The distance is 18.4 m.
+            What was the average speed of the baseball?
+          </p>
+          <ol class="choices" type="a">
+            <li>40 m/s</li>
+            <li>−40 m/s</li>
+            <li>0.03 m/s</li>
+            <li>8.5 m/s</li>
+          </ol>
+        </article>
+        <article class="question">
+          <h4>10. Finding travel time</h4>
+          <p>
+            Cassie walked to her friend’s house with an average speed of 1.40 m/s. The distance between the houses
+            is 205 m. How long did the trip take her?
+          </p>
+          <ol class="choices" type="a">
+            <li>146 s</li>
+            <li>0.01 s</li>
+            <li>2.50 min</li>
+            <li>287 s</li>
+          </ol>
+        </article>
+      </section>
+    </section>
+
+    <section aria-labelledby="velocity-heading">
+      <h2 id="velocity-heading">Velocity</h2>
+      <p>
+        The vector version of speed is velocity. Velocity describes the speed and direction of an object. As with
+        speed, it is useful to describe either the average velocity over a time period or the velocity at a specific
+        moment. Average velocity is displacement divided by the time over which the displacement occurs.
+      </p>
+      <div class="equation">
+        \[
+          \boldsymbol{v}_{\mathrm{avg}}
+          = \frac{\text{displacement}}{\text{time}}
+          = \frac{\Delta \boldsymbol{d}}{\Delta t}
+          = \frac{\boldsymbol{d}_f-\boldsymbol{d}_0}{t_f-t_0}
+        \]
+      </div>
+      <p>
+        Velocity, like speed, has SI units of meters per second (m/s), but because it is a vector, you must also
+        include a direction. The variable \(\boldsymbol{v}\) for velocity is bold because it is a vector, in contrast
+        to the italic \(v\) for speed, which is a scalar quantity.
+      </p>
+
+      <aside class="panel" aria-labelledby="tips-heading">
+        <h3 id="tips-heading">Tips for Success</h3>
+        <p>
+          Average speed is not the same thing as average velocity without its direction. As with displacement and
+          distance, changes in direction over a time interval have a larger effect on the relationship between
+          speed and velocity.
+        </p>
+      </aside>
+
+      <p>
+        Suppose a passenger moved toward the back of a plane with an average velocity of −4 m/s. We cannot tell
+        from the average velocity whether the passenger stopped momentarily or backed up before reaching the back
+        of the plane. To get more details, we must consider smaller segments of the trip over smaller time intervals,
+        such as those shown in Figure 2.9. If we consider infinitesimally small intervals, we can define
+        instantaneous velocity, which is the velocity at a specific instant in time. Instantaneous velocity and
+        average velocity are the same if the velocity is constant.
+      </p>
+
+      <figure>
+        <div class="figure-description">
+          A one-dimensional position diagram shows an airplane passenger moving toward the back of the plane.
+          The initial position \(d_0\) is to the right of the final position \(d_f\). Several short displacement
+          arrows point left, one points right, and the total displacement arrow points left from \(d_0\) to \(d_f\).
+          The horizontal axis is \(x\), with positive \(x\) to the right.
+        </div>
+        <figcaption>
+          <strong>Figure 2.9.</strong> The diagram shows a more detailed record of an airplane passenger heading
+          toward the back of the plane, showing smaller segments of the trip.
+        </figcaption>
+      </figure>
+
+      <p>
+        Distance traveled can differ from the magnitude of displacement. In the same way, speed can differ from
+        the magnitude of velocity. For example, you drive to a store and return home in half an hour. If your car’s
+        odometer shows the total distance traveled was 6 km, then your average speed was 12 km/h. Your average
+        velocity, however, was zero because your displacement for the round trip is zero.
+      </p>
+
+      <section class="worked-example" aria-labelledby="avg-velocity-example">
+        <h3 id="avg-velocity-example">Worked Example: Calculating Average Velocity</h3>
+        <p>
+          A student has a displacement of 304 m north in 180 s. What was the student’s average velocity?
+        </p>
+        <h4>Strategy</h4>
+        <p>
+          We know that the displacement is 304 m north and the time is 180 s. We can use the formula for average
+          velocity to solve the problem.
+        </p>
+        <h4>Solution</h4>
+        <div class="equation">
+          \[
+            \boldsymbol{v}_{\mathrm{avg}}
+            = \frac{\Delta \boldsymbol{d}}{\Delta t}
+            = \frac{304\ \text{m}}{180\ \text{s}}
+            = 1.7\ \text{m/s north}
+          \]
+        </div>
+        <h4>Discussion</h4>
+        <p>
+          Since average velocity is a vector quantity, you must include direction as well as magnitude in the
+          answer. The direction can be omitted until the end to avoid cluttering the problem. Pay attention to
+          significant figures: 304 m has three significant figures, but 180 s has only two, so the quotient should
+          have only two significant figures.
+        </p>
+        <aside class="panel">
+          <h4>Tips for Success</h4>
+          <p>
+            In this book, \(d\) represents distance and displacement. Similarly, \(v\) represents speed, and
+            \(\boldsymbol{v}\) represents velocity. A variable that is not bold indicates a scalar quantity, while
+            a bold variable indicates a vector quantity. Vectors are sometimes represented by small arrows above
+            variables.
+          </p>
+        </aside>
+      </section>
+
+      <aside class="panel" aria-labelledby="sigfig-teacher-heading">
+        <h3 id="sigfig-teacher-heading">Teacher Support</h3>
+        <p>
+          Use this problem to emphasize the importance of using the correct number of significant figures in
+          calculations. Some students include many digits in their final calculations, incorrectly believing this
+          improves accuracy. Point out that doing this introduces errors. In more complicated calculations, these
+          errors can propagate and cause the final answer to be wrong. Remind students to carry one or two extra
+          digits in intermediate calculations and round the final answer to the correct number of significant figures.
+        </p>
+      </aside>
+
+      <section class="worked-example" aria-labelledby="displacement-example">
+        <h3 id="displacement-example">
+          Worked Example: Solving for Displacement when Average Velocity and Time Are Known
+        </h3>
+        <p>
+          Layla jogs with an average velocity of 2.4 m/s east. What is her displacement after 46 seconds?
+        </p>
+        <h4>Strategy</h4>
+        <p>
+          We know that Layla’s average velocity is 2.4 m/s east, and the time interval is 46 seconds. We can
+          rearrange the average velocity formula to solve for the displacement.
+        </p>
+        <h4>Solution</h4>
+        <div class="equation">
+          \[
+            \begin{aligned}
+              \boldsymbol{v}_{\mathrm{avg}} &= \frac{\Delta \boldsymbol{d}}{\Delta t} \\
+              \Delta \boldsymbol{d} &= \boldsymbol{v}_{\mathrm{avg}}\Delta t \\
+                &= (2.4\ \text{m/s})(46\ \text{s}) \\
+                &= 1.1\times10^2\ \text{m east}
+            \end{aligned}
+          \]
+        </div>
+        <h4>Discussion</h4>
+        <p>
+          The answer is about 110 m east, which is a reasonable displacement for slightly less than a minute of
+          jogging. A calculator shows the answer as 110.4 m. We chose to write the answer using scientific
+          notation to make clear that we used only two significant figures.
+        </p>
+        <aside class="panel">
+          <h4>Tips for Success</h4>
+          <p>
+            Dimensional analysis is a good way to determine whether you solved a problem correctly. Write the
+            calculation using only units to be sure they match on opposite sides of the equal sign. In this example,
+            \(\text{m}=(\text{m/s})(\text{s})\). Seconds cancel, leaving meters.
+          </p>
+        </aside>
+      </section>
+
+      <section class="worked-example" aria-labelledby="time-example">
+        <h3 id="time-example">
+          Worked Example: Solving for Time when Displacement and Average Velocity Are Known
+        </h3>
+        <p>
+          Phillip walks along a straight path from his house to his school. How long will it take him to get to
+          school if he walks 428 m west with an average velocity of 1.7 m/s west?
+        </p>
+        <h4>Strategy</h4>
+        <p>
+          We know that Phillip’s displacement is 428 m west, and his average velocity is 1.7 m/s west. We can
+          calculate the time required for the trip by rearranging the average velocity equation.
+        </p>
+        <h4>Solution</h4>
+        <div class="equation">
+          \[
+            \begin{aligned}
+              \boldsymbol{v}_{\mathrm{avg}} &= \frac{\Delta \boldsymbol{d}}{\Delta t} \\
+              \Delta t &= \frac{\Delta \boldsymbol{d}}{\boldsymbol{v}_{\mathrm{avg}}} \\
+                &= \frac{428\ \text{m}}{1.7\ \text{m/s}} \\
+                &= 2.5\times10^2\ \text{s}
+            \end{aligned}
+          \]
+        </div>
+        <h4>Discussion</h4>
+        <p>
+          Scientific notation is used because the answer can have only two significant figures. Since time is a
+          scalar, the answer includes only a magnitude and not a direction.
+        </p>
+      </section>
+
+      <section aria-labelledby="practice-velocity-heading">
+        <h3 id="practice-velocity-heading">Practice Problems</h3>
+        <article class="question">
+          <h4>11. Trucker’s average velocity</h4>
+          <p>
+            A trucker drives along a straight highway for 0.25 h with a displacement of 16 km south. What is the
+            trucker’s average velocity?
+          </p>
+          <ol class="choices" type="a">
+            <li>4 km/h north</li>
+            <li>4 km/h south</li>
+            <li>64 km/h north</li>
+            <li>64 km/h south</li>
+          </ol>
+        </article>
+        <article class="question">
+          <h4>12. Bird’s total displacement</h4>
+          <p>
+            A bird flies with an average velocity of 7.5 m/s east from one branch to another in 2.4 s. It then
+            pauses before flying with an average velocity of 6.8 m/s east for 3.5 s to another branch. What is the
+            bird’s total displacement from its starting point?
+          </p>
+          <ol class="choices" type="a">
+            <li>42 m west</li>
+            <li>6 m west</li>
+            <li>6 m east</li>
+            <li>42 m east</li>
+          </ol>
+        </article>
+      </section>
+
+      <aside class="panel" aria-labelledby="virtual-physics-heading">
+        <h3 id="virtual-physics-heading">Virtual Physics: The Walking Man</h3>
+        <p>
+          In this simulation you will put your cursor on the man and move him first in one direction and then in
+          the opposite direction. Keep the <em>Introduction</em> tab active. You can use the <em>Charts</em> tab
+          after you learn about graphing motion later in this chapter. Carefully watch the sign of the numbers in
+          the position and velocity boxes. Ignore the acceleration box for now. See if you can make the man’s
+          position positive while the velocity is negative. Then see if you can do the opposite.
+        </p>
+        <div class="question">
+          <h4>Grasp Check</h4>
+          <p>
+            Which situation correctly describes when the moving man’s position was negative but his velocity was
+            positive?
+          </p>
+          <ol class="choices" type="a">
+            <li>Man moving toward 0 from left of 0</li>
+            <li>Man moving toward 0 from right of 0</li>
+            <li>Man moving away from 0 from left of 0</li>
+            <li>Man moving away from 0 from right of 0</li>
+          </ol>
+        </div>
+      </aside>
+
+      <aside class="panel" aria-labelledby="walking-teacher-heading">
+        <h3 id="walking-teacher-heading">Teacher Support</h3>
+        <p>
+          This interactive animation can be used for many lessons. At this point, it can show that displacement
+          can be positive or negative and that when displacement is negative, velocity can be either positive or
+          negative. Later, it can show that velocity and acceleration can have different signs. It is strongly
+          suggested that you keep students on the <em>Introduction</em> tab. The <em>Charts</em> tab can be used
+          after students learn about graphing motion later in this chapter.
+        </p>
+      </aside>
+
+      <section aria-labelledby="check-heading">
+        <h2 id="check-heading">Check Your Understanding</h2>
+
+        <article class="question">
+          <h3>13. Runners’ average velocities</h3>
+          <p>
+            Two runners traveling along the same straight path start and end their run at the same time. At the
+            halfway mark, they have different instantaneous velocities. Is it possible for their average velocities
+            for the entire trip to be the same?
+          </p>
+          <ol class="choices" type="a">
+            <li>Yes, because average velocity depends on the net or total displacement.</li>
+            <li>Yes, because average velocity depends on the total distance traveled.</li>
+            <li>No, because the velocities of both runners must remain exactly the same throughout the journey.</li>
+            <li>
+              No, because the instantaneous velocities of the runners must remain the same at the midpoint but can
+              vary at other points.
+            </li>
+          </ol>
+        </article>
+
+        <article class="question">
+          <h3>14. Average speed and average velocity</h3>
+          <p>
+            If you divide the total distance traveled on a car trip, as determined by the odometer, by the time for
+            the trip, are you calculating the average speed or the magnitude of the average velocity? Under what
+            circumstances are these two quantities the same?
+          </p>
+          <ol class="choices" type="a">
+            <li>
+              Average speed. Both are the same when the car is traveling at a constant speed and changing direction.
+            </li>
+            <li>
+              Average speed. Both are the same when the speed is constant and the car does not change its direction.
+            </li>
+            <li>
+              Magnitude of average velocity. Both are the same when the car is traveling at a constant speed.
+            </li>
+            <li>
+              Magnitude of average velocity. Both are the same when the car does not change its direction.
+            </li>
+          </ol>
+        </article>
+
+        <article class="question">
+          <h3>15. Negative average velocity</h3>
+          <p>Is it possible for average velocity to be negative?</p>
+          <ol class="choices" type="a">
+            <li>Yes, if net displacement is negative.</li>
+            <li>Yes, if the object’s direction changes during motion.</li>
+            <li>No, because average velocity describes only the magnitude and not the direction of motion.</li>
+            <li>No, because average velocity only describes the magnitude in the positive direction of motion.</li>
+          </ol>
+        </article>
+      </section>
+
+      <aside class="panel" aria-labelledby="assessment-teacher-heading">
+        <h3 id="assessment-teacher-heading">Teacher Support</h3>
+        <p>
+          Use the Check Your Understanding questions to assess students’ achievement of the section’s learning
+          objectives. If students are struggling with a specific objective, these questions can help identify which
+          objective needs attention and direct students to the relevant content. Assessment items in TUTOR allow
+          you to reassess.
+        </p>
+      </aside>
+    </section>
+  </main>
+
+  <footer>
+    <p>
+      “2.2 Speed and Velocity” from <cite>Physics</cite> by Paul Peter Urone and Roger Hinrichs, OpenStax.
+    </p>
+    <p>
+      Licensed under the
+      <a href="https://creativecommons.org/licenses/by/4.0/">
+        Creative Commons Attribution 4.0 International License (CC BY 4.0)
+      </a>.
+    </p>
+    <p>
+      Original page:
+      <a href="https://openstax.org/books/physics/pages/2-2-speed-and-velocity">
+        https://openstax.org/books/physics/pages/2-2-speed-and-velocity
+      </a>
+    </p>
+    <p>Access for free at openstax.org.</p>
+    <p>
+      This version is reformatted as accessible HTML. Figure descriptions are provided as text alternatives.
+      No wording has been intentionally edited.
+    </p>
+    <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+  </footer>
+</body>
+</html>

@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "5e2cf1e6f178d438b7d5f284e1b00e38926cff4b37a68d6e95a6fd8fd972a35a",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 1.22,
+    "load_before": 1.22,
+    "offline": false,
+    "peak_rss_mb": 377.8,
+    "quiet_box": true,
+    "system_seconds": 1.93,
+    "timeout_seconds": 1800,
+    "user_seconds": 41.882,
+    "wall_seconds_per_page": 0.296
+  },
+  "output": {
+    "file": "physics__2-2-speed-and-velocity.md",
+    "format": "md"
+  },
+  "pdf_pages": 14,
+  "seconds": 4.138,
+  "section": "physics/2-2-speed-and-velocity",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

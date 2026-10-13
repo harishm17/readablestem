@@ -1,0 +1,99 @@
+{
+  "arm": "chatbot-luna-purdue",
+  "attempts": [],
+  "cost_usd": 0.0044,
+  "counted_input_tokens": 53267,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.002808,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-3-position-vs-time-graphs/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.003322,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-3-position-vs-time-graphs/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.003632,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-3-position-vs-time-graphs/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.003776,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-3-position-vs-time-graphs/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.002426,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-3-position-vs-time-graphs/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.015964,
+  "output": {
+    "file": "physics__2-3-position-vs-time-graphs.run2.html",
+    "format": "html"
+  },
+  "output_chars": 27486,
+  "pdf_pages": 13,
+  "response_status": "completed",
+  "run": 2,
+  "seconds": 61.7,
+  "section": "physics/2-3-position-vs-time-graphs",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue",
+    "store": false
+  },
+  "status": "ok",
+  "usage": {
+    "cached_input_tokens": 53264,
+    "input_tokens": 53267,
+    "output_tokens": 7735,
+    "reasoning_tokens": 718
+  },
+  "versions": {
+    "model_requested": "gpt-6-luna",
+    "model_served": "gpt-6-luna"
+  }
+}

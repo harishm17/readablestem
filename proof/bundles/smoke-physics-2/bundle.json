@@ -53,7 +53,37 @@
     "reports/document.run1.json": "3e0304a01d92befea109b552485d59588cf5236d0f61d623c056bc24c448db1b",
     "reports/equations.run1.json": "60dcb6f5287c5f848570a2e5e9bec3fb800ea87b5548332089f421c5eea32415",
     "reports/figures.run1.json": "9feba152f2f8fd3248ec0a5229039ee8bc3aa638a7c0f3d0a5697e991c410ccd",
-    "reports/headings.run1.json": "07c4053964ee048c062a194941f684fd4cf2d5d044648669157763dfcf5fbe06"
+    "reports/headings.run1.json": "07c4053964ee048c062a194941f684fd4cf2d5d044648669157763dfcf5fbe06",
+    "systems/chatbot-luna-purdue/physics__2-1-relative-motion-distance-and-displacement.run1.html": "6dd043f0e70cd9da4378f80df66c765f85f6776c0f04aa6de10aa69fef11386d",
+    "systems/chatbot-luna-purdue/physics__2-1-relative-motion-distance-and-displacement.run1.json": "1ec7b1f9cfb3c1554a492237cc07be08321b3e7b1135a1cfc83eee5efcef4d50",
+    "systems/chatbot-luna-purdue/physics__2-1-relative-motion-distance-and-displacement.run2.html": "988e04293ae697c47c48ae684bb591b595c57901e5c5b48fed3aca5a68d94c7d",
+    "systems/chatbot-luna-purdue/physics__2-1-relative-motion-distance-and-displacement.run2.json": "9a34b4b63e1b6dbb2aa6f4e963b8dfa649f17f7df8f2a2201943827439072ecd",
+    "systems/chatbot-luna-purdue/physics__2-2-speed-and-velocity.run1.html": "3af2aa3326be0fc7f1cb7ea6cdff0ced588da0d83d7f4f3ad660f8036462ac05",
+    "systems/chatbot-luna-purdue/physics__2-2-speed-and-velocity.run1.json": "9e0793e45779b8adbd1f54dccc1fd0782fa6758215ca01e42ee5e51acd3cf143",
+    "systems/chatbot-luna-purdue/physics__2-2-speed-and-velocity.run2.html": "3b26017ff76b103e18a1bf89f219181b72371a99fee6cbb4dfa8ffa5d617271b",
+    "systems/chatbot-luna-purdue/physics__2-2-speed-and-velocity.run2.json": "d2ee349f2cccd9ec0a5e82b6bb7efa2bad0d01c09faedd32f484a58d64983abd",
+    "systems/chatbot-luna-purdue/physics__2-3-position-vs-time-graphs.run1.html": "bd2aa84200084db0a57a101016064c1c384616c35071e7fc0291062a273aceaf",
+    "systems/chatbot-luna-purdue/physics__2-3-position-vs-time-graphs.run1.json": "107c88e1b85f9af46fd61110efb42e458e8b6a6d1988891dc6b482dfc9660f0f",
+    "systems/chatbot-luna-purdue/physics__2-3-position-vs-time-graphs.run2.html": "8272b27ad089ccf3520ba68d973c21312fedefcf02466224d7676ce1d4ef952b",
+    "systems/chatbot-luna-purdue/physics__2-3-position-vs-time-graphs.run2.json": "0460af2a732297eb6c216513cc9090046c8bce2a6eb376a1dedc7876393d4ed5",
+    "systems/docling/physics__2-1-relative-motion-distance-and-displacement.json": "95baad77cd9f655f0dccf1656cd89eda7f305a1e9d491372a25cacaa82f46b54",
+    "systems/docling/physics__2-1-relative-motion-distance-and-displacement.md": "9038cd5b3c65d6496b4fca01a27369fd03c2be6bb4c745a116335c87abaf1597",
+    "systems/docling/physics__2-2-speed-and-velocity.json": "6f9f78706e1e32048c0834f083c203451393df0ca66b7be12d710d2afe56682a",
+    "systems/docling/physics__2-2-speed-and-velocity.md": "317c44c1b523298796f6976b788583d77548a129daa97bf06073a965b1c6a51b",
+    "systems/docling/physics__2-3-position-vs-time-graphs.json": "cb0aee499de1ca4ed495accf27461f700f2b2514f3b43471d99e62a0111ee2e3",
+    "systems/docling/physics__2-3-position-vs-time-graphs.md": "cd0c1ae418dd440f7fb30cb13903c932e9400e376d84a1cd978c611cc03b36e6",
+    "systems/mineru-basic/physics__2-1-relative-motion-distance-and-displacement.json": "89fd922676dd90e3aaace81c468c5e09bf1acd1998ca598eff9e730aedcb72ba",
+    "systems/mineru-basic/physics__2-1-relative-motion-distance-and-displacement.md": "ef9ea1ca8e0f3c6a48f822e6a8e2b64efc861c3d59863477f0caffbd2b713c0a",
+    "systems/mineru-basic/physics__2-2-speed-and-velocity.json": "e439c51fd5c599ed7cb0ad0e2f126c13333c01a001b326fc64c24c44e1c8af31",
+    "systems/mineru-basic/physics__2-2-speed-and-velocity.md": "7a023ebef773cc3f5da0d4022ba593984560395f42d4bf5240f67fb88b6d4aae",
+    "systems/mineru-basic/physics__2-3-position-vs-time-graphs.json": "f869cf38fa2682ae91f6ddb041a2a91f2767e5caa467ed6625389623a756abc6",
+    "systems/mineru-basic/physics__2-3-position-vs-time-graphs.md": "acc80c0360e3769fac358b92c382ac9be770ea153d7dc839212517b837454332",
+    "systems/pymupdf4llm/physics__2-1-relative-motion-distance-and-displacement.json": "843c3b085964c107160a96cbd7d28e78d23c347364d95ee3a294d8830508ab08",
+    "systems/pymupdf4llm/physics__2-1-relative-motion-distance-and-displacement.md": "656d429acb65c88db00cfcbd80735894964e7976aade6417da90d6daa8cac2b0",
+    "systems/pymupdf4llm/physics__2-2-speed-and-velocity.json": "467118a2ae0d919c885604553cea88bf3691eaaaf77aa30eb7e2f8888823bc53",
+    "systems/pymupdf4llm/physics__2-2-speed-and-velocity.md": "acefb87739197f04770303aca17d88a3df789346b24909e041ad7da9ccf04cf2",
+    "systems/pymupdf4llm/physics__2-3-position-vs-time-graphs.json": "e5884dac094d7468e819da8fe39afb30efdcf89caac2c9c00da237a5350beb76",
+    "systems/pymupdf4llm/physics__2-3-position-vs-time-graphs.md": "7bf423913257ed53bd2c2830410b92d21531b4ef795e277198ca38af424634cf"
   },
   "mode": "live",
   "pdfs": [
@@ -153,5 +183,11 @@
   "spend": {
     "cap_usd": 2.0,
     "total_usd": 0.280674
+  },
+  "systems_parsers": "recorded",
+  "systems_spend": {
+    "cap_usd": 0.6,
+    "chatbot_usd": 0.043641,
+    "judge_usd": 0.083168
   }
 }

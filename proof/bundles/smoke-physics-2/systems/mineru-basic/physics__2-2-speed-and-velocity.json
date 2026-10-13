@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "5e2cf1e6f178d438b7d5f284e1b00e38926cff4b37a68d6e95a6fd8fd972a35a",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 2.81,
+    "load_before": 1.36,
+    "offline": false,
+    "peak_rss_mb": 3469.9,
+    "quiet_box": true,
+    "system_seconds": 3.387,
+    "timeout_seconds": 1800,
+    "user_seconds": 98.263,
+    "wall_seconds_per_page": 2.529
+  },
+  "output": {
+    "file": "physics__2-2-speed-and-velocity.md",
+    "format": "md"
+  },
+  "pdf_pages": 14,
+  "seconds": 35.404,
+  "section": "physics/2-2-speed-and-velocity",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

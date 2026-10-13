@@ -1,0 +1,111 @@
+{
+  "arm": "chatbot-luna-purdue",
+  "attempts": [],
+  "cost_usd": 0.005983,
+  "counted_input_tokens": 63671,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.002808,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.002466,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.003438,
+      "factual_error": true,
+      "figure_id": "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-002",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.002704,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.003336,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.002874,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-005",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "figure"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.017626,
+  "output": {
+    "file": "physics__2-1-relative-motion-distance-and-displacement.run1.html",
+    "format": "html"
+  },
+  "output_chars": 46702,
+  "pdf_pages": 16,
+  "response_status": "completed",
+  "run": 1,
+  "seconds": 88.7,
+  "section": "physics/2-1-relative-motion-distance-and-displacement",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue",
+    "store": false
+  },
+  "status": "ok",
+  "usage": {
+    "cached_input_tokens": 63668,
+    "input_tokens": 63671,
+    "output_tokens": 10692,
+    "reasoning_tokens": 259
+  },
+  "versions": {
+    "model_requested": "gpt-6-luna",
+    "model_served": "gpt-6-luna"
+  }
+}

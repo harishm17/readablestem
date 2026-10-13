@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -443,13 +444,22 @@ def add_systems(
             client=chat_client or chatbot.make_client(),
             say=say,
         )
-        if summary["refused_by_cap"]:
+        refused = summary["refused_by_cap"]
+        not_run = sorted({r.split("/")[0] for r in refused})
+        if chatbot.ARMS[0].id in not_run:
             raise ProofError(
-                f"the cap ${opts.max_usd:.2f} did not hold every run "
-                f"({len(summary['refused_by_cap'])} refused, first: "
-                f"{summary['refused_by_cap'][0]}); nothing was added to the bundle. "
-                "Runs already made are kept in the work folder, so a rerun does not pay for them"
+                f"the cap ${opts.max_usd:.2f} did not hold the primary arm "
+                f"({len(refused)} jobs refused, first: {refused[0]}); nothing was added to the "
+                "bundle. Runs already made are kept in the work folder, so a rerun does not "
+                "pay for them"
             )
+        if not_run:
+            say(f"not run, the cap did not hold them: {', '.join(not_run)}")
+        # Only arms that finished whole go into the bundle; a half-run arm is never scored.
+        ready = work / "systems-out" / "chatbot-ready"
+        for arm_dir in sorted(p for p in out.iterdir() if p.is_dir() and p.name not in not_run):
+            shutil.copytree(arm_dir, ready / arm_dir.name, dirs_exist_ok=True)
+        out = ready
         remaining = max(0.0, opts.max_usd - summary["spent_usd"])
         settings = runner.proof_settings()
         records = goldinfo.load_records(gold_dir)
@@ -471,6 +481,8 @@ def add_systems(
                 "cap_usd": opts.max_usd,
             }
         }
+        if not_run:
+            extra["systems_not_run"] = {arm: "the spend cap did not hold it" for arm in not_run}
     else:
         folder = opts.root / stages.PARSERS_DIR
         if not (folder / "Makefile").is_file():

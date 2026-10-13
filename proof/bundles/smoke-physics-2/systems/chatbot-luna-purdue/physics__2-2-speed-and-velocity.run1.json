@@ -1,0 +1,63 @@
+{
+  "arm": "chatbot-luna-purdue",
+  "attempts": [],
+  "cost_usd": 0.008632,
+  "counted_input_tokens": 49319,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.003088,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-2-speed-and-velocity/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "aria"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.004246,
+      "factual_error": false,
+      "figure_id": "openstax/physics/2-2-speed-and-velocity/fig-001",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "aria"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.007334,
+  "output": {
+    "file": "physics__2-2-speed-and-velocity.run1.html",
+    "format": "html"
+  },
+  "output_chars": 30460,
+  "pdf_pages": 14,
+  "response_status": "completed",
+  "run": 1,
+  "seconds": 68.7,
+  "section": "physics/2-2-speed-and-velocity",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue",
+    "store": false
+  },
+  "status": "ok",
+  "usage": {
+    "cached_input_tokens": 0,
+    "input_tokens": 49319,
+    "output_tokens": 7401,
+    "reasoning_tokens": 342
+  },
+  "versions": {
+    "model_requested": "gpt-6-luna",
+    "model_served": "gpt-6-luna"
+  }
+}
