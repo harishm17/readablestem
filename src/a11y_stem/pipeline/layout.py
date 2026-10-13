@@ -2519,9 +2519,12 @@ class _Path:
     # Where a curved open stroke's subpaths start and end (display space): a plotted
     # line starts at its axes' corner (`_mark_plots`).
     ends: tuple[tuple[float, float], ...] = ()
-    turns: bool = False  # it has a curve, or lines in two directions (not one straight line)
-    colour: tuple[float, float, float] = (0.0, 0.0, 0.0)  # its stroke's (or fill's) sRGB
-    fill_share: float = 0.0  # a filled path: the share of its box it covers
+    # Set only where a later test reads them (`_page_paths`): an open stroke 12 pt or more
+    # that has a curve or lines in two directions; a curved closed or filled shape's sRGB
+    # colour, and the share of its box a filled one covers.
+    turns: bool = False
+    colour: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    fill_share: float = 0.0
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
