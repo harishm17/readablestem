@@ -47,7 +47,8 @@ RERUN_DIR = Path(".local/reproduce")
 # Reports that `eval pipeline` writes as data/eval/latest-<task>.json; the tables task
 # writes latest-tables-<mode>.json.
 RERUN_TASKS = (
-    ("headings", ["--task", "headings"], "latest-headings.json"),
+    # Headings call no model; the command still wants a cap, so it gets the smallest one.
+    ("headings", ["--task", "headings", "--max-usd", "0.01"], "latest-headings.json"),
     ("tables (local)", ["--task", "tables", "--mode", "local"], "latest-tables-local.json"),
 )
 TOLERANCE = 1e-9
@@ -209,8 +210,19 @@ def committed_numbers(root: Path) -> list[str]:
 
 
 def _run_cli(root: Path, args: Sequence[str]) -> int:
+    """Run `a11y-stem <args>` in a child process; show its output only if it fails."""
     code = "import sys; from a11y_stem.cli.main import main; sys.exit(main())"
-    return subprocess.run([sys.executable, "-c", code, *args], cwd=root, check=False).returncode
+    done = subprocess.run(
+        [sys.executable, "-c", code, *args],
+        cwd=root,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+    if done.returncode != 0:
+        tail = (done.stdout + done.stderr).strip().splitlines()[-8:]
+        print("\n".join(tail), file=sys.stderr)
+    return done.returncode
 
 
 def compare_reports(committed: dict, fresh: dict) -> list[str]:
