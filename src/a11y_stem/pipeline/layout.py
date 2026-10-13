@@ -3672,6 +3672,7 @@ def _vector_figures(
                     ink=ink,
                     hand=hand,
                 )
+                _take_border_marks(found, [p for p in members if p not in inner])
                 figures += found
                 after = (len(left_out or ()), len(small_out or ()))
                 # Nothing was made of what is left once the border is off: if it held
@@ -3714,6 +3715,30 @@ def _vector_figures(
             if small_out is not None:
                 small_out.append((box, members))
     return figures
+
+
+def _take_border_marks(figures: Sequence[_Figure], border: Sequence[_Path]) -> None:
+    """The marks smaller than a figure among a page-filling cluster's `border` that lie
+    within FIGURE_PART_REACH of a figure made of the rest are part of it, spreading along
+    a row of them: a plot's axes drawn as dashes, set aside as a frame's pieces along two
+    edges (2026-10-13: the curve was a figure and its dashed axes were lost). A frame of
+    dashes round the page stays apart from the plot inside it."""
+    marks = [
+        p for p in border if max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) < MIN_DRAWING_PT
+    ]
+    grew = bool(figures)
+    while marks and grew:
+        grew = False
+        rest = []
+        for path in marks:
+            near = next((f for f in figures if _within(path.bbox, f.bbox, FIGURE_PART_REACH)), None)
+            if near is None:
+                rest.append(path)
+                continue
+            near.bbox = _union([near.bbox, path.bbox])
+            near.paths += 1
+            grew = True
+        marks = rest
 
 
 JOIN_PT = 1.5  # pt: line ends this close meet (a corner of a staircase, a connector's end)
