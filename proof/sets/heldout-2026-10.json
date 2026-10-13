@@ -1,0 +1,132 @@
+{
+  "schema_version": 1,
+  "id": "heldout-2026-10",
+  "title": "Held-out OpenStax sections (pre-registered 2026-10-13)",
+  "held_out": true,
+  "description": "Fifteen sections of five OpenStax books (242 Letter pages), chosen by rule and registered, with this set's answer key hashed, before any system ran on them. The books are retired first editions, which are CC BY 4.0 (the current editions are CC BY-NC-SA 4.0 and the live CC BY STEM books were used in development).",
+  "preregistration": {
+    "file": "proof/PREREGISTRATION.md",
+    "sha256": "8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9",
+    "note": "Public copy of the registration. The run stops if the file here does not have this hash."
+  },
+  "gold": {
+    "dir": null,
+    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "fetch": {
+      "date": "2026-10-13",
+      "allow_retired": true,
+      "pins": {
+        "college-physics": {
+          "archive_version": "20260604.144757",
+          "version": "1aa3e7a"
+        },
+        "chemistry": {
+          "archive_version": "20260604.144757",
+          "version": "741a7af"
+        },
+        "precalculus": {
+          "archive_version": "20260604.144757",
+          "version": "ebc5beb"
+        },
+        "introductory-statistics": {
+          "archive_version": "20260604.144757",
+          "version": "1d23970"
+        },
+        "intermediate-algebra": {
+          "archive_version": "20260604.144757",
+          "version": "eb2e29d"
+        }
+      },
+      "sections": [
+        {
+          "book": "college-physics",
+          "page": "29-3-photon-energies-and-the-electromagnetic-spectrum"
+        },
+        {
+          "book": "college-physics",
+          "page": "5-3-elasticity-stress-and-strain"
+        },
+        {
+          "book": "college-physics",
+          "page": "28-4-relativistic-addition-of-velocities"
+        },
+        {
+          "book": "chemistry",
+          "page": "19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds"
+        },
+        {
+          "book": "chemistry",
+          "page": "7-3-lewis-symbols-and-structures"
+        },
+        {
+          "book": "chemistry",
+          "page": "14-7-acid-base-titrations"
+        },
+        {
+          "book": "precalculus",
+          "page": "5-4-right-triangle-trigonometry"
+        },
+        {
+          "book": "precalculus",
+          "page": "1-6-absolute-value-functions"
+        },
+        {
+          "book": "precalculus",
+          "page": "3-1-complex-numbers"
+        },
+        {
+          "book": "introductory-statistics",
+          "page": "2-4-box-plots"
+        },
+        {
+          "book": "introductory-statistics",
+          "page": "4-5-hypergeometric-distribution"
+        },
+        {
+          "book": "introductory-statistics",
+          "page": "3-1-terminology"
+        },
+        {
+          "book": "intermediate-algebra",
+          "page": "4-3-solve-mixture-applications-with-systems-of-equations"
+        },
+        {
+          "book": "intermediate-algebra",
+          "page": "4-6-solve-systems-of-equations-using-determinants"
+        },
+        {
+          "book": "intermediate-algebra",
+          "page": "1-5-properties-of-real-numbers"
+        }
+      ]
+    }
+  },
+  "repeats": {
+    "document": 2,
+    "equations": 2,
+    "headings": 1,
+    "figures": 2
+  },
+  "tasks": [
+    "document",
+    "equations",
+    "headings",
+    "figures"
+  ],
+  "concurrency": 4,
+  "bundle": "proof/bundles/heldout-2026-10",
+  "suggested_max_usd": 50.0,
+  "signoff": [
+    "retired first editions accepted as ground truth (ADR 0001 question 2)",
+    "spend cap approved for the whole run (the registration estimates about $27 for the a11y-stem arm and the chatbot arms; its cap is $50)",
+    "the frozen items of registration section 12 are in place"
+  ],
+  "notes": [
+    "Every section of this set is from a retired first edition. Whether such an edition is acceptable ground truth was decided before the run; the report states it."
+  ],
+  "limits": [
+    "Fifteen sections of five books: intervals come from resampling sections, which is approximate with this few clusters; per-book numbers are point estimates.",
+    "The sections come from retired first editions, whose text may differ from the current editions.",
+    "Any change to a11y-stem's prompts, rules, thresholds, models or scorers after the first held-out output exists means these numbers can no longer be quoted as held-out results for the changed system."
+  ]
+}

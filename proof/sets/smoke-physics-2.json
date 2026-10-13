@@ -1,0 +1,32 @@
+{
+  "schema_version": 1,
+  "id": "smoke-physics-2",
+  "title": "Development sample: OpenStax Physics, chapter 2 (not held out)",
+  "held_out": false,
+  "description": "The three sections of OpenStax Physics (high school), chapter 2, that a11y-stem was developed on: the sample gold set in data/gold. This set exists so that the whole proof command, from the answer key to PROOF.md, can be run and checked by anyone and in CI. Its numbers say that the pipeline and the harness work end to end. They are not held-out results.",
+  "gold": {
+    "dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "fetch": {
+      "date": "2026-10-06",
+      "allow_retired": false,
+      "sections": [
+        {"book": "physics", "page": "2-1-relative-motion-distance-and-displacement"},
+        {"book": "physics", "page": "2-2-speed-and-velocity"},
+        {"book": "physics", "page": "2-3-position-vs-time-graphs"}
+      ]
+    }
+  },
+  "repeats": {"document": 1, "equations": 1, "headings": 1, "figures": 1},
+  "tasks": ["document", "equations", "headings", "figures"],
+  "concurrency": 4,
+  "bundle": "proof/bundles/smoke-physics-2",
+  "suggested_max_usd": 2.0,
+  "notes": [
+    "OpenStax Physics is a live CC BY 4.0 book. These three sections are also the gold set in data/gold and the sample behind docs/eval.md."
+  ],
+  "limits": [
+    "Three sections of one book, all used while building a11y-stem: nothing here shows how it does on material it has not seen.",
+    "One run of each task (the held-out set repeats them), so run-to-run variation is not visible."
+  ]
+}

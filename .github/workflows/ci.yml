@@ -53,6 +53,33 @@ jobs:
       - name: Pytest (offline; live OpenStax and model tests are opt-in)
         run: uv run pytest
 
+  proof-replay:
+    name: make proof (replay of the recorded run)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    env:
+      UV_NO_DEV: "1"  # so that `uv run` in the make targets does not install the dev group
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      # Replay needs no key, no browser and no network: it feeds the committed model answers
+      # through the real pipeline and scoring code. The job fails if the pins or the bundle's
+      # hashes do not match, if the replay does not reproduce the recorded numbers, or if the
+      # committed PROOF.md is not what the command writes.
+      - name: Install (locked, no dev tools, no browser)
+        run: uv sync --locked --no-dev
+      - name: Check the pins and the recorded run
+        run: make proof-check
+      - name: Replay and write PROOF.md
+        run: make proof
+      - name: PROOF.md is what the command writes
+        run: git diff --exit-code -- PROOF.md
+
   postgres:
     name: pytest -m postgres (Postgres 16)
     runs-on: ubuntu-24.04

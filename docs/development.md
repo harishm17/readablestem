@@ -22,6 +22,7 @@ printed pages read differently.
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
 | `make eval-plumbing` | Plumbing check only: scores each gold equation against itself, so it always prints 1.0. Does **not** test normalisation |
 | `make eval-latex-check` | Scorer check: known-correct LaTeX for every sample equation (`tests/fixtures/sample_latex_predictions.jsonl`) must match leniently; also runs in CI via `pytest` |
+| `make proof` | Replay the recorded run in `proof/bundles/` and write `PROOF.md` (no key, no network, no cost). `proof-check`, `proof-sources`, `proof-live`: see docs/proof.md |
 
 CLI:
 
@@ -33,6 +34,7 @@ a11y-stem gold fetch --set heldout --allow-retired [--date 2026-10-13] [--heldou
 a11y-stem gold verify --set heldout [--gold DIR] [--heldout-dir DIR]
 a11y-stem eval equations --gold PATH (--pred PRED.jsonl | --self-check) [--display all|block|inline] [--report OUT.json]
 a11y-stem parse FILE.pdf [--pages 1,2] [--json]
+a11y-stem proof [--set ID] [--check | --verify-sources | --live --max-usd N] [--out PATH]
 ```
 
 Default paths (`data/gold`, `.cache/openstax`) resolve against the project root (the
@@ -53,6 +55,7 @@ any subdirectory. Outside a checkout they fall back to the working directory. Ba
 | `src/a11y_stem/pipeline/` | the conversion pipeline (layout, steps, assemble, run); see docs/layout.md, docs/steps.md, docs/tables.md, docs/output.md |
 | `src/a11y_stem/web/`, `src/a11y_stem/ops/` | the hosted app and its cron, retention and reports; see docs/web.md, docs/operations.md |
 | `src/a11y_stem/cli/main.py` | `a11y-stem` command |
+| `src/a11y_stem/proof/`, `proof/` | the one-command reproduction: code, proof sets, recorded runs; see docs/proof.md |
 | `data/gold/` | Committed sample gold set, `manifest.json`, `ATTRIBUTION.md` |
 | `docs/decisions/` | Architecture decision records |
 | `private-inputs/` | **Git-ignored.** Your own course PDFs and any outputs from them |

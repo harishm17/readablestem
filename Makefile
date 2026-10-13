@@ -1,6 +1,6 @@
 # Common tasks. Everything runs through uv; no global installs needed.
 .PHONY: sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
-	table-model fuzz-tables
+	table-model fuzz-tables proof proof-check proof-list proof-sources proof-live
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
 # Harish picks the real gold-set pages; override with e.g. make gold GOLD_CHAPTER=5.
@@ -83,3 +83,31 @@ heldout-verify:
 
 heldout-pdfs:  ## print the 15 sections and check the page counts (242)
 	uv run --group browser a11y-stem eval render --set heldout --all
+
+# One-command reproduction of the public proof (docs/proof.md). `make proof` replays the
+# recorded run committed under proof/bundles/: no key, no network, no cost, same bytes
+# every time, and it writes PROOF.md. The other targets need the browser group
+# (`uv sync --group browser`, `uv run playwright install --with-deps chromium`).
+#   SET=<id>       another proof set (make proof-list)
+#   BUNDLE=<dir>   another recorded run
+#   MAX_USD=<n>    hard spend cap for proof-live (required there)
+#   ENV_FILE=<f>   env file holding OPENAI_API_KEY for proof-live (never printed)
+#   RECORD=<dir>   where proof-live writes the new recording (default: outside the repo)
+PROOF_ARGS = $(if $(SET),--set $(SET)) $(if $(BUNDLE),--bundle $(BUNDLE)) $(PROOF_EXTRA)
+
+proof:  ## replay the recorded run and write PROOF.md (no key, no network, no cost)
+	uv run a11y-stem proof $(PROOF_ARGS)
+
+proof-check:  ## check the pins and the recorded run's hashes; run nothing
+	uv run a11y-stem proof --check $(PROOF_ARGS)
+
+proof-list:
+	uv run a11y-stem proof --list
+
+proof-sources:  ## also fetch the answer key from OpenStax and print the PDFs again
+	uv run --group browser a11y-stem proof --verify-sources $(PROOF_ARGS)
+
+proof-live:  ## re-call the models (costs money): make proof-live MAX_USD=2 ENV_FILE=.env
+	@test -n "$(MAX_USD)" || { echo "usage: make proof-live MAX_USD=<dollars> [ENV_FILE=.env] [SET=<id>]"; exit 2; }
+	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser a11y-stem proof --live \
+		--max-usd $(MAX_USD) $(if $(RECORD),--record $(RECORD)) $(PROOF_ARGS)
