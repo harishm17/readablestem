@@ -130,6 +130,18 @@ def test_a_hand_mark_over_typed_text_is_cut_out_and_the_text_stays():
     assert "it is a vector" in " ".join(e.text or "" for e in out.elements)
 
 
+def test_a_stroke_off_the_page_is_never_loose_ink():
+    # An ink annotation can run past the page edge; what is off the page is not seen, so
+    # it is no handwriting to cut out (it had made a sliver of a region at the edge).
+    on, off, header = (100, 400, 120, 410), (620, 400, 640, 410), (100, 20, 120, 30)
+    strokes = [on, off, header]
+    assert layout._loose_strokes(strokes, [], (612, 792), margins=True) == [on, header]
+    assert layout._loose_strokes(strokes, [], (612, 792), margins=False) == [on]
+    assert layout._loose_strokes(strokes, [(90, 390, 130, 420)], (612, 792), margins=True) == [
+        header
+    ]
+
+
 def test_the_safety_net_keeps_a_painted_page_layout_read_nothing_from():
     doc = layout.analyze(data("drawn_page.pdf"))
     assert doc.page_types[1].kind == "vector_no_text"  # not handwriting, not a scan ...

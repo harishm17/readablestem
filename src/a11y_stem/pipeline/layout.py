@@ -3855,7 +3855,7 @@ def _page_blocks(
     # line underlined by hand) is not part of the text, and a note in the top or bottom
     # margin counts too.
     held = [b.bbox for b in blocks if b.kind in (Kind.FIGURE, Kind.TABLE, Kind.EQUATION)]
-    loose = _loose_strokes(strokes, held, None)
+    loose = _loose_strokes(strokes, held, (page_rect.width, page_rect.height), margins=True)
     if len(loose) >= LOOSE_INK_STROKES:
         ink = [*ink, *page_type.stroke_regions(loose)]
     blocks.extend(_ink_blocks(ink, page_rect))
@@ -4080,7 +4080,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             unread = _painted(doc[n], paths[n])
         else:
             left_out = bool(page.left_out) and types[n].kind != "mixed_ink"
-            unread = left_out or page.unread or _unread_ink(types[n], boxes[n], page.size[1])
+            unread = left_out or page.unread or _unread_ink(types[n], boxes[n], page.size)
         if unread:
             kept[n] = page_type.UNREAD_PAGE
     title = _meaningful_title(doc.metadata.get("title") if doc.metadata else None)
@@ -4105,31 +4105,36 @@ def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:
     return _PageBlocks(number, (round(page.rect.width, 2), round(page.rect.height, 2)), [])
 
 
-def _unread_ink(kind: page_type.PageTypeResult, boxes: list[BBox], height: float) -> bool:
+def _unread_ink(
+    kind: page_type.PageTypeResult, boxes: list[BBox], size: tuple[float, float]
+) -> bool:
     """INK_MIXED_STROKES or more of the page's handwriting-like strokes (the page type's
     ink analysis, clean or rejected) lie outside every element read from the page and
     outside the header and footer bands: writing layout made nothing of (a figure, a
     table and a cut-out handwriting region each hold their own)."""
     if len(kind.ink.stroke_boxes) < page_type.INK_MIXED_STROKES:
         return False
-    return len(_loose_strokes(kind.ink.stroke_boxes, boxes, height)) >= (
+    return len(_loose_strokes(kind.ink.stroke_boxes, boxes, size, margins=False)) >= (
         page_type.INK_MIXED_STROKES
     )
 
 
 def _loose_strokes(
-    strokes: Sequence[BBox], boxes: Sequence[BBox], height: float | None
+    strokes: Sequence[BBox], boxes: Sequence[BBox], size: tuple[float, float], *, margins: bool
 ) -> list[BBox]:
-    """The strokes whose centre is in none of `boxes` (each grown by UNREAD_PAD), and,
-    with the page `height`, outside the header and footer bands."""
+    """The strokes on the page (`size`: a stroke of a drawing that runs off the page is
+    not seen) whose centre is in none of `boxes` (each grown by UNREAD_PAD); with
+    `margins` False, outside the header and footer bands too."""
     if not strokes:
         return []
     pad = UNREAD_PAD
+    width, height = size
     grown = [(b[0] - pad, b[1] - pad, b[2] + pad, b[3] + pad) for b in boxes]
     return [
         stroke
         for stroke in strokes
-        if (height is None or _box_zone(stroke, height) is None)
+        if _centre_inside(stroke, (0.0, 0.0, width, height))
+        and (margins or _box_zone(stroke, height) is None)
         and not any(_centre_inside(stroke, box) for box in grown)
     ]
 
