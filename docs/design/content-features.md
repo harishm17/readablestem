@@ -397,6 +397,8 @@ later. Built (docs/layout.md "Hidden text and page types"):
 - Ops: `page page_type:<kind>` and `page_type_reason:<code>`.
 
 Open: Harish's final wording (the drafts are marked `TODO(Harish)`), the design's second
-button ("Leave this page out of the HTML", not built), the d1 case (a scan with 40 or
-more visible typed characters and no hidden layer is still dropped silently), and the
-headings and document evals to re-run with the next model run.
+button ("Leave this page out of the HTML", not built), and the headings eval to re-run
+with the next model run. The d1 case (a scan with 40 or more visible typed characters
+and no hidden layer, dropped silently) is closed since the silent-loss sweep of
+2026-10-12: a picture covering a typed page keeps the page image with a decision unless
+it is plain or the template's repeated background (docs/layout.md "The safety net").
