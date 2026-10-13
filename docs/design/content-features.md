@@ -223,7 +223,7 @@ document text.
 
 Each builder owns its new modules outright and touches shared files only where listed.
 "Owns" means the builder may change it freely; everything else in this repo is changed
-only as listed here, or after asking the integrator.
+only as listed here, or after asking the maintainer.
 
 | Builder | Owns (new or wholly theirs) | Shared files it touches (only these parts) |
 |---|---|---|
@@ -239,7 +239,7 @@ only as listed here, or after asking the integrator.
 | ux-b | review-screen UX fixes, their tests | `review_split.html`, `review.html`, the review CSS and scripts, `web/routes/split.py` (not the TABLE branch) |
 | auth-ms | Microsoft sign-in (Authlib OIDC with tenant check, identities in `auth_identities`), its tests | `web/auth.py`, `login.html` and `_signin.html`, `web/app.py` (OAuth registry), `docs/web.md` sign-in section, deploy settings |
 
-Files nobody edits without the integrator: `core/types.py` (except adding a notice code
+Files nobody edits without the maintainer: `core/types.py` (except adding a notice code
 to `NOTICE_CODES`), `web/db.py` and `migrations/`, `pipeline/table_html.py`,
 `pipeline/safe_html.py`, `pipeline/options.py`, `config.py`, this page.
 

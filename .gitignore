@@ -31,5 +31,5 @@ private-inputs/
 # Local databases and scratch output
 .local/
 
-# Agent worktrees
+# Worktrees made by coding agents
 .claude/worktrees/

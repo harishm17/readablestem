@@ -10,8 +10,8 @@ Rows marked `known_gap` are gaps already found and left open on purpose (see the
 equations.py docstring and ADR 0001 question 3). They are strict xfails: if a change
 makes one pass, the test fails so the fixture gets updated.
 
-The LaTeX in the fixture is a scorer test input written from the gold MathML,
-not a gold label. Harish may spot-check it.
+The LaTeX in the fixture is a scorer test input written from the gold MathML, not a gold
+label. It is worth spot-checking.
 """
 
 from __future__ import annotations

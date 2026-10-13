@@ -2,10 +2,11 @@
 
 How a11y-stem measures its own output, on what data, and what the numbers leave out.
 
-Status (2026-10-07): the harness is built and tested offline. No real-model numbers exist
-yet. The first real run happens after the pipeline work packages (layout, steps, OpenAI
-client, `convert_pdf`) are merged; until then the pipeline modules are stubs and
-`eval pipeline` reports "still a stub".
+Status (2026-10-13): the harness is built and tested offline, and real-model runs on the
+sample are committed as `data/eval/latest-<task>.json` (pipeline 0.4.0; see "Results"
+below). All of them come from three sections of one OpenStax book, the same sample the
+checks were developed on. They are development numbers: none of them
+is a held-out result, and they should not be read as an estimate for documents in general.
 
 ## The idea
 
@@ -32,7 +33,7 @@ real heading outline. That makes a page an answer key. The harness:
 
 Three sections of OpenStax *Physics* (high school), chapter 2, CC BY 4.0, retrieved
 2026-10-06 (archive 20260604.144757). This sample is a pipeline smoke test, not the final
-gold set; choosing the gold-set pages is Harish's decision (ADR 0001).
+gold set; choosing the final gold-set pages is still open (ADR 0001).
 
 | Kind | n | Notes |
 |---|---|---|
@@ -489,8 +490,8 @@ and commit it with the change; CI's gate fails (exit 2) until you do.
 TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The committed
 `data/eval/latest-<task>.json` are all pipeline 0.4.0 runs (equations, figures, document
 and tables re-run on 2026-10-12, headings on 2026-10-09; see "Results" below); review
-them and promote each as the baseline. Earlier runs are in the main checkout's
-`.local/eval/`. figures-run1 was graded by the older text-only judge and cannot be a
+them and promote each as the baseline. Earlier runs were kept in a git-ignored
+`.local/eval/` and are not in the repository. figures-run1 was graded by the older text-only judge and cannot be a
 baseline for runs graded with the image.
 
 Weekly sample (drift check between full runs): a 5% share of the gold units, seeded by
@@ -776,11 +777,11 @@ measured (variant b), and keep the text-layer style rule as the bold check.
 
 ## Tables (`--task tables`, 2026-10-09)
 
-Status: the task, its gold and its gate are built (branch `feat/tables-eval`), and since
-the integration (2026-10-09) it runs against the real detector and table step: the first
-in-repo numbers are in "Content features after integration" below. The scorer was
-checked against the research benchmark first (below). Code: `eval/tables.py`; design: `PDF-RECOMMENDATION.md` 4.6 and
-its challenge (Harish's research notes, not in the repo).
+Status: the task, its gold and its gate are built, and since the integration
+(2026-10-09) it runs against the real detector and table step: the first in-repo numbers
+are in "Content features after integration" below. The scorer was checked against the
+research benchmark first (below). Code: `eval/tables.py`; the design is in the author's
+private research notes, which are not in this repository.
 
 ### Gold
 
@@ -1260,7 +1261,7 @@ counts and file names only: never page text. No model is called.
 
 The labelled sets are not in this repository: the research corpus holds derivatives of
 a real lecturer's handwritten notes and PDFs from local research folders, and lives with
-the research (`a11y-research/handwriting/detect/corpus/labels_all.json`, 996 pages). The
+the author's private research (996 labelled pages). The
 results, and why only one of them is out of sample, are in docs/layout.md "Accuracy,
 honestly": page-type-v5 on fresh set 4 (31 pages built after it was frozen) 27 of 31
 kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 989

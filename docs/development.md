@@ -1,6 +1,7 @@
 # Development notes
 
-Reference for working on the code. The public README is separate and Harish writes it.
+Reference for working on the code. The README is the short version; `docs/README.md` is
+the index to everything else.
 
 ## Setup and commands
 
@@ -92,8 +93,8 @@ does.
 ### Scorer check on the sample (2026-10-06)
 
 `tests/fixtures/sample_latex_predictions.jsonl` holds correct LaTeX for each of the 30
-sample equations (a scorer test input written from the gold MathML, not a gold
-label). With it:
+sample equations (a scorer test input written from the gold MathML, not a gold label).
+With it:
 
 | | exact_strict | exact_lenient | mean TEDS |
 |---|---|---|---|

@@ -129,9 +129,9 @@ class Floor:
     part: Literal["main", "real"] = "main"
 
 
-# Starting floors for tables (PDF-RECOMMENDATION.md 4.6 and its challenge): a little
+# Starting floors for tables (the research benchmark, docs/eval.md "Tables"): a little
 # under table-bench's measurements. Replace them with the 95% CI lower bounds of the first
-# full in-repo run (TODO(Harish): after the integrator's first full run).
+# full in-repo run (TODO(Harish): after the first full in-repo run).
 DEFAULT_FLOORS: tuple[Floor, ...] = (
     Floor("table_detection_recall", "tables", "metrics.detection_recall", minimum=0.86),
     Floor("table_detection_precision", "tables", "metrics.detection_precision", minimum=0.93),
