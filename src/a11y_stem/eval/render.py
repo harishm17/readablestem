@@ -178,6 +178,20 @@ def _is_playwright_error(exc: BaseException) -> bool:
     return isinstance(exc, PlaywrightError)
 
 
+INSTALL_HINT = (
+    ". The browser is not installed: run `uv run playwright install --with-deps chromium` "
+    "and install the fonts (`fonts-noto-core fonts-liberation`; docs/development.md)"
+)
+
+
+def _is_missing_browser(exc: BaseException) -> bool:
+    """Playwright's "Executable doesn't exist ... run playwright install" failure. Only this
+    is recognised, and the message itself is not repeated (other Playwright messages can carry
+    page content)."""
+    text = str(exc)
+    return "Executable doesn't exist" in text or "playwright install" in text
+
+
 @contextmanager
 def _chromium_errors(action: str) -> Generator[None]:
     """Playwright failures (a timeout, a browser that will not start) as RenderError.
@@ -189,7 +203,8 @@ def _chromium_errors(action: str) -> Generator[None]:
         yield
     except Exception as exc:
         if _is_playwright_error(exc):
-            raise RenderError(f"Chromium could not {action} ({type(exc).__name__})") from exc
+            hint = INSTALL_HINT if _is_missing_browser(exc) else ""
+            raise RenderError(f"Chromium could not {action} ({type(exc).__name__}){hint}") from exc
         raise
 
 

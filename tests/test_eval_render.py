@@ -448,6 +448,28 @@ def test_playwright_failures_become_render_errors():
         other._browser = None
 
 
+def test_a_missing_chromium_says_how_to_install_it_without_echoing_the_message():
+    sync_api = pytest.importorskip("playwright.sync_api")
+
+    class NotInstalled:
+        def new_context(self, **_):
+            raise sync_api.Error(
+                "BrowserType.launch: Executable doesn't exist at /secret/path/chrome\n"
+                "Looks like Playwright was just installed or updated. Run: playwright install"
+            )
+
+    renderer = render.ChromiumRenderer()
+    renderer._browser = NotInstalled()
+    try:
+        with pytest.raises(RenderError) as caught:
+            renderer.equation_png(FRACTION)
+    finally:
+        renderer._browser = None
+    text = str(caught.value)
+    assert "playwright install --with-deps chromium" in text and "fonts-liberation" in text
+    assert "/secret/path" not in text
+
+
 # ======================================================================= browser
 
 

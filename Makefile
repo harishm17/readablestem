@@ -116,10 +116,16 @@ proof-check:  ## check the pins and the recorded run's hashes; run nothing
 proof-list:
 	uv run a11y-stem proof --list
 
-proof-sources:  ## also fetch the answer key from OpenStax and print the PDFs again
-	uv run --group browser a11y-stem proof --verify-sources $(PROOF_ARGS)
+# Needs network and Chromium: `uv sync --group browser` and
+# `uv run playwright install --with-deps chromium` (docs/development.md for the fonts).
+# Writes proof/PROOF-sources.md (OUT=<file> to change), never PROOF.md: this check replaces
+# the report with one that holds the fetch and print results, which would leave the tree dirty.
+proof-sources:  ## also fetch the answer key from OpenStax and print the PDFs again (network, Chromium)
+	uv run --group browser a11y-stem proof --verify-sources --out $(or $(OUT),proof/PROOF-sources.md) $(PROOF_ARGS)
 
-proof-live:  ## re-call the models (costs money): make proof-live MAX_USD=2 ENV_FILE=.env
+# A live run of the default set records about $0.30 and stops without a result below that:
+# use MAX_USD=0.50 or more. Needs Chromium like proof-sources.
+proof-live:  ## re-call the models (costs money, needs Chromium): make proof-live MAX_USD=2 ENV_FILE=.env
 	@test -n "$(MAX_USD)" || { echo "usage: make proof-live MAX_USD=<dollars> [ENV_FILE=.env] [SET=<id>]"; exit 2; }
 	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser a11y-stem proof --live \
 		--max-usd $(MAX_USD) $(if $(RECORD),--record $(RECORD)) $(PROOF_ARGS)
@@ -131,7 +137,7 @@ proof-add-chatbot:  ## record the chatbot arms into a recorded run: make proof-a
 		--max-usd $(MAX_USD) $(PROOF_ARGS)
 
 proof-interim:  ## the held-out results that need no model (headings, parsers): needs `make heldout-gold`
-	uv run python proof/interim/report.py --gold $${HELDOUT_GOLD:-$$HOME/.cache/a11y-stem/heldout/gold}
+	uv run python proof/interim/report.py --gold $${HELDOUT_GOLD:-$${XDG_CACHE_HOME:-$$HOME/.cache}/a11y-stem/heldout/gold}
 
 proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)
 	uv run a11y-stem proof --add-systems parsers $(PROOF_ARGS)

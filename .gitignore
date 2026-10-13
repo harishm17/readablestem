@@ -33,3 +33,6 @@ private-inputs/
 
 # Worktrees made by coding agents
 .claude/worktrees/
+
+# Output of `make proof-sources` (a check, not the committed report)
+proof/PROOF-sources.md
