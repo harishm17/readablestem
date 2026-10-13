@@ -1,0 +1,54 @@
+# Documentation index
+
+The [README](../README.md) is the short version. This page says which document answers
+which question. The docs are long because they record how each number and each rule was
+arrived at; read them by question, not front to back.
+
+## If you want to know what the numbers mean
+
+| Question | Read |
+|---|---|
+| How is quality measured, on what data, with what error bars? | [eval.md](eval.md): "The idea", "Metrics", "Results", then "What the numbers do not show" |
+| Why does the app ask a person about some conversions and not others? | [design/beta-architecture.md](design/beta-architecture.md), "Review tiers"; [eval.md](eval.md), "Review load" |
+| How are equations and figures checked after the model has answered? | [steps.md](steps.md) |
+| How are headings, lists, equations and figures found in a PDF? | [layout.md](layout.md): "How a page is read" and "Known failure modes" |
+| How do tables work, and why are they off by default? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
+
+## If you want to know how it is built
+
+| Question | Read |
+|---|---|
+| What are the parts and the rules every part follows? | [design/beta-architecture.md](design/beta-architecture.md) |
+| What do the optional content features promise? | [design/content-features.md](design/content-features.md) |
+| What is in the HTML file that comes out? | [output.md](output.md) |
+| How does the web app work (routes, sign-in, review screen, retention)? | [web.md](web.md) |
+| How do I run, test and extend it? | [development.md](development.md) |
+
+## If you want to know why a choice was made
+
+The decision records are in [decisions/](decisions/): 0001 scope, 0002 models, 0003 PDF
+library and the AGPL, 0004 web stack, 0005 the second automated check. Each ends with its
+consequences.
+
+## If you want to run it as a service
+
+[deploy.md](deploy.md) for the first deploy and rollback, [operations.md](operations.md)
+for what runs on a schedule and what to do when something breaks. [../SECURITY.md](../SECURITY.md)
+says how to report a vulnerability.
+
+## Reading notes
+
+- **Labels such as "MF10", "BW9", "FEATURE-REVIEW 10.3" or "handwriting design 3.3"** point
+  into internal working notes (UX and feature reviews) that are not part of this
+  repository. The text around each label states the decision, so nothing depends on
+  finding the note.
+- **"WP"** is a work package: a unit of the original build plan that owns one module
+  contract.
+- **`TODO(Harish)`** marks wording or a decision that the author has not settled yet.
+  `uv run a11y-stem ops launch-check` lists the ones that still sit on the public pages
+  of the web app.
+- **Private research.** Some evidence (the PDF-parser comparison, the handwriting corpus,
+  the lab-manual table set) comes from the author's private research folder. Where a number
+  depends on it, the doc says so, and the number cannot be reproduced from this repository.
+- **Licences.** Which files are under which licence is listed in
+  [../THIRD_PARTY_NOTICES.md](../THIRD_PARTY_NOTICES.md).

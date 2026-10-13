@@ -1,6 +1,7 @@
 # Development notes
 
-Reference for working on the code. The public README is separate and Harish writes it.
+Reference for working on the code. The README is the short version; `docs/README.md` is
+the index to everything else.
 
 ## Setup and commands
 
@@ -20,6 +21,8 @@ printed pages read differently.
 | `make ci-local` | What CI's `lint-test` job runs (ruff, ty, pytest), on 3.12 and again on 3.14 (`.local/venv-3.14`). Run it before pushing |
 | `make gold` | Fetch the sample gold set (3 sections of `physics`, chapter 2) into `data/gold/` |
 | `make gold-licenses` | Write every OpenStax book's license to `data/openstax-licenses.csv` |
+| `make reproduce` | Offline reproduction: gold files against their manifests, committed eval reports against the gold they were scored on, the scorer's ceiling, then the committed numbers. No key, no network, no browser |
+| `make reproduce-rerun` | The same, plus a re-run of the headings and tables tasks (no model) compared with the committed reports; needs network on the first run, Chromium and the fonts above |
 | `make eval-plumbing` | Plumbing check only: scores each gold equation against itself, so it always prints 1.0. Does **not** test normalisation |
 | `make eval-latex-check` | Scorer check: known-correct LaTeX for every sample equation (`tests/fixtures/sample_latex_predictions.jsonl`) must match leniently; also runs in CI via `pytest` |
 | `make proof` | Replay the recorded run in `proof/bundles/` and write `PROOF.md` (no key, no network, no cost). `proof-check`, `proof-sources`, `proof-live`: see docs/proof.md |
@@ -98,8 +101,8 @@ does.
 ### Scorer check on the sample (2026-10-06)
 
 `tests/fixtures/sample_latex_predictions.jsonl` holds correct LaTeX for each of the 30
-sample equations (a scorer test input written from the gold MathML, not a gold
-label). With it:
+sample equations (a scorer test input written from the gold MathML, not a gold label).
+With it:
 
 | | exact_strict | exact_lenient | mean TEDS |
 |---|---|---|---|

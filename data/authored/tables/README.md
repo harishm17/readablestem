@@ -25,5 +25,6 @@ Each folder holds one document: its source, the PDF the eval reads, and `gold.js
 PowerPoint's look, not an export from PowerPoint: LibreOffice Impress was not available
 to export a real deck.
 
-TODO(Harish): `LICENSE` says the code is MIT and `data/gold/` is CC BY 4.0; say also that
-`data/authored/` is MIT (it is written for this project), if you agree.
+Licence scope: `LICENSE` is MIT for the code; `data/authored/` is MIT as well (it is
+written for this project) and `data/gold/` is CC BY 4.0. The full list is in
+`THIRD_PARTY_NOTICES.md`, "Which licence covers which files".

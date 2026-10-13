@@ -611,7 +611,7 @@ maths by the document's evidence; the equation step's own tiers then decide it.
   0.3 or more apart: a circle round a step number in the text's colour is the text's),
   is a pen mark too; and a display equation holds no mark at least as tall as its text
   (a tick over an equation: the transcription would leave it out). Measured on the
-  research corpus (`a11y-research/handwriting/detect/corpus`) and the repository's
+  private research corpus (not in this repository) and the repository's
   PDFs: of the 17 drawings too small to be figures whose middle lies in a text element
   on born-digital pages (the 586 real born-digital pages, fresh set 4, the 42 OpenStax
   renders, the three printed gold sections, the demo source and the fixtures), none is

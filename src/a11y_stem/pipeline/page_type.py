@@ -123,12 +123,15 @@ TEXT_MIN = 40  # visible chars for a page to "have a text layer" (about one line
 OCR_MIN = 20  # untrusted chars that alone (no image, no ink) mean an OCR layer
 HIDDEN_FEW = 3  # untrusted chars that make a page "_ocr" or "mixed_hidden_text"
 
-# Ink strokes: a handwriting stroke is a small, curved, wiggly, one-off path.
+# Ink strokes: a handwriting stroke is a small, curved, wiggly, one-off path. Where a
+# comment says "the reference lecture", it means one real iPad lecture that is kept
+# private and is not in this repository (only its measurements are quoted).
 STROKE_MIN_SIDE = 1.5  # pt; smaller is a dot or noise
 STROKE_MAX_SIDE = 90.0  # pt; larger is a plot line, a frame or a long rule
 STROKE_MIN_POINTS = 8  # flattened points; circle markers and arrowheads have fewer
-FILLED_MIN_POINTS = 12  # a filled pen outline has two sides: lec14's 10th percentile is 28;
-#                         quiver arrows and other machine polygons have 4 to 8
+# A filled pen outline has two sides: the reference lecture's 10th percentile is 28 points;
+# quiver arrows and other machine polygons have 4 to 8.
+FILLED_MIN_POINTS = 12
 OBLIQUE_MIN = 3  # segments off the axes; fewer and no curves means boxes, grids, ticks
 CLOSED_TURNING = 2.6 * math.pi  # any convex outline turns exactly 2 pi; pen strokes wiggle
 OPEN_TURNING = 1.25 * math.pi  # an open pen stroke bends more than a half circle
@@ -136,16 +139,16 @@ RIBBON_MAX_RATIO = 0.3  # filled outline: 2 x area / perimeter (its mean width) 
 #                         share of its longest side. A pen ribbon is ~0.1; a disc is 0.5.
 ZIGZAG_ANGLE = 0.35  # rad (20 degrees): a "sharp" turn, for the zigzag measure
 ZIGZAG_MAX = 0.3  # share of turns that are sharp and reverse the last sharp turn. Pen
-#                   strokes bend one way at a time (lec14 p90 0.16, synthetic p90 0.17);
-#                   TikZ random steps 0.49, random-walk tracks 0.43.
+#                   strokes bend one way at a time (reference lecture p90 0.16, synthetic
+#                   p90 0.17); TikZ random steps 0.49, random-walk tracks 0.43.
 SIG_GRID = 0.2  # pt / pt^2: perimeter and area rounded to this are compared for repeats
 SIG_TURN = 0.25  # rad: total turning rounded to this; coarse, as PDF coordinates are
 #                  written with few decimals and copies differ by rounding noise
 
 # Pen consistency (filled ribbons only): one pen gives one ribbon width. Share of filled
 # strokes whose width is within PEN_BAND x the median of strokes of the same colour.
-# lec14: 0.95-0.98; synthetic ribbons 0.97; a filled contour map 0.24; the outlined
-# lettering of a seal 0.55; quiver arrows 0.79.
+# reference lecture: 0.95-0.98; synthetic ribbons 0.97; a filled contour map 0.24; the
+# outlined lettering of a seal 0.55; quiver arrows 0.79.
 PEN_BAND = (0.75, 1.33)
 PEN_SHARE_MIN = 0.8
 
@@ -163,7 +166,8 @@ SIZE_TWIN_ABS = 0.01  # pt
 SIZE_TWIN_MAX = 0.5  # share of strokes with a twin above which the "ink" is a layout
 
 # Page-level ink decisions.
-INK_PAGE_STROKES = 40  # strokes for a page of handwriting (lec14's sparsest page has 220)
+# Strokes for a page of handwriting (the reference lecture's sparsest page has 220).
+INK_PAGE_STROKES = 40
 INK_PAGE_ROWS = 3  # rows of writing for a page of handwriting
 INK_MIXED_STROKES = 12  # strokes for "some handwriting" on a typed page
 INK_MIXED_ROWS = 1

@@ -36,4 +36,16 @@ One rendered equation (`v = d / t = 12 m / 4 s`), both models, structured output
 
 ## Consequences
 
-TODO(Harish)
+Drafted from what the repository shows; the author confirms or edits.
+
+- **Easier.** One provider and one SDK. Structured outputs make every answer pass a schema
+  before any check sees it. Because each model is the other's fallback, one model failing
+  does not stop a conversion. Run costs are small: `docs/eval.md` records $0.0017 per
+  equation and $0.0034 per PDF page on the sample.
+- **Harder.** The product depends on one provider's availability, prices and model names;
+  the price table above is dated 2026-10-07 and must be re-checked. Model answers are not
+  deterministic, so two runs on the same input can differ (the eval reports give
+  confidence intervals for this reason). Document images and the text around them are
+  sent to that provider, which the privacy page has to say.
+- **When to revisit.** A price change, a model being retired, or a drop in the eval
+  gate's numbers after a model or prompt change (`a11y-stem eval gate`).

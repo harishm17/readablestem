@@ -1,8 +1,9 @@
 # Beta architecture (2026-10-07)
 
-Status: built on branch `feat/beta-app` for Harish's review. Decisions it rests
-on are in `docs/decisions/` (0001 scope, 0002 models, 0003 PDF library and AGPL,
-0004 web stack). Product context: the private planning notes (not public).
+Status: the architecture the beta is built to; kept up to date as the code changes. The
+decisions it rests on are in `docs/decisions/` (0001 scope, 0002 models, 0003 PDF library
+and AGPL, 0004 web stack, 0005 second automated check). The "WP" column of the module
+map names the work package, a unit of the original build plan, that owns each contract.
 
 ## What the app does
 
@@ -43,7 +44,7 @@ flowchart LR
 
 ## Module map and contracts
 
-Signatures below are fixed. Work packages (WP) implement them; tests live in
+Signatures below are fixed. Each work package (WP) implements its own; tests live in
 `tests/test_<area>_*.py`. The content features of pipeline 0.4.0 (tables, long
 descriptions, links and language, colour, notation memory, the job page, Microsoft
 sign-in) have their own contracts, flags and ownership map in
@@ -169,7 +170,9 @@ upload probe's child process (`web/page_images.py`). The full list stays at
    (`settings.source_url`); `THIRD_PARTY_NOTICES.md` lists it.
 7. **Wording.** "Assists"; never "compliant", "ensures compliance" or "ADA/WCAG
    compliant" anywhere in the UI, output or docs.
-8. **Harish writes:** README prose, the known-limits copy, the ADR "Consequences"
-   sections. Leave clearly marked `TODO(Harish)` placeholders there.
+8. **Public copy is the author's.** The README prose, the known-limits copy and the ADR
+   "Consequences" sections are written or confirmed by the author. Unfinished wording is
+   marked `TODO(Harish)`, and `a11y-stem ops launch-check` lists what is left on the
+   public pages.
 9. **Style.** Python 3.12+, ruff (line length 100), type hints that pass `ty check src`,
    docstrings that say why. No new runtime dependencies without a note in the PR.

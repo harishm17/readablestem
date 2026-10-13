@@ -12,8 +12,8 @@ How a data table in a PDF becomes an accessible HTML table (pipeline 0.4.0). Two
 
 The review card is in [web.md](web.md) ("The table card") and the evaluation in
 [eval.md](eval.md) ("Tables"). Contracts, flags and review tiers:
-[design/content-features.md](design/content-features.md). The plan behind it:
-`a11y-research/PDF-RECOMMENDATION.md` sections 4.3 to 4.6.
+[design/content-features.md](design/content-features.md). The plan behind it is in the
+author's private research notes, which are not in this repository.
 
 ## Detection (`pipeline/tables.py`)
 
@@ -197,13 +197,12 @@ HTML, cell text included):
 By style (after): grid R 1.00 / P 0.98 / TEDS 0.98; booktabs 0.89 / 0.96 / 0.86;
 no rules 0.81 / 0.98 / 0.73; LaTeX 0.83 / 1.00 / 0.76; Word 1.00 / 1.00 / 1.00.
 
-How to repeat: the benchmark, the labels and the challenge's scripts are in
-`a11y-research` (`pdf-eval-2026-10-09.tgz`, `pdf-eval-challenge-2026-10-09.tgz`); the
-scripts and result files behind this section are in
-`a11y-research/tables-detect-eval-2026-10-09.tgz` (`evaluate_full.py` for the manuals,
-`tb/predict.py` and `tb/score.py` for the benchmark, `misrouted.py`, `time_analyze.py`; run them pinned
-with `taskset -c N`). The manuals come from the public URLs in the challenge section of
-`PDF-RECOMMENDATION.md`. The tables-eval work turns this into `a11y-stem eval tables`.
+How to repeat: not from this repository. The benchmark, the labels and the scripts behind
+these numbers live in the author's private research folder, and the manuals are
+third-party documents that are not redistributed here, so the numbers measured on the
+manuals cannot be reproduced from a checkout. What can be reproduced is the same task on
+the OpenStax and authored table documents: `a11y-stem eval pipeline --task tables --mode
+local` (docs/eval.md, "Tables").
 
 ### Known misses
 
