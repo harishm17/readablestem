@@ -111,6 +111,25 @@ def test_a_short_note_on_a_typed_page_is_cut_out_as_handwriting():
     assert result_outcome(result) == ("done", "pages_not_converted")
 
 
+def test_a_hand_mark_over_typed_text_is_cut_out_and_the_text_stays():
+    # Three pen strokes written over a word of a paragraph: not part of the text, so not
+    # held by it; cut out as handwriting, and the paragraph is read whole.
+    from fixtures.handwriting.make_fixtures import INK_BLACK, TYPED, Writer
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_textbox(pymupdf.Rect(72, 72, 540, 300), "\n\n".join(TYPED[1:]), fontsize=11)
+    word = page.search_for("vector")[0]
+    writer = Writer(page, 31, "polyline", INK_BLACK, width=1.0)
+    writer.word("aeo", word.x0 - 4, word.y1 + 1, 9, 0.1)
+    writer.commit()
+    out = layout.analyze(doc.tobytes())
+    assert out.page_types[0].kind == "born_digital" and out.page_types[0].ink.strokes == 3
+    (ink,) = [e for e in out.elements if "handwriting" in e.reasons]
+    assert ink.bbox[0] < word.x1 and ink.bbox[2] > word.x0  # over the word
+    assert "it is a vector" in " ".join(e.text or "" for e in out.elements)
+
+
 def test_the_safety_net_keeps_a_painted_page_layout_read_nothing_from():
     doc = layout.analyze(data("drawn_page.pdf"))
     assert doc.page_types[1].kind == "vector_no_text"  # not handwriting, not a scan ...

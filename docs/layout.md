@@ -546,7 +546,7 @@ the design review's changes (`CLASSIFIER_VERSION` "page-type-v5.3"):
 |---|---|---|
 | `born_digital` | visible text, nothing hidden | reads it as before |
 | `mixed_hidden_text` | visible text plus invisible or covered words | reads the visible text; notice `hidden_text_ignored` (optional) with the count |
-| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), 3 or more clean strokes that went into no element are cut out the same way (`layout.LOOSE_INK_STROKES`: a short note, a signature, a circle and a tick) |
+| `mixed_ink` | visible text plus handwriting | reads the text; the ink is kept out of the figures and each region of it (strokes within 24 pt, at most 6 regions) becomes a FIGURE kept as an image (`handwriting_on_page`). On a typed page with lighter ink (fewer than 12 strokes, so `born_digital`), 3 or more clean strokes that no figure, table or equation holds are cut out the same way (`layout.LOOSE_INK_STROKES`: a short note, a signature, a word circled and ticked by hand over the typed text, which stays read) |
 | `handwritten`, `handwritten_ocr` | vector ink, no or only a hidden text layer | the page is kept as its image (`handwritten_page`): no elements |
 | `scan_no_text`, `scan_ocr` | a picture of a page, no or only a hidden text layer | the page is kept as its image (`scanned_page`): no elements. With a little visible typed text and nothing hidden (a typed header on a scan, a title slide on a photo) it is not called a scan: its visible text is read, and the page is also kept as its image (`unread_page`) |
 | `vector_no_text` | drawings, little or no text | read as before (figures); kept as an image (`unread_page`) when it has less than a line (40 characters) of visible text and its ink could not be analysed in time; its visible text is read, its drawings are not sent to the figure model |
@@ -662,9 +662,11 @@ fails a result with the same rule (`worker.result_outcome`).
   and no hidden layer: the scan is dropped as a page background, silently, as before
   (the design review's "d1 rule" is not built: it would flag every slide with a
   full-slide background picture);
-- very light handwriting on a typed page: fewer than 3 clean pen strokes outside every
-  element (a tick, a one-stroke signature) is lost; strokes that cluster into a drawing
-  of 24 pt or more on a side are a figure for the figure model, as before;
+- very light handwriting on a typed page: fewer than 3 clean pen strokes that no figure,
+  table or equation holds (a tick, a one-stroke signature) are lost; strokes that cluster
+  into a drawing of 24 pt or more on a side are a figure for the figure model, as before.
+  Three pages of the research corpus labelled born-digital (an underline, a tick and a
+  circle drawn by hand over typed text) now get a handwriting region and a decision;
 - grids of small machine-drawn curves (sparklines, small multiples of loops) can look
   like handwriting: kept as an image with a needless decision (a PDF of only such pages
   is refused at upload, with or without a short typed title);

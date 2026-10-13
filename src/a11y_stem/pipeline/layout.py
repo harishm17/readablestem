@@ -123,10 +123,10 @@ FRAME_LINE_BAND = 0.05  # every point of a frame lies this share of its smaller 
 # handwriting (mixed_ink) the handwriting is cut out already and the rest is left out.
 INK_REASONS = frozenset({"ink_rejected", "ink_not_analysed", "ink_some", "ink_writing"})
 UNREAD_PAD = 2.0  # pt: a stroke within this of an element's box belongs to the element
-# Clean pen strokes outside every block of a typed page that are cut out as handwriting
-# (fewer than page_type.INK_MIXED_STROKES make no mixed_ink page). On the research
-# corpus no born-digital page has 3 (544 pages; one TikZ page has 2), nor any of the
-# repository's 887 born-digital pages.
+# Clean pen strokes of a typed page that no figure, table or equation holds, cut out as
+# handwriting (fewer than page_type.INK_MIXED_STROKES make no mixed_ink page). On the
+# research corpus's born-digital pages: three with 3 (hand marks over typed text: an
+# underline, a tick, a circle), one TikZ page with 2, none of the repository's 887.
 LOOSE_INK_STROKES = 3
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
@@ -3850,9 +3850,12 @@ def _page_blocks(
         )
     blocks.extend(_table_blocks(page_tables))
     # Handwriting too light for a mixed_ink page (a short note, a signature, a circle and
-    # a tick) that went into no block: cut out like the rest of handwriting on a typed
-    # page, not lost. A note in the top or bottom margin counts too.
-    loose = _loose_strokes(strokes, [b.bbox for b in blocks], None)
+    # a tick) that no figure, table or equation holds: cut out like the rest of
+    # handwriting on a typed page, not lost. A mark over typed text (a word circled, a
+    # line underlined by hand) is not part of the text, and a note in the top or bottom
+    # margin counts too.
+    held = [b.bbox for b in blocks if b.kind in (Kind.FIGURE, Kind.TABLE, Kind.EQUATION)]
+    loose = _loose_strokes(strokes, held, None)
     if len(loose) >= LOOSE_INK_STROKES:
         ink = [*ink, *page_type.stroke_regions(loose)]
     blocks.extend(_ink_blocks(ink, page_rect))
