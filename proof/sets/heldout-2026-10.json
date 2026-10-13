@@ -127,6 +127,11 @@
   "limits": [
     "Fifteen sections of five books: intervals come from resampling sections, which is approximate with this few clusters; per-book numbers are point estimates.",
     "The sections come from retired first editions, whose text may differ from the current editions.",
-    "Any change to a11y-stem's prompts, rules, thresholds, models or scorers after the first held-out output exists means these numbers can no longer be quoted as held-out results for the changed system."
+    "Any change to a11y-stem's prompts, rules, thresholds, models or scorers after the first held-out output exists means these numbers can no longer be quoted as held-out results for the changed system.",
+    "Docling is run in its default settings (a formula is not decoded); the registered arm with formula recognition on was not carried out (Addendum 4). MinerU is run at its basic tier, not the standard tier its documentation names as the default.",
+    "A paired verdict is written only when the registered Bonferroni interval excludes 0; where a sign-flip test on the section differences disagrees, the report says 'higher by point estimate'.",
+    "a11y-stem's review screen asked about none of the 28 wrong headings in the interim headings run: that is a limit of the pipeline, documented here and not fixed on the held-out data.",
+    "The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.",
+    "The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch."
   ]
 }

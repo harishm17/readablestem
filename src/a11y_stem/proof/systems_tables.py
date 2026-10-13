@@ -63,8 +63,22 @@ METRICS: dict[str, MetricSpec] = {
         MetricSpec("h_precision", "heading precision"),
         MetricSpec("h_recall", "heading recall"),
         MetricSpec("h_level", "heading level_accuracy (among matched)"),
-        MetricSpec("inv_sentence", "invented prose sentences", better="lower"),
-        MetricSpec("inv_number", "invented numbers", better="lower"),
+        MetricSpec("e2e_norm", "end_to_end_exact_lenient, markup normalised (descriptive row)"),
+        MetricSpec(
+            "inv_sentence",
+            "invented prose sentences (text-layer mismatch, rule unaudited)",
+            better="lower",
+        ),
+        MetricSpec(
+            "inv_number",
+            "invented numbers (text-layer mismatch, rule unaudited)",
+            better="lower",
+        ),
+        MetricSpec(
+            "inv_sentence_nocomment",
+            "prose sentences not in the text layer, HTML comments removed (descriptive row)",
+            better="lower",
+        ),
         MetricSpec("inv_heading", "headings the PDF does not support", better="lower"),
         MetricSpec("inv_eq_aligned", "aligned equations with an added symbol", better="lower"),
         MetricSpec(
@@ -274,6 +288,8 @@ class Comparison:
     narrow: stats.Interval  # the Bonferroni-corrected interval the claim rests on
     wide: stats.Interval  # 95%
     result: str
+    p_sign_flip: float | None = None  # robustness check beside the registered interval
+    n_sections: int = 0
 
 
 def verdict(spec: MetricSpec, narrow: stats.Interval, other: str, a_name: str) -> str:
@@ -288,6 +304,38 @@ def verdict(spec: MetricSpec, narrow: stats.Interval, other: str, a_name: str) -
     return "no difference this set can detect"
 
 
+# A percentile bootstrap over a handful of sections only returns the sections' own extremes
+# (3 sections give the same 95% and 99% interval), so no verdict is written below this.
+MIN_SECTIONS_FOR_A_VERDICT = 10
+
+
+def final_result(
+    base: str,
+    *,
+    p: float | None,
+    k: int,
+    n_sections: int,
+    min_sections: int = MIN_SECTIONS_FOR_A_VERDICT,
+) -> str:
+    """The registered verdict, qualified where it rests on the bootstrap alone.
+
+    Fewer than `min_sections` sections: no verdict at all. A "better" whose sign-flip p-value
+    is above the same Bonferroni threshold (0.05 / k) becomes "higher": the registered
+    interval excludes 0 but the permutation test does not agree.
+    """
+    if n_sections < min_sections:
+        return f"not tested, {n_sections} sections"
+    if base.endswith(" is better"):
+        who = base.removesuffix(" is better")
+        if p is None or p > 0.05 / k:
+            shown = "n/a" if p is None else f"{p:.4f}"
+            return (
+                f"{who} is higher by point estimate: the registered interval excludes 0, "
+                f"the sign-flip test does not (p = {shown})"
+            )
+    return base
+
+
 def compare(
     key: str,
     label: str,
@@ -298,6 +346,7 @@ def compare(
     other: str,
     k: int,
     n_boot: int,
+    min_sections: int = MIN_SECTIONS_FOR_A_VERDICT,
 ) -> Comparison:
     spec = METRICS[key]
     pa, pb = a.get(key), b.get(key)
@@ -318,6 +367,14 @@ def compare(
     va, vb = value_of(spec, a), value_of(spec, b)
     scale = spec.scale
     scaled = _scaled(narrow, scale), _scaled(wide, scale)
+    flip = stats.sign_flip(pa, pb, spec.statistic)
+    result = final_result(
+        verdict(spec, narrow, other, a_name),
+        p=flip.p,
+        k=k,
+        n_sections=len(pa),
+        min_sections=min_sections,
+    )
     return Comparison(
         label,
         key,
@@ -327,7 +384,9 @@ def compare(
         None if estimate is None else estimate * scale,
         scaled[0],
         scaled[1],
-        verdict(spec, narrow, other, a_name),
+        result,
+        flip.p,
+        len(pa),
     )
 
 
@@ -337,10 +396,23 @@ def _scaled(i: stats.Interval, scale: float) -> stats.Interval:
     return stats.Interval(i.low * scale, i.high * scale, i.skipped, i.n_sections, i.level)
 
 
+CLAIMS_NOTE = (
+    "Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section "
+    "differences, a robustness check that is not part of the registered rule; the Bonferroni "
+    "threshold for it is {threshold:.5f}. With fewer than {min} sections no verdict is "
+    "written (a bootstrap over so few sections only returns the sections' own extremes), "
+    'and a "better" that the sign-flip test does not support is written as "higher by point '
+    'estimate".'
+)
+
+
 def claims_table(
     title: str, comparisons: Sequence[Comparison], *, a_name: str, k: int, note: str = ""
 ) -> Table:
     level = 100 * (1 - 0.05 / k)
+    note = (note + " " if note else "") + CLAIMS_NOTE.format(
+        min=MIN_SECTIONS_FOR_A_VERDICT, threshold=0.05 / k
+    )
     rows = []
     for c in comparisons:
         spec = METRICS[c.key]
@@ -353,6 +425,7 @@ def claims_table(
                 num(c.difference, spec.digits),
                 interval(c.narrow.low, c.narrow.high, spec.digits),
                 interval(c.wide.low, c.wide.high, spec.digits),
+                "n/a" if c.p_sign_flip is None else f"{c.p_sign_flip:.4f}",
                 f"**{c.result}**",
             ]
         )
@@ -366,6 +439,7 @@ def claims_table(
             f"Difference ({a_name} minus other)",
             f"Cluster {level:.3f}% (k = {k}): the claim",
             "Cluster 95%",
+            "Sign-flip p",
             "Result",
         ],
         rows,

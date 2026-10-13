@@ -27,6 +27,10 @@
   ],
   "limits": [
     "Three sections of one book, all used while building a11y-stem: nothing here shows how it does on material it has not seen.",
-    "One run of each task (the held-out set repeats them), so run-to-run variation is not visible."
+    "One run of each task (the held-out set repeats them), so run-to-run variation is not visible.",
+    "The paired comparisons need at least 10 sections to print a verdict; with three they print 'not tested', because a bootstrap over three sections returns only the sections' own extremes.",
+    "The review screen's heading flags look better here (precision 0.5556, recall 0.7778) than they did on the held-out headings, where it asked about none of the 28 wrong headings (proof/interim/INTERIM-heldout-2026-10.md): the rules were tuned on these pages, and the held-out miss is a limit of the pipeline that was not fixed afterwards.",
+    "The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.",
+    "The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch."
   ]
 }

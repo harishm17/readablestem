@@ -240,3 +240,48 @@ def test_a_section_missing_on_one_side_is_a_section_of_zeros_not_a_gap():
     done = systems_tables.compare("inv_sentence", "x", a, b, a_name="a", other="b", k=5, n_boot=200)
     assert done.result != "not computed"
     assert done.a == pytest.approx(3 / 30) and done.b == pytest.approx(11 / 20)
+
+
+def _vectors(rates_a, rates_b, key="inv_sentence"):
+    a = {key: {f"s{i:02d}": (r * 10.0, 10.0) for i, r in enumerate(rates_a)}}
+    b = {key: {f"s{i:02d}": (r * 10.0, 10.0) for i, r in enumerate(rates_b)}}
+    return a, b
+
+
+def test_no_verdict_is_written_for_fewer_sections_than_the_floor():
+    a, b = _vectors([0.9, 0.8, 0.9], [0.1, 0.0, 0.2], key="e2e")
+    done = systems_tables.compare("e2e", "x", a, b, a_name="a", other="b", k=6, n_boot=200)
+    assert done.result == "not tested, 3 sections"
+    assert done.n_sections == 3 and done.difference is not None  # the numbers are still shown
+    # A caller may lower the floor (a test of the machinery, not a claim).
+    low = systems_tables.compare(
+        "e2e", "x", a, b, a_name="a", other="b", k=6, n_boot=200, min_sections=3
+    )
+    assert low.result.startswith("a is")
+
+
+def test_a_steady_gain_over_enough_sections_is_better_by_both_tests():
+    a, b = _vectors([0.9] * 15, [0.1] * 15, key="e2e")
+    done = systems_tables.compare("e2e", "x", a, b, a_name="a", other="b", k=8, n_boot=200)
+    assert done.result == "a is better"
+    assert done.p_sign_flip is not None and done.p_sign_flip < 0.05 / 8
+
+
+def test_a_bootstrap_verdict_the_sign_flip_test_does_not_support_is_only_higher():
+    base = "a is better"
+    text = systems_tables.final_result(base, p=0.0073, k=8, n_sections=15)
+    assert text.startswith("a is higher by point estimate")
+    assert "p = 0.0073" in text and "better" not in text
+    assert systems_tables.final_result(base, p=0.001, k=8, n_sections=15) == base
+    assert "p = n/a" in systems_tables.final_result(base, p=None, k=8, n_sections=15)
+    nothing = "no difference this set can detect"
+    assert systems_tables.final_result(nothing, p=0.5, k=8, n_sections=15) == nothing
+    assert systems_tables.final_result(base, p=0.0, k=8, n_sections=9) == "not tested, 9 sections"
+
+
+def test_the_claims_table_prints_the_sign_flip_p_and_says_what_it_is():
+    a, b = _vectors([0.9] * 15, [0.1] * 15, key="e2e")
+    done = systems_tables.compare("e2e", "x", a, b, a_name="a", other="b", k=8, n_boot=200)
+    table = systems_tables.claims_table("t", [done], a_name="a", k=8)
+    text = table.markdown()
+    assert "Sign-flip p" in text and "robustness check" in text and "fewer than 10 sections" in text

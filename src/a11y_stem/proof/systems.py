@@ -206,13 +206,18 @@ def equation_item(
     output: inv_read.Output | None,
     *,
     allowlist_free: bool = False,
+    mathml_of: Callable[[inv_read.Equation], str | None] | None = None,
 ) -> dict[str, Any]:
     """The document task's item for one section of one system. `output` None: it found
-    nothing."""
+    nothing. `mathml_of` replaces how an equation becomes MathML (a descriptive row that
+    rewrites a parser's markup first); the default is what the reader made of it."""
     elements: list[Element] = []
     fixes: dict[str, Fix] = {}
     for position, equation in enumerate(output.equations if output else []):
-        mathml = _allowlist_free(equation) if allowlist_free else equation.mathml
+        if mathml_of is not None:
+            mathml = mathml_of(equation)
+        else:
+            mathml = _allowlist_free(equation) if allowlist_free else equation.mathml
         eid = f"x{position}"
         elements.append(
             Element(

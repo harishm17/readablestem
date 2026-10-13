@@ -12,7 +12,11 @@ The preregistration (section 8) fixes the method, and this module follows it:
   to quote;
 - with repeats, a section's numerators and denominators are summed over the repeats
   before resampling: the run is not a resampling unit;
-- a paired difference A - B uses the same resampled sections for both systems.
+- a paired difference A - B uses the same resampled sections for both systems;
+- as a robustness check beside the bootstrap, `sign_flip` gives the two-sided p-value of a
+  paired sign-flip permutation test on the per-section differences (exact for up to 16
+  sections). It is not part of the registered rule; the proof tables print it next to the
+  registered interval so a reader can see when a verdict depends on the bootstrap alone.
 
 The resample matrix is `rng.integers(0, n_sections, size=(B, n_sections))`, one draw for
 the whole bootstrap. With 15 sections a percentile bootstrap is approximate and tends to be
@@ -129,6 +133,56 @@ def paired_difference(
     alpha = (1 - level) / 2 * 100
     low, high = np.percentile(diffs, [alpha, 100 - alpha])
     return estimate, Interval(float(low), float(high), skipped, n, level)
+
+
+SIGN_FLIP_EXACT_MAX = 16
+SIGN_FLIP_DRAWS = 200_000
+
+
+@dataclass(frozen=True)
+class SignFlip:
+    p: float | None
+    n_used: int  # sections with a difference that is not zero
+    n_sections: int  # sections where the statistic exists on both sides
+
+
+def sign_flip(
+    a: Mapping[str, Sequence[float]],
+    b: Mapping[str, Sequence[float]],
+    statistic: Statistic,
+    *,
+    seed: int = SEED,
+) -> SignFlip:
+    """Two-sided paired sign-flip permutation test on per-section differences.
+
+    The statistic is computed on each section on its own (the section's own F1 or rate), the
+    differences A - B are formed, and the p-value is the share of sign assignments whose sum
+    is at least as far from 0 as the observed sum. Sections where the statistic is undefined
+    on either side are left out and counted. Exact when 16 sections or fewer are used,
+    otherwise 200,000 seeded draws.
+    """
+    if set(a) != set(b):
+        raise ValueError("a paired test needs the same sections on both sides")
+    diffs: list[float] = []
+    for key in sorted(a):
+        va = statistic(np.asarray(a[key], dtype=float))
+        vb = statistic(np.asarray(b[key], dtype=float))
+        if va is not None and vb is not None:
+            diffs.append(va - vb)
+    n_sections = len(diffs)
+    d = np.asarray([x for x in diffs if abs(x) > 1e-12])
+    if len(d) == 0:
+        return SignFlip(None, 0, n_sections)
+    observed = abs(float(d.sum()))
+    if len(d) <= SIGN_FLIP_EXACT_MAX:
+        signs = ((np.arange(2 ** len(d))[:, None] >> np.arange(len(d))) & 1) * 2 - 1
+        sums = np.abs(signs @ d)
+    else:
+        rng = np.random.default_rng(seed)
+        signs = rng.integers(0, 2, size=(SIGN_FLIP_DRAWS, len(d))) * 2 - 1
+        sums = np.abs(signs @ d)
+    p = float(np.mean(sums >= observed - 1e-12))
+    return SignFlip(p, len(d), n_sections)
 
 
 def wilson(successes: float, n: float) -> tuple[float, float] | None:

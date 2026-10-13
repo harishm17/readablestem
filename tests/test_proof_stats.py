@@ -84,3 +84,48 @@ def test_wilson_rounds_counts_and_is_none_for_no_items():
     low, high = stats.wilson(5, 10) or (None, None)
     assert low is not None and high is not None and low < 0.5 < high
     assert stats.wilson(0, 0) is None
+
+
+def _pairs(a_values, b_values):
+    """Per-section (numerator, denominator) vectors whose rates are the given numbers."""
+    a = {f"s{i:02d}": [v * 10.0, 10.0] for i, v in enumerate(a_values)}
+    b = {f"s{i:02d}": [v * 10.0, 10.0] for i, v in enumerate(b_values)}
+    return a, b
+
+
+def test_sign_flip_is_exact_for_few_sections():
+    # Four equal gains: only the all-plus and all-minus assignments are as extreme, 2 of 16.
+    a, b = _pairs([1.0] * 4, [0.0] * 4)
+    flip = stats.sign_flip(a, b, stats.ratio)
+    assert flip.p == pytest.approx(2 / 16)
+    assert (flip.n_used, flip.n_sections) == (4, 4)
+
+
+def test_sign_flip_matches_a_hand_count():
+    # Differences +0.3, -0.1, +0.2: sums over the 8 sign patterns are 0.6, 0.4, 0.2, 0.0 and
+    # their negatives; |sum| >= 0.4 in 4 of 8 patterns.
+    a, b = _pairs([0.4, 0.1, 0.3], [0.1, 0.2, 0.1])
+    assert stats.sign_flip(a, b, stats.ratio).p == pytest.approx(4 / 8)
+
+
+def test_sign_flip_leaves_out_ties_and_undefined_sections():
+    a, b = _pairs([1.0, 0.5, 0.5], [0.0, 0.5, 0.5])
+    flip = stats.sign_flip(a, b, stats.ratio)
+    assert (flip.n_used, flip.n_sections) == (1, 3)
+    assert flip.p == pytest.approx(1.0)  # one section cannot separate the two signs
+    a["s02"] = [0.0, 0.0]  # rate undefined on this side: left out of the count
+    assert stats.sign_flip(a, b, stats.ratio).n_sections == 2
+    same, other = _pairs([0.5] * 3, [0.5] * 3)
+    assert stats.sign_flip(same, other, stats.ratio).p is None
+
+
+def test_sign_flip_with_many_sections_is_seeded_and_small_for_a_steady_gain():
+    a, b = _pairs([0.9] * 20, [0.1] * 20)
+    first = stats.sign_flip(a, b, stats.ratio)
+    assert first == stats.sign_flip(a, b, stats.ratio)
+    assert first.p is not None and first.p < 1e-4
+
+
+def test_sign_flip_refuses_different_sections():
+    with pytest.raises(ValueError, match="same sections"):
+        stats.sign_flip({"a": [1.0, 2.0]}, {"b": [1.0, 2.0]}, stats.ratio)

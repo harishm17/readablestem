@@ -223,7 +223,10 @@ class ChatbotStage:
         intro = [
             "The chatbot recipe is what an instructor does today: upload the PDF to a general "
             "model and type one sentence. Prompt of the primary arm, from Purdue Innovative "
-            'Learning ("Accessibility in Mathematics"), verbatim, and quoted as the input '
+            'Learning ("Accessibility in Mathematics", section "PDF to HTML / Using Gemini", '
+            "https://www.purdue.edu/innovativelearning/tools-resources/accessibility/"
+            "digital-instructional-materials-accessibility-checklist/digital-math/, page "
+            "last modified 2026-07-28, read 2026-10-09), verbatim, and quoted as the input "
             "it is, not as a claim this project makes:",
             "<!-- quote -->\n> " + chatbot.PROMPTS["purdue"] + "\n<!-- /quote -->",
             "Each arm sends the PDF as a file and a 150 dpi image of every page, then the "
@@ -235,7 +238,8 @@ class ChatbotStage:
             "to the gold equations by the document task's code, so the same scorer reads "
             "both systems.",
             "Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); "
-            "`chatbot-sol-expert` is the careful prompt the earlier research wrote (one run) "
+            "`chatbot-sol-expert` is a longer, more careful prompt written for this project "
+            "(one run; the text is `src/a11y_stem/proof/chat_prompts.json`) "
             "so that the comparison is not only against the weakest prompt an instructor "
             "might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper "
             "gpt-6-luna (two runs). The last two are descriptive.",

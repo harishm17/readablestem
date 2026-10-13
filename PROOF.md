@@ -329,7 +329,7 @@ Units counted per system and section, with the text of every flagged unit, are n
 
 ## Comparison with the chatbot recipe
 
-The chatbot recipe is what an instructor does today: upload the PDF to a general model and type one sentence. Prompt of the primary arm, from Purdue Innovative Learning ("Accessibility in Mathematics"), verbatim, and quoted as the input it is, not as a claim this project makes:
+The chatbot recipe is what an instructor does today: upload the PDF to a general model and type one sentence. Prompt of the primary arm, from Purdue Innovative Learning ("Accessibility in Mathematics", section "PDF to HTML / Using Gemini", https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/, page last modified 2026-07-28, read 2026-10-09), verbatim, and quoted as the input it is, not as a claim this project makes:
 
 <!-- quote -->
 > Convert to accessible HTML compliant with WCAG 2.2 AA with complete MathJax headers and remove [cite].
@@ -337,7 +337,7 @@ The chatbot recipe is what an instructor does today: upload the PDF to a general
 
 Each arm sends the PDF as a file and a 150 dpi image of every page, then the prompt; no system instructions, no tools, `store=False`, default reasoning effort, at most 64,000 output tokens (`proof.chatbot`). The HTML in the reply is scored as it comes: a reply that was cut off or empty is a failure of the section, not asked again. Equations are read from the reply's MathJax TeX or MathML, converted the way a11y-stem converts its own model's LaTeX, and aligned to the gold equations by the document task's code, so the same scorer reads both systems.
 
-Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); `chatbot-sol-expert` is the careful prompt the earlier research wrote (one run) so that the comparison is not only against the weakest prompt an instructor might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper gpt-6-luna (two runs). The last two are descriptive.
+Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); `chatbot-sol-expert` is a longer, more careful prompt written for this project (one run; the text is `src/a11y_stem/proof/chat_prompts.json`) so that the comparison is not only against the weakest prompt an instructor might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper gpt-6-luna (two runs). The last two are descriptive.
 
 **Not run in this recording:** `chatbot-sol-purdue`, `chatbot-sol-expert` (see the status table).
 
@@ -380,8 +380,8 @@ Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.
 
 | Metric | a11y-stem | chatbot-luna-purdue |
 |---|---|---|
-| invented prose sentences | 0.0190 [0.0133, 0.0261] | 0.0538 [0.0155, 0.1621] |
-| invented numbers | 0.0000 [0.0000, 0.0000] | 0.0042 [0.0000, 0.0108] |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 0.0190 [0.0133, 0.0261] | 0.0538 [0.0155, 0.1621] |
+| invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0042 [0.0000, 0.0108] |
 | headings the PDF does not support | 0.0213 [0.0189, 0.0270] | 0.1770 [0.0875, 0.3607] |
 | aligned equations with an added symbol | 0.0000 [0.0000, 0.0000] | 0.0351 [0.0000, 0.1111] |
 | equations with no gold partner and no match in the PDF | 0.0000 [0.0000, 0.0000] | 0.3390 [0.0000, 0.3810] |
@@ -412,8 +412,8 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 | figure judge_pass_rate (no description = fail) | 13/13 | 23/26 |
 | figure judge_factual_error_rate (among judged) | 0/13 | 1/26 |
 | figures with no description | 0/13 | 0/26 |
-| invented prose sentences | 12/632 | 62/1,153 |
-| invented numbers | 0/278 | 2/477 |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 12/632 | 62/1,153 |
+| invented numbers (text-layer mismatch, rule unaudited) | 0/278 | 2/477 |
 | headings the PDF does not support | 3/141 | 40/226 |
 | aligned equations with an added symbol | 0/30 | 2/57 |
 | equations with no gold partner and no match in the PDF | 0/9 | 20/59 |
@@ -434,8 +434,8 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 | figure judge_pass_rate (no description = fail) | [0.7719, 1.0000] | [0.7102, 0.9600] |
 | figure judge_factual_error_rate (among judged) | [0.0000, 0.2281] | [0.0068, 0.1889] |
 | figures with no description | [0.0000, 0.2281] | [0.0000, 0.1287] |
-| invented prose sentences | [0.0109, 0.0329] | [0.0422, 0.0683] |
-| invented numbers | [0.0000, 0.0136] | [0.0012, 0.0152] |
+| invented prose sentences (text-layer mismatch, rule unaudited) | [0.0109, 0.0329] | [0.0422, 0.0683] |
+| invented numbers (text-layer mismatch, rule unaudited) | [0.0000, 0.0136] | [0.0012, 0.0152] |
 | headings the PDF does not support | [0.0073, 0.0607] | [0.1328, 0.2320] |
 | aligned equations with an added symbol | [0.0000, 0.1135] | [0.0097, 0.1192] |
 | equations with no gold partner and no match in the PDF | [0.0000, 0.2991] | [0.2314, 0.4663] |
@@ -495,8 +495,8 @@ The parsers solve a different problem: getting a PDF's text into an LLM. They ar
 | System | Built for | Not built for |
 |---|---|---|
 | a11y-stem | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans |
-| Docling | lossless document conversion for gen-AI pipelines (Markdown, JSON; HTML is one export) | accessibility remediation: no alt text on pictures, one heading level in the export, formulas kept as pictures unless the opt-in enrichment is on |
-| MinerU | extraction for LLM corpora and RAG (Markdown, JSON) | accessible HTML: empty alt text on images, one heading level; its higher tiers want a GPU |
+| Docling | lossless document conversion for gen-AI pipelines (Markdown, JSON; HTML is one export) | accessibility remediation: no alt text on pictures, one heading level in the export, formulas left undecoded unless the opt-in enrichment is on |
+| MinerU | extraction for LLM corpora and RAG (Markdown, JSON) | accessible HTML: empty alt text on images, one heading level in its Markdown |
 | PyMuPDF4LLM | fast text-layer to Markdown for LLM and RAG ingestion | mathematics (no formula recognition); images are off by default |
 
 **Considered and not run**
@@ -512,22 +512,22 @@ The parsers solve a different problem: getting a PDF's text into an LLM. They ar
 
 | Arm | Versions | Equations written as TeX/MathML | Note |
 |---|---|---|---|
-| docling | docling 2.138.0 | 0 | writes no LaTeX in its default settings (a formula stays a picture whose alt text is the PDF's flattened text) |
-| mineru-basic | mineru 4.0.12 | 62 |  |
+| docling | docling 2.138.0 | 0 | default settings: a formula is not decoded, so no LaTeX is written (its Markdown holds `<!-- formula-not-decoded -->`); the registered arm with formula recognition on was not carried out (Addendum 4) |
+| mineru-basic | mineru 4.0.12 | 62 | the basic tier on CPU; MinerU's documentation names the standard tier as its default, and that tier was not run, so this is not MinerU at its default settings |
 | pymupdf4llm | pymupdf4llm 1.28.2 | 0 | has no formula recognition |
 
 **Family B: a11y-stem against each parser**
 
-| Measure | Against | a11y-stem | Other | Difference (a11y-stem minus other) | Cluster 99.167% (k = 6): the claim | Cluster 95% | Result |
-|---|---|---|---|---|---|---|---|
-| end_to_end_exact_lenient | docling | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | **a11y-stem is better** |
-| heading F1 | docling | 0.9344 | 0.8764 | 0.0580 | [0.0000, 0.1219] | [0.0000, 0.1219] | **no difference this set can detect** |
-| end_to_end_exact_lenient | mineru-basic | 0.7333 | 0.2000 | 0.5333 | [0.3000, 0.6667] | [0.3000, 0.6667] | **a11y-stem is better** |
-| heading F1 | mineru-basic | 0.9344 | 0.9055 | 0.0289 | [0.0098, 0.0433] | [0.0098, 0.0433] | **a11y-stem is better** |
-| end_to_end_exact_lenient | pymupdf4llm | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | **a11y-stem is better** |
-| heading F1 | pymupdf4llm | 0.9344 | 0.9064 | 0.0280 | [0.0000, 0.0543] | [0.0000, 0.0543] | **no difference this set can detect** |
+| Measure | Against | a11y-stem | Other | Difference (a11y-stem minus other) | Cluster 99.167% (k = 6): the claim | Cluster 95% | Sign-flip p | Result |
+|---|---|---|---|---|---|---|---|---|
+| end_to_end_exact_lenient | docling | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | 0.2500 | **not tested, 3 sections** |
+| heading F1 | docling | 0.9344 | 0.8764 | 0.0580 | [0.0000, 0.1219] | [0.0000, 0.1219] | 0.5000 | **not tested, 3 sections** |
+| end_to_end_exact_lenient | mineru-basic | 0.7333 | 0.2000 | 0.5333 | [0.3000, 0.6667] | [0.3000, 0.6667] | 0.2500 | **not tested, 3 sections** |
+| heading F1 | mineru-basic | 0.9344 | 0.9055 | 0.0289 | [0.0098, 0.0433] | [0.0098, 0.0433] | 0.2500 | **not tested, 3 sections** |
+| end_to_end_exact_lenient | pymupdf4llm | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | 0.2500 | **not tested, 3 sections** |
+| heading F1 | pymupdf4llm | 0.9344 | 0.9064 | 0.0280 | [0.0000, 0.0543] | [0.0000, 0.0543] | 0.5000 | **not tested, 3 sections** |
 
-Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% paired cluster-bootstrap interval of the difference decides. For a parser that writes no LaTeX by design (`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool that does not attempt equations; read it as a description of what the tool is built for, not as evidence that a11y-stem transcribes better. Flat heading levels in a parser's export are a property of that export.
+Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% paired cluster-bootstrap interval of the difference decides. For a parser that writes no LaTeX by design (`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool that does not attempt equations; read it as a description of what the tool is built for, not as evidence that a11y-stem transcribes better. Flat heading levels in a parser's export are a property of that export. Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section differences, a robustness check that is not part of the registered rule; the Bonferroni threshold for it is 0.00833. With fewer than 10 sections no verdict is written (a bootstrap over so few sections only returns the sections' own extremes), and a "better" that the sign-flip test does not support is written as "higher by point estimate".
 
 **All parsers: equations (preregistration 7.1)**
 
@@ -568,8 +568,8 @@ Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.
 
 | Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| invented prose sentences | 0.0190 [0.0133, 0.0261] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0016 [0.0000, 0.0056] |
-| invented numbers | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 0.0190 [0.0133, 0.0261] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0016 [0.0000, 0.0056] |
+| invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
 | headings the PDF does not support | 0.0213 [0.0189, 0.0270] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
 | aligned equations with an added symbol | 0.0000 [0.0000, 0.0000] | n/a | 0.3750 [0.2857, 0.4286] | n/a |
 | equations with no gold partner and no match in the PDF | 0.0000 [0.0000, 0.0000] | n/a | 0.1111 [0.0000, 0.5000] | n/a |
@@ -600,8 +600,8 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 | figure judge_pass_rate (no description = fail) | 13/13 | 0/13 | 0/13 | 0/13 |
 | figure judge_factual_error_rate (among judged) | 0/13 | 0/0 | 0/0 | 0/0 |
 | figures with no description | 0/13 | 13/13 | 13/13 | 13/13 |
-| invented prose sentences | 12/632 | 0/619 | 0/620 | 1/628 |
-| invented numbers | 0/278 | 0/276 | 0/273 | 0/448 |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 12/632 | 0/619 | 0/620 | 1/628 |
+| invented numbers (text-layer mismatch, rule unaudited) | 0/278 | 0/276 | 0/273 | 0/448 |
 | headings the PDF does not support | 3/141 | 0/146 | 0/133 | 0/146 |
 | aligned equations with an added symbol | 0/30 | 0/0 | 9/24 | 0/0 |
 | equations with no gold partner and no match in the PDF | 0/9 | 0/0 | 2/18 | 0/0 |
@@ -622,8 +622,8 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 | figure judge_pass_rate (no description = fail) | [0.7719, 1.0000] | [0.0000, 0.2281] | [0.0000, 0.2281] | [0.0000, 0.2281] |
 | figure judge_factual_error_rate (among judged) | [0.0000, 0.2281] | n/a | n/a | n/a |
 | figures with no description | [0.0000, 0.2281] | [0.7719, 1.0000] | [0.7719, 1.0000] | [0.7719, 1.0000] |
-| invented prose sentences | [0.0109, 0.0329] | [0.0000, 0.0062] | [0.0000, 0.0062] | [0.0003, 0.0090] |
-| invented numbers | [0.0000, 0.0136] | [0.0000, 0.0137] | [0.0000, 0.0139] | [0.0000, 0.0085] |
+| invented prose sentences (text-layer mismatch, rule unaudited) | [0.0109, 0.0329] | [0.0000, 0.0062] | [0.0000, 0.0062] | [0.0003, 0.0090] |
+| invented numbers (text-layer mismatch, rule unaudited) | [0.0000, 0.0136] | [0.0000, 0.0137] | [0.0000, 0.0139] | [0.0000, 0.0085] |
 | headings the PDF does not support | [0.0073, 0.0607] | [0.0000, 0.0256] | [0.0000, 0.0281] | [0.0000, 0.0256] |
 | aligned equations with an added symbol | [0.0000, 0.1135] | n/a | [0.2116, 0.5729] | n/a |
 | equations with no gold partner and no match in the PDF | [0.0000, 0.2991] | n/a | [0.0310, 0.3280] | n/a |
@@ -677,6 +677,10 @@ Parser timings: 9 runs started on a quiet machine (1-minute load under 1.5) and 
 
 - Three sections of one book, all used while building a11y-stem: nothing here shows how it does on material it has not seen.
 - One run of each task (the held-out set repeats them), so run-to-run variation is not visible.
+- The paired comparisons need at least 10 sections to print a verdict; with three they print 'not tested', because a bootstrap over three sections returns only the sections' own extremes.
+- The review screen's heading flags look better here (precision 0.5556, recall 0.7778) than they did on the held-out headings, where it asked about none of the 28 wrong headings (proof/interim/INTERIM-heldout-2026-10.md): the rules were tuned on these pages, and the held-out miss is a limit of the pipeline that was not fixed afterwards.
+- The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.
+- The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch.
 - Exact match of MathML is strict: a correct answer can fail on markup (see G1), and a wrong digit in a long equation costs little tree-edit similarity. It is not a measure of how a screen reader would speak the result.
 - With this few sections the bootstrap intervals are approximate and tend to be a little narrow. Per-book numbers are point estimates.
 - The figure judge is a model and is not calibrated against human labels.

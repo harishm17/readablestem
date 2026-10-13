@@ -1,7 +1,8 @@
 """Stage: a11y-stem against the open PDF parsers (preregistration 6.3, PARSERS-PLAN.md).
 
-The parsers are Docling (default settings, and with formula recognition on as a labelled
-non-default arm), MinerU (basic tier, CPU) and PyMuPDF4LLM. They were run by
+The parsers are Docling (default settings; a second arm with formula recognition on was
+registered and, if it is not in the bundle, was not carried out), MinerU (basic tier on CPU,
+which is not the tier its documentation names as the default) and PyMuPDF4LLM. They were run by
 `proof/parsers` (a separate uv project, one pinned environment per tool); their Markdown
 exports are in the bundle's `systems/`, and a time and memory record of each run.
 
@@ -25,9 +26,12 @@ from a11y_stem.proof.systems_stage import A11Y, Scored
 TITLE = "Comparison with open PDF parsers"
 FAMILY_B = (("e2e", "end_to_end_exact_lenient"), ("h_f1", "heading F1"))
 
-NO_LATEX_BY_DESIGN = {
-    "docling": "writes no LaTeX in its default settings (a formula stays a picture whose "
-    "alt text is the PDF's flattened text)",
+PARSER_NOTES = {
+    "docling": "default settings: a formula is not decoded, so no LaTeX is written (its Markdown "
+    "holds `<!-- formula-not-decoded -->`); the registered arm with formula recognition on was "
+    "not carried out (Addendum 4)",
+    "mineru-basic": "the basic tier on CPU; MinerU's documentation names the standard tier as "
+    "its default, and that tier was not run, so this is not MinerU at its default settings",
     "pymupdf4llm": "has no formula recognition",
 }
 
@@ -42,12 +46,12 @@ BUILT_FOR = [
         "Docling",
         "lossless document conversion for gen-AI pipelines (Markdown, JSON; HTML is one export)",
         "accessibility remediation: no alt text on pictures, one heading level in the export, "
-        "formulas kept as pictures unless the opt-in enrichment is on",
+        "formulas left undecoded unless the opt-in enrichment is on",
     ],
     [
         "MinerU",
         "extraction for LLM corpora and RAG (Markdown, JSON)",
-        "accessible HTML: empty alt text on images, one heading level; its higher tiers want a GPU",
+        "accessible HTML: empty alt text on images, one heading level in its Markdown",
     ],
     [
         "PyMuPDF4LLM",
@@ -144,7 +148,7 @@ class ParserStage:
                         n,
                         _versions(scored, n),
                         num(_transcribed(scored, n)[0]),
-                        NO_LATEX_BY_DESIGN.get(n, ""),
+                        PARSER_NOTES.get(n, ""),
                     ]
                     for n in names
                 ],
