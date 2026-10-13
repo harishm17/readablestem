@@ -1,4 +1,4 @@
-"""CLI: a11y-stem eval pipeline|gate|calibrate|render, demo build (WP7).
+"""CLI: a11y-stem eval pipeline|gate|calibrate|render|invented, demo build (WP7).
 
 Commands that can call a model take `--max-usd` (a hard cap enforced by an
 `InMemorySpendGuard` before each request) or `--fake` (an offline `FakeVisionClient`
@@ -767,6 +767,10 @@ def register(
     render.add_argument("--cache", type=Path, help="render cache (default: .cache/eval)")
     render.add_argument("--paper", choices=["Letter", "A4"], default="Letter")
     render.set_defaults(func=_cmd_render)
+
+    from a11y_stem.eval.invented.cli import register as register_invented
+
+    register_invented(group)
 
     if top is None:
         return
