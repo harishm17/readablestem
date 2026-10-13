@@ -97,13 +97,15 @@ A live run:
    the run with nothing spent);
 3. runs every (task, repeat) once with the real models behind one spend cap, with
    `store=False` and no content in the logs, recording each answer;
-4. runs the optional recording hooks of the other parts (the open parsers, if
-   `proof/parsers` is installed);
+4. calls the `record` hook of each stage (the chatbot and the parsers are recorded
+   afterwards, with `--add-systems`);
 5. writes the bundle (to `--record`, by default outside the repository), then replays it, so
    `PROOF.md` is always what `make proof` writes from that bundle.
 
 A run that hits the cap stops with exit code 1 and writes no bundle: a budget stop is never
-scored as if the document had been converted. `--fake` swaps in the offline fake client to
+scored as if the document had been converted. With `--keep-finished` the runs that had
+finished are kept instead (the one the cap stopped is dropped whole), the bundle says it is
+incomplete, and `PROOF.md` opens with a banner saying how many planned runs are missing. `--fake` swaps in the offline fake client to
 check the plumbing; its report carries a banner and a held-out set refuses it.
 
 A new live recording will not give the same numbers as the committed one. Model output
@@ -135,28 +137,45 @@ uses the recorded PDFs. This needs the network and Chromium.
 It holds content derived from CC BY OpenStax sections and nothing else: no keys, host names
 or user data. Course material from other sources never goes into a bundle.
 
-## Parts other work fills in
+## The other systems and the other parts
 
-The a11y-stem arm is complete. Four other parts of the proof are stages with a stub that
-prints no number, until the module that makes them is installed:
+The a11y-stem arm is in the bundle as model answers. Everything else in `PROOF.md` is
+computed from files the bundle holds, by stages (`src/a11y_stem/proof/stages.py`):
 
-| Stage | Module (`a11y_stem.proof.<name>`) |
-|---|---|
-| invented-content rate | `invented` |
-| comparison with the chatbot recipe | `comparison` |
-| comparison with open PDF parsers | `parsers` |
-| human labels and judge agreement | `labels` |
+| Stage | Module | What it reads |
+|---|---|---|
+| invented-content rate | `proof/invented.py` | a11y-stem's HTML (rebuilt by the replay) and the outputs below, against each PDF's text layer; rules in `eval/invented/` ([eval-invented.md](eval-invented.md)) |
+| comparison with the chatbot recipe | `proof/comparison.py` | `systems/chatbot-*/` |
+| comparison with open PDF parsers | `proof/parsers.py` | `systems/<parser>/` |
+| human labels and judge agreement | `proof/labels.py` | not written: those labels are the author's, and none exist yet; the stage prints "not computed" |
 
-A module registers a `Stage` with `a11y_stem.proof.stages.register`; its stage replaces the
-stub in the same place in `PROOF.md`. `record(ctx, writer)` runs in a live run and writes
-into the bundle (for example `systems/`); `run(ctx)` runs in both modes, reads the bundle
-and returns report sections. While a stub is in place `PROOF.md` begins with an
-"Incomplete" banner naming it, and `--require-complete` exits 1. Every other system's output
-is converted to one shared form (`proof/intermediate.py`) before it is scored.
+`proof/systems.py` is the shared scorer: each output file is read by one reader
+(`eval.invented.read`), its maths converted the way a11y-stem converts its own model's LaTeX,
+aligned to the gold equations by the document task's code, and its headings matched by the
+headings task's code. The stages print the claims of preregistration section 8.3 (family A:
+the chatbot, 5 comparisons; family B: each parser, 2 comparisons each, Bonferroni-corrected)
+and every single-system number.
 
-If `proof/parsers/Makefile` exists, a live run calls its `proof` target with `PDF_DIR`
-(the section PDFs, `<book>__<page>.pdf`) and `OUT_DIR`, and copies `OUT_DIR` into the
-bundle's `systems/`.
+### Recording the other systems
+
+They are recorded into a finished bundle, each with its own cap, so a failure in one never
+loses another:
+
+```
+# the chatbot recipe: one cap for the calls and the figure judge together
+a11y-stem proof --set heldout-2026-10 --add-systems chatbot --max-usd 10
+# the open parsers (CPU, hours, resumable; needs `make -C proof/parsers setup` once)
+a11y-stem proof --set heldout-2026-10 --add-systems parsers
+```
+
+`--arms` limits them. The chatbot recipe repeats `niche/chatbot-runs` of the research
+(`proof/chatbot.py`: the PDF as a file and a 150 dpi image of every page, one prompt, no
+system instructions, `store=False`, at most 64,000 output tokens). A reply that was cut off
+or empty is a failure of the section and is not asked again. The parsers run in
+`proof/parsers` (a separate uv project, one pinned environment per tool); a crash, an empty
+output or a 30-minute limit also scores the section as found nothing. Parser outputs are the
+tools' Markdown exports (images in them cut to a marker). After `--add-systems` the bundle's
+manifest is rewritten; a system that is already in it is never overwritten.
 
 ## Wording rules
 
@@ -189,6 +208,7 @@ example the `ghcr.io/astral-sh/uv:python3.12-bookworm` image); then run `make pr
 - `src/a11y_stem/cli/proof.py`: the command.
 - `src/a11y_stem/proof/`: `registry` (sets and pins), `bundle`, `replay`, `runner`,
   `engine` (the flow), `stages`, `a11y_tables`, `report`, `document` (PROOF.md), `stats`,
-  `goldinfo`, `sources`, `intermediate`.
+  `goldinfo`, `sources`, `intermediate`; the other systems: `chatbot`, `judging`, `systems`,
+  `systems_stage`, `systems_tables`, `invented`, `comparison`, `parsers`.
 - `proof/sets/`, `proof/bundles/`: the sets and their recorded runs.
 - `tests/test_proof_*.py`: offline tests of all of the above.

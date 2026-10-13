@@ -122,7 +122,7 @@ def status_rows(
 
 
 def cost_totals(scored: Scored, names: Sequence[str]) -> dict[str, systems_tables.ArmTotals]:
-    out = {A11Y: scored.a11y_totals}
+    out = {f"{A11Y} (document task)": scored.a11y_totals}
     for name in names:
         out[name] = scored.arms[name].totals
     return out
@@ -178,7 +178,9 @@ def arm_block(
             n_boot,
             note="All text, including text a11y-stem wrote itself. A section a system failed "
             "on has no units, so it adds nothing here; the raw rates include paraphrase the "
-            "rule counts as unsupported, and the audit that measures that has not been done.",
+            "rule counts as unsupported, and the audit that measures that has not been done. "
+            "A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): "
+            "the Wilson upper bound in the last table is the bound to read.",
         ),
         systems_tables.metrics_table(f"{title_prefix}: coverage (7.6)", ["coverage"], cols, n_boot),
         systems_tables.counts_table(

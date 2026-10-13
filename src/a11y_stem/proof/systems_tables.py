@@ -256,6 +256,7 @@ def counts_table(title: str, keys: Sequence[str], systems: Sequence[tuple[str, V
 def wilson_table(title: str, keys: Sequence[str], systems: Sequence[tuple[str, Vectors]]) -> Table:
     headers = ["Wilson 95% (items treated as independent)", *[name for name, _ in systems]]
     rows = [[METRICS[k].label, *[wilson_cell(METRICS[k], v) for _, v in systems]] for k in keys]
+    rows = [r for r in rows if any(c != NA for c in r[1:])]
     return Table(title, headers, rows)
 
 
