@@ -1,13 +1,45 @@
 # Third-party notices
 
-This project's own code is MIT-licensed (`LICENSE`). It depends on third-party packages
-under their own licences (see `uv.lock` for exact versions). The ones with obligations
-beyond attribution are PyMuPDF and its layout add-on (AGPL-3.0):
+## Which licence covers which files
+
+`LICENSE` is the plain MIT text. It covers the project's own work, with the exceptions in
+this table. This is a plain statement of scope, not legal advice.
+
+| Files | Licence | Where to read it |
+|---|---|---|
+| The code, tests, documentation, `deploy/`, `migrations/` and everything not listed below | MIT | `LICENSE` |
+| `data/authored/` (documents written for this project: LaTeX and Word sources, their PDFs, gold labels) | MIT | `data/authored/README.md` |
+| `data/eval/*.json` (the project's own eval reports: metrics, cost and dataset hashes) | MIT | The reports name OpenStax items by id only |
+| `data/openstax-licenses.csv` (a table of each OpenStax book's licence, read from OpenStax's public interfaces) | MIT | `docs/decisions/0001-scope.md` |
+| `data/gold/` (equations, figure alt text and captions, tables and headings extracted from OpenStax web books) | CC BY 4.0 (OpenStax) | `data/gold/ATTRIBUTION.md`, `data/gold/tables/ATTRIBUTION.md` |
+| The precomputed demo page: `src/a11y_stem/web/static/demo/{index.html,report.json,source.pdf}` (OpenStax *Physics* 2.3, converted) | CC BY 4.0 (OpenStax) | Attribution is inside `index.html` |
+| Test fixtures made from OpenStax content: `tests/fixtures/assemble/golden/demo.html`, `tests/fixtures/assemble/golden/stored_demo_0_2_0.html`, `tests/fixtures/stored/demo-report-0.2.0.json`, `tests/fixtures/sample_latex_predictions.jsonl` (LaTeX of OpenStax equations), `tests/fixtures/tables/table_bench_excerpt.json` (cell text from OpenStax tables) | CC BY 4.0 (OpenStax) | `data/gold/ATTRIBUTION.md` |
+| Vendored files under `src/a11y_stem/pipeline/vendor/` and `src/a11y_stem/web/static/vendor/` | Their own (table below) | The licence files beside them |
+
+All OpenStax material used in this repository is from books that OpenStax publishes under
+CC BY 4.0. Books published under CC BY-NC-SA are not used. a11y-stem is not affiliated
+with or endorsed by OpenStax. The PDFs under `tests/fixtures/` are built from sources in
+the repository (LaTeX, HTML, python-docx or a script) with invented text; the one
+OpenStax PDF is the demo's `source.pdf`.
+
+The hosted service links PyMuPDF (AGPL-3.0), so the combined work, when run as a network
+service, is offered under the AGPL-3.0 terms through the source link in every page
+footer. The code in this repository stays MIT. See
+`docs/decisions/0003-pdf-library-agpl.md`.
+
+## Third-party packages
+
+This project depends on third-party packages under their own licences (see `uv.lock` for
+exact versions). The ones with obligations beyond attribution are PyMuPDF and its layout
+add-on (AGPL-3.0), and psycopg (LGPL-3.0, used unmodified as a dependency):
 
 | Package | Licence | Notes |
 |---|---|---|
 | PyMuPDF (`pymupdf`) | AGPL-3.0 (or commercial from Artifex) | Used for PDF parsing and rendering. The hosted app links to this repository's complete source in every page footer. See `docs/decisions/0003-pdf-library-agpl.md`. |
 | PyMuPDF Layout (`pymupdf-layout` 1.28.2, Artifex) | AGPL-3.0 (or commercial from Artifex), the same terms as PyMuPDF | Finds table regions (`page.find_tables(union=True, refine=True)` with its ONNX layout models, which ship in the wheel). Licence of 1.28.2 read from its PyPI metadata, wheel `COPYING` and GitHub `LICENSE` (the PyPI classifier still says "Other/Proprietary"; earlier releases were under other terms). See the 2026-10-09 amendment in `docs/decisions/0003-pdf-library-agpl.md`. |
+| psycopg and psycopg-binary 3.3 (the psycopg team) | LGPL-3.0-only | The PostgreSQL driver of the hosted app. Used unmodified and installed from PyPI, not vendored. LGPL-3.0 lets you replace it with another build of the library. Source: https://github.com/psycopg/psycopg. |
+| certifi | MPL-2.0 | Root certificates for HTTPS, pulled in by httpx and the OpenAI client. Used unmodified. |
+| pgserver | no licence metadata | A development dependency only (an embedded PostgreSQL for local tests, `dev` group). It is not installed in the Docker image and not distributed with this project. |
 | onnxruntime (Microsoft) | MIT | Runs the layout models and SLANet-plus on the CPU. Pinned to 1.31.x. |
 | SLANet-plus model (PaddlePaddle, from PaddleOCR) | Apache-2.0 | Recognises a table's rows, columns and spans. The ONNX file RapidTable 3.0.2 distributes is downloaded at build time and checked against its SHA-256 (`src/a11y_stem/pipeline/table_model.py`); it is not in this repository. |
 | RapidTable 3.0.2 (RapidAI; code from PaddleOCR's PP-Structure) | Apache-2.0 | The pre- and post-processing around SLANet-plus, vendored with changes as `src/a11y_stem/pipeline/vendor/rapid_table.py`, with its licence (`rapid_table-LICENSE.txt`) and notice (`rapid_table-NOTICE.txt`). Source: https://github.com/RapidAI/RapidTable. |
