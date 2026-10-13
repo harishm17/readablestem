@@ -3517,7 +3517,13 @@ def _vector_figures(
         members = [paths[i] for i in group]
         rule_only = all(p.kind in ("hrule", "vrule") or p.rules for p in members)
         ruler = any(p.ruler for p in members)  # a timeline, an axis with ticks
-        if rule_only and not ruler and not _line_chain(members) and not _connected(members):
+        if (
+            rule_only
+            and not ruler
+            and not _line_chain(members)
+            and not _connected(members)
+            and not any(_bond_ends(p, index) for p in members)
+        ):
             continue  # separators, underlines, table grids, paper rules
         x0, y0, x1, y1 = _union(p.bbox for p in members)
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
@@ -3590,6 +3596,8 @@ def _vector_figures(
                 if not _round_text(members, inside) and left_out is not None:
                     left_out.append(box)
                 continue
+        if rule_only:  # a Fischer projection's bonds: the atom groups at their ends too
+            box = _union([box, *(end for p in members for end in _bond_ends(p, index))])
         figures.append(_Figure(box, paths=len(members)))
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
     # a legend's markers a little apart) are part of it: left out, its crop missed them.
@@ -3812,6 +3820,75 @@ def _connected(members: Sequence[_Path]) -> bool:
     return False
 
 
+BOND_GAP = 1.5  # x font size: a bond ends this close to the atom groups it joins
+BOND_TOKEN = 6  # characters: an atom group (H, OH, CHO, CH2OH, COOH) is at most this long
+
+
+def _bond_ends(rule: _Path, index: _RowIndex) -> list[BBox]:
+    """The boxes of the two atom groups a horizontal or vertical rule joins, or []: a
+    token of at most BOND_TOKEN characters beyond each end of the rule, within BOND_GAP x
+    its size, the rule at least as long as the tokens are tall, through the middle half of
+    their height (a horizontal rule) or through their width (a vertical one). A bond of
+    a structural formula or a Fischer projection (2026-10-13: dropped as rules alone). A
+    blank to fill in lies on the baseline, a minus sign is shorter than its text, an
+    underline and a strikeout run under or through one row."""
+    if rule.kind not in ("hrule", "vrule"):
+        return []
+    x0, y0, x1, y1 = rule.bbox
+    horizontal = rule.kind == "hrule"
+    reach = BOND_GAP * index.largest
+    before: BBox | None = None
+    after: BBox | None = None
+    for row in index.near(y0 - reach, y1 + reach):
+        for start, end in _tokens(row):
+            chars = [c for c in row.chars[start:end] if not c.blank]
+            if not chars:
+                continue
+            box = _union((c.x0, c.y0, c.x1, c.y1) for c in chars)
+            size = max(c.size for c in chars)
+            gap = BOND_GAP * size
+            # Text over or under a horizontal rule (a fraction's numerator, a word over an
+            # underline), or beside a vertical one (a table's cells), is no atom group.
+            if horizontal:
+                over = min(box[2], x1) - max(box[0], x0) > 0.5 * (box[2] - box[0])
+                near = -gap <= y0 - box[3] <= gap or -gap <= box[1] - y1 <= gap
+            else:
+                over = min(box[3], y1) - max(box[1], y0) > 0.5 * (box[3] - box[1])
+                near = -gap <= x0 - box[2] <= gap or -gap <= box[0] - x1 <= gap
+            if over and near:
+                return []
+            if len(chars) > BOND_TOKEN or (x1 - x0 if horizontal else y1 - y0) < box[3] - box[1]:
+                continue
+            if horizontal:
+                y, h = (y0 + y1) / 2, box[3] - box[1]
+                if not box[1] + 0.25 * h <= y <= box[3] - 0.25 * h:
+                    continue
+                if -1 <= x0 - box[2] <= gap:
+                    before = box
+                if -1 <= box[0] - x1 <= gap:
+                    after = box
+            else:
+                if not box[0] <= (x0 + x1) / 2 <= box[2]:
+                    continue
+                if -1 <= y0 - box[3] <= gap:
+                    before = box
+                if -1 <= box[1] - y1 <= gap:
+                    after = box
+    return [before, after] if before is not None and after is not None else []
+
+
+def _bonds(members: Sequence[_Path], index: _RowIndex) -> list[BBox]:
+    """The atom groups the bonds among `members` join (`_bond_ends`), when every member
+    is such a bond; else []."""
+    found: list[BBox] = []
+    for path in members:
+        ends = _bond_ends(path, index)
+        if not ends:
+            return []
+        found += ends
+    return found
+
+
 def _diagram_signs(
     members: Sequence[_Path],
     index: _RowIndex,
@@ -3826,8 +3903,8 @@ def _diagram_signs(
     least MIN_IMAGE_PT long) inside none of the cluster's other boxes (a mark drawn in a
     box round text is no sign of a diagram). "lines" when it holds no running text: lines
     joined into an open chain or boxes joined by a line (`_drawn_diagram`), or a line
-    leaving a box or running along several (`_connected`): a box round paragraphs drawn
-    in pieces, or a
+    leaving a box or running along several (`_connected`), or bonds between atom groups
+    (`_bond_ends`: a Fischer projection): a box round paragraphs drawn in pieces, or a
     grid of cell borders in a worked example, has them too. None without either. The
     drawings sweep of 2026-10-13: scatter plots with a legend, outlined bars on a
     baseline, histograms and step plots drawn as one path, timing diagrams, a box plot,
@@ -3863,6 +3940,8 @@ def _diagram_signs(
         return "drawing"
     if _drawn_diagram(members) or _connected(members):
         return "lines"
+    if any(_bond_ends(p, index) for p in members):
+        return "lines"  # bonds between atom groups
     return None
 
 
@@ -5018,7 +5097,12 @@ def _leftover_drawings(
     (most of their paths are the page type's pen strokes, or every path is an open
     stroked line or curve: a tick, a cross, a signature) are returned as handwriting
     boxes (never sent to the figure model); any other drawing becomes a FIGURE block for
-    the model."""
+    the model. Since 2026-10-13 (the drawings sweep) some straight drawings count too:
+    bonds between atom groups (`_bond_ends`: a structural formula's h/v bonds, which the
+    row of its letters holds), boxes joined by lines across their sides (`_connected`: a
+    one-line circuit of resistor boxes and wires), and dots round a letter that reach out
+    of its line (`_dots_out_of_line`: a Lewis structure's electrons); the drawing's box
+    takes in the atom groups its bonds join."""
     pad = UNREAD_PAD
     grown = [(b.bbox[0] - pad, b.bbox[1] - pad, b.bbox[2] + pad, b.bbox[3] + pad) for b in blocks]
     keep: list[tuple[BBox, list[_Path]]] = []
@@ -5032,7 +5116,12 @@ def _leftover_drawings(
         ):
             continue
         holders = [b for b, g in zip(blocks, grown, strict=True) if _centre_inside(box, g)]
-        if holders and not _pen_mark_over_text(members, box, holders):
+        if (
+            holders
+            and not _pen_mark_over_text(members, box, holders)
+            and not _dots(members)  # decided once grouped (`_dots_out_of_line`)
+            and not _bonds(members, index)
+        ):
             continue  # an underline, a box round a word, maths drawn in a line
         if any(_at_edge(box, frame, FIGURE_PART_REACH) for frame in frames):
             continue
@@ -5049,11 +5138,17 @@ def _leftover_drawings(
         ) or _round_page(box, page_rect):
             continue
         curved = any(p.curved for p in members)
-        if not curved and not any(p.ruler for p in members):
+        atoms = [end for p in members for end in _bond_ends(p, index)]
+        if (
+            not curved
+            and not atoms
+            and not any(p.ruler for p in members)
+            and not _connected(members)
+        ):
             continue  # rules, boxes and bars alone (an answer box, a box over a line)
-        if all(p.filled and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= DOT_PT
-               for p in members):  # fmt: skip
+        if _dots(members) and not _dots_out_of_line(members, box, index):
             continue  # dots alone: leaders, bullets the bullet test missed
+        box = _union([box, *atoms])  # a formula's bonds and the atom groups they join
         if any(_centre_inside((x, y, x, y), box) for x, y in covers):
             continue  # a shape painted over hidden text: its cover, not a drawing
         pen = sum(p.source in ink_sources for p in members)
@@ -5063,6 +5158,30 @@ def _leftover_drawings(
             reasons = [f"vector drawing ({len(members)} paths)"]
             figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
     return figures, marks
+
+
+def _dots(members: Sequence[_Path]) -> bool:
+    """Every path is a filled mark no bigger than DOT_PT."""
+    return all(
+        p.filled and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= DOT_PT for p in members
+    )
+
+
+def _dots_out_of_line(members: Sequence[_Path], box: BBox, index: _RowIndex) -> bool:
+    """Dots in page_type.VECTOR_MIN_PATHS places or more over a line of text that reach
+    out of it, above or below, by PEN_MARK_OUT of their height: the electrons of a Lewis
+    structure round its letters (2026-10-13: dropped as dots alone, and held by the row of
+    letters). Dot leaders and a missed bullet lie in their line."""
+    if len({_box_key(p.bbox) for p in members}) < page_type.VECTOR_MIN_PATHS:
+        return False
+    height = box[3] - box[1]
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    rows = [r for r in index.near(box[1], box[3]) if r.x0 <= cx <= r.x1]
+    if height <= 0 or not rows:
+        return False
+    row = min(rows, key=lambda r: abs((r.y0 + r.y1) / 2 - cy))
+    out = max(0.0, row.y0 - box[1]) + max(0.0, box[3] - row.y1)
+    return out >= PEN_MARK_OUT * height
 
 
 def _pen_mark_over_text(members: Sequence[_Path], box: BBox, holders: Sequence[_Block]) -> bool:
