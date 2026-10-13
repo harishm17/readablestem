@@ -40,8 +40,10 @@ the run. The second kind comes from the sample on which the checks were develope
 
 <!-- INTEGRATOR: replace each double-brace token in the table below with the number and
 interval from PROOF.md, in the form "value (95% CI a to b, n = N)"; do not round in a
-favourable direction. Delete this comment when done. Then `grep -n '{{' README.md` must
-print nothing before the repository is published. -->
+favourable direction. If the held-out run did not complete, rewrite this section from
+PROOF.md instead of filling the tokens, and drop the first paragraph's claim about
+protocol and unseen documents. Delete this comment when done. Then `grep -n '{{' README.md`
+must print nothing before the repository is published. -->
 
 | What was measured | Held-out result |
 |---|---|
@@ -58,7 +60,8 @@ that file before quoting any number from this one.
 
 Three sections of OpenStax *Physics* chapter 2 (CC BY 4.0). The detection and review
 rules were tuned on these pages, so these figures flatter the system. They are listed
-because they are committed, reproducible and the base for the regression gate.
+because they are committed and reproducible, and because the regression gate will compare
+against them once baselines are promoted.
 
 | Task | n | Result | Cost |
 |---|---|---|---|
