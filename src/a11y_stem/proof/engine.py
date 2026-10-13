@@ -296,6 +296,10 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
     prereg = registry.check_prereg(pset, opts.root)
     if prereg is not None:
         registry.require_ok([prereg])
+        if pset.held_out and prereg.status == "absent":
+            # A replay may be shown without the registration file; a run that makes
+            # held-out numbers may not (preregistration section 12, item 9).
+            raise ProofError(f"a held-out live run needs the registration file: {prereg.detail}")
     settings = runner.proof_settings()
     gold_dir = resolve_gold(pset, opts, None, work, say)
     registry.require_ok(registry.check_gold(gold_dir, pset))

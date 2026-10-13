@@ -324,6 +324,24 @@ def test_a_held_out_run_from_a_dirty_checkout_is_refused(tmp_path, monkeypatch):
         )
 
 
+def test_a_held_out_live_run_needs_the_registration_file_to_be_present(tmp_path, monkeypatch):
+    root = make_project(tmp_path, held_out=True, prereg=b"registered text")
+    (root / "proof" / "PREREGISTRATION.md").unlink()
+    monkeypatch.setattr(runner, "git_state", lambda _root: {"commit": "abc", "dirty": False})
+    with pytest.raises(ProofError, match="needs the registration file: no copy at"):
+        engine.run_proof(
+            engine.ProofOptions(
+                root=root,
+                live=True,
+                max_usd=1.0,
+                confirm_signoff=True,
+                date=DATE,
+                work_dir=tmp_path / "w",
+            ),
+            say=lambda _m: None,
+        )
+
+
 def test_a_changed_preregistration_stops_a_held_out_run(tmp_path, monkeypatch):
     root = make_project(tmp_path, held_out=True, prereg=b"registered text")
     (root / "proof" / "PREREGISTRATION.md").write_bytes(b"edited afterwards")
