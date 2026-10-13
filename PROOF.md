@@ -37,11 +37,11 @@ Replayed 149 model requests and 134 second-check requests from the bundle; 0 had
 
 | Part | Status |
 |---|---|
-| a11y-stem, production defaults | ok |
-| Invented-content rate | ok |
-| Comparison with the chatbot recipe | ok |
-| Comparison with open PDF parsers | ok |
-| Human labels and judge agreement | not_wired |
+| a11y-stem, production defaults | done |
+| Invented-content rate | done |
+| Comparison with the chatbot recipe | done |
+| Comparison with open PDF parsers | done |
+| Human labels and judge agreement | not computed |
 
 ## The 3 sections
 

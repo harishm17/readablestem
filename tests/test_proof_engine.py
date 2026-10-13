@@ -418,7 +418,7 @@ def test_a_registered_stage_replaces_its_stub_in_the_same_place(recorded, monkey
     assert len(result.not_wired) == 3
     order = [text.index(h) for h in ("## Results: a11y-stem", "## Invented-content rate")]
     assert order == sorted(order)
-    assert "| Invented-content rate | ok |" in text
+    assert "| Invented-content rate | done |" in text
     assert "Not computed in this build: Comparison" in text  # the other three still say so
 
 

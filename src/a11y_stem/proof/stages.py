@@ -38,7 +38,7 @@ from a11y_stem.proof.bundle import Bundle, BundleWriter, pdf_name
 from a11y_stem.proof.errors import ProofError
 from a11y_stem.proof.goldinfo import SectionFacts
 from a11y_stem.proof.registry import ProofSet
-from a11y_stem.proof.report import Section, StageResult, Table, bullets
+from a11y_stem.proof.report import STATUS_WORDS, Section, StageResult, Table, bullets
 from a11y_stem.proof.runner import ArmResults
 
 PARSERS_DIR = Path("proof") / "parsers"
@@ -318,9 +318,11 @@ def active_stages() -> list[Stage]:
 
 
 def stage_table(results: dict[str, StageResult], stages: list[Stage]) -> Table:
-    words = {"ok": "done", "not_wired": "not computed", "skipped": "skipped", "failed": "failed"}
     rows = [
-        [s.title, words.get(results[s.name].status, "?") if s.name in results else "not run"]
+        [
+            s.title,
+            STATUS_WORDS.get(results[s.name].status, "?") if s.name in results else "not run",
+        ]
         for s in stages
     ]
     return Table("Parts of this proof", ["Part", "Status"], rows)

@@ -19,6 +19,12 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 NA = "n/a"
+STATUS_WORDS = {
+    "ok": "done",
+    "not_wired": "not computed",
+    "skipped": "skipped",
+    "failed": "failed",
+}
 _FORBIDDEN = re.compile(
     r"\b(compliant|compliance|complies|verified|verifies|guarantee[sd]?|certified|"
     r"(?:wcag|ada)[ -](?:conformant|conformance|compliant))\b",

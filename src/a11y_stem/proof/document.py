@@ -15,6 +15,7 @@ from a11y_stem.proof.goldinfo import SectionFacts
 from a11y_stem.proof.registry import PinCheck, ProofSet
 from a11y_stem.proof.report import (
     NA,
+    STATUS_WORDS,
     Section,
     StageResult,
     Table,
@@ -180,7 +181,10 @@ def _status(info: DocumentInfo) -> Section:
             Table(
                 "Parts of this proof",
                 ["Part", "Status"],
-                [[title, result.status] for title, result in info.stages],
+                [
+                    [title, STATUS_WORDS.get(result.status, result.status)]
+                    for title, result in info.stages
+                ],
             )
         )
     return Section("Status", blocks)
