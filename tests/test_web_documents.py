@@ -323,7 +323,7 @@ def test_the_landing_page_says_why_now_how_long_and_how_accurate(web):
     flat = text(web.client().get("/").text)
     assert "public universities" in flat
     assert "a 16-page textbook section needed 3 decisions" in flat
-    assert "22 of 30 equations" in flat and "It makes mistakes" in flat
+    assert "23 of 30 equations" in flat and "It makes mistakes" in flat
     assert "How to post it in your course" in flat
     assert "confidence score" not in flat
 

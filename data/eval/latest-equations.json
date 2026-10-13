@@ -1,8 +1,8 @@
 {
   "schema_version": 1,
   "task": "equations",
-  "date": "2026-10-09",
-  "pipeline_version": "0.3.0",
+  "date": "2026-10-12",
+  "pipeline_version": "0.4.0",
   "prompt_versions": {
     "equation": "equation-df0e12f1"
   },
@@ -28,59 +28,53 @@
   "stopped_reason": null,
   "metrics": {
     "exact_strict": 0.4,
-    "exact_lenient": 0.7333333333333333,
+    "exact_lenient": 0.7666666666666667,
     "exact_lenient_ci95": [
-      0.5555203815871325,
-      0.8581733675241899
+      0.5907167369328042,
+      0.8820761191944214
     ],
-    "mean_teds": 0.8614544808971188,
+    "mean_teds": 0.8642322586748965,
     "proposal_rate": 1.0,
     "by_status": {
       "accepted": {
-        "n": 29,
-        "share": 0.9666666666666667,
-        "exact_lenient": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
-      },
-      "needs_review": {
-        "n": 1,
-        "share": 0.03333333333333333,
-        "exact_lenient": 0.0,
-        "mean_teds": 0.8
+        "n": 30,
+        "share": 1.0,
+        "exact_lenient": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       }
     },
     "by_route": {
       "cheap": {
-        "n": 8,
-        "share": 0.26666666666666666,
+        "n": 7,
+        "share": 0.23333333333333334,
         "exact_lenient": 1.0,
-        "mean_teds": 0.9375
+        "mean_teds": 0.9285714285714286
       },
       "main": {
         "n": 17,
         "share": 0.5666666666666667,
-        "exact_lenient": 0.5294117647058824,
-        "mean_teds": 0.8574686917792291
+        "exact_lenient": 0.5882352941176471,
+        "mean_teds": 0.8584490839360919
       },
       "escalated": {
-        "n": 5,
-        "share": 0.16666666666666666,
+        "n": 6,
+        "share": 0.2,
         "exact_lenient": 1.0,
-        "mean_teds": 0.7533333333333333
+        "mean_teds": 0.8055555555555557
       }
     },
     "by_display": {
       "block": {
         "n": 17,
         "share": 0.5666666666666667,
-        "exact_lenient": 0.5294117647058824,
-        "mean_teds": 0.8574686917792291
+        "exact_lenient": 0.5882352941176471,
+        "mean_teds": 0.8584490839360919
       },
       "inline": {
         "n": 13,
         "share": 0.43333333333333335,
         "exact_lenient": 1.0,
-        "mean_teds": 0.8666666666666667
+        "mean_teds": 0.8717948717948718
       }
     },
     "selective": [
@@ -88,95 +82,93 @@
         "threshold": 0.5,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8614544808971188
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.55,
         "kept": 30,
         "coverage": 1.0,
-        "accuracy": 0.7333333333333333,
-        "mean_teds": 0.8614544808971188
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.6,
-        "kept": 29,
-        "coverage": 0.9666666666666667,
-        "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.65,
-        "kept": 29,
-        "coverage": 0.9666666666666667,
-        "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.7,
-        "kept": 29,
-        "coverage": 0.9666666666666667,
-        "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.75,
-        "kept": 29,
-        "coverage": 0.9666666666666667,
-        "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.8,
-        "kept": 29,
-        "coverage": 0.9666666666666667,
-        "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.85,
-        "kept": 29,
-        "coverage": 0.9666666666666667,
-        "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "kept": 30,
+        "coverage": 1.0,
+        "accuracy": 0.7666666666666667,
+        "mean_teds": 0.8642322586748965
       },
       {
         "threshold": 0.9,
         "kept": 29,
         "coverage": 0.9666666666666667,
         "accuracy": 0.7586206896551724,
-        "mean_teds": 0.8635736009280539
+        "mean_teds": 0.8664471641464446
       },
       {
         "threshold": 0.95,
-        "kept": 23,
-        "coverage": 0.7666666666666667,
-        "accuracy": 0.7391304347826086,
-        "mean_teds": 0.8757041479357965
+        "kept": 25,
+        "coverage": 0.8333333333333334,
+        "accuracy": 0.72,
+        "mean_teds": 0.8910787104098757
       }
     ],
     "review_load": {
-      "required": 1,
+      "required": 0,
       "optional": 1,
-      "required_per_item": 0.0333,
+      "required_per_item": 0.0,
       "optional_per_item": 0.0333,
       "sections": 3,
-      "required_per_section": 0.3333,
+      "required_per_section": 0.0,
       "optional_per_section": 0.3333,
-      "required_by_reason": {
-        "style_mismatch": 1
-      },
+      "required_by_reason": {},
       "optional_by_reason": {
         "style_cosmetic": 1
       },
       "flags": {
         "units": 30,
-        "required_units": 1,
-        "required_units_wrong": 1,
-        "wrong": 8,
-        "wrong_required": 1,
-        "flag_precision": 1.0,
-        "flag_recall": 0.125
+        "required_units": 0,
+        "required_units_wrong": 0,
+        "wrong": 7,
+        "wrong_required": 0,
+        "flag_precision": null,
+        "flag_recall": 0.0
       },
       "scorer_gaps": [
         "openstax/physics/2-2-speed-and-velocity/eq-003",
@@ -187,12 +179,12 @@
       ],
       "flags_excluding_scorer_gaps": {
         "units": 25,
-        "required_units": 1,
-        "required_units_wrong": 1,
-        "wrong": 3,
-        "wrong_required": 1,
-        "flag_precision": 1.0,
-        "flag_recall": 0.3333333333333333
+        "required_units": 0,
+        "required_units_wrong": 0,
+        "wrong": 2,
+        "wrong_required": 0,
+        "flag_precision": null,
+        "flag_recall": 0.0
       },
       "wrong_not_required": [
         {
@@ -248,34 +240,33 @@
       ],
       "ran": 30,
       "outcomes": {
-        "api_error": 1,
-        "ok": 29
+        "ok": 30
       },
       "final": {
-        "answered": 29,
-        "wrong": 8,
-        "auroc_vs_wrong": 0.5565,
-        "auroc_vs_wrong_excluding_scorer_gaps": 0.6667,
-        "would_flag": 15,
-        "would_flag_precision": 0.3333,
-        "would_flag_recall": 0.625,
-        "would_flag_wrong_excluding_scorer_gaps": 3
+        "answered": 30,
+        "wrong": 7,
+        "auroc_vs_wrong": 0.4534,
+        "auroc_vs_wrong_excluding_scorer_gaps": 0.4783,
+        "would_flag": 16,
+        "would_flag_precision": 0.25,
+        "would_flag_recall": 0.5714,
+        "would_flag_wrong_excluding_scorer_gaps": 2
       },
       "cheap_stage": {
-        "ran": 5,
-        "answered": 5,
+        "ran": 6,
+        "answered": 6,
         "would_flag": 0,
-        "mean_p_meaning": 0.062
+        "mean_p_meaning": 0.0533
       },
       "p_meaning": {
-        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-000": null,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-000": 0.42,
         "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-001": 0.01,
-        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-002": 0.23,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-002": 0.38,
         "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-003": 0.46,
         "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-004": 0.37,
         "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-005": 0.36,
-        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-006": 0.31,
-        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-007": 0.32,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-006": 0.32,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/eq-007": 0.42,
         "openstax/physics/2-2-speed-and-velocity/eq-000": 0.03,
         "openstax/physics/2-2-speed-and-velocity/eq-001": 0.03,
         "openstax/physics/2-2-speed-and-velocity/eq-002": 0.01,
@@ -286,40 +277,40 @@
         "openstax/physics/2-2-speed-and-velocity/eq-007": 0.2,
         "openstax/physics/2-2-speed-and-velocity/eq-008": 0.16,
         "openstax/physics/2-2-speed-and-velocity/eq-009": 0.43,
-        "openstax/physics/2-2-speed-and-velocity/eq-010": 0.31,
+        "openstax/physics/2-2-speed-and-velocity/eq-010": 0.24,
         "openstax/physics/2-2-speed-and-velocity/eq-011": 0.59,
         "openstax/physics/2-3-position-vs-time-graphs/eq-000": 0.01,
         "openstax/physics/2-3-position-vs-time-graphs/eq-001": 0.42,
         "openstax/physics/2-3-position-vs-time-graphs/eq-002": 0.26,
-        "openstax/physics/2-3-position-vs-time-graphs/eq-003": 0.5,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-003": 0.21,
         "openstax/physics/2-3-position-vs-time-graphs/eq-004": 0.38,
         "openstax/physics/2-3-position-vs-time-graphs/eq-005": 0.2,
         "openstax/physics/2-3-position-vs-time-graphs/eq-006": 0.01,
-        "openstax/physics/2-3-position-vs-time-graphs/eq-007": 0.02,
+        "openstax/physics/2-3-position-vs-time-graphs/eq-007": 0.03,
         "openstax/physics/2-3-position-vs-time-graphs/eq-008": 0.01,
         "openstax/physics/2-3-position-vs-time-graphs/eq-009": 0.01
       },
-      "cost_usd": 0.0012172,
-      "per_equation_usd": 4.057e-05,
-      "requests": 35
+      "cost_usd": 0.001279,
+      "per_equation_usd": 4.263e-05,
+      "requests": 36
     }
   },
   "cost": {
-    "total_usd": 0.05309934,
-    "pipeline_usd": 0.05309934,
-    "per_item_usd": 0.001769978,
+    "total_usd": 0.052483840000000004,
+    "pipeline_usd": 0.052483840000000004,
+    "per_item_usd": 0.0017494613333333335,
     "per_item_unit": "equation",
-    "model_calls": 35,
-    "verifier_usd": 0.0012172,
-    "verifier_per_item_usd": 4.057333333333333e-05,
-    "verifier_requests": 35,
-    "budget_spent_usd": 0.053099340000000016,
-    "budget_calls": 35,
-    "dropped_usd": 1.3877787807814457e-17
+    "model_calls": 36,
+    "verifier_usd": 0.001279,
+    "verifier_per_item_usd": 4.263333333333333e-05,
+    "verifier_requests": 36,
+    "budget_spent_usd": 0.05248384,
+    "budget_calls": 36,
+    "dropped_usd": 0.0
   },
   "latency_ms": {
-    "p50": 5327.5,
-    "p95": 10062.7,
+    "p50": 5287.5,
+    "p95": 11273.350000000002,
     "n": 30,
     "basis": "sum of model-call latencies per item (excludes rendering)"
   }

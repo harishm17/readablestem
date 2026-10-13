@@ -15,10 +15,11 @@
   <li>figures have short alt text, or a clear flag where a description is still needed.</li>
 </ul>
 
-{# The numbers below are the committed eval reports (data/eval/latest-*.json, 2026-10-09:
-   equations exact_lenient 0.733, 22 of 30; document flag precision 0.60, 6 of 10) and the
-   triage re-runs in docs/eval.md "Review load" (OpenStax 2.1, 16 pages: 3 decisions in
-   both runs; the one-page LaTeX handout: 2, then 1). Update them when the eval is rerun.
+{# The numbers below are the committed eval reports (data/eval/latest-*.json, pipeline
+   0.4.0, 2026-10-12: equations exact_lenient 0.767, 23 of 30; document flag precision
+   0.60, 6 of 10) and the triage re-runs in docs/eval.md "Review load" (OpenStax 2.1, 16
+   pages: 3 decisions in both runs; the one-page LaTeX handout: 2, then 1). Update them
+   when the eval is rerun.
    TODO(Harish): decide whether the product shows these numbers at all (FEATURE-REVIEW
    10.3, row 3, says link "how we measure" instead). #}
 <h2>How long it takes</h2>
@@ -29,7 +30,7 @@
 
 <h2>How accurate it is</h2>
 <p>It makes mistakes, so look over the equations your students rely on. In our small
-  test, 22 of 30 equations from one physics textbook came out exactly right, and about 6
+  test, 23 of 30 equations from one physics textbook came out exactly right, and about 6
   in 10 of the decisions it asked for pointed at a real problem. Its checks against the
   PDF's own text catch some wrong equations, not all.
   <a href="{{ source_url }}/blob/main/docs/eval.md">How we measured this, and what the

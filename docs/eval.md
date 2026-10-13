@@ -486,12 +486,12 @@ uv run a11y-stem eval gate --require-current --current data/eval/latest-equation
 After a prompt or model change, re-run the task, promote the new report `--as latest`
 and commit it with the change; CI's gate fails (exit 2) until you do.
 
-TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The real runs of
-2026-10-09 are committed as `data/eval/latest-<task>.json` (pipeline 0.3.0; headings
-re-run on 0.4.0; see "Results" below); review them and promote each as the baseline,
-after equations, figures and document are re-run on 0.4.0. Earlier runs are in
-the main checkout's `.local/eval/`. figures-run1 was graded by the older text-only judge
-and cannot be a baseline for runs graded with the image.
+TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The committed
+`data/eval/latest-<task>.json` are all pipeline 0.4.0 runs (equations, figures, document
+and tables re-run on 2026-10-12, headings on 2026-10-09; see "Results" below); review
+them and promote each as the baseline. Earlier runs are in the main checkout's
+`.local/eval/`. figures-run1 was graded by the older text-only judge and cannot be a
+baseline for runs graded with the image.
 
 Weekly sample (drift check between full runs): a 5% share of the gold units, seeded by
 the ISO week, scored like any other run (`eval/sample.py`). Reports go to
@@ -531,29 +531,52 @@ and a link to the original), `report.json` (the `DocumentResult` without the HTM
 `source.pdf` (the exact input) to `src/a11y_stem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
-## Results (pipeline 0.3.0, 2026-10-09, gpt-6.1-sol and gpt-6-luna)
+## Results (pipeline 0.4.0, 2026-10-12, gpt-6.1-sol and gpt-6-luna)
 
 Reports: `data/eval/latest-<task>.json`. Sample: 3 sections of OpenStax *Physics* ch. 2 (CC
 BY 4.0). Small: read the confidence intervals before reading the point estimates.
 
-Pipeline 0.4.0 (the content features, every flag off): the headings task was re-run on
-0.4.0 (no model calls) and gave the same numbers to the last digit; its report is now
-the committed one. The equations, figures and document reports are still the 0.3.0 runs.
-They are not stale for the gate: `eval gate --require-current` passes on all four,
-because it compares prompts and models (`equation-df0e12f1`, `figure-ac51f42d`,
-`judge_figure-137e2607`, the same models), not the pipeline version. Nor should their
-numbers move with the flags off: the equation and figure steps send the same prompts
-and keep the same rules without course notation or long descriptions, and layout finds
-the same 55 equations and 138 headings on the three sections, and no table. Still, each
-report should name the code that made it: equations, figures and document are to be
-re-run on 0.4.0 (about $0.28) before any of them is promoted as a baseline.
+Pipeline 0.4.0 (the content features, every flag off, as in production): all the
+committed reports are 0.4.0 runs. Equations, figures and document were re-run with the
+real models on 2026-10-12 (equations $0.052, figures $0.090 with the judge, document
+$0.145) and promoted with `eval promote --as latest`; tables is the local run of the
+same day (no model, `latest-tables-local.json`); headings is the 0.4.0 re-run of
+2026-10-09 (no model calls, the same numbers as 0.3.0 to the last digit). Against the
+0.3.0 reports they replace, `eval gate --require-current` passes on each: equations
+exact_lenient 0.733 to 0.767 (23 of 30; inside each other's intervals, the models are
+not deterministic), figures judge pass 0.923 to 1.000 (13 of 13), and the document task
+the same to the last digit on equations (recall 1.000, precision 0.545, matched
+exact_lenient 0.733) and in review load (10 required decisions, 0.233 per PDF page; 6 of
+the 10 point at a real error). Of the 7 equation misses, 5 are the known scorer gaps
+(2.2 eq-003, eq-004, eq-010; 2.3 eq-004, eq-007), one is 2.2 eq-007's bold subscript
+"avg" (cosmetic by the policy: an optional note) and one 2.3 eq-005's comma after the
+second row; no meaning-level miss was accepted. The layout changes made after these
+runs (the silent-loss sweep, 2026-10-12, docs/layout.md "The safety net") leave the
+document task as it was: run offline (`--fake`) before and after them, its per-page
+rows are identical apart from timing, so the runs were not repeated.
+
+The same document task with every content flag on (`FEATURE_TABLES`,
+`FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY`) is kept apart
+as `data/eval/document-flags-on.json` ($0.144; it cannot be `latest`: the long-description
+figure prompt is not the production one): 9 required decisions (0.209 per PDF page, the 9
+heading groups; the equation the flags-off run asked about was read right this time),
+27 optional notes (0.628 per PDF page: the 5 chart data tables read from the image are
+optional extras), matched exact_lenient 0.767, 64 predicted equations (bold letters in
+prose made maths), 0 static and 0 axe violations. These replace the estimate in "What
+this gives for the targets" below: flags off 0.233 (target 0.25), flags on 0.209 (target
+0.28).
 
 | Task | n | Headline | Cost |
 |---|---|---|---|
-| equations | 30 | exact_lenient 0.733 (95% CI 0.556-0.858; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.861 | $0.0018 per equation |
+| equations | 30 | exact_lenient 0.767 (95% CI 0.591-0.882; ceiling 0.833 with known-correct LaTeX), mean TEDS 0.864 | $0.0017 per equation |
 | headings | 121 | recall 1.000 (CI 0.969-1.000), level accuracy 0.992, precision 0.877 (every extra is NEEDS_REVIEW) | no model calls |
-| figures | 13 | image-aware judge pass 0.923 (CI 0.667-0.986), factual errors 0 (judge not yet calibrated) | $0.0036 per figure |
-| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations | $0.0033 per PDF page |
+| figures | 13 | image-aware judge pass 1.000 (CI 0.772-1.000), factual errors 0 (judge not yet calibrated) | $0.0039 per figure |
+| document | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 excluding prose maths), matched exact_lenient 0.733, 0 split equations, 0 axe and 0 static violations; 0.233 required decisions per PDF page | $0.0034 per PDF page |
+| tables (local) | 197 gold data tables | recall 0.909, precision 0.984, TEDS 0.866 (0.954 on found), header exact 0.812 | no model calls |
+
+The 0.3.0 runs of 2026-10-09 for comparison: equations exact_lenient 0.733 (CI
+0.556-0.858), mean TEDS 0.861; figures judge pass 0.923 (CI 0.667-0.986); document as
+above at $0.0033 per PDF page.
 
 How the equations number got there (error analysis on real runs, same 30 equations):
 
@@ -1186,10 +1209,10 @@ By cause, both: 9 heading decisions (measured offline above), 1 equation (equati
 answers vary from run to run (an escalation more or less), so this is an estimate on
 the integration's answers.
 
-TODO(Harish): when the account has credit again, run the document task with the flags
-off and on (about $0.15 each), rebuild the demo with the flags on (about $0.07) and run
-the tables model task on `grid` + authored (about $0.26), then replace this estimate
-with the numbers.
+Measured on 2026-10-12 with real models ("Results"): flags off 10 (0.233), flags on 9
+(0.209), each the 9 heading groups plus, flags off, equation 2.5. TODO(Harish): rebuild
+the demo with the flags on (about $0.07) and run the tables model task on `grid` +
+authored (about $0.26).
 
 ### Tables (`--task tables`, local mode, no model)
 
@@ -1244,7 +1267,9 @@ kinds and 28 of 31 actions; page-type-v5.1 on the 996-page corpus 984 kinds and 
 actions, on the design review's 41 adversarial pages 29 and 35; page-type-v5.2
 (2026-10-10) on the 996-page corpus the same 984 and 989 (median 7 ms a page, p95
 146 ms), on fresh set 4 29 and 29, on the 41 adversarial pages 29 and 35; page-type-v5.3
-(2026-10-12) the same on all three (median 7 ms, p95 151 ms).
+(2026-10-12) the same on all three (median 7 ms, p95 151 ms); page-type-v5.4 (the
+silent-loss sweep, the same evening) the same kind and action for every page of the
+three sets (median 8 ms, p95 157 ms on the corpus).
 
 The headings and document evals were not re-run for this change: no model was called
 in this stage. The committed born-digital fixtures (`tests/test_page_types.py`) have no
@@ -1257,6 +1282,30 @@ rows are identical (30 of 30 gold equations matched among 55 predicted, the same
 and the same 80 required decisions of the offline client), and layout gives the same
 elements on every PDF in the repository (the three printed gold sections, the LaTeX
 fixtures, the demo source).
+
+The silent-loss sweep's changes (2026-10-12, docs/layout.md: diagrams of joined boxes
+and line chains, small drawings and hand marks on typed pages, pictures with text on
+them and covering the page, chart labels in the bands, near-white paint on a dark
+ground) were checked the same way. The document task offline (`--fake`): identical
+per-page rows. Layout on the repository's PDFs: the same elements on the three printed
+gold sections, the 42 cached OpenStax renders, the LaTeX and layout fixtures and the
+demo source; the authored tables slides lose a figure made of their table's coloured
+cells (the white lines between them are now seen, so the table's grid is drawn), with
+the tables eval (local) the same to the last digit; and one handwriting fixture,
+`overlays.pdf`, changes as intended (its page under a transparent picture of hand-drawn
+circles keeps its image; its half-page striped mask is a figure). The 110 sweep PDFs: 3 LOST verdicts left, all
+the generator's subtitle that was never written (41 before), 56 converted, 38 kept with
+a decision, 13 refused; only the three typed controls say "Everything was converted".
+On the research corpus (909 pages; labels as in "Page types"), no page labelled
+born-digital keeps its image or changes kind. Twelve of them change: three keep the
+same elements (a figure gains its white lines), seven gain content that was dropped
+before (a report's two screenshots under their captions and a brochure's cover
+pictures, once taken for backgrounds; a scatter of TikZ shapes and five flat spring
+drawings under 24 pt; icons at a page edge; a small mark at a page's foot; one hand
+mark, as a handwriting region), and two pages of machine-drawn loops the classifier
+already calls `mixed_ink` (a known error) gain handwriting regions (a needless
+decision). Three `vector_no_text` pages (two of typed text turned into outlines, a
+hatched pie chart that became no figure) now keep their image.
 
 ## What the numbers do not show
 
@@ -1311,6 +1360,7 @@ fixtures, the demo source).
 | `src/a11y_stem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |
 | `src/a11y_stem/models/prompts/judge_long_description.md` | the long-description and data-table rubric (versioned by hash) |
 | `data/eval/figures-long-descriptions.json` | the figures report with long descriptions on (2026-10-09) |
+| `data/eval/document-flags-on.json` | the document report with every content flag on (pipeline 0.4.0, 2026-10-12) |
 | `src/a11y_stem/eval/verifier_metrics.py` | the second automated check's eval metrics |
 | `src/a11y_stem/models/prompts/judge_figure.md` | judge instructions (versioned by hash) |
 | `src/a11y_stem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
