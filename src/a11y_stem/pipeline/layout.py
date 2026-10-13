@@ -66,7 +66,7 @@ from collections import Counter, OrderedDict, deque
 from collections.abc import Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
-from itertools import count, pairwise
+from itertools import combinations, count, pairwise
 from typing import Any
 
 import pymupdf
@@ -97,6 +97,7 @@ from a11y_stem.pipeline.parse import (
 # Sizes are PDF points unless the name says otherwise. docs/layout.md explains each one.
 
 HEADING_SIZE_RATIO = 1.15  # a short run at least this much larger than body text
+TITLE_MIN_PT = 18.0  # a row of several words this large is a title, never a figure's label
 HEADING_LEVEL_TOLERANCE = 0.05  # heading sizes within 5 % of each other share a level
 MAX_HEADING_CHARS = 200
 MAX_HEADING_ROWS = 3
@@ -136,6 +137,13 @@ LEFTOVER_MIN_PT = 6.0
 # the glyphs of one formula drawn as outlines): MIN_DRAWING_PT.
 LEFTOVER_REACH = 24.0
 DOT_PT = 4.0  # a filled mark this small on its longer side is a dot
+# A pen mark over typed text (`_pen_mark_over_text`): at most this many strokes, reaching
+# out of the line they lie on by at least this share of their height. A hand tick, cross
+# or slash is drawn bigger than the text; a cancel stroke or an icon set in a line is not.
+PEN_MARK_STROKES = 2
+PEN_MARK_OUT = 0.25
+PEN_MARK_COLOUR = 0.3  # a closed or filled mark differs from the text this much (sRGB)
+PEN_FILL_SHARE = 0.5  # a filled mark is a stroke's ribbon when it covers at most this of its box
 # A row the header/footer rules dropped is a figure's label (`_figure_labels`) when it is
 # at most this long and within LABEL_REACH x its font size of the figure or its labels.
 LABEL_MAX_CHARS = 40
@@ -785,6 +793,7 @@ class _Char:
     size: float
     font: str
     flags: int
+    colour: int = 0  # the span's sRGB colour (0xRRGGBB)
 
     @property
     def blank(self) -> bool:
@@ -1096,13 +1105,22 @@ def _page_rows(
                 if page_type.span_hidden(span):
                     continue
                 size, font, flags = float(span["size"]), span["font"], int(span["flags"])
+                colour = int(span.get("color") or 0)
                 for ch in span["chars"]:
                     if covered and page_type.origin_key(ch["origin"]) in covered:
                         continue
                     box = display.box(ch["bbox"])
                     origin = display.point(*ch["origin"])
                     chars.append(
-                        _Char(ch["c"], *box, baseline=origin[1], size=size, font=font, flags=flags)
+                        _Char(
+                            ch["c"],
+                            *box,
+                            baseline=origin[1],
+                            size=size,
+                            font=font,
+                            flags=flags,
+                            colour=colour,
+                        )
                     )
             if any(not c.blank for c in chars):
                 vertical = abs(dy) > 0.2 or dx < 0
@@ -1325,6 +1343,12 @@ class _MarginFilter:
             return False
         prominent = row.size >= HEADING_SIZE_RATIO * self.body or row.bold
         return key in self.fixed or not prominent
+
+    def numbering(self, row: _Row, height: float) -> bool:
+        """The row's band text repeats on the reference pages and changes from page to
+        page: a page-number series ("24", "25", ...), not a figure's label."""
+        key = (_margin_zone(row, height), _norm_margin(row.clean))
+        return key in self.repeated and key not in self.fixed
 
     def drops_figure(self, box: BBox, height: float) -> bool:
         zone = _box_zone(box, height)
@@ -2484,6 +2508,23 @@ class _Path:
     frame: bool = False  # an outline along the edges of its own box only (a frame's shape)
     rules: bool = False  # paper rules: long separate horizontal and vertical lines only
     open_stroke: bool = False  # a stroked line or curve that does not close: a pen mark's shape
+    axis: bool = False  # holds one of two lines meeting at a corner: a plot's axes (`_mark_axes`)
+    ruler: bool = False  # holds a line with tick marks across or on it, or one of the ticks
+    # The L pairs (horizontal line, vertical line) the path holds a line of (`_mark_axes`).
+    axes: tuple[tuple[_Straight, _Straight], ...] = ()
+    plot: bool = False  # one of those Ls has evidence of a plot (`_mark_plots`)
+    # A ruler whose ticks all stand on one side of its line, a letter cell apart: an
+    # answer field's cells when no label is near (`_answer_fields`).
+    comb: bool = False
+    # Where a curved open stroke's subpaths start and end (display space): a plotted
+    # line starts at its axes' corner (`_mark_plots`).
+    ends: tuple[tuple[float, float], ...] = ()
+    # Set only where a later test reads them (`_page_paths`): an open stroke 12 pt or more
+    # that has a curve or lines in two directions; a curved closed or filled shape's sRGB
+    # colour, and the share of its box a filled one covers.
+    turns: bool = False
+    colour: tuple[float, float, float] = (0.0, 0.0, 0.0)
+    fill_share: float = 0.0
 
 
 def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
@@ -2496,16 +2537,17 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
     width_pt, height_pt = page.rect.width, page.rect.height
     frame = page.cropbox  # the drawings' own (unrotated) frame
     paths: list[_Path] = []
+    lines: list[list[_Straight]] = []  # each path's horizontal and vertical lines
     drawings = drawings if drawings is not None else page.get_cdrawings()
     seen = page_type.paint_visibility(drawings, page_type.image_boxes(page)[0])
     for source, drawing in enumerate(drawings):
         filled, stroked = seen[source]
         if not (stroked or filled):
             continue  # white boxes and invisible paths
-        box = display.box(drawing["rect"])
+        items = drawing.get("items") or []
+        box = display.box(_drawing_bounds(drawing["rect"], items))
         if box[2] < 0 or box[3] < 0 or box[0] > width_pt or box[1] > height_pt:
             continue  # outside the CropBox: not visible on the page
-        items = drawing.get("items") or []
         segments = []
         curved = False
         straight = 0.0  # length of horizontal and vertical lines
@@ -2537,10 +2579,356 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
         )
         rules = kind == "shape" and page_type.paper_rules(drawing, frame.width, frame.height)
         open_stroke = stroked and not filled and not _encloses(items, drawing.get("closePath"))
-        paths.append(
-            _Path(box, kind, curved, filled and kind == "shape", source, border, rules, open_stroke)
-        )
+        fill = filled and kind == "shape"
+        path = _Path(box, kind, curved, fill, source, border, rules, open_stroke)
+        # What later tests read, only for the paths they look at (a page of handwriting
+        # has tens of thousands of strokes, and the ink budget runs while they are read).
+        if curved and open_stroke:
+            path.ends = _subpath_ends(items, display)
+        if open_stroke and kind == "shape" and max(width, height) >= MIN_IMAGE_PT:
+            path.turns = _turns(items, segments)  # an open polyline (`_diagram_signs`)
+        if curved and kind == "shape" and not open_stroke:  # a closed or filled hand mark
+            path.colour = _rgb(drawing.get("color") if stroked else drawing.get("fill"))
+            if fill:  # a ribbon tick has tens of points; a longer fill is no such mark
+                path.fill_share = _fill_share(items, display, box) if len(items) <= 200 else 1.0
+        paths.append(path)
+        lines.append(_straight_lines(path, segments))
+    _mark_axes(paths, lines)
     return paths
+
+
+def _fill_share(items: Sequence[Any], display: _Display, box: BBox) -> float:
+    """The share of `box` a filled path covers: its subpaths' areas by the shoelace over
+    their points (a curve by its ends), at most 1. A highlight covers most of its box; a
+    tick drawn as a filled ribbon little of it."""
+    size = _area(box)
+    if size <= 0:
+        return 0.0
+    total = 0.0
+    ring: list[tuple[float, float]] = []
+
+    def close() -> float:
+        if len(ring) < 3:
+            return 0.0
+        return abs(sum(a[0] * b[1] - b[0] * a[1] for a, b in pairwise([*ring, ring[0]]))) / 2
+
+    for item in items:
+        if item[0] == "re":
+            x0, y0, x1, y1 = item[1][0], item[1][1], item[1][2], item[1][3]
+            total += abs(x1 - x0) * abs(y1 - y0)
+            continue
+        if item[0] == "qu":
+            total += close()
+            ring = [display.point(*q) for q in item[1]]
+            total += close()
+            ring = []
+            continue
+        start, end = display.point(*item[1]), display.point(*item[-1])
+        if ring and (abs(ring[-1][0] - start[0]) > 0.01 or abs(ring[-1][1] - start[1]) > 0.01):
+            total += close()
+            ring = []
+        if not ring:
+            ring.append(start)
+        ring.append(end)
+    total += close()
+    return min(1.0, total / size)
+
+
+def _rgb(paint: Sequence[float] | None) -> tuple[float, float, float]:
+    """A drawing's colour as sRGB components 0..1 (grey and CMYK converted)."""
+    if not paint:
+        return (0.0, 0.0, 0.0)
+    if len(paint) == 1:
+        return (paint[0], paint[0], paint[0])
+    if len(paint) == 4:
+        c, m, y, k = paint
+        return ((1 - c) * (1 - k), (1 - m) * (1 - k), (1 - y) * (1 - k))
+    return (paint[0], paint[1], paint[2])
+
+
+def _turns(items: Sequence[Any], segments: list[tuple[float, float, float, float]]) -> bool:
+    """The path has a curve, or lines in two directions at least 20 degrees apart: a
+    polyline (a step, a zigzag, an arrowhead, a wire round a corner), not one straight
+    line drawn in pieces."""
+    if any(item[0] == "c" for item in items):
+        return True
+    first = None
+    for px, py, qx, qy in segments:
+        dx, dy = qx - px, qy - py
+        length2 = dx * dx + dy * dy
+        if length2 < 0.25:
+            continue
+        if first is None:
+            first = (dx, dy, length2)
+            continue
+        cross = first[0] * dy - first[1] * dx
+        if cross * cross > 0.117 * first[2] * length2:  # sin^2 of 20 degrees
+            return True
+    return False
+
+
+SUBPATH_ENDS = 16  # at most this many subpath starts and ends are kept per path
+
+
+def _subpath_ends(items: Sequence[Any], display: _Display) -> tuple[tuple[float, float], ...]:
+    """The start and end of each subpath of a path of lines and curves (display space): a
+    subpath starts where an item does not begin at the last one's end. At most
+    SUBPATH_ENDS points."""
+    found: list[tuple[float, float]] = []
+    last = None
+    for item in items:
+        if item[0] not in ("l", "c"):
+            continue
+        first, end = item[1], item[-1]
+        if last is None or abs(first[0] - last[0]) > 0.01 or abs(first[1] - last[1]) > 0.01:
+            if last is not None:
+                found.append(display.point(*last))
+            found.append(display.point(*first))
+            if len(found) >= SUBPATH_ENDS:
+                return tuple(found)
+        last = end
+    if last is not None:
+        found.append(display.point(*last))
+    return tuple(found)
+
+
+def _drawing_bounds(rect: Sequence[float], items: Sequence[Any]) -> tuple[float, ...]:
+    """The box of every point of a drawing (unrotated frame). MuPDF's `rect` leaves out the
+    start of a subpath that begins away from where the last one ended: the axes of a plot
+    drawn as one path, "80 75 m 640 75 l 80 335 m 80 75 l S", read as the x-axis alone and
+    the y-axis was lost (the second final verify, 2026-10-12). Curves count their control
+    points, as `rect` does."""
+    x0, y0, x1, y1 = rect[0], rect[1], rect[2], rect[3]
+    for item in items:
+        op = item[0]
+        if op == "re":
+            points = ((item[1][0], item[1][1]), (item[1][2], item[1][3]))
+        elif op == "qu":
+            points = item[1]
+        else:  # "l" and "c": their points
+            points = item[1:]
+        for x, y in points:
+            if x < x0:
+                x0 = x
+            elif x > x1:
+                x1 = x
+            if y < y0:
+                y0 = y
+            elif y > y1:
+                y1 = y
+    return x0, y0, x1, y1
+
+
+AXIS_MIN_PT = 48.0  # pt: each of a plot's two axes is at least this long
+AXIS_CLOSE_PT = 4.5  # pt: a long line's end this close to an axis's far end closes a box
+TICK_MAX_PT = 16.0  # pt: a tick mark across or on a ruler's line is at most this long
+RULER_TICKS = 3  # tick marks at different places make a line a ruler (a frame's corner marks are 2)
+STRAIGHT_MIN_PT = 3.0  # pt: shorter horizontal and vertical lines are not looked at
+AXES_MAX_LINES = 20_000  # a page with more straight lines (a grid, hatching) is not looked at
+PATH_MAX_LINES = 200  # nor are the lines of a path with more (a grid drawn as one path)
+
+
+@dataclass(frozen=True, slots=True)
+class _Straight:
+    """A horizontal or vertical line of a path: at `c` (y for a horizontal line, x for a
+    vertical one) from `lo` to `hi` along it, display space."""
+
+    horizontal: bool
+    c: float
+    lo: float
+    hi: float
+
+    def ends(self) -> tuple[tuple[float, float], tuple[float, float]]:
+        if self.horizontal:
+            return (self.lo, self.c), (self.hi, self.c)
+        return (self.c, self.lo), (self.c, self.hi)
+
+
+def _straight_lines(
+    path: _Path, segments: list[tuple[float, float, float, float]]
+) -> list[_Straight]:
+    """The horizontal and vertical lines of a path at least STRAIGHT_MIN_PT long; a rule
+    drawn as a thin filled rectangle is its middle line. A line drawn there and back (as
+    MuPDF reports a closed one-segment path) is one line."""
+    if not segments and path.kind in ("hrule", "vrule"):
+        x0, y0, x1, y1 = path.bbox
+        if path.kind == "hrule":
+            return [_Straight(True, (y0 + y1) / 2, x0, x1)]
+        return [_Straight(False, (x0 + x1) / 2, y0, y1)]
+    found: dict[tuple[bool, int, int, int], _Straight] = {}
+    for px, py, qx, qy in segments:
+        if abs(py - qy) <= 0.5 and abs(px - qx) >= STRAIGHT_MIN_PT:
+            line = _Straight(True, (py + qy) / 2, min(px, qx), max(px, qx))
+        elif abs(px - qx) <= 0.5 and abs(py - qy) >= STRAIGHT_MIN_PT:
+            line = _Straight(False, (px + qx) / 2, min(py, qy), max(py, qy))
+        else:
+            continue
+        found.setdefault((line.horizontal, round(line.c), round(line.lo), round(line.hi)), line)
+        if len(found) > PATH_MAX_LINES:
+            return []
+    return list(found.values())
+
+
+def _mark_axes(paths: list[_Path], lines: list[list[_Straight]]) -> None:
+    """Flag the paths that hold a plot's axes (`_Path.axis`) or a ruler (`_Path.ruler`),
+    whether each line is its own path or one path holds them all.
+
+    Axes: a horizontal and a vertical line, each at least AXIS_MIN_PT long, meeting end to
+    end at a corner (JOIN_PT), with nothing else at that corner or at their other ends: an
+    L. A frame drawn line by line meets itself at every corner; a U or a staircase has
+    more than two lines. A ruler: a line at least AXIS_MIN_PT long that RULER_TICKS or more
+    short perpendicular lines (TICK_MAX_PT, at most a quarter of it) cross or end on, at
+    different places along it, where a tick that ends on it has its other end free (a
+    table's row has its column rules end on the rules above and below: not ticks). A
+    y-axis near the page's edge and as tall as the page read as a side of a frame, and a
+    timeline across the top of a page as a header rule (the second final verify,
+    2026-10-12): an axis or a ruler is never page furniture (`_page_furniture`)."""
+    unique: dict[tuple[bool, int, int, int], tuple[_Straight, list[int]]] = {}
+    for owner, own in enumerate(lines):
+        for line in own:
+            key = (line.horizontal, round(line.c), round(line.lo), round(line.hi))
+            unique.setdefault(key, (line, []))[1].append(owner)
+    flat = list(unique.values())
+    if not flat or len(flat) > AXES_MAX_LINES:
+        return
+    ends: dict[tuple[int, int], list[int]] = {}
+    for k, (line, _) in enumerate(flat):
+        for x, y in line.ends():
+            ends.setdefault((int(x // JOIN_PT), int(y // JOIN_PT)), []).append(k)
+
+    def meeting(k: int, point: tuple[float, float]) -> set[int]:
+        """The other lines with an end within JOIN_PT of `point`."""
+        x, y = point
+        bx, by = int(x // JOIN_PT), int(y // JOIN_PT)
+        found = set()
+        for dx in (-1, 0, 1):
+            for dy in (-1, 0, 1):
+                for m in ends.get((bx + dx, by + dy), ()):
+                    if m != k and any(
+                        abs(ex - x) <= JOIN_PT and abs(ey - y) <= JOIN_PT
+                        for ex, ey in flat[m][0].ends()
+                    ):
+                        found.add(m)
+        return found
+
+    def flag(k: int, attribute: str) -> None:
+        for owner in flat[k][1]:
+            setattr(paths[owner], attribute, True)
+
+    long = [k for k, (line, _) in enumerate(flat) if line.hi - line.lo >= AXIS_MIN_PT]
+
+    def closed_by(point: tuple[float, float], horizontal: bool) -> bool:
+        """A long line of that orientation has an end within AXIS_CLOSE_PT of `point`: the
+        L is part of a box whose corners do not quite meet (a report's box of four lines,
+        2026-10-13), not axes."""
+        x, y = point
+        return any(
+            flat[j][0].horizontal == horizontal
+            and any(
+                abs(ex - x) <= AXIS_CLOSE_PT and abs(ey - y) <= AXIS_CLOSE_PT
+                for ex, ey in flat[j][0].ends()
+            )
+            for j in long
+        )
+
+    for k in long:
+        line = flat[k][0]
+        if not line.horizontal:
+            continue
+        for corner, other in (line.ends(), line.ends()[::-1]):
+            met = meeting(k, corner)
+            if len(met) != 1:
+                continue
+            (m,) = met
+            upright = flat[m][0]
+            if upright.horizontal or upright.hi - upright.lo < AXIS_MIN_PT or meeting(k, other):
+                continue
+            near, far = upright.ends()
+            if abs(near[0] - corner[0]) > JOIN_PT or abs(near[1] - corner[1]) > JOIN_PT:
+                near, far = far, near
+            if closed_by(other, False) or closed_by(far, True):
+                continue
+            if meeting(m, near) == {k} and not meeting(m, far):
+                flag(k, "axis")
+                flag(m, "axis")
+                for owner in {*flat[k][1], *flat[m][1]}:
+                    paths[owner].axes += ((line, upright),)
+    # Rulers: short lines by orientation, in bands of TICK_MAX_PT of their middle.
+    short: dict[tuple[bool, int], list[int]] = {}
+    for k, (line, _) in enumerate(flat):
+        if line.hi - line.lo <= TICK_MAX_PT:
+            middle = (line.lo + line.hi) / 2
+            short.setdefault((line.horizontal, int(middle // TICK_MAX_PT)), []).append(k)
+    across: dict[tuple[bool, int], list[int]] = {}  # every line, by orientation and place
+    for k, (line, _) in enumerate(flat):
+        across.setdefault((line.horizontal, int(line.c // JOIN_PT)), []).append(k)
+
+    def on_parallel(point: tuple[float, float], horizontal: bool, skip: int) -> bool:
+        """`point` lies on a line of that orientation other than `skip`."""
+        x, y = point
+        c, t = (y, x) if horizontal else (x, y)
+        for b in (int(c // JOIN_PT) - 1, int(c // JOIN_PT), int(c // JOIN_PT) + 1):
+            for m in across.get((horizontal, b), ()):
+                other = flat[m][0]
+                if (
+                    m != skip
+                    and abs(other.c - c) <= JOIN_PT
+                    and other.lo - JOIN_PT <= t <= other.hi + JOIN_PT
+                ):
+                    return True
+        return False
+
+    for k in long:
+        line = flat[k][0]
+        length = line.hi - line.lo
+        band = int(line.c // TICK_MAX_PT)
+        ticks: list[int] = []
+        places: set[int] = set()
+        sides: set[int] = set()  # which side of the line each tick stands on (0: across it)
+        for b in (band - 1, band, band + 1):
+            for t in short.get((not line.horizontal, b), ()):
+                tick = flat[t][0]
+                if tick.hi - tick.lo > length / 4:
+                    continue
+                if not line.lo - JOIN_PT <= tick.c <= line.hi + JOIN_PT:
+                    continue  # beyond the line's ends
+                if tick.lo > line.c + JOIN_PT or tick.hi < line.c - JOIN_PT:
+                    continue  # does not reach it
+                if not (tick.lo < line.c - 1 and tick.hi > line.c + 1):  # ends on it
+                    free = tick.hi if abs(tick.lo - line.c) <= JOIN_PT else tick.lo
+                    point = (tick.c, free) if line.horizontal else (free, tick.c)
+                    if on_parallel(point, line.horizontal, k):
+                        continue  # a column rule between two rules, not a tick
+                    sides.add(1 if free > line.c else -1)
+                else:
+                    sides.add(0)
+                ticks.append(t)
+                places.add(round(tick.c))
+        if len(places) >= RULER_TICKS:
+            flag(k, "ruler")
+            for t in ticks:
+                flag(t, "ruler")
+            if len(sides) == 1 and 0 not in sides and _cells(sorted(places), ticks, flat):
+                flag(k, "comb")
+                for t in ticks:
+                    flag(t, "comb")
+
+
+COMB_CELL_PT = (8.0, 30.0)  # pt: an answer field's letter cells are this wide
+COMB_EVEN = 1.3  # its widest cell is at most this x its narrowest
+
+
+def _cells(places: list[int], ticks: list[int], flat: list[tuple[_Straight, list[int]]]) -> bool:
+    """Ticks at even places a letter cell apart (COMB_CELL_PT, COMB_EVEN), all as long:
+    the cells of an answer field to write a name or a number in, one letter each."""
+    gaps = [b - a for a, b in pairwise(places)]
+    lengths = [flat[t][0].hi - flat[t][0].lo for t in ticks]
+    return (
+        COMB_CELL_PT[0] <= min(gaps)
+        and max(gaps) <= COMB_CELL_PT[1]
+        and max(gaps) <= COMB_EVEN * min(gaps)
+        and max(lengths) <= COMB_EVEN * min(lengths)
+    )
 
 
 def _encloses(items: Sequence[Any], close_path: object) -> bool:
@@ -2560,15 +2948,24 @@ def _encloses(items: Sequence[Any], close_path: object) -> bool:
 
 
 def _border_like(items: Sequence[Any], display: _Display, box: BBox) -> bool:
-    """The path runs along the edges of its own box only: the shape of a frame, single or
-    double, with square, rounded, ticked or curled corners, drawn as one path. Each line
-    or curve stays near one edge (all its points within the band of that edge; a rounded
-    corner is near both of its edges), and each rectangle or quad lies along all four.
-    A plot's grid, axes or curves drawn in the same path cross the inside."""
+    """The path runs along the edges of its own box only, all four of them: the shape of a
+    frame, single or double, with square, rounded, ticked or curled corners, drawn as one
+    path. Each line or curve stays near one edge (all its points within the band of that
+    edge; a rounded corner is near both of its edges), and each rectangle or quad lies
+    along all four. A plot's grid, axes or curves drawn in the same path cross the inside;
+    a plot's two axes drawn as one L-shaped path run along two edges only (2026-10-12: a
+    full-page plot's axes were set aside as a frame)."""
     x0, y0, x1, y1 = box
     band = max(MIN_IMAGE_PT, FRAME_LINE_BAND * min(x1 - x0, y1 - y0))
     if min(x1 - x0, y1 - y0) <= 4 * band:
         return False  # too small or too thin to tell its edges from its inside
+    edges = [
+        lambda q: q[0] - x0,
+        lambda q: x1 - q[0],
+        lambda q: q[1] - y0,
+        lambda q: y1 - q[1],
+    ]
+    along = [False] * 4
     for item in items:
         if item[0] in ("re", "qu"):
             corners = (
@@ -2580,19 +2977,14 @@ def _border_like(items: Sequence[Any], display: _Display, box: BBox) -> bool:
             xs, ys = [q[0] for q in points], [q[1] for q in points]
             if max(min(xs) - x0, x1 - max(xs), min(ys) - y0, y1 - max(ys)) > band:
                 return False
+            along = [True] * 4
             continue
         points = [display.point(*q) for q in item[1:]]
-        if not any(
-            all(distance(q) <= band for q in points)
-            for distance in (
-                lambda q: q[0] - x0,
-                lambda q: x1 - q[0],
-                lambda q: q[1] - y0,
-                lambda q: y1 - q[1],
-            )
-        ):
+        near = [all(distance(q) <= band for q in points) for distance in edges]
+        if not any(near):
             return False
-    return True
+        along = [a or n for a, n in zip(along, near, strict=True)]
+    return all(along)
 
 
 def _rectangle_outline(
@@ -3187,26 +3579,37 @@ def _vector_figures(
     left_out: list[BBox] | None = None,
     depth: int = 0,
     small_out: list[tuple[BBox, list[_Path]]] | None = None,
+    ink: Collection[int] = frozenset(),
+    hand: Sequence[BBox] = (),
 ) -> list[_Figure]:
     """Clusters of drawings that look like a picture, not rules, borders or tables.
 
-    Page furniture (a frame round the page, a page-wide rule along an edge, a background
-    fill) is set aside first: a frame's box holds everything on the page, so clustered
-    with the rest it made every figure on the page one "page border" (docs/layout.md
-    "Figures"). A drawing that still fills the page (a full-page plot, a slide's chart)
-    is a figure when it has three curves or two bars and no running text inside. Else it
-    may be a decorated border or a background drawn behind text, but a drawing must not
-    be lost with it: its border (`_border_member`) is set aside and the rest clustered
-    again; with no border to take off, a page-filling drawing that still holds a plotted
-    line, curves or bars goes to `left_out`, and the safety net keeps the page image.
-    With `page_sized` False (the page has ink: it may be a page of notes) such a drawing
-    is never a figure for the model: its box goes to `left_out` too (`INK_REASONS`).
+    Page furniture (a frame round the page, a page-wide rule along an edge that is no
+    plot's axis or ruler, a background fill) is set aside first: a frame's box holds
+    everything on the page, so clustered with the rest it made every figure on the page
+    one "page border" (docs/layout.md "Figures"). A drawing that still fills the page (a
+    full-page plot, a slide's chart) is a figure when it is a plot (a plotted line or
+    bars on axes or a ruler with evidence of a plot: `_mark_plots`), whatever text is
+    inside its axes (a title, a note: it stays in the reading flow), or when it has three
+    curves or two bars and no running text inside. Else it may be a decorated border or
+    a background drawn behind text, but a drawing must not be lost with it: its border
+    (`_border_member`) is set aside and the rest clustered again, and when nothing is
+    made of a rest that holds curves or bars, or there is no border to take off, a
+    page-filling drawing that holds a plotted line, curves or bars goes to `left_out`,
+    and the safety net keeps the page image. With `page_sized` False (the page has ink:
+    it may be a page of notes) such a drawing is never a figure for the model: its box
+    goes to `left_out` too (`INK_REASONS`).
 
     Rules alone (separators, underlines, a table's grid) and boxes or panels round text
-    are not figures, unless they are drawn as a diagram (`_drawn_diagram`: lines joined
-    end to end into a staircase, boxes joined by lines) with no running text inside.
-    Clusters too small to be figures that are no part of one go to `small_out`: the page
-    decides what they are once its text is read (`_leftover_drawings`)."""
+    are not figures, unless they show signs of a drawing (`_diagram_signs`: axes, a
+    ruler, markers, a polyline; with no running text inside, also lines joined end to end
+    into a staircase, boxes joined by lines, a line leaving a box or running along
+    several: `_connected`). Without such signs a cluster whose text rows are not all held
+    by its boxes, panels or rules (`_round_text`) goes to `left_out`: something is drawn
+    there that is no box round text. Pen strokes (`ink`) and what lies in the page's
+    handwriting regions (`hand`) are no signs. Clusters too small to be figures that are
+    no part of one go to `small_out`: the page decides what they are once its text is
+    read (`_leftover_drawings`)."""
     figures = []
     small: list[tuple[BBox, list[_Path]]] = []  # drawings too small to be figures on their own
     index = _RowIndex([r for r in rows if not r.vertical])
@@ -3214,7 +3617,14 @@ def _vector_figures(
     for group in _overlapping(_cluster([p.bbox for p in paths], DRAWING_CLUSTER_GAP), paths):
         members = [paths[i] for i in group]
         rule_only = all(p.kind in ("hrule", "vrule") or p.rules for p in members)
-        if rule_only and not _line_chain(members):
+        ruler = any(p.ruler for p in members)  # a timeline, an axis with ticks
+        if (
+            rule_only
+            and not ruler
+            and not _line_chain(members)
+            and not _connected(members)
+            and not any(_bond_ends(p, index) for p in members)
+        ):
             continue  # separators, underlines, table grids, paper rules
         x0, y0, x1, y1 = _union(p.bbox for p in members)
         box = (max(x0, 0.0), max(y0, 0.0), min(x1, page_rect.width), min(y1, page_rect.height))
@@ -3241,30 +3651,60 @@ def _vector_figures(
                 if left_out is not None:
                     left_out.append(box)
                 continue
-            if (len(curves) < 3 and len(bars) < 2) or (
-                ctx is not None and _running_text(inside, ctx)
-            ):
-                inner = [p for p in members if not _border_member(p, box, page_rect)]
-                if inner and len(inner) < len(members) and depth < 2:
-                    figures += _vector_figures(
-                        inner,
-                        rows,
-                        page_rect,
-                        ctx,
-                        page_sized=page_sized,
-                        left_out=left_out,
-                        depth=depth + 1,
-                        small_out=small_out,
-                    )
-                elif (curved or len(bars) >= 2) and left_out is not None:
+            # A plotted line or bars on axes (or on a ruler: an axis with ticks) with
+            # evidence of a plot is a plot, not a decorated border, with one curve and
+            # with running text inside (which stays in the reading flow: `_absorb_labels`).
+            plot = (curved or len(bars) >= 2) and any(p.plot or p.ruler for p in members)
+            running = ctx is not None and bool(_running_text(inside, ctx))
+            figure = plot or not ((len(curves) < 3 and len(bars) < 2) or running)
+            inner = [p for p in members if not _border_member(p, box, page_rect)]
+            border = bool(inner) and len(inner) < len(members) and depth < 2
+            if border and (plot or not figure):
+                # A plot inside a border of dashes or ornaments is the plot without them;
+                # anything else is clustered again once its border is off.
+                before = (len(left_out or ()), len(small_out or ()))
+                found = _vector_figures(
+                    inner,
+                    rows,
+                    page_rect,
+                    ctx,
+                    page_sized=page_sized,
+                    left_out=left_out,
+                    depth=depth + 1,
+                    small_out=small_out,
+                    ink=ink,
+                    hand=hand,
+                )
+                _take_border_marks(found, [p for p in members if p not in inner])
+                figures += found
+                after = (len(left_out or ()), len(small_out or ()))
+                # Nothing was made of what is left once the border is off: if it held
+                # curves or bars, the page image keeps them.
+                if (
+                    not found
+                    and after == before
+                    and left_out is not None
+                    and any(p.curved or p in bars for p in inner)
+                ):
+                    left_out.append(box)
+                continue
+            if not figure:
+                if (curved or len(bars) >= 2) and left_out is not None:
                     left_out.append(box)  # drawings no figure was made of: the page image
                 continue
         elif not curved and len(bars) < 2 and (len(inside) >= 2 or rule_only):
-            # A box, shaded panel or table drawn around text, unless it is a diagram of
-            # boxes and lines with labels in it (an org chart, a step plot).
-            drawn = rule_only or _drawn_diagram(members)  # rules alone got here as a chain
-            if not drawn or (ctx is not None and _running_text(inside, ctx)):
+            # A box, shaded panel or table drawn around text, unless it shows signs of a
+            # drawing (axes, a connector, markers, a polyline: a diagram with labels in
+            # it, whose running text stays in the reading flow). With neither signs nor
+            # every row held by its boxes or rules, the page image keeps it.
+            signs = _diagram_signs(members, index, ink, hand)
+            running = ctx is not None and bool(_running_text(inside, ctx))
+            if signs != "drawing" and (signs is None or running):
+                if not _round_text(members, inside) and left_out is not None:
+                    left_out.append(box)
                 continue
+        if rule_only:  # a Fischer projection's bonds: the atom groups at their ends too
+            box = _union([box, *(end for p in members for end in _bond_ends(p, index))])
         figures.append(_Figure(box, paths=len(members)))
     # Small drawings just outside a figure (axis titles and tick labels drawn as outlines,
     # a legend's markers a little apart) are part of it: left out, its crop missed them.
@@ -3280,8 +3720,124 @@ def _vector_figures(
     return figures
 
 
+def _take_border_marks(figures: Sequence[_Figure], border: Sequence[_Path]) -> None:
+    """The marks smaller than a figure among a page-filling cluster's `border` that lie
+    within FIGURE_PART_REACH of a figure made of the rest are part of it, spreading along
+    a row of them: a plot's axes drawn as dashes, set aside as a frame's pieces along two
+    edges (2026-10-13: the curve was a figure and its dashed axes were lost). A frame of
+    dashes round the page stays apart from the plot inside it."""
+    marks = [
+        p for p in border if max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) < MIN_DRAWING_PT
+    ]
+    grew = bool(figures)
+    while marks and grew:
+        grew = False
+        rest = []
+        for path in marks:
+            near = next((f for f in figures if _within(path.bbox, f.bbox, FIGURE_PART_REACH)), None)
+            if near is None:
+                rest.append(path)
+                continue
+            near.bbox = _union([near.bbox, path.bbox])
+            near.paths += 1
+            grew = True
+        marks = rest
+
+
 JOIN_PT = 1.5  # pt: line ends this close meet (a corner of a staircase, a connector's end)
 MAX_DIAGRAM_BOXES = 200  # more box outlines in one cluster are a grid of cells, not a diagram
+ORIGIN_REACH = 4.0  # pt: a plotted line that starts this close to its axes' corner starts there
+AXIS_LABEL_REACH = 3.0  # x font size: a tick label or axis title is this close outside an axis
+
+
+def _answer_fields(paths: Sequence[_Path], rows: Sequence[_Row]) -> None:
+    """Rulers whose ticks stand on one side of the line a letter cell apart (`_Path.comb`)
+    with no short row by their ticks (a tick label) are an answer field's cells (a comb
+    to write a candidate number or a name in): no ruler, so rules alone, not a drawing
+    (2026-10-13: an exam cover's two comb fields became figures and decisions). A label
+    beside the field's start ("Candidate number") is the field's own, not a tick's."""
+    combs = [p for p in paths if p.comb]
+    if not combs:
+        return
+    labels = [r for r in rows if not r.vertical and len(r.clean) <= LABEL_MAX_CHARS]
+    for group in _cluster([p.bbox for p in combs], JOIN_PT):
+        members = [combs[i] for i in group]
+        x0, y0, x1, y1 = _union(p.bbox for p in members)
+        horizontal = x1 - x0 >= y1 - y0
+        labelled = False
+        for row in labels:
+            reach = 1.5 * max(row.size, (y1 - y0) if horizontal else (x1 - x0))
+            mx, my = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
+            if horizontal and x0 <= mx <= x1 and _gap(row.bbox, (x0, y0, x1, y1)) <= reach:
+                labelled = True
+            if not horizontal and y0 <= my <= y1 and _gap(row.bbox, (x0, y0, x1, y1)) <= reach:
+                labelled = True
+        if not labelled:
+            for p in members:
+                p.ruler = p.comb = False
+
+
+def _mark_plots(paths: Sequence[_Path], rows: Iterable[_Row]) -> None:
+    """Flag the paths that hold an L of axes (`_mark_axes`) with evidence of a plot
+    (`_Path.plot`), not a frame's two sides or a template's accent: tick marks on it (a
+    ruler), a curve starting at its corner (ORIGIN_REACH), two bars standing on it, or a
+    short row (a tick label, an axis title; LABEL_MAX_CHARS) just outside one of its lines
+    (AXIS_LABEL_REACH x its size), on the side away from the other line. `rows` are the
+    page's rows, the ones the header and footer rules dropped too (a full-page plot's tick
+    labels are in the footer band). A title slide's L-shaped accent and the wave across it
+    have none of these (2026-10-13: the slide became one figure whose labels were its
+    title and subtitle)."""
+    owners: dict[tuple[_Straight, _Straight], list[_Path]] = {}
+    for p in paths:
+        for pair in p.axes:
+            owners.setdefault(pair, []).append(p)
+    if not owners:
+        return
+    labels = [r for r in rows if len(r.clean) <= LABEL_MAX_CHARS and not CAPTION.match(r.clean)]
+    ends = [(x, y) for p in paths for x, y in p.ends]
+    filled = [p for p in paths if p.filled]
+    for (h, v), held in owners.items():
+        if any(p.plot for p in held):
+            continue
+        if any(p.ruler for p in held) or _plot_evidence(h, v, ends, filled, labels):
+            for p in held:
+                p.plot = True
+
+
+def _plot_evidence(
+    h: _Straight,
+    v: _Straight,
+    ends: Sequence[tuple[float, float]],
+    filled: Sequence[_Path],
+    labels: Sequence[_Row],
+) -> bool:
+    """`_mark_plots`' tests for one L: a curve end at its corner, two bars standing on its
+    horizontal line, or a label just outside one of its lines."""
+    # The corner, and which way each line runs from it.
+    cx = h.lo if abs(h.lo - v.c) <= abs(h.hi - v.c) else h.hi
+    cy = v.lo if abs(v.lo - h.c) <= abs(v.hi - h.c) else v.hi
+    right = h.hi - cx > cx - h.lo  # the horizontal line runs right from the corner
+    up = cy - v.lo > v.hi - cy  # the vertical line runs up from the corner
+    if any(abs(x - cx) <= ORIGIN_REACH and abs(y - cy) <= ORIGIN_REACH for x, y in ends):
+        return True
+    standing = [
+        p
+        for p in filled
+        if h.lo <= (p.bbox[0] + p.bbox[2]) / 2 <= h.hi
+        and abs((p.bbox[3] if up else p.bbox[1]) - h.c) <= JOIN_PT + 1
+    ]
+    if len(standing) >= 2:
+        return True
+    for row in labels:
+        reach = AXIS_LABEL_REACH * row.size
+        mx, my = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
+        below = row.y0 - h.c if up else h.c - row.y1  # outside the horizontal line
+        if -0.5 * row.size <= below <= reach and h.lo - reach <= mx <= h.hi + reach:
+            return True
+        beside = v.c - row.x1 if right else row.x0 - v.c  # outside the vertical line
+        if -0.5 * row.size <= beside <= reach and v.lo - reach <= my <= v.hi + reach:
+            return True
+    return False
 
 
 def _drawn_diagram(members: Sequence[_Path]) -> bool:
@@ -3294,12 +3850,9 @@ def _drawn_diagram(members: Sequence[_Path]) -> bool:
     return _line_chain(members) or _joined_boxes(members)
 
 
-def _line_chain(members: Sequence[_Path]) -> bool:
-    """Four or more horizontal and vertical rules (two of each at least) joined corner to
-    corner, end to end, into a chain that does not close (some end meets nothing)."""
-    rules = [p for p in members if p.kind in ("hrule", "vrule")]
-    if len(rules) < 4:
-        return False
+def _rule_chains(rules: Sequence[_Path]) -> list[tuple[list[int], bool]]:
+    """The horizontal and vertical `rules` joined corner to corner, end to end (JOIN_PT):
+    each chain's rule indices, and whether it closes (every end meets another rule's)."""
     ends: list[tuple[float, float, int]] = []
     for i, rule in enumerate(rules):
         x0, y0, x1, y1 = rule.bbox
@@ -3335,15 +3888,243 @@ def _line_chain(members: Sequence[_Path]) -> bool:
     chains: dict[int, list[int]] = {}
     for i in range(len(rules)):
         chains.setdefault(find(i), []).append(i)
-    for chain in chains.values():
-        if len(chain) < 4:
-            continue
+    closed = {find(i): True for i in range(len(rules))}
+    for k, (_, _, i) in enumerate(ends):
+        if not met[k]:
+            closed[find(i)] = False
+    return [(chain, closed[root]) for root, chain in chains.items()]
+
+
+def _line_chain(members: Sequence[_Path]) -> bool:
+    """Four or more horizontal and vertical rules (two of each at least) joined corner to
+    corner, end to end, into a chain that does not close (some end meets nothing)."""
+    rules = [p for p in members if p.kind in ("hrule", "vrule")]
+    if len(rules) < 4:
+        return False
+    for chain, closed in _rule_chains(rules):
         kinds = Counter(rules[i].kind for i in chain)
-        if kinds["hrule"] < 2 or kinds["vrule"] < 2:
-            continue
-        if any(not met[k] for k, (_, _, i) in enumerate(ends) if find(i) == find(chain[0])):
+        if len(chain) >= 4 and kinds["hrule"] >= 2 and kinds["vrule"] >= 2 and not closed:
             return True
     return False
+
+
+def _rule_boxes(members: Sequence[_Path]) -> list[tuple[BBox, list[_Path]]]:
+    """Boxes drawn line by line: two horizontal and two vertical rules that close on each
+    other corner to corner (`_rule_chains`), with the rules that draw each."""
+    rules = [p for p in members if p.kind in ("hrule", "vrule")]
+    if len(rules) < 4:
+        return []
+    found = []
+    for chain, closed in _rule_chains(rules):
+        sides = [rules[i] for i in chain]
+        if closed and len(sides) == 4 and sum(p.kind == "hrule" for p in sides) == 2:
+            found.append((_union(p.bbox for p in sides), sides))
+    return found
+
+
+CONTAINER_MIN_PT = 8.0  # pt: a filled panel this big on both sides can hold a row of text
+MARK_MAX_PT = 8.0  # pt: a plot's marker (a small square, a plus) is at most this big
+MARKS_MIN = 3  # markers in different places: a scatter plot's points
+
+
+def _containers(members: Sequence[_Path]) -> tuple[list[BBox], set[int]]:
+    """The boxes of a cluster that can hold text: box outlines (one path, or four rules:
+    `_rule_boxes`) and filled panels (CONTAINER_MIN_PT); and the ids of the rules that
+    draw the boxes drawn line by line."""
+    boxes = [
+        p.bbox
+        for p in members
+        if p.kind == "shape"
+        and (p.frame or p.filled)
+        and min(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) >= CONTAINER_MIN_PT
+    ]
+    sides: set[int] = set()
+    for box, rules in _rule_boxes(members):
+        boxes.append(box)
+        sides.update(id(r) for r in rules)
+    return boxes, sides
+
+
+def _connected(members: Sequence[_Path]) -> bool:
+    """A line outside every box of the cluster (`_containers`) that leaves one of them
+    across its side (a connector, a whisker, a wire into a resistor's box: its end on the
+    box's side, between that side's corners), or that runs along two or more boxes apart
+    from each other (the baseline of a bar chart of outlined bars). A table's rule along a
+    header panel runs along one box; its cells touch each other."""
+    boxes, sides = _containers(members)
+    if not boxes or len(boxes) > MAX_DIAGRAM_BOXES:
+        return False
+    reach = JOIN_PT + 1
+    for path in members:
+        if path.kind not in ("hrule", "vrule") or id(path) in sides:
+            continue
+        if any(_inside(path.bbox, b) for b in boxes):
+            continue
+        x0, y0, x1, y1 = path.bbox
+        touching = [b for b in boxes if _within(path.bbox, b, reach)]
+        for b in touching:
+            if path.kind == "hrule":
+                y = (y0 + y1) / 2
+                across = abs(x1 - b[0]) <= reach or abs(x0 - b[2]) <= reach
+                if across and b[1] + 1 < y < b[3] - 1:
+                    return True
+            else:
+                x = (x0 + x1) / 2
+                across = abs(y1 - b[1]) <= reach or abs(y0 - b[3]) <= reach
+                if across and b[0] + 1 < x < b[2] - 1:
+                    return True
+        if any(_gap(a, b) > 2 * JOIN_PT for a, b in combinations(touching, 2)):
+            return True
+    return False
+
+
+BOND_GAP = 1.5  # x font size: a bond ends this close to the atom groups it joins
+BOND_TOKEN = 6  # characters: an atom group (H, OH, CHO, CH2OH, COOH) is at most this long
+
+
+def _bond_ends(rule: _Path, index: _RowIndex) -> list[BBox]:
+    """The boxes of the two atom groups a horizontal or vertical rule joins, or []: a
+    token of at most BOND_TOKEN characters beyond each end of the rule, within BOND_GAP x
+    its size, the rule at least as long as the tokens are tall, through the middle half of
+    their height (a horizontal rule) or through their width (a vertical one). A bond of
+    a structural formula or a Fischer projection (2026-10-13: dropped as rules alone). A
+    blank to fill in lies on the baseline, a minus sign is shorter than its text, an
+    underline and a strikeout run under or through one row."""
+    if rule.kind not in ("hrule", "vrule"):
+        return []
+    x0, y0, x1, y1 = rule.bbox
+    horizontal = rule.kind == "hrule"
+    reach = BOND_GAP * index.largest
+    before: BBox | None = None
+    after: BBox | None = None
+    for row in index.near(y0 - reach, y1 + reach):
+        for start, end in _tokens(row):
+            chars = [c for c in row.chars[start:end] if not c.blank]
+            if not chars:
+                continue
+            box = _union((c.x0, c.y0, c.x1, c.y1) for c in chars)
+            size = max(c.size for c in chars)
+            gap = BOND_GAP * size
+            # Text over or under a horizontal rule (a fraction's numerator, a word over an
+            # underline), or beside a vertical one (a table's cells), is no atom group.
+            if horizontal:
+                over = min(box[2], x1) - max(box[0], x0) > 0.5 * (box[2] - box[0])
+                near = -gap <= y0 - box[3] <= gap or -gap <= box[1] - y1 <= gap
+            else:
+                over = min(box[3], y1) - max(box[1], y0) > 0.5 * (box[3] - box[1])
+                near = -gap <= x0 - box[2] <= gap or -gap <= box[0] - x1 <= gap
+            if over and near:
+                return []
+            if len(chars) > BOND_TOKEN or (x1 - x0 if horizontal else y1 - y0) < box[3] - box[1]:
+                continue
+            if horizontal:
+                y, h = (y0 + y1) / 2, box[3] - box[1]
+                if not box[1] + 0.25 * h <= y <= box[3] - 0.25 * h:
+                    continue
+                if -1 <= x0 - box[2] <= gap:
+                    before = box
+                if -1 <= box[0] - x1 <= gap:
+                    after = box
+            else:
+                if not box[0] <= (x0 + x1) / 2 <= box[2]:
+                    continue
+                if -1 <= y0 - box[3] <= gap:
+                    before = box
+                if -1 <= box[1] - y1 <= gap:
+                    after = box
+    return [before, after] if before is not None and after is not None else []
+
+
+def _bonds(members: Sequence[_Path], index: _RowIndex) -> list[BBox]:
+    """The atom groups the bonds among `members` join (`_bond_ends`), when every member
+    is such a bond; else []."""
+    found: list[BBox] = []
+    for path in members:
+        ends = _bond_ends(path, index)
+        if not ends:
+            return []
+        found += ends
+    return found
+
+
+def _diagram_signs(
+    members: Sequence[_Path],
+    index: _RowIndex,
+    ink: Collection[int] = frozenset(),
+    hand: Sequence[BBox] = (),
+) -> str | None:
+    """Signs that a cluster of straight lines, boxes and marks with text in it is a
+    drawing, not structure round text (a box, a panel, a table). "drawing" whatever text
+    is in it: an L of axes or a ruler (`_mark_axes`), MARKS_MIN small marks in different
+    places that are no list bullets (a scatter plot's squares or crosses), or an open
+    polyline (a step, a skyline, a signal, a zigzag, a wire round a corner, an arrow; at
+    least MIN_IMAGE_PT long) inside none of the cluster's other boxes (a mark drawn in a
+    box round text is no sign of a diagram). "lines" when it holds no running text: lines
+    joined into an open chain or boxes joined by a line (`_drawn_diagram`), or a line
+    leaving a box or running along several (`_connected`), or bonds between atom groups
+    (`_bond_ends`: a Fischer projection): a box round paragraphs drawn in pieces, or a
+    grid of cell borders in a worked example, has them too. None without either. The
+    drawings sweep of 2026-10-13: scatter plots with a legend, outlined bars on a
+    baseline, histograms and step plots drawn as one path, timing diagrams, a box plot,
+    circuits and flowcharts with labels inside were dropped as boxes round text. Pen
+    strokes (`ink`: the page type's) and what lies in the handwriting cut out of a typed
+    page (`hand`) are no sign: a hand mark in a box round text is cut out as
+    handwriting, the box stays structure."""
+    drawn = [
+        p
+        for p in members
+        if p.source not in ink and not any(_centre_inside(p.bbox, r) for r in hand)
+    ]
+    if any(p.axis or p.ruler for p in drawn):
+        return "drawing"
+    marks = {
+        _box_key(p.bbox)
+        for p in drawn
+        if p.kind == "shape"
+        and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= MARK_MAX_PT
+        and not _bullet_mark(p, index)
+    }
+    if len(marks) >= MARKS_MIN:
+        return "drawing"
+    boxes, _ = _containers(members)
+    if any(
+        p.open_stroke
+        and p.turns
+        and p.kind == "shape"
+        and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) >= MIN_IMAGE_PT
+        and not any(b != p.bbox and _inside(p.bbox, b) for b in boxes)
+        for p in drawn
+    ):
+        return "drawing"
+    if _drawn_diagram(members) or _connected(members):
+        return "lines"
+    if any(_bond_ends(p, index) for p in members):
+        return "lines"  # bonds between atom groups
+    return None
+
+
+def _round_text(members: Sequence[_Path], rows: Sequence[_Row]) -> bool:
+    """Every row is held by the cluster's structure: inside one of its boxes or panels
+    (`_containers`), or between two of its rules that span it (a table's rows between
+    its rules). Rows outside every box (the value labels over a bar chart's outlined bars)
+    are not."""
+    boxes, _ = _containers(members)
+    boxes += [p.bbox for p in members if p.filled]  # a band of thin strips is a panel too
+    grown = [(b[0] - 1, b[1] - 1, b[2] + 1, b[3] + 1) for b in boxes]
+    hrules = [p.bbox for p in members if p.kind == "hrule"]
+    vrules = [p.bbox for p in members if p.kind == "vrule"]
+    for row in rows:
+        if any(_centre_inside(row.bbox, b) for b in grown):
+            continue
+        cx, cy = (row.x0 + row.x1) / 2, (row.y0 + row.y1) / 2
+        spans = [r for r in hrules if r[0] <= row.x0 + 1 and r[2] >= row.x1 - 1]
+        if any(r[3] <= cy for r in spans) and any(r[1] >= cy for r in spans):
+            continue
+        spans = [r for r in vrules if r[1] <= row.y0 + 1 and r[3] >= row.y1 - 1]
+        if any(r[2] <= cx for r in spans) and any(r[0] >= cx for r in spans):
+            continue
+        return False
+    return True
 
 
 def _joined_boxes(members: Sequence[_Path]) -> bool:
@@ -3391,7 +4172,10 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
     page-long rule near an edge), a background fill (at least PAGE_SIZED_FRACTION of the
     page's area, or a straight-edged panel round the page with a margin) or a band of
     colour along an edge (a slide template's title bar): never part of a figure, and
-    never content on its own."""
+    never content on its own. A page-long rule that is a plot's axis or a ruler's line
+    (`_mark_axes`: a full-page plot's y-axis, a timeline across the top) is a drawing; an
+    L round the page with no evidence of a plot (`_mark_plots`: a template's accent along
+    two edges) is two sides of a frame."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
     big = PAGE_SIZED_FRACTION
@@ -3403,8 +4187,10 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
         )
     if path.frame:
         return _round_page(path.bbox, page_rect)
-    if path.curved:
+    if path.curved or path.ruler or path.plot:
         return False
+    if path.axis and path.kind == "shape":  # an L drawn as one path
+        return _round_page(path.bbox, page_rect)
     edge = FRAME_EDGE_BAND
     if path.kind == "hrule":
         return x1 - x0 >= big * w and (y1 <= edge * h or y0 >= (1 - edge) * h)
@@ -3414,18 +4200,34 @@ def _page_furniture(path: _Path, page_rect: pymupdf.Rect) -> bool:
 
 
 def _border_member(path: _Path, box: BBox, page_rect: pymupdf.Rect) -> bool:
-    """Part of the border of a page-filling cluster (`box`): frame-shaped, across the page
-    (PAGE_SIZED_FRACTION of its width or height), or a mark smaller than a figure along
-    an edge of the cluster (within FRAME_EDGE_BAND of the page): the pieces of a frame
-    whose shape was not recognised, corner ornaments."""
+    """Part of the border of a page-filling cluster (`box`): frame-shaped, an L with no
+    evidence of a plot (`_mark_plots`: a frame's two sides, a template's accent), straight
+    and across the page (PAGE_SIZED_FRACTION of its width or height), curved and across
+    the page along one of its edges (within FRAME_EDGE_BAND), or a mark smaller than a
+    figure along an edge of the cluster: the pieces of a frame whose shape was not
+    recognised, corner ornaments. A plot's axes and a ruler (`_mark_axes`) are not; nor
+    is a curve across the middle of the page (a wave across a title slide, a plotted
+    line: 2026-10-13, a full-page plot's curve was set aside and its axes alone made
+    nothing)."""
     x0, y0, x1, y1 = path.bbox
     w, h = page_rect.width, page_rect.height
-    if path.frame or x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
+    if path.ruler or path.plot:
+        return False
+    if path.frame or path.axis:
         return True
+    if x1 - x0 >= PAGE_SIZED_FRACTION * w or y1 - y0 >= PAGE_SIZED_FRACTION * h:
+        return not path.curved or _in_edge_band(path.bbox, page_rect)
     if max(x1 - x0, y1 - y0) >= MIN_DRAWING_PT:
         return False
     bx, by = FRAME_EDGE_BAND * w, FRAME_EDGE_BAND * h
     return x1 <= box[0] + bx or x0 >= box[2] - bx or y1 <= box[1] + by or y0 >= box[3] - by
+
+
+def _in_edge_band(box: BBox, page_rect: pymupdf.Rect) -> bool:
+    """`box` lies within FRAME_EDGE_BAND of one edge of the page, all of it."""
+    w, h = page_rect.width, page_rect.height
+    band_x, band_y = FRAME_EDGE_BAND * w, FRAME_EDGE_BAND * h
+    return box[3] <= band_y or box[1] >= h - band_y or box[2] <= band_x or box[0] >= w - band_x
 
 
 def _round_page(box: BBox, page_rect: pymupdf.Rect) -> bool:
@@ -3542,18 +4344,24 @@ def _absorb_labels(
 
 def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
     """Ids of rows that are not labels: lines of a paragraph (a prose line that the next
-    or previous prose line continues) and title-sized lines of several words."""
+    or previous prose line continues) and title-sized lines of several words: at least
+    HEADING_SIZE_RATIO x body size, or TITLE_MIN_PT whatever the body (a slide whose only
+    text is its title sets the body size itself: its title was a figure's label). The
+    short last line of such a paragraph ("the three.") is one of its lines too."""
     found: set[int] = set()
     prose = []
+    texts = []
     for row in rows:
         if row.kind != "text" or row.vertical:
             continue
+        texts.append(row)
         words = _prose_words(row, _CharInfo.of(row))
-        if words >= 2 and row.size >= HEADING_SIZE_RATIO * ctx.body:
+        if words >= 2 and (row.size >= HEADING_SIZE_RATIO * ctx.body or row.size >= TITLE_MIN_PT):
             found.add(id(row))
         if words >= 3:
             prose.append(row)
     prose.sort(key=lambda r: r.baseline)
+    lines: set[int] = set()  # lines of a paragraph
     for i, above in enumerate(prose):
         for below in prose[i + 1 :]:
             if below.baseline - above.baseline > 2.0 * max(above.size, below.size):
@@ -3561,8 +4369,22 @@ def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
             if below.column == above.column and _continues(
                 above, below, _Run([above], "text", True), ctx
             ):
-                found.update((id(above), id(below)))
-    return found
+                lines.update((id(above), id(below)))
+    texts.sort(key=lambda r: r.baseline)
+    for i, row in enumerate(texts):
+        if id(row) in lines:
+            continue
+        for above in reversed(texts[:i]):
+            if row.baseline - above.baseline > 2.0 * max(above.size, row.size):
+                break
+            if (
+                id(above) in lines
+                and above.column == row.column
+                and _continues(above, row, _Run([above], "text", True), ctx)
+            ):
+                lines.add(id(row))
+                break
+    return found | lines
 
 
 # ============================================================================ blocks
@@ -4129,18 +4951,27 @@ def _page_blocks(
     left_out: list[BBox] = []
     small: list[tuple[BBox, list[_Path]]] = []
     vector = _vector_figures(
-        loose, rows, page_rect, ctx, page_sized=page_sized, left_out=left_out, small_out=small
+        loose,
+        rows,
+        page_rect,
+        ctx,
+        page_sized=page_sized,
+        left_out=left_out,
+        small_out=small,
+        ink=ink_sources,
+        hand=ink,
     )
     figures = _merge_figures(_raster_figures(page, page_rect) + vector)
     # A logo repeated in the header or footer band is decoration, like a running header.
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     # A chart's tick labels in the footer band, or its axis title repeated on every slide,
     # are its labels, not running text.
-    restored = _figure_labels(dropped, figures, rows, page_rect.height, label_keys)
+    restored = _figure_labels(dropped, figures, rows, page_rect.height, label_keys, margins)
     for row in restored:
         _classify_row(row)
     rows = [*rows, *restored]
     figures = [f for f in figures if _absorb_labels(f, rows, ctx, page.parent)]
+    _take_labels(restored, figures, rows)
     text_rows = [r for r in rows if not r.absorbed]
     _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
@@ -4239,6 +5070,7 @@ def _figure_labels(
     rows: Sequence[_Row],
     height: float,
     accepted: Collection[tuple] = frozenset(),
+    margins: _MarginFilter | None = None,
 ) -> list[_Row]:
     """Rows the header and footer rules dropped (`_prepare_rows`) that label a figure: a
     chart's tick labels in the footer band (bare numbers, read as page numbers), its axis
@@ -4247,7 +5079,10 @@ def _figure_labels(
     (LABEL_MAX_CHARS), not diagonal, and within LABEL_REACH x its size of a figure or of
     the short rows just beside it (its tick labels), level with it for a rotated row and
     under or over it otherwise (`_beside_figure`). Bare numbers count only two or more on
-    one baseline: a page number alone under a figure is still a page number. Other text
+    one baseline, or level with a figure when the document's page numbers are not there
+    (`margins.numbering`: an axis title "v" at the top of a full-page plot's y-axis, read
+    as a page number in roman numerals): a page number alone under a figure, or beside
+    one in the band where the other pages have theirs, is still a page number. Other text
     counts only when its key is `accepted` (`_label_keys`: beside a figure wherever the
     document repeats it), so a running footer that also runs under pages of text stays
     dropped."""
@@ -4265,8 +5100,42 @@ def _figure_labels(
         id(r)
         for r in numbers
         if not any(o is not r and abs(o.baseline - r.baseline) <= 0.3 * r.size for o in numbers)
+        and not (
+            any(f.bbox[1] <= (r.y0 + r.y1) / 2 <= f.bbox[3] for f in figures)
+            and not (margins is not None and margins.numbering(r, height))
+        )
     }
     return [r for r in found if id(r) not in lone]
+
+
+def _gap(box: BBox, other: BBox) -> float:
+    """How far apart two boxes are (0 when they touch or overlap), sideways plus up or down."""
+    return max(0.0, other[0] - box[2], box[0] - other[2]) + max(
+        0.0, other[1] - box[3], box[1] - other[3]
+    )
+
+
+def _take_labels(
+    restored: Sequence[_Row], figures: Sequence[_Figure], rows: Sequence[_Row]
+) -> None:
+    """The rows `_figure_labels` took back from the header and footer bands are labels of
+    the figure they are beside, not text of their own, even beyond the reach of
+    `_absorb_labels` (a full-page plot's tick labels 6 pt under its x-axis in the footer
+    band were read as five paragraphs of one digit each)."""
+    for row in restored:
+        if row.absorbed:
+            continue
+        beside = [
+            (_gap(row.bbox, f.bbox), i)
+            for i, f in enumerate(figures)
+            if _beside_figure(row, _figure_extents([f.bbox], rows))
+        ]
+        if not beside:
+            continue
+        figure = figures[min(beside)[1]]
+        row.absorbed = True
+        figure.labels.append(row)
+        figure.bbox = _union([figure.bbox, row.bbox])
 
 
 def _is_number_row(row: _Row) -> bool:
@@ -4376,7 +5245,8 @@ def _leftover_drawings(
     2026-10-12: an icon, a benzene ring, a number line, maths drawn as glyph outlines,
     ticks). Not counted: drawn list bullets, a repeated mark in the header or footer band,
     horizontal and vertical lines and boxes alone (an empty answer box, a black box over a
-    line), anything whose middle lies in a block (an underline, a box round a word), and
+    line) unless they are a ruler (a timeline: `_mark_axes`), anything whose middle lies
+    in a block (an underline, a box round a word), and
     the ornaments of a page frame: marks at the edges of a frame round the page
     (`frames`, corner curls), or a group that runs round the page itself (a frame of
     separate dots), dots alone (DOT_PT), and a shape painted over hidden text (`covers`,
@@ -4386,10 +5256,16 @@ def _leftover_drawings(
     (most of their paths are the page type's pen strokes, or every path is an open
     stroked line or curve: a tick, a cross, a signature) are returned as handwriting
     boxes (never sent to the figure model); any other drawing becomes a FIGURE block for
-    the model."""
+    the model. Since 2026-10-13 (the drawings sweep) some straight drawings count too:
+    bonds between atom groups (`_bond_ends`: a structural formula's h/v bonds, which the
+    row of its letters holds), boxes joined by lines across their sides (`_connected`: a
+    one-line circuit of resistor boxes and wires), and dots round a letter that reach out
+    of its line (`_dots_out_of_line`: a Lewis structure's electrons); the drawing's box
+    takes in the atom groups its bonds join."""
     pad = UNREAD_PAD
     grown = [(b.bbox[0] - pad, b.bbox[1] - pad, b.bbox[2] + pad, b.bbox[3] + pad) for b in blocks]
     keep: list[tuple[BBox, list[_Path]]] = []
+    hand: set[int] = set()  # hand marks over typed text (`_pen_mark_over_text`)
     for _, cluster in clusters:
         members = [p for p in cluster if not _bullet_mark(p, index)]
         if not members:
@@ -4399,9 +5275,20 @@ def _leftover_drawings(
             margins.drops_mark(p.bbox, page_rect.height) for p in members
         ):
             continue
-        if any(_centre_inside(box, g) for g in grown) or any(
-            _at_edge(box, frame, FIGURE_PART_REACH) for frame in frames
+        holders = [
+            b
+            for b, g in zip(blocks, grown, strict=True)
+            if _centre_inside(box, g) and not _glyph_in(b, box)
+        ]
+        if holders and _pen_mark_over_text(members, box, holders):
+            hand.update(id(p) for p in members)
+        elif (
+            holders
+            and not _dots(members)  # decided once grouped (`_dots_out_of_line`)
+            and not _bonds(members, index)
         ):
+            continue  # an underline, a box round a word, maths drawn in a line
+        if any(_at_edge(box, frame, FIGURE_PART_REACH) for frame in frames):
             continue
         keep.append((box, members))
     figures: list[_Block] = []
@@ -4415,20 +5302,112 @@ def _leftover_drawings(
             and places < page_type.VECTOR_MIN_PATHS
         ) or _round_page(box, page_rect):
             continue
-        if not any(p.curved for p in members):
+        curved = any(p.curved for p in members)
+        atoms = [end for p in members for end in _bond_ends(p, index)]
+        if (
+            not curved
+            and not atoms
+            and not any(p.ruler for p in members)
+            and not _connected(members)
+        ):
             continue  # rules, boxes and bars alone (an answer box, a box over a line)
-        if all(p.filled and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= DOT_PT
-               for p in members):  # fmt: skip
+        if _dots(members) and not _dots_out_of_line(members, box, index):
             continue  # dots alone: leaders, bullets the bullet test missed
+        box = _union([box, *atoms])  # a formula's bonds and the atom groups they join
         if any(_centre_inside((x, y, x, y), box) for x, y in covers):
             continue  # a shape painted over hidden text: its cover, not a drawing
         pen = sum(p.source in ink_sources for p in members)
-        if 2 * pen >= len(members) or all(p.open_stroke for p in members):
-            marks.append(box)
+        if curved and (
+            2 * pen >= len(members) or all(p.open_stroke or id(p) in hand for p in members)
+        ):
+            marks.append(box)  # a ruler's straight lines are machine-drawn: a figure
         else:
             reasons = [f"vector drawing ({len(members)} paths)"]
             figures.append(_Block(Kind.FIGURE, box, reasons=reasons))
     return figures, marks
+
+
+def _glyph_in(block: _Block, box: BBox) -> bool:
+    """`block` is one or two glyphs smaller than the drawing round them (`box`): the "!"
+    of a warning triangle, the "i" of an information circle. It does not hold the
+    drawing (2026-10-13: the icons were dropped as held by their glyph)."""
+    glyphs = sum(1 for r in block.rows for c in r.chars if not c.blank)
+    x0, y0, x1, y1 = block.bbox
+    return 0 < glyphs <= 2 and x1 - x0 < box[2] - box[0] and y1 - y0 < box[3] - box[1]
+
+
+def _dots(members: Sequence[_Path]) -> bool:
+    """Every path is a filled mark no bigger than DOT_PT."""
+    return all(
+        p.filled and max(p.bbox[2] - p.bbox[0], p.bbox[3] - p.bbox[1]) <= DOT_PT for p in members
+    )
+
+
+def _dots_out_of_line(members: Sequence[_Path], box: BBox, index: _RowIndex) -> bool:
+    """Dots in page_type.VECTOR_MIN_PATHS places or more over a line of text that reach
+    out of it, above or below, by PEN_MARK_OUT of their height: the electrons of a Lewis
+    structure round its letters (2026-10-13: dropped as dots alone, and held by the row of
+    letters). Dot leaders and a missed bullet lie in their line."""
+    if len({_box_key(p.bbox) for p in members}) < page_type.VECTOR_MIN_PATHS:
+        return False
+    height = box[3] - box[1]
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    rows = [r for r in index.near(box[1], box[3]) if r.x0 <= cx <= r.x1]
+    if height <= 0 or not rows:
+        return False
+    row = min(rows, key=lambda r: abs((r.y0 + r.y1) / 2 - cy))
+    out = max(0.0, row.y0 - box[1]) + max(0.0, box[3] - row.y1)
+    return out >= PEN_MARK_OUT * height
+
+
+def _pen_mark_over_text(members: Sequence[_Path], box: BBox, holders: Sequence[_Block]) -> bool:
+    """A hand mark drawn over typed text (`holders`: the blocks whose box holds the middle
+    of `box`), not a mark set with the text: one or two open strokes that are diagonal
+    lines or curves, or one curved outline, closed or filled (an answer circled, a tick
+    drawn as a note app's filled ribbon) in another colour than the text under it
+    (PEN_MARK_COLOUR), no radical sign; over a paragraph, list item, heading or display
+    equation, reaching out of the line under its middle (the nearest one, or the nearest
+    line it is beside) by PEN_MARK_OUT of its height or more, and over an equation at least
+    as tall as its text. A hand tick, a cross or a slash over a line was taken as part of
+    the line, like an underline, and lost (the second final verify, 2026-10-12); so were a
+    red ellipse round an answer, a filled tick, and a tick over an equation, whose
+    transcription leaves it out (the drawings sweep, 2026-10-13). A box round a word and
+    an underline are closed or straight, a circle round a step number is in the text's
+    colour, and a cancel stroke across a term stays within its line. On the research
+    corpus's born-digital pages (586 real ones, the OpenStax renders, the fixtures) no
+    drawing in a text element is an open diagonal or curved stroke at all."""
+    if len(members) > PEN_MARK_STROKES or any(p.kind == "radical" or not p.curved for p in members):
+        return False
+    strokes = all(p.open_stroke and not p.filled for p in members)
+    outline = len(members) == 1 and members[0].kind == "shape" and not members[0].open_stroke
+    if not (strokes or outline):
+        return False
+    if any(b.kind not in (*_TEXT_BLOCKS, Kind.HEADING, Kind.EQUATION) for b in holders):
+        return False
+    height = box[3] - box[1]
+    if height <= 0:
+        return False
+    cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+    rows = [r for b in holders for r in b.rows if not r.vertical]
+    under = [r for r in rows if r.x0 <= cx <= r.x1] or rows  # or beside a line's end
+    if not under:
+        return False
+    row = min(under, key=lambda r: abs((r.y0 + r.y1) / 2 - cy))
+    out = max(0.0, row.y0 - box[1]) + max(0.0, box[3] - row.y1)
+    if out < PEN_MARK_OUT * height:
+        return False
+    if any(b.kind == Kind.EQUATION for b in holders) and height < row.size:
+        return False  # a mark in the maths (an arrow over a letter), not over it
+    if strokes:
+        return True
+    if members[0].filled and members[0].fill_share > PEN_FILL_SHARE:
+        return False  # a highlight behind the line, a filled icon: not a stroke's ribbon
+    chars = [c for c in row.chars if not c.blank and box[0] <= (c.x0 + c.x1) / 2 <= box[2]]
+    if not chars:
+        return False
+    text = Counter(c.colour for c in chars).most_common(1)[0][0]
+    rgb = ((text >> 16) & 255) / 255, ((text >> 8) & 255) / 255, (text & 255) / 255
+    return max(abs(a - b) for a, b in zip(rgb, members[0].colour, strict=True)) >= PEN_MARK_COLOUR
 
 
 def _at_edge(box: BBox, frame: BBox, reach: float) -> bool:
@@ -4602,6 +5581,12 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             paths[number] = [p for p in paths[number] if p.source not in ink]
         found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
         prepared[number] = _prepare_rows(doc[number], frags[number], margins)
+        # Axes with tick labels, an axis title or a curve from their corner are a plot's:
+        # the rows the header and footer rules dropped count (tick labels in the bands).
+        # Rulers with no labels whose ticks are an answer field's cells are not rulers.
+        page_rows = [*prepared[number][0], *prepared[number][2]]
+        _answer_fields(paths[number], page_rows)
+        _mark_plots(paths[number], page_rows)
     ctx = _body_and_pitch({n: rows for n, (rows, _, _) in prepared.items()})
     _list_markers({n: rows for n, (rows, _, _) in prepared.items()}, paths, ctx)
     label_keys = _label_keys(doc, list(prepared), prepared, paths, ctx, margins)
@@ -4784,11 +5769,12 @@ def _painted(
 
 def _drawn_rules(paths: Sequence[_Path]) -> set[int]:
     """Ids of the horizontal and vertical rules that are part of a drawing: a cluster of
-    rules joined end to end into an open chain (`_line_chain`: a step plot, a staircase)."""
+    rules joined end to end into an open chain (`_line_chain`: a step plot, a staircase),
+    or a ruler's line and ticks (`_mark_axes`: a timeline, a number line)."""
     rules = [p for p in paths if p.kind in ("hrule", "vrule")]
+    drawn = {id(r) for r in rules if r.ruler}
     if len(rules) < 4:
-        return set()
-    drawn: set[int] = set()
+        return drawn
     for group in _cluster([r.bbox for r in rules], DRAWING_CLUSTER_GAP):
         members = [rules[i] for i in group]
         if _line_chain(members):

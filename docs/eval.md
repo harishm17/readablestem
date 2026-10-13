@@ -1307,6 +1307,61 @@ already calls `mixed_ink` (a known error) gain handwriting regions (a needless
 decision). Three `vector_no_text` pages (two of typed text turned into outlines, a
 hatched pie chart that became no figure) now keep their image.
 
+The second final verify's cases (2026-10-12, docs/layout.md: a path's box from all its
+points, axes and rulers, labels taken back from the bands, pen marks over typed text)
+were checked the same way, no model called. The document task offline (`--fake`): the
+same per-page rows and report as before, timing aside. Layout on the repository's PDFs
+(the three printed gold sections, the 42 cached OpenStax renders, the authored tables,
+the demo source, the layout, LaTeX, tables and handwriting fixtures): the same elements
+and kept pages everywhere but one handwriting fixture, whose machine-drawn curve's box
+grows by the start of a subpath MuPDF left out. Page types: the same 984 kinds and 989
+actions on the 996-page corpus, 29 and 35 on the skeptic's 41 pages, 29 and 29 on fresh
+set 4. On the research corpus's 909 analysed pages, no page changes kind or kept image;
+three born-digital pages change only a figure's box or path count, and one `mixed_ink`
+page gains two handwriting regions (red pen marks over its typed lines). The 110 sweep
+PDFs end to end: the same verdicts (56 converted, 38 kept with a decision, 13 refused;
+the three LOST items are the generator's subtitle that was never written), and the
+framed full-page plot has no painted pixel outside its elements (88 cells before). The
+86 evidence PDFs and the 90 handwriting pages: the same verdicts and decisions; two
+full-page charts read their tick labels as the figure's, not as one-digit paragraphs,
+and a 30-page file of notes has more of its pages analysed within the 10 s ink budget
+(called handwritten, not "not analysed"; kept as images either way): the machine's load,
+not the change, as the base code run alone gives the same.
+
+The drawings sweep's fixes (2026-10-13, docs/layout.md "Figures": evidence of a plot,
+boxes round text and diagrams, bonds, boxes joined by wires, dots round a letter, hand
+marks circled or filled in another colour and over equations, answer fields, icons round
+a glyph) were checked the same way, no model called, against the branch before them
+(`91697be`) and the merged base (`9071495`). The document task offline (`--fake`): the
+same report and per-document rows as the base, timing aside (the same 80 required
+decisions of the offline client). Layout on the 96 born-digital PDFs (the 42 cached
+OpenStax renders, the three printed gold sections, the authored tables, the demo source,
+the layout, LaTeX, tables and handwriting fixtures): the same refusals, kept pages, kinds
+and elements as before the fixes; against the base, only the five handwriting fixtures
+the previous fix targeted differ. The research corpus's 909 analysed pages, the
+skeptic's 41, fresh set 4 and the evidence and sweep sets: no page changes kind, kept
+image or elements, except a slide whose title, 18 pt and its only text, is read as a
+heading instead of a figure's label, and one page of the 30-page file of notes that ran
+out of the 10 s ink budget (called not analysed instead of handwritten, and kept as an
+image either way: the base code run twice on its own analyses 26 and 27 of its pages).
+The checks found four opposite errors in the first versions of the fixes, each fixed and
+pinned by a control before the end: a worked example's frames round paragraphs with a
+grid of cell borders made one figure of the box (its open chain of rules was taken for a
+diagram; such signs now need a cluster without running text), a report's box of four
+lines whose corners do not quite meet read as an L of axes (`AXIS_CLOSE_PT`), a yellow
+highlight annotation was cut out as a hand mark (a filled mark must be a thin ribbon),
+and a gradient band of thin strips behind text kept its page (filled strips are panels).
+The drawings sweep (97 PDFs) end to end, after the fixes: 73 converted, 18 kept with a
+decision, 6 LOST; before them 48, 16 and 33 (the base: 46, 15 and 36), with 22 pages
+saying "Everything was converted". The six: four partial losses, where a chart is a
+figure but its baseline along the page's edge (three times) or its axes that stop short
+of their corner (once) are not in it (docs/layout.md "What is not detected"), and the
+two documented ones, a gear icon drawn inside a sentence and three ticks close together
+over a line, which still say "Everything was converted". The only other page that says
+so is the exam cover, rightly: its comb fields hold nothing yet. The earlier 110 sweep PDFs, the 86
+evidence PDFs, the 90 handwriting pages and the 88 extra pages end to end: the same
+verdicts as before the fixes.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%

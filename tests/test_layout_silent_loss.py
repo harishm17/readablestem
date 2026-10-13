@@ -13,6 +13,7 @@ import math
 import random
 import re
 from html import unescape
+from pathlib import Path
 
 import pymupdf
 import pytest
@@ -34,6 +35,7 @@ from fixtures.handwriting.make_fixtures import (
     text_layer,
 )
 
+HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
 LETTER = (612.0, 792.0)
 A4 = (595.28, 841.89)
 SLIDE = (720.0, 405.0)
@@ -794,6 +796,131 @@ def test_strokes_under_a_hidden_layer_and_a_title_are_handwriting_not_a_scan():
         assert out.page_types[0].kind == "handwritten_ocr"
     assert out.page_types[0].kind not in page_type.SCAN_KINDS
     assert out.kept_pages  # kept as an image either way
+
+
+# --------------------------------------------------------------------------- axes and rulers
+# The second final verify (2026-10-12), on committed fixtures
+# (tests/fixtures/handwriting/make_fixtures.py, `build_edge_cases`).
+
+
+def _fixture(name: str) -> bytes:
+    return (HANDWRITING / name).read_bytes()
+
+
+@pytest.mark.parametrize(
+    ("page", "y_axis_x", "top", "x_axis_y"),
+    [(0, 60, 40, 737), (1, 60, 40, 737), (2, 40, 30, 755), (3, 40, 30, 755)],
+)
+def test_a_full_page_plot_keeps_its_axes_and_their_labels(page, y_axis_x, top, x_axis_y):
+    # A y-axis near the page's edge and nearly as tall as the page was taken for a side of
+    # a frame round the page, the x-axis was then dropped as a lone rule, and the tick
+    # labels (in the footer band) and the axis title (in the header band) with them: the
+    # figure was the curve alone. Pages: a frame round the page; no frame; axes filling
+    # the page as two lines; as one L-shaped path.
+    out = layout.analyze(_fixture("full_page_plots.pdf"))
+    assert page not in out.kept_pages
+    (figure,) = _figures(out, page)
+    x0, y0, _, y1 = figure.bbox
+    assert x0 <= y_axis_x and y0 <= top + 1 and y1 >= x_axis_y  # both axes are in it
+    assert {"v", "0", "1", "2", "3", "4"} <= set((figure.text or "").split())
+    assert [e.kind for e in out.elements if e.page == page] == [Kind.FIGURE]
+
+
+def test_axes_drawn_as_one_path_of_separate_lines_stay_in_the_plot():
+    # "80 75 m 640 75 l 80 335 m 80 75 l S": MuPDF's box of the path leaves out the start
+    # of the second line, so the axes read as a horizontal rule and the y-axis was lost.
+    with pymupdf.open(stream=_fixture("open_axes.pdf")) as doc:
+        axes = layout._page_paths(doc[0])[0]
+    assert axes.bbox == (80.0, 70.0, 640.0, 330.0)
+    assert axes.kind == "shape" and not axes.frame  # two sides of a box are not a frame
+    out = layout.analyze(_fixture("open_axes.pdf"))
+    assert out.kept_pages == {}
+    for page in (0, 1):
+        (figure,) = _figures(out, page)
+        x0, y0, x1, y1 = figure.bbox
+        assert x0 <= 80 and y0 <= 70 and y1 >= 330 and x1 >= 640
+    assert all(f" {n} " in f" {_text(out)} " for n in ("0", "2", "4", "6", "8", "10"))
+
+
+@pytest.mark.parametrize("page", [0, 1])
+def test_a_timeline_across_the_top_of_a_page_is_a_drawing(page):
+    # A rule within the top 15 % of the page with tick marks across it: dropped as a header
+    # rule (or as rules alone), with nothing to say so. Its ticks make it a drawing. The
+    # rule and ticks are one path on page 1 and separate paths on page 2.
+    out = layout.analyze(_fixture("timelines.pdf"))
+    assert page not in out.kept_pages
+    (figure,) = _figures(out, page)
+    assert figure.bbox[0] <= 31 and figure.bbox[2] >= 581
+    assert figure.bbox[1] <= 85 and figure.bbox[3] >= 95  # the ticks too
+    assert "Repeat question 2" in _text(out)
+    assert "1900" in _text(out)
+
+
+def test_a_timeline_under_a_short_title_keeps_its_page():
+    # Less than a line of text: no figure is made of a drawing this flat, so the safety net
+    # must count the ruler's lines (before, rules never counted unless joined end to end).
+    doc = pymupdf.open()
+    page = _page(doc)
+    _title(page, "Timeline")
+    shape = page.new_shape()
+    _line(shape, (30, 120), (582, 120), width=1.2)
+    for i in range(7):
+        _line(shape, (30 + i * 92, 114), (30 + i * 92, 126), width=1.2)
+    shape.commit()
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {0: page_type.UNREAD_PAGE} or _held(out, 0, (30, 114, 582, 126))
+
+
+def test_a_running_header_over_a_rule_across_the_page_adds_nothing():
+    out = layout.analyze(_fixture("timelines.pdf"))
+    assert 2 not in out.kept_pages
+    assert _figures(out, 2) == [] and _regions(out, 2) == []
+
+
+@pytest.mark.parametrize("style", ["lines", "lines and header"])
+def test_a_frame_of_four_lines_and_rules_with_end_marks_are_still_furniture(style):
+    # Controls: a frame round the page drawn as four separate lines meets itself at every
+    # corner (no open corner: not axes), and a rule with a mark at each end only (two, not
+    # three: not a ruler) is a rule.
+    doc = pymupdf.open()
+    page = _page(doc)
+    shape = page.new_shape()
+    for a, b in itertools.pairwise([(24, 24), (588, 24), (588, 768), (24, 768), (24, 24)]):
+        _line(shape, a, b, width=1.5)
+    if style == "lines and header":
+        _line(shape, (36, 60), (576, 60), width=0.8)
+        _line(shape, (36, 56), (36, 64), width=0.8)
+        _line(shape, (576, 56), (576, 64), width=0.8)
+    shape.commit()
+    page.insert_text((72, 52), "PHYS 101 Mechanics, week 3", fontsize=9)
+    _title(page, "Kinematics", at=(72, 100))
+    _paragraphs(page, top=120, n=3)
+    out = layout.analyze(doc.tobytes())
+    assert out.kept_pages == {}
+    assert _figures(out) == [] and _regions(out) == []
+
+
+@pytest.mark.parametrize(
+    ("page", "box"),
+    [(0, (250, 106, 270, 124)), (1, (250, 102, 264, 118)), (2, (160, 110, 182, 128))],
+)
+def test_a_hand_tick_cross_or_slash_over_a_line_of_typed_text_is_cut_out(page, box):
+    # One or two pen strokes too simple for the stroke test, drawn over typed text: taken
+    # as part of the line they lie on (like an underline), they were lost. Open strokes
+    # that are no radical sign and reach out of their line are pen marks.
+    out = layout.analyze(_fixture("marks_over_text.pdf"))
+    assert out.page_types[page].kind == "born_digital"
+    assert page not in out.kept_pages
+    (region,) = _regions(out, page)
+    assert _held(out, page, box) and region.bbox[0] <= box[0] and region.bbox[2] >= box[2]
+    text = " ".join(e.text or "" for e in out.elements if e.page == page)
+    assert "How high does it go" in text or "It has a direction" in text  # read whole
+
+
+def test_an_underline_a_box_or_a_cancel_stroke_in_a_line_is_still_part_of_the_text():
+    out = layout.analyze(_fixture("marks_over_text.pdf"))
+    assert 3 not in out.kept_pages
+    assert _regions(out, 3) == [] and _figures(out, 3) == []
 
 
 # --------------------------------------------------------------------------- end to end

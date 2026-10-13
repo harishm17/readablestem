@@ -561,6 +561,7 @@ def build(out: Path) -> list[Path]:
     made.append(save(doc, out, "mixed_course.pdf"))
     made += build_review_cases(out)
     made += build_verify_cases(out)
+    made += build_edge_cases(out)
     return made
 
 
@@ -1005,6 +1006,167 @@ def build_verify_cases(out: Path) -> list[Path]:
     page.insert_text((72, 430), WORKSHEET, fontsize=11)
     _note(page, 2501, "see eq note", base=480)
     made.append(save(doc, out, "typed_with_note.pdf"))
+    return made
+
+
+# ----------------------------------------------------------------------------- edge cases
+# The second final verifier's cases (2026-10-12): axes and rulers read as page furniture or
+# as plain rules, rebuilt from made-up text and drawings.
+
+QUESTIONS = [
+    "1. A cart of mass 2 kg moves at 3 m/s on a level track. Find its kinetic energy.",
+    "2. The cart then climbs a ramp. How high does it go before it stops?",
+    "3. Repeat question 2 for a cart of twice the mass and explain the result.",
+]
+
+
+def _axes_plot(page: pymupdf.Page, rect: pymupdf.Rect, *, one_path: bool = False) -> None:
+    """A plot filling `rect`: an x-axis along its foot and a y-axis up its left side (two
+    lines, or one L-shaped path), one sine curve, tick labels "0" to "4" under the x-axis
+    and the axis title "v" at the top of the y-axis."""
+    r = pymupdf.Rect(rect)
+    origin = (r.x0 + 20, r.y1 - 15)
+    shape = page.new_shape()
+    if one_path:
+        shape.draw_polyline([(r.x0 + 20, r.y0), origin, (r.x1, r.y1 - 15)])
+        shape.finish(color=(0, 0, 0), width=0.8, closePath=False)
+    else:
+        shape.draw_line(origin, (r.x1, r.y1 - 15))
+        shape.finish(color=(0, 0, 0), width=0.8)
+        shape.draw_line(origin, (r.x0 + 20, r.y0))
+        shape.finish(color=(0, 0, 0), width=0.8)
+    pts = []
+    for i in range(80):
+        t = i / 79
+        pts.append((r.x0 + 22 + t * (r.width - 24),
+                    r.y0 + (r.height - 20) * (0.5 - 0.4 * math.sin(2 * math.pi * t))))  # fmt: skip
+    shape.draw_polyline(pts)
+    shape.finish(color=(0.1, 0.3, 0.8), width=1.0, closePath=False)
+    shape.commit()
+    for i in range(5):
+        page.insert_text((r.x0 + 20 + i * (r.width - 25) / 4, r.y1 - 4), str(i), fontsize=7)
+    page.insert_text((r.x0 + 2, r.y0 + 8), "v", fontsize=8)
+
+
+def _open_axes_slide(page: pymupdf.Page, *, title: bool, labels: bool, gap: float) -> None:
+    """A slide's plot whose two axes are one stroked path of two lines, the second starting
+    away from the first ("80 75 m 640 75 l 80 335 m 80 75 l S": MuPDF's box of the path
+    leaves that start out), a straight line from the axes up, and tick labels."""
+    if title:
+        page.insert_text((40, 40), "Speed of the cart against time", fontsize=20)
+    shape = page.new_shape()
+    shape.draw_line((80, 330), (640, 330))
+    shape.draw_line((80, 70), (80, 330))
+    shape.finish(color=(0, 0, 0), width=1, closePath=False)
+    pts = [(80 + gap + (560 - gap) * t / 100, 310 - 220 * t / 100) for t in range(101)]
+    shape.draw_polyline(pts)
+    shape.finish(color=(0.1, 0.3, 0.8), width=2.0, closePath=False)
+    shape.commit()
+    if labels:
+        for i in range(6):
+            page.insert_text((80 + 112 * i - 3, 344), str(2 * i), fontsize=10)
+
+
+def _timeline(page: pymupdf.Page, *, one_path: bool) -> None:
+    """A timeline across the top of a page: a rule within its top 15 % with seven tick
+    marks across it (one path, or each line its own path) and a year under each tick,
+    under a typed title and above typed questions."""
+    page.insert_text((72, 60), "Timeline of physics", fontsize=14)
+    shape = page.new_shape()
+    shape.draw_line((30, 90), (582, 90))
+    if not one_path:
+        shape.finish(color=(0, 0, 0), width=1.2)
+    for i in range(7):
+        x = 30 + i * 92
+        shape.draw_line((x, 84), (x, 96))
+        if not one_path:
+            shape.finish(color=(0, 0, 0), width=1.2)
+    if one_path:
+        shape.finish(color=(0, 0, 0), width=1.2)
+    shape.commit()
+    for i in range(7):
+        page.insert_text((30 + i * 92 - 12, 110), str(1900 + 20 * i), fontsize=9)
+    for i, line in enumerate(QUESTIONS):
+        page.insert_text((72, 200 + 22 * i), line, fontsize=11)
+
+
+def build_edge_cases(out: Path) -> list[Path]:
+    made = []
+
+    # 26. Full-page plots of one curve: with a frame round the page (the y-axis, near the
+    #     page's edge and nearly as tall, was taken for a side of the frame), without it,
+    #     with axes long enough to fill the page (two lines, one L-shaped path).
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    shape = page.new_shape()
+    shape.draw_rect(pymupdf.Rect(18.36, 18.36, 593.64, 773.64))
+    shape.finish(color=(0.2, 0.2, 0.5), width=2)
+    shape.commit()
+    _axes_plot(page, pymupdf.Rect(40, 40, 572, 752))
+    page = doc.new_page(width=612, height=792)
+    _axes_plot(page, pymupdf.Rect(40, 40, 572, 752))
+    page = doc.new_page(width=612, height=792)
+    _axes_plot(page, pymupdf.Rect(20, 30, 600, 770))
+    page = doc.new_page(width=612, height=792)
+    _axes_plot(page, pymupdf.Rect(20, 30, 600, 770), one_path=True)
+    made.append(save(doc, out, "full_page_plots.pdf"))
+
+    # 27. Slides whose axes are one path of two separate lines: with a title and tick
+    #     labels; with neither, the line starting 10 pt right of the y-axis.
+    doc = pymupdf.open()
+    _open_axes_slide(doc.new_page(width=720, height=405), title=True, labels=True, gap=0)
+    _open_axes_slide(doc.new_page(width=720, height=405), title=False, labels=False, gap=10)
+    made.append(save(doc, out, "open_axes.pdf"))
+
+    # 28. A timeline across the top of a page (one path; separate lines), and a control:
+    #     a running header over a rule across the top of a typed page.
+    doc = pymupdf.open()
+    _timeline(doc.new_page(width=612, height=792), one_path=True)
+    _timeline(doc.new_page(width=612, height=792), one_path=False)
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 50), "PHYS 101 Mechanics, week 3", fontsize=9)
+    shape = page.new_shape()
+    shape.draw_line((30, 58), (582, 58))
+    shape.finish(color=(0, 0, 0), width=0.8)
+    shape.commit()
+    for i, line in enumerate(QUESTIONS):
+        page.insert_text((72, 120 + 22 * i), line, fontsize=11)
+    made.append(save(doc, out, "timelines.pdf"))
+
+    # 29. One or two hand marks over lines of typed text, too simple for the stroke test: a
+    #     tick over question 2, a cross over a word of a paragraph's middle line, a slash
+    #     through a word; and a control, marks typeset with the text (an underline, a box
+    #     round a word, a cancel stroke across a term within its line).
+    doc = pymupdf.open()
+    red, blue = (0.85, 0, 0), (0.0, 0.44, 1.0)
+    for strokes in (
+        [[(250, 116), (256, 124), (270, 106)]],
+        [[(250, 102), (264, 118)], [(264, 102), (250, 118)]],
+        [[(160, 128), (170, 120.5), (182, 110)]],
+    ):
+        page = doc.new_page(width=612, height=792)
+        if len(strokes) == 2:
+            page.insert_textbox(pymupdf.Rect(72, 90, 540, 300), " ".join(TYPED[1:3]), fontsize=11)
+        else:
+            for i, line in enumerate(QUESTIONS):
+                page.insert_text((72, 100 + 22 * i), line, fontsize=11)
+        shape = page.new_shape()
+        for points in strokes:
+            shape.draw_polyline(points)
+            shape.finish(color=red if len(strokes) < 3 else blue, width=1.6, closePath=False)
+        shape.commit()
+    page = doc.new_page(width=612, height=792)
+    for i, line in enumerate(QUESTIONS):
+        page.insert_text((72, 100 + 22 * i), line, fontsize=11)
+    shape = page.new_shape()
+    shape.draw_line((72, 104), (160, 104))  # an underline under question 1
+    shape.finish(color=(0, 0, 0), width=0.6)
+    shape.draw_rect(pymupdf.Rect(130, 112, 162, 125))  # a box round a word of question 2
+    shape.finish(color=(0, 0, 0), width=0.6)
+    shape.draw_line((150, 145), (162, 136))  # a cancel stroke across a term of question 3
+    shape.finish(color=(0, 0, 0), width=0.6)
+    shape.commit()
+    made.append(save(doc, out, "marks_over_text.pdf"))
     return made
 
 
