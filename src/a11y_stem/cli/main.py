@@ -1,4 +1,5 @@
-"""Command line: `a11y-stem gold ...`, `a11y-stem eval ...`, `a11y-stem parse ...`.
+"""Command line: `a11y-stem gold ...`, `a11y-stem eval ...`, `a11y-stem parse ...`,
+`a11y-stem proof ...`.
 
 Default paths (data/gold, .cache/openstax) are resolved against the project root: the
 nearest parent of the working directory whose pyproject.toml names this project. Outside
@@ -17,6 +18,7 @@ from typing import Any
 
 from a11y_stem import __version__
 from a11y_stem.cli import convert, eval_cli, ops, serve
+from a11y_stem.cli import proof as proof_cli
 
 GOLD_DIR = Path("data/gold")
 CACHE_DIR = Path(".cache/openstax")
@@ -319,6 +321,7 @@ def build_parser() -> argparse.ArgumentParser:
     convert.register(sub)
     serve.register(sub)
     ops.register(sub)
+    proof_cli.register(sub)
     return parser
 
 
