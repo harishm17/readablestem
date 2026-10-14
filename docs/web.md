@@ -80,8 +80,8 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 |---|---|---|
 | GET `/` | anyone | What the tool does, why now, how long, how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
-| GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `readablestem ops launch-check` lists what is still unfinished on the public pages |
-| GET `/limits` | anyone | Known limits: the facts that hold today and the measured accuracy, marked "Draft, to be reviewed by Harish" until he writes the copy |
+| GET `/privacy`, `/terms` | anyone | The beta wording, describing the real behaviour (hourly purge, Railway's daily backups kept about 6 days, Langfuse only when tracing is on). `readablestem ops launch-check` lists any unfinished wording left on the public pages |
+| GET `/limits` | anyone | Known limits: the facts that hold today (including tables, links, colour, language and file types, as this server is set up) and the measured accuracy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
 | GET `/login` | anyone | Sign-in page |
@@ -207,8 +207,7 @@ yours to see". It is a 404 either way. The
   allowed directory set) is linked to the same user too, the way the re-registration
   case needs; Google sign-in gives access by verified address alone in the same way.
   Refusing it (`login_refused reason=identity_conflict`, with an admin command to unlink
-  an identity after a re-registration) is a decision for Harish, not taken here.
-  TODO(Harish).
+  an identity after a re-registration) is not done for the beta (docs/launch.md P8).
 - **Other Google accounts for one instructor** (T3-10, `web/linked_emails.py`, table
   `linked_emails`). An instructor invited under a university address who can sign in with
   Google only as a personal one is linked by an admin (`/admin`, "Let an instructor sign in
@@ -370,8 +369,7 @@ review write, a language, title or contact change, a download), never earlier th
 was; `dev` keeps its 30 days from upload. "Keep 7 more days" on the job page
 (`POST /jobs/{id}/keep`) makes a `day` job a `week` job and starts its seven days now. The
 purge knows only `retain_until` (`ops.retention.purge_expired`), so it honours all of
-this unchanged. The privacy page's three lines are marked `TODO(Harish)` for the final
-wording.
+this unchanged. The privacy page's three lines are the beta wording.
 
 When today's budget is spent, the upload form is replaced by a notice saying when
 uploads open again (the next midnight UTC, shown in the reader's time), instead of a form
@@ -1028,8 +1026,7 @@ From top to bottom:
    labelled print copy, as the help page says; do not paste it into a page editor; for a
    Canvas page, "For Canvas (zip with images)" below the download, a plain form with an optional
    course number; the
-   tested steps per
-   LMS are `TODO(Harish)`), then the two questions after a download ("After a
+   Canvas and Blackboard steps are stated as not yet tried in a live course), then the two questions after a download ("After a
    download"). Deleting is a quiet button at the end of the page.
 4. **Not handled in this file** and **Worth checking**: `pipeline.notices.current(result)`
    (notices derived again from the fixes as they are now, plus the stored ones of other
@@ -1265,7 +1262,7 @@ the results".
   "On pages 2 and 3" links each page number. Each page of a waiting group counts the
   decision in the page strip. "Hidden text in the PDF" (folded) gives only a count of the
   hidden characters that were not used, never the text. There is nothing to accept and
-  no promise of a later conversion. TODO(Harish): the wording is the design's draft;
+  no promise of a later conversion. The wording is the beta wording;
   its second button ("Leave this page out of the HTML") is not built.
 
 **"Reject" is named for what it does** (UX review MF14), per kind

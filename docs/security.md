@@ -270,10 +270,10 @@ short fenced piece of nearby text, and "Read this cell with the model" sends the
 Nothing else leaves the server, they are the same "what is sent" as the table above, and they
 are under the same spend caps (docs/web.md, "What the model costs here").
 
-TODO(Harish): the wording on the privacy page for the model provider is a draft. What is
-known as of the audit is above; it must be re-read against the provider's policy page on the
-day of launch, and a decision made on whether to request zero data retention. A document
-deleted here can remain at the provider for up to 30 days.
+The privacy page's wording for the model provider is the beta wording (docs/launch.md B1).
+What is known as of the audit is above; re-read the provider's policy page on the day of
+launch. No zero-data-retention agreement is requested for the beta. A document deleted here
+can remain at the provider for up to 30 days.
 
 ## Pre-launch audit: findings
 
@@ -288,8 +288,8 @@ have regression tests; 7 to 9 are wording and are tracked in [launch.md](launch.
 | 4 | Low | Setting `ANTHROPIC_LOG=debug` or `OPENAI_LOG=debug` makes the SDKs log whole request bodies (document text and images); the Anthropic logger was not clamped | Variables removed and the loggers clamped at start; `test_audit_privacy.py` |
 | 5 | Low | The session cookie had no `__Host-` prefix in production | Prefix in production; `test_audit_headers.py` |
 | 6 | Low | No `Cross-Origin-Resource-Policy` | Added; `test_audit_headers.py` |
-| 7 | Low | The privacy page did not say that a document deleted here can remain with Anthropic for up to 30 days | Stated, final wording left as TODO(Harish) |
-| 8 | Info | The privacy page had no "how it is protected", "where it is processed" or "changes" section, and the terms had no accounts, institution or changes section | Sections added; recommended wording in TODO(Harish) comments |
+| 7 | Low | The privacy page did not say that a document deleted here can remain with Anthropic for up to 30 days | Stated; the wording is final for the beta |
+| 8 | Info | The privacy page had no "how it is protected", "where it is processed" or "changes" section, and the terms had no accounts, institution or changes section | Sections added; the launch.md defaults are now the wording |
 | 9 | Info | SECURITY.md names a different email address (outlook) from the project metadata (gmail) | Left for Harish to confirm ([launch.md](launch.md)) |
 
 Checked and found sound (tests added as regression guards, no code change): headers on

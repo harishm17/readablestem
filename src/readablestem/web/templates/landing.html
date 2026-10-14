@@ -2,9 +2,10 @@
 {% block title %}Accessible HTML from STEM course PDFs{% endblock %}
 {% block content %}
 <h1>Turn STEM course PDFs into accessible web pages, equations included</h1>
-{# TODO(Harish): confirm the rule and its date against the DOJ rule (28 CFR part 35,
-   subpart H) and UTD's own page before adding a date here (UX review BW9). #}
-<p class="lede">A 2024 Justice Department rule under the ADA asks public universities to
+{# No deadline date is stated here: the rule is 28 CFR part 35, subpart H, and a date
+   should only be added once it is checked against it and the university's own page
+   (UX review BW9, docs/launch.md P6). #}
+<p class="lede">The Department of Justice's ADA Title II web rule asks public universities to
   make their online course materials accessible to students with disabilities. In STEM the
   hard part is the maths. ReadableSTEM assists with it: upload a PDF of your own notes, slides
   or problem sets, and get back one web page where:</p>
@@ -19,14 +20,14 @@
    0.4.0, 2026-10-12: equations exact_lenient 0.767, 23 of 30; document flag precision
    0.60, 6 of 10) and the triage re-runs in docs/eval.md "Review load" (OpenStax 2.1, 16
    pages: 3 decisions in both runs; the one-page LaTeX handout: 2, then 1). Update them
-   when the eval is rerun.
-   TODO(Harish): decide whether the product shows these numbers at all (FEATURE-REVIEW
-   10.3, row 3, says link "how we measure" instead). #}
+   when the eval is rerun. FEATURE-REVIEW 10.3, row 3, prefers a link to "how we measure"
+   over numbers; the beta shows them with that link (docs/launch.md P7). #}
 <h2>How long it takes</h2>
 <p>Converting takes a few minutes. Then you decide only what could change what a student
   reads; everything else is accepted for you and listed, so you can look it over. In our
   tests a 16-page textbook section needed 3 decisions, and a one-page handout 1 or 2 (it
-  varies from run to run).</p>
+  varies from run to run). <a href="{{ source_url }}/blob/main/docs/eval.md#review-load-equations-headings-document">How
+  this was measured</a>.</p>
 
 <h2>How accurate it is</h2>
 <p>It makes mistakes, so look over the equations your students rely on. In our small
@@ -57,7 +58,7 @@
 <p>Your PDF and everything made from it are deleted {{ retention_hours }} hours after you
   last worked on it. You can choose to keep it for 7 days, so only you can see it, and
   separately to let the developer look at the results for {{ opt_in_days }} days to improve
-  the tool. You can delete it yourself at any time. Uploads are never used to train AI models. ReadableSTEM
-  assists you; it does not replace your judgement or a full accessibility review of your
+  the tool. You can delete it yourself at any time. We do not use your uploads to train models.
+  ReadableSTEM assists you; it does not replace your judgement or a full accessibility review of your
   course. <a href="/privacy">Read the privacy notice</a>.</p>
 {% endblock %}

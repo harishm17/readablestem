@@ -45,14 +45,14 @@
     {% endif %}
   </ul>
   <h3 id="course-heading">Put it in your course</h3>
-  {# TODO(Harish): the tested steps for eLearning (Blackboard) and Canvas (BW1 of the UX
-     review: upload the file, link it from the module, keep the PDF beside it). The Canvas
-     steps are on /help/posting (help_posting.html), not yet tried in a live course. #}
+  {# The steps are on /help/posting (help_posting.html); the Canvas and Blackboard
+     click-paths there are stated as not yet tried in a live course (docs/launch.md B8). #}
   <p><a href="/help/posting">How to post it in your course</a>: upload the HTML file to your
     course as a file and link to it where the PDF was linked, so it is the main version;
     keep the PDF only as a print copy, labelled as such. Do not paste it into a page
     editor: course sites remove the images and the layout the equations need. In Canvas,
-    the zip above is the way to make a page.</p>
+    the zip above is the way to make a page. These steps have not yet been tried in a live
+    Canvas or Blackboard course.</p>
   {# ux-a's part under the download (the two questions); its posting link is the one
      above. #}
   {% with posting_link = false %}{% include "_after_download.html" %}{% endwith %}

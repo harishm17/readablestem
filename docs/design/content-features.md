@@ -397,7 +397,7 @@ later. Built (docs/layout.md "Hidden text and page types"):
   student file names the page and says it is a picture.
 - Ops: `page page_type:<kind>` and `page_type_reason:<code>`.
 
-Open: Harish's final wording (the drafts are marked `TODO(Harish)`), the design's second
+Open: the design's second
 button ("Leave this page out of the HTML", not built), and the headings eval to re-run
 with the next model run. The d1 case (a scan with 40 or more visible typed characters
 and no hidden layer, dropped silently) is closed since the silent-loss sweep of

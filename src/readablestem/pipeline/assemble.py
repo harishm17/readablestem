@@ -99,10 +99,10 @@ _FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merg
 EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
 FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
 # The student note (`_about_section`). It speaks to students: what this file is and who
-# to tell about problems. TODO(Harish): confirm this wording, and whether to name the
-# screen readers that read MathML aloud (NVDA with MathCAT, JAWS, VoiceOver). The
+# to tell about problems. Final for the beta: it does not name screen readers, and
+# "checked" appears only once an instructor has made a decision (docs/launch.md B7). The
 # feature review's challenge (10.3, row 4) warns that "checked" can read as a
-# certificate; its alternative is "N parts were decided by your instructor" (CHECKED).
+# certificate; its alternative, "N parts were decided by your instructor", was not taken.
 ABOUT_TITLE = "About this version"
 ABOUT_WORDING = (
     "This is a web version of a PDF from your course, made with ReadableSTEM, a tool that "
@@ -131,7 +131,7 @@ FIGURE_NOTE = (
 # Pages and handwriting kept as images (pipeline.page_type: there is no handwriting or
 # scan conversion): their alt text ("{page}" is the page number) and the note students
 # see, by the fix's reason. Rendered from the stored reason, so a stored result renders
-# the same. TODO(Harish): confirm these words (handwriting design, section 3.3).
+# the same. These words are the beta wording (handwriting design, section 3.3).
 KEPT_IMAGE_LABEL = "Not converted."
 KEPT_IMAGE_WORDS = {
     "handwritten_page": (
@@ -1055,7 +1055,7 @@ def kept_pages_note(kept_pages: list[int]) -> str:
     """ "Pages 2 and 5 are shown only as pictures of the page and were not converted."
     (1-based), or "" when no page is kept whole as an image. Whatever the reason (a
     handwritten or scanned page, or one with drawings nothing could be read from): each
-    image's own note says which. TODO(Harish): confirm this line of the student note."""
+    image's own note says which."""
     numbers = [str(p + 1) for p in sorted(set(kept_pages))]
     if not numbers:
         return ""
@@ -1068,7 +1068,7 @@ def kept_pages_note(kept_pages: list[int]) -> str:
 def omitted_pages_note(omitted_pages: list[int]) -> str:
     """ "Page 1 of the original PDF was left out of this file." (1-based), or "" when no
     page was left out. The instructor chose it (a blank page, a cover: T3-16), so the
-    note says the page is not here and does not say why. TODO(Harish): confirm this line."""
+    note says the page is not here and does not say why."""
     numbers = [str(p + 1) for p in sorted(set(omitted_pages))]
     if not numbers:
         return ""

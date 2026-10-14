@@ -126,13 +126,13 @@
         out.</p>
     </div>
     {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
-       `retention_hours` after the last activity. TODO(Harish): the default and the final
-       wording; the privacy page (privacy.html) says the same. #}
+       `retention_hours` after the last activity. One checkbox for the beta (docs/launch.md L2);
+       the privacy page (privacy.html) says the same. #}
     <fieldset class="field retention-choices">
       <legend>How long to keep my document</legend>
       <p class="hint" id="keep-hint">If you tick neither box, your document, results and
         decisions are deleted {{ retention_hours }} hours after you last worked on them.
-        Uploads are never used to train AI models.</p>
+        We do not use your uploads to train models.</p>
       <div class="field checkbox-field">
         <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint">
         <label for="keep">Keep for 7 days, only I can see it</label>

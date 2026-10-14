@@ -423,9 +423,8 @@
  * anyway, and when Sign out is chosen in this tab. Without JavaScript nothing is kept
  * (the browser's Back button usually still has the text).
  *
- * TODO(Harish): decide whether the privacy page should say that unsaved review text is
- * kept in the browser tab (sessionStorage) until it is saved, the tab is closed, or you
- * sign out there.
+ * The privacy page says so ("Cookies": unsaved review text is kept in the browser tab until
+ * it is saved, the tab is closed, or you sign out there).
  */
 (function () {
   "use strict";

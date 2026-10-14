@@ -71,7 +71,8 @@ def privacy(request: Request) -> Response:
 
 @router.get("/terms")
 def terms(request: Request) -> Response:
-    return render(request, "terms.html", {"active": "terms"})
+    ms_on = get_ctx(request).settings.ms_sign_in_enabled
+    return render(request, "terms.html", {"active": "terms", "microsoft_on": ms_on})
 
 
 @router.get("/limits")
@@ -84,6 +85,10 @@ def limits(request: Request) -> Response:
         or settings.source_page_limit > settings.max_pages_per_job,
         "upload_limit_mb": settings.upload_limit_mb,
         "source_pages": settings.source_page_limit,
+        # Which content features are on, so the page describes what this server does.
+        "tables_on": settings.feature_tables,
+        "colour_on": settings.feature_colour,
+        "office_on": bool(office_convert.input_kinds(settings)),
     }
     return render(request, "limits.html", context)
 

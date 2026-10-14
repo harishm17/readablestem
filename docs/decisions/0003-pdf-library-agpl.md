@@ -106,9 +106,9 @@ The AGPL network-use source offer above (a footer link to this repository's comp
 source) is **not met while the repository is private** (checked with `gh` on 2026-10-09:
 `PRIVATE`). Before the first user outside the project (allowlisted beta users
 included), the repository must be public, or the source offered another way, and
-`SOURCE_URL` must point at the deployed commit. TODO(Harish): make the repository public
-(or decide another way to offer the source) before the beta; this change does not alter
-its visibility. Optionally ask Artifex to confirm the 1.28.2 terms, without blocking on
+`SOURCE_URL` must point at the deployed commit. Open: make the repository public at https://github.com/harishm17/readablestem (the
+`SOURCE_URL` default) before the beta, or offer the source another way; this change does not
+alter visibility. Optionally ask Artifex to confirm the 1.28.2 terms, without blocking on
 the reply.
 
 ### Consequences

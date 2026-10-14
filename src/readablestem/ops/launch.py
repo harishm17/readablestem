@@ -60,7 +60,7 @@ def launch_blockers(
                 "Anthropic",
                 "MODEL_PROVIDER=anthropic sends document images to Anthropic",
             ),
-            (settings.feature_tables, "rebuild tables", "FEATURE_TABLES sends tables to OpenAI"),
+            (settings.feature_tables, "rebuild tables", "FEATURE_TABLES sends tables to the model provider"),
             (
                 settings.feature_notation_memory,
                 "notation",

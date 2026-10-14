@@ -531,7 +531,7 @@ class PageGroupView:
 
 
 # What the page group card says, by the reason the pages were kept (pipeline.page_type).
-# "{pages}" is "Page 2" or "Pages 2 and 5". TODO(Harish): final wording (design 3.3).
+# "{pages}" is "Page 2" or "Pages 2 and 5". Final wording for the beta (design 3.3).
 PAGE_GROUP_WORDS: dict[str, dict[str, tuple[str, str]]] = {
     "handwritten_page": {
         "title": ("Handwritten page, not converted", "Handwritten pages, not converted"),

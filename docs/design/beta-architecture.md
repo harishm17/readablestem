@@ -216,10 +216,10 @@ data?", read 2026-10-13):
 - Not known: whether a zero-data-retention agreement is in place for Harish's account, and
   whether the account's workspace uses any retention setting other than the default.
 
-TODO(Harish): the final wording for the privacy page and the deploy checklist: whether to
-say "up to 30 days" and the 2-year flagged-content exception in the notice, whether to ask
-Anthropic for zero data retention, and a decision on the sentence "Uploads are never used to
-train AI models". The privacy page (`web/templates/privacy.html`) names Anthropic instead of
+Decided for the beta (docs/launch.md B1): the notice says "up to 30 days" (longer for
+material the provider's safety systems flag), no zero data retention is requested, and the
+sentence "Uploads are never used to train AI models" became "We do not use your uploads to
+train models, sell them or share them beyond the services named here". The privacy page (`web/templates/privacy.html`) names Anthropic instead of
 OpenAI when the provider is anthropic, with the same words as for OpenAI plus a pointer to
 Anthropic's own policies; `readablestem ops launch-check` lists the page as a launch blocker on
 this provider if it does not name Anthropic.
@@ -251,6 +251,6 @@ this provider if it does not name Anthropic.
 8. **Public copy is the author's.** The README prose, the known-limits copy and the ADR
    "Consequences" sections are written or confirmed by the author. Unfinished wording is
    marked `TODO(Harish)`, and `readablestem ops launch-check` lists what is left on the
-   public pages.
+   public pages (none for the beta).
 9. **Style.** Python 3.12+, ruff (line length 100), type hints that pass `ty check src`,
    docstrings that say why. No new runtime dependencies without a note in the PR.

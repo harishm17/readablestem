@@ -2,18 +2,13 @@
 {% block title %}Known limits{% endblock %}
 {% block content %}
 <h1>Known limits</h1>
-{# TODO(Harish): write the known-limits copy (architecture rule 8: Harish writes it). Until
-   then this page lists, in plain words, facts that hold whatever content features are on
-   (UX review MF8), so it no longer reads as "no limits". Still to add once the content
-   features land and their flags are decided (docs/design/content-features.md): tables,
-   links, coloured text, language, maths in captions; also docs/output.md "Engineering
-   limits" and docs/steps.md "Known limits". #}
-<p class="draft-note"><strong>Draft, to be reviewed by Harish.</strong> This list describes
-  the beta as it works today; the wording is not final.</p>
+{# The facts that hold whatever content features are on (UX review MF8), plus the limits
+   in docs/output.md "Engineering limits" and docs/steps.md "Known limits". Keep the two in
+   step when a limit changes. #}
+<p class="hint">This list describes the beta as it works today.</p>
 
 <h2>What it does not do yet</h2>
 <ul>
-  {# TODO(Harish): your final wording for the next two lines (handwriting design, 3.3). #}
   <li><strong>Handwritten notes and scanned pages are not converted.</strong> A PDF made
     only of them is refused before it counts against your daily pages. In a PDF with typed
     pages, each one is kept as an image, marked “Not converted”, and you are asked about
@@ -25,6 +20,27 @@
     text under a drawn shape that only partly covers it, very small text, and OCR text
     that is visible on the page.</li>
   <li><strong>Chemistry notation</strong> is not converted.</li>
+  <li><strong>Maths in headings and captions</strong> stays as plain characters in the
+    text, not as MathML equations: check how it reads.</li>
+  <li><strong>Tables.</strong>
+    {% if tables_on %}A table the tool cannot read as a table of data stays a picture of the
+    original, marked “Not converted”, and you are asked about it. A table without ruled lines
+    can be missed and shown as plain text, sometimes as an equation.{% else %}Tables are not
+    rebuilt yet: each stays a picture of the original, marked “Not converted”, and you are
+    asked about it.{% endif %}</li>
+  <li><strong>Links.</strong> A link over a picture or a drawing, or in a figure's caption, is
+    not kept. Link text is kept as printed, even when it says nothing on its own (“click
+    here”): only you can reword it.</li>
+  <li><strong>Colour.</strong> {% if colour_on %}Coloured text in paragraphs keeps its colour;
+    colour in headings is not kept.{% else %}Coloured text is not kept: the file uses its own
+    colours.{% endif %} Colour inside figures stays in the picture.</li>
+  <li><strong>Language.</strong> The language is worked out from the text and needs about 20
+    words of prose. A short handout that is mostly maths is assumed to be English unless the PDF
+    says otherwise. A passage in another language is marked only when it is a whole paragraph
+    or list item.</li>
+  <li><strong>File types.</strong> {% if office_on %}PDF files, and Word (.docx) or PowerPoint
+    (.pptx) files, which are turned into a PDF first.{% else %}Only PDF files are taken. For a Word
+    or PowerPoint file, save a copy as a PDF first.{% endif %}</li>
   <li><strong>Two-column pages and slides</strong> convert less well than single-column
     notes: check the reading order.</li>
   <li><strong>Size.</strong> Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.

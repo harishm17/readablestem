@@ -302,7 +302,7 @@ REASON_MESSAGES: dict[str, str] = {
     "budget_cancelled": "The conversion was stopped before this item was converted.",
     "budget_unknown": "A spending limit was reached before this item was converted.",
     # Pages and handwriting kept as images before any model work (pipeline.page_type).
-    # TODO(Harish): final wording (handwriting design, section 3.3).
+    # Final wording for the beta (handwriting design, section 3.3).
     "handwritten_page": "This page is handwritten and this tool does not convert handwriting, "
     "so the page is kept as an image, marked “Not converted”.",
     "scanned_page": "This page is a scanned image and this tool does not convert scans, so "
@@ -322,7 +322,7 @@ NOTICE_MESSAGES: dict[str, str] = {
     "table_not_rebuilt": "A table is kept as an image of the original, so screen readers "
     "cannot read its cells.",
     # Pages and hidden text (pipeline.page_type). "{count}" is replaced by the number of
-    # characters (web.job_page). TODO(Harish): final wording (handwriting design, 3.3).
+    # characters (web.job_page). Final wording for the beta (handwriting design, 3.3).
     "scanned_page": "A scanned image, not converted: the page is kept as an image.",
     "handwritten_page": "Handwritten, not converted: the page is kept as an image.",
     "unread_page": "Drawings or writing this tool could not read, not converted: the page is "

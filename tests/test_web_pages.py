@@ -137,27 +137,42 @@ def test_landing_page_says_assists_and_links_the_demo(pages):
     assert 'href="/dev-login"' in html  # the sign-in option on this test server
 
 
-def test_privacy_and_terms_are_drafts_describing_real_behaviour(pages):
+def test_privacy_and_terms_describe_real_behaviour(pages):
     for path in ("/privacy", "/terms"):
-        assert "Draft, to be reviewed by Harish." in pages[path]
+        assert "Draft" not in pages[path] and "draft-note" not in pages[path]
         assert "help@example.org" in pages[path]
     privacy = " ".join(pages["/privacy"].split())
     assert "deleted automatically <strong>24 hours</strong> after you last worked on it" in privacy
     assert "<strong>7 days</strong>" in privacy and "<strong>30 days</strong>" in privacy
     assert "Both boxes are unticked unless you tick them" in privacy
-    assert "never used to train AI models" in privacy
+    assert "We do not use your uploads to train models, sell them or share them" in privacy
+    assert "Harish Manoharan, an individual (a student project)" in privacy
     assert "student records" in privacy
     assert "never contain document text" in privacy
     terms = " ".join(pages["/terms"].split())
     assert "student records" in terms and "assists" in terms
+    assert "governed by the law of the State of Texas, USA" in terms
+    assert "does not certify" in terms
 
 
 def test_privacy_page_states_the_purge_window_and_backups(pages):
     privacy = " ".join(pages["/privacy"].split())
     assert "an hourly clean-up then removes it from the database" in privacy
-    assert "one backup is kept" in privacy and "up to about one more day" in privacy
+    assert "kept for about 6 days" in privacy and "up to about a week" in privacy
+    assert "one more day" not in privacy
     assert "TODO(Harish)" not in pages["/privacy"]  # the decision note is a template comment
     assert "Langfuse" not in privacy  # only named when traces are actually sent there
+
+
+def test_privacy_page_names_the_real_host_and_processors(pages):
+    privacy = " ".join(pages["/privacy"].split())
+    assert "<strong>Railway</strong> hosts the app and its database" in privacy
+    assert "Google Cloud" not in privacy and "Cloud Run" not in privacy
+    assert "The app and its database run on Railway, in its United States region" in privacy
+    assert "Changes to this notice" in privacy and "Where it is processed" in privacy
+    assert "kept in your browser tab until you save it" in privacy
+    # Word and PowerPoint are described only when this server takes them (LibreOffice).
+    assert ("Word or PowerPoint" in privacy) == ("turned into a PDF on the server" in privacy)
 
 
 class StubTracer:
@@ -219,27 +234,39 @@ def test_status_page_says_whether_conversions_are_open(tmp_path):
         assert "Paused: today" in page
 
 
-def test_limits_page_is_an_honest_draft_left_for_harish(pages):
-    """A blank limits page reads as "no limits" (UX review MF8): until Harish writes it,
-    it lists the facts that hold today and says it is a draft."""
+def test_limits_page_lists_the_facts_that_hold_today(pages):
+    """A blank limits page reads as "no limits" (UX review MF8): it lists the facts that
+    hold today, with no draft banner."""
     limits = " ".join(pages["/limits"].split())
-    assert "Draft, to be reviewed by Harish." in limits
+    assert "Draft" not in limits and "draft-note" not in pages["/limits"]
     assert "Handwritten notes and scanned pages are not converted." in limits
     assert "Hidden text is never used." in limits and "Run OCR" not in limits
     assert "Up to 5 pages and 1 MB per upload." in limits  # from the settings
     assert "23 of 30 came out exactly right" in limits and 'id="accuracy"' in limits
-    assert "TODO(Harish)" in (TEMPLATES / "limits.html").read_text(encoding="utf-8")
+    for topic in ("Tables.", "Links.", "Colour.", "Language.", "File types.", "Maths in headings"):
+        assert topic in limits
+    assert "Only PDF files are taken" in limits or "turned into a PDF first" in limits
 
 
-def test_launch_check_lists_what_is_unfinished(capsys):
+def test_launch_check_reports_no_unfinished_public_copy(capsys):
     from readablestem.cli.main import main
     from readablestem.ops.launch import launch_blockers
 
-    items = launch_blockers()
+    assert launch_blockers() == []
+    assert main(["ops", "launch-check"]) == 0
+    assert "launch_blockers=0" in capsys.readouterr().out
+
+
+def test_launch_check_still_catches_a_todo_or_a_draft_note(tmp_path, monkeypatch):
+    from readablestem.ops import launch
+
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    (templates / "limits.html").write_text("{# TODO(Harish): x #}<p class=\"draft-note\">Draft</p>")
+    monkeypatch.setattr(launch, "TEMPLATES_DIR", templates)
+    items = launch.launch_blockers()
     assert "web/templates/limits.html: still has a TODO(Harish) note" in items
-    assert main(["ops", "launch-check"]) == 1
-    out = capsys.readouterr().out
-    assert "limits.html" in out and f"launch_blockers={len(items)}" in out
+    assert "web/templates/limits.html: still shows the draft note" in items
 
 
 def test_a_placeholder_demo_is_not_counted_as_done(tmp_path, monkeypatch):
@@ -369,3 +396,20 @@ def test_htmx_is_configured_for_the_strict_csp():
         '"historyCacheSize": 0',
     ):
         assert setting in base
+
+
+def test_pages_do_not_offer_word_when_libreoffice_is_missing(tmp_path):
+    """The production image is built without LibreOffice: OFFICE_INPUT_ENABLED is true by
+    default, but the form, the privacy page and the limits page must say PDF only."""
+    env = WebEnv(
+        tmp_path, office_input_enabled=True, soffice_path=str(tmp_path / "no-such-soffice")
+    )
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        app = client.get("/app").text
+        privacy = " ".join(client.get("/privacy").text.split())
+        limits = " ".join(client.get("/limits").text.split())
+    assert "data-office" not in app and ".docx" not in app
+    assert "Word or PowerPoint" not in privacy and "LibreOffice" not in privacy
+    assert "Only PDF files are taken" in limits

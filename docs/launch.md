@@ -17,6 +17,38 @@ templates for `TODO(Harish)` and the draft note) and exits 1 while any remains; 
 reminder, not a refusal, so a staging deploy still starts. Items marked "(launch-check)" below
 clear it when done.
 
+## Decided on 2026-10-14: the drafts are the beta wording
+
+Harish's decision was "use the drafts": the draft wording of the public pages became the
+beta wording, the draft banners and `TODO(Harish)` markers were removed from them, and
+`readablestem ops launch-check` reports `launch_blockers=0`. Where a draft had a gap, the
+recommended default in the tables below filled it, with these changes for the Railway deploy:
+
+- **B1** The model-provider paragraph says images and nearby text go to Anthropic, which
+  deletes API inputs within 30 days (longer for flagged material). "Uploads are never used to
+  train AI models" became "We do not use your uploads to train models, sell them or share them
+  beyond the services named here" (privacy, landing, upload form).
+- **B2** Railway's Daily backup is kept about 6 days, so the privacy page says a deleted
+  document can remain in a backup for up to about a week (not "one more day"). Do not switch on
+  weekly or monthly backups without changing that sentence.
+- **B4** The processing sentence names Railway (United States region), Railway Postgres and
+  Anthropic in the United States. Check the region in the Railway project before publishing.
+- **P4** Governing law: Texas, USA, no venue and no liability cap. Confirm.
+- **P5** The privacy page says the host (Railway) keeps standard request logs for a limited
+  time, without a number (Railway's retention depends on the plan).
+- **P6/P7** The landing page says "the Department of Justice's ADA Title II web rule" with no
+  date. It still shows the measured review-load numbers (3 decisions for a 16-page section),
+  with a link to how they were measured; P7's default was to remove them.
+- **L1** The privacy page says unsaved review text stays in the browser tab until saved.
+- **W1/W2** With the production image (no LibreOffice) the upload form takes PDF only, and the
+  privacy and limits pages say so; the Word and PowerPoint lines appear only when the server
+  can convert them.
+- **B7/L5** The student note and the handwritten and scanned messages are unchanged.
+- **C1/B8** The Canvas and Blackboard steps are stated as "not yet tried in a live course".
+- `SOURCE_URL` and the repository links point at https://github.com/harishm17/readablestem.
+
+The table rows below keep their original text as the record of the options.
+
 ## Blocking the beta
 
 | ID | Where | Decision | Recommended default |

@@ -63,8 +63,9 @@ chart data tables' scroll boxes (`tabindex`); `details`, `summary`, `caption`,
 Files, link it where the PDF was, check it in Student View), says to make the HTML the
 main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
 Justice Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
-page links to it under the download link. TODO(Harish): try the steps in a real Canvas
-course (Canvas Lite, then UTD) and update both, and the Canvas export's.
+page links to it under the download link. The steps are stated as not yet tried in a live
+Canvas course; once they have been (Canvas Lite, then UTD), update both pages and the Canvas
+export's.
 
 ### The Canvas export (`pipeline/export_canvas.py`)
 
@@ -401,7 +402,7 @@ and label are unchanged. In a document in another language the alt text is marke
 - A page (or handwriting) kept as an image is never called a figure: its alt text names
   the page and what it is, and its note says a screen reader cannot read it and to ask
   the instructor for a text version (`assemble.KEPT_IMAGE_WORDS`, by the fix's reason,
-  so a stored result renders the same; `TODO(Harish)`: the design's draft wording).
+  so a stored result renders the same; the design's draft wording is the beta wording).
   Hidden text from such a page is never in the file: layout never reads it.
 - NEEDS_REVIEW fixes are shown as converted and not flagged here: the review screen is
   where they are handled. So are fixes accepted with an optional note
@@ -665,14 +666,14 @@ review words ("needs review", "rejected"): those are for the instructor, on the 
   converted. They are shown as pictures of the original, marked "Not converted" or
   "Needs a description": ask your instructor for a version you can read.", and when whole
   pages are kept as images, which ones: "Pages 2 and 5 are pictures of handwritten or
-  scanned pages and were not converted." (`assemble.kept_pages_note`, `TODO(Harish)`);
+  scanned pages and were not converted." (`assemble.kept_pages_note`);
 - "If something is hard to read or looks wrong, tell your instructor.";
 - an optional plain-text `source_note`, such as an OpenStax attribution.
 
-The wording is `TODO(Harish)` in `pipeline/assemble.py`: whether to name the screen
-readers that read MathML aloud, and whether "checked" stays (the feature review's
-challenge, 10.3 row 4, would say "decided by your instructor" instead, since the tool
-only knows that decisions were made). Model cost is not in the HTML: the file is meant for
+The wording is final for the beta (docs/launch.md B7): the note does not name screen
+readers, and "checked" appears only once an instructor has made a decision (the feature
+review's challenge, 10.3 row 4, would say "decided by your instructor" instead, since the
+tool only knows that decisions were made). Model cost is not in the HTML: the file is meant for
 students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
 Text the tool writes (notes, labels, the student note) carries `class="readablestem"`. The
@@ -888,9 +889,10 @@ after $0.016 of real spend. That is why the default follows the cap; a number gi
 than one step at once, the summary says so and suggests `--concurrency 1`, which reserves
 one call at a time.
 
-## Engineering limits (input for the known-limits copy)
+## Engineering limits (the source of the known-limits page)
 
-TODO(Harish): turn these into the public known-limits copy.
+The public known-limits page (`web/templates/limits.html`) states these in plain words.
+Keep the two in step when a limit changes.
 
 - An equation wider than the screen does not wrap: it scrolls sideways inside its own
   box (a tab stop when it may not fit a phone screen).

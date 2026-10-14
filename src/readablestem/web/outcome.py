@@ -126,22 +126,22 @@ def _outage(result_json: dict[str, Any] | None) -> tuple[int, int, str] | None:
 FAILED_MESSAGES = {
     # Every page handwritten or scanned (pipeline.page_type.refusal_code): the upload
     # probe refuses these first; a job sees them only when the probe could not tell.
-    # Never "run OCR": OCR'd scans are what these are. TODO(Harish): final wording.
+    # Never "run OCR": OCR'd scans are what these are.
     "scanned": "Every page of this PDF is a scanned image, so this tool cannot convert it. "
     "It has no text this tool can use. If you have the original file (LaTeX, Word or "
-    "PowerPoint), upload that instead.",
+    "PowerPoint), export a PDF from it and upload that instead.",
     "scanned_ocr": "Every page of this PDF is a scanned image, so this tool cannot convert "
     "it. Its text was guessed from the images by a text recognition (OCR) program. OCR "
     "text is often wrong, most of all in maths, so this tool does not use it, and running "
     "OCR again will not help. If you have the original file (LaTeX, Word or PowerPoint), "
-    "upload that instead.",
+    "export a PDF from it and upload that instead.",
     "handwritten": "This PDF is handwritten, so this tool cannot convert it. It also holds "
     "hidden text that a tablet or a text recognition (OCR) program guessed from the "
     "handwriting. That text is often wrong, most of all in maths, so this tool does not "
-    "use it. If you have a typed version (LaTeX, Word or PowerPoint), upload that instead.",
+    "use it. If you have a typed version (LaTeX, Word or PowerPoint), export a PDF from it and upload that instead.",
     "handwritten_no_text": "This PDF is handwritten, so this tool cannot convert it. "
     "It has no text this tool can use. If you have a typed version (LaTeX, Word or "
-    "PowerPoint), upload that instead.",
+    "PowerPoint), export a PDF from it and upload that instead.",
     "no_content": "This PDF has no text, equations or figures that could be converted.",
     "model_not_configured": "Conversions are not set up on this server yet, so nothing "
     "was converted and nothing was sent anywhere. Please tell the person who runs this "
@@ -216,7 +216,7 @@ def job_outcome(
 # Done with pages kept as images ("scanned_pages" is the code jobs had before page types).
 PAGES_NOT_CONVERTED = frozenset({"pages_not_converted", "scanned_pages"})
 # How the job page names the pages kept whole as images, by their fix's reason
-# (pipeline.page_type), in this order. TODO(Harish): final wording (design, section 3.3).
+# (pipeline.page_type), in this order. Final wording for the beta (design, section 3.3).
 PAGE_WORDS = {
     "handwritten_page": ("is handwritten", "are handwritten"),
     "scanned_page": ("is a scanned image", "are scanned images"),

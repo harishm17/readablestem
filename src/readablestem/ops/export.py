@@ -14,10 +14,10 @@ Not exported: the uploaded PDF, the file name, the owner's email, the output HTM
 
 The export is a copy of document content outside the database, so it keeps the same
 deadline: `prune_exports(DIR)` (`readablestem ops export-opted-in --prune DIR`) deletes
-every job directory whose `EXPIRES` has passed. TODO(Harish): before using this, make
-the privacy page say opted-in results may be copied to your own machine for analysis
-and are deleted by the same date, and decide whether reviewer decisions should outlive
-the job as labels (that needs its own retention and wording; not built).
+every job directory whose `EXPIRES` has passed. Do not use this before the privacy page
+says opted-in results may be copied to the maintainer's machine for analysis and are
+deleted by the same date (docs/launch.md L3). Reviewer decisions do not outlive the job
+as labels; that would need its own retention and wording, and is not built.
 """
 
 from __future__ import annotations

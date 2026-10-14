@@ -34,9 +34,10 @@ is also a dashboard setting; the table in step 5 lists them so you can copy them
 
 ## Decisions for Harish
 
-1. **Backup window and the privacy page (blocking-beta, B2 in [launch.md](launch.md)).** The privacy page
-   says one daily backup is kept and a deleted document can stay in it "up to about one more day"
-   (the Cloud SQL setting). Railway's backups are different: daily backups are kept 6 days, weekly
+1. **Backup window and the privacy page (blocking-beta, B2 in [launch.md](launch.md)). Decided:
+   daily only, kept 6 days; the privacy page says a deleted document can remain in a backup for up
+   to about a week.** The earlier sentence ("one daily backup", "up to about one more day") was
+   the Cloud SQL setting. Railway's backups are different: daily backups are kept 6 days, weekly
    27 days, monthly 89 days, and you choose which schedules to switch on. A deleted document stays in
    any backup taken before it was deleted. Pick one and make the privacy sentence match:
    - recommended: **daily only, kept 6 days**; change the sentence to "up to about a week";

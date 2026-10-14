@@ -193,21 +193,21 @@ def upload_error_message(
         # Every page handwritten or scanned (pipeline.page_type.refusal_code). Never "run
         # OCR first": that makes exactly the files refused here. One sentence for what
         # happened (the error summary's link), then why and what to do (the field's
-        # message, `upload_error_summary`). TODO(Harish): final words.
+        # message, `upload_error_summary`).
         "scanned": f"{name} is scanned, so this tool cannot convert it. It has no text "
         f"this tool can use. {NOTHING_TAKEN} If you have the original file (LaTeX, Word or "
-        "PowerPoint), upload that instead.",
+        "PowerPoint), export a PDF from it and upload that instead.",
         "scanned_ocr": f"{name} is scanned, so this tool cannot convert it. Its text was "
         "guessed from the images by a text recognition (OCR) program, which is often wrong "
         f"in maths, so it is not used; running OCR again will not help. {NOTHING_TAKEN} If "
-        "you have the original file (LaTeX, Word or PowerPoint), upload that instead.",
+        "you have the original file (LaTeX, Word or PowerPoint), export a PDF from it and upload that instead.",
         "handwritten": f"{name} is handwritten, so this tool cannot convert it. Its hidden "
         "text, guessed from the handwriting by a tablet or an OCR program, is often wrong in "
         f"maths, so it is not used. {NOTHING_TAKEN} If you have a typed version (LaTeX, Word "
-        "or PowerPoint), upload that instead.",
+        "or PowerPoint), export a PDF from it and upload that instead.",
         "handwritten_no_text": f"{name} is handwritten, so this tool cannot convert it. "
         f"It has no text this tool can use. {NOTHING_TAKEN} If you have a typed version "
-        "(LaTeX, Word or PowerPoint), upload that instead.",
+        "(LaTeX, Word or PowerPoint), export a PDF from it and upload that instead.",
         "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
         "chose the right file.",
         "unknown_revision": "The document you wanted to replace with a new version was not "

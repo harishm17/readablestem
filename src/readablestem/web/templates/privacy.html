@@ -2,12 +2,12 @@
 {% block title %}Privacy{% endblock %}
 {% block content %}
 <h1>Privacy</h1>
-<p class="draft-note"><strong>Draft, to be reviewed by Harish.</strong> This page describes
-  how the beta actually behaves today; the wording is not final.</p>
+<p class="hint">This page describes how the beta works today. If it changes in a way that
+  matters to you, see "Changes to this notice" below.</p>
 
 <h2>Who runs this</h2>
-<p>ReadableSTEM is a free, open-source beta run by Harish, an individual developer, not a
-  company or a university.{% if contact_email %} Contact:
+<p>ReadableSTEM is a free, open-source beta run by Harish Manoharan, an individual (a student
+  project), not a company or a university.{% if contact_email %} Contact:
   <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>.{% endif %}</p>
 
 <h2>What you may upload</h2>
@@ -16,12 +16,12 @@
   with students' personal information in it.</p>
 
 <h2>What is stored, and for how long</h2>
-<p>For each upload we store: the PDF (for a Word or PowerPoint file, the PDF made from it;
-  the Word or PowerPoint file itself is not kept) and its file name, images cut from it (equations and
+<p>For each upload we store: the PDF{% if office_on %} (for a Word or PowerPoint file, the PDF
+  made from it; the Word or PowerPoint file itself is not kept){% endif %} and its file name, images cut from it (equations and
   figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
   converted HTML, and your review decisions.</p>
 <ul>
-  {# TODO(Harish): final wording of these three lines (T1-8). What the code does: the
+  {# What the code does (T1-8): the
      24-hour and 7-day clocks restart on every review decision, language, title or contact
      change, and download; "Keep 7 more days" on the job page makes a 24-hour document a
      7-day one; the developer-look choice is 30 days from upload and does not restart. #}
@@ -45,12 +45,13 @@
     Nothing is sent to an AI service until you choose the pages. The sample document is
     a recorded conversion of a published textbook section, not your file: it is deleted on the
     same schedule as your own documents.</li>
-  {# TODO(Harish): this matches the deploy default (SQL_RETAINED_BACKUPS=1). Decide the
-     backup window (docs/deploy.md, "Backups and deleted documents") and keep this
-     sentence true: change the number, or remove it if backups are turned off. #}
-  <li>The database is backed up once a day and one backup is kept, so a deleted document
-    can remain in that backup for up to about one more day before the next backup
-    replaces it. Backups are only used to recover the service after a failure.</li>
+  {# Railway's Daily backup schedule keeps each backup for about 6 days
+     (docs/deploy-railway.md, "Backups"). Keep this sentence true: if the schedule or the
+     kept time changes, change the sentence; weekly or monthly schedules would stretch it. #}
+  <li>The database is backed up once a day by our host, Railway, and each daily backup is
+    kept for about 6 days, so a deleted document can remain in a backup for up to about a
+    week after you delete it. Backups are only used to recover the service after a
+    failure.</li>
   {% if notation_on %}
   <li>Your courses and their notation (course names, symbols, what they mean, your notes,
     and the letters you chose to remember for a course during a review) are kept until
@@ -61,12 +62,11 @@
 <h2>Who else sees your documents</h2>
 <ul>
   {% if provider == "anthropic" %}
-  {# TODO(Harish): final wording for Anthropic. What is known (docs/design/beta-architecture.md,
-     "Data path and retention with Anthropic"): the commercial API terms say inputs and outputs
-     are not used to train models by default; Anthropic's standard API retention is 30 days;
-     content its safety systems flag can be kept longer; zero data retention exists only by
-     agreement. Check Anthropic's current pages and say here exactly what applies to this
-     account (and whether a zero-retention agreement is in place). #}
+  {# What is known (docs/design/beta-architecture.md, "Data path and retention with
+     Anthropic"): the commercial API terms say inputs and outputs are not used to train
+     models by default; Anthropic's standard API retention is 30 days; content its safety
+     systems flag can be kept longer. No zero-retention agreement is in place for the beta
+     (docs/launch.md B1). Re-read Anthropic's policy page when you launch. #}
   <li><strong>Anthropic.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
     nearby text, are sent to Anthropic's API (the Claude models).{% if notation_on %} For a document you upload
@@ -83,15 +83,18 @@
     sent with the equations.{% endif %} OpenAI states that it does not use API data to train its models by
     default; see OpenAI's own API data policies for how long it keeps requests.</li>
   {% endif %}
-  <li><strong>Google Cloud</strong> hosts the app and its database.</li>
+  <li><strong>Railway</strong> hosts the app and its database (Railway Postgres), in its
+    United States region.</li>
   {% if tracing %}
-  {# TODO(Harish): state how long Langfuse keeps traces once its project retention is set
-     (docs/operations.md, "Tracing"). #}
+  {# Tracing is off for the beta (TRACING_ENABLED=false, docs/launch.md L4). Before turning
+     it on, set the Langfuse project retention (docs/operations.md, "Tracing") and state it
+     in this item. #}
   <li><strong>Langfuse</strong> receives performance records of each conversion: timings,
     model names, token counts, costs and error categories, with random ids. They never
     contain document text, images, LaTeX, alt text, file names or your email address.</li>
   {% endif %}
-  <li>No one else. Uploads are never used to train AI models, sold or shared.</li>
+  <li>No one else. We do not use your uploads to train models, sell them or share them
+    beyond the services named here.</li>
 </ul>
 
 <h2>Your account</h2>
@@ -104,16 +107,22 @@
 
 <h2>Cookies</h2>
 <p>One cookie keeps you signed in (for up to 7 days) and protects forms against forgery.
-  There are no analytics, advertising or third-party tracking cookies.</p>
+  There are no analytics, advertising or third-party tracking cookies. While you type a
+  review decision, the text is kept in your browser tab until you save it, close the tab or
+  sign out; it is never sent to the server before you save.</p>
 
 <h2>What is logged</h2>
-<p>Logs record what happened, not what was in your document: event names, random ids,
-  page and fix counts, timings, model costs and error categories (for example
+{# Platform logs: Railway keeps its own request logs; how long depends on the plan, so the
+   sentence does not give a number (docs/launch.md P5). #}
+<p>The app's logs record what happened, not what was in your document: event names, random
+  ids, page and fix counts, timings, model costs and error categories (for example
   <code>unknown_command</code>). They never contain document text, images, LaTeX, alt
   text, file names or your email address. Before documents are deleted, daily counts (for
-  example, how many equations needed review) are added to totals that contain no content.</p>
-{# TODO(Harish): final wording of the usage-events line (web/events.py, FEATURE-REVIEW
-   "Beta 6"); the number of days is EVENT_RETENTION_DAYS. #}
+  example, how many equations needed review) are added to totals that contain no content.
+  Our host, Railway, also keeps its own standard logs of requests (time, address and page)
+  for a limited time.</p>
+{# Usage events (web/events.py, FEATURE-REVIEW "Beta 6"); the number of days is
+   EVENT_RETENTION_DAYS. #}
 {% if events_on %}
 <p>We also note what you do in the app, never what is in your documents: for example that
   you signed in, uploaded, made a review decision or downloaded, and your answers to the
@@ -136,7 +145,7 @@
     and memory limits, and is kept only in the database, never as a file on the server's disk.</li>
   <li>Sign-in, uploads and daily page counts have limits that stop automated misuse.</li>
   {% if office_on %}
-  {# TODO(Harish): final wording (T3-30). What the code does: a Word or PowerPoint file is
+  {# T3-30. What the code does: a Word or PowerPoint file is
      checked in a separate process (macros, linked content and oversized contents are refused),
      written to a private temporary folder, turned into a PDF by LibreOffice running on the
      server with no network access of its own, and the folder is removed at once. Nothing is
@@ -148,14 +157,16 @@
     refused.</li>
   {% endif %}
 </ul>
-{# TODO(Harish): "Where it is processed". Recommended text: "The app and its database run
-   in Google Cloud, region {REGION from deploy.env}. Images and nearby text of equations and
-   figures are sent to {OpenAI|Anthropic} in the United States for processing, as described
-   above. If you are outside the United States, your documents are therefore transferred
-   there." Check the region before publishing; a university's privacy office will ask. #}
-{# TODO(Harish): "Changes to this notice". Recommended text: "If this notice changes in a
-   way that affects what is stored or who receives it, we will say so on this page, with the
-   date, before the change takes effect, and email the people on the beta list." #}
+<h2>Where it is processed</h2>
+<p>The app and its database run on Railway, in its United States region. Images and nearby
+  text of equations and figures are sent to {% if provider == "anthropic" %}Anthropic{% else %}OpenAI{% endif %} in
+  the United States for processing, as described above. If you are outside the United
+  States, your documents are therefore transferred there.</p>
+
+<h2>Changes to this notice</h2>
+<p>If this notice changes in a way that affects what is stored or who receives it, we will
+  say so on this page, with the date, before the change takes effect, and email the people
+  on the beta list.</p>
 
 <h2>Requests, takedowns and rights</h2>
 <p>To have your data deleted, to report material that should not be here, or for any

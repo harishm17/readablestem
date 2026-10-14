@@ -2,11 +2,11 @@
 {% block title %}Terms of use{% endblock %}
 {% block content %}
 <h1>Terms of use</h1>
-<p class="draft-note"><strong>Draft, to be reviewed by Harish.</strong> These terms describe
-  how the beta works today; the wording is not final.</p>
+<p class="hint">These terms describe how the beta works today.</p>
 
 <h2>The service</h2>
-<p>ReadableSTEM is a free beta, open by invitation to a small group of instructors. It may
+<p>ReadableSTEM is a free beta run by Harish Manoharan, an individual (a student project),
+  not a company or a university. It is open by invitation to a small group of instructors. It may
   change, pause or stop at any time. Daily limits apply to pages and uploads, and the
   service pauses for the day when its budget for AI model calls is used up.</p>
 
@@ -38,24 +38,20 @@
   <a href="{{ source_url }}">{{ source_url }}</a>.</p>
 
 <h2>Accounts</h2>
-<p>Access is by invitation. You sign in with your own university or Google account. Do not
+<p>Access is by invitation. You sign in with your own Google account{% if microsoft_on %} or your
+  Microsoft school or work account{% endif %}. Do not
   share your session or let others use your access. Access can be removed at any time.</p>
 
 <h2>Your institution</h2>
 <p>This is an independent project, not a service of your university, and it is not
   endorsed by it. Follow your institution's own rules for course materials and for
   student information.</p>
-{# TODO(Harish): confirm "Your institution" with the pilot universities' accessibility
-   offices. Recommended: keep it as written; if a university requires its own data-protection
-   or vendor-review terms, record that in docs/launch.md and link the agreement here. #}
 
 <h2>Changes to these terms</h2>
 <p>If these terms change in a way that matters to you, the new version will be shown here
   with its date before it applies, and the people on the beta list will be told.</p>
-{# TODO(Harish): "Governing law and disputes". Recommended: say nothing for a free invite-only
-   beta except "These terms are governed by the law of {your US state/country}." once you have
-   chosen; ask a lawyer or the university's counsel before adding a venue or liability cap
-   beyond the no-warranty paragraph below. #}
+<h2>Governing law</h2>
+<p>These terms are governed by the law of the State of Texas, USA.</p>
 
 <h2>No warranty</h2>
 <p>The service is provided as it is, without any warranty. To the extent the law allows,

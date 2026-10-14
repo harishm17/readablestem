@@ -502,8 +502,7 @@ v and a are vectors", real models (docs/eval.md "Course notation"):
   it flags every one of them again, plus the same 6.
   So the case is worth its required decision only where a course writes a letter one
   way; the course page asks instructors to add both forms when they use both.
-  TODO(Harish): keep this case required (content-features.md's tier), or make it an
-  optional note for letters the course lists in bold only.
+  Kept required for the beta (content-features.md's tier; docs/launch.md L6).
 
 ## Validators and codes
 

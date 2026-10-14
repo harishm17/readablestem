@@ -414,8 +414,8 @@ The production image does **not** include it: it adds a few hundred megabytes, a
    It installs the Writer and Impress components without the graphical interface, and three
    metric-compatible fonts (Carlito for Calibri, Caladea for Cambria, Liberation).
 2. Set `MEMORY=2Gi` in `deploy/.env.deploy`.
-3. Read the privacy page's new line (it appears when the form takes these files) and the
-   `TODO(Harish)` above it, docs/launch.md "Sign-in fallback and Word input".
+3. Read the privacy page's new line (it appears when the form takes these files), and
+   docs/launch.md "Sign-in fallback and Word input".
 
 With no LibreOffice in the image nothing else changes: the form takes PDFs only and a Word
 file is refused with a message that says to save it as a PDF. `OFFICE_INPUT_ENABLED=false`
@@ -586,8 +586,9 @@ deleted document can then remain in that backup for up to about a day after the 
 Point-in-time recovery stays off (the gcloud default for the Enterprise edition): its
 transaction logs would keep deleted documents for days as well.
 
-TODO(Harish): pick the trade-off and make the privacy page agree with it. Either keep one
-backup and say so ("deleted documents can remain in a database backup for up to one more
+Decided for Railway (docs/deploy-railway.md, decision 1): daily backups kept about 6 days, and
+the privacy page says a deleted document can remain in a backup for up to about a week. For
+Cloud SQL, either keep one backup and say so ("deleted documents can remain in a database backup for up to one more
 day"), or set `SQL_RETAINED_BACKUPS` higher and state that window, or turn automated
 backups off for the beta (`gcloud sql instances patch readablestem-db --no-backup`) and keep
 the current wording. The privacy page today promises deletion after `RETENTION_HOURS`
