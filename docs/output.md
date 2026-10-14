@@ -370,6 +370,32 @@ and label are unchanged. In a document in another language the alt text is marke
   where they are handled. So are fixes accepted with an optional note
   (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
 
+## Equations kept as pictures (T3-15)
+
+An equation that was not converted is shown as the crop of the PDF
+(`pipeline/equation_scale.py`). Two things are done for it:
+
+- **Text size.** The picture is shown at the size its text would have in the file, not at
+  the size it was printed: scaled by 18 CSS px (the file's text) over the PDF's text size
+  at 4/3 CSS px a point. The PDF's text size is that of the paragraph an inline equation
+  stands in, the equation's own size for a display equation when it is within 0.6 to 1.8
+  times the body size, else the document's body size (the size most paragraph and list
+  text is set in). A 10 pt handout's pictures are shown 1.35 times their printed size, a
+  12 pt one's 1.125 times, a slide deck's 24 pt text brings them down to 0.56 times. The
+  scale is kept between 0.5 and 2, and is 1 when the document has no text to measure by.
+  Width and height are set together from the crop's pixels, so the picture keeps its
+  shape (it was set from the equation's box before, which left out the 2 pt of margin
+  the crop has: small pictures were squeezed).
+- **Sharp.** The crop is cut at three image pixels for each CSS pixel it will take
+  (`crop_dpi`: 288 dpi times the scale), not at the 200 dpi of other crops, and says so in
+  its PNG header (pHYs), which is how the assembler knows to size it from its pixels. The
+  model is sent the same 200 dpi crop as before (a second cut, so what the model reads is
+  unchanged); the stored crop, which the review screen also shows, is the sharp one. A
+  result stored before this has untagged crops and gets the printed size times the scale.
+
+The cost is size: the 14 flagged equations of the problem-set fixture take 3 KB more each
+(60 KB to 102 KB for the file). Figures, tables and pages are not changed.
+
 ## Inline equations
 
 Layout writes a marker such as `⟦p1-e7⟧` (`core.types.inline_marker`) into the paragraph
@@ -622,7 +648,8 @@ About 35 lines of inline CSS:
 
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
   (about 17:1 contrast; for a dark scheme see "Dark colours");
-- images at their printed size (PDF points x 96/72) and never wider than the column;
+- images at their printed size (PDF points x 96/72) and never wider than the column; an
+  equation kept as a picture is the exception ("Equations kept as pictures" below);
 - display equations scroll sideways inside their `.equation` box when wider than the
   screen (see "Wide equations");
 - block maths keep the browser's own `display: block math` and centring (overriding

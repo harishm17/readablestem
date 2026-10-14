@@ -288,7 +288,10 @@ def test_declared_prompt_versions_are_used_when_no_call_was_made(fake):
 
 def test_crops_on_the_calling_thread_and_steps_in_the_pool(fake):
     convert_pdf(b"%PDF", settings=settings(), client=fake_client(), concurrency=3)
-    assert fake.crop_threads == [threading.current_thread().name] * len(MODEL_IDS)
+    # Each element is cut once, an equation twice (the model's crop and the sharp one for
+    # the student file, T3-15): every cut on the calling thread.
+    assert len(fake.crop_threads) >= len(MODEL_IDS)
+    assert set(fake.crop_threads) == {threading.current_thread().name}
     assert fake.step_threads and all(name.startswith("step") for name in fake.step_threads)
 
 

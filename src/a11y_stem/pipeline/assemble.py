@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import base64
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
@@ -61,6 +61,7 @@ from a11y_stem.core.types import (
 from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from a11y_stem.pipeline import (
     assemble_tables,
+    equation_scale,
     figure_details,
     figure_images,
     inline_text,
@@ -304,6 +305,10 @@ def _png_data_uri(png: bytes | None) -> str | None:
     if png is None or not _is_png(png):
         return None
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+
+def _unit_scale(_element: Element) -> float:
+    return 1.0
 
 
 def _size_attrs(element: Element) -> str:
@@ -624,6 +629,8 @@ class _Renderer:
     # Levels added to every heading written (T3-13): 1 when the document has several
     # top-level headings (slides), so its title can be the one h1 above them.
     demote: int = 0
+    # The scale an unconverted equation's picture is shown at (T3-15).
+    scale_of: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -871,6 +878,16 @@ class _Renderer:
         original = self.original(element, equation_alt(element)) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
+    def picture_size(self, element: Element, png: bytes | None) -> str:
+        """The `width` and `height` of a crop's `<img>`: a figure or table at its printed
+        size, an equation at the size of the file's text (T3-15, `pipeline.equation_scale`)."""
+        if element.kind is not Kind.EQUATION or png is None:
+            return _size_attrs(element)
+        x0, y0, x1, y1 = element.bbox
+        printed = (round((x1 - x0) * _PT_TO_CSS_PX), round((y1 - y0) * _PT_TO_CSS_PX))
+        size = equation_scale.display_size(png, self.scale_of(element), printed)
+        return f' width="{size[0]}" height="{size[1]}"' if size else ""
+
     def inline_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "inline", with_id=True)
         if mathml is not None:
@@ -885,7 +902,8 @@ class _Renderer:
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
             alt = _escape(equation_alt(element))
-            image = f'<img src="{src}" alt="{alt}"{_size_attrs(element)}>'
+            size = self.picture_size(element, self.crops.get(element.id))
+            image = f'<img src="{src}" alt="{alt}"{size}>'
             label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
         else:
             image = _escape(element.text or "")
@@ -958,7 +976,8 @@ class _Renderer:
         """The crop as an <img>, or the extracted text when there is no image."""
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
-            return f'<img src="{src}" alt="{_escape(alt)}"{_size_attrs(element)}>'
+            size = self.picture_size(element, self.crops.get(element.id))
+            return f'<img src="{src}" alt="{_escape(alt)}"{size}>'
         text = (element.text or "").strip()
         unavailable = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
         if text:
@@ -1250,6 +1269,7 @@ def render_html(
         equations=equations,
         math_alttext=math_alttext,
         demote=shift,
+        scale_of=equation_scale.scaler(ordered),
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = renderer.render_all(ordered)
