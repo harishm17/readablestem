@@ -1231,18 +1231,7 @@ def _lift_stacked_fractions(frags: list[_Row], rules: Sequence[_Path]) -> list[_
         lifted.append(piece)
     if not lifted:
         return frags
-    out: list[_Row] = []
-    for frag in frags:
-        gone = removed.get(id(frag))
-        if not gone:
-            out.append(frag)
-            continue
-        kept = [c for i, c in enumerate(frag.chars) if i not in gone]
-        if any(not c.blank for c in kept):
-            out.append(
-                _Row(kept, vertical=frag.vertical, diagonal=frag.diagonal, column=frag.column)
-            )
-    return [*out, *lifted]
+    return [*_without(frags, removed), *lifted]
 
 
 def _fraction_at(
@@ -1307,11 +1296,156 @@ def _fraction_at(
     return over, under, nearest.baseline
 
 
+def _lift_stacked_pairs(frags: list[_Row]) -> list[_Row]:
+    """Take the glyphs of inline binomials out of the lines they were read into.
+
+    "( 5 over 3 )", a binomial coefficient or a column of two entries, has no bar: a
+    bracket, two short pieces of text one above the other, a bracket. They arrive as
+    three lines (the bracket and the numerator in the line of text, the denominator and
+    the closing bracket in the next), and the maths came out cut in pieces, without its
+    brackets and with half of its entries. The glyphs between a bracket and its closing
+    one are the pair when nothing stands on the line of the brackets between them, one
+    short token stands above it and one below, and the two overlap in x; they become one
+    stacked fragment, like the glyphs of a fraction (`_lift_stacked_fractions`).
+    """
+    rows = [f for f in frags if not f.vertical]
+    index = _RowIndex(rows)
+    claimed: set[int] = set()
+    lifted: list[_Row] = []
+    removed: dict[int, set[int]] = {}
+    for row in rows:
+        for i, bracket in enumerate(row.chars):
+            if bracket.c not in "([" or id(bracket) in claimed:
+                continue
+            found = _binomial_at(row, i, index, claimed)
+            if found is None:
+                continue
+            members, baseline = found
+            for owner, place, glyph in members:
+                removed.setdefault(id(owner), set()).add(place)
+                claimed.add(id(glyph))
+            glyphs = [g for _, _, g in members]
+            gap = next(k for k, g in enumerate(glyphs) if g.y0 > bracket.y0 + 0.25 * bracket.size)
+            chars = [replace(g, stacked=True) for g in glyphs]
+            before = chars[gap - 1]
+            chars.insert(  # a space between the top and the bottom
+                gap,
+                _Char(
+                    " ",
+                    before.x1,
+                    before.y0,
+                    before.x1,
+                    before.y1,
+                    before.baseline,
+                    before.size,
+                    before.font,
+                    0,
+                ),
+            )
+            piece = _Row(chars)
+            piece.__dict__["baseline"] = baseline
+            lifted.append(piece)
+    if not lifted:
+        return frags
+    return [*_without(frags, removed), *lifted]
+
+
+def _without(frags: list[_Row], removed: dict[int, set[int]]) -> list[_Row]:
+    """`frags` without the characters at the given places (a row left with no ink goes)."""
+    out: list[_Row] = []
+    for frag in frags:
+        gone = removed.get(id(frag))
+        if not gone:
+            out.append(frag)
+            continue
+        kept = [c for i, c in enumerate(frag.chars) if i not in gone]
+        if any(not c.blank for c in kept):
+            out.append(
+                _Row(kept, vertical=frag.vertical, diagonal=frag.diagonal, column=frag.column)
+            )
+    return out
+
+
+def _binomial_at(
+    row: _Row, place: int, index: _RowIndex, claimed: set[int]
+) -> tuple[list[tuple[_Row, int, _Char]], float] | None:
+    """The glyphs (bracket, top, bottom, closing bracket, each with its row and place) of
+    the inline binomial that the opening bracket at `place` of `row` starts, with the
+    baseline of the text beside it; None when it starts none."""
+    opening = row.chars[place]
+    closing = ")" if opening.c == "(" else "]"
+    size = opening.size
+    middle = (opening.y0 + opening.y1) / 2
+    near: list[tuple[_Row, int, _Char]] = []
+    for other in index.near(opening.y0 - 1.3 * size, opening.y1 + 1.3 * size):
+        for i, c in enumerate(other.chars):
+            if c.blank or c is opening or id(c) in claimed:
+                continue
+            centre_x = (c.x0 + c.x1) / 2
+            if (
+                opening.x1 - 0.3 * size <= centre_x <= opening.x1 + 8 * size
+                and c.y1 >= opening.y0 - 0.5 * size  # within reach of the bracket's height
+                and c.y0 <= opening.y1 + 0.5 * size
+            ):
+                near.append((other, i, c))
+    ends = [
+        m for m in near if m[2].c == closing and abs((m[2].y0 + m[2].y1) / 2 - middle) <= 0.6 * size
+    ]
+    if not ends:
+        return None
+    end = min(ends, key=lambda m: m[2].x0)
+    between = [m for m in near if m[2].x1 <= end[2].x0 + 0.3 * size and m is not end]
+    above = [m for m in between if (m[2].y0 + m[2].y1) / 2 < middle - 0.25 * size]
+    below = [m for m in between if (m[2].y0 + m[2].y1) / 2 > middle + 0.25 * size]
+    if not above or not below or len(above) + len(below) != len(between):
+        return None  # something stands on the line of the brackets, or one side is empty
+    if len(above) > 6 or len(below) > 6 or not (_one_token(above) and _one_token(below)):
+        return None
+    shared = min(max(m[2].x1 for m in above), max(m[2].x1 for m in below)) - max(
+        min(m[2].x0 for m in above), min(m[2].x0 for m in below)
+    )
+    narrow = min(
+        max(m[2].x1 for m in above) - min(m[2].x0 for m in above),
+        max(m[2].x1 for m in below) - min(m[2].x0 for m in below),
+    )
+    if shared < 0.5 * narrow:
+        return None
+    left = min(m[2].x0 for m in between)
+    right = max(m[2].x1 for m in between)
+    if left - opening.x1 > size or end[2].x0 - right > size:
+        return None
+    text = [
+        c
+        for r in index.near(middle, middle)
+        for c in r.chars
+        if c.c.isalnum()
+        and c.y0 <= middle <= c.y1
+        and c.size >= 0.9 * size
+        and c not in [m[2] for m in between]
+    ]
+    nearest = min(text, key=lambda c: abs((c.x0 + c.x1) / 2 - opening.x0), default=None)
+    baseline = nearest.baseline if nearest is not None else opening.baseline
+    key = lambda m: m[2].x0  # noqa: E731
+    members = [
+        (row, place, opening),
+        *sorted(above, key=key),
+        *sorted(below, key=key),
+        end,
+    ]
+    return members, baseline
+
+
+def _one_token(glyphs: list[tuple[_Row, int, _Char]]) -> bool:
+    """Do the glyphs form one token: no gap between neighbours of 0.3 x their size?"""
+    chars = sorted((m[2] for m in glyphs), key=lambda c: c.x0)
+    return all(b.x0 - a.x1 < 0.3 * a.size for a, b in pairwise(chars))
+
+
 def _merge_baselines(
     frags: list[_Row], gutter: tuple[float, float] | None, rules: Sequence[_Path] = ()
 ) -> list[_Row]:
     """Merge fragments that share a baseline into rows, never across the column gutter."""
-    frags = _lift_stacked_fractions(frags, rules)
+    frags = _lift_stacked_pairs(_lift_stacked_fractions(frags, rules))
     rows: list[_Row] = []
     horizontal = sorted((f for f in frags if not f.vertical), key=lambda f: f.baseline)
     bands: list[list[_Row]] = []

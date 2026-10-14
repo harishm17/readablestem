@@ -125,3 +125,48 @@ def test_a_stacked_fraction_keeps_the_sizes_and_baselines_of_its_line():
     assert len(paragraphs) == 3  # first line, the sentence with its equation, last line
     assert "Half of the pool is ⟦" in (paragraphs[1].text or "")
     assert (paragraphs[1].text or "").endswith("full and the rest is empty.")
+
+
+# ------------------------------------------------------------ a binomial: no bar
+
+
+def binomial(page: pymupdf.Page, x: float, baseline: float, top: str, bottom: str) -> float:
+    """ "( top over bottom )": brackets on the baseline, the entries one above the other."""
+    page.insert_text((x, baseline), "(", fontsize=BODY)
+    inner = x + 5.0
+    page.insert_text((inner, baseline - 4.0), top, fontsize=SMALL, fontname="tiit")
+    page.insert_text((inner, baseline + 6.0), bottom, fontsize=SMALL, fontname="tiit")
+    width = max(pymupdf.get_text_length(t, fontname="tiit", fontsize=SMALL) for t in (top, bottom))
+    page.insert_text((inner + width + 1.0, baseline), ")", fontsize=BODY)
+    return inner + width + 8.0
+
+
+def test_a_binomial_keeps_its_brackets_and_both_entries():
+    def fill(page):
+        page.insert_text((72, 140), "The number of ways to choose is", fontsize=BODY)
+        end = binomial(page, 250, 140, "5", "2")
+        page.insert_text((end + 3, 140), "and it equals ten.", fontsize=BODY)
+
+    found = equations(prose_page(fill))
+    assert [spaceless(e.text) for e in found] == ["(52)"]
+
+
+def test_brackets_around_one_line_of_text_are_not_a_pair():
+    def fill(page):
+        page.insert_text((72, 140), "A sentence with (an aside) in it and x_1 here.", fontsize=BODY)
+        page.insert_text((72, 154), "(see 7) and another line of ordinary words.", fontsize=BODY)
+
+    assert equations(prose_page(fill)) == []
+
+
+def test_the_period_of_an_exercise_number_is_not_taken_into_a_binomial():
+    def fill(page):
+        page.insert_text((62, 140), "40.", fontsize=SMALL)
+        page.insert_text((63, 150), "(", fontsize=SMALL)
+        page.insert_text((66, 148), "12", fontsize=5.2, fontname="tiit")
+        page.insert_text((66, 155), "6", fontsize=5.2, fontname="tiit")
+        page.insert_text((72, 150), ")!", fontsize=SMALL)
+
+    elements = prose_page(fill)
+    texts = [spaceless(e.text) for e in equations(elements)]
+    assert all(not t.startswith("40") for t in texts)
