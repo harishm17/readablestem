@@ -978,6 +978,9 @@ class _Row:
     region: _Region | None = None  # the display equation it belongs to (_equation_regions)
     # An exercise number ("18.", "4)") cut off the front of a maths row: text, never maths.
     exercise_number: bool = False
+    # A line of a table of contents with its leaders and page number cut off
+    # (`_contents_rows`): an entry of its own, at this nesting level (1 = outermost).
+    contents_level: int = 0
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -4701,6 +4704,7 @@ class _Run:
     block_start: bool  # the run starts after a geometric break, not just a style change
     block_end: bool = True
     code: bool = False  # rows of program code, grouped whatever their indentation
+    contents: bool = False  # a line of a table of contents: a list item of its own
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # union of the rows' boxes
     margin: float = 0.0  # left edge of the rows after the first (the first's when alone)
 
@@ -4739,6 +4743,7 @@ class _Block:
     table: TableGrid | None = None  # tables: the grid built from the PDF (`_table_blocks`)
     code: bool = False  # paragraphs: program code, lines and indentation kept (`_code_text`)
     term_pieces: int | None = None  # glossary entries: how many of `pieces` are the term
+    contents_level: int = 0  # list items: an entry of a table of contents, at this level
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -4784,6 +4789,97 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
     if prev.bold != row.bold:
         return False
     return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
+
+
+# `Element.reasons` of a table of contents' entry (a list item): the link step looks for
+# the heading it names (`_contents_links`).
+CONTENTS_ENTRY = "contents entry"
+LEADER_DOTS = frozenset(".\u00b7\u2219\u22c5\u2026")
+MIN_LEADER_DOTS = 4  # dots in a leader; an ellipsis character counts as three
+MIN_CONTENTS_LEADER_ROWS = 2  # lines with leaders that make a page a contents page
+_PAGE_NUMBER = re.compile(r"\d{1,4}|[ivxlcdm]{1,7}", re.IGNORECASE)
+
+
+def _leader_split(row: _Row) -> list[_Char] | None:
+    """The characters of the title of a line like "1.1 Drop times . . . . 4" (dot leaders,
+    or ellipses, and then a page number, which may be a line of its own at the right
+    margin instead); None for any other line."""
+    chars = row.chars
+    end = len(chars)
+    while end and chars[end - 1].blank:
+        end -= 1
+    start = end
+    while start and chars[start - 1].c.isalnum():
+        start -= 1
+    if _PAGE_NUMBER.fullmatch("".join(c.c for c in chars[start:end])):
+        end = start
+    cut, dots = end, 0
+    while cut and (chars[cut - 1].blank or chars[cut - 1].c in LEADER_DOTS):
+        dots += 0 if chars[cut - 1].blank else 3 if chars[cut - 1].c == "\u2026" else 1
+        cut -= 1
+    title = chars[:cut]
+    if dots < MIN_LEADER_DOTS or not any(c.c.isalpha() for c in title):
+        return None
+    return title
+
+
+def _contents_rows(rows: list[_Row]) -> list[_Row]:
+    """The lines of a table of contents as entries without their leaders and page numbers.
+
+    A page with at least `MIN_CONTENTS_LEADER_ROWS` lines that end in dot leaders (and a
+    page number) is a contents page. There each such line keeps its title; a line with no
+    leaders whose page number stands alone at the right margin on the same baseline (a
+    chapter line, set in bold, with its number at the margin) keeps its text; the page
+    number's own line goes; each entry gets a level from its indent. Page numbers are
+    where the printed book had the pages, which nothing in this file has."""
+    split = {id(r): found for r in rows if not r.vertical and (found := _leader_split(r))}
+    if len(split) < MIN_CONTENTS_LEADER_ROWS:
+        return rows
+    numbers = [r for r in rows if _PAGE_NUMBER.fullmatch(r.clean) and not r.vertical]
+    pairs: list[tuple[_Row, _Row | None]] = []  # (a line, the page number beside it)
+    taken: set[int] = set()
+    for row in rows:
+        if row.vertical or any(row is n for n in numbers):
+            continue
+        twin = next(
+            (
+                n
+                for n in numbers
+                if id(n) not in taken
+                and abs(n.baseline - row.baseline) <= 0.35 * row.size
+                and n.x0 > row.x1
+            ),
+            None,
+        )
+        if twin is not None:
+            taken.add(id(twin))
+        pairs.append((row, twin))
+    # The numbers of a contents page stand at one right edge.
+    edge = statistics.median([t.x1 for _, t in pairs if t is not None] or [0.0])
+    entries: list[tuple[_Row, _Row]] = []  # (the line, the line it becomes)
+    dropped: set[int] = set()
+    for row, twin in pairs:
+        aligned = twin is not None and abs(twin.x1 - edge) <= 1.5 * row.size
+        if id(row) in split:
+            entries.append((row, _Row(split[id(row)], column=row.column)))
+        elif aligned and row.kind == "text" and len(split) >= 1:
+            entries.append((row, row))
+        else:
+            continue
+        if aligned and twin is not None:
+            dropped.add(id(twin))
+    if not entries:
+        return rows
+    steps: list[float] = []  # the distinct indents, outermost first
+    for x in sorted(new.x0 for _, new in entries):
+        if not steps or x > steps[-1] + 0.6 * entries[0][1].size:
+            steps.append(x)
+    for old, new in entries:
+        new.contents_level = 1 + max(i for i, x in enumerate(steps) if x <= new.x0 + 0.6 * new.size)
+        new.kind = "text"
+        new.column = old.column
+    swap = {id(old): new for old, new in entries}
+    return [swap.get(id(r), r) for r in rows if id(r) not in dropped]
 
 
 def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
@@ -4880,6 +4976,12 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
+            if row.contents_level or run.contents:
+                run.block_end = True
+                runs.append(
+                    _Run([row], row.kind, block_start=True, contents=bool(row.contents_level))
+                )
+                continue
             if id(row) in code or run.code:
                 if id(row) in code and run.code and code[id(row)] == code[id(prev)]:
                     run.add(row)
@@ -4907,7 +5009,15 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             starts = not geometric or restyled or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
-            runs.append(_Run([row], row.kind, block_start=True, code=id(row) in code))
+            runs.append(
+                _Run(
+                    [row],
+                    row.kind,
+                    block_start=True,
+                    code=id(row) in code,
+                    contents=bool(row.contents_level),
+                )
+            )
     return runs
 
 
@@ -5011,6 +5121,15 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     box = _union(r.bbox for r in rows)
     size = _dominant_size(rows)
     ink = [c for r in rows for c in r.ink]
+    if run.contents:
+        return _Block(
+            Kind.LIST_ITEM,
+            box,
+            rows,
+            font_size=size,
+            bold=all(r.bold for r in rows),
+            contents_level=rows[0].contents_level,
+        )
     if run.code:
         return _Block(
             Kind.PARAGRAPH, box, rows, text=_code_text(rows), font_size=size, bold=False, code=True
@@ -5497,6 +5616,7 @@ def _page_blocks(
     rows = _split_exercise_numbers(_split_labels(rows))
     for row in rows:
         _classify_row(row)
+    rows = _contents_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
     used = {id(rule) for rule in used_rules}
@@ -6175,7 +6295,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     elements = _to_elements(pages, ctx, block_ids)
     footnote_marks: dict[str, _FootnoteMark] = {}
     notices = _layout_notices(pages, ctx, block_ids, footnote_marks)
-    elements = _footnote_links(elements, footnote_marks)
+    elements = _contents_links(_footnote_links(elements, footnote_marks))
     # The safety net (independent of the page types; docs/layout.md "The safety net"): a
     # page keeps its page image, with a decision, when something painted on it was read
     # into nothing. The elements read from it stay.
@@ -6442,6 +6562,37 @@ def _layout_notices(
     return notices
 
 
+def _title_key(text: str) -> str:
+    """A title for matching a contents entry with its heading: letters and digits of the
+    words, case-folded, without the section number in front ("1.1 Drop times")."""
+    words = re.sub(r"[^\w\s]", " ", unicodedata.normalize("NFKC", text).casefold()).split()
+    while (
+        words and re.fullmatch(r"[\d.]+|[ivxlc]+|chapter|section|part", words[0]) and len(words) > 1
+    ):
+        words.pop(0)
+    return " ".join(words)
+
+
+def _contents_links(elements: list[Element]) -> list[Element]:
+    """Each entry of a table of contents links to the heading it names, when the PDF's own
+    links do not already say so (`text_pass` keeps those): a heading later in the document
+    whose title is the entry's, once the section number is left out of both. An entry that
+    names no heading, or more than one, is plain text."""
+    headings: dict[str, list[Element]] = {}
+    for e in elements:
+        if e.kind == Kind.HEADING and e.text:
+            headings.setdefault(_title_key(e.text), []).append(e)
+    out = []
+    for e in elements:
+        if CONTENTS_ENTRY in e.reasons and e.text and not e.links:
+            found = [h for h in headings.get(_title_key(e.text), []) if h.order > e.order]
+            if len(found) == 1:
+                link = Link(start=0, end=len(e.text), kind="internal", target_id=found[0].id)
+                e = e.model_copy(update={"links": [link]})
+        out.append(e)
+    return out
+
+
 def _footnote_links(elements: list[Element], marks: dict[str, _FootnoteMark]) -> list[Element]:
     """The elements with an internal link from each footnote's mark in the text to the
     footnote. The mark is found again in the element's text by what is printed just before
@@ -6527,7 +6678,9 @@ def _to_elements(
                         term_end=term_end,
                         list_marker=marker.text if marker else None,
                         list_ordered=marker.ordered if marker else None,
-                        list_level=levels.get(id(block)) if marker else None,
+                        list_level=block.contents_level
+                        or (levels.get(id(block)) if marker else None),
+                        reasons=[CONTENTS_ENTRY] if block.contents_level else [],
                     )
                 )
                 for child_id, inline in children:

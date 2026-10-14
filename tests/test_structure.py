@@ -308,3 +308,84 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
 
     marks = {note.id: layout_module._FootnoteMark(body.id, "no such text", "1")}
     assert layout_module._footnote_links([twice, note], marks)[0].links == []
+
+
+# ------------------------------------------------------------------------- contents
+
+
+def contents_pdf() -> bytes:
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        y = 120.0
+        for indent, title, number in [
+            (0, "1 Motion", "3"),
+            (16, "1.1 Speed", "4"),
+            (16, "1.2 Velocity", "9"),
+            (0, "2 Forces", "15"),
+        ]:
+            dots = " ." * 40
+            page.insert_text((72 + indent, y), title + dots, fontsize=BODY, fontname="helv")
+            page.insert_text((520, y), number, fontsize=BODY, fontname="helv")
+            y += 18
+        page.insert_text((72, 300), "1 Motion", fontsize=16, fontname="hebo")
+        page.insert_text((72, 330), "1.1 Speed", fontsize=13, fontname="hebo")
+
+    return page_of(fill)
+
+
+def test_a_contents_page_with_dot_leaders_is_a_list_of_titles_without_leaders_or_numbers():
+    elements = analyze(contents_pdf()).elements
+    entries = [e for e in elements if e.kind == Kind.LIST_ITEM]
+    assert [(e.text, e.list_level) for e in entries] == [
+        ("1 Motion", 1),
+        ("1.1 Speed", 2),
+        ("1.2 Velocity", 2),
+        ("2 Forces", 1),
+    ]
+    assert not [e for e in elements if e.kind == Kind.PARAGRAPH]  # no stray page numbers
+
+
+def test_a_contents_entry_links_to_the_heading_it_names_once():
+    elements = analyze(contents_pdf()).elements
+    by_text = {e.text: e for e in elements if e.kind == Kind.LIST_ITEM}
+    motion = by_text["1 Motion"]
+    # Two entries share a title with a heading ("1 Motion", "1.1 Speed"); "1.2" and "2" name none.
+    heads = [e for e in elements if e.kind == Kind.HEADING and e.text != "Contents"]
+    assert [h.text for h in heads] == ["1 Motion", "1.1 Speed"]
+    assert [(k.kind, k.target_id) for k in motion.links] == [("internal", heads[0].id)]
+    assert by_text["1.2 Velocity"].links == [] and by_text["2 Forces"].links == []
+
+
+def test_a_contents_page_is_written_as_nested_links():
+    html = html_of(contents_pdf())
+    assert '<ul><li id="p1-e1"><a href="#p1-e5">1 Motion</a><ul><li id="p1-e2">' in html
+    assert ". . ." not in html
+
+
+def test_a_page_with_one_dotted_line_is_not_a_contents_page():
+    def fill(page):
+        page.insert_text(
+            (72, 100),
+            "The answer is given on page " + ". " * 10 + "12",
+            fontsize=BODY,
+            fontname="helv",
+        )
+
+    assert [e.kind for e in analyze(page_of(fill)).elements] == [Kind.PARAGRAPH]
+
+
+def test_chapter_lines_with_their_number_at_the_margin_are_entries_on_a_contents_page():
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        page.insert_text((72, 120), "1 Motion", fontsize=BODY, fontname="hebo")
+        page.insert_text((520, 120), "1", fontsize=BODY, fontname="helv")
+        for i, title in enumerate(["1.1 Speed", "1.2 Velocity"]):
+            page.insert_text((88, 138 + 18 * i), title + " ." * 40, fontsize=BODY, fontname="helv")
+            page.insert_text((520, 138 + 18 * i), "1", fontsize=BODY, fontname="helv")
+
+    entries = [e for e in analyze(page_of(fill)).elements if e.kind == Kind.LIST_ITEM]
+    assert [(e.text, e.list_level) for e in entries] == [
+        ("1 Motion", 1),
+        ("1.1 Speed", 2),
+        ("1.2 Velocity", 2),
+    ]
