@@ -115,3 +115,42 @@ def test_split_exercise_numbers_marks_the_number_row_as_text():
     assert rest.clean == "0 = 5 t - 4.9 t" and not rest.exercise_number
     layout._classify_row(number)
     assert number.kind == "text"
+
+
+def fraction_exercise_page(number: str) -> bytes:
+    """An exercise that is only a stacked fraction: the number alone on a row above the
+    numerator (OpenStax prints it so), the bar between numerator and denominator."""
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    page.insert_text((72, 100), "Decompose each expression.", fontsize=11)
+    page.insert_text((72, 140), number, fontsize=11, fontname="helv")
+    page.insert_text((84, 154), "5x + 16", fontsize=8, fontname="tiit")
+    page.draw_line((72, 158), (118, 158), width=0.7)
+    page.insert_text((72, 167), "x2 + 10x + 24", fontsize=8, fontname="tiit")
+    page.insert_text((72, 230), "That is all for this page of exercises.", fontsize=11)
+    return doc.tobytes()
+
+
+@pytest.mark.parametrize("number", ["6.", "14)"])
+def test_a_number_alone_above_a_stacked_fraction_is_not_part_of_the_equation(number):
+    elements = analyze(fraction_exercise_page(number)).elements
+    equations = [e for e in elements if e.kind == Kind.EQUATION]
+    assert len(equations) == 1
+    assert not (equations[0].text or "").startswith(number[:-1])
+    assert "5x" in (equations[0].text or "") and "x2" in (equations[0].text or "")
+    assert number in [e.text for e in elements if e.kind != Kind.EQUATION]
+
+
+def test_a_lone_number_row_is_marked_by_its_shape_only():
+    def row(text: str, font: str) -> layout._Row:
+        x, out = 72.0, []
+        for ch in text:
+            width = pymupdf.get_text_length(ch, fontname=font, fontsize=11)
+            out.append(layout._Char(ch, x, 100, x + width, 111, 109, 11.0, font, 0))
+            x += width
+        return layout._Row(out)
+
+    kept = layout._split_exercise_numbers([row("6.", "Helvetica"), row("2.5", "Helvetica")])
+    assert [r.exercise_number for r in kept] == [True, False]
+    symbol = layout._split_exercise_numbers([row("6.", "Symbol")])
+    assert not symbol[0].exercise_number  # a maths font: part of the maths

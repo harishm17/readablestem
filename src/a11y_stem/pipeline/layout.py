@@ -3209,6 +3209,10 @@ def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
     out: list[_Row] = []
     for row in rows:
         tokens = _tokens(row)
+        if _lone_exercise_number(row, tokens):
+            row.exercise_number = True
+            out.append(row)
+            continue
         if row.vertical or row.marker is not None or len(tokens) < 2:
             out.append(row)
             continue
@@ -3236,6 +3240,19 @@ def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
         out.append(_Row(number, column=row.column, exercise_number=True))
         out.append(_Row(row.chars[rest[0][0] :], column=row.column))
     return out
+
+
+def _lone_exercise_number(row: _Row, tokens: list[tuple[int, int]]) -> bool:
+    """Is the row only an exercise number ("6.", "14)", also "6 ." in two spans), drawn in a
+    text font? Where an exercise is only maths (a fraction, a system), the number sits on a
+    row of its own beside or above the first line of it; read as a fragment it would be
+    taken into the equation (`_math_neighbours`). A row that starts a list item
+    (`row.marker`) already has its number."""
+    if row.vertical or row.marker is not None or row.exercise_number or not 0 < len(tokens) <= 2:
+        return False
+    if not _EXERCISE_NUMBER.match("".join(c.c for c in row.ink)):
+        return False
+    return not any(c.math or c.mono for c in row.ink)
 
 
 @dataclass(eq=False)
