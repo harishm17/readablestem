@@ -42,7 +42,7 @@ Fifteen sections of five OpenStax books (242 Letter pages, 1,369 equations, 509 
 69 figures with an OpenStax alt text), chosen by a rule and registered before any system ran.
 The full report, with every table, interval and per-section number, is [PROOF.md](PROOF.md);
 it is replayed from the recorded model answers committed in
-[`proof/bundles/heldout-2026-10/`](proof/bundles/heldout-2026-10/) (`make proof`, no key, no
+[`proof/bundles/heldout-2026-10/`](proof/bundles/heldout-2026-10/) (`git checkout proof-heldout-2026-10 && make proof`, no key, no
 network, the same bytes every time). Intervals are 95% cluster bootstraps over the 15 sections,
 which are approximate with this few and tend to be a little narrow.
 
@@ -163,7 +163,10 @@ To make the recording again, `PROVIDER=anthropic ENV_FILE=/path/to/.env proof/re
 for the chatbot arms and their judge, within a $45 ceiling), or `PROVIDER=openai` for the
 registration's OpenAI models. The recording code, the caps and the reproduction path are
 described in [docs/proof.md](docs/proof.md). `make proof` replays the committed recording and
-writes [PROOF.md](PROOF.md) (about ten minutes, no key). The report of the development sample is
+writes [PROOF.md](PROOF.md) (about ten minutes, no key) with the pipeline as it was when the
+run was recorded, so reproduce it from the tag: `git checkout proof-heldout-2026-10 && make
+proof` (later commits change the product, and a recording cannot be replayed through code that
+asks the models something else; `make proof-check` still checks its hashes anywhere). The report of the development sample is
 [`proof/PROOF-development-sample.md`](proof/PROOF-development-sample.md) (`make proof
 SET=smoke-physics-2 PROOF_EXTRA="--out proof/PROOF-development-sample.md"`).
 
@@ -284,7 +287,7 @@ tasks that call no model (headings and tables) and compares them with the commit
 reports; that needs network on the first run, Chromium and two font packages
 ([docs/development.md](docs/development.md)). `make proof` is the other path: it replays a
 recorded model run, the chatbot and parser arms included, and writes `PROOF.md` byte for byte
-(no key, no network). `make proof-sources` also fetches the answer key and prints the PDFs
+(no key, no network; at the tag `proof-heldout-2026-10`, see [docs/proof.md](docs/proof.md)). `make proof-sources` also fetches the answer key and prints the PDFs
 again (network and Chromium); it writes `proof/PROOF-sources.md` and leaves `PROOF.md` alone.
 The held-out run's commands are in [docs/proof.md](docs/proof.md).
 

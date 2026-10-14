@@ -108,8 +108,27 @@ heldout-pdfs:  ## print the 15 sections and check the page counts (242)
 #   RECORD=<dir>   where proof-live writes the new recording (default: outside the repo)
 PROOF_ARGS = $(if $(SET),--set $(SET)) $(if $(BUNDLE),--bundle $(BUNDLE)) $(PROOF_EXTRA)
 
-proof:  ## replay the recorded run and write PROOF.md (no key, no network, no cost)
-	uv run a11y-stem proof $(PROOF_ARGS)
+# The recorded runs were made with the pipeline as it was at PROOF_TAG, and a replay feeds
+# the recorded answers to the pipeline in this checkout: a later commit that changes a
+# model request (or anything else a recording pins) cannot replay them. So the one-command
+# reproduction is pinned to the tag: `git checkout $(PROOF_TAG) && make proof`. On any other
+# commit a failed replay says so instead of leaving a bare traceback. `make proof-check`
+# (pins and hashes, no replay) works on every commit. CI replays at the tag
+# (.github/workflows/ci.yml, job proof-replay); tests/test_proof_pin.py keeps the names equal.
+PROOF_TAG = proof-heldout-2026-10
+
+proof:  ## replay the recorded run and write PROOF.md (no key, no network, no cost); reproduce at the tag
+	uv run a11y-stem proof $(PROOF_ARGS) || { status=$$?; \
+		if [ "$$(git rev-parse -q --verify HEAD 2>/dev/null)" != "$$(git rev-parse -q --verify '$(PROOF_TAG)^{commit}' 2>/dev/null)" ]; then \
+			echo >&2; \
+			echo "make proof failed, and this is not the commit the recorded run belongs to." >&2; \
+			echo "The recording was made with the pipeline at the tag $(PROOF_TAG); this checkout's" >&2; \
+			echo "pipeline can differ from it (a changed model request has no recorded answer), and" >&2; \
+			echo "then a replay cannot reproduce it. That does not mean the proof is broken. To" >&2; \
+			echo "reproduce it:  git checkout $(PROOF_TAG) && make proof" >&2; \
+			echo "Here, 'make proof-check' still checks the pins and the recorded run's hashes." >&2; \
+		fi; \
+		exit $$status; }
 
 proof-check:  ## check the pins and the recorded run's hashes; run nothing
 	uv run a11y-stem proof --check $(PROOF_ARGS)

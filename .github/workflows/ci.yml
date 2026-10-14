@@ -67,17 +67,32 @@ jobs:
         with:
           python-version: "3.12"
           enable-cache: true
-      # Replay needs no key, no browser and no network: it feeds the committed model answers
-      # through the real pipeline and scoring code. The job fails if the pins or the bundle's
-      # hashes do not match, if the replay does not reproduce the recorded numbers, or if the
-      # committed PROOF.md is not what the command writes.
+      # The recorded run belongs to the pipeline as it was at the tag proof-heldout-2026-10
+      # (Makefile PROOF_TAG; tests/test_proof_pin.py keeps the names equal). Later commits
+      # change model requests, so their replay misses recorded answers, by design. This job
+      # therefore checks the recording's integrity on the branch head and replays it at the
+      # tag, in a second directory. The tag must exist on the remote (it is pushed, never
+      # moved). Replay needs no key, no browser and no network: it feeds the committed model
+      # answers through the real pipeline and scoring code. The job fails if the pins or the
+      # bundle's hashes do not match, if the replay does not reproduce the recorded numbers,
+      # or if the committed PROOF.md at the tag is not what the command writes.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: proof-heldout-2026-10
+          path: at-tag
+          persist-credentials: false
       - name: Install (locked, no dev tools, no browser)
         run: uv sync --locked --no-dev
-      - name: Check the pins and the recorded run
+      - name: Check the pins and the recorded run (branch head)
         run: make proof-check
-      - name: Replay and write PROOF.md
+      - name: Install at the tag (locked, no dev tools, no browser)
+        working-directory: at-tag
+        run: uv sync --locked --no-dev
+      - name: Replay at the tag and write PROOF.md
+        working-directory: at-tag
         run: make proof
-      - name: PROOF.md is what the command writes
+      - name: PROOF.md at the tag is what the command writes
+        working-directory: at-tag
         run: git diff --exit-code -- PROOF.md
 
   site:

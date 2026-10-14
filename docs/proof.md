@@ -22,6 +22,23 @@ make proof-list       # the proof sets in proof/sets/
 `uv` and Python 3.12 or newer are the only requirements (`uv sync` runs by itself on the
 first `make`). A clean machine can use the container instead (see "Container" below).
 
+### Reproduce the published run: the tag
+
+The published `PROOF.md` is the replay of the recorded run with the pipeline as it was when
+the run was recorded. That commit carries the tag `proof-heldout-2026-10`. Later commits
+change the product (every change to a model request is a request the recording has no
+answer for), so the replay is pinned to the tag:
+
+```
+git checkout proof-heldout-2026-10
+make proof            # writes PROOF.md; `git diff PROOF.md` shows nothing
+```
+
+On a later commit `make proof` may fail, and when it does it says so and names the tag; that
+is not a defect in the proof, and re-recording or editing the bundle is not the fix.
+`make proof-check` (the pins and the hashes of the recorded run, nothing replayed) works on
+every commit, and CI runs it on the branch head and runs `make proof` at the tag.
+
 ## What a proof set is
 
 A proof set is one JSON file in `proof/sets/` (`proof/sets/index.json` names the default). It
