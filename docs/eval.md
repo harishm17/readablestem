@@ -463,9 +463,19 @@ well above one main-model reservation (the actual cost of a call is far less; a 
 equation crop costs a fraction of a cent on haiku). `eval promote` refuses a Claude report
 unless `--out-dir` is given, so it cannot replace the OpenAI baselines the CI gate reads;
 `eval gate` between a Claude and an OpenAI report prints the differences and notes that
-`models` and `client` changed. The figure judge of `eval pipeline` is the run's main model,
-so it is Claude too; the `eval invented judge` command and the registered chatbot arms stay
-on OpenAI (their code is part of the pre-registered fingerprint in `PROOF.md`).
+`models` and `client` changed.
+
+Who judges the figures is a choice of its own: `--judge-provider` and `--judge-model` on
+`eval pipeline --task figures`, `eval sample`, `eval calibrate --probes` and
+`eval invented judge`. The default is the run's provider: its main model on OpenAI, and
+`claude-opus-5-5` on Anthropic whatever the run's main model is, so a run with Sonnet as
+main model is still graded by the same judge as one with Opus. The judge has its own client
+on the run's budget (one `--max-usd` covers both), the same prompt on both providers, and on
+Claude no server-side refusal fallback. The report records it: `models.judge` and
+`judge_client` (provider and model); the invented-content judge result has `judge_provider`
+and `judge_model`, the probe report `judge`. Figure pass rates graded by an OpenAI judge and
+by a Claude judge are two instruments and do not compare (the gate refuses, `judge_changed`).
+The chatbot arms of the registered comparison stay on OpenAI.
 
 ```
 uv run a11y-stem eval pipeline --task equations --provider anthropic --limit 10 --max-usd 1.00 --out .local/eval/equations-claude.json
