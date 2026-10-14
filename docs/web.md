@@ -304,7 +304,11 @@ comes before the upload form.
 
 Only the title and the fixes are read from each stored result, through JSON paths, and
 only for finished jobs. While a document is waiting or converting, htmx polls
-`/app/documents` every 5 s; `list_version` (from the jobs' own columns) answers 204 when
+`/app/documents` every 5 s; the list reads no stored result: the title and the number
+of open decisions of a finished job are columns of the job (`jobs.result_title`,
+`jobs.open_decisions`), set whenever `result_json` is assigned (a SQLAlchemy set event in
+`web/db.py`), and a finished job from before them is filled in the first time the list
+sees it. `list_version` (from the jobs' own columns) answers 204 when
 nothing changed, otherwise the whole list is swapped. Every link in it has a stable id,
 so htmx puts focus back on the same link after a swap; the list is not a live region,
 but the tab title follows it ("My documents (4 of 6 finished)"). Without JavaScript a
@@ -431,9 +435,13 @@ UPDATE spend_days SET held_usd = held_usd + :a
 WHERE day = :d AND spent_usd + held_usd + :a <= :cap
 ```
 
-No row updated means `BudgetExceeded("daily")`. The day row is created first with an
-insert-ignore (`ON CONFLICT DO NOTHING`, on SQLite and Postgres). Settling moves the hold
-to `spent_usd` on the day it was reserved. The Postgres test runs 20 threads against the
+No row updated means `BudgetExceeded("daily")`. When the UPDATE finds no row and this
+process has not seen the day's row yet, the row is created with an insert-ignore (`ON
+CONFLICT DO NOTHING`, on SQLite and Postgres) and the UPDATE runs once more; after that a
+reservation and a settlement are one UPDATE each, where each used to be an insert-ignore
+and an UPDATE (a model call now costs four UPDATEs on the two rows it touches, the day's and
+the job's, instead of four and two inserts). Settling moves the hold to `spent_usd` on the
+day it was reserved. The Postgres test runs 20 threads against the
 cap and checks it is never exceeded. If a process dies between reserve and settle, its
 hold stays until the day ends: the cap errs on the side of spending less.
 
@@ -448,6 +456,12 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
   someone also fails their queued and running jobs with `access_removed`.
+- **Idle polls.** Every `WORKER_POLL_S` (2 s) the loop does one read: is a job queued
+  (the claimable kind) or has a running job's lease run out (`Worker.pending`). With
+  neither it goes back to sleep, with no write, no spend snapshot and no claim attempt
+  (it used to be two UPDATEs and two SELECTs in three transactions, about 130,000
+  transactions and 86,000 writes a day on an idle server). Only when a lease has run out are
+  the requeue UPDATEs run, and the daily budget is looked at only when a job waits.
 - **Daily budget spent.** While less than the largest single model call is left under
   the daily cap (the same threshold as the upload gate), the worker claims nothing and
   logs `claims_paused` once (`claims_resumed` when it starts again). Queued jobs wait,
@@ -1279,9 +1293,16 @@ the way model output is (LaTeX through `web.edit_check`, the equation step's own
 against the PDF included; alt text through `validate.clean_alt`, then `check_alt`), store
 a `ReviewEdit` (its `after` snapshot also records the review version the write made, so
 Undo can find the write's edits), set the fix status (`accepted`, `edited`, `rejected`)
-and `Fix.reviewed` in `result_json`, re-render the job's HTML with
-`pipeline.assemble.render_html`, re-run its static checks (`result_json.html_checks`,
-listed on the job page) and count the write (`jobs.result_version`). A failed check
+and `Fix.reviewed` in `result_json`, mark the HTML file out of date (`jobs.html_stale`)
+and count the write (`jobs.result_version`). The file is made again with
+`pipeline.assemble.render_html`, and its static checks re-run (`result_json.html_checks`,
+listed on the job page), when somebody asks for it: download, view, the Canvas version or
+the job page (`routes.jobs.current_html`, under the job's row lock, so a click that comes
+meanwhile waits and marks it again). A run of clicks therefore costs one render, not one
+each, and the figure images in it are kept per crop (`pipeline.figure_images`, 15 minutes,
+64 MB); measured on a 12-page document with 52 crops, a click went from 210 ms of CPU to
+58 ms (`scripts/bench_runtime.py review`). The student note's date is the day of the last
+decision, not of the render. A failed check
 re-shows the page (422) with the reviewer's input as typed and an error summary linked to
 the field; nothing is saved.
 
@@ -1374,6 +1395,8 @@ Cross-Origin-Resource-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 Cache-Control: no-store            (everything except /static/; page images and
                                     marks.css: private, no-store)
+                                   (/static/: public, max-age=31536000, immutable for
+                                    hashed names and vendor/ files, no-cache otherwise)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
@@ -1399,7 +1422,11 @@ forms or reading our cookies.
 The app pages have no inline scripts, styles or event handlers (a test scans the
 templates). htmx is vendored at `web/static/vendor/` (version, hashes and licence in its
 README) and configured to need no `eval`, inject no `<style>` and keep no history cache.
-Our own script, `web/static/app.js`, places error summary links (below), shows times in
+Static files are cached for a year under names that change with their content: pages ask
+for `/static/app.<12 hex>.css` and `.js` (`web/assets.py`, `static_url`; the hash is the
+file's SHA-256, read again only when the file changes), `vendor/` files carry their version
+in the name, and anything else is revalidated (`no-cache`, ETag). The math font is sent as
+WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
 enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts,

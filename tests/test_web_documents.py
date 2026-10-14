@@ -341,3 +341,101 @@ def test_the_privacy_notice_mentions_usage_events(web):
     flat = text(web.client().get("/privacy").text)
     assert "No cookies or scripts are used for this." in flat
     assert "deleted after 400 days" in flat
+
+
+# --------------------------------------------------------------------------- list facts
+
+
+class Reads:
+    """The SQL an engine runs while attached (statements only)."""
+
+    def __init__(self, env) -> None:
+        from sqlalchemy import event
+
+        self.engine = env.ctx.factory.kw["bind"]
+        self.sql: list[str] = []
+        self._listener = lambda conn, cur, statement, *rest: self.sql.append(statement)
+        event.listen(self.engine, "before_cursor_execute", self._listener)
+
+    def stop(self) -> list[str]:
+        from sqlalchemy import event
+
+        event.remove(self.engine, "before_cursor_execute", self._listener)
+        return self.sql
+
+
+def test_the_job_keeps_the_two_facts_the_list_shows(web):
+    job_id = finish(web, title="Week 1: Vectors")
+    job = web.job(job_id)
+    assert (job.open_decisions, job.result_title) == (3, "Week 1: Vectors")
+    done = finish(web, filename="ps.pdf", title="Problem Set 2", decided=True)
+    assert web.job(done).open_decisions == 0
+
+
+def test_the_list_poll_reads_no_stored_result(web):
+    """It used to load the fixes of every finished document each time a page count
+    changed; the facts are on the job now."""
+    for n in range(3):
+        finish(web, filename=f"w{n}.pdf", title=f"Week {n}")
+    running = job_id_from(upload(web.browser, make_pdf(1), filename="next.pdf"))
+    assert running
+    reads = Reads(web)
+    page = web.browser.get("/app/documents").text
+    sql = reads.stop()
+    assert "Week 2" in page and "3 documents need your decisions (9 decisions in all)" in text(page)
+    assert not any("result_json" in statement for statement in sql), sql
+    assert not any("jobs.html" in statement for statement in sql), sql
+
+
+def test_the_list_is_built_with_one_query_for_the_jobs_and_one_for_their_facts(web):
+    finish(web)
+    reads = Reads(web)
+    web.browser.get("/app")
+    selects = [s for s in reads.stop() if "FROM jobs" in s and s.lstrip().startswith("SELECT")]
+    # the jobs, then the facts of the finished ones (the page's own lookups are elsewhere)
+    assert sum("jobs.result_title" in s for s in selects) == 1
+
+
+def test_a_decision_in_review_changes_the_number_the_list_shows(web):
+    job_id = finish(web)
+    assert web.job(job_id).open_decisions == 3
+    from a11y_stem.core.types import DocumentResult
+
+    with session_scope(web.ctx.factory) as session:
+        job = session.get(Job, job_id)
+        assert job is not None
+        result = DocumentResult.model_validate(job.result_json)
+        pending = next(f for f in result.fixes if f.pending)
+        pending.status = Status.REJECTED
+        pending.reviewed = True
+        job.result_json = result.model_dump(mode="json", exclude={"html"})  # as review does
+    assert web.job(job_id).open_decisions == 2
+    assert "2 decisions to make" in text(web.browser.get("/app").text)
+
+
+def test_a_finished_job_from_before_the_columns_is_filled_in_once(web):
+    job_id = finish(web, title="Old one")
+    with session_scope(web.ctx.factory) as session:
+        session.execute(
+            Job.__table__.update()
+            .where(Job.id == job_id)
+            .values(open_decisions=None, result_title=None)
+        )
+    assert web.job(job_id).open_decisions is None
+    first = text(web.browser.get("/app").text)
+    assert "Old one" in first and "3 decisions to make" in first
+    assert (web.job(job_id).open_decisions, web.job(job_id).result_title) == (3, "Old one")
+    reads = Reads(web)
+    web.browser.get("/app/documents")
+    assert not any("result_json" in s for s in reads.stop())  # read once, not every poll
+
+
+def test_the_version_in_the_list_is_the_one_the_poll_compares(web):
+    """The list makes its version from the rows it already read; the poll asks for it with
+    the other query, and the two have to agree or every poll would redraw."""
+    finish(web)
+    upload(web.browser, make_pdf(1), filename="b.pdf")
+    page = web.browser.get("/app").text
+    version = re.search(r"/app/documents\?v=([0-9a-f]+)", page)
+    assert version is not None
+    assert web.browser.get(f"/app/documents?v={version.group(1)}").status_code == 204

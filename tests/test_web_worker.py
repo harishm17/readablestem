@@ -105,6 +105,7 @@ def test_worker_converts_a_job_and_stores_everything(env):
     assert job.result_json is not None and "html" not in job.result_json
     assert job.result_json["fixes"][2]["status"] == "needs_review"
     assert job.html is not None and "SECRET-DOC-TEXT" in job.html
+    assert job.html_stale is False
     assert set(blobs(env, job_id, "crop")) == {"p1-e3", "p1-e4", "p1-e5"}
     assert env.converter.calls[0]["pdf"] == pdf
 
@@ -885,4 +886,51 @@ def test_without_tracing_the_converter_gets_no_tracer_argument(env):
     worker = env.worker()
     worker.converter = converter
     worker.run_once()
-    assert set(seen) == {"stage_progress"}  # live progress for the job page, no tracer
+    # live progress for the job page and the steps to run at once; no tracer
+    assert set(seen) == {"stage_progress", "concurrency"}
+
+
+# --------------------------------------------------------------------------- concurrency
+
+
+def test_the_converter_runs_the_setting_many_steps_at_once(env):
+    queue_job(env)
+    env.run_worker()
+    assert env.settings.model_concurrency == 8
+    assert env.converter.calls[0]["concurrency"] == 8
+
+
+def test_a_job_whose_cap_cannot_hold_that_many_calls_runs_fewer_steps(tmp_path):
+    """One page on Claude is capped at $1.00 and a call can hold $0.14: seven at once."""
+    from a11y_stem.ops.limits import largest_reservation_usd
+
+    env = WebEnv(tmp_path, model_provider="anthropic")
+    with env.running():
+        env.allow(ALICE)
+        queue_job(env)
+        env.run_worker()
+    cap, _ = job_caps(env.settings, 1)
+    assert cap == 1.0
+    assert env.converter.calls[0]["concurrency"] == int(
+        cap // largest_reservation_usd(env.settings)
+    )
+    assert env.converter.calls[0]["concurrency"] == 7
+
+
+def test_a_retry_after_a_costly_first_attempt_runs_fewer_steps(env):
+    """The caps cover the job, not the attempt: what an earlier attempt spent is gone."""
+    job_id = queue_job(env)
+    with session_scope(env.ctx.factory) as session:
+        session.execute(update(Job).where(Job.id == job_id).values(cost_usd=0.2))
+    env.run_worker()
+    assert env.converter.calls[0]["concurrency"] == 3  # $0.30 - $0.20 held, at about $0.03 a call
+
+
+def test_what_is_left_of_the_day_limits_the_steps_too(env):
+    queue_job(env)
+    guard = env.worker().guard
+    guard.reserve(env.settings.daily_spend_cap_usd - 0.05)  # five cents left today
+    worker = env.worker(guard=guard, headroom_usd=0.0)
+    worker.converter = env.converter
+    assert worker.run_once() is not None
+    assert env.converter.calls[0]["concurrency"] == 1

@@ -635,24 +635,30 @@ a second.
 
 `convert_pdf` stores the static checks on `DocumentResult.html_checks` (and, for older
 callers, on `run.PipelineOutput.checks`). The CLI prints them and writes them to
-`--report`; the web app lists the failed ones on the job page and re-runs them after
-every review decision re-renders the file. `static_checks(result.html)` is deterministic
+`--report`; the web app lists the failed ones on the job page and re-runs them whenever
+it makes the file again after review decisions (once for a run of decisions: web.md,
+"Review screen"). `static_checks(result.html)` is deterministic
 and fast, so anyone holding only the HTML can recompute them.
 
 ## How `convert_pdf` fills it in
 
 `pipeline/run.py`:
 
-1. `layout.analyze` (raises `LayoutError` for unreadable, encrypted or too-long PDFs),
-   then `text_pass.apply`: links, cross-references, the document and passage languages,
-   and with FEATURE_COLOUR the colour runs (docs/layout.md "The text pass"). It sets
-   `lang`, `lang_source` and its notices on the result, and never fails the run.
-2. `heading_step.heading_fixes` on all elements. If it raises, every heading becomes
-   FAILED `internal_error` and renders as a paragraph.
-3. Page by page, on the calling thread (PyMuPDF is not thread-safe): crop each equation
+1. `layout.analyze` (raises `LayoutError` for unreadable, encrypted or too-long PDFs).
+   The table detector runs only on pages that could hold a table
+   (`tables.may_hold_table`, docs/tables.md "Which pages are looked at").
+2. Page by page, on the calling thread (PyMuPDF is not thread-safe): crop each equation
    and figure from its own bbox (inline equations included), then queue its step on a
    `ThreadPoolExecutor(concurrency)`. Cropping page N+1 overlaps the model calls for
    page N.
+3. Once every crop is made and the steps are at work, on the same thread:
+   `text_pass.apply` (links, cross-references, the document and passage languages, and
+   with FEATURE_COLOUR the colour runs; docs/layout.md "The text pass"; it sets `lang`,
+   `lang_source` and its notices on the result, and never fails the run) and
+   `heading_step.heading_fixes` on all elements (if it raises, every heading becomes
+   FAILED `internal_error` and renders as a paragraph). Neither changes anything a step
+   reads or needs a model, so they run while the models answer rather than before the
+   first request.
 4. Each step gets ~600 characters of neighbouring text as untrusted `context_text`: for an
    inline equation, its paragraph or list item around the marker (`[this equation]`
    marks the spot); otherwise the end of the previous text element (paragraph, heading or
@@ -749,14 +755,16 @@ When a limit stops the run, the summary names it, e.g. `Budget: stopped early
 which reports the scope `daily` because it stands in for the web app's daily cap.
 `--out` and `--report` may not be the input PDF or each other.
 
-`--concurrency` (default 4, at most 16) is how many equation and figure steps run at
+`--concurrency` (at most 16; default `MODEL_CONCURRENCY`, 8, lowered to what `--max-usd`
+can hold) is how many equation and figure steps run at
 once. Every model request first reserves its worst-case cost and settles to the real
 cost when it returns, so the reservations of the steps in flight count against
 `--max-usd` until they settle. A small cap therefore fills before it is spent: with
 `--max-usd 0.10` and 4 steps of about $0.02 worst case each, a real run refused a call
-after $0.016 of real spend. When the run cap stops a real run with more than one step at
-once, the summary says so and suggests `--concurrency 1`, which reserves one call at a
-time.
+after $0.016 of real spend. That is why the default follows the cap; a number given with
+`--concurrency` is used as it is, and when the run cap then stops a real run with more
+than one step at once, the summary says so and suggests `--concurrency 1`, which reserves
+one call at a time.
 
 ## Engineering limits (input for the known-limits copy)
 

@@ -343,16 +343,21 @@ def test_vendored_htmx_matches_its_pinned_hashes():
 def test_vendored_math_font_is_the_unmodified_release_with_its_licence():
     """Latin Modern Math draws the proposal in the review screen's same-size compare.
     It is the CTAN release, unmodified (the GUST Font License asks derived fonts to be
-    renamed), with its licence, manifest and readme beside it."""
+    renamed), with its licence, manifest and readme beside it; the page loads it as the
+    lossless WOFF2 packaging of the same file (about half the bytes)."""
     fonts = WEB / "static" / "vendor" / "fonts"
     data = (fonts / "latinmodern-math.otf").read_bytes()
     readme = (WEB / "static" / "vendor" / "README.md").read_text(encoding="utf-8")
     assert hashlib.sha256(data).hexdigest() in readme
+    packed = (fonts / "latinmodern-math-1.959.woff2").read_bytes()
+    assert hashlib.sha256(packed).hexdigest() in readme
+    assert packed[:4] == b"wOF2" and len(packed) < 0.6 * len(data)
     licence = (fonts / "GUST-FONT-LICENSE.txt").read_text(encoding="utf-8")
     assert "LaTeX Project Public License" in licence
     assert "latinmodern-math.otf" in (fonts / "MANIFEST-Latin-Modern-Math.txt").read_text()
     css = (WEB / "static" / "app.css").read_text(encoding="utf-8")
-    assert 'url("/static/vendor/fonts/latinmodern-math.otf") format("opentype")' in css
+    assert 'url("/static/vendor/fonts/latinmodern-math-1.959.woff2") format("woff2")' in css
+    assert "latinmodern-math.otf" not in css  # the OpenType file is the source, not served to pages
     assert '.cmp-math math { font-size: inherit; font-family: "Latin Modern Math"' in css
 
 

@@ -54,7 +54,8 @@ import re
 import struct
 import unicodedata
 from collections import Counter, defaultdict
-from collections.abc import Callable, Iterable, Sequence
+from collections.abc import Callable, Iterable, Iterator, Sequence
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Protocol
@@ -409,6 +410,11 @@ class EvalConfig:
     client_label: str = "openai"  # "fake" for FakeVisionClient runs
     gold_label: str | None = None  # how to show gold_dir in the report (no home paths)
     concurrency: int = 4  # document task: convert_pdf's thread pool
+    # Document task: sections converted at once (`_eval_document`). 1 is one after the
+    # other, as every recorded run was made; more only for a live run, which waits on a
+    # hosted model. A section's `latency_ms` then includes the time it waited for the
+    # others (layout is one PyMuPDF call at a time), so a run that reports latency keeps 1.
+    section_workers: int = 1
     # The client's budget, when there is one: its record of spend is the source of truth
     # (it includes calls made for an item that was then dropped at a budget stop).
     budget: JobBudget | None = None
@@ -1731,56 +1737,88 @@ def document_review_load(items: Sequence[dict]) -> dict:
 def _eval_document(
     cfg: EvalConfig, units: list[list[dict]], pdfs: list[bytes]
 ) -> tuple[list[dict], str | None]:
-    items = []
-    for page, pdf in zip(units, pdfs, strict=True):
-        try:
-            output = run.convert_pdf(
-                pdf, settings=cfg.settings, client=cfg.client, concurrency=cfg.concurrency
-            )
-        except BudgetExceeded as exc:
-            return items, f"budget_{exc.scope}"
-        except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
-            item = document_page_item(_page_id(page), _of_kind(page, "equation"), [], {}, [], [])
-            item |= _calls_summary([]) | {"error": exc.code, "pdf_pages": 0}
-            if classes := prose_classes.score_page("", page):  # nothing was found: all misses
-                item["prose_classes"] = classes
-            items.append(item)
-            continue
-        result = output.result
-        stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
-        if stopped:  # a half-converted page would score as misses; drop it and stop
-            return items, stopped
-        fixes = {f.element_id: f for f in result.fixes}
-        item = document_page_item(
-            _page_id(page),
-            _of_kind(page, "equation"),
-            result.elements,
-            fixes,
-            html_checks.static_checks(result.html),
-            html_checks.axe_checks(result.html),
+    """Convert every section and score it; the items come back in section order whichever
+    order the conversions finished in. A budget stop ends the run at the first section it
+    stopped (in section order): later sections' results are dropped, as when they ran after
+    it. With `cfg.section_workers` above 1 those may already have been converted (and spent)."""
+    sections = list(zip(units, pdfs, strict=True))
+    workers = min(max(1, cfg.section_workers), len(sections)) or 1
+    if workers == 1:
+        results: Iterator[tuple[dict | None, str | None]] = (
+            _document_section(cfg, page, pdf) for page, pdf in sections
         )
-        for pair in item["pairs"]:
-            pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
-        item["review"] = load_counts(result.fixes)
-        headings = predicted_headings(result.fixes)
-        heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
-        item["heading_flags"] = heading_flags(heading_item, headings)
-        calls = [c for f in result.fixes for c in f.calls]
-        item.update(_calls_summary(calls))
-        item["verifier"] = vm.page_summary(result.fixes)
-        item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
-        item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
-        item["latency_ms"] = result.stats.latency_ms or item["latency_ms"]
-        item["prompt_versions"] = dict(result.prompt_versions) or item["prompt_versions"]
-        # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
-        # page is the figure to compare with production (`ops report`), not per item.
-        item["pdf_pages"] = result.stats.pages
-        # The dev-v2 classes with gold but no equation/heading scorer (scripts, code,
-        # glossary, hyphenated words): scored on the output HTML; absent without such gold.
-        if classes := prose_classes.score_page(result.html, page):
-            item["prose_classes"] = classes
-        items.append(item)
+        return _collect_sections(results)
+    with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="section") as pool:
+        futures = [pool.submit(_document_section, cfg, page, pdf) for page, pdf in sections]
+        try:
+            return _collect_sections(future.result() for future in futures)
+        finally:
+            for future in futures:
+                future.cancel()  # not started: a stopped run starts no more
+
+
+def _collect_sections(
+    results: Iterable[tuple[dict | None, str | None]],
+) -> tuple[list[dict], str | None]:
+    items: list[dict] = []
+    for item, stopped in results:
+        if stopped:
+            return items, stopped
+        if item is not None:
+            items.append(item)
     return items, None
+
+
+def _document_section(
+    cfg: EvalConfig, page: list[dict], pdf: bytes
+) -> tuple[dict | None, str | None]:
+    """One section: its item, or the reason the run stops at it."""
+    try:
+        output = run.convert_pdf(
+            pdf, settings=cfg.settings, client=cfg.client, concurrency=cfg.concurrency
+        )
+    except BudgetExceeded as exc:
+        return None, f"budget_{exc.scope}"
+    except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
+        item = document_page_item(_page_id(page), _of_kind(page, "equation"), [], {}, [], [])
+        item |= _calls_summary([]) | {"error": exc.code, "pdf_pages": 0}
+        if classes := prose_classes.score_page("", page):  # nothing was found: all misses
+            item["prose_classes"] = classes
+        return item, None
+    result = output.result
+    stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
+    if stopped:  # a half-converted page would score as misses; drop it and stop
+        return None, stopped
+    fixes = {f.element_id: f for f in result.fixes}
+    item = document_page_item(
+        _page_id(page),
+        _of_kind(page, "equation"),
+        result.elements,
+        fixes,
+        html_checks.static_checks(result.html),
+        html_checks.axe_checks(result.html),
+    )
+    for pair in item["pairs"]:
+        pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
+    item["review"] = load_counts(result.fixes)
+    headings = predicted_headings(result.fixes)
+    heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
+    item["heading_flags"] = heading_flags(heading_item, headings)
+    calls = [c for f in result.fixes for c in f.calls]
+    item.update(_calls_summary(calls))
+    item["verifier"] = vm.page_summary(result.fixes)
+    item["verifier_cost_usd"] = sum(f.verifier_cost_usd for f in result.fixes)
+    item["verifier_requests"] = sum(vm.requests_sent(f) for f in result.fixes)
+    item["latency_ms"] = result.stats.latency_ms or item["latency_ms"]
+    item["prompt_versions"] = dict(result.prompt_versions) or item["prompt_versions"]
+    # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
+    # page is the figure to compare with production (`ops report`), not per item.
+    item["pdf_pages"] = result.stats.pages
+    # The dev-v2 classes with gold but no equation/heading scorer (scripts, code,
+    # glossary, hyphenated words): scored on the output HTML; absent without such gold.
+    if classes := prose_classes.score_page(result.html, page):
+        item["prose_classes"] = classes
+    return item, None
 
 
 # ========================================================================== report

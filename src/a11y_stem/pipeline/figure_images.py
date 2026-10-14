@@ -22,14 +22,25 @@ figures it was smaller than Pillow's `optimize=True`, so an image that keeps its
 keeps its PNG bytes. A scaled image's PNG size is estimated from the original's
 (bytes x area ratio) to choose the format, so a JPEG-bound scan is never encoded twice.
 The result depends only on the crop and the figure type, so rendering a stored result
-gives the same file every time (docs/design/content-features.md rule 3).
+gives the same file every time (docs/design/content-features.md rule 3). That also makes it
+cacheable: the web app makes the file again after review writes, and decoding, scaling and
+encoding every figure each time was most of a re-render's work, so the finished image is
+kept per (crop, figure type) in a small memory cache (`CACHE_BYTES`; a crop is looked up by
+its SHA-256 and the cache holds no document text, only these images). An image is dropped
+`CACHE_TTL_S` after it was last used, and all of them by `clear_cache`, which deleting a
+job calls (`ops.retention.delete_jobs`): a deleted document's figures do not stay in a
+long-lived worker's memory.
 """
 
 from __future__ import annotations
 
 import base64
 import contextlib
+import hashlib
 import logging
+import threading
+import time
+from collections import OrderedDict
 
 from a11y_stem.pipeline.safe_html import escape_text
 
@@ -41,6 +52,15 @@ PHOTO_TYPES = frozenset({"photo", "illustration"})
 # Line art keeps PNG unless JPEG is at most this share of its size.
 JPEG_SHARE_FOR_LINE_ART = 0.5
 _PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+# The finished images kept between renders: at most this many bytes of them (the least
+# recently used go first). A document's figures are a few MB at the most (the student file
+# is built from them), so this holds several documents under review at once.
+CACHE_BYTES = 64 * 1024 * 1024
+CACHE_TTL_S = 15 * 60  # a review session's clicks come close together
+
+_cache: OrderedDict[tuple[str, str | None], tuple[float, tuple[str, bytes]]] = OrderedDict()
+_cache_bytes = 0
+_cache_lock = threading.Lock()
 
 
 def _lock() -> contextlib.AbstractContextManager[object]:
@@ -52,9 +72,52 @@ def _lock() -> contextlib.AbstractContextManager[object]:
     return lock if lock is not None else contextlib.nullcontext()
 
 
+def clear_cache() -> None:
+    """Forget every kept image."""
+    global _cache_bytes
+    with _cache_lock:
+        _cache.clear()
+        _cache_bytes = 0
+
+
 def student_image(png: bytes, figure_type: str | None) -> tuple[str, bytes]:
     """(MIME type, bytes) of the image to embed for a figure crop (see the module
-    docstring). Falls back to the PNG as it is when anything goes wrong."""
+    docstring), from the cache when this crop was seen before with this figure type."""
+    global _cache_bytes
+    key = (hashlib.sha256(png).hexdigest(), figure_type)
+    now = time.monotonic()
+    with _cache_lock:
+        _expire(now)
+        found = _cache.get(key)
+        if found is not None:
+            _cache[key] = (now, found[1])
+            _cache.move_to_end(key)
+            return found[1]
+    made = _student_image(png, figure_type)
+    with _cache_lock:
+        if key not in _cache and len(made[1]) <= CACHE_BYTES:
+            _cache[key] = (now, made)
+            _cache_bytes += len(made[1])
+            while _cache_bytes > CACHE_BYTES:
+                _, (_, (_, dropped)) = _cache.popitem(last=False)
+                _cache_bytes -= len(dropped)
+    return made
+
+
+def _expire(now: float) -> None:
+    """Drop the images not used for `CACHE_TTL_S` (oldest first). Hold `_cache_lock`."""
+    global _cache_bytes
+    while _cache:
+        key, (used, (_, data)) = next(iter(_cache.items()))
+        if now - used <= CACHE_TTL_S:
+            return
+        del _cache[key]
+        _cache_bytes -= len(data)
+
+
+def _student_image(png: bytes, figure_type: str | None) -> tuple[str, bytes]:
+    """`student_image` without the cache. Falls back to the PNG as it is when anything
+    goes wrong."""
     try:
         import pymupdf
     except ImportError:  # pragma: no cover - a core dependency

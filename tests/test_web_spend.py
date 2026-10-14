@@ -151,3 +151,56 @@ def test_no_quota_still_counts(factory):
     with db.session_scope(factory) as session:
         assert try_consume_pages(session, user_id, 500, quota=None, day=DAY)
         assert session.scalar(select(db.QuotaDay.pages)) == 500
+
+
+def test_a_reservation_and_its_settlement_are_one_statement_each(factory):
+    """The day's row is made by the first reservation of the day (and only then): after
+    that a model call costs two UPDATEs on this table, not two INSERTs and two UPDATEs."""
+    from sqlalchemy import event
+
+    guard = DbSpendGuard(factory, 5.0)
+    engine = factory.kw["bind"]
+    statements: list[str] = []
+
+    def record(conn, cursor, statement, parameters, context, executemany) -> None:
+        statements.append(statement.strip().split(None, 1)[0].upper())
+
+    event.listen(engine, "before_cursor_execute", record)
+    try:
+        first = guard.reserve(0.1)
+        assert statements == ["UPDATE", "INSERT", "UPDATE"]  # no row yet: made, then held
+        statements.clear()
+        second = guard.reserve(0.1)
+        guard.settle(first, 0.05)
+        guard.settle(second, 0.02)
+        assert statements == ["UPDATE", "UPDATE", "UPDATE"]
+    finally:
+        event.remove(engine, "before_cursor_execute", record)
+    assert guard.snapshot().spent_usd == pytest.approx(0.07)
+    assert guard.snapshot().held_usd == pytest.approx(0.0)
+
+
+def test_a_refusal_by_the_cap_makes_no_row_and_a_new_day_makes_its_own(factory):
+    now = [datetime(2026, 10, 7, 23, 59, tzinfo=UTC)]
+    guard = DbSpendGuard(factory, 0.5, clock=lambda: now[0])
+    with pytest.raises(BudgetExceeded):
+        guard.reserve(0.6)  # more than the cap: refused, and nothing is left behind
+    with db.session_scope(factory) as session:
+        assert session.scalars(select(db.SpendDay)).all() == []
+    held = guard.reserve(0.2)
+    now[0] = datetime(2026, 10, 8, 0, 1, tzinfo=UTC)  # past midnight: tomorrow's row
+    guard.reserve(0.2)
+    guard.settle(held, 0.1)  # the hold is released from the day it was made on
+    assert day_row(factory, date(2026, 10, 7)) == (pytest.approx(0.1), pytest.approx(0.0))
+    assert day_row(factory, date(2026, 10, 8)) == (pytest.approx(0.0), pytest.approx(0.2))
+
+
+def test_a_second_process_sharing_the_database_finds_the_row_the_first_made(factory):
+    first, second = DbSpendGuard(factory, 1.0), DbSpendGuard(factory, 1.0)
+    a = first.reserve(0.3)
+    b = second.reserve(0.3)  # its own cache is empty and the row exists
+    first.settle(a, 0.3)
+    second.settle(b, 0.3)
+    assert first.snapshot().spent_usd == pytest.approx(0.6)
+    with pytest.raises(BudgetExceeded):
+        second.reserve(0.5)

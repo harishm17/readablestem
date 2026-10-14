@@ -369,6 +369,93 @@ def test_the_content_migration_round_trips_on_postgres(pg_url):
         engine.dispose()
 
 
+def test_the_list_facts_migration_round_trips_on_postgres(pg_url):
+    """Down to the exam revision (the columns gone, jobs kept), up again (schema matches
+    the models), and an older release's job insert still gets a valid row."""
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from a11y_stem.web.database import alembic_config
+    from test_web_migrations import EXAM_REVISION, FACTS_COLUMNS, INSERT_JOB, INSERT_USER
+
+    config = alembic_config(pg_url)
+    config.attributes["configure_logger"] = False
+    command.upgrade(config, "head")
+    command.downgrade(config, EXAM_REVISION)
+    engine = create_engine(pg_url)
+    try:
+        assert not {c["name"] for c in inspect(engine).get_columns("jobs")} & FACTS_COLUMNS
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+            conn.execute(text(INSERT_JOB), {"id": "j2"})
+            found = conn.execute(
+                text("SELECT id, open_decisions, result_title FROM jobs ORDER BY id")
+            ).all()
+        assert [tuple(row) for row in found] == [("j1", None, None), ("j2", None, None)]
+    finally:
+        engine.dispose()
+
+
+def test_the_stale_html_migration_round_trips_on_postgres(pg_url):
+    """Down one revision (the flag gone; a file marked stale emptied so the older release
+    does not serve it), up again (a job without a file is marked to be made again)."""
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from a11y_stem.web.database import alembic_config
+    from test_web_migrations import (
+        FACTS_REVISION,
+        INSERT_DONE_JOB,
+        INSERT_JOB,
+        INSERT_USER,
+    )
+
+    config = alembic_config(pg_url)
+    config.attributes["configure_logger"] = False
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_DONE_JOB), {"id": "j1", "html": "<p>a</p>", "result": "{}"})
+            conn.execute(text(INSERT_DONE_JOB), {"id": "j2", "html": "<p>b</p>", "result": "{}"})
+            conn.execute(text("UPDATE jobs SET html_stale = true WHERE id = 'j2'"))
+    finally:
+        engine.dispose()
+    command.downgrade(config, FACTS_REVISION)
+    engine = create_engine(pg_url)
+    try:
+        assert "html_stale" not in {c["name"] for c in inspect(engine).get_columns("jobs")}
+        with engine.connect() as conn:
+            found = conn.execute(text("SELECT id, html FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [("j1", "<p>a</p>"), ("j2", None)]
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_JOB), {"id": "j3"})  # an older release's insert
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+            found = conn.execute(text("SELECT id, html_stale FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [("j1", False), ("j2", True), ("j3", False)]
+    finally:
+        engine.dispose()
+
+
 def test_erasure_and_course_deletion_on_postgres(factory):
     """Real ON DELETE behaviour: a deleted course leaves its job (course_id NULL) and
     takes its notation; erasing a user leaves nothing of theirs and keeps the other

@@ -322,6 +322,9 @@ _SUPERSCRIPT_FLAG = 1
 _MONO_FLAG = 8
 
 _LOCK = threading.RLock()  # PyMuPDF is not thread-safe: one PyMuPDF call at a time
+# Run the table detector only on pages that could hold a table (`tables.may_hold_table`).
+# The result is the same either way; switched off, only to check that.
+TABLE_PREFILTER = True
 
 
 class LayoutError(ValueError):
@@ -5451,6 +5454,8 @@ def _claim_tables(
     `previous` is the page before's tables, when it was analysed: a table that goes on
     from its last one is marked, and the end of a row the page break split is joined to
     that row (`tables.join_split_row`)."""
+    if TABLE_PREFILTER and not tables.may_hold_table(page, frags[number], paths[number]):
+        return []  # nothing the detector could find would be kept (`may_hold_table`)
     found = tables.find(page, frags[number], paths[number], clean=_clean)
     if not found:
         return found

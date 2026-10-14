@@ -538,6 +538,13 @@ in the offline `FakeVisionClient` with no recorded answers: every call is refuse
 real cost, so a fake run checks the plumbing and nothing else (all scores are 0).
 `--fake --max-usd X` caps the fake's simulated cost, which exercises the budget stop.
 
+`--section-workers N` (document task, default 1) converts N sections at once. It shortens a
+live run, which waits on a hosted model, and gives the same items in the same order (a
+budget stop still ends the run at the first section it stopped, in section order, although
+the sections after it may already have been converted and paid for). A section's
+`latency_ms` then includes its wait for the others, so a run whose latencies are reported
+keeps the default.
+
 Pre-render or inspect inputs:
 
 ```

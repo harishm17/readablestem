@@ -377,14 +377,14 @@ progress { width: 16rem; height: 1.1rem; }
 .cmp-image { display: block; width: 100%; height: auto; background: #fff; border: 1px solid var(--rule); border-radius: 4px; }
 .cmp-row { background: #fff; border: 1px solid var(--rule); border-radius: 4px; overflow-x: auto; padding: 0.15em 0; }
 /* The proposal is drawn in the family LaTeX PDFs are set in (Computer Modern; Latin
-   Modern Math is its OpenType math font, served from here: static/vendor/fonts, GUST
-   Font License), so a bold letter next to a plain one looks as it does in the crop
+   Modern Math is its OpenType math font, served from here as a WOFF2: static/vendor/fonts,
+   GUST Font License), so a bold letter next to a plain one looks as it does in the crop
    above. The browser's default math font (Noto Sans Math on Linux) draws a plain omega
    as heavy as a bold Computer Modern one. Only downloaded when an equation is shown. */
 @font-face {
   font-family: "Latin Modern Math";
   src: local("Latin Modern Math"), local("LatinModernMath-Regular"),
-       url("/static/vendor/fonts/latinmodern-math.otf") format("opentype");
+       url("/static/vendor/fonts/latinmodern-math-1.959.woff2") format("woff2");
   font-display: swap;
 }
 .cmp-math { white-space: nowrap; font-size: 1.6rem; line-height: 1.3; }

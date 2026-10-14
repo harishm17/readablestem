@@ -32,7 +32,17 @@ from a11y_stem.core.types import (
 )
 from a11y_stem.web.db import ReviewEdit, session_scope
 from a11y_stem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
-from fixtures.web.support import ALICE, PNG, WebEnv, job_id_from, login, make_pdf, token, upload
+from fixtures.web.support import (
+    ALICE,
+    PNG,
+    WebEnv,
+    job_id_from,
+    login,
+    make_pdf,
+    token,
+    upload,
+    with_file,
+)
 
 
 class FakePipeline:
@@ -384,7 +394,9 @@ def test_accept_updates_the_result_records_the_edit_and_rerenders(web):
     [edit] = edits(web)
     assert (edit.action, edit.element_id) == ("accept", "p1-e3")
     assert edit.before["status"] == "needs_review" and edit.after["status"] == "accepted"
-    job = web.job(web.job_id)
+    assert web.job(web.job_id).html_stale  # the file is made when somebody asks for it
+    job = with_file(web)
+    assert not job.html_stale
     assert job.html is not None and "p1-e3:accepted" in job.html
     assert "crops=3" in job.html  # the stored crops are passed to the assembler
     page = review_page(web)
@@ -534,7 +546,7 @@ def test_reject_keeps_the_original(web):
     assert post(web, "p1-e4", action="reject").status_code == 303
     fix = result(web).fix_for("p1-e4")
     assert fix is not None and fix.status.value == "rejected"
-    assert "p1-e4:rejected" in (web.job(web.job_id).html or "")
+    assert "p1-e4:rejected" in (with_file(web).html or "")
 
 
 def test_heading_level_can_be_changed(web):
@@ -588,15 +600,22 @@ def test_free_text_in_the_action_field_never_reaches_the_logs(web, caplog):
     assert "SECRET" not in caplog.text
 
 
-def test_a_failed_rerender_changes_nothing(web):
-    before = settled(web)
+def test_a_failed_render_loses_no_decision_and_shows_no_content(web):
+    """The click stores the decision; making the file is done when it is asked for, so an
+    assembler bug fails that request (500, no document text) and the next one that works
+    makes the file with the decision in it."""
     web.pipeline.render_raises = RuntimeError("SECRET-DOC-TEXT assembler bug")
     response = post(web, "p1-e3", action="accept")
-    assert response.status_code == 500
-    assert "SECRET" not in response.text
-    assert result(web) == before
+    assert response.status_code == 303
+    assert result(web).fix_for("p1-e3").status.value == "accepted"  # type: ignore[union-attr]
     with session_scope(web.ctx.factory) as session:
-        assert session.scalar(select(func.count()).select_from(ReviewEdit)) == 0
+        assert session.scalar(select(func.count()).select_from(ReviewEdit)) == 1
+    assert web.job(web.job_id).html_stale
+    failed = web.browser.get(f"/jobs/{web.job_id}/download")
+    assert failed.status_code == 500 and "SECRET" not in failed.text
+    assert web.job(web.job_id).html_stale  # nothing was half-written
+    web.pipeline.render_raises = None
+    assert "p1-e3:accepted" in (with_file(web).html or "")
 
 
 # --------------------------------------------------------------------------- MathML
@@ -979,7 +998,7 @@ def test_static_checks_are_rerun_on_the_rerendered_html(web):
     from a11y_stem.pipeline.html_checks import static_checks
 
     assert post(web, "p1-e3", action="accept").status_code == 303
-    job = web.job(web.job_id)
+    job = with_file(web)  # the checks are of the file, so they are made with it
     stored = DocumentResult.model_validate(job.result_json).html_checks
     assert stored and stored == static_checks(job.html or "")
     # The fake assembler writes a bare page: the stored checks are of that page.

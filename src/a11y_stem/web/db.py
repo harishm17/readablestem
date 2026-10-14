@@ -133,6 +133,18 @@ class Job(Base):
     # The upload form's "Exam or quiz" box: the figure step describes what is shown and
     # never the result (`ConversionOptions.exam_mode`, read by `web.notation.conversion_options`).
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # What the documents list needs from `result_json`, kept beside it so the list (polled
+    # every few seconds while anything converts) never loads a result's fixes: the decisions
+    # still open (a heading group is one) and the title. Both are set whenever `result_json`
+    # is assigned (`_keep_list_facts`); NULL on a row from before they existed, which the
+    # list fills in on first sight (`web.documents`). Document-derived: deleted with the job.
+    open_decisions: Mapped[int | None] = mapped_column(Integer)
+    result_title: Mapped[str | None] = mapped_column(Text)
+    # A review write changes `result_json` at once and the HTML file only when somebody
+    # asks for it (download, view, the job page), so a run of review clicks costs one
+    # render, not one each (`web.routes.jobs.current_html`). True: `html` and the checks in
+    # `result_json` are from before the last review write.
+    html_stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -141,6 +153,14 @@ class Job(Base):
     edits: Mapped[list[ReviewEdit]] = relationship(
         back_populates="job", cascade="all, delete-orphan", passive_deletes=True
     )
+
+
+@event.listens_for(Job.result_json, "set")
+def _keep_list_facts(target: Job, value: object, _old: object, _initiator: object) -> None:
+    """Whenever a result is stored, store the two facts the list reads next to it."""
+    from a11y_stem.web import documents
+
+    target.open_decisions, target.result_title = documents.list_facts(value)
 
 
 class Blob(Base):

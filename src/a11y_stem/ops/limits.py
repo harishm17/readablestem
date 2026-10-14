@@ -28,10 +28,6 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from a11y_stem.config import Settings
 
-# Steps that run at once inside one conversion (`pipeline.run.convert_pdf(concurrency=4)`);
-# each holds its own reservation while its request is out.
-CONCURRENT_STEPS = 4
-
 # What a dense page costs, rounded up from the measurements (docs/deploy.md): on Claude
 # (claude-opus-5-5 main, claude-haiku-5-5 cheap, effort medium and low) a development
 # page costs $0.0030-0.0047 and a dense held-out page about $0.014; on OpenAI $0.0037.
@@ -79,16 +75,44 @@ def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) 
 
 
 def in_flight_usd(settings: Settings) -> float:
-    """Most that can be held at once by one conversion: every concurrent step at the
-    dearest reservation."""
-    return CONCURRENT_STEPS * largest_reservation_usd(settings)
+    """Most that can be held at once by one conversion: every concurrent step
+    (`Settings.model_concurrency`) at the dearest reservation."""
+    return settings.model_concurrency * largest_reservation_usd(settings)
+
+
+def affordable_concurrency(
+    settings: Settings,
+    *,
+    budget_usd: float | None,
+    daily_left_usd: float | None = None,
+    largest_usd: float | None = None,
+) -> int:
+    """How many steps of one conversion may run at once: `Settings.model_concurrency`, or
+    fewer when the money that is left could not hold that many worst-case reservations.
+
+    Every step holds its reservation while its request is out, and a refused reservation
+    stops all further model work of the job (`pipeline.run`: a budget stop). A one-page
+    job on Claude has $1.00 and a call holds up to $0.14, so eight at once would be
+    refused on the way to a job that costs a few cents; seven fit. `budget_usd` is what the
+    job may still hold or spend (its cap minus what earlier attempts spent), `daily_left_usd`
+    what is left under the day's cap (None: no cap). At least 1, at most the setting.
+    """
+    largest = largest_reservation_usd(settings) if largest_usd is None else largest_usd
+    wanted = settings.model_concurrency
+    if largest <= 0:
+        return wanted
+    room = [x for x in (budget_usd, daily_left_usd) if x is not None]
+    if not room:
+        return wanted
+    return max(1, min(wanted, int(min(room) // largest)))
 
 
 def spend_findings(settings: Settings) -> list[Finding]:
     """Errors and warnings about the spend limits for the provider in use."""
     out: list[Finding] = []
     largest = largest_reservation_usd(settings)
-    in_flight = CONCURRENT_STEPS * largest
+    steps = settings.model_concurrency
+    in_flight = steps * largest
     who = f"MODEL_PROVIDER={settings.model_provider} (worst case ${largest:.2f} per call)"
 
     def error(text: str) -> None:
@@ -108,12 +132,9 @@ def spend_findings(settings: Settings) -> list[Finding]:
             f"MAX_USD_PER_PAGE ${settings.max_usd_per_page:.2f} is below one call's "
             f"reservation, so no page could be converted"
         )
-    elif settings.max_usd_per_page < in_flight:
-        warning(
-            f"MAX_USD_PER_PAGE ${settings.max_usd_per_page:.2f} is below "
-            f"{CONCURRENT_STEPS} calls held at once (${in_flight:.2f}): a short document "
-            f"can have elements left unconverted at a cost of a few cents"
-        )
+    # A page cap below `steps` calls held at once is no finding: a job whose cap could not
+    # hold that many runs fewer steps at once (`affordable_concurrency`, used by the worker
+    # and the convert command), so a short document is converted either way.
     if settings.max_usd_per_job < largest:
         error(f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below one call's reservation")
     elif full_job_cap < normal_job + in_flight:
@@ -132,7 +153,7 @@ def spend_findings(settings: Settings) -> list[Finding]:
     if daily is not None:
         if daily < in_flight:
             error(
-                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below {CONCURRENT_STEPS} calls held "
+                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below {steps} calls held "
                 f"at once (${in_flight:.2f}), so a document could not be converted"
             )
         elif daily < settings.max_usd_per_job:

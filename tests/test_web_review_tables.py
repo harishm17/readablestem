@@ -51,7 +51,7 @@ from a11y_stem.web.review import (
     with_header_row,
 )
 from a11y_stem.web.routes.review import STALE_MESSAGE, STALE_TITLE
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
 from fixtures.web.table_doc import (
     MATHS_LATEX,
     TABLE_2,
@@ -314,7 +314,7 @@ def test_accept_moves_on_and_the_document_has_the_table(tables):
     assert "Table 1: Accepted. 2 decisions left." in page
     fix = fix_of(tables, "p1-e1")
     assert (fix.status, fix.reviewed) == (Status.ACCEPTED, True)
-    html = tables.job(tables.job_id).html
+    html = with_file(tables).html
     assert '<div class="table-scroll" id="p1-e1" role="group"' in html
     (edit,) = edits(tables)
     assert edit.action == "accept"
@@ -329,7 +329,7 @@ def test_reject_keeps_the_image_of_the_table(tables):
         page
     )
     assert fix_of(tables, "p1-e1").status is Status.REJECTED
-    html = tables.job(tables.job_id).html
+    html = with_file(tables).html
     flagged = section(html, 'id="p1-e1"', "</div>")
     assert 'alt="Table not converted"' in flagged
     assert "This table is shown as an image of the original" in flagged
@@ -365,7 +365,7 @@ def test_use_the_grid_read_from_the_pdf_stays_on_the_table(tables):
     assert fix.status is Status.EDITED and fix.reviewed
     assert fix.table is not None and fix.table.grid == grid_of(TABLE_2)
     assert fix.reason == "table_not_rebuilt"  # what the pipeline did stays recorded
-    html = tables.job(tables.job_id).html
+    html = with_file(tables).html
     assert '<div class="table-scroll" id="p1-e3"' in html and '<th scope="col">Unit</th>' in html
 
 
@@ -453,8 +453,8 @@ def test_a_cell_changed_is_checked_escaped_and_shown_again(tables):
     cell = next(c for c in grid(tables, "p1-e1").cells if (c.row, c.col) == (1, 1))
     assert cell.text == "<b>12</b> & up"
     assert "<td>&lt;b&gt;12&lt;/b&gt; &amp; up</td>" in panel(page)
-    assert "&lt;b&gt;12&lt;/b&gt; &amp; up" in tables.job(tables.job_id).html
-    assert "<b>12</b>" not in tables.job(tables.job_id).html
+    assert "&lt;b&gt;12&lt;/b&gt; &amp; up" in with_file(tables).html
+    assert "<b>12</b>" not in with_file(tables).html
     # The same text again changes nothing.
     again = post(
         tables, "p1-e1", action="edit", change="cell", row="1", col="1", cell="<b>12</b> & up"

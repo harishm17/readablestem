@@ -45,6 +45,27 @@ nearest parent directory whose `pyproject.toml` names `a11y-stem`), so commands 
 any subdirectory. Outside a checkout they fall back to the working directory. Bad input
 (missing file, page out of range, malformed JSONL) prints `error: ...` and exits 2.
 
+## Benchmarks
+
+`scripts/bench_runtime.py` measures the runtime and web work with no key, no network and no
+cost: model calls are the offline client with a simulated latency (`--latency`), the
+documents are the repository's own layout fixtures. `uv run python scripts/bench_runtime.py
+--help` lists them; to compare with an earlier commit, put its `src/` first on
+`PYTHONPATH` (`git archive <commit> src | tar -x -C /tmp/old`, then
+`PYTHONPATH=/tmp/old/src uv run python scripts/bench_runtime.py ...`). Numbers depend on the
+machine (these are from a 16-core machine with a load average over 20, so only the ratios
+mean anything).
+
+| Command | Measures | Before | After |
+|---|---|---|---|
+| `convert --pages 12 --latency 1.5 --concurrency 4 8` | one conversion, 82 calls | 35.3 s at 4, layout 6.2 s CPU | 19.3 s at 8, layout 3.6 s CPU |
+| `first` | first conversion after a start, table models loaded or not | 9.3 s | 8.2 s |
+| `review --pages 12 --clicks 12` | CPU of a review click (52 crops) | 210 ms; 120 image encodes in 12 clicks | 58 ms; none |
+| `documents --documents 20` | one rebuild of My documents, 20 finished jobs of 240 KB, Postgres | 256 ms, 3 statements | 6.6 ms, 2 statements |
+| `spend` | database work of a model call; of an idle worker poll | 6 statements (2 INSERT, 4 UPDATE) in 4 transactions; 4 statements (2 UPDATE, 2 SELECT) in 3 | 4 UPDATE in 4 transactions; 1 SELECT in 1 |
+| `static` | a first and a repeat view of a page | 3 requests and 115 KB (font 734 KB); 3 revalidations on every repeat | the same 115 KB (font 392 KB); no request on a repeat |
+| `sections --sections 8 --workers 1 4` | the document task over 8 sections | 79.2 s | 27.7 s, the same items |
+
 ## Layout
 
 | Path | Contents |

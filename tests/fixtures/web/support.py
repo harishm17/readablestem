@@ -196,9 +196,16 @@ class FakeConverter:
         progress=None,
         options=None,
         stage_progress=None,
+        concurrency=None,
     ) -> ConversionOutput:
         self.calls.append(
-            {"pdf": pdf_bytes, "settings": settings, "client": client, "options": options}
+            {
+                "pdf": pdf_bytes,
+                "settings": settings,
+                "client": client,
+                "options": options,
+                "concurrency": concurrency,
+            }
         )
         if progress is not None:
             progress(1, 1)
@@ -211,6 +218,15 @@ class FakeConverter:
 
 def fake_client_factory(settings: Settings, budget: JobBudget) -> FakeVisionClient:
     return FakeVisionClient(budget=budget)
+
+
+def with_file(env: Any, job_id: str | None = None) -> Job:
+    """The job after its HTML file is up to date: a review write only marks the file out
+    of date, and asking for the file makes it (`routes.jobs.current_html`)."""
+    job_id = job_id or env.job_id
+    response = env.browser.get(f"/jobs/{job_id}/view")
+    assert response.status_code == 200, response.status_code
+    return env.job(job_id)
 
 
 def csrf_from(html: str) -> str:

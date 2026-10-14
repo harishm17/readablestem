@@ -264,15 +264,15 @@ Decisions second check off), measured with `a11y-stem convert` on 1 vCPU
 
 The planning rate is **$0.015 a dense page** (`ops/limits.py`, `PLANNING_USD_PER_PAGE`);
 a 30-page document at that rate is $0.45. Worst-case reservations on `claude-opus-5-5`:
-$0.14 a call (equations, figures), $0.22 with long descriptions, $0.53 with tables; four
-calls are in flight at once (`convert_pdf` concurrency 4).
+$0.14 a call (equations, figures), $0.22 with long descriptions, $0.53 with tables; eight
+calls are in flight at once (`MODEL_CONCURRENCY`, "Concurrency" below).
 
 | Setting | Claude | OpenAI | Why |
 |---|---|---|---|
-| `MAX_USD_PER_PAGE` | **$1.00** | $0.30 | A job's cap is at most this times its pages, and holds count: a one-page job must hold four calls at once ($0.57; $0.88 with long descriptions). $1.00 is also the most a runaway one-page job can spend |
-| `MAX_USD_PER_JOB` | **$3.00** | $2.00 | A 30-page dense document is $0.45 spent plus about $0.9 held at once, so $1.3 at worst: it never reaches $3.00; a runaway stops at 7x a normal document |
+| `MAX_USD_PER_PAGE` | **$1.00** | $0.30 | A job's cap is at most this times its pages, and holds count: a one-page job holds as many calls at once as its cap allows (seven at $0.14; four with long descriptions: "Concurrency"). $1.00 is also the most a runaway one-page job can spend |
+| `MAX_USD_PER_JOB` | **$3.00** | $2.00 | A 30-page dense document is $0.45 spent plus about $1.1 held at once, so $1.6 at worst: it never reaches $3.00; a runaway stops at 7x a normal document |
 | `MAX_MODEL_CALLS_PER_JOB` / `_PER_PAGE` | 400 / 80 | 400 / 80 | Measured 2-2.7 calls a page, so 30 pages is about 80 calls: 5x room |
-| `DAILY_SPEND_CAP_USD` | **$10** (set by you) | any | 5 instructors converting their full quota is 5 x 90 pages x $0.015 = $6.75, plus the calls in flight (two instances x $0.9) = $8.5 |
+| `DAILY_SPEND_CAP_USD` | **$10** (set by you) | any | 5 instructors converting their full quota is 5 x 90 pages x $0.015 = $6.75, plus the calls in flight (two instances x $1.1) = $9 |
 | `PER_USER_DAILY_PAGE_QUOTA` | **90** (set by you) | any | Three full-size (30-page) documents a day each; a course week of lecture notes |
 
 If you set `MAX_USD_PER_PAGE`/`MAX_USD_PER_JOB` yourself, they apply to whichever provider
@@ -282,16 +282,40 @@ workspace limit ($100, checklist item 3) is the hard stop above that. A realisti
 
 `Settings.check_production` refuses to start (and `deploy.sh` stops before touching
 anything) when a number cannot work for the provider: a page or job cap below one call's
-reservation, or a daily cap below four calls held at once. `a11y-stem ops launch-check`
-lists the softer problems too: a page cap below four calls (short documents may lose
-elements), a job cap a normal document comes near or a runaway would run far past (over
+reservation, or a daily cap below `MODEL_CONCURRENCY` calls held at once. `a11y-stem ops
+launch-check` lists the softer problems too: a job cap a normal document comes near or a runaway would run far past (over
 25x), a daily cap under one job's cap or one user's quota, a quota under one full-size
 document. Turning on `FEATURE_TABLES` makes the reservation $0.53 a call; the check then
 asks for `MAX_USD_PER_PAGE` of at least $2.20 and `MAX_USD_PER_JOB` of at least $2.60.
 
 To measure again: `uv run --env-file .env a11y-stem convert FILE.pdf --out out.html
---max-usd 1.5`. A small `--max-usd` stops a Claude run early, because the four calls in
-flight each hold a reservation against it (use at least $1, or `--concurrency 1`).
+--max-usd 1.5`. Without `--concurrency` the command runs as many steps at once as the cap
+can hold; with one given, a small `--max-usd` stops a Claude run early, because the calls
+in flight each hold a reservation against it (use at least $1, or `--concurrency 1`).
+
+#### Concurrency
+
+`MODEL_CONCURRENCY` (default 8, 1 to 16) is how many equation, figure and table steps of
+one conversion run at once. Model calls are I/O-bound, so a dense document's model phase
+is roughly 1/concurrency of the summed call latencies: with 82 calls of about 1.5 s
+(offline client, simulated latency; `scripts/bench_runtime.py convert`, docs/development.md
+"Benchmarks") a 12-page document took 35.3 s at 4 (the old default) and 19.3 s at 8, the
+model phase 32.0 s and 17.3 s. Three things keep 8 safe:
+
+- *Spend.* Every step holds its worst-case reservation while its request is out, and a
+  refused reservation stops all model work of the job. The worker therefore passes
+  `ops.limits.affordable_concurrency`: `MODEL_CONCURRENCY`, or fewer when the money left
+  for the job (its cap minus what earlier attempts spent) or for the day could not hold
+  that many reservations. A one-page job on Claude ($1.00 cap, $0.14 a call) runs seven;
+  one with long descriptions runs four. The caps themselves are unchanged. The convert
+  command does the same for `--max-usd`.
+- *Rate limits.* A 429 is retried after the provider's `retry-after` (as before, at most
+  `MODEL_MAX_RETRIES` times), and now also pauses every other request of the process for
+  that long (`models.base.RateGate`, one per provider), so seven steps do not each send into
+  the same limit and spend a retry. Raise your Anthropic tier, or set `MODEL_CONCURRENCY`
+  lower, if the logs show `model_call_retry` with status 429 often.
+- *CPU and memory.* The steps only wait on the network; layout, cropping and assembly are
+  on one thread, so eight in flight add no CPU use to speak of.
 
 ### Content features
 
@@ -309,6 +333,25 @@ at the next deploy: put it in the file. Choices for the beta, and why:
 | `FEEDBACK_URL` | empty | The footer then links to an email to `CONTACT_EMAIL`. A form service is a new data processor; name it on the privacy page first |
 
 Flip a switch by editing the file and running `./deploy/deploy.sh service`.
+
+### Layout and the first job
+
+Layout is one thread of PyMuPDF work before the first model call (`MODEL_CONCURRENCY` cannot
+shorten it), and most of it is the table detector. Three changes shorten that part and keep
+the result byte for byte the same (checked on 46 PDFs of the repository with every content
+feature on, and on the replay of the committed proof bundle):
+
+- the detector runs only on pages that could hold a table (docs/tables.md, "Which pages
+  are looked at"): on the 12-page fixture document the time to the first model call fell
+  from 4.4-5.1 s to 2.5-2.7 s; on two OpenStax sections the layout took 3.9 s and 4.3 s
+  before and 2.8 s and 2.4 s after (a page with boxed callouts cannot be skipped);
+- the text pass and the heading decisions, which no step reads, run while the models
+  answer instead of before the first request;
+- the worker loads the table models when it starts (`PRELOAD_TABLE_MODELS`, production
+  only), while it waits for its first job: the first conversion after a start no longer
+  pays for them (6 pages: 9.3 s to 8.2 s here, 1.7 s of CPU moved out of the job; measured
+  on a busy 16-core machine, so on one vCPU the saving is the 4-5 s the model load takes
+  there).
 
 ### Sizing
 

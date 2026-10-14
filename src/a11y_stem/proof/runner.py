@@ -284,6 +284,7 @@ def _config(
     concurrency: int,
     budget: JobBudget | None,
     gaps: frozenset[str],
+    section_workers: int = 1,
 ) -> pe.EvalConfig:
     return pe.EvalConfig(
         task=task,
@@ -295,6 +296,7 @@ def _config(
         client_label=label,
         gold_label=gold_label(pset),
         concurrency=concurrency,
+        section_workers=section_workers,
         budget=budget,
         scorer_gaps=gaps if task in {"equations", "document"} else frozenset(),
     )
@@ -606,8 +608,15 @@ def record_arm(
     client_factory: Callable[[Settings, JobBudget], VisionClient] | None = None,
     keep_finished: bool = False,
     resume: bool = False,
+    section_workers: int = 1,
 ) -> tuple[ArmResults, MediaRecorder, float]:
     """Run every (task, repeat) with the real models and record the answers into `writer`.
+
+    `section_workers` converts that many sections of the document task at once, which
+    shortens a live run (it waits on a hosted model). The default 1 is how the registered
+    runs are made. With more, the sections' wall-clock times are not recorded (they would
+    include each one's wait for the others, and a replay cannot measure them), and a
+    replay is unchanged: it always converts the sections one after the other.
 
     One spend guard covers the whole proof; each run gets its own `JobBudget`, so a run's
     own spend is known. A run the budget stops is not scored half-converted: the proof
@@ -641,6 +650,7 @@ def record_arm(
             keep_finished=keep_finished,
             resume=resume,
             tally=tally,
+            section_workers=section_workers,
         )
     finally:
         models_log.removeHandler(tally)
@@ -662,6 +672,7 @@ def _record_arm(
     keep_finished: bool,
     resume: bool,
     tally: CallTally,
+    section_workers: int = 1,
 ) -> tuple[ArmResults, MediaRecorder, float]:
     records = goldinfo.load_records(gold_dir)
     gaps = goldinfo.g1_ids(records)
@@ -721,6 +732,7 @@ def _record_arm(
             concurrency=pset.concurrency,
             budget=budget,
             gaps=gaps,
+            section_workers=section_workers if task == "document" else 1,
         )
         say(f"live {run_stem(task, repeat)}")
         started = time.monotonic()
@@ -747,7 +759,8 @@ def _record_arm(
                 f"{message}; raise --max-usd. A budget stop is never scored half-converted"
             )
         require_answers(stem, store.rows(), tally)
-        timing = section_timing(task, done.items)
+        # Sections that ran together waited for each other: their times say nothing.
+        timing = [] if cfg.section_workers > 1 else section_timing(task, done.items)
         spent_here = float(done.report.get("cost", {}).get("budget_spent_usd") or 0.0)
         writer.write_jsonl(f"answers/{stem}.jsonl", store.rows())
         writer.write_json(f"reports/{stem}.json", done.report)

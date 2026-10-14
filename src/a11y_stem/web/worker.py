@@ -84,6 +84,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
 from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
+from a11y_stem.ops import limits
 from a11y_stem.web import events
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
@@ -139,8 +140,8 @@ PROGRESS_WRITE_S = 2.0
 class Converter(Protocol):
     """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments.
 
-    The optional arguments (`tracer`, `options`, `stage_progress`) are passed only when
-    set (`Worker._converter_kwargs`), so a fake without them works in every other case.
+    The optional arguments (`tracer`, `options`, `stage_progress`, `concurrency`) are passed
+    only when set (`Worker._converter_kwargs`), so a fake without them works in every other case.
     """
 
     def __call__(
@@ -154,6 +155,7 @@ class Converter(Protocol):
         tracer: Tracer | None = None,
         options: ConversionOptions | None = None,
         stage_progress: StageProgressFn | None = None,
+        concurrency: int = ...,
     ) -> ConversionOutput: ...
 
 
@@ -376,6 +378,9 @@ class Worker:
             largest_reservation_usd(settings) if headroom_usd is None else headroom_usd
         )
         self.tracer = tracer  # None: the converter's own default (no tracing)
+        # The dearest reservation any enabled step can hold (steps' own sizes, the optional
+        # ones included): what one more concurrent step may need.
+        self._largest_usd = limits.largest_reservation_usd(settings)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._current: _Attempt | None = None
@@ -425,6 +430,24 @@ class Worker:
         if requeued or failed:
             log_event(logger, "leases_expired", logging.WARNING, requeued=requeued, failed=failed)
         return requeued, failed
+
+    def pending(self, now: datetime | None = None) -> tuple[bool, bool]:
+        """(a job a worker could claim is queued, a running job's lease has run out): one
+        read for both, which is all an idle poll costs. The queued test is the one `claim`
+        makes (the owner is still on the allowlist)."""
+        now = now or self.clock()
+        queued = (
+            select(Job.id)
+            .join(User, User.id == Job.user_id)
+            .where(Job.status == JobStatus.QUEUED, User.is_allowed.is_(True))
+            .limit(1)
+        )
+        expired = (
+            select(Job.id).where(Job.status == JobStatus.RUNNING, Job.lease_until < now).limit(1)
+        )
+        with session_scope(self.factory) as session:
+            row = session.execute(select(queued.exists(), expired.exists())).one()
+        return bool(row[0]), bool(row[1])
 
     def claim(self, now: datetime | None = None) -> Claim | None:
         """Take the next queued job (fewest attempts, then oldest), or None.
@@ -634,7 +657,30 @@ class Worker:
         if _accepts(self.converter, "stage_progress"):
             kwargs["stage_progress"] = self._stage_progress(attempt)
 
+        # concurrency: `MODEL_CONCURRENCY` steps at once, fewer when what is left of the
+        # job's cap or of today's cap could not hold that many reservations.
+        if _accepts(self.converter, "concurrency"):
+            kwargs["concurrency"] = self._concurrency(attempt)
+
         return kwargs
+
+    def _concurrency(self, attempt: _Attempt) -> int:
+        """Steps this attempt may run at once (`ops.limits.affordable_concurrency`)."""
+        from a11y_stem.ops.limits import affordable_concurrency
+
+        daily_left: float | None = None
+        snapshot = getattr(self.guard, "snapshot", None)
+        if callable(snapshot):
+            try:
+                daily_left = snapshot().remaining_usd
+            except Exception as exc:  # the settings' number is the answer without a snapshot
+                log_exception(logger, "concurrency_snapshot_failed", exc)
+        return affordable_concurrency(
+            self.settings,
+            budget_usd=attempt.budget.max_usd,
+            daily_left_usd=daily_left,
+            largest_usd=self._largest_usd,
+        )
 
     # ------------------------------------------------------------------ live progress
 
@@ -875,6 +921,7 @@ class Worker:
                 )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
+            job.html_stale = False  # the file is made from this result
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
             job.cost_usd = max(
@@ -895,8 +942,14 @@ class Worker:
     def run_once(self) -> str | None:
         """Requeue expired leases, then claim and process one job. Returns its id.
 
-        Claims nothing while the daily budget is spent (`budget_closed`)."""
-        self.requeue_expired()
+        Claims nothing while the daily budget is spent (`budget_closed`). With nothing
+        queued and no lease run out it does one read and returns (`pending`)."""
+        now = self.clock()
+        queued, expired = self.pending(now)
+        if expired:
+            queued = self.requeue_expired(now)[0] > 0 or queued
+        if not queued:  # an idle poll is this one read: no write, no snapshot, no claim
+            return None
         if self.budget_closed():
             if not self._paused:
                 self._paused = True
@@ -954,6 +1007,10 @@ class Worker:
         self._thread = threading.Thread(target=self._loop, name="a11y-stem-worker", daemon=True)
         self._thread.start()
         log_event(logger, "worker_started")
+        if self.settings.env == "prod" and self.settings.preload_table_models:
+            from a11y_stem.pipeline import tables
+
+            threading.Thread(target=tables.preload, name="a11y-stem-preload", daemon=True).start()
 
     @property
     def alive(self) -> bool:
