@@ -26,12 +26,13 @@ ANTHROPIC_MAIN_MODEL = "claude-opus-5-5"
 ANTHROPIC_CHEAP_MODEL = "claude-haiku-5-5"
 Provider = Literal["openai", "anthropic"]
 # The job spend caps differ by provider, because a call's worst-case reservation does: about
-# $0.03 on gpt-6.1-sol, about $0.30-0.37 on claude-opus-5-5 (a thinking allowance and a large
-# image). Used for a cap the environment does not set (`Settings._provider_limits`); the
+# $0.03 on gpt-6.1-sol, about $0.11 on claude-opus-5-5 (a 2,048-token thinking allowance and
+# the crop's real size). Four calls are held at once, so a one-page job needs about $0.57 on
+# Claude. Used for a cap the environment does not set (`Settings._provider_limits`); the
 # measurements and the reasoning are in docs/deploy.md, "Spend limits".
 PROVIDER_LIMIT_DEFAULTS: dict[str, dict[str, float]] = {
     "openai": {"max_usd_per_job": 2.0, "max_usd_per_page": 0.30},
-    "anthropic": {"max_usd_per_job": 4.0, "max_usd_per_page": 2.0},
+    "anthropic": {"max_usd_per_job": 2.0, "max_usd_per_page": 0.60},
 }
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 

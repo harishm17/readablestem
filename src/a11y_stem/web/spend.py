@@ -146,25 +146,12 @@ def largest_reservation_usd(settings: Settings) -> float:
     """Worst-case cost of the largest single model call the pipeline reserves.
 
     That is a crop plus its fenced neighbouring text, at the larger output limit of the
-    two steps, on the dearer model (a display equation sent to the main model: about
-    $0.031 at 2026-10 prices). With less than this left under the daily cap the first
-    reservation of a typical document fails, so admitting an upload, or claiming a job,
-    would only produce a document with everything flagged "not converted".
+    two steps, on the dearer model (`ops.limits.largest_reservation_usd`, without the
+    optional steps: about $0.03 on gpt-6.1-sol and about $0.11 on claude-opus-5-5 at
+    2026-10 prices). With less than this left under the daily cap the first reservation
+    of a typical document fails, so admitting an upload, or claiming a job, would only
+    produce a document with everything flagged "not converted".
     """
-    from a11y_stem.models.base import fence_untrusted
-    from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
-    from a11y_stem.pipeline import equation_step, figure_step, run
+    from a11y_stem.ops.limits import largest_reservation_usd as largest
 
-    # Neighbouring text is up to CONTEXT_CHARS plus separators and "..." markers.
-    context = fence_untrusted("x" * (run.CONTEXT_CHARS + 64))
-    largest = 0.0
-    for model in (settings.main_model, settings.cheap_model):
-        for tokens in (equation_step.MAX_OUTPUT_TOKENS, figure_step.MAX_OUTPUT_TOKENS):
-            try:
-                cost = estimate_max_cost_usd(
-                    model, n_images=1, text_chars=len(context), max_output_tokens=tokens
-                )
-            except UnknownModelError:  # refused at the first call anyway (FATAL_ERRORS)
-                continue
-            largest = max(largest, cost)
-    return largest
+    return largest(settings, optional_steps=False)

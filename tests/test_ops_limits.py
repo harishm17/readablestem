@@ -31,7 +31,7 @@ def settings(**kw) -> Settings:
 def test_claude_gets_its_own_job_caps_unless_the_environment_sets_them():
     assert (settings().max_usd_per_job, settings().max_usd_per_page) == (2.0, 0.30)
     claude = settings(model_provider="anthropic")
-    assert (claude.max_usd_per_job, claude.max_usd_per_page) == (4.0, 2.0)
+    assert (claude.max_usd_per_job, claude.max_usd_per_page) == (2.0, 0.60)
     set_by_hand = settings(model_provider="anthropic", max_usd_per_job=1.5, max_usd_per_page=0.9)
     assert (set_by_hand.max_usd_per_job, set_by_hand.max_usd_per_page) == (1.5, 0.9)
 
@@ -41,14 +41,14 @@ def test_environment_variable_sets_a_cap_and_a_blank_one_does_not(monkeypatch):
     monkeypatch.setenv("MAX_USD_PER_JOB", "")
     monkeypatch.setenv("MAX_USD_PER_PAGE", "1.25")
     s = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert (s.max_usd_per_job, s.max_usd_per_page) == (4.0, 1.25)
+    assert (s.max_usd_per_job, s.max_usd_per_page) == (2.0, 1.25)
 
 
 def test_switching_provider_brings_that_providers_defaults():
     base = settings(max_usd_per_page=0.5)
     claude = with_provider(base, "anthropic")
-    assert claude.max_usd_per_job == 4.0  # a default follows the provider
     assert claude.max_usd_per_page == 0.5  # a set value is kept
+    assert claude.max_usd_per_job == 2.0
     assert with_provider(claude, "openai").max_usd_per_job == 2.0
 
 
@@ -56,8 +56,8 @@ def test_a_short_claude_document_can_hold_four_calls_under_the_default_page_cap(
     claude = settings(model_provider="anthropic")
     usd, _ = job_caps(claude, 1)
     assert usd >= limits.in_flight_usd(claude)
-    # ...which OpenAI's page cap would not allow for Claude's reservations:
-    assert limits.largest_reservation_usd(claude) > 0.30
+    # OpenAI's $0.30 page cap would have been above one call but under four:
+    assert limits.largest_reservation_usd(claude) < 0.30 < usd
 
 
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])
@@ -77,14 +77,14 @@ def test_a_normal_30_page_claude_document_never_reaches_the_default_job_cap():
 
 
 def test_openai_page_cap_on_claude_is_refused_in_production():
-    s = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.30})
-    with pytest.raises(ConfigError, match=r"spend limits: MAX_USD_PER_PAGE \$0.30"):
+    s = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.10})
+    with pytest.raises(ConfigError, match=r"spend limits: MAX_USD_PER_PAGE \$0.10"):
         s.check_production()
     settings(**{**PROD, "model_provider": "anthropic"}).check_production()
 
 
 def test_a_daily_cap_below_the_calls_held_at_once_is_refused_in_production():
-    s = settings(**{**PROD, "model_provider": "anthropic", "daily_spend_cap_usd": 1.0})
+    s = settings(**{**PROD, "model_provider": "anthropic", "daily_spend_cap_usd": 0.3})
     with pytest.raises(ConfigError, match="DAILY_SPEND_CAP_USD"):
         s.check_production()
     # the same cap is fine on OpenAI, whose reservations are a tenth of the size
@@ -118,9 +118,9 @@ def test_warnings_for_caps_far_from_a_normal_document():
 
 
 def test_launch_check_lists_a_refusal_and_the_warnings(capsys):
-    refused = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.30})
+    refused = settings(**{**PROD, "model_provider": "anthropic", "max_usd_per_page": 0.10})
     items = launch.launch_blockers(settings=refused)
-    assert sum("MAX_USD_PER_PAGE $0.30" in i for i in items) == 1  # named once
+    assert sum("MAX_USD_PER_PAGE $0.10" in i for i in items) == 1  # named once
     assert any(i.startswith("settings: production start refused") for i in items)
     tight = settings(**{**PROD, "model_provider": "anthropic", "per_user_daily_page_quota": 5})
     assert any(

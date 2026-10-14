@@ -50,29 +50,31 @@ class Finding:
         return f"{self.severity}: {self.text}"
 
 
-def largest_reservation_usd(settings: Settings) -> float:
+def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) -> float:
     """Worst-case cost of the dearest single call the enabled steps can make: equations
-    and figures always, long descriptions and tables only when their flags are on."""
+    and figures always; long descriptions and tables when their flags are on and
+    `optional_steps` is True. The images are priced at their largest, a 2048 px crop (what
+    the pipeline's crops are cut to), and the neighbouring text at its largest."""
     from a11y_stem.models.base import fence_untrusted
     from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
     from a11y_stem.pipeline import equation_step, figure_step, run, table_step
 
     context = fence_untrusted("x" * (run.CONTEXT_CHARS + 64))
-    limits = [equation_step.MAX_OUTPUT_TOKENS, figure_step.MAX_OUTPUT_TOKENS]
-    if settings.feature_long_descriptions:
-        limits.append(figure_step.LONG_MAX_OUTPUT_TOKENS)
-    if settings.feature_tables:
-        limits.append(table_step.MAX_OUTPUT_TOKENS)
     largest = 0.0
     for model in (settings.main_model, settings.cheap_model):
-        for tokens in limits:
-            try:
+        try:
+            limits = [equation_step.output_limit(model), figure_step.MAX_OUTPUT_TOKENS]
+            if optional_steps and settings.feature_long_descriptions:
+                limits.append(figure_step.LONG_MAX_OUTPUT_TOKENS)
+            if optional_steps and settings.feature_tables:
+                limits.append(table_step.MAX_OUTPUT_TOKENS)
+            for tokens in limits:
                 cost = estimate_max_cost_usd(
                     model, n_images=1, text_chars=len(context), max_output_tokens=tokens
                 )
-            except UnknownModelError:  # refused at the first call anyway
-                continue
-            largest = max(largest, cost)
+                largest = max(largest, cost)
+        except UnknownModelError:  # refused at the first call anyway
+            continue
     return largest
 
 
@@ -146,3 +148,24 @@ def spend_findings(settings: Settings) -> list[Finding]:
             f"{settings.max_pages_per_job}: a full-size document is refused"
         )
     return out
+
+
+def main() -> int:
+    """`python -m a11y_stem.ops.limits`: check the spend limits in the process environment
+    (deploy/deploy.sh runs it before it deploys anything). Exit 3 when an error was found,
+    0 otherwise; warnings are printed. Reads no `.env` file."""
+    from a11y_stem.config import Settings
+
+    settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    findings = spend_findings(settings)
+    for finding in findings:
+        print(finding)
+    print(
+        f"provider={settings.model_provider} errors={sum(f.severity == 'error' for f in findings)} "
+        f"warnings={sum(f.severity == 'warning' for f in findings)}"
+    )
+    return 3 if any(f.severity == "error" for f in findings) else 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

@@ -16,6 +16,9 @@ list of its own, `DECISIONS_PRICES`, at the end of this module.
 
 from __future__ import annotations
 
+import math
+import struct
+from collections.abc import Sequence
 from dataclasses import dataclass
 
 PRICES_CHECKED = "2026-10-07"
@@ -51,6 +54,11 @@ class Price:
     max_image_tokens: int = MAX_IMAGE_TOKENS
     base_input_tokens: int = BASE_INPUT_TOKENS
     thinking_tokens: int = 0
+    # Pixels one image token covers (Claude: width x height / 750 after the image is scaled
+    # to at most `IMAGE_MAX_EDGE_PX` on its long edge). With this set, the reservation
+    # prices an image by its real size (`image_tokens_upper_bound`) instead of
+    # `max_image_tokens`, which stays the ceiling. None: every image is priced at the maximum.
+    pixels_per_token: int | None = None
 
     def for_prompt(self, prompt_tokens: int) -> Price:
         """The rate card that applies to a prompt of this many tokens."""
@@ -91,7 +99,21 @@ PRICES: dict[str, Price] = {
 #   the dearer of the two models' rates.
 ANTHROPIC_IMAGE_TOKENS = 6500
 ANTHROPIC_BASE_INPUT_TOKENS = 3500
-THINKING_ALLOWANCE_TOKENS = 8192
+# Thinking is part of `max_tokens`, so the request asks for the step's limit plus this much
+# and the reservation prices all of it at the output rate. It is a ceiling on thinking, not
+# a typical size: on the 2,405 calls of the held-out run (effort medium on claude-opus-5-5,
+# low on claude-haiku-5-5) the largest answer was 707 output tokens, 671 of them thinking,
+# and none ran into the limit. It was 8192 at first, which alone made one claude-opus-5-5
+# reservation about $0.2 and a one-page job's $0.30 cap unable to hold a single call.
+THINKING_ALLOWANCE_TOKENS = 2048
+# Image sizing, measured with the free token-counting endpoint on 2026-10-14
+# (claude-opus-5-5): a PNG costs about width x height / 750 tokens (+4..7), the long edge is
+# scaled down to 2576 px first, and the cost stops at about 4764 tokens. The bound adds the
+# 1.35 allowance for the newer tokenizers that `ANTHROPIC_IMAGE_TOKENS` already includes.
+IMAGE_MAX_EDGE_PX = 2576
+IMAGE_PIXELS_PER_TOKEN = 750
+IMAGE_TOKEN_CAP = 4784
+IMAGE_TOKEN_MARGIN = 1.35
 HAIKU_LONG_PROMPT_TOKENS = 100_000
 
 _HAIKU_LONG = Price(
@@ -102,6 +124,7 @@ _HAIKU_LONG = Price(
     max_image_tokens=ANTHROPIC_IMAGE_TOKENS,
     base_input_tokens=ANTHROPIC_BASE_INPUT_TOKENS,
     thinking_tokens=THINKING_ALLOWANCE_TOKENS,
+    pixels_per_token=IMAGE_PIXELS_PER_TOKEN,
 )
 _OPUS_FALLBACK_CEILING = Price(input=5.00, cached_input=0.50, output=25.00, cache_write=6.25)
 
@@ -116,6 +139,7 @@ PRICES.update(
             max_image_tokens=ANTHROPIC_IMAGE_TOKENS,
             base_input_tokens=ANTHROPIC_BASE_INPUT_TOKENS,
             thinking_tokens=THINKING_ALLOWANCE_TOKENS,
+            pixels_per_token=IMAGE_PIXELS_PER_TOKEN,
         ),
         "claude-sonnet-5-5": Price(
             input=2.00,
@@ -125,6 +149,7 @@ PRICES.update(
             max_image_tokens=ANTHROPIC_IMAGE_TOKENS,
             base_input_tokens=ANTHROPIC_BASE_INPUT_TOKENS,
             thinking_tokens=THINKING_ALLOWANCE_TOKENS,
+            pixels_per_token=IMAGE_PIXELS_PER_TOKEN,
         ),
         "claude-haiku-5-5": Price(
             input=0.10,
@@ -136,6 +161,7 @@ PRICES.update(
             max_image_tokens=ANTHROPIC_IMAGE_TOKENS,
             base_input_tokens=ANTHROPIC_BASE_INPUT_TOKENS,
             thinking_tokens=THINKING_ALLOWANCE_TOKENS,
+            pixels_per_token=IMAGE_PIXELS_PER_TOKEN,
         ),
     }
 )
@@ -206,15 +232,48 @@ def output_token_limit(model: str, max_output_tokens: int) -> int:
     return max_output_tokens + price_for(model).thinking_tokens
 
 
-def estimate_max_cost_usd(
-    model: str, *, n_images: int, text_chars: int, max_output_tokens: int
-) -> float:
-    """Worst-case cost of one call, for the spend reservation made before sending it."""
+def png_size(data: bytes) -> tuple[int, int] | None:
+    """(width, height) from a PNG's header, or None if it is not a readable PNG."""
+    if len(data) < 24 or not data.startswith(b"\x89PNG\r\n\x1a\n") or data[12:16] != b"IHDR":
+        return None
+    width, height = struct.unpack(">II", data[16:24])
+    return (width, height) if width > 0 and height > 0 else None
+
+
+def image_tokens_upper_bound(model: str, image: bytes | None = None) -> int:
+    """Most input tokens one image can cost on `model`: its measured size when the model
+    prices by pixels and the PNG header is readable, else the model's flat maximum."""
     price = price_for(model)
+    size = png_size(image) if image is not None else None
+    if price.pixels_per_token is None or size is None:
+        return price.max_image_tokens
+    width, height = size
+    scale = min(1.0, IMAGE_MAX_EDGE_PX / max(width, height))
+    pixels = math.ceil(width * scale) * math.ceil(height * scale)
+    tokens = min(math.ceil(pixels / price.pixels_per_token) + 16, IMAGE_TOKEN_CAP)
+    return min(price.max_image_tokens, math.ceil(tokens * IMAGE_TOKEN_MARGIN))
+
+
+def estimate_max_cost_usd(
+    model: str,
+    *,
+    n_images: int,
+    text_chars: int,
+    max_output_tokens: int,
+    images: Sequence[bytes] | None = None,
+) -> float:
+    """Worst-case cost of one call, for the spend reservation made before sending it.
+
+    `images` (the PNG bytes, when the caller has them) lets a model that prices images by
+    size reserve for the images actually sent; without them each of `n_images` is priced
+    at the model's maximum."""
+    price = price_for(model)
+    if images is not None:
+        image_tokens = sum(image_tokens_upper_bound(model, image) for image in images)
+    else:
+        image_tokens = n_images * price.max_image_tokens
     input_tokens = (
-        price.base_input_tokens
-        + n_images * price.max_image_tokens
-        + int(text_chars * MAX_TEXT_TOKENS_PER_CHAR)
+        price.base_input_tokens + image_tokens + int(text_chars * MAX_TEXT_TOKENS_PER_CHAR)
     )
     output_tokens = output_token_limit(model, max_output_tokens)
     worst = 0.0
