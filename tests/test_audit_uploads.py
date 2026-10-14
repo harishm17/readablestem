@@ -429,3 +429,35 @@ def test_child_env_keeps_only_what_an_interpreter_needs(monkeypatch):
     env = child_env()
     assert env.get("PATH") == "/usr/bin"
     assert "secret-value" not in env.values()
+
+
+def test_the_probe_child_caps_its_own_memory_and_the_parent_caps_its_time(monkeypatch):
+    import subprocess
+    import sys
+
+    from a11y_stem.web.pdf_probe import MEMORY_LIMIT_BYTES
+
+    shown = subprocess.run(
+        [
+            sys.executable,
+            "-c",
+            "import resource; from a11y_stem.web.pdf_probe import limit_memory; limit_memory(); "
+            "print(resource.getrlimit(resource.RLIMIT_AS)[0])",
+        ],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    assert int(shown.stdout) == MEMORY_LIMIT_BYTES <= 1024 * 1024 * 1024
+
+    real_run = subprocess.run
+
+    def hang(command, **kwargs):
+        return real_run([sys.executable, "-c", "import time; time.sleep(60)"], **kwargs)
+
+    monkeypatch.setattr(uploads.subprocess, "run", hang)
+    started = time.monotonic()
+    with pytest.raises(UploadRejected) as rejected:
+        inspect_pdf_isolated(make_pdf(1), max_pages=5, timeout_s=0.5)
+    assert rejected.value.code == "unreadable"
+    assert time.monotonic() - started < 10, "the hung child was not killed at its timeout"
