@@ -10,9 +10,9 @@ goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
 | Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
 | Decisions canary | At most once per UTC day, inside the hourly cron, after the purge | `ops.canary.maybe_run_daily`: 20 fixed requests to the Decisions API, compared with committed answers; `decisions_canary_drift` (ERROR) on any move over 0.02. See "Decisions canary" below |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the scheduler is late |
-| Uptime check of `/healthz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when it fails for 10 minutes |
+| Uptime check of `/readyz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when the database, the worker thread or the model provider setting is not ok for 10 minutes |
 | Cron alerts | Cloud Monitoring (log-based metrics) | Emails `ALERT_EMAIL` when there is no `cron_done` for 2 hours, or on any `cron_refused`, `aggregate_failed`, `purge_backstop_deleted`, `purge_backstop_failed` or failed Cloud Scheduler attempt |
-| Outside-in check of `/healthz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set |
+| Outside-in check of `/readyz` and `/demo` | Weekly, GitHub Actions `uptime.yml` | Skips unless the repo variable `LIVE_URL` is set |
 | Dependency updates | Weekly, Dependabot | One grouped PR per ecosystem (uv, actions, Docker) |
 
 The same tasks run by hand:
@@ -25,6 +25,9 @@ DATABASE_URL=postgresql+psycopg://... uv run a11y-stem ops cron
 uv run a11y-stem ops aggregate
 uv run a11y-stem ops purge
 uv run --env-file .env a11y-stem ops decisions-canary --max-usd 0.02   # no database needed
+uv run a11y-stem ops launch-check      # unfinished copy, demo, baseline, settings and spend limits
+uv run a11y-stem ops backup-check      # DATABASE_URL could run the app? ("Backups and restore")
+uv run a11y-stem ops restore-drill     # pg_dump, restore into a scratch database, check, drop
 ```
 
 `ops cron` exits 1 if aggregation failed, but only after the purge has run.
@@ -306,6 +309,131 @@ yet. To be told by email, add `decisions_canary_drift` to the
 `$SERVICE-cron-problems` log metric in `deploy/deploy.sh` (it then reports as a "cron or
 purge problem"), or give it a policy of its own.
 
+## Health, readiness and shutdown
+
+| Endpoint | Answers | Used by |
+|---|---|---|
+| `GET /healthz` | `{"status":"ok"}` when the process answers and a `SELECT 1` works, else 503 | Cloud Run's startup probe; the Dockerfile's HEALTHCHECK |
+| `GET /readyz` | 200 `{"status":"ready","checks":{...}}`, or 503 `not_ready` when any check is not ok | The Cloud Monitoring uptime check; the weekly GitHub `uptime.yml`; you, with `curl` |
+
+`/readyz` has three checks, each one word and never a setting's value (so no key, URL or
+model name can leak): `database` (`ok`, `unreachable`), `worker` (`ok`; `disabled` when
+`RUN_WORKER=false`; `stopping` after SIGTERM; `stopped` if the thread died; `stalled` if
+neither the loop nor a running conversion has shown life for six minutes; `not_started`),
+`model_provider` (`ok`; `no_key` if the selected provider's key is empty; `unpriced_model`;
+`fake` with `FAKE_MODELS`). A spent daily cap is not "not ready": the service is working
+and says so on `/status`.
+
+**Shutdown.** Cloud Run sends SIGTERM and kills the process 10 seconds later (a new
+revision, a scale-down, a deploy). The app stops the worker at once: no new job is
+claimed, the running conversion is cancelled (no more model calls are sent), and its lease
+ends now so another instance requeues it immediately instead of after two minutes. Then
+uvicorn drains open connections for at most 5 seconds (`GRACEFUL_SHUTDOWN_S`) and the
+app's shutdown makes sure the worker is stopped (3 seconds). The requeued job restarts
+from the beginning on another attempt (three attempts end in `lease_expired`). Look for
+`sigterm_received`, `job_cancelled reason=shutdown` and `worker_stopped` in the logs.
+`tests/test_web_health.py` starts a real server, sends SIGTERM, and checks it exits
+well inside 10 seconds.
+
+**Error pages.** Every page that fails answers in the app's plain style with a way home:
+404 "Page not found", 500 "Something went wrong" (the same page whether the error was
+raised or unhandled, with no document text), 503 "Not available right now". When the
+database does not answer (connection refused, pool exhausted), the 503 page is a static
+file, because the usual error page looks the signed-in user up in that database; it
+carries `Retry-After: 30` and links to `/status`. Only the exception type is logged
+(`database_unavailable`), never its message.
+
+## Backups and restore
+
+**What is in the database, and what a backup is for.** Documents and everything made from
+them (uploads, crops, results, review edits) are deleted after `RETENTION_HOURS` (24), so
+a backup mostly protects what is not temporary: the allowlist and admins, courses and
+notation memory, the daily spend and quota counters, the content-free aggregates and usage
+events, and opted-in documents (30 days). Losing the lot would cost you the allowlist
+(re-add the instructors) and some history; instructors would upload again.
+
+**What the deploy sets up.** Cloud SQL's automated backup, daily at 08:00 UTC, of which
+`SQL_RETAINED_BACKUPS` (1) is kept, and no point-in-time recovery. That is deliberate:
+every backup holds the documents present when it ran, so keeping seven would stretch
+"deleted after 24 hours" to a week, and the transaction logs of point-in-time recovery
+would do the same (deploy.md, "Backups and deleted documents"). The cost is a restore
+point up to a day old and no recovery to a chosen minute. If you need that, enable it on
+purpose and change the privacy page: `gcloud sql instances patch a11y-stem-db
+--enable-point-in-time-recovery --retained-transaction-log-days=3`.
+
+**Check it weekly** (a calendar reminder is enough; exits 1 when something needs you):
+
+```sh
+set -a; . deploy/.env.deploy; set +a
+./deploy/backups.sh status
+```
+
+It reports: automated backups on; the newest successful automated backup is under 36 hours
+old; and no manual backup older than 7 days (a manual backup is kept until deleted, so it
+outlives the retention promise). `./deploy/backups.sh list` shows every backup.
+
+**Before a risky change** (a migration that drops or renames something, a restore):
+
+```sh
+./deploy/backups.sh now                      # one on-demand backup
+# ... make the change, check it ...
+gcloud sql backups delete BACKUP_ID --instance=a11y-stem-db --project="$PROJECT_ID"
+```
+
+**Prove a restore works (the drill; do it once before real use and after any big schema
+change; it costs a few cents).** This restores the newest backup into a throwaway
+instance, so the live database is never touched:
+
+```sh
+./deploy/backups.sh list                     # note the newest BACKUP_ID (status SUCCESSFUL)
+gcloud sql instances create a11y-stem-db-drill --database-version=POSTGRES_16 \
+  --edition=enterprise --tier=db-f1-micro --region="$REGION" --storage-size=10 \
+  --project="$PROJECT_ID"
+gcloud sql backups restore BACKUP_ID --restore-instance=a11y-stem-db-drill \
+  --backup-instance=a11y-stem-db --project="$PROJECT_ID"
+gcloud sql users set-password postgres --instance=a11y-stem-db-drill \
+  --prompt-for-password --project="$PROJECT_ID"
+# in a second terminal: the Cloud SQL Auth Proxy to the drill instance
+cloud-sql-proxy "$PROJECT_ID:$REGION:a11y-stem-db-drill" --port 5433
+```
+
+then, from the checkout:
+
+```sh
+read -rs PGPW; export DATABASE_URL="postgresql+psycopg://postgres:${PGPW}@127.0.0.1:5433/a11y"; unset PGPW
+uv run a11y-stem ops backup-check
+gcloud sql instances delete a11y-stem-db-drill --project="$PROJECT_ID"   # when done
+```
+
+`backup-check` reads the copy and prints table names and row counts only. It exits 1 unless
+the schema is at this release's migration head (`schema=head`; `ahead` means a newer
+release migrated it, fine for a rollback), every table exists, and at least one admin can
+sign in. It also prints the age of the newest job and the newest spend day, which should
+match the day the backup was taken.
+
+**Restoring for real.** To go back to a backup in place (this overwrites the instance):
+
+```sh
+gcloud sql backups restore BACKUP_ID --restore-instance=a11y-stem-db --project="$PROJECT_ID"
+gcloud scheduler jobs run a11y-stem-cron --location="$REGION" --project="$PROJECT_ID"
+```
+
+Run the cron right after: the restore brings back documents that retention had already
+deleted, and the purge removes them again. Then `uv run a11y-stem ops backup-check`
+against the instance (through the proxy) and a sign-in.
+
+**Any Postgres: the pg_dump drill.** `a11y-stem ops restore-drill` takes the database in
+`DATABASE_URL`, runs `pg_dump` (custom format) into a private temporary directory, runs
+`pg_restore` into a scratch database on the same server, runs the same checks as
+`backup-check` on the scratch copy, compares the row counts with the source and drops the
+scratch database and the dump file whatever happens. It needs the PostgreSQL client tools
+on the machine (`--pg-bin DIR` if they are not on PATH) and a user allowed to create
+databases (on Cloud SQL, `postgres` through the proxy, not the app's `a11y` user). The
+output is counts only. It is also the way to test a `pg_dump` schedule for `DB_MODE=external`:
+a cron job running `pg_dump --format=custom --file=a11y-$(date +%F).dump` to storage you
+control, with the file deleted after a day for the same reason as the Cloud SQL setting.
+`tests/test_ops_backup.py` runs both commands against a real Postgres.
+
 ## Tracing (Langfuse)
 
 Off unless `TRACING_ENABLED=true` and both Langfuse keys are set (`deploy.sh` stores the
@@ -353,7 +481,9 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | Symptom | Look at | Usual fix |
 |---|---|---|
 | Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
-| `/healthz` answers 503 | The database: Cloud SQL instance state, connections | See "Too many connections" below |
+| `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: Cloud SQL instance state, connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
+| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Deploy a new revision (`./deploy/deploy.sh service`) or `gcloud run services update a11y-stem --region="$REGION" --project="$PROJECT_ID" --update-env-vars=RESTARTED_AT=$(date +%s)` to replace the instance; the running job's lease expires and it is requeued |
+| `/readyz` shows `model_provider: no_key` or `unpriced_model` | The `anthropic-api-key` secret has a version and the service reads `:latest`; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Add the secret version and redeploy, or fix the model name |
 | Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |
 | "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | See the next rows. The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the scheduler anyway |

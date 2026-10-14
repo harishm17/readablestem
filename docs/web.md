@@ -118,6 +118,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
 | POST `/internal/cron/aggregate-and-purge` | Cloud Scheduler | `X-Cron-Token` header; aggregates, then purges |
 | GET `/healthz` | anyone | `{"status": "ok"}` after a database ping, else 503 |
+| GET `/readyz` | anyone | `{"status": "ready", "checks": {"database", "worker", "model_provider"}}`, one word per check, 503 `not_ready` if any is not ok (docs/operations.md, "Health, readiness and shutdown") |
 
 Every `/jobs/*` route answers 404 for a job that does not exist or belongs to someone
 else, admins included, so job ids cannot be probed and admins never see documents. Its
