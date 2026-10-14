@@ -503,6 +503,18 @@ def _list_levels(items: list[Element]) -> list[int]:
 # --------------------------------------------------------------------------- headings
 
 
+def is_entry(element: Element) -> bool:
+    """A glossary entry that is written as a term and its definition."""
+    text = element.text or ""
+    return (
+        element.kind is Kind.PARAGRAPH
+        and element.term_end is not None
+        and 0 < element.term_end < len(text)
+        and bool(text[: element.term_end].strip())
+        and bool(text[element.term_end :].strip())
+    )
+
+
 def heading_parts(element: Element, fix: Fix | None) -> tuple[int | None, str]:
     """(level, text) for a heading element; level None means it is written as <p>
     (no fix, rejected or not converted, or no text)."""
@@ -627,6 +639,16 @@ class _Renderer:
         chunks: list[str] = []
         i = 0
         while i < len(ordered):
+            if is_entry(ordered[i]):
+                entries: list[Element] = []
+                while i < len(ordered):
+                    if is_entry(ordered[i]):
+                        entries.append(ordered[i])
+                    elif ordered[i].id not in self.placed:
+                        break  # (a term's inline equations are written inside it)
+                    i += 1
+                chunks.append(self.definitions(entries))
+                continue
             if ordered[i].kind is Kind.LIST_ITEM:
                 items: list[Element] = []
                 inside: dict[str, list[Element]] = {}
@@ -674,8 +696,34 @@ class _Renderer:
     def paragraph(self, element: Element, text: str) -> str:
         if not text.strip():
             return ""
+        if element.preformatted:
+            return self.code_block(element, text)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
         return f"<p{attrs}>{self.rich(text, element)}</p>"
+
+    def code_block(self, element: Element, text: str) -> str:
+        """Program code as `<pre><code>`: its lines and indentation as printed, no
+        highlighting. A long line scrolls inside the block (WCAG 1.4.10), and a block with
+        a line wider than a phone screen is a tab stop, so a keyboard user can scroll it
+        (axe `scrollable-region-focusable`), named "Program code" for the focus."""
+        self.add_style("code", CODE_CSS)
+        wide = max((len(line) for line in text.split("\n")), default=0) > CODE_WIDE_CHARS
+        stop = ' tabindex="0" role="group" aria-label="Program code"' if wide else ""
+        attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
+        return f"<pre{attrs}{stop}><code>{_escape(text.strip(chr(10)))}</code></pre>"
+
+    def definitions(self, entries: list[Element]) -> str:
+        """Glossary entries (`Element.term_end`) as one definition list: the term in a
+        `<dt>`, its definition in the `<dd>` after it."""
+        self.add_style("definitions", DEFINITIONS_CSS)
+        out = []
+        for entry in entries:
+            text = entry.text or ""
+            end = entry.term_end or 0
+            attrs = self.id_attr(entry.id) + inline_text.passage_attrs(entry)
+            term, definition = text[:end].strip(), text[end:].strip()
+            out.append(f"<dt{attrs}>{self.rich(term)}</dt><dd>{self.rich(definition)}</dd>")
+        return f"<dl>{''.join(out)}</dl>"
 
     def lists(self, items: list[Element], inside: dict[str, list[Element]] | None = None) -> str:
         """Consecutive list items as nested lists.
@@ -993,6 +1041,21 @@ def _contact_sentence(contact: str | None) -> str:
     link = f'<a href="{_escape(href)}">{_escape(line)}</a>'
     return f"{CONTACT.removesuffix('.')}: {link}."
 
+
+# Added to a document's stylesheet only when it has a code block / a definition list
+# (`_Renderer.add_style`), so documents without them are written as before.
+CODE_WIDE_CHARS = 36  # characters in a line that may not fit a 320 px screen at 0.9 rem
+CODE_CSS = """\
+pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px solid #c8c8c8;
+  border-radius: 4px; overflow-x: auto; tab-size: 4; }
+pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  white-space: pre; }
+"""
+DEFINITIONS_CSS = """\
+dl { margin: 0 0 1em; }
+dt { font-weight: bold; margin-top: 0.75em; }
+dd { margin: 0.1em 0 0 1.5em; }
+"""
 
 STYLE = """\
 :root { color-scheme: light; }

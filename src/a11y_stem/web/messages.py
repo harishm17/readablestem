@@ -322,8 +322,10 @@ NOTICE_MESSAGES: dict[str, str] = {
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",
-    "code_block": "Program code is kept as plain text, without its layout or highlighting.",
-    "footnote": "A footnote is kept where it falls in the text, not linked to its mark.",
+    "code_block": "Program code is kept as a code block with its line breaks and "
+    "indentation, without highlighting.",
+    "footnote": "A footnote is kept where it falls in the text; its mark in the text links "
+    "to it where the mark could be found.",
     "colour_reference": "The text refers to a colour (for example, shown in red), so add "
     "a cue that does not depend on seeing the colour.",
     "colour_only": "A figure tells things apart by colour alone, so add labels or patterns "

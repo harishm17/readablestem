@@ -74,7 +74,7 @@ import pymupdf
 from a11y_stem.core.childenv import child_env
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
-from a11y_stem.core.types import BBox, Element, Kind, Notice, TableGrid, inline_marker
+from a11y_stem.core.types import BBox, Element, Kind, Link, Notice, TableGrid, inline_marker
 from a11y_stem.pipeline import hyphens, page_type, tables
 from a11y_stem.pipeline import options as run_options
 from a11y_stem.pipeline.notation_memory import (
@@ -1020,6 +1020,18 @@ class _Row:
     def bold(self) -> bool:
         letters = [c for c in self.ink if c.c.isalnum()]
         return bool(letters) and all(c.bold for c in letters)
+
+    @cached_property
+    def code(self) -> bool:
+        """A line of program code: monospaced throughout (`CODE_MONO_SHARE` of its glyphs),
+        upright text. Whether a run of such lines is a code block is `_code_run`'s call."""
+        ink = [c for c in self.ink if not c.blank]
+        return (
+            bool(ink)
+            and not self.vertical
+            and not self.diagonal
+            and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(ink)
+        )
 
     @cached_property
     def family(self) -> str:
@@ -2148,6 +2160,203 @@ def _bold_letter_runs(
     if ink:
         state.before = chars[ink[-1]].c
     return sorted(out)
+
+
+GLOSSARY_HEADING = re.compile(
+    r"\b(?:key\s+terms?|glossary|vocabulary|terms\s+and\s+definitions)\s*:?\s*$", re.IGNORECASE
+)
+GLOSSARY_INDENT = 1.2  # x font size: a definition starts this much further right than its term
+GLOSSARY_TERM_ROWS = 2  # lines a term may take
+GLOSSARY_GAP = 1.6  # x font size: most space between a term line and its definition
+
+
+def _term_words(text: str) -> bool:
+    """Reads like a term: a few words, not ending like a sentence."""
+    words = text.split()
+    return 0 < len(words) <= MAX_TERM_WORDS and text.rstrip()[-1:] not in ".?!;,"
+
+
+def _entry_rows(block: _Block) -> int | None:
+    """In a paragraph that is a term and its definition (the term at the margin, the
+    definition on the lines indented below it: how OpenStax sets "Key Terms"), the number
+    of lines the term takes; None for any other paragraph."""
+    rows = block.rows
+    if block.kind != Kind.PARAGRAPH or block.code or block.marker is not None or len(rows) < 2:
+        return None
+    margin, size = rows[0].x0, rows[0].size
+    taken = 0
+    while taken < min(len(rows), GLOSSARY_TERM_ROWS + 1) and rows[taken].x0 <= margin + 0.5 * size:
+        taken += 1
+    if not 1 <= taken <= GLOSSARY_TERM_ROWS or taken >= len(rows):
+        return None
+    if any(r.x0 < margin + GLOSSARY_INDENT * size for r in rows[taken:]):
+        return None
+    if not _term_words(_clean(" ".join(r.text for r in rows[:taken]))):
+        return None
+    return taken
+
+
+def _bold_lead(row: _Row) -> int:
+    """Where a line's bold lead ends (an index into `row.chars`; 0 if it has none): the
+    line starts in bold and goes on in regular type, "Limit The value that ...". A line
+    that is bold throughout has no lead."""
+    chars = row.chars
+    first = next((i for i, c in enumerate(chars) if not c.blank), None)
+    if first is None or not chars[first].bold:
+        return 0
+    end = first
+    for i in range(first, len(chars)):
+        if chars[i].blank:
+            continue
+        if not chars[i].bold:
+            return end if end > first or chars[first].c.strip() else 0
+        end = i + 1
+    return 0
+
+
+def _run_in_entries(block: _Block) -> list[_Block] | None:
+    """A paragraph whose lines start entries of a glossary, each with a bold term that runs
+    into its definition ("Derivative The limit of ..."), as one block per entry; None when
+    the paragraph is not that. An entry starts at a line with a bold lead of at most
+    MAX_TERM_WORDS words, after a line that ends a sentence; every entry needs a
+    definition."""
+    rows = block.rows
+    if block.kind != Kind.PARAGRAPH or block.code or block.marker is not None:
+        return None
+    starts = []
+    for i, row in enumerate(rows):
+        lead = _bold_lead(row)
+        if not lead or not _term_words(_clean("".join(c.c for c in row.chars[:lead]))):
+            continue
+        if i == 0 or rows[i - 1].clean[-1:] in ".?!)":
+            starts.append(i)
+    if not starts or starts[0] != 0:
+        return None
+    entries = []
+    for number, first in enumerate(starts):
+        end = starts[number + 1] if number + 1 < len(starts) else len(rows)
+        group = rows[first:end]
+        lead = _bold_lead(group[0])
+        term = _Block(Kind.PARAGRAPH, block.bbox, [_Row(group[0].chars[:lead])])
+        rest = [_Row(group[0].chars[lead:], column=group[0].column), *group[1:]]
+        body = _Block(Kind.PARAGRAPH, block.bbox, rest)
+        definition = _paragraph_pieces(body)
+        if not _has_content(definition):
+            return None
+        box = _union(r.bbox for r in group)
+        entries.append(_entry(_paragraph_pieces(term), definition, box, group, group[0].size))
+    return entries
+
+
+def _entry(term: list[str | _Inline], definition: list[str | _Inline], box: BBox, rows, size):
+    """One glossary entry as a paragraph block: the term's pieces, a space, the definition's;
+    `term_pieces` says how many pieces are the term."""
+    return _Block(
+        Kind.PARAGRAPH,
+        box,
+        list(rows),
+        font_size=size,
+        pieces=[*term, " ", *definition],
+        term_pieces=len(term),
+    )
+
+
+def _term_over(block: _Block, following: _Block | None) -> bool:
+    """Is `block` a term on a line or two of its own, with the paragraph indented right
+    below it as its definition (OpenStax sets some entries as two blocks)?"""
+    if following is None or block.kind != Kind.PARAGRAPH or following.kind != Kind.PARAGRAPH:
+        return False
+    if block.code or following.code or block.marker is not None or following.marker is not None:
+        return False
+    rows = block.rows
+    margin, size = rows[0].x0, rows[0].size
+    return (
+        len(rows) <= GLOSSARY_TERM_ROWS
+        and all(abs(r.x0 - margin) <= 0.5 * size for r in rows)
+        and _term_words(_clean(" ".join(r.text for r in rows)))
+        and all(r.x0 >= margin + GLOSSARY_INDENT * size for r in following.rows)
+        and 0 <= following.bbox[1] - block.bbox[3] <= GLOSSARY_GAP * size
+        and _has_content(following.pieces)
+    )
+
+
+def _glossary_entries(pages: list[_PageBlocks]) -> None:
+    """Under a heading that ends in "Key Terms", "Glossary" or "Vocabulary", a term and its
+    definition become one paragraph block that the assembler writes as a `<dt>` and `<dd>`
+    (in place; `Element.term_end`). Two shapes: the term on a line of its own at the margin
+    with the definition indented below it, in one paragraph (OpenStax), and a bold term of
+    a few words that layout took for a heading, directly over its definition paragraph.
+    The second one makes the terms stop being headings: a heading for every term of a
+    glossary would be an outline of hundreds of entries.
+
+    The section lasts until a heading that is not a bold line (a larger font or a section
+    number); a bold line that is not directly over a paragraph stays a heading."""
+    active = False
+    for page in pages:
+        blocks, out, i = page.blocks, [], 0
+        while i < len(blocks):
+            block = blocks[i]
+            if block.kind == Kind.HEADING:
+                strong = REASON_LARGER_FONT in block.reasons or REASON_NUMBERED in block.reasons
+                if GLOSSARY_HEADING.search(block.text or ""):
+                    active = True
+                elif strong:
+                    active = False
+            following = blocks[i + 1] if i + 1 < len(blocks) else None
+            if active and (entries := _run_in_entries(block)):
+                out.extend(entries)
+            elif active and block.kind == Kind.PARAGRAPH and (taken := _entry_rows(block)):
+                head = _Block(Kind.PARAGRAPH, block.bbox, block.rows[:taken])
+                tail = _Block(Kind.PARAGRAPH, block.bbox, block.rows[taken:])
+                out.append(
+                    _entry(
+                        _paragraph_pieces(head),
+                        _paragraph_pieces(tail),
+                        block.bbox,
+                        block.rows,
+                        block.font_size,
+                    )
+                )
+            elif active and _term_over(block, following):
+                assert following is not None
+                out.append(
+                    _entry(
+                        _paragraph_pieces(block),
+                        _paragraph_pieces(following),
+                        _union([block.bbox, following.bbox]),
+                        [*block.rows, *following.rows],
+                        block.font_size,
+                    )
+                )
+                i += 1
+            elif (
+                active
+                and block.kind == Kind.HEADING
+                and REASON_BOLD_BODY in block.reasons
+                and REASON_LARGER_FONT not in block.reasons
+                and _term_words(block.text or "")
+                and following is not None
+                and following.kind == Kind.PARAGRAPH
+                and not following.code
+                and not following.bold
+                and following.marker is None
+                and following.bbox[1] - block.bbox[3] <= GLOSSARY_GAP * (block.font_size or 10.0)
+                and _has_content(following.pieces)
+            ):
+                out.append(
+                    _entry(
+                        [block.text or ""],
+                        following.pieces,
+                        _union([block.bbox, following.bbox]),
+                        [*block.rows, *following.rows],
+                        following.font_size,
+                    )
+                )
+                i += 1
+            else:
+                out.append(block)
+            i += 1
+        page.blocks = out
 
 
 def _settle_bold_letters(pages: list[_PageBlocks]) -> None:
@@ -4406,6 +4615,13 @@ def _absorb_labels(
     running = _running_text(inside, ctx)
     if running and figure.images == 1 and not figure.paths and _plain_image(doc, figure.xref):
         return False
+    if (
+        inside
+        and not near
+        and not figure.images
+        and all(r.code and id(r) in running for r in inside)
+    ):
+        return False  # a box drawn round program code is its frame, not a figure
     for row in [*inside, *near]:
         if id(row) not in running:
             row.absorbed = True
@@ -4428,6 +4644,9 @@ def _running_text(rows: list[_Row], ctx: _Context) -> set[int]:
         if row.kind != "text" or row.vertical:
             continue
         texts.append(row)
+        if row.code and len(row.ink) >= CODE_MIN_GLYPHS:
+            found.add(id(row))  # a line of code in a box is code, not the box's label
+            continue
         words = _prose_words(row, _CharInfo.of(row))
         if words >= 2 and (row.size >= HEADING_SIZE_RATIO * ctx.body or row.size >= TITLE_MIN_PT):
             found.add(id(row))
@@ -4481,6 +4700,7 @@ class _Run:
     kind: str  # "math" | "text"
     block_start: bool  # the run starts after a geometric break, not just a style change
     block_end: bool = True
+    code: bool = False  # rows of program code, grouped whatever their indentation
     box: BBox = (0.0, 0.0, 0.0, 0.0)  # union of the rows' boxes
     margin: float = 0.0  # left edge of the rows after the first (the first's when alone)
 
@@ -4517,6 +4737,8 @@ class _Block:
     label: str | None = None  # display equations: the equation number beside them
     regular: str | None = None  # display equations: `Element.regular_letters`
     table: TableGrid | None = None  # tables: the grid built from the PDF (`_table_blocks`)
+    code: bool = False  # paragraphs: program code, lines and indentation kept (`_code_text`)
+    term_pieces: int | None = None  # glossary entries: how many of `pieces` are the term
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -4564,12 +4786,107 @@ def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
     return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
 
 
+def _code_groups(rows: Sequence[_Row]) -> dict[int, int]:
+    """Rows of program code, by `id(row)`, with the number of the code block they are in.
+
+    A code block is consecutive rows (in reading order) of upright text that is
+    monospaced throughout (`_Row.code`), in one column, one line pitch apart (a blank line
+    in the code is a gap of up to two) and of one size, with at least `CODE_MIN_GLYPHS`
+    glyphs, or `CODE_MIN_SHORT` in two lines or more. Whatever their indentation: a
+    Python loop's body is a line that starts further right, not a new paragraph. A single
+    short monospaced line ("print") is not a block.
+    """
+    groups: list[list[_Row]] = []
+    for row in rows:
+        if row.kind != "text" or not row.code:
+            groups.append([])  # ends the block
+            continue
+        last = groups[-1] if groups else []
+        if last:
+            prev = last[-1]
+            pitch = row.baseline - prev.baseline
+            if (
+                row.column == prev.column
+                and abs(row.size - prev.size) <= 0.5
+                and 0.5 * prev.size <= pitch <= CODE_MAX_PITCH * prev.size
+            ):
+                last.append(row)
+                continue
+        groups.append([row])
+    found: dict[int, int] = {}
+    for group in groups:
+        glyphs = sum(len(r.ink) for r in group)
+        if glyphs >= CODE_MIN_GLYPHS or (len(group) >= 2 and glyphs >= CODE_MIN_SHORT):
+            for row in group:
+                found[id(row)] = id(group[0])
+    return found
+
+
+def _pitch(row: _Row) -> list[float]:
+    """Distances between the starts of neighbouring characters of one word of a code line
+    (no space between them), the advance of its monospaced font."""
+    return [
+        b.x0 - a.x0
+        for a, b in pairwise(row.chars)
+        if not a.blank and not b.blank and a.mono and b.mono and 0 < b.x0 - a.x0 < 2 * row.size
+    ]
+
+
+def _median(values: Sequence[float]) -> float:
+    ordered = sorted(values)
+    return ordered[len(ordered) // 2] if ordered else 0.0
+
+
+def _code_text(rows: Sequence[_Row]) -> str:
+    """The text of a code block, line by line, with the indentation it was printed with.
+
+    A line's spaces are the text layer's own; what it lacks is the indentation, which is
+    the line's distance from the block's left edge over the font's advance (the usual
+    distance between the starts of two neighbouring characters; a monospaced font moves
+    the same distance for each). A gap between two neighbours with no space between them
+    (a PDF that moves the pen instead of printing spaces) counts as spaces by the same
+    measure. Blank lines are the gaps between lines that are bigger than the usual one."""
+    advance = _median([d for r in rows for d in _pitch(r)])
+    left = min(r.x0 for r in rows)
+    pitches = [b.baseline - a.baseline for a, b in pairwise(rows) if b.baseline > a.baseline]
+    unit = min(min(pitches), CODE_LINE * rows[0].size) if pitches else 0.0
+    lines: list[str] = []
+    for i, row in enumerate(rows):
+        if i and unit > 0:
+            lines.extend([""] * max(0, round((row.baseline - rows[i - 1].baseline) / unit) - 1))
+        own = _median(_pitch(row)) or advance
+        line = " " * (round((row.x0 - left) / advance) if advance > 0 else 0)
+        before: _Char | None = None  # the character just before, with nothing between
+        for c in row.chars:
+            if c.blank:
+                if (c.x1 - c.x0) < CODE_SPACE * own:
+                    continue  # a space the text layer made up for a small gap, not printed
+                if line.strip():
+                    line += " "
+                before = None
+                continue
+            if before is not None and own > 0 and (c.x0 - before.x0) >= CODE_GAP * own:
+                line += " " * (round((c.x0 - before.x0) / own) - 1)
+            line += c.c.translate(_TEXT_MAP)
+            before = c
+        lines.append(line.rstrip())
+    return "\n".join(lines)
+
+
 def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
     runs: list[_Run] = []
+    code = _code_groups(rows)
     for row in rows:
         if runs:
             run = runs[-1]
             prev = run.rows[-1]
+            if id(row) in code or run.code:
+                if id(row) in code and run.code and code[id(row)] == code[id(prev)]:
+                    run.add(row)
+                    continue
+                run.block_end = True
+                runs.append(_Run([row], row.kind, block_start=True, code=id(row) in code))
+                continue
             if run.kind == "math" and row.kind == "math" and row.region is prev.region:
                 run.add(row)  # rows of one display equation (`_contiguous_regions`)
                 continue
@@ -4590,7 +4907,7 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             starts = not geometric or restyled or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
-            runs.append(_Run([row], row.kind, block_start=True))
+            runs.append(_Run([row], row.kind, block_start=True, code=id(row) in code))
     return runs
 
 
@@ -4694,6 +5011,10 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     box = _union(r.bbox for r in rows)
     size = _dominant_size(rows)
     ink = [c for r in rows for c in r.ink]
+    if run.code:
+        return _Block(
+            Kind.PARAGRAPH, box, rows, text=_code_text(rows), font_size=size, bold=False, code=True
+        )
     # A lone ">4" or "+8" (a table cell, a stray sign) is too little to call an equation.
     trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
     if run.kind == "math" and not trivial:
@@ -4805,6 +5126,8 @@ def _merge_style_splits(blocks: list[_Block], runs: list[_Run]) -> list[_Block]:
             and block.kind == Kind.PARAGRAPH
             and out[-1].kind == Kind.PARAGRAPH
             and not run.block_start
+            and not block.code
+            and not out[-1].code
         ):
             prev = out[-1]
             prev.rows.extend(block.rows)
@@ -4844,6 +5167,8 @@ def _merge_chapter_numbers(blocks: list[_Block]) -> list[_Block]:
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
+    if block.code:
+        return [block.text or ""]  # kept as printed: lines, indentation, no inline maths
     pieces: list[str | _Inline] = []
     rows = list(block.rows)
     if block.marker is not None and block.marker.end:
@@ -5695,6 +6020,8 @@ def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
             prev is not None
             and prev.kind in _TEXT_BLOCKS
             and block.kind == Kind.PARAGRAPH
+            and not prev.code
+            and not block.code
             and block.bbox[1] < prev.bbox[1]
             and prev.rows[-1].clean[-1:] not in tuple(".?!:")
             and block.rows[0].clean[:1].islower()
@@ -5842,9 +6169,13 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         )
         for n in selected
     ]
+    _glossary_entries(pages)
     _settle_bold_letters(pages)
     block_ids: dict[int, str] = {}
     elements = _to_elements(pages, ctx, block_ids)
+    footnote_marks: dict[str, _FootnoteMark] = {}
+    notices = _layout_notices(pages, ctx, block_ids, footnote_marks)
+    elements = _footnote_links(elements, footnote_marks)
     # The safety net (independent of the page types; docs/layout.md "The safety net"): a
     # page keeps its page image, with a decision, when something painted on it was read
     # into nothing. The elements read from it stay.
@@ -5876,7 +6207,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         page_sizes=[p.size for p in pages],
         title=title,
         lang=_document_lang(doc),
-        notices=_layout_notices(pages, ctx, block_ids) + _hidden_text_notices(types, kept),
+        notices=notices + _hidden_text_notices(types, kept),
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
     )
@@ -6046,47 +6377,103 @@ def _hidden_text_notices(
     return notices
 
 
-# A paragraph or list item set in a monospaced font (at least this share of its glyphs,
-# and this many of them) is program code: its text is kept, but its line breaks and
-# indentation (which decide a Python loop's body) are not.
+# Consecutive lines set in a monospaced font (at least this share of each line's glyphs,
+# and this many of them in all) are program code: a block of its own, with its line breaks
+# and indentation (which decide a Python loop's body) kept (`_code_groups`).
 CODE_MONO_SHARE = 0.8
 CODE_MIN_GLYPHS = 12
+CODE_MIN_SHORT = 6  # glyphs that are enough for a block of two lines or more
+CODE_SPACE = 0.5  # x the advance: a narrower space in the text layer is not a printed one
+CODE_LINE = 1.6  # x font size: a line pitch bigger than this has a blank line in it
+CODE_GAP = 1.8  # x the advance: a gap this wide between two characters is a missing space
+CODE_MAX_PITCH = 3.4  # x font size: line to line in code, one blank line included
 # A footnote: a block in the bottom part of the page (below this share of its height), in
 # a smaller font than the body, that starts with a mark (a digit, *, a dagger) printed
 # raised in the text above it on the same page.
 FOOTNOTE_ZONE = 0.6
 FOOTNOTE_SIZE = 0.92
+FOOTNOTE_CONTEXT = 10  # characters printed before a footnote's mark that find it again
 _FOOTNOTE_MARKS = frozenset("*\u2020\u2021\u00a7")
 
 
+@dataclass(frozen=True)
+class _FootnoteMark:
+    """A footnote's mark in the text above it: the block (by its element id) and what is
+    printed just before the mark, to find it again in the element's text."""
+
+    block_id: str
+    before: str
+    mark: str
+
+
 def _layout_notices(
-    pages: list[_PageBlocks], ctx: _Context, block_ids: dict[int, str]
+    pages: list[_PageBlocks],
+    ctx: _Context,
+    block_ids: dict[int, str],
+    marks_out: dict[str, _FootnoteMark] | None = None,
 ) -> list[Notice]:
     """The code blocks and footnotes the job page lists under "Not handled in this file"
-    (review "none": no decision; docs/design/content-features.md "Notices")."""
+    (review "none": no decision; docs/design/content-features.md "Notices"). `marks_out`
+    gets each footnote's element id with the place of its mark (`_FootnoteMark`)."""
     notices: list[Notice] = []
     for page in pages:
-        raised: set[str] = set()  # marks printed raised above, on this page
+        raised: dict[str, _FootnoteMark] = {}  # marks printed raised above, on this page
         for block in page.blocks:
             element_id = block_ids.get(id(block))
             if block.kind not in _TEXT_BLOCKS or element_id is None:
                 continue
             ink = [c for row in block.rows for c in row.chars if not c.blank]
-            if len(ink) >= CODE_MIN_GLYPHS and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(
-                ink
+            if block.code or (
+                len(ink) >= CODE_MIN_GLYPHS
+                and sum(c.mono for c in ink) >= CODE_MONO_SHARE * len(ink)
             ):
                 notices.append(Notice(code="code_block", page=page.number, element_id=element_id,
                                       review="none"))  # fmt: skip
-            elif ink and _footnote(block, ink[0].c, page, ctx, raised):
+            elif ink and _footnote(block, ink[0].c, page, ctx, raised.keys()):
                 notices.append(Notice(code="footnote", page=page.number, element_id=element_id,
                                       review="none"))  # fmt: skip
+                if marks_out is not None:
+                    marks_out[element_id] = raised[ink[0].c]
             for row in block.rows:
-                raised |= {c.c for c in row.chars if row.is_script(c) and c.c.strip()}
+                for i, c in enumerate(row.chars):
+                    if row.is_script(c) and c.c.strip():
+                        before = _clean("".join(x.c for x in row.chars[:i]))[-FOOTNOTE_CONTEXT:]
+                        raised[c.c] = _FootnoteMark(element_id, before, c.c)
     return notices
 
 
+def _footnote_links(elements: list[Element], marks: dict[str, _FootnoteMark]) -> list[Element]:
+    """The elements with an internal link from each footnote's mark in the text to the
+    footnote. The mark is found again in the element's text by what is printed just before
+    it; a mark that cannot be found once, exactly, gets no link."""
+    by_id = {e.id: e for e in elements}
+    added: dict[str, list[Link]] = {}
+    for footnote, found in marks.items():
+        owner = by_id.get(found.block_id)
+        if owner is None or owner.text is None or not found.before.strip():
+            continue
+        wanted = [found.before + found.mark, found.before + " " + found.mark]
+        spots = [
+            m.end() - len(found.mark)
+            for needle in wanted
+            for m in re.finditer(re.escape(needle), owner.text)
+        ]
+        if len(spots) != 1:
+            continue
+        start = spots[0]
+        added.setdefault(owner.id, []).append(
+            Link(start=start, end=start + len(found.mark), kind="internal", target_id=footnote)
+        )
+    return [
+        e.model_copy(update={"links": sorted([*e.links, *added[e.id]], key=lambda k: k.start)})
+        if e.id in added
+        else e
+        for e in elements
+    ]
+
+
 def _footnote(
-    block: _Block, first: str, page: _PageBlocks, ctx: _Context, raised: set[str]
+    block: _Block, first: str, page: _PageBlocks, ctx: _Context, raised: Collection[str]
 ) -> bool:
     small = block.font_size is not None and block.font_size < FOOTNOTE_SIZE * ctx.body
     low = block.bbox[1] >= FOOTNOTE_ZONE * page.size[1]
@@ -6110,13 +6497,21 @@ def _to_elements(
             if block.kind in _TEXT_BLOCKS:
                 children = []
                 parts = []
-                for piece in block.pieces:
+                term_length = 0
+                for number, piece in enumerate(block.pieces, start=1):
                     if isinstance(piece, _Inline):
                         child_id = next(ids)
                         children.append((child_id, piece))
                         parts.append(inline_marker(child_id))
                     else:
                         parts.append(piece)
+                    if number == block.term_pieces:
+                        term_length = len("".join(parts))
+                joined = "".join(parts)
+                text = joined.strip("\n") if block.code else joined.strip()
+                term_end = None
+                if block.term_pieces is not None:
+                    term_end = max(0, term_length - (len(joined) - len(joined.lstrip())))
                 marker = block.marker
                 elements.append(
                     Element(
@@ -6125,9 +6520,11 @@ def _to_elements(
                         page=page.number,
                         bbox=_rounded(block.bbox),
                         order=len(elements),
-                        text="".join(parts).strip(),
+                        text=text,
                         font_size=block.font_size,
                         bold=block.bold,
+                        preformatted=block.code,
+                        term_end=term_end,
                         list_marker=marker.text if marker else None,
                         list_ordered=marker.ordered if marker else None,
                         list_level=levels.get(id(block)) if marker else None,
