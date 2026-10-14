@@ -813,7 +813,7 @@ def transcribe(
             prompt_version=prompt.version,
             instructions=prompt.text,
             images=[png],
-            context_text=context_text,
+            context_text=first_context if not escalation else context_text,
             max_output_tokens=output_limit(model),
             image_detail="high",
             effort=settings.anthropic_effort_equation,
@@ -825,6 +825,11 @@ def transcribe(
         return _evaluate(output, calls, element, display, course_bold=course_bold, spoken=spoken)
 
     first_model = _first_model(element, settings)
+    # The text around the equation goes to the main model only when it re-reads a cheap
+    # answer (`Settings.equation_context_on_escalation`); course notation always goes.
+    first_context = context_text
+    if settings.equation_context_on_escalation and first_model != settings.main_model:
+        first_context = None if not entries else context_text
     candidate = first = attempt(first_model)
     calls = list(candidate.calls)
     cheap_start = first_model != settings.main_model

@@ -81,6 +81,12 @@ class Settings(BaseSettings):
     # the model's own effort above. The measurement is in docs/eval.md "Model cost".
     anthropic_effort_equation: Effort | None = None
     anthropic_effort_figure: Effort | None = None
+    # The fixed untrusted-text notice rides in the cached system block instead of in every
+    # request's user message (T3-23). Claude only.
+    anthropic_notice_in_system: bool = False
+    # Equation context (the text around the equation) is sent only when the main model
+    # re-reads a cheap model's answer, not with the cheap model's first reading (T3-23).
+    equation_context_on_escalation: bool = False
     # Server-side refusal fallback on claude-opus-5-5 and claude-sonnet-5-5 (`fallbacks:
     # "default"`, beta header server-side-fallback-2026-07-01): a request a safety
     # classifier declines is re-run by Anthropic on the model it recommends. Turn off to
