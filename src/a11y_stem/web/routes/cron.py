@@ -18,7 +18,7 @@ from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse, Response
 
 from a11y_stem.web.db import utcnow
-from a11y_stem.web.deps import get_ctx
+from a11y_stem.web.deps import get_ctx, limited
 from a11y_stem.web.logsafe import log_event, log_exception
 
 logger = logging.getLogger(__name__)
@@ -31,7 +31,7 @@ def token_ok(expected: str | None, given: str | None) -> bool:
     return hmac.compare_digest(expected.encode("utf-8"), given.encode("utf-8"))
 
 
-@router.post("/internal/cron/aggregate-and-purge")
+@router.post("/internal/cron/aggregate-and-purge", dependencies=[limited("cron")])
 def aggregate_and_purge(
     request: Request, x_cron_token: str | None = Header(default=None)
 ) -> Response:

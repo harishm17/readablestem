@@ -44,8 +44,10 @@ from a11y_stem.web.deps import (
     PageError,
     UserDep,
     csrf_valid,
+    enforce,
     flash,
     get_ctx,
+    limited,
     render,
     require_csrf,
 )
@@ -306,9 +308,10 @@ def _upload_error_page(
     return render(request, "app.html", context, status_code=status, headers=headers)
 
 
-@router.post("/jobs")
+@router.post("/jobs", dependencies=[limited("upload")])
 async def create_job(request: Request, user: UserDep) -> Response:
     ctx = get_ctx(request)
+    enforce(request, "upload_user", user.id)  # before anything is read or any process starts
     if await run_in_threadpool(ctx.guard.cap_reached, ctx.min_headroom_usd):
         log_event(logger, "upload_rejected", code="spend_cap")
         raise PageError(

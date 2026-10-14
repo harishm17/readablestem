@@ -7,6 +7,7 @@ several independent apps (each with its own database) in one process.
 from __future__ import annotations
 
 import hmac
+import logging
 import re
 import secrets
 from dataclasses import dataclass, field
@@ -21,7 +22,9 @@ from starlette.responses import Response
 
 from a11y_stem.config import Settings
 from a11y_stem.observability.tracing import Tracer
+from a11y_stem.web.abuse import RateLimiter, client_ip
 from a11y_stem.web.db import User, session_scope
+from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.spend import DbSpendGuard
 from a11y_stem.web.uploads import UploadGate
 from a11y_stem.web.worker import ClientFactory, Converter, Worker
@@ -31,6 +34,8 @@ SESSION_USER = "uid"
 SESSION_VERSION = "sv"  # users.session_version when the session was signed in
 SESSION_CSRF = "csrf"
 SESSION_FLASH = "flash"
+
+logger = logging.getLogger(__name__)
 
 JOB_ID = re.compile(r"^[0-9a-f]{32}$")
 ELEMENT_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
@@ -55,6 +60,8 @@ class AppContext:
     tracer: Tracer | None = None
     # Uploads in progress (total and per user); `create_app` sizes it from settings.
     uploads: UploadGate = field(default_factory=lambda: UploadGate(limit=3))
+    # Attempts per address and person on sign-in, upload and cron (`web.abuse`).
+    limiter: RateLimiter = field(default_factory=RateLimiter)
 
     @property
     def dev_login_enabled(self) -> bool:
@@ -183,6 +190,37 @@ async def require_csrf(request: Request) -> None:
     form = await request.form()
     if not csrf_valid(request, form.get(CSRF_FIELD)):
         raise CsrfFailed()
+
+
+# --------------------------------------------------------------------------- rate limits
+
+
+def enforce(request: Request, rule_name: str, key: str | None = None) -> None:
+    """Count one attempt against `rule_name` (for this address, or `key`); 429 page when
+    the allowance is used up. Logs the rule name only, never the address."""
+    ctx = get_ctx(request)
+    key = key or client_ip(request, ctx.settings.trusted_proxy_hops)
+    wait = ctx.limiter.check(rule_name, key)
+    if wait is None:
+        return
+    log_event(logger, "rate_limited", logging.WARNING, rule=rule_name)
+    minutes = max(1, round(wait / 60))
+    raise PageError(
+        429,
+        "Too many attempts",
+        f"Please wait about {minutes} minute{'' if minutes == 1 else 's'} and try again. "
+        "Nothing was changed.",
+        headers={"Retry-After": str(wait)},
+    )
+
+
+def limited(rule_name: str) -> Any:
+    """A route dependency: `dependencies=[limited("login")]` counts the call per address."""
+
+    def dependency(request: Request) -> None:
+        enforce(request, rule_name)
+
+    return Depends(dependency)
 
 
 # --------------------------------------------------------------------------- flash

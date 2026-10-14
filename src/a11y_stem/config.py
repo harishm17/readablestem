@@ -148,6 +148,10 @@ class Settings(BaseSettings):
     # Run the background worker thread inside the web process (one Cloud Run service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
+    # How many proxies in front of the app write the caller's address into the right-hand end
+    # of X-Forwarded-For (web/abuse.py): 1 on Cloud Run, 2 behind an external load balancer
+    # as well, 0 with none (the peer address is used and the header is ignored).
+    trusted_proxy_hops: int = Field(default=1, ge=0, le=5)
 
     # --- public pages
     source_url: str = "https://github.com/harishm17/a11y-stem"

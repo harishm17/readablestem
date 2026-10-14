@@ -11,7 +11,15 @@ from fastapi.testclient import TestClient
 
 from a11y_stem.web.app import SESSION_COOKIE, create_app
 from a11y_stem.web.security import APP_CSP, VIEW_CSP
-from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login, make_pdf, make_settings
+from fixtures.web.support import (
+    ALICE,
+    WebEnv,
+    csrf_from,
+    job_id_from,
+    login,
+    make_pdf,
+    make_settings,
+)
 from fixtures.web.support import upload as upload_pdf
 
 BASELINE = {

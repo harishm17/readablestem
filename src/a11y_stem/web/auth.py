@@ -40,6 +40,7 @@ from a11y_stem.web.deps import (
     current_user,
     flash,
     get_ctx,
+    limited,
     render,
     require_csrf,
     start_session,
@@ -232,7 +233,7 @@ def login_page(request: Request) -> Response:
     return render(request, "login.html")
 
 
-@router.post("/login", dependencies=[Depends(require_csrf)])
+@router.post("/login", dependencies=[limited("login"), Depends(require_csrf)])
 async def login_start(request: Request) -> Response:
     ctx = get_ctx(request)
     google = ctx.sign_in_client(GOOGLE)
@@ -244,7 +245,7 @@ async def login_start(request: Request) -> Response:
     return await google.authorize_redirect(request, redirect_uri)
 
 
-@router.get("/auth/callback")
+@router.get("/auth/callback", dependencies=[limited("callback")])
 async def auth_callback(request: Request) -> Response:
     ctx = get_ctx(request)
     google = ctx.sign_in_client(GOOGLE)
@@ -291,7 +292,7 @@ MS_DID_NOT_FINISH = (
 )
 
 
-@router.post("/login/microsoft", dependencies=[Depends(require_csrf)])
+@router.post("/login/microsoft", dependencies=[limited("login"), Depends(require_csrf)])
 async def microsoft_login_start(request: Request) -> Response:
     ctx = get_ctx(request)
     client = ctx.sign_in_client(MICROSOFT)
@@ -311,7 +312,7 @@ async def microsoft_login_start(request: Request) -> Response:
         ) from None
 
 
-@router.get("/auth/microsoft/callback")
+@router.get("/auth/microsoft/callback", dependencies=[limited("callback")])
 async def microsoft_callback(request: Request) -> Response:
     ctx = get_ctx(request)
     client = ctx.sign_in_client(MICROSOFT)
@@ -375,7 +376,10 @@ def dev_login_page(request: Request) -> Response:
     return render(request, "dev_login.html", {"error": "", "email": ""})
 
 
-@router.post("/dev-login", dependencies=[Depends(_require_dev_login), Depends(require_csrf)])
+@router.post(
+    "/dev-login",
+    dependencies=[Depends(_require_dev_login), limited("login"), Depends(require_csrf)],
+)
 def dev_login(request: Request, email: Annotated[str, Form()] = "") -> Response:
     normalised = normalise_email(email)
     if normalised is None:
