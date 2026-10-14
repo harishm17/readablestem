@@ -52,12 +52,42 @@ def test_switching_provider_brings_that_providers_defaults():
     assert with_provider(claude, "openai").max_usd_per_job == 2.0
 
 
-def test_a_short_claude_document_can_hold_four_calls_under_the_default_page_cap():
+def test_a_short_claude_document_runs_as_many_steps_as_its_cap_can_hold():
+    """Eight steps at once is the default; a one-page job on Claude has $1.00, and a call
+    holds up to $0.14, so it runs seven: a refused reservation would stop its model work."""
     claude = settings(model_provider="anthropic")
+    assert claude.model_concurrency == 8
     usd, _ = job_caps(claude, 1)
-    assert usd >= limits.in_flight_usd(claude)
+    largest = limits.largest_reservation_usd(claude)
+    held = limits.affordable_concurrency(claude, budget_usd=usd)
+    assert held == int(usd // largest) == 7 and held * largest <= usd
     # OpenAI's $0.30 page cap would have been above one call but under four:
-    assert limits.largest_reservation_usd(claude) < 0.30 < usd
+    assert largest < 0.30 < usd
+    # a 30-page document has room for all eight, and so does a short one on OpenAI
+    assert limits.affordable_concurrency(claude, budget_usd=job_caps(claude, 30)[0]) == 8
+    openai = settings()
+    assert limits.affordable_concurrency(openai, budget_usd=job_caps(openai, 1)[0]) == 8
+
+
+def test_affordable_concurrency_follows_the_money_that_is_left():
+    claude = settings(model_provider="anthropic")
+    largest = limits.largest_reservation_usd(claude)
+    assert limits.affordable_concurrency(claude, budget_usd=None) == 8  # nothing to hold it to
+    assert limits.affordable_concurrency(claude, budget_usd=10.0, daily_left_usd=None) == 8
+    assert limits.affordable_concurrency(claude, budget_usd=10.0, daily_left_usd=3 * largest) == 3
+    assert limits.affordable_concurrency(claude, budget_usd=2.5 * largest) == 2
+    assert limits.affordable_concurrency(claude, budget_usd=0.01) == 1  # never fewer than one
+    assert limits.affordable_concurrency(claude, budget_usd=0.0) == 1
+    four = settings(model_provider="anthropic", model_concurrency=4)
+    assert limits.affordable_concurrency(four, budget_usd=10.0) == 4
+
+
+def test_the_concurrency_is_a_setting_with_a_range():
+    assert settings().model_concurrency == 8
+    assert settings(model_concurrency=4).model_concurrency == 4
+    for bad in (0, 17):
+        with pytest.raises(ValueError, match="model_concurrency"):
+            settings(model_concurrency=bad)
 
 
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])
@@ -95,12 +125,15 @@ def test_limits_are_not_enforced_outside_production():
     settings(model_provider="anthropic", max_usd_per_page=0.01).check_production()
 
 
-def test_tables_and_long_descriptions_raise_the_worst_case_and_a_warning():
+def test_tables_and_long_descriptions_raise_the_worst_case():
     plain = settings(model_provider="anthropic")
     heavy = settings(model_provider="anthropic", feature_tables=True)
     assert limits.largest_reservation_usd(heavy) > 2 * limits.largest_reservation_usd(plain)
-    texts = [f.text for f in limits.spend_findings(heavy)]
-    assert any("MAX_USD_PER_PAGE" in t and "held at once" in t for t in texts)
+    # a page cap that cannot hold eight of them is no finding: such a job runs fewer steps
+    assert not any("MAX_USD_PER_PAGE" in f.text for f in limits.spend_findings(heavy))
+    usd, _ = job_caps(heavy, 1)
+    assert limits.affordable_concurrency(heavy, budget_usd=usd) < heavy.model_concurrency
+    assert limits.largest_reservation_usd(heavy) <= usd  # but one call still fits
 
 
 def test_warnings_for_caps_far_from_a_normal_document():
@@ -141,7 +174,8 @@ def test_the_beta_feature_set_raises_no_finding_on_the_default_claude_caps():
     )
     assert limits.spend_findings(s) == []
     usd, _ = job_caps(s, 1)
-    assert usd >= limits.in_flight_usd(s)
+    assert usd >= limits.largest_reservation_usd(s)  # one call fits; a short job runs fewer steps
+    assert limits.affordable_concurrency(s, budget_usd=usd) >= 1
 
 
 def test_a_small_page_limit_is_judged_by_the_job_cap_it_really_gives():

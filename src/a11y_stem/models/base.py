@@ -19,6 +19,9 @@ data ("<document_text>...</document_text>") after a fixed notice that it is untr
 
 from __future__ import annotations
 
+import threading
+import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from typing import Protocol, TypeVar
 
@@ -53,6 +56,64 @@ class VisionClient(Protocol):
         sent in that case).
         """
         ...
+
+
+class RateGate:
+    """A pause every request of a process honours after the provider said "slow down".
+
+    A 429 carries a `retry-after`, and the request that got it waits that long before it
+    sends again. With eight steps in flight, the other seven would otherwise go on sending
+    into the same limit and each get a 429 of their own (and spend a retry). `pause` is
+    called with the wait a refused request is about to make, `wait` before every send: a
+    request that was not refused waits out the rest of the pause, the others carry on at
+    once. One gate per provider (`rate_gate`) because a limit belongs to an API key.
+    Sleeps in slices of at most `MAX_WAIT_S` so a cancelled job is not held for long.
+    """
+
+    MAX_WAIT_S = 60.0
+
+    def __init__(
+        self,
+        *,
+        clock: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+    ) -> None:
+        self._clock = clock
+        self._sleep = sleep
+        self._until = 0.0
+        self._lock = threading.Lock()
+
+    def pause(self, seconds: float) -> None:
+        """No request is sent for `seconds` (the longest pause already set stays)."""
+        if not 0 < seconds <= self.MAX_WAIT_S:
+            return
+        with self._lock:
+            self._until = max(self._until, self._clock() + seconds)
+
+    def remaining(self) -> float:
+        with self._lock:
+            return max(0.0, self._until - self._clock())
+
+    def wait(self) -> float:
+        """Block until the pause is over; returns the seconds waited (0 when none)."""
+        waited = 0.0
+        while (left := self.remaining()) > 0:
+            self._sleep(left)
+            waited += left
+        return waited
+
+
+_GATES: dict[str, RateGate] = {}
+_GATES_LOCK = threading.Lock()
+
+
+def rate_gate(provider: str) -> RateGate:
+    """The process's gate for one provider ("openai", "anthropic")."""
+    with _GATES_LOCK:
+        gate = _GATES.get(provider)
+        if gate is None:
+            gate = _GATES[provider] = RateGate()
+        return gate
 
 
 UNTRUSTED_NOTICE = (

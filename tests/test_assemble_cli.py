@@ -230,7 +230,9 @@ def test_run_cap_is_named_as_the_max_usd_cap(pdf, tmp_path, pipeline, monkeypatc
 
 def test_a_small_run_cap_suggests_fewer_steps_at_once(pdf, tmp_path, pipeline, monkeypatch, capsys):
     """Each step in flight holds a worst-case reservation against --max-usd, so with a
-    small cap the reservations, not the spend, stop the run."""
+    small cap the reservations, not the spend, stop the run. Without --concurrency the
+    run takes only as many steps as the cap can hold, so it needs no hint; one asked for
+    explicitly is used as it is."""
     monkeypatch.setattr(
         models,
         "make_vision_client",
@@ -238,6 +240,9 @@ def test_a_small_run_cap_suggests_fewer_steps_at_once(pdf, tmp_path, pipeline, m
         raising=False,
     )
     assert run(pdf, "--out", tmp_path / "o.html", "--max-usd", "0.0001") == 0
+    assert "try --concurrency" not in capsys.readouterr().out  # already one at a time
+    args = ("--max-usd", "0.0001", "--concurrency", "4")
+    assert run(pdf, "--out", tmp_path / "q.html", *args) == 0
     assert "with a small --max-usd try --concurrency 1" in capsys.readouterr().out
     args = ("--max-usd", "0.0001", "--concurrency", "1")
     assert run(pdf, "--out", tmp_path / "p.html", *args) == 0
@@ -257,7 +262,8 @@ def test_concurrency_is_passed_to_the_pipeline(pdf, tmp_path, pipeline, monkeypa
     monkeypatch.setattr(run_module, "convert_pdf", recording)
     assert run(pdf, "--out", tmp_path / "a.html", "--fake") == 0
     assert run(pdf, "--out", tmp_path / "b.html", "--fake", "--concurrency", "1") == 0
-    assert seen == [4, 1]
+    assert run(pdf, "--out", tmp_path / "c.html", "--fake", "--concurrency", "16") == 0
+    assert seen == [8, 1, 16]  # MODEL_CONCURRENCY by default, as asked when asked
 
 
 @pytest.mark.parametrize("value", ["0", "-1", "17", "two", "1.5"])

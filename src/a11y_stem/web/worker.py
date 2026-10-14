@@ -84,6 +84,7 @@ from sqlalchemy.orm import Session, sessionmaker
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
 from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
+from a11y_stem.ops import limits
 from a11y_stem.web import events
 from a11y_stem.web.database import rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
@@ -139,8 +140,8 @@ PROGRESS_WRITE_S = 2.0
 class Converter(Protocol):
     """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments.
 
-    The optional arguments (`tracer`, `options`, `stage_progress`) are passed only when
-    set (`Worker._converter_kwargs`), so a fake without them works in every other case.
+    The optional arguments (`tracer`, `options`, `stage_progress`, `concurrency`) are passed
+    only when set (`Worker._converter_kwargs`), so a fake without them works in every other case.
     """
 
     def __call__(
@@ -154,6 +155,7 @@ class Converter(Protocol):
         tracer: Tracer | None = None,
         options: ConversionOptions | None = None,
         stage_progress: StageProgressFn | None = None,
+        concurrency: int = ...,
     ) -> ConversionOutput: ...
 
 
@@ -376,6 +378,9 @@ class Worker:
             largest_reservation_usd(settings) if headroom_usd is None else headroom_usd
         )
         self.tracer = tracer  # None: the converter's own default (no tracing)
+        # The dearest reservation any enabled step can hold (steps' own sizes, the optional
+        # ones included): what one more concurrent step may need.
+        self._largest_usd = limits.largest_reservation_usd(settings)
         self._stop = threading.Event()
         self._thread: threading.Thread | None = None
         self._current: _Attempt | None = None
@@ -634,7 +639,30 @@ class Worker:
         if _accepts(self.converter, "stage_progress"):
             kwargs["stage_progress"] = self._stage_progress(attempt)
 
+        # concurrency: `MODEL_CONCURRENCY` steps at once, fewer when what is left of the
+        # job's cap or of today's cap could not hold that many reservations.
+        if _accepts(self.converter, "concurrency"):
+            kwargs["concurrency"] = self._concurrency(attempt)
+
         return kwargs
+
+    def _concurrency(self, attempt: _Attempt) -> int:
+        """Steps this attempt may run at once (`ops.limits.affordable_concurrency`)."""
+        from a11y_stem.ops.limits import affordable_concurrency
+
+        daily_left: float | None = None
+        snapshot = getattr(self.guard, "snapshot", None)
+        if callable(snapshot):
+            try:
+                daily_left = snapshot().remaining_usd
+            except Exception as exc:  # the settings' number is the answer without a snapshot
+                log_exception(logger, "concurrency_snapshot_failed", exc)
+        return affordable_concurrency(
+            self.settings,
+            budget_usd=attempt.budget.max_usd,
+            daily_left_usd=daily_left,
+            largest_usd=self._largest_usd,
+        )
 
     # ------------------------------------------------------------------ live progress
 

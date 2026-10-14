@@ -6,11 +6,13 @@ for this run, and `MAX_USD_PER_JOB` / `MAX_MODEL_CALLS_PER_JOB` cap the job. `--
 uses the offline fake model client instead (no API key, nothing billed); its answers are
 placeholders, so the HTML then opens with a note saying it is an offline test run.
 
-`--concurrency` (default 4) is how many model steps run at once. Each one reserves its
-worst-case cost before its request is sent and settles to the real cost afterwards, so
-with a small `--max-usd` the concurrent reservations, not the spend, fill the cap: at 4
-steps of about $0.02 worst case each, a $0.10 cap refused a call after $0.016 had been
-spent. For a small cap, lower the concurrency (1 reserves one call at a time).
+`--concurrency` is how many model steps run at once. Each one reserves its worst-case
+cost before its request is sent and settles to the real cost afterwards, so with a small
+`--max-usd` the concurrent reservations, not the spend, fill the cap: at 4 steps of about
+$0.02 worst case each, a $0.10 cap refused a call after $0.016 had been spent. Without the
+option the number is `MODEL_CONCURRENCY` (8), lowered to what the cap can hold
+(`ops.limits.affordable_concurrency`); given, it is used as it is (1 reserves one call at
+a time).
 
 A real run checks its setup before converting anything: no API key for the provider
 (OPENAI_API_KEY, or ANTHROPIC_API_KEY with MODEL_PROVIDER=anthropic) or a model
@@ -47,8 +49,7 @@ FAKE_NOTICE = (
 )
 
 
-# Same default as pipeline.run.convert_pdf and the web worker.
-DEFAULT_CONCURRENCY = 4
+# The most `--concurrency` takes; the default is `Settings.model_concurrency`.
 MAX_CONCURRENCY = 16
 
 
@@ -104,9 +105,10 @@ def register(
     convert.add_argument(
         "--concurrency",
         type=_positive_int,
-        default=DEFAULT_CONCURRENCY,
-        help="model steps run at once (default %(default)s); each reserves its worst-case "
-        "cost from --max-usd until it settles, so a small cap fills sooner with more",
+        default=None,
+        help="model steps run at once (default: MODEL_CONCURRENCY, lowered to what --max-usd "
+        "can hold); each reserves its worst-case cost from --max-usd until it settles, so a "
+        "small cap fills sooner with more",
     )
     convert.add_argument("--report", type=Path, help="also write the full result as JSON")
     convert.add_argument(
@@ -250,7 +252,7 @@ def _print_summary(
     *,
     fake: bool,
     cap_usd: float,
-    concurrency: int = DEFAULT_CONCURRENCY,
+    concurrency: int,
 ) -> None:
     result, stats = output.result, output.result.stats
     kinds = {k: sum(1 for e in result.elements if e.kind is k) for k in Kind}
@@ -333,6 +335,13 @@ def _convert(args: argparse.Namespace) -> int:
     pages = _parse_pages(args.pages, _page_count(pdf_bytes, args.pdf), args.pdf)
 
     cap_usd = settings.max_usd_per_job if args.fake else args.max_usd
+    concurrency = args.concurrency
+    if concurrency is None:
+        from a11y_stem.ops.limits import affordable_concurrency
+
+        concurrency = affordable_concurrency(
+            settings, budget_usd=min(cap_usd, settings.max_usd_per_job)
+        )
     budget = JobBudget(
         guard=InMemorySpendGuard(cap_usd=cap_usd),
         max_usd=settings.max_usd_per_job,
@@ -351,7 +360,7 @@ def _convert(args: argparse.Namespace) -> int:
             pages=pages,
             progress=_progress,
             tracer=tracer,
-            concurrency=args.concurrency,
+            concurrency=concurrency,
             notice=FAKE_NOTICE if args.fake else None,
         )
     except FATAL_ERRORS as exc:  # the client's own setup failed on its first request
@@ -380,7 +389,7 @@ def _convert(args: argparse.Namespace) -> int:
         axe,
         fake=args.fake,
         cap_usd=min(cap_usd, settings.max_usd_per_job),
-        concurrency=args.concurrency,
+        concurrency=concurrency,
     )
     print(f"wrote {args.out}")
     if args.report:

@@ -27,8 +27,9 @@ ANTHROPIC_CHEAP_MODEL = "claude-haiku-5-5"
 Provider = Literal["openai", "anthropic"]
 # The job spend caps differ by provider, because a call's worst-case reservation does: about
 # $0.03 on gpt-6.1-sol, about $0.14 on claude-opus-5-5 ($0.22 with long descriptions; a
-# 2,048-token thinking allowance and the crop's size). Four calls are held at once, so a
-# one-page job needs about $0.57 on Claude ($0.88 with long descriptions). Used for a cap
+# 2,048-token thinking allowance and the crop's size). Up to `model_concurrency` (8) calls are
+# held at once; a one-page job holds as many as its cap allows, seven on Claude and four with
+# long descriptions (`ops.limits.affordable_concurrency`). Used for a cap
 # the environment does not set (`Settings._provider_limits`); the measurements and the
 # reasoning are in docs/deploy.md, "Spend limits".
 PROVIDER_LIMIT_DEFAULTS: dict[str, dict[str, float]] = {
@@ -84,6 +85,14 @@ class Settings(BaseSettings):
     anthropic_refusal_fallback: bool = True
     model_timeout_s: float = Field(default=60.0, gt=0)
     model_max_retries: int = Field(default=2, ge=0, le=5)
+    # How many equation, figure and table steps of one conversion run at once (model calls
+    # are I/O-bound; each holds a worst-case spend reservation while its request is out).
+    # 8 shortens a dense document by about 40% against 4 (docs/deploy.md, "Concurrency").
+    # The web worker lowers it for a job whose caps could not hold that many reservations
+    # (`ops.limits.affordable_concurrency`), and a 429 pauses every request of the process
+    # for the provider's retry-after (`models.base.RateGate`). Proof and eval runs keep
+    # their own registered setting (4); this one is for the app and the convert command.
+    model_concurrency: int = Field(default=8, ge=1, le=16)
     # Confidence at or above which a validated fix is accepted without review.
     auto_accept_confidence: float = Field(default=0.85, ge=0, le=1)
     # Below this the step abstains instead of proposing a fix.

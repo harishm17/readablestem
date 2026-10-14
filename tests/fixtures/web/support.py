@@ -196,9 +196,16 @@ class FakeConverter:
         progress=None,
         options=None,
         stage_progress=None,
+        concurrency=None,
     ) -> ConversionOutput:
         self.calls.append(
-            {"pdf": pdf_bytes, "settings": settings, "client": client, "options": options}
+            {
+                "pdf": pdf_bytes,
+                "settings": settings,
+                "client": client,
+                "options": options,
+                "concurrency": concurrency,
+            }
         )
         if progress is not None:
             progress(1, 1)

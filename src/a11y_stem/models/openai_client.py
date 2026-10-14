@@ -75,7 +75,7 @@ from pydantic import ValidationError
 from a11y_stem.config import Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation
 from a11y_stem.core.types import ModelCall, Outcome
-from a11y_stem.models.base import T, VisionRequest, fence_untrusted
+from a11y_stem.models.base import T, VisionRequest, fence_untrusted, rate_gate
 from a11y_stem.models.pricing import cost_usd, estimate_max_cost_usd
 from a11y_stem.observability.logging import log_fields
 
@@ -198,6 +198,8 @@ class OpenAIVisionClient:
             max_output_tokens=request.max_output_tokens,
         )
         started = time.perf_counter()
+        gate = rate_gate("openai")
+        gate.wait()  # after a 429 anywhere in this process, wait out its retry-after
         reservation = self._budget.reserve(estimate)  # BudgetExceeded: nothing was sent
         replies: list[_Reply] = []
         charged = 0.0
@@ -222,6 +224,10 @@ class OpenAIVisionClient:
                 )
                 break
             delay = _retry_delay_s(len(replies), reply.retry_after_s)
+            if reply.status == 429:
+                gate.pause(
+                    delay
+                )  # the other steps in flight wait too, instead of each being refused
             _log_retry(request, reply, sends=len(replies), delay_s=delay)
             try:
                 _sleep(delay)

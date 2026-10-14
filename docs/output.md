@@ -746,14 +746,16 @@ When a limit stops the run, the summary names it, e.g. `Budget: stopped early
 which reports the scope `daily` because it stands in for the web app's daily cap.
 `--out` and `--report` may not be the input PDF or each other.
 
-`--concurrency` (default 4, at most 16) is how many equation and figure steps run at
+`--concurrency` (at most 16; default `MODEL_CONCURRENCY`, 8, lowered to what `--max-usd`
+can hold) is how many equation and figure steps run at
 once. Every model request first reserves its worst-case cost and settles to the real
 cost when it returns, so the reservations of the steps in flight count against
 `--max-usd` until they settle. A small cap therefore fills before it is spent: with
 `--max-usd 0.10` and 4 steps of about $0.02 worst case each, a real run refused a call
-after $0.016 of real spend. When the run cap stops a real run with more than one step at
-once, the summary says so and suggests `--concurrency 1`, which reserves one call at a
-time.
+after $0.016 of real spend. That is why the default follows the cap; a number given with
+`--concurrency` is used as it is, and when the run cap then stops a real run with more
+than one step at once, the summary says so and suggests `--concurrency 1`, which reserves
+one call at a time.
 
 ## Engineering limits (input for the known-limits copy)
 
