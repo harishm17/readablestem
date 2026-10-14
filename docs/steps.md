@@ -633,6 +633,10 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde" |
 | Functions | "sine", "cosine", "natural log", ... |
 | Tables | "row 1: ...; row 2: ..." when there are several rows; cells of an aligned equation read as one line, matrix cells are comma-separated |
+| Matrices | a table inside parentheses or brackets: "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix"; one column "the 3 by 1 column matrix", one row "the 1 by 3 row matrix"; inside bars "the 2 by 2 determinant; ...; end determinant". A single fenced cell, an aligned table and brace-fenced tables are not matrices |
+| Cases | a table after an opening brace with no closing one: "cases: case 1: x squared, if x greater than 0; case 2: 0, otherwise; end cases". The second cell is the condition; "if" is added unless it starts with if, for, when, otherwise, ... |
+| Nuclides | scripts on an empty base before an element or particle: "carbon 14, atomic number 6", "uranium 235, atomic number 92", "neutron, mass number 1, atomic number 0", "electron, ... atomic number minus 1". Unknown letters read as written (`speech_nuclides.py`) |
+| Units | upright letters or text right after a number: "5 m/s" reads "5 meters per second", "9.8 m/s^2" "9.8 meters per second squared", "3 kg·m/s" "3 kilogram meters per second", "2.9 m/s" "2.9 meters per second", "25 °C" "25 degrees Celsius"; singular after 1. Italic letters (a variable `m`), ambiguous divisions (`J/kg K`) and unknown symbols read as before (`speech_units.py`) |
 | Text | verbatim, except words that are a single maths symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
 
@@ -759,10 +763,10 @@ check found a possible mismatch" or "found no contradiction", never "verified".
 **OpenAI only.** The Decisions API belongs to OpenAI, so this check runs only with
 `MODEL_PROVIDER=openai`. With the Anthropic provider it is skipped cleanly
 (`verifier.any_check_enabled` is false whatever the `DECISIONS_*` settings say): no verifier
-is built, no request goes to OpenAI, no OpenAI key is needed, figures get no optional note,
-equations no shadow, and the daily canary is not due. Fixes then carry no `verifications`.
-(Keeping it on OpenAI when an OpenAI key is also configured was rejected: it would send the
-same images to a second company.)
+is built, no request goes to OpenAI, no OpenAI key is needed, and its daily canary is not
+due. Under Claude the job carries the Claude check instead (next section, T2-20), through
+the same `Verifier` protocol. (Keeping the Decisions check on OpenAI when an OpenAI key is
+also configured was rejected: it would send the same images to a second company.)
 
 Code: `models/verifier.py` (the narrow `Verifier` protocol, its content-free
 `VerifierVerdict(probabilities, reason_code)`, the question wording, `FakeVerifier`),
@@ -837,3 +841,77 @@ crops are at most 5% (docs/eval.md "Second automated check").
 | `tests/test_web_second_check_review.py` | the wording around the note on the review screen and the job page: worth a look, never "something small" or "nothing to do" |
 | `tests/test_web_second_check_browser.py` | `browser`: the note on the review screen under Optional checks; axe-core at 1280 and 320 CSS px |
 | `tests/test_decisions_live.py` | `live_model`: four real requests (about $0.0002) |
+
+## Second check on Claude (T2-20)
+
+Under `MODEL_PROVIDER=anthropic` alt text and equations had no second look. The Claude check
+(`models/claude_verifier.py`) is a `Verifier` like the Decisions one, so the steps, the
+aggregates (`verify:*` counts), the eval metrics (`eval.verifier_metrics`) and the review
+screen's optional note work unchanged. It asks a Claude model that did not read the page,
+with an audit prompt, whether the proposal matches the image.
+
+**Independent of the first pass** in three ways: a different model (`CLAUDE_CHECK_MODEL`,
+claude-sonnet-5-5; the first pass is claude-haiku-5-5 and claude-opus-5-5, and
+`anthropic_effort_for` gives it its own effort `CLAUDE_CHECK_EFFORT`, low); a different
+prompt (`models/prompts/check_figure.md`, `check_equation.md`: "you audit text someone else
+wrote", the image first, no confidence field to echo); and it never sees the first pass's
+confidence or reasoning, only the proposal (alt text and caption, or LaTeX) fenced as data.
+
+| | Figures | Equations |
+|---|---|---|
+| Output (structured) | `conveys_key_information`, `contradicts_image`, `problem` (a code) | `verdict` (`match`, `cosmetic`, `meaning_changing`), `difference` (a code) |
+| As answer codes | `ok` 1/0, `factual_error` 1/0 (no calibrated probabilities from Claude: a vote, not a measurement) | `match`, `cosmetic`, `meaning_changing` one-hot |
+| Flagged when | min(ok, 1 - factual_error) < `DECISIONS_FIGURE_FLAG_BELOW` (0.5): either answer is bad | `meaning_changing` >= `DECISIONS_EQUATION_FLAG_AT` (0.2) |
+| Asked about | an ACCEPTED, non-decorative figure with alt text | the final proposal of an ACCEPTED equation (`CLAUDE_CHECK_SCOPE=accepted`, default; `all` adds those already waiting for review) |
+
+**`CLAUDE_SECOND_CHECK`** (default **`shadow`**): `off` asks nothing. `shadow` asks, records
+a `Verification` with mode `shadow` and its `flagged` verdict, and changes nothing: no
+check, no note, no status, no review tier, no escalation. `enforce` (off by default) is for
+figures only: a flag adds the same optional `figure.second_check` note as the Decisions
+check (`second_check_mismatch`, review "optional", never required, never a status
+change). Equations stay shadow whatever the setting. Agreement is therefore read from the
+records: of the elements the first pass accepted, the share the check did not flag, in
+`ops report` (the `verify:*` counts) and `eval pipeline` (`second_check`).
+
+**Cost and safety.** Every request reserves its worst case through the job's `JobBudget`
+in dollars only (`count_calls=False` on the check's own `AnthropicVisionClient`): it counts
+against the job and daily dollar caps, never against the job's model-call cap, so it
+cannot use up the calls a later element needs. One send, no retries, `CLAUDE_CHECK_TIMEOUT_S`
+(45 s). Fail-open: an error, a timeout, a refusal, invalid output, a missing key or no
+budget leaves the fix as it would be without the check and records the outcome code.
+Document text travels only in `context_text` (fenced by the client after `fence_data`).
+Not part of a proof: `proof.runner.live_client` leaves Claude proof recordings without it,
+because a recording must replay exactly.
+
+**Measured (2026-10-14, claude-sonnet-5-5, low effort, dev part of dev-v2, one run each,
+total live spend $0.74 of the $3 cap).**
+
+| Run | What | Result |
+|---|---|---|
+| `convert` of 9 pages of 4 authored dev documents (matrices, chemistry, equation pictures, slides), scope `all` | 136 equation + 18 equation-picture ("figure") checks | all 154 answered; of the 93 the first pass **accepted**, the check flagged 3 (**96.8% agree**); of the 61 it sent to review it flagged 16 (26%): the two passes doubt the same elements |
+| `eval pipeline --task equations` (48-item stride sample) | 47 answered | flagged 2 (4.3%); both equal the gold LaTeX (apparent false flags); 0 of the 18 the scorer calls wrong flagged, most of those are notation differences with the same meaning (`array` vs `aligned`, `\text` vs `\mathrm`); one probable real miss (a dropped "?") was not flagged |
+| `eval pipeline --task figures` (8-item stride sample) | judged by claude-opus-5-5 | the judge passed all 8; the check flagged 1: raw agreement 7/8 |
+| Cost per check | 154 + 47 + 8 checks | equations $0.0007-0.0009 (about 1,200 input tokens), figures $0.0014-0.0026 |
+| Cost per page | 9 pages, scope `all` | $0.015 a page (27% of the $0.055 a page the conversion cost); default scope `accepted`: **$0.009 a page** (the 93 accepted checks cost $0.080) |
+| Latency | 154 checks | median 1.3 s, p90 2.1 s, slowest 11.8 s |
+
+Read this as plumbing and cost, not as proof of accuracy: no human labels exist for these
+disagreements, the sample is small, and "agreement with the first pass" says nothing about
+whether both are right. It becomes a gate (`enforce` for figures, anything for equations)
+only after the disagreements are looked at by a person and false flags on real crops are
+at most 5%, the same bar as the Decisions check.
+
+**Claude canary** (`ops/claude_canary.py`): the Decisions canary compares a deterministic
+API with recorded answers; Claude is not deterministic, so this one asks the check about 12
+fixed synthetic cases (the figure and equation cases of `canary_requests.json`) whose
+answer is known by construction (`SHOULD_FLAG`) and counts the cases it gets wrong. More
+than `CLAUDE_CANARY_MAX_MISSES` (1) is drift: one ERROR line `claude_canary_drift`. At most
+once a day in the hourly cron (claim row `canary/claude:run`, counts `claude:<status>`),
+fail-open, off with `CLAUDE_CANARY=false`, never with `ENV=test`, `FAKE_MODELS`, another
+provider or `CLAUDE_SECOND_CHECK=off`. By hand: `a11y-stem ops claude-canary --max-usd 0.25`
+(exit 0, 1 drift, 2 could not run). First live run: 12 of 12 right, $0.0166.
+
+| Test file | What it covers |
+|---|---|
+| `tests/test_models_claude_verifier.py` | independence (model, prompt, effort), the request, answer codes, fail-open, the factories and modes, shadow vs enforce in the steps, scope |
+| `tests/test_ops_claude_canary.py` | known cases, tolerated misses and drift, fail-open, once a day, the counts, the CLI |

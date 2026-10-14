@@ -127,7 +127,13 @@ def _attributes(node: XmlElement) -> str:
     return "".join(kept)
 
 
-def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = None) -> str | None:
+def sanitize_mathml(
+    mathml: str,
+    *,
+    display: Display,
+    element_id: str | None = None,
+    alttext: str | None = None,
+) -> str | None:
     """Re-serialise MathML from an allowlisted tree, or None if it cannot be shown.
 
     The input comes from a converter fed by model output, or from a reviewer's edit, so
@@ -136,6 +142,8 @@ def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = N
     back, with all text escaped. Unknown attributes are dropped; an unknown element
     rejects the whole equation (the caller then shows the original image). `display`
     is forced to where the equation is placed; `element_id` becomes the root id.
+    `alttext` (plain text, already checked by the caller) becomes the root's `alttext`
+    attribute, escaped; blank means none.
     """
     try:
         root = SafeET.fromstring(mathml, forbid_dtd=True)
@@ -153,4 +161,5 @@ def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = N
     if not writer.has_text:  # nothing a screen reader could speak
         return None
     id_attr = f' id="{escape_text(element_id)}"' if element_id else ""
-    return f'<math display="{display}"{id_attr}>{inner}</math>'
+    alt_attr = f' alttext="{escape_text(alttext)}"' if alttext and alttext.strip() else ""
+    return f'<math display="{display}"{id_attr}{alt_attr}>{inner}</math>'

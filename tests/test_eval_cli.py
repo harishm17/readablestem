@@ -445,7 +445,7 @@ def test_provider_anthropic_runs_with_claude_and_the_report_records_it(
     class StubAnthropicVisionClient(FakeVisionClient):
         def __init__(self, settings, budget, **kw):
             super().__init__(budget=budget)
-            built.append((settings, budget))
+            built.append((settings, budget, kw))
 
     from a11y_stem.models import anthropic_client
 
@@ -453,7 +453,11 @@ def test_provider_anthropic_runs_with_claude_and_the_report_records_it(
     monkeypatch.setattr(eval_cli, "_settings", lambda: settings(anthropic_api_key="sk-ant-test"))
     args = pipeline_args(gold, tmp_path, "--provider", "anthropic", "--max-usd", "1.5")
     assert main(args) == 0
-    ((used, budget),) = built
+    # The Claude second check's client (dollars only, no calls) is built first, then the
+    # run's own, which carries it.
+    (_, check_budget, check_kw), (used, budget, own_kw) = built
+    assert check_budget is budget and check_kw == {"count_calls": False}
+    assert "verifier" in own_kw
     assert (used.model_provider, used.main_model, used.cheap_model) == (
         "anthropic",
         "claude-opus-5-5",

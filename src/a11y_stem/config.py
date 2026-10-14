@@ -117,6 +117,35 @@ class Settings(BaseSettings):
     # most once per UTC day; an answer that moves by more than 0.02 logs an ERROR.
     decisions_canary: bool = True
 
+    # --- second automated check on Claude (T2-20; docs/steps.md "Second check on Claude")
+    # The Decisions API above is OpenAI's, so under MODEL_PROVIDER=anthropic alt text and
+    # equations had no second look. This one asks a different Claude model (not the one
+    # that read the page), with a different prompt written as an audit (prompts
+    # `check_figure.md`, `check_equation.md`), whether the proposal matches the image.
+    #   off     - never asked;
+    #   shadow  - asked and recorded (agreement is counted in the aggregates and the eval),
+    #             nothing about the output changes. The default;
+    #   enforce - figures only: a flagged alt text gets the optional note "a second
+    #             automated check found a possible mismatch", as the Decisions check does.
+    #             Never a required decision, never a status change. Equations stay shadow.
+    claude_second_check: Literal["off", "shadow", "enforce"] = "shadow"
+    # Must not be the model that read the page (the cheap and main models) for the check to
+    # be independent; sonnet is neither by default.
+    claude_check_model: str = "claude-sonnet-5-5"
+    claude_check_effort: Effort = "low"
+    # Which equations the check looks at: "accepted" (the proposals that reach a student
+    # without a person's decision, which is what a second look is for; figures are always
+    # only accepted ones) or "all" (also those already waiting for review: more spend, used
+    # to measure the check against the first pass's own doubt).
+    claude_check_scope: Literal["accepted", "all"] = "accepted"
+    # A slow check is skipped (fail-open), it never holds up a conversion; no retries.
+    claude_check_timeout_s: float = Field(default=45.0, gt=0)
+    # Daily canary of the Claude check on fixed synthetic cases with known answers
+    # (ops/claude_canary.py); about 12 requests, at most once per UTC day.
+    claude_canary: bool = True
+    # More cases than this answered against their known truth is drift (an ERROR line).
+    claude_canary_max_misses: int = Field(default=1, ge=0)
+
     # --- cost and abuse limits (no defaults for the money ones on purpose)
     # MAX_USD_PER_JOB and MAX_USD_PER_PAGE: the values below are OpenAI's; with
     # MODEL_PROVIDER=anthropic, a value the environment does not set becomes the Claude
@@ -195,6 +224,12 @@ class Settings(BaseSettings):
     # Per-course notation memory: hints for the equation step, spoken readings, bold
     # letters in running text as maths, "remember for this course" on the review screen.
     feature_notation_memory: bool = False
+    # Write each converted equation's stored speech text (`pipeline.speech`, the reading
+    # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
+    # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some
+    # screen readers read `alttext` in place of the maths structure, which would take
+    # away navigation inside the equation. Steps: docs/mathml-alttext.md.
+    mathml_alttext: bool = False
 
     # --- tracing (off by default; never on for private-inputs/ runs)
     tracing_enabled: bool = False
@@ -297,6 +332,8 @@ class Settings(BaseSettings):
 
     def anthropic_effort_for(self, model: str) -> Effort:
         """The effort to ask `model` for: the main model's, else the cheap model's."""
+        if model == self.claude_check_model and model not in {self.main_model, self.cheap_model}:
+            return self.claude_check_effort
         return (
             self.anthropic_effort_main if model == self.main_model else self.anthropic_effort_cheap
         )

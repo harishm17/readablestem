@@ -1,5 +1,5 @@
 """CLI commands: a11y-stem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
-report|export-opted-in|decisions-canary.
+report|export-opted-in|decisions-canary|claude-canary.
 
 The same tasks the web app runs on Cloud Scheduler's hourly call, for running by hand or
 from a Cloud Run job. Output is counts only, as `key=value` pairs on one line; database
@@ -8,6 +8,7 @@ errors are reported by type, because their messages can include connection detai
 app and whether dump-and-restore works; they print table names and counts only.
 `decisions-canary` is the Decisions API drift canary the hourly cron runs once a day
 (ops/canary.py); by hand it needs no database, only a key and `--max-usd`.
+`claude-canary` is the same for the Claude second check (ops/claude_canary.py).
 """
 
 from __future__ import annotations
@@ -84,6 +85,15 @@ def register(
         "--expected", type=Path, help="expected-answers file (default: the committed one)"
     )
     canary.set_defaults(func=_cmd_decisions_canary)
+    claude = sub.add_parser(
+        "claude-canary",
+        help="ask the Claude second check about the fixed synthetic cases with known answers "
+        "(about $0.04; exit 1 on drift)",
+    )
+    claude.add_argument(
+        "--max-usd", type=_positive_usd, required=True, help="hard spend cap for this run"
+    )
+    claude.set_defaults(func=_cmd_claude_canary)
 
 
 def _positive_usd(value: str) -> float:
@@ -242,6 +252,36 @@ def _cmd_export(args: argparse.Namespace) -> int:
     print(f"jobs={stats.jobs} crops={stats.crops} labels={stats.labels}")
     print("delete them by their EXPIRES date: a11y-stem ops export-opted-in --prune DIR")
     return 0
+
+
+def _cmd_claude_canary(args: argparse.Namespace) -> int:
+    """Exit 0: the check got the known cases right (within the tolerated misses); 1: drift
+    (also an ERROR log line); 2: could not run (no key, a case without an answer)."""
+    from a11y_stem.config import ConfigError, get_settings
+    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from a11y_stem.models.claude_verifier import make_claude_verifier
+    from a11y_stem.observability.logging import configure_logging
+    from a11y_stem.ops import claude_canary
+
+    settings = get_settings()
+    configure_logging(settings)
+    try:
+        settings.require_anthropic_key()  # the key itself is never printed
+    except ConfigError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    budget = JobBudget(InMemorySpendGuard(cap_usd=args.max_usd), max_usd=args.max_usd, max_calls=0)
+    result = claude_canary.run_canary(make_claude_verifier(settings, budget), settings)
+    for case in result.missed:
+        print(f"missed case={case}")
+    for case, reason in result.failed:
+        print(f"failed case={case} reason={reason}")
+    claude_canary.report(result, source="cli")
+    print(
+        f"cases={result.cases} answered={result.answered} missed={len(result.missed)} "
+        f"failed={len(result.failed)} cost_usd={result.cost_usd:.6f} status={result.status}"
+    )
+    return {"ok": 0, "drift": 1}.get(result.status, 2)
 
 
 def _cmd_decisions_canary(args: argparse.Namespace) -> int:

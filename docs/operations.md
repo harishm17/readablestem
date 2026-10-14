@@ -9,6 +9,7 @@ goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
 |---|---|---|
 | Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
 | Decisions canary | At most once per UTC day, inside the hourly cron, after the purge | `ops.canary.maybe_run_daily`: 20 fixed requests to the Decisions API, compared with committed answers; `decisions_canary_drift` (ERROR) on any move over 0.02. See "Decisions canary" below |
+| Claude canary | At most once per UTC day, inside the hourly cron, after the Decisions canary | `ops.claude_canary.maybe_run_daily`: the Claude second check asked about 12 synthetic cases with known answers; `claude_canary_drift` (ERROR) when more than `CLAUDE_CANARY_MAX_MISSES` are wrong. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the scheduler is late |
 | Uptime check of `/readyz` | Every 5 minutes, Cloud Monitoring | Emails `ALERT_EMAIL` when the database, the worker thread or the model provider setting is not ok for 10 minutes |
 | Cron alerts | Cloud Monitoring (log-based metrics) | Emails `ALERT_EMAIL` when there is no `cron_done` for 2 hours, or on any `cron_refused`, `aggregate_failed`, `purge_backstop_deleted`, `purge_backstop_failed` or failed Cloud Scheduler attempt |
@@ -203,6 +204,7 @@ resource.labels.service_name="a11y-stem"`):
 | Tracing problems | `jsonPayload.message=("tracing_disabled" OR "trace_failed")` |
 | Handwritten and scanned PDFs refused at upload (they never become jobs, so the `page_type` aggregates cannot count them) | `jsonPayload.message="upload_rejected" AND jsonPayload.code=("handwritten" OR "handwritten_no_text" OR "scanned" OR "scanned_ocr")` |
 | Decisions API | `jsonPayload.message=("decision_call" OR "verifier_unavailable")` (failures are WARNING; `outcome`, `status`, `code`, `request_id`) |
+| Claude canary | `jsonPayload.message=("claude_canary_ok" OR "claude_canary_drift" OR "claude_canary_incomplete" OR "claude_canary_failed")`, and `jsonPayload.claude_canary` on `cron_done` |
 | Decisions canary | `jsonPayload.message=("decisions_canary_ok" OR "decisions_canary_drift" OR "decisions_canary_incomplete" OR "decisions_canary_failed")`, and `jsonPayload.decisions_canary` on `cron_done` |
 
 ### What can never be in a log line

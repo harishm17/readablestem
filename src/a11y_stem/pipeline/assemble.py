@@ -49,6 +49,7 @@ import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
 from a11y_stem import __version__
+from a11y_stem.config import get_settings
 from a11y_stem.core.types import (
     HEADING_REPEATS_ABOVE,
     KEPT_ORIGINAL_STATUSES,
@@ -373,6 +374,18 @@ def _equation_label(label: str | None) -> str:
 WIDE_EQUATION_EM = 11.0
 
 
+# Longest speech written as alttext. A reading cut short would mislead more than none, so a
+# longer one is left out and the screen reader reads the MathML itself.
+MAX_ALTTEXT_CHARS = 300
+
+
+def alttext_from_speech(speech: str | None) -> str | None:
+    """The stored speech as an `alttext` value (one line of text), or None when there is
+    none or it is too long to be a useful label."""
+    text = " ".join((speech or "").split())
+    return text if text and len(text) <= MAX_ALTTEXT_CHARS else None
+
+
 def _scroller_attrs(mathml: str, label: str | None) -> str:
     """Attributes that make a wide equation's box a named tab stop ("" if not wide).
 
@@ -588,6 +601,8 @@ class _Renderer:
     outline: Outline = field(default_factory=Outline)
     # CSS a feature added for this document (`add_style`), by name.
     styles: dict[str, str] = field(default_factory=dict)
+    # Write the stored speech as each <math>'s alttext (Settings.mathml_alttext).
+    math_alttext: bool = False
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -815,7 +830,10 @@ class _Renderer:
         if fix.equation is None or not fix.equation.mathml.strip():
             return None, "no_output"
         claimed = self.claim_id(element.id) if with_id else None
-        mathml = sanitize_mathml(fix.equation.mathml, display=display, element_id=claimed)
+        alttext = alttext_from_speech(fix.equation.speech) if self.math_alttext else None
+        mathml = sanitize_mathml(
+            fix.equation.mathml, display=display, element_id=claimed, alttext=alttext
+        )
         if mathml is None:
             if claimed:
                 self.used_ids.discard(claimed)  # the flagged fallback carries it instead
@@ -1165,6 +1183,7 @@ def render_html(
     checked_on: date | None = None,
     title_set: bool = False,
     contact: str | None = None,
+    math_alttext: bool | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1181,14 +1200,19 @@ def render_html(
     `title_set`: `title` is the one the instructor chose (T1-7): used as typed, and written
     as the top-level heading too when the body has none. Otherwise the title is
     `suggested_title` of the PDF's. `contact`: the instructor's contact line for the note
-    after `<main>` (T1-17).
+    after `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
+    `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
     """
     ordered = sorted(elements, key=lambda e: e.order)
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
     first_fix: dict[str, Fix] = {}
     for fix in fixes:  # first wins, like DocumentResult.fix_for
         first_fix.setdefault(fix.element_id, fix)
-    renderer = _Renderer(fixes=first_fix, crops=crops, equations=equations)
+    if math_alttext is None:
+        math_alttext = get_settings().mathml_alttext
+    renderer = _Renderer(
+        fixes=first_fix, crops=crops, equations=equations, math_alttext=math_alttext
+    )
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = renderer.render_all(ordered)
     kept_pages = [

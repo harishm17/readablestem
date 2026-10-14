@@ -23,8 +23,13 @@ from __future__ import annotations
 import dataclasses
 
 from a11y_stem.config import Settings
-from a11y_stem.core.types import Fix, Verification
-from a11y_stem.models.verifier import MEANING_CHANGING, VerifierVerdict, verifier_of
+from a11y_stem.core.types import Fix, Status, Verification
+from a11y_stem.models.verifier import (
+    MEANING_CHANGING,
+    VerifierVerdict,
+    equation_check_on,
+    verifier_of,
+)
 
 
 def record(
@@ -37,8 +42,14 @@ def record(
     the final answer is reused for it instead of asking (and paying) twice.
     """
     verifier = verifier_of(client)
-    if verifier is None or not settings.decisions_equation_shadow:
+    if verifier is None or not equation_check_on(settings):
         return fix
+    if (
+        settings.model_provider == "anthropic"
+        and settings.claude_check_scope == "accepted"
+        and fix.status is not Status.ACCEPTED
+    ):
+        return fix  # a person looks at it anyway; the Claude check costs real money
     final_latex = fix.equation.latex if fix.equation is not None else None
     final = verifier.equation_match(png, latex=final_latex) if final_latex else None
     records: list[Verification] = []

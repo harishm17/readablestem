@@ -40,7 +40,7 @@ def test_gold_examples_read_naturally():
     )
     assert mathml_to_speech(gold("2-2-speed-and-velocity/eq-005")) == (
         "row 1: v sub avg equals distance over time; "
-        "row 2: equals 150 km over 3.2 h; row 3: equals 47 km/h"
+        "row 2: equals 150 kilometers over 3.2 hours; row 3: equals 47 kilometers per hour"
     )
     assert mathml_to_speech(gold("2-3-position-vs-time-graphs/eq-000")) == ("y equals m x plus b")
 
@@ -106,7 +106,7 @@ def test_openstax_and_latex_markup_read_the_same():
         # functions and text
         (r"\sin x", "sine x"),
         (r"\ln x", "natural log x"),
-        (r"\text{distance} = 5\ \text{km}", "distance equals 5 km"),
+        (r"\text{distance} = 5\ \text{km}", "distance equals 5 kilometers"),
         # tables
         (
             r"\begin{array}{rcl} a & = & b \\ & = & c \end{array}",
@@ -114,7 +114,7 @@ def test_openstax_and_latex_markup_read_the_same():
         ),
         (
             r"\begin{pmatrix} a & b \\ c & d \end{pmatrix}",
-            "open parenthesis row 1: a, b; row 2: c, d close parenthesis",
+            "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix",
         ),
         (r"\begin{aligned} a &= b \end{aligned}", "a equals b"),
         # sentence punctuation at the end is not read

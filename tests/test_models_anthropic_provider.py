@@ -29,8 +29,9 @@ from a11y_stem.models import (
     make_vision_client,
 )
 from a11y_stem.models.anthropic_client import AnthropicVisionClient
+from a11y_stem.models.claude_verifier import ClaudeVerifier
 from a11y_stem.models.openai_client import OpenAIVisionClient
-from a11y_stem.models.verifier import any_check_enabled, verifier_of
+from a11y_stem.models.verifier import FakeVerifier, any_check_enabled, verifier_of
 from a11y_stem.pipeline.equation_step import transcribe
 from test_steps_support import equation_element, use_fallback_router
 
@@ -193,10 +194,11 @@ def test_live_factory_checks_the_key_first():
         settings(model_provider="anthropic", anthropic_api_key="sk-a"), budget()
     )
     assert isinstance(claude, AnthropicVisionClient)
-    assert verifier_of(claude) is None
+    # The Claude second check (T2-20) is on in shadow mode by default.
+    assert isinstance(verifier_of(claude), ClaudeVerifier)
 
 
-# --- the second automated check is OpenAI's -------------------------------------------
+# --- the second automated check: OpenAI Decisions, or the Claude check -----------------
 
 
 def test_the_decisions_check_is_skipped_with_the_anthropic_provider():
@@ -204,8 +206,14 @@ def test_the_decisions_check_is_skipped_with_the_anthropic_provider():
     assert any_check_enabled(settings(**on))
     claude = settings(model_provider="anthropic", **on)
     assert not any_check_enabled(claude)
-    # Offline too: the fake client carries no verifier, so the steps record nothing.
-    assert verifier_of(make_vision_client(claude, budget(), fake=True)) is None
+    # Offline too: the Claude provider's check is the Claude one (fake offline), not the
+    # Decisions API's, and it names the Claude check model.
+    fake = verifier_of(make_vision_client(claude, budget(), fake=True))
+    assert isinstance(fake, FakeVerifier)
+    assert fake.reported_model == claude.claude_check_model
+    # ... and CLAUDE_SECOND_CHECK=off leaves the job without one.
+    off = settings(model_provider="anthropic", claude_second_check="off", **on)
+    assert verifier_of(make_vision_client(off, budget(), fake=True)) is None
     assert verifier_of(make_vision_client(settings(**on), budget(), fake=True)) is not None
 
 

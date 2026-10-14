@@ -20,6 +20,15 @@ conventions, kept short:
   meaning in place of its style ("vector d" for a bold d the course calls a vector; see
   `readings` below and `pipeline.notation_memory`);
 - tables: "row 1: ...; row 2: ..." (cells of an aligned equation read as one line);
+- matrices: a table inside parentheses or brackets reads "the 2 by 2 matrix; row 1: a, b;
+  row 2: c, d; end matrix" (bars: "determinant"; a column or row of numbers: "column
+  matrix", "row matrix");
+- cases: a table after an opening brace reads "cases: case 1: x squared, if x greater than
+  0; case 2: 0, otherwise; end cases";
+- nuclides: an empty base with mass and atomic number scripts before an element reads
+  "carbon 14, atomic number 6" (`speech_nuclides`);
+- units: upright letters or text after a number read as a unit, "5 m/s" as "5 meters per
+  second" (`speech_units`); an italic letter is a variable and is never a unit;
 - text is read verbatim, except words that are a single maths symbol ("=" -> "equals").
 """
 
@@ -40,6 +49,8 @@ import defusedxml.ElementTree as DET
 
 from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.eval.equations import normalize
+from a11y_stem.pipeline.speech_nuclides import nuclide_words
+from a11y_stem.pipeline.speech_units import unit_words
 
 MAX_DEPTH = 64
 
@@ -465,12 +476,10 @@ def _starts_with_relation(cell: ET.Element) -> bool:
     return first.tag in {"mo", "mtext"} and _text_of(first) in _RELATIONS
 
 
-def _speak_mtable(node: ET.Element) -> list[str]:
-    """Rows as "row N: ..." (only when there are several). Cells of an aligned equation
-    (some cell starts with a relation) read as one line; matrix cells are comma-separated.
-    """
+def _table_cells(node: ET.Element) -> list[list[ET.Element]]:
+    """The non-empty cells of each row of an mtable (a row label is skipped)."""
     rows = [row for row in node if row.tag in {"mtr", "mlabeledtr"}]
-    cells_by_row = [
+    return [
         [
             cell
             for cell in (row[1:] if row.tag == "mlabeledtr" else list(row))
@@ -478,6 +487,13 @@ def _speak_mtable(node: ET.Element) -> list[str]:
         ]
         for row in rows
     ]
+
+
+def _speak_mtable(node: ET.Element) -> list[str]:
+    """Rows as "row N: ..." (only when there are several). Cells of an aligned equation
+    (some cell starts with a relation) read as one line; matrix cells are comma-separated.
+    """
+    cells_by_row = _table_cells(node)
     aligned = any(_starts_with_relation(c) for cells in cells_by_row for c in cells)
     spoken_rows = []
     for cells in cells_by_row:
@@ -489,10 +505,243 @@ def _speak_mtable(node: ET.Element) -> list[str]:
     return [joined]
 
 
+# ------------------------------------------------------------ matrices and cases
+
+_MATRIX_FENCES = {"(": ")", "[": "]", "|": "|", "‖": "‖", "∣": "∣"}
+_BARS = {"|", "‖", "∣"}
+_CASE_WORDS = {"if", "for", "when", "otherwise", "else", "elsewhere", "where", "unless"}
+
+
+def _mo_text(node: ET.Element) -> str | None:
+    return _text_of(node) if node.tag == "mo" else None
+
+
+def _speak_matrix(table: ET.Element, fence: str) -> list[str] | None:
+    """ "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix" for a fenced table, or
+    None when it is not a matrix (an aligned equation, or a single cell)."""
+    cells_by_row = _table_cells(table)
+    if not cells_by_row or any(_starts_with_relation(c) for r in cells_by_row for c in r):
+        return None
+    rows, columns = len(cells_by_row), max(len(r) for r in cells_by_row)
+    if rows * columns < 2:
+        return None
+    kind = "determinant" if fence in _BARS else "matrix"
+    if kind == "matrix" and columns == 1:
+        kind = "column matrix"
+    elif kind == "matrix" and rows == 1:
+        kind = "row matrix"
+    spoken = [
+        ", ".join(p for p in (" ".join(_speak(cell)) for cell in cells) if p)
+        for cells in cells_by_row
+    ]
+    body = "; ".join(f"row {i}: {text}" for i, text in enumerate(spoken, 1))
+    end = "end determinant" if kind == "determinant" else "end matrix"
+    return [f"the {rows} by {columns} {kind}; {body}; {end}"]
+
+
+def _speak_cases(table: ET.Element) -> list[str] | None:
+    """ "cases: case 1: x squared, if x greater than 0; case 2: 0, otherwise; end cases"
+    for a table after an opening brace. A condition that does not start with a word like
+    "if" or "otherwise" gets an "if"."""
+    cases = []
+    for index, cells in enumerate(_table_cells(table), 1):
+        spoken = [text for text in (" ".join(_speak(cell)) for cell in cells) if text]
+        if not spoken:
+            continue
+        value, condition = spoken[0], " ".join(spoken[1:])
+        if condition:
+            first = condition.split()[0].lower().rstrip(",.;:")
+            value += (", " if first in _CASE_WORDS else ", if ") + condition
+        cases.append(f"case {index}: {value}")
+    return [f"cases: {'; '.join(cases)}; end cases"] if cases else None
+
+
+def _fenced_table(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
+    """A matrix or cases at kids[i] (an opening fence, an mtable, then the closing fence
+    for a matrix): the words and how many siblings they cover."""
+    opener = _mo_text(kids[i])
+    if opener is None or i + 1 >= len(kids) or kids[i + 1].tag != "mtable":
+        return None
+    table = kids[i + 1]
+    closer = _mo_text(kids[i + 2]) if i + 2 < len(kids) else None
+    if opener in _MATRIX_FENCES:
+        if closer != _MATRIX_FENCES[opener]:
+            return None
+        words = _speak_matrix(table, opener)
+        return (words, 3) if words else None
+    if opener == "{" and closer != "}":
+        words = _speak_cases(table)
+        # An empty or "." closing fence belongs to the brace.
+        return (words, 3 if closer in {"", "."} else 2) if words else None
+    return None
+
+
+# ------------------------------------------------------------- nuclides and units
+
+_SCRIPTS = {"msub", "msup", "msubsup"}
+
+
+def _is_empty(node: ET.Element) -> bool:
+    return not _text_of(node) and all(_is_empty(child) for child in node)
+
+
+def _letters(node: ET.Element) -> str | None:
+    """The letters of a token or a row of tokens, else None."""
+    if node.tag in {"mi", "mtext"}:
+        return _text_of(node)
+    if node.tag == "mrow" and len(node) and all(c.tag in {"mi", "mtext"} for c in node):
+        return "".join(_text_of(c) for c in node)
+    return None
+
+
+def _number_text(node: ET.Element | None) -> str | None:
+    """An integer printed as one mn, or a sign and an mn ("-1"); else None."""
+    if node is None:
+        return None
+    if node.tag in {"mn", "mtext"}:
+        return _text_of(node) or None
+    if node.tag == "mrow" and len(node) == 2 and _mo_text(node[0]) in {"+", "-", "−"}:
+        inner = _number_text(node[1])
+        return f"{_text_of(node[0])}{inner}" if inner else None
+    return None
+
+
+def _script_numbers(node: ET.Element) -> tuple[str | None, str | None] | None:
+    """(mass, atomic number) from the scripts of an empty-based msub/msup/msubsup."""
+    if node.tag == "msubsup" and len(node) == 3:
+        return _number_text(node[2]), _number_text(node[1])
+    if node.tag == "msup" and len(node) == 2:
+        return _number_text(node[1]), None
+    if node.tag == "msub" and len(node) == 2:
+        return None, _number_text(node[1])
+    return None
+
+
+def _nuclide(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
+    """A nuclide at kids[i]: scripts on an empty base, then the element's letters (one
+    sibling "Fe" or "C", or two "H" "e"). The words and the siblings they cover."""
+    node = kids[i]
+    if node.tag not in _SCRIPTS or not len(node) or not _is_empty(node[0]):
+        return None
+    numbers = _script_numbers(node)
+    if numbers is None:
+        return None
+    for used in (2, 1):
+        parts = [_letters(k) for k in kids[i + 1 : i + 1 + used]]
+        if len(parts) < used or any(p is None for p in parts):
+            continue
+        words = nuclide_words("".join(p for p in parts if p), *numbers)
+        if words is not None:
+            return [words], used + 1
+    return None
+
+
+def _speak_multiscripts(node: ET.Element) -> list[str]:
+    """`mmultiscripts` with prescripts on an element ("C" with 6 below and 14 above) reads
+    as a nuclide; any other use is read child by child."""
+    kids = list(node)
+    tags = [k.tag for k in kids]
+    if tags.count("mprescripts") == 1 and tags[-3:-2] == ["mprescripts"] and len(kids) == 4:
+        base, sub, sup = _letters(kids[0]), _number_text(kids[2]), _number_text(kids[3])
+        words = nuclide_words(base, sup, sub) if base else None
+        if words is not None:
+            return [words]
+    return _speak_children(node)
+
+
+_UNIT_CHARS = frozenset("/·⋅*()")
+
+
+def _unit_string(node: ET.Element, *, first: bool) -> str | None:
+    """`node` as a piece of a unit string ("kg", "/", "s^2"), or None if it cannot be one.
+    Italic single letters are variables, so only upright letters and text count."""
+    tag, text = node.tag, _text_of(node)
+    if tag == "mi":
+        upright = node.get("mathvariant") == "normal" or len(text) > 1
+        return text if upright and text.replace("°", "").isalpha() else None
+    if tag == "mtext":
+        allowed = all(ch.isalpha() or ch in _UNIT_CHARS or ch in "° -−" for ch in text)
+        return text if text and allowed else None
+    if tag == "mo":
+        return text if text in _UNIT_CHARS and not (first and text != "(") else None
+    if tag == "msup" and len(node) == 2:
+        base, power = _unit_string(node[0], first=first), _number_text(node[1])
+        return f"{base}^{power}" if base and power and power.lstrip("+-−").isdigit() else None
+    if tag == "mfrac" and len(node) == 2:
+        top, bottom = _unit_string(node[0], first=True), _unit_string(node[1], first=True)
+        return f"({top})/({bottom})" if top and bottom else None
+    if tag == "mrow":
+        parts = [_unit_string(child, first=first and k == 0) for k, child in enumerate(node)]
+        return "".join(p for p in parts if p) if all(parts) and parts else None
+    return None
+
+
+def _after_number(prev: ET.Element) -> str | None:
+    """The number just before a unit, as text, or None when `prev` is not a number."""
+    if prev.tag == "mn":
+        return _text_of(prev)
+    if prev.tag in {"msup", "msubsup"} and len(prev) and prev[0].tag == "mn":
+        return "10"  # 3 x 10^8 m/s reads in the plural
+    return None
+
+
+def _unit_run(kids: list[ET.Element], i: int, count: str) -> tuple[list[str], int] | None:
+    """A unit at kids[i:] after the number `count`: the longest run of siblings that
+    reads wholly as one unit ("kg", "·", "m", "/", "s^2"). The words and the siblings."""
+    pieces: list[str] = []
+    for k, node in enumerate(kids[i:]):
+        piece = _unit_string(node, first=k == 0)
+        if piece is None:
+            break
+        pieces.append(piece)
+    for used in range(len(pieces), 0, -1):
+        words = unit_words("".join(pieces[:used]), count)
+        if words is not None:
+            return [words], used
+    return None
+
+
+_DEGREE_SIGNS = {"°", "∘"}
+_TEMPERATURE_SCALES = {"C", "F"}
+
+
+def _degrees(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
+    """A temperature at kids[i]: a number with a degree superscript then the scale
+    (`25^\\circ C`), or the degree sign after a number that was already read
+    (`25 ^\\circ C`, `25 °C` as three tokens)."""
+    node = kids[i]
+    scale = _letters(kids[i + 1]) if i + 1 < len(kids) else None
+    if scale not in _TEMPERATURE_SCALES:
+        return None
+    own_number = node.tag == "msup" and len(node) == 2 and node[0].tag == "mn"
+    if own_number:
+        count, sign = _text_of(node[0]), _text_of(node[1])
+    else:
+        count = _after_number(kids[i - 1]) if i > 0 else None
+        sign = _text_of(node[0] if node.tag == "msup" and len(node) == 1 else node)
+        if node.tag not in {"msup", "mi", "mo"}:
+            return None
+    unit = unit_words(f"°{scale}", count) if count is not None else None
+    if unit is None or sign not in _DEGREE_SIGNS:
+        return None
+    return ([count or "", unit] if own_number else [unit]), 2
+
+
 def _speak_children(node: ET.Element) -> list[str]:
     words: list[str] = []
-    for child in node:
-        words += _speak(child)
+    kids = list(node)
+    i = 0
+    while i < len(kids):
+        found = _fenced_table(kids, i) or _nuclide(kids, i) or _degrees(kids, i)
+        if found is None and i > 0:
+            count = _after_number(kids[i - 1])
+            found = _unit_run(kids, i, count) if count is not None else None
+        if found is None:
+            words += _speak(kids[i])
+            i += 1
+        else:
+            words += found[0]
+            i += found[1]
     return words
 
 
@@ -513,6 +762,7 @@ _HANDLERS: dict[str, Callable[[ET.Element], list[str]]] = {
     "mroot": _speak_mroot,
     "menclose": _speak_menclose,
     "mtable": _speak_mtable,
+    "mmultiscripts": _speak_multiscripts,
 }
 
 

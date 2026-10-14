@@ -288,12 +288,17 @@ def expected_document(result: CanaryResult, *, model: str, day: date) -> dict[st
 
 
 def _claim_today(factory: sessionmaker[Session], day: date) -> bool:
-    """Insert the day's "decisions:run" aggregate row if missing; True if this caller
-    inserted it (and so runs today's canary). One statement, safe across instances."""
+    return claim_today(factory, day, "decisions:run")
+
+
+def claim_today(factory: sessionmaker[Session], day: date, category: str) -> bool:
+    """Insert the day's `category` ("decisions:run", "claude:run") aggregate row if
+    missing; True if this caller inserted it (and so runs today's canary). One statement,
+    safe across instances."""
     from a11y_stem.web.database import rowcount
     from a11y_stem.web.db import ErrorAggregate, session_scope
 
-    values = {"day": day, "step": CANARY_STEP, "category": "decisions:run", "count": 1}
+    values = {"day": day, "step": CANARY_STEP, "category": category, "count": 1}
     with session_scope(factory) as session:
         dialect = session.get_bind().dialect.name
         if dialect == "postgresql":
@@ -308,13 +313,19 @@ def _claim_today(factory: sessionmaker[Session], day: date) -> bool:
 
 
 def _count(factory: sessionmaker[Session], day: date, status: str) -> None:
+    count_status(factory, day, f"decisions:{status}")
+
+
+def count_status(factory: sessionmaker[Session], day: date, label: str) -> None:
+    """Count one canary result for the day under "<prefix>:<status>" (both parts coded)."""
     from collections import Counter
 
     from a11y_stem.ops.aggregate import code, upsert_counts
     from a11y_stem.web.db import session_scope
 
+    prefix, _, status = label.partition(":")
     with session_scope(factory) as session:
-        upsert_counts(session, day, Counter({(CANARY_STEP, f"decisions:{code(status)}"): 1}))
+        upsert_counts(session, day, Counter({(CANARY_STEP, f"{code(prefix)}:{code(status)}"): 1}))
 
 
 def due(settings: Settings) -> str | None:

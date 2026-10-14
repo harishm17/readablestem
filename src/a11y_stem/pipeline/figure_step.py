@@ -77,6 +77,12 @@ confidence. If the check is off, has no answer (an error, a timeout, a refusal, 
 budget left) or the figure is not an accepted description, the fix is exactly what it
 would be without it; the answer, or why there is none, is recorded on
 `Fix.verifications` either way.
+
+With the Anthropic provider the job's verifier is the Claude check (`models.claude_verifier`,
+T2-20): another Claude model, an audit prompt, yes/no answers. In shadow mode (the default,
+CLAUDE_SECOND_CHECK=shadow) the answer is recorded with mode "shadow" and nothing else
+happens: no check, no note, no change of review. Only CLAUDE_SECOND_CHECK=enforce gives the
+note above, from the same threshold.
 """
 
 from __future__ import annotations
@@ -101,7 +107,7 @@ from a11y_stem.core.types import (
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
-from a11y_stem.models.verifier import figure_score, verifier_of
+from a11y_stem.models.verifier import figure_check_mode, figure_score, verifier_of
 from a11y_stem.pipeline import figure_details
 from a11y_stem.pipeline import options as run_options
 from a11y_stem.pipeline.validate import check_alt, clean_alt, has_errors
@@ -444,10 +450,11 @@ def second_check(
     "optional". Never raises (the verifier fails open).
     """
     verifier = verifier_of(client)
+    mode = figure_check_mode(settings)
     figure = fix.figure
     if (
         verifier is None
-        or not settings.decisions_figure_verify
+        or mode == "off"
         or fix.status is not Status.ACCEPTED
         or figure is None
         or figure.decorative
@@ -460,10 +467,10 @@ def second_check(
     update: dict[str, Any] = {
         "verifications": [
             *fix.verifications,
-            verdict.record(stage="final", mode="note", flagged=flagged),
+            verdict.record(stage="final", mode=mode, flagged=flagged),
         ]
     }
-    if flagged is not None:
+    if flagged is not None and mode == "note":
         check = Check(
             name="figure.second_check",
             passed=not flagged,
