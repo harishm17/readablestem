@@ -794,6 +794,12 @@ class ConversionOptions(BaseModel):
     long_descriptions: bool = False
     colour: bool = False
     notation_memory: bool = False
+    # The document is an exam or graded assessment: figure alt text describes what is
+    # shown and never the result (prompt `figure_exam.md`), and the long description and
+    # data table, which give values and trends, are not asked for even when
+    # `long_descriptions` is on. A per-job choice (the upload form), not a deployment
+    # flag, so `from_settings` leaves it off.
+    exam_mode: bool = False
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ConversionOptions:

@@ -28,6 +28,13 @@ context, and the proposal may also carry (`pipeline.figure_details`):
   tier (the job page lists it as the notice `colour_only`).
 The alt text, the status rules and the escalation below are the same either way.
 
+Exam mode (`ConversionOptions.exam_mode`; a per-job choice, off by default). The step sends
+`figure_exam.md` with the schema `FigureOutput`: the alt text describes what the figure
+shows and never the result (no trend, extreme, total, net quantity or value read off a
+graph that is not printed in it). Long descriptions and data tables are not asked for in
+an exam even when they are on, because a description of a trend or a table of values is a
+result. Everything else, the status rules and the escalation included, is as above.
+
 Routing: figures go to the main model. Tiny figures (no side longer than one inch on the
 page: icons, bullets, small logos) start on the cheap model with a low-detail image and
 escalate to the main model when the result would not be accepted (confidence below the
@@ -105,6 +112,10 @@ PROMPT_VERSION = load_prompt(PROMPT_NAME).version
 # The prompt sent instead when long descriptions are on (`ConversionOptions`).
 LONG_PROMPT_NAME = "figure_long"
 LONG_PROMPT_VERSION = load_prompt(LONG_PROMPT_NAME).version
+# The prompt sent instead for an exam (`ConversionOptions.exam_mode`): the same output
+# fields, and alt text rules that describe what is shown and never the result.
+EXAM_PROMPT_NAME = "figure_exam"
+EXAM_PROMPT_VERSION = load_prompt(EXAM_PROMPT_NAME).version
 
 TINY_FIGURE_MAX_SIDE_PT = 72.0  # one inch on the page
 DECORATIVE_ACCEPT_CONFIDENCE = 0.95
@@ -444,8 +455,10 @@ def describe(
     description, data table and colour flag). Never raises for model or validation
     problems (they become FAILED/ABSTAINED fixes); raises BudgetExceeded when spend is
     refused."""
-    long = run_options.current().long_descriptions
-    prompt = load_prompt(LONG_PROMPT_NAME if long else PROMPT_NAME)
+    options = run_options.current()
+    exam = options.exam_mode
+    long = options.long_descriptions and not exam  # values and trends are results
+    prompt = load_prompt(EXAM_PROMPT_NAME if exam else LONG_PROMPT_NAME if long else PROMPT_NAME)
     schema: type[FigureOutput] = FigureLongOutput if long else FigureOutput
     tiny = is_tiny(element)
     context = figure_context(element, context_text, labels=long)
