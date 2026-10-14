@@ -8,6 +8,7 @@ ships them; with an external server they must be on PATH.
 from __future__ import annotations
 
 import os
+import shutil
 import uuid
 from collections.abc import Generator, Iterator
 from contextlib import contextmanager
@@ -181,7 +182,10 @@ def test_a_failed_restore_still_drops_the_scratch_database(live, server, pg_bin,
     bad = tmp_path / "pg_restore"
     bad.write_text("#!/bin/sh\necho SECRET-ROW-TEXT >&2\nexit 3\n")
     bad.chmod(0o755)
-    (tmp_path / "pg_dump").symlink_to(Path(pg_bin or "") / "pg_dump")
+    # With an external server (CI) there is no pg_bin: take pg_dump from PATH.
+    real_pg_dump = Path(pg_bin) / "pg_dump" if pg_bin else shutil.which("pg_dump")
+    assert real_pg_dump, "pg_dump is neither in pg_bin nor on PATH"
+    (tmp_path / "pg_dump").symlink_to(real_pg_dump)
     before = _databases(server[0])
     with pytest.raises(DrillError, match=r"pg_restore failed with exit code 3") as raised:
         restore_drill(live, pg_bin=tmp_path)

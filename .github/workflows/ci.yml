@@ -56,9 +56,11 @@ jobs:
   proof-replay:
     name: make proof (replay of the recorded run)
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 30
     env:
       UV_NO_DEV: "1"  # so that `uv run` in the make targets does not install the dev group
+      # Where the tag's code looks for the table-structure model (TABLE_MODEL_DIR).
+      TABLE_MODEL_DIR: ${{ github.workspace }}/table-model
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -88,6 +90,27 @@ jobs:
       - name: Install at the tag (locked, no dev tools, no browser)
         working-directory: at-tag
         run: uv sync --locked --no-dev
+      # The recorded run was made with the SLANet-plus table-structure model present. It is
+      # not in the repository (7.5 MB, Apache-2.0, pinned by SHA-256 in the tag's
+      # pipeline/table_model.py). Without it tables fall back to PyMuPDF's grid, the model
+      # requests differ, and the replay stops with "64 request(s) have no recorded answer".
+      # The cache key names the pinned checksum; the tag's own `make table-model` fetches
+      # the file and refuses anything that does not match that checksum.
+      - name: Cache the table-structure model
+        id: table-model-cache
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: table-model
+          key: table-model-slanet-plus-d57a942af6a2f57d6a4a0372573c696a2379bf5857c45e2ac69993f3b334514b
+      - name: Fetch the table-structure model (checksum-verified by the tag's code)
+        if: steps.table-model-cache.outputs.cache-hit != 'true'
+        working-directory: at-tag
+        run: |
+          for attempt in 1 2 3 4; do
+            make table-model && exit 0
+            echo "fetch attempt $attempt failed; retrying"; sleep $((attempt * 15))
+          done
+          exit 1
       - name: Replay at the tag and write PROOF.md
         working-directory: at-tag
         run: make proof
@@ -155,6 +178,14 @@ jobs:
           enable-cache: true
       - name: Install (locked)
         run: uv sync --locked --all-extras
+      # tests/test_ops_backup.py runs pg_dump and pg_restore against the service container
+      # (locally pgserver ships them). The client major version must match the service's
+      # (postgres:16); Ubuntu 24.04 packages 16.
+      - name: Install the Postgres 16 client tools (pg_dump, pg_restore)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends postgresql-client-16
+          pg_dump --version
       # Exit code 5 means no test carries the marker yet; anything else is a real result.
       - name: Pytest (Postgres-marked tests only)
         run: |
