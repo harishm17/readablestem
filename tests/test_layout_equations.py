@@ -302,18 +302,18 @@ def braced_system(page: pymupdf.Page, number: str | None, brace_row: int) -> Non
         page.insert_text((72, 128), number, fontsize=BODY, fontname="helv")
     if brace_row == 0:
         page.insert_text((number and 100 or 72, 140), "Solve the system.", fontsize=BODY)
-        page.insert_text((214, 140), "{", fontsize=BODY)
+        page.insert_text((number and 190 or 162, 140), "{", fontsize=BODY)
     else:
-        page.insert_text((212, 147), "{", fontsize=BODY)
-    page.insert_text((224, 140), "2 x + y = 7", fontsize=BODY, fontname="tiit")
-    page.insert_text((224, 154), "x - 2 y = 6", fontsize=BODY, fontname="tiit")
+        page.insert_text((176, 147), "{", fontsize=BODY)
+    page.insert_text((number and 200 or 172, 140), "2 a + b = 7", fontsize=BODY, fontname="symb")
+    page.insert_text((number and 200 or 172, 154), "a - 2 b = 6", fontsize=BODY, fontname="symb")
     prose(page, 230, "Then check the answer in both original equations as well.")
 
 
 def test_a_brace_after_prose_keeps_both_rows_of_the_system_in_one_equation():
     elements = analyze(one_page(lambda page: braced_system(page, None, 0))).elements
     blocks = equations(elements)
-    assert [nospace(e.text) for e in blocks] == ["{2x+y=7x-2y=6"]
+    assert [nospace(e.text) for e in blocks] == ["{2a+b=7a-2b=6"]
     assert blocks[0].display == "block"
     assert any(e.kind == Kind.PARAGRAPH and "Solve the system." in (e.text or "") for e in elements)
 
@@ -322,7 +322,7 @@ def test_a_brace_beside_the_middle_of_the_rows_is_part_of_the_system():
     elements = analyze(one_page(lambda page: braced_system(page, "87.", 1))).elements
     blocks = equations(elements)
     assert len(blocks) == 1
-    assert sorted(nospace(blocks[0].text)) == sorted("{2x+y=7x-2y=6")
+    assert sorted(nospace(blocks[0].text)) == sorted("{2a+b=7a-2b=6")
     assert "87." in [e.text for e in elements if e.kind != Kind.EQUATION]
 
 
