@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -106,7 +107,10 @@ def test_version_1_hashes_differ_from_version_2_in_the_five_reworded_files_only(
         dict((r, d) for d, r in _lines("PREREG-v1.sha256")),
         dict((r, d) for d, r in _lines("PREREG-v2.sha256")),
     )
-    assert list(v1) == list(v2), "version 2 hashes the same files in the same order"
+    # Addenda written after version 2 are appended to its hash list (Addendum 6, ...).
+    assert list(v2)[: len(v1)] == list(v1), "version 2 hashes the same files in the same order"
+    later = list(v2)[len(v1) :]
+    assert all(re.fullmatch(r"PREREGISTRATION-ADDENDUM-\d+\.md", rel) for rel in later), later
     assert {rel for rel in v1 if v1[rel] != v2[rel]} == CHANGED_IN_V2
     assert v1["PREREGISTRATION.md"] == V1_REGISTRATION
     assert v2["PREREGISTRATION.md"] != V1_REGISTRATION

@@ -132,6 +132,7 @@
     "A paired verdict is written only when the registered Bonferroni interval excludes 0; where a sign-flip test on the section differences disagrees, the report says 'higher by point estimate'.",
     "a11y-stem's review screen asked about none of the 28 wrong headings in the interim headings run: that is a limit of the pipeline, documented here and not fixed on the held-out data.",
     "The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.",
+    "The model-dependent parts ran on Claude, not on the OpenAI models the registration names (Addendum 6): a11y-stem with claude-haiku-5-5 and claude-opus-5-5 and no second automated check, the Purdue-prompt chatbot arms on claude-opus-5-5 and claude-haiku-5-5, the figure judge on claude-opus-5-5. The expert-prompt chatbot arm was not run. Each arm's number of runs is the one this report states.",
     "The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch."
   ]
 }
