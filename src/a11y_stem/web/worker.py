@@ -1006,6 +1006,10 @@ class Worker:
         self._thread = threading.Thread(target=self._loop, name="a11y-stem-worker", daemon=True)
         self._thread.start()
         log_event(logger, "worker_started")
+        if self.settings.env == "prod" and self.settings.preload_table_models:
+            from a11y_stem.pipeline import tables
+
+            threading.Thread(target=tables.preload, name="a11y-stem-preload", daemon=True).start()
 
     @property
     def alive(self) -> bool:

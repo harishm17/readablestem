@@ -334,6 +334,25 @@ at the next deploy: put it in the file. Choices for the beta, and why:
 
 Flip a switch by editing the file and running `./deploy/deploy.sh service`.
 
+### Layout and the first job
+
+Layout is one thread of PyMuPDF work before the first model call (`MODEL_CONCURRENCY` cannot
+shorten it), and most of it is the table detector. Three changes shorten that part and keep
+the result byte for byte the same (checked on 46 PDFs of the repository with every content
+feature on, and on the replay of the committed proof bundle):
+
+- the detector runs only on pages that could hold a table (docs/tables.md, "Which pages
+  are looked at"): on the 12-page fixture document the time to the first model call fell
+  from 4.4-5.1 s to 2.5-2.7 s; on two OpenStax sections the layout took 3.9 s and 4.3 s
+  before and 2.8 s and 2.4 s after (a page with boxed callouts cannot be skipped);
+- the text pass and the heading decisions, which no step reads, run while the models
+  answer instead of before the first request;
+- the worker loads the table models when it starts (`PRELOAD_TABLE_MODELS`, production
+  only), while it waits for its first job: the first conversion after a start no longer
+  pays for them (6 pages: 9.3 s to 8.2 s here, 1.7 s of CPU moved out of the job; measured
+  on a busy 16-core machine, so on one vCPU the saving is the 4-5 s the model load takes
+  there).
+
 ### Sizing
 
 Measured with `taskset -c 0` (one CPU) on the development box, Python 3.12, SLANet table

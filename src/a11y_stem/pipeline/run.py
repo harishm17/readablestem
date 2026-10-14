@@ -1,8 +1,10 @@
 """The conversion pipeline end to end.
 
-convert_pdf: layout.analyze -> text_pass.apply -> heading_fixes -> per page: crops
-(serial, calling thread) -> equation/figure/table steps (thread pool) ->
-assemble.render_html -> html_checks.static_checks.
+convert_pdf: layout.analyze -> per page: crops (serial, calling thread) -> equation/figure/
+table steps (thread pool); once every crop is made and the steps are at work, still on the
+calling thread: text_pass.apply and heading_fixes (they need no model, so they overlap the
+model calls instead of delaying the first one) -> assemble.render_html ->
+html_checks.static_checks.
 
 Design notes:
 
@@ -913,9 +915,16 @@ class _CachedDocument:
 
 
 def _process(
-    run: _Run, elements: list[Element], page_list: list[int], cached: _CachedDocument
+    run: _Run,
+    elements: list[Element],
+    page_list: list[int],
+    cached: _CachedDocument,
+    while_waiting: Callable[[], None] | None = None,
 ) -> None:
-    """Crop page by page on this thread, run the steps in the pool, collect every result."""
+    """Crop page by page on this thread, run the steps in the pool, collect every result.
+
+    `while_waiting` runs once every crop is made and the steps are at work: the text pass
+    and the heading decisions, which no step needs, are done while the models answer."""
     by_page: defaultdict[int, list[Element]] = defaultdict(list)
     for element in elements:
         by_page[element.page].append(element)
@@ -925,6 +934,8 @@ def _process(
             run.process_page(page, by_page[page])
             run.collect(block=False)  # report finished pages while cropping the rest
         cached.release()  # every crop is made; the steps only need the PNGs
+        if while_waiting is not None:
+            while_waiting()
         run.collect(block=True)
     finally:
         run.pool.shutdown(wait=True, cancel_futures=True)
@@ -1011,12 +1022,9 @@ def _convert(
             sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
             boxes = _page_boxes(pdf_bytes, kept, sizes)
             elements, scan_fixes = _with_page_images(elements, kept, boxes)
-            text = _text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer)
-            elements = text.elements
             read = len(page_list)
             _send(stage_progress, "layout", read, read, _kind_counts(elements))
-            fixes = {f.element_id: f for f in _heading_fixes(elements, tracer)}
-            fixes.update({f.element_id: f for f in scan_fixes})
+            fixes = {f.element_id: f for f in scan_fixes}
             run = _Run(
                 pdf_bytes=pdf_bytes,
                 settings=settings,
@@ -1033,7 +1041,20 @@ def _convert(
                 page_ms=Counter(),
                 futures={},
             )
-            _process(run, elements, page_list, cached)
+            # The text pass adds links, colour runs and passage languages to the elements
+            # without touching their text or anything a step reads, and the heading
+            # decisions need no model: both are done once the steps are at work, not
+            # before the first one starts (they were 2-3% of a job's wall time).
+            made: list[text_pass.TextPassResult] = []
+
+            def text_and_headings() -> None:
+                made.append(_text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer))
+                for fix in _heading_fixes(made[0].elements, tracer):
+                    run.fixes.setdefault(fix.element_id, fix)  # a kept page's fix wins
+
+            _process(run, elements, page_list, cached, text_and_headings)
+            text = made[0]
+            elements = text.elements
         finally:
             cached.release()  # also when analysis, a step or `progress` failed
 

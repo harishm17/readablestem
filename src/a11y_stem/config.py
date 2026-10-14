@@ -170,6 +170,10 @@ class Settings(BaseSettings):
     # Run the background worker thread inside the web process (one Cloud Run service).
     run_worker: bool = True
     worker_poll_s: float = Field(default=2.0, gt=0)
+    # Load the table detector and the structure model when the worker starts (production
+    # only), while it waits for its first job, instead of inside that job: 4-5 s off the
+    # first conversion after every start.
+    preload_table_models: bool = True
     # How many proxies in front of the app write the caller's address into the right-hand end
     # of X-Forwarded-For (web/abuse.py): 1 on Cloud Run, 2 behind an external load balancer
     # as well, 0 with none (the peer address is used and the header is ignored).

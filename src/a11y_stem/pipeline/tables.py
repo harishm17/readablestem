@@ -1461,6 +1461,20 @@ def _structurer() -> _Structurer | None:
         return structurer
 
 
+def preload() -> None:
+    """Load the detector and the structure model now, not in the first page that needs
+    them: importing `pymupdf.layout` builds its ONNX sessions and the structure model is
+    checksummed (7.5 MB) and loaded, about 4-5 s together on the first conversion after
+    a start. Holds layout's PyMuPDF lock, because the import patches PyMuPDF. Never
+    raises (a model that cannot be loaded is reported once, as when a page needs it)."""
+    try:
+        with _pdf_lock():
+            load_detector()
+            _structurer()
+    except Exception as exc:  # the first page that needs a model finds out for itself
+        log.warning("table models not preloaded: %s", type(exc).__name__)
+
+
 def reset_models() -> None:
     """Forget the loaded structure model (tests; after fetching the file)."""
     with _LOAD_LOCK:
