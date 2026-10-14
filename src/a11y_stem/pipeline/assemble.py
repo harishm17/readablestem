@@ -722,7 +722,9 @@ class _Renderer:
             end = entry.term_end or 0
             attrs = self.id_attr(entry.id) + inline_text.passage_attrs(entry)
             term, definition = text[:end].strip(), text[end:].strip()
-            out.append(f"<dt{attrs}>{self.rich(term)}</dt><dd>{self.rich(definition)}</dd>")
+            out.append(
+                f"<dt{attrs}><strong>{self.rich(term)}</strong></dt><dd>{self.rich(definition)}</dd>"
+            )
         return f"<dl>{''.join(out)}</dl>"
 
     def lists(self, items: list[Element], inside: dict[str, list[Element]] | None = None) -> str:
@@ -1047,13 +1049,13 @@ def _contact_sentence(contact: str | None) -> str:
 CODE_WIDE_CHARS = 36  # characters in a line that may not fit a 320 px screen at 0.9 rem
 CODE_CSS = """\
 pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px solid #c8c8c8;
-  border-radius: 4px; overflow-x: auto; tab-size: 4; }
+  border-radius: 4px; overflow-x: auto; }
 pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre; }
 """
 DEFINITIONS_CSS = """\
 dl { margin: 0 0 1em; }
-dt { font-weight: bold; margin-top: 0.75em; }
+dt { margin-top: 0.75em; }
 dd { margin: 0.1em 0 0 1.5em; }
 """
 

@@ -1224,7 +1224,7 @@ the same while the list reorders. Tables carry the number their captions print i
 so a table the detector missed does not make the card titled "Table 3" show the caption
 "Table 4"; otherwise all keep their ordinals, so no two names clash.
 
-**Heading groups.** Repeated headings with weak evidence (the same label and style two or
+**Heading groups.** *Since T2-7 (2026-10-14) the pipeline no longer makes new groups: a repeated label is an optional note on each copy (`heading.repeated_label`), and a bold line that reads as a sentence is a single required decision (`heading.sentence_like`). This card is for results stored before, which still carry `group_key`.* Repeated headings with weak evidence (the same label and style two or
 more times, `pipeline/heading_step.py`) share a `Fix.group_key` and are one card: "“Teacher
 Support” appears 11 times as a bold line in the body text size. Keep them as headings at
 level 3, or make them bold text?", with **Apply to all 11** (accept each at its proposed

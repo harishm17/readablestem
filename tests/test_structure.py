@@ -170,8 +170,8 @@ def test_a_term_at_the_margin_over_its_indented_definition_is_a_definition_list(
     ]
     html = html_of(terms_page(entries))
     assert (
-        '<dl><dt id="p1-e1">alpha decay</dt><dd>loss of an alpha particle during radioactive '
-        'decay</dd><dt id="p1-e2">half-life</dt><dd>time for half of the atoms in a sample to '
+        '<dl><dt id="p1-e1"><strong>alpha decay</strong></dt><dd>loss of an alpha particle during radioactive '
+        'decay</dd><dt id="p1-e2"><strong>half-life</strong></dt><dd>time for half of the atoms in a sample to '
         "decay</dd></dl>"
     ) in html
 
@@ -193,7 +193,7 @@ def test_bold_terms_over_their_paragraphs_stop_being_headings():
     html = html_of(pdf)
     assert '<h2 id="p1-' not in html
     assert html.count("<dt") == 2
-    assert '<dt id="p1-e1">Loop</dt><dd>A piece of code' in html
+    assert '<dt id="p1-e1"><strong>Loop</strong></dt><dd>A piece of code' in html
 
 
 def test_bold_terms_running_into_their_definitions_make_one_entry_each():
@@ -259,7 +259,7 @@ def test_an_entry_is_written_as_dt_and_dd_by_the_assembler():
     )
     html = render_html(title="T", lang="en", elements=[entry], fixes=[], crops={})
     assert (
-        '<dl><dt id="p1-e1">beta decay</dt>'
+        '<dl><dt id="p1-e1"><strong>beta decay</strong></dt>'
         "<dd>breakdown of a neutron &lt;into&gt; a proton</dd></dl>"
     ) in html
     broken = entry.model_copy(update={"term_end": 99})  # a bad offset: a plain paragraph
@@ -389,3 +389,28 @@ def test_chapter_lines_with_their_number_at_the_margin_are_entries_on_a_contents
         ("1.1 Speed", 2),
         ("1.2 Velocity", 2),
     ]
+
+
+# ------------------------------------------------------------------------- axe
+
+
+def test_code_definitions_and_contents_pass_axe_in_chromium():
+    import pytest
+
+    from a11y_stem.pipeline.html_checks import axe_checks
+
+    def fill(page):
+        page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")
+        for i, title in enumerate(["1 Motion", "2 Forces"]):
+            page.insert_text((72, 110 + 18 * i), title + " ." * 30, fontsize=BODY, fontname="helv")
+            page.insert_text((520, 110 + 18 * i), str(3 + 4 * i), fontsize=BODY, fontname="helv")
+        y = prose(page, 200)
+        code(page, y, [(0, "result = compute_the_total(first_value, second_value, third_value)")])
+        page.insert_text((72, 300), "Key Terms", fontsize=18, fontname="hebo")
+        page.insert_text((72, 330), "Loop", fontsize=BODY, fontname="hebo")
+        page.insert_text((72, 345), "A piece of code that repeats.", fontsize=BODY, fontname="helv")
+
+    checks = axe_checks(html_of(page_of(fill)))
+    if checks == [] or (len(checks) == 1 and checks[0].code == "skipped"):
+        pytest.skip("axe-core needs Playwright and its Chromium")
+    assert [c.name for c in checks] == ["axe"] and checks[0].passed

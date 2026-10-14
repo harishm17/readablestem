@@ -109,7 +109,7 @@ decision.
   pipeline asked, and ops counts it. The failed checks of an optional fix are its notes
   (their codes stay in `checks`). `Fix.optional_note` is "accepted with a note nobody
   has acted on yet".
-- **Heading groups.** Uncertain headings with the same label (NFKC, case-folded, letters
+- **Heading groups** (until T2-7, 2026-10-14: now an optional note, docs/layout.md "Review tiers"). Uncertain headings with the same label (NFKC, case-folded, letters
   and digits) and the same style (font size to 0.5 pt, weight, larger-font evidence,
   proposed level) that appear two or more times share `Fix.group_key` (content-free:
   `"hg-" + the first one's element id`) and `Fix.group_size`, and are NEEDS_REVIEW.
