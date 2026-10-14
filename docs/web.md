@@ -94,7 +94,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | POST `/logout` | signed in | Clears the session |
 | GET `/app?revises=` | signed in | My documents as a to-do list (below), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
-| POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, a results page for several ("Uploads and limits") |
+| POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, 303 to `/app/upload/{id}` (the results page) for several ("Uploads and limits") |
 | GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all") |
 | POST `/sample` | signed in | Opens the person's sample document, made from the recorded conversion; 303 to its job page ("The sample document") |
 | GET `/uploads/{id}` | owner | A large file kept for choosing its pages: the suggested parts, the box to change them, "Shrink large pictures first" ("Large files in parts") |
@@ -398,12 +398,29 @@ becomes **a job of its own**, with the course, exam and keeping choices of the f
 - the token, once, and the upload gate (one request in progress per person).
 
 One file is answered as before (303 to its job page, or the upload form again with the
-reason). Several files get a results page (`upload_results.html`, status 200; the status of
-the first reason when nothing came of it): the documents that are converting, the large
-files waiting for their pages, and the files that were not uploaded with the reason for each
-("It did not use any of your pages"). It is a page, not a redirect, because the reasons name
-the files and a file name never goes in the session cookie. A revised version
-(`revises`) replaces one document, so it takes one file.
+reason). Several files are answered by **post-redirect-get**: the outcome of each file is
+stored for an hour under the person (`upload_results`, `web/upload_result.py`; names and
+numbers, no document content, deleted with the person and by the hourly purge) and the POST
+answers 303 to `GET /app/upload/{id}` (`upload_results.html`, status 200 whatever came of the
+files, owner only, 404 for another person's or an old one). The page lists the documents
+that are converting, the large files waiting for their pages, and the files that were not
+uploaded with the reason for each ("It did not use any of your pages"). A refresh, the back
+button or a bookmark opens the page again and uploads nothing; before, the page was the POST's
+own response and a refresh sent every file again. The outcomes are stored, not carried in the
+URL or the session cookie, because the reasons name the files and a file name never goes in a
+cookie. A revised version (`revises`) replaces one document, so it takes one file.
+
+**Word and PowerPoint among several files, and large ones.** Each file is checked on its own, so
+a `.docx` or `.pptx` among the files is made into a PDF in the sandbox (above) first, one
+after another, and from there on the PDF is what is probed, stored and converted:
+its pages are what the quota counts and what the page limits apply to. A Word file that
+cannot be used is one refusal beside the others. The conversions of one request share
+`OFFICE_BUDGET_S` (180 s); a file the time ran out for is refused ("was not converted: Word and
+PowerPoint files take a while ...", `office_budget`), and the probes keep their own 120 s.
+A Word file whose PDF is over the page or size limit of one conversion is kept for choosing its
+pages like a large PDF, as the PDF (never the Word file): its parts are named as PDFs
+("Long notes (pages 1-5).pdf"). A PDF over `MAX_LARGE_UPLOAD_MB` is `too_large`. A Word file can
+be a revised version if it fits one conversion; a large one cannot.
 
 ### Large files in parts (`web/pending.py`, `web/routes/parts.py`, `web/ranges.py`)
 
@@ -470,8 +487,12 @@ My documents offers "Try a sample first" (before the upload form for someone wit
 document of their own, after it otherwise). `POST /sample` (token, rate limited) puts a
 finished **recorded conversion** in the person's list and sends them to its page; opening it
 again returns the same one. It is OpenStax *Physics* 2.3 (CC BY 4.0, 13 pages, the committed
-`static/demo/report.json` and `source.pdf`: a real run of pipeline 0.4.0), with the pictures
-cut from its pages by the layout code, which reads no model, once per process.
+`static/demo/report.json` and `source.pdf`: a real run with the models), with the pictures
+cut from its pages as a conversion cuts them (`pipeline.run.recrop`: an unconverted equation sharp
+for the size of the text) and the file written by today's assembler (one h1, the dark colour
+scheme, the About region), once per process: the sample shows the current output, not the output
+of the day it was recorded. A sample document a person already has was made by the code of that
+day and is deleted with its day.
 
 - **No model call for anyone**, no pages (no `quota_days` row) and no spend (cost 0), and it
   takes no place from the 10 waiting or 40 kept documents (`Job.is_sample`,
@@ -679,6 +700,42 @@ The job page's "Compared with the earlier version" card says how many decisions 
 over, how many items changed or are new, and links to the first that needs a decision; the
 review screen marks a decision it carried. If the earlier document was deleted before the new
 one finished, the card says so and every decision is new.
+
+**Edits that are not decisions (`web/carry_edits.py`).** The review screen also changes what no
+fix covers: the words of a paragraph, a paragraph made a heading, a picture or an equation
+added by hand, an image described in words, a page left out. They are carried by the same rule,
+onto an item that is **unchanged**, and never onto changed content; the worker does it in this
+order (`Worker._carry_decisions`): words, headings and added items, then the decisions, then
+the pages left out. The earlier version is read with its omitted pages put back, so a decision
+made before a page was left out is found.
+
+- **Words and headings** are found by what the item said before the edits: the earlier
+  version's `ReviewEdit` rows (`edit_text`, `make_heading`) are walked back from the result as it
+  stands, so an edit that was undone is not carried and two edits in a row are one. The new
+  file's item must say the same words (case and spacing aside), be of the same kind, size and
+  weight, and be told from a twin by place only when both files have the same number of them.
+  The inline equations in the text must be the same pictures in the same order, or the words
+  are left alone. The edit is made by the review's own functions (`page_edits.edit_text`,
+  `make_heading`), so a level the outline would now change is refused and nothing is left half
+  done.
+- **Pictures and equations added by hand** come back only on the same page, where the region
+  looks exactly as it did (both PDFs drawn the same way and compared; a file that is the same
+  bytes needs no drawing), and where the tool has not found something new in that place (a
+  caption that was there before does not count). The equation keeps its read and what was
+  decided about it.
+- **A description in words** travels with the rejection it belongs to
+  (`carry._put_decision`), onto the same picture only.
+- **A page left out** is left out again only when it looks exactly as it did; a blank page
+  is told apart from another blank page by that, not by its number alone.
+
+What was not carried is counted (`edits_dropped`, the card says "N changes you made by hand
+were not carried over, because the part of the page it was made on is not the same any
+more"); what was is a `carried` `ReviewEdit` with the kind in its `after`
+(`carried_edit`), shown on the record. A document **tried again** is the same file, so the
+comparison needs no drawing; a picture added by hand on a page the tool could not read before
+is not added a second time once the tool reads it. Any failure leaves the result as the
+pipeline made it (a copy of it is put back).
+
 ## The review record (`web/record.py`, `web/routes/record.py`, T3-6)
 
 For the person's accessibility office. `GET /jobs/{id}/record` is a page made to print
@@ -695,7 +752,16 @@ from a person, decided by a person, still open, shown as pictures); every review
 - the document's owner, the only person who can review it); the decisions still open; the
 parts shown as pictures and why; the automatic checks (how many ran, which did not pass);
 **what was not checked**; what the instructor set (a chosen title, a contact line); and blank
-lines for the office to sign. "Not checked" is five fixed facts (no screen reader testing, the
+lines for the office to sign. Every kind of change a person can make is a row with who and
+when: accepted, edited or rejected decisions; text changed, a paragraph made a heading, a
+picture added, an equation marked (the tool read it, a person checked), an image described in
+words, a page left out or put back; clean tables accepted together in one action and a table
+cell read by the AI service at the person's request (marks in the `ReviewEdit`'s `after`,
+`review.BULK_KEY` and `MODEL_READ_KEY`); and what was carried over from an earlier version. The
+summary counts the pictures and equations added, the images described and the pages left out,
+and "not checked" says that the tool checked a description's form and not what it says. The
+record brings the HTML file up to date first if a review write left it out of date (it lists
+that file's checks), which is not a change to the document. "Not checked" is five fixed facts (no screen reader testing, the
 axe test not run on the document, meaning is not checked, not tried in a course site, the PDF
 itself is out of scope) plus counts from the result: the equations, figure descriptions,
 headings and tables the tool accepted without a person, the decisions still open, the parts
@@ -1987,6 +2053,11 @@ a user id is added without it.
   `a8c4e0b61d97` (`pending_uploads`, `jobs.part_group`, `jobs.part_label`) and `b1d5f7a29c46`
   (`jobs.is_sample`; its downgrade deletes the sample documents first). `tests/test_web_jobs_migrations.py`
   runs each one up and down on SQLite and `tests/test_web_postgres.py` on Postgres.
+- After them, in this order and as the one chain (one head): `5e2b8d70a3c1` (`linked_emails`,
+  `login_links`: the sign-in fallback; made on the same parent as the jobs work and put after
+  it when the two were merged) and `d3f8a1c5b920` (`upload_results`: the answer to an upload of
+  several files, kept an hour). `tests/test_web_migrations.py` checks the chain, the one head
+  and both downgrades.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
@@ -2004,6 +2075,9 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px, and every number in a six-column table on one line; "Add the data table" then "Remove the data table" without JavaScript) |
+| `uv run pytest tests/test_carry_edits.py tests/test_web_carry_edits.py` | Edits carried to a revised file or a document tried again: words, headings, pictures and equations added, pages left out, descriptions; carried only onto an unchanged item (rules on small results, then the whole path with real PDFs and renders) |
+| `uv run pytest tests/test_web_edits_record_exports.py` | Every new edit on the review record (who, when, what), every edit route marking the file out of date, and download, view, Canvas, cartridge, download all and the record making it again |
+| `uv run pytest tests/test_web_office_upload_together.py` | Word files among several files, a large Word file kept for choosing its pages, Word as a revised version, the time budget of one upload |
 | `uv run pytest tests/test_web_record.py` | The review record: the page and the CSV, decisions with who and when, what was not checked, no "certification", owner only, nothing changed by asking, formula-safe cells |
 | `uv run pytest tests/test_notation_suggest.py tests/test_web_course_suggestions.py` | Notation suggested from documents: what is found and guessed, the course and job pages, ticking and meanings, ownership, CSRF, skipped duplicates, logs without symbols |
 | `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |

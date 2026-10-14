@@ -56,6 +56,22 @@ Everything is committed. Nothing is fetched or generated at build time.
   `uv run --project <stemcheck checkout> stemcheck check <pdf> <html> -o <folder>` and copy
   `report.html` over the sample.
 
+## Writing the examples again without a model
+
+When the output changes (the assembler, the stylesheet, the About region) and the models'
+answers do not, the stored results are still right and only the HTML has to be written again:
+
+```
+uv run a11y-stem demo rerender <report.json> <source.pdf> <converted.html> [--no-note]
+```
+
+It cuts the pictures from the PDF as a conversion does, writes the file with today's assembler
+from the stored result, puts the demo note back (`--no-note` for a fixture), and keeps the
+stored result as it was written (only its `html_checks` are replaced, and only if they differ).
+No page is fetched, no model is asked, nothing is paid. The result still says which pipeline
+version converted it. The 2026-10-14 Tier 3 rebuild of the public demo and the four examples was
+made this way: one `h1`, the dark colour scheme and the labelled "About this version" region.
+
 ## Adding an example
 
 1. Convert a page or a fixture with the Claude provider, with a spend cap:

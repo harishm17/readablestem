@@ -157,6 +157,8 @@ script injected into an app page is refused by the policy.
 | Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (30); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
 | Large files kept for choosing their pages | 2 per person, up to 30 MB and 300 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
 | Zip of ready documents | 25 documents and 80 MB, in memory | `web/bundle.py` |
+| Answers to an upload of several files | one row per upload, names and numbers only, kept 1 hour, deleted with the person; readable by its owner only (404 for anyone else) | `web/upload_result.py`, `ops.retention.purge_upload_results` |
+| Word and PowerPoint files of one upload | their conversions share 180 s (`OFFICE_BUDGET_S`); the rest are refused with a reason | `routes/jobs.py` (`_place_files`) |
 | Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
