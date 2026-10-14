@@ -961,6 +961,8 @@ class _Row:
     absorbed: bool = False  # belongs to a figure (labels, text inside a diagram)
     marker: _Marker | None = None  # the row starts a list item (see _list_markers)
     region: _Region | None = None  # the display equation it belongs to (_equation_regions)
+    # An exercise number ("18.", "4)") cut off the front of a maths row: text, never maths.
+    exercise_number: bool = False
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -1824,6 +1826,8 @@ def _classify_row(row: _Row) -> None:
     prose = _prose_words(row, info)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
+    elif row.exercise_number:
+        row.kind = "text"  # "18.": kept as text before the equation it numbers
     elif row.marker is not None:
         row.kind = "text"  # a list item ("b. - 40 m/s"): maths in it is inline
     elif not counted:
@@ -3177,6 +3181,54 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
             out.append(_Row(row.chars[start:], column=row.column))
         else:
             out.append(row)
+    return out
+
+
+_EXERCISE_NUMBER = re.compile(r"^\d{1,3}[.)]$")
+
+
+def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
+    """Cut an exercise number ("18.", "4)") off the front of a maths row into a text row.
+
+    A numbered exercise that is only an equation ("18. 0 = 5 t - 4.9 t") reads as one maths
+    row because `_merge_baselines` joins the number and the equation when they sit on one
+    baseline. The number would then be sent to the model as part of the equation, and
+    would stand in its text layer. The first token is cut off when it is a one- to
+    three-digit number with a full stop or bracket, drawn in a text font (no maths font,
+    no maths character), with a gap before the rest, and the rest alone reads as a display
+    equation. A row that already starts a list item (`row.marker`) keeps its item, and a
+    row whose rest is prose or a lone fragment is not touched. The number stays in the
+    document as a text row of its own, in front of the equation (`_Row.exercise_number`).
+    """
+    out: list[_Row] = []
+    for row in rows:
+        tokens = _tokens(row)
+        if row.vertical or row.marker is not None or len(tokens) < 2:
+            out.append(row)
+            continue
+        first, rest = tokens[0], tokens[1:]
+        end = first[1]
+        token = "".join(c.c for c in row.chars[first[0] : end])
+        if token.isdigit() and "".join(c.c for c in row.chars[slice(*rest[0])]) in (".", ")"):
+            end = rest[0][1]  # "18 ." (the number and its full stop in separate spans)
+            rest = rest[1:]
+            token += row.chars[end - 1].c
+        number = row.chars[first[0] : end]
+        if (
+            not rest
+            or not _EXERCISE_NUMBER.match(token)
+            or any(c.math or c.mono for c in number)
+            or row.chars[rest[0][0]].x0 - number[-1].x1 < 0.3 * row.size
+        ):
+            out.append(row)
+            continue
+        remainder = _Row(row.chars[rest[0][0] :], column=row.column)
+        _classify_row(remainder)
+        if remainder.kind != "math":
+            out.append(row)
+            continue
+        out.append(_Row(number, column=row.column, exercise_number=True))
+        out.append(_Row(row.chars[rest[0][0] :], column=row.column))
     return out
 
 
@@ -4941,7 +4993,7 @@ def _page_blocks(
     covers: Sequence[tuple[float, float]] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
-    rows = _split_labels(rows)
+    rows = _split_exercise_numbers(_split_labels(rows))
     for row in rows:
         _classify_row(row)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]

@@ -333,6 +333,16 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   The box covers every row and the rules the equation uses (no rule of a neighbouring
   equation). A single row of at most two characters without a maths character (`>4`,
   `+8`) is not an equation.
+- **Exercise numbers.** A numbered exercise that is only an equation (`18. 0 = 5 t -
+  4.9 t`) is one row, because the number and the equation sit on one baseline. The first
+  token is cut off into a text row of its own (`_split_exercise_numbers`) when it is one
+  to three digits and a full stop or bracket (`18.`, `4)`; also `18 .` in two spans),
+  drawn in a text font (no maths font, no maths character), with a gap before the rest,
+  and the rest alone reads as a display equation. The number then stays a paragraph in
+  front of the equation and is in neither its crop nor its text layer, which the
+  text-layer checks compare the model's answer with. A row that already starts a list
+  item (siblings `17.`, `19.` confirmed it) is untouched, and so are `2.5` (a decimal) and
+  `A)` (a letter).
 - **Equation numbers.** A row that reads as an equation number and touches no rule goes
   to the line it sits beside (`_number_beside`, nearest vertical centre first), unless
   that line ends with a relation or operator (`x =   2.4`: the number is its right-hand
