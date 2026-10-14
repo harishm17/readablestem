@@ -3146,7 +3146,7 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
 # "v = ...", "+ c" under a long sum).
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
-TABLE_ROW_GAP = 0.55  # x font size: widest gap between whole equations that are rows of a table
+TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table
 MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
 
 
@@ -3449,7 +3449,7 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
 def _table_rows(above: _Line, line: _Line, box: BBox, size: float) -> bool:
     """Are two whole equations the rows of one table (a system, worked steps)?
 
-    A table sets its rows closer than separate displays are set (half a font size at
+    A table sets its rows closer than separate displays are set (0.7 of a font size at
     most, where a display gets an em or more above and below) and gives them one edge or
     one centre: each row centred as OpenStax prints a system, or flush left or right.
     """
