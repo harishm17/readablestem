@@ -11,6 +11,8 @@ Evidence and confidence (also in docs/layout.md):
 |---------------------------------------------------|------|---------|
 | larger font (>= 1.15 x body text)                 | 0.90 | yes     |
 | ... plus a section number ("2.3", "Chapter 2")    | 0.95 | yes     |
+| tagged heading (the PDF's own tags: H1-H6)       | 0.90 | yes     |
+| ... plus a section number                         | 0.95 | yes     |
 | bold body-size line, or a standalone numbered line | 0.60 | no      |
 | ... plus a section number                         | 0.88 | yes     |
 
@@ -72,6 +74,7 @@ from a11y_stem.pipeline.layout import (
     REASON_LIST_NUMBER,
     REASON_NUMBERED,
     heading_levels,
+    tagged_level,
 )
 
 ACCEPT_AT = 0.85  # matches the default Settings.auto_accept_confidence
@@ -215,23 +218,24 @@ class _Evidence:
     list_like: bool
     all_caps: bool
     very_short: bool
+    tagged: bool = False  # the PDF's own tags call it a heading (`pipeline.tagged`)
 
     @property
     def strong(self) -> bool:
-        return self.larger_font or self.numbered
+        return self.larger_font or self.numbered or self.tagged
 
     @property
     def maybe_list_item(self) -> bool:
         """A body-size "1. Measure the cart" reads like a list item; in a large font,
         "1. Introduction" is an ordinary heading style."""
-        return self.list_like and not self.larger_font
+        return self.list_like and not (self.larger_font or self.tagged)
 
     @property
     def weak_flags(self) -> bool:
         return self.all_caps or self.very_short or self.maybe_list_item
 
     def confidence(self, repaired: bool) -> float:
-        if self.larger_font:
+        if self.larger_font or self.tagged:
             value = 0.95 if self.numbered else 0.90
         else:
             value = 0.88 if self.numbered else 0.60
@@ -250,6 +254,7 @@ def _evidence(element: Element, text: str) -> _Evidence:
         list_like=REASON_LIST_NUMBER in reasons,
         all_caps=len(letters) >= MIN_LETTERS and all(c.isupper() for c in letters),
         very_short=len(letters) < MIN_LETTERS,
+        tagged=tagged_level(element) is not None,
     )
 
 

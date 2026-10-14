@@ -178,6 +178,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "image, so its values may be off; it is added only if you choose to after checking them.",
     ("figure.long_description", "long_description_unsure"): "Part of the figure was hard "
     "to read, so the longer description may be wrong in places; worth a look.",
+    ("figure.source_alt", "source_alt_unchecked"): "No description from the model was usable, "
+    "so this is the alt text the PDF's own tags give the picture: check it against the "
+    "image.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",

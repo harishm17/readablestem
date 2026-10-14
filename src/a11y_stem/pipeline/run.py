@@ -118,6 +118,7 @@ from a11y_stem.pipeline import (
     layout,
     page_type,
     table_step,
+    tagged,
     text_pass,
 )
 from a11y_stem.pipeline import notices as notice_rules
@@ -1011,6 +1012,7 @@ def _convert(
             sizes = dict(zip(doc.pages, getattr(doc, "page_sizes", None) or [], strict=False))
             boxes = _page_boxes(pdf_bytes, kept, sizes)
             elements, scan_fixes = _with_page_images(elements, kept, boxes)
+            elements = tagged.apply(elements, tagged.read(pdf_bytes, page_list))
             text = _text_pass(pdf_bytes, elements, page_list, doc.lang, options, tracer)
             elements = text.elements
             read = len(page_list)

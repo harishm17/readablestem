@@ -172,6 +172,8 @@ TEXT_FLAGS = page_type.TEXT_FLAGS  # whitespace kept, clipped to the MediaBox, g
 # them to decide confidence and review status.
 REASON_LARGER_FONT = "larger font"
 REASON_BOLD_BODY = "bold body-size line"
+# The PDF's own tags call this line a heading, "tagged heading h2" (`pipeline.tagged`).
+REASON_TAGGED = "tagged heading h"
 REASON_NUMBERED = "numbered section"
 REASON_NUMBERED_LINE = "standalone numbered line"
 REASON_LIST_NUMBER = "list-style number"
@@ -439,13 +441,22 @@ def release(pdf_bytes: bytes | None = None) -> None:
         _CACHE.release(pdf_bytes)
 
 
+def tagged_level(element: Element) -> int | None:
+    """The heading level the PDF's tags gave this element, or None."""
+    for reason in element.reasons:
+        if reason.startswith(REASON_TAGGED) and reason[len(REASON_TAGGED) :].isdigit():
+            return int(reason[len(REASON_TAGGED) :])
+    return None
+
+
 def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
     """Raw outline level (1-6) per heading element id, before outline repair.
 
     Sizes of size-based headings are clustered (within `HEADING_LEVEL_TOLERANCE`), the
     largest cluster is level 1. Bold body-size and plain numbered headings sit one level
     below the smallest size cluster; among them, deeper section numbers ("2.3.1" under
-    "2.3") go one level deeper per extra number. Used by heading_step and for the title.
+    "2.3") go one level deeper per extra number. A heading the PDF's tags gave a level
+    (`REASON_TAGGED`) has that level. Used by heading_step and for the title.
     """
     headings = [e for e in elements if e.kind == Kind.HEADING]
     sized = sorted(
@@ -467,7 +478,7 @@ def heading_levels(elements: Sequence[Element]) -> dict[str, int]:
             raw = level_of[round(e.font_size or 0.0, 1)]
         else:
             raw = below + max(0, (depth[e.id] or shallowest) - shallowest)
-        levels[e.id] = max(1, min(6, raw))
+        levels[e.id] = max(1, min(6, tagged_level(e) or raw))
     return levels
 
 

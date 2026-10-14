@@ -225,6 +225,8 @@ def figure_context(
     nearby = (context_text or "").strip()
     printed = " ".join((element.text or "").split()) if labels else ""
     parts = []
+    if element.source_alt:
+        parts.append(f"Alt text in the PDF's own tags (may be wrong): {element.source_alt}")
     if caption:
         parts.append(f"Caption: {caption}")
     if nearby and nearby != caption:
@@ -355,6 +357,33 @@ def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
     return main
 
 
+def _tagged_proposal(
+    element: Element, calls: list[ModelCall], confidence: float | None = None
+) -> Fix | None:
+    """When the model gave no description a student could use but the PDF's own tags have
+    one (`Element.source_alt`, checked by `pipeline.tagged`): that text as the proposal, a
+    decision for a reviewer, marked as taken from the tags and not checked against the
+    image (check "figure.source_alt"). None when the figure has no such text."""
+    if not element.source_alt:
+        return None
+    return Fix(
+        element_id=element.id,
+        kind=Kind.FIGURE,
+        status=Status.NEEDS_REVIEW,
+        confidence=confidence,
+        figure=FigureFix(figure_type="other", alt=element.source_alt),
+        checks=[
+            Check(
+                name="figure.source_alt",
+                passed=False,
+                severity="warning",
+                code="source_alt_unchecked",
+            )
+        ],
+        calls=calls,
+    )
+
+
 def _fix(
     element: Element, candidate: _Candidate, calls: list[ModelCall], settings: Settings
 ) -> Fix:
@@ -388,11 +417,15 @@ def _fix(
     output = candidate.output
     if output is None:
         outcome = calls[-1].outcome if calls else "skipped"
-        return make(Status.FAILED, f"model_{outcome}")
+        return _tagged_proposal(element, calls) or make(Status.FAILED, f"model_{outcome}")
     if output.confidence < settings.abstain_confidence:
-        return make(Status.ABSTAINED, "low_confidence")
+        return _tagged_proposal(element, calls, candidate.confidence) or make(
+            Status.ABSTAINED, "low_confidence"
+        )
     if has_errors(candidate.checks):
-        return make(Status.FAILED, "invalid_alt")
+        return _tagged_proposal(element, calls, candidate.confidence) or make(
+            Status.FAILED, "invalid_alt"
+        )
     failed = [c for c in candidate.checks if not c.passed]
     notes_only = all(c.severity == "warning" and c.code in NOTE_CODES for c in failed)
     if output.confidence >= _accept_bar(output, settings) and notes_only:
