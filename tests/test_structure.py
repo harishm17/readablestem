@@ -259,9 +259,9 @@ def test_an_entry_is_written_as_dt_and_dd_by_the_assembler():
     )
     html = render_html(title="T", lang="en", elements=[entry], fixes=[], crops={})
     assert (
-        '<dl><dt id="p1-e1">beta decay</dt><dd>breakdown of a neutron &lt;into&gt; a proton</dd></dl>'
-        in html
-    )
+        '<dl><dt id="p1-e1">beta decay</dt>'
+        "<dd>breakdown of a neutron &lt;into&gt; a proton</dd></dl>"
+    ) in html
     broken = entry.model_copy(update={"term_end": 99})  # a bad offset: a plain paragraph
     assert "<dl" not in render_html(title="T", lang="en", elements=[broken], fixes=[], crops={})
 
