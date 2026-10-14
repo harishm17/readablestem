@@ -1,0 +1,136 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>a11y-stem</h1>
+<p class="lede measure">a11y-stem helps instructors turn a STEM course PDF into an accessible web
+  page. It also shows a person which parts of the result to check.</p>
+
+<div class="callout">
+  <p>This site is a read-only demo. It needs no sign-in. Every result on it was made earlier and
+    is stored with the site. Nothing here sends a document to a model.</p>
+</div>
+
+<h2>What it is</h2>
+<div class="prose">
+  <p>An instructor uploads a PDF. a11y-stem reads it and returns one self-contained HTML file.</p>
+  <ul>
+    <li><strong>Equations</strong> become MathML, which a screen reader can speak. A model reads
+      each equation and proposes LaTeX. Checks then compare it with the PDF's own text.</li>
+    <li><strong>Headings</strong> become real headings, with levels that make sense as an outline.</li>
+    <li><strong>Lists</strong> become real lists.</li>
+    <li><strong>Figures</strong> get short alt text, or a plain flag that they need a description.</li>
+    <li><strong>Pages it cannot read</strong>, such as scans and handwriting, are kept as images
+      and marked.</li>
+  </ul>
+  <p>Anything it is unsure about goes to a review screen. The instructor accepts it, edits it or
+    keeps the original. The examples on this site show that screen in a static form.</p>
+</div>
+
+<h2>Who it is for</h2>
+<ul class="prose">
+  <li>Instructors with a course PDF that has equations, who need a version a screen reader can use.</li>
+  <li>Accessibility staff who review such conversions and want to see what was changed and why.</li>
+  <li>Technical reviewers who want to see the output and the evidence behind it.</li>
+</ul>
+
+<h2>What it does not do</h2>
+<ul class="prose">
+  <li>It does not check or certify conformance with WCAG, the ADA or any other standard. The output
+    still needs a person to look at it.</li>
+  <li>It does not read scans or handwriting. Those pages are kept as images and flagged.</li>
+  <li>It is not a general PDF-to-Markdown converter. It starts from a PDF, not from Word, LaTeX or
+    PowerPoint.</li>
+  <li>It does not remove the need for review. A model can be wrong, and some wrong answers agree
+    with the PDF's text and are not flagged.</li>
+</ul>
+
+<h2 id="numbers">The numbers</h2>
+{% if proof.available %}
+<p class="measure">
+  {% if proof.kind == "development" %}
+  <span class="tag dev">Development set</span>
+  {% elif proof.kind == "held-out" %}
+  <span class="tag">Held-out set</span>
+  {% else %}
+  <span class="tag">Set not stated</span>
+  {% endif %}
+  These figures are copied from <a href="{{ repo_url }}/blob/main/{{ proof.file_name }}">{{ proof.file_name }}</a>
+  in the repository as it stood when this site was built.
+</p>
+<div class="callout{% if proof.kind == 'development' %} flag{% endif %}">
+  {% for line in proof.banners %}
+  <p>{{ line }}</p>
+  {% endfor %}
+  {% if proof.kind == "development" %}
+  <p>They do not show how the tool does on material it has not seen. This page shows held-out
+    numbers only when <code>{{ proof.file_name }}</code> holds them.</p>
+  {% endif %}
+</div>
+
+<div class="table-scroll" role="region" aria-labelledby="numbers-caption" tabindex="0">
+<table>
+  <caption id="numbers-caption">Headline figures: {{ proof.title }}</caption>
+  <thead><tr><th scope="col">What was measured</th><th scope="col">Result</th><th scope="col">Count</th><th scope="col">95% interval</th><th scope="col">How to read it</th></tr></thead>
+  <tbody>
+  {% for h in proof.headlines %}
+  <tr><th scope="row">{{ h.label }}</th><td class="num">{{ h.value }}</td><td class="num">{{ h.count or "n/a" }}</td><td class="num">{{ h.interval or "n/a" }}</td><td>{{ h.note }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small muted measure">Intervals come from resampling a handful of sections, so they are
+  approximate and tend to be a little narrow. Nothing in this table measures conformance with a
+  standard.</p>
+
+{% if proof.status %}
+<h3>How the run was made</h3>
+<dl class="facts">
+  {% for key, value in proof.status %}
+  <dt>{{ key }}</dt><dd>{{ value }}</dd>
+  {% endfor %}
+</dl>
+{% endif %}
+{% if proof.parts %}
+<h3>Parts of the proof and their status</h3>
+<ul class="measure">
+  {% for part, status in proof.parts %}
+  <li>{{ part }}: {{ status }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+<p class="measure">The models named above are the ones the proof run used. The examples on this
+  site name their own models.</p>
+{% else %}
+<p class="measure">No <code>PROOF.md</code> was found when this site was built, so no figures are
+  shown. See the <a href="{{ repo_url }}">repository</a>.</p>
+{% endif %}
+
+<h2>Look at the output</h2>
+<ul class="grid">
+  <li class="card">
+    <h3><a href="{{ root }}examples/index.html">Worked examples</a></h3>
+    <p>{{ examples|length }} documents. For each: the PDF pages beside the HTML, what the checks
+      found, the decisions a person would see, and how some equations are read aloud.</p>
+  </li>
+  <li class="card">
+    <h3><a href="{{ root }}before-after/index.html">Before and after</a></h3>
+    <p>What a screen reader gets from the PDF's text layer, and what it gets from the HTML, for the
+      same equations.</p>
+  </li>
+  <li class="card">
+    <h3><a href="{{ root }}stemcheck/index.html">A second look with stemcheck</a></h3>
+    <p>A separate tool that lists where a chatbot's HTML says something the PDF does not. One
+      sample report.</p>
+  </li>
+</ul>
+
+<h2>Read the evidence</h2>
+<ul class="measure">
+  <li><a href="{{ repo_url }}/blob/main/README.md">README</a>: what the tool does, how to run it,
+    and its limits.</li>
+  <li><a href="{{ repo_url }}/blob/main/PROOF.md">PROOF.md</a>: every table behind the numbers
+    above, and what they leave out.</li>
+  <li><a href="{{ root }}method/index.html">Method and limits</a> on this site, and
+    <a href="{{ repo_url }}/blob/main/docs/eval.md">docs/eval.md</a> for the full method.</li>
+  <li><a href="{{ root }}attribution/index.html">Attribution</a> for every OpenStax page shown here.</li>
+</ul>
+{% endblock %}

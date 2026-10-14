@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>A second look with stemcheck</h1>
+<p class="lede measure">stemcheck is a separate, small tool. It compares an HTML version of a STEM
+  PDF with the PDF's own visible text. It lists the places where the HTML says something the PDF
+  does not.</p>
+
+<h2>What it checks</h2>
+<ul class="measure">
+  <li>A changed digit, sign or letter in an equation.</li>
+  <li>A bold vector that became a plain letter.</li>
+  <li>A reworded answer option, a dropped paragraph or an added hint.</li>
+</ul>
+<p class="measure">A person decides each place. It uses no model, no text recognition and no
+  network. It is for instructors who want to look at an HTML file before posting it, and for
+  accessibility staff who need a record of the checking done on a converted file. The HTML can come
+  from a chatbot, from a11y-stem or from another converter.</p>
+
+<h2>The sample report</h2>
+<p class="measure">The sample is a real run on HTML that a chatbot wrote from two OpenStax
+  <cite>Physics</cite> sections (2.2 and 2.3, development pages). It is not a11y-stem output.</p>
+<dl class="facts">
+  <dt>Tool</dt><dd>{{ stemcheck.version }}, source commit {{ stemcheck.commit }}</dd>
+  <dt>PDF</dt><dd>{{ stemcheck.pdf }}</dd>
+  <dt>HTML</dt><dd>{{ stemcheck.html }}. It writes its equations as TeX for MathJax, which needs a script to display them.</dd>
+  <dt>Command</dt><dd><code>{{ stemcheck.command }}</code></dd>
+  <dt>Coverage</dt><dd>{{ stemcheck.checkable }} of {{ stemcheck.pages }} pages could be checked. It compared {{ stemcheck.line_compared }}.</dd>
+  <dt>Found</dt><dd>{{ stemcheck.line_places }}. {{ stemcheck.line_rewrite|capitalize }}, which is why so many places are listed.</dd>
+</dl>
+<p><a class="btn" href="sample-report.html">Open the sample report</a></p>
+<p class="small muted measure">The report is one self-contained page of about 2 MB with page
+  images. It opens in the same tab and has no link back to this site: use your browser's Back
+  button to return.</p>
+
+<h2>How to read the report</h2>
+<ul class="measure">
+  <li>It starts with a list of what stemcheck cannot see, then the counts for this run. Read that
+    list first.</li>
+  <li>“Places to look at” are differences, not verdicts. The report never says that a file is
+    correct. No places listed would mean no differences were found in what was compared. It would
+    not mean the HTML is right or accessible.</li>
+  <li>Pages with no usable text layer, such as scans and handwriting, are listed as not
+    checkable.</li>
+</ul>
+
+<h2>What it is not</h2>
+<ul class="measure">
+  <li>It is not an accessibility checker. For that, use axe and a person.</li>
+  <li>It does not judge whether the PDF itself is right.</li>
+  <li>It does not check how a screen reader speaks the maths. The
+    <a href="{{ root }}before-after/index.html">before and after page</a> is about that.</li>
+</ul>
+<p class="measure">The source and the full documentation are in the
+  <a href="{{ stemcheck_url }}">stemcheck repository</a>. stemcheck is MIT licensed. It uses MuPDF,
+  which is AGPL-3.0.</p>
+{% endblock %}

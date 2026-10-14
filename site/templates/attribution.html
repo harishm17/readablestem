@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Attribution</h1>
+<p class="lede measure">Credit for every page of other people's work shown on this site.</p>
+
+<h2>OpenStax pages</h2>
+<p class="measure">OpenStax books are published under the Creative Commons Attribution 4.0 licence
+  (CC BY 4.0). The books used here are listed with their licence in the repository. a11y-stem is
+  not affiliated with or endorsed by OpenStax.</p>
+<div class="table-scroll" role="region" aria-labelledby="attr-cap" tabindex="0">
+<table>
+  <caption id="attr-cap">OpenStax sections shown on this site</caption>
+  <thead><tr><th scope="col">Title</th><th scope="col">Book and authors</th><th scope="col">Licence</th><th scope="col">Link</th></tr></thead>
+  <tbody>
+  {% for e in examples if e.meta.kind == "openstax" %}
+  <tr>
+    <th scope="row">{{ e.demo.page_title }}</th>
+    <td><cite>{{ e.demo.book_title }}</cite>, {{ e.demo.authors|join(", ") }}, OpenStax</td>
+    <td><a href="{{ e.demo.license_url }}">{{ e.demo.license_name }} (CC BY 4.0)</a></td>
+    <td><a href="{{ e.demo.page_url }}">{{ e.demo.page_url }}</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="measure"><strong>Changes.</strong> Each web page was printed to a PDF by this project. The PDF
+  was converted by a11y-stem, and the result is shown here with notes about what the tool checked.
+  The OpenStax wording was not edited. The sections 2.2 and 2.3 also appear in the stemcheck sample
+  report, with a chatbot's HTML made from them.</p>
+<p class="measure"><strong>Figures with other credits.</strong> A licence on a book does not change the
+  credit of a photograph or figure that OpenStax attributes to a third party. Such figures keep their
+  own licences and the credits OpenStax gives in their captions. They appear here only inside the
+  printed pages shown to demonstrate the tool.</p>
+<p class="measure">Where each page appears: the example pages, the “before and after” page, and the
+  sample report on the stemcheck page.</p>
+
+<h2>Other material</h2>
+<ul class="measure">
+  <li><strong>Lecture notes fixture.</strong> The text was invented for this project's tests and is under
+    the MIT licence, like the repository.</li>
+  <li><strong>stemcheck sample report.</strong> Made with stemcheck ({{ stemcheck.version }}), MIT licence.
+    It contains page images and text from the OpenStax sections above, with their credit.
+    <a href="{{ stemcheck_url }}">stemcheck repository</a>.</li>
+  <li><strong>This site.</strong> Written by {{ author }}. Text, code and stylesheet are MIT, as in the
+    <a href="{{ repo_url }}">repository</a>. See
+    <a href="{{ repo_url }}/blob/main/THIRD_PARTY_NOTICES.md">THIRD_PARTY_NOTICES.md</a> for every
+    file and package licence.</li>
+</ul>
+{% if proof.available %}
+<p class="measure small muted">The figures on the home page come from {{ proof.file_name }}, which has
+  its own attribution section for the OpenStax sections it scores.</p>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,221 @@
+{% extends "base.html" %}
+{% block head %}<link rel="stylesheet" href="{{ root }}assets/converted.css">{% endblock %}
+{% block content %}
+{% set d = example.demo %}
+{% set s = summary %}
+<p class="eyebrow">Worked example</p>
+<h1>{{ example.title }}</h1>
+<p class="lede measure">{{ example.meta.blurb }}</p>
+
+<nav aria-label="On this page" class="measure">
+  <ul>
+    <li><a href="#side-by-side">The PDF beside the HTML</a></li>
+    <li><a href="#checks">What the checks found</a></li>
+    <li><a href="#decisions">Decisions a person would see</a></li>
+    <li><a href="#spoken">How some equations are read aloud</a></li>
+    <li><a href="#files">Files and credit</a></li>
+  </ul>
+</nav>
+
+<h2 id="about">About this conversion</h2>
+<dl class="facts">
+  <dt>Source</dt>
+  <dd>{% if example.meta.kind == "openstax" %}<cite>{{ d.book_title }}</cite>, section “{{ d.page_title }}”, by {{ d.authors|join(", ") }}, OpenStax.
+    <a href="{{ d.page_url }}">Original page</a>.{% else %}{{ d.page_title }}. Invented text, written for this project's tests (MIT).{% endif %}</dd>
+  <dt>Set</dt><dd>{{ example.meta.set|capitalize }}.</dd>
+  <dt>Converted</dt><dd>{{ d.date }}, by pipeline version {{ d.pipeline_version }} with {{ provider }}. {{ s.calls }} model calls, ${{ s.cost }}.</dd>
+  <dt>What came out</dt>
+  <dd>{{ s.pages }} PDF pages: {{ s.headings }} headings, {{ s.equations }} equations, {{ s.figures }} figures.
+    {{ s.accepted }} items were accepted without a question. {{ s.asked }}
+    {{ "decision was" if s.asked == 1 else "decisions were" }} asked of a person{% if s.optional %}, and
+    {{ s.optional }} {{ "item carries" if s.optional == 1 else "items carry" }} an optional note{% endif %}.</dd>
+</dl>
+
+<h3>The PDF as it came</h3>
+<ul class="measure">
+  <li>{% if s.source.tagged %}The PDF is tagged.{% else %}The PDF is not tagged, so it carries no structure for a screen reader.{% endif %}</li>
+  <li>{% if s.source.has_lang %}It declares a language.{% else %}It declares no language.{% endif %}{{ " " }}{% if s.source.bookmarks %}It has {{ s.source.bookmarks }} bookmarks.{% else %}It has no bookmarks.{% endif %}</li>
+  {% if s.source.images %}
+  <li>{{ s.source.images }} images{% if s.source.images_with_alt is none %}; an untagged PDF cannot carry alt text for them{% else %}, {{ s.source.images_with_alt }} with alt text{% endif %}.</li>
+  {% endif %}
+  {% if s.source.equations %}
+  <li>{{ s.source.equations }} equations were found. In {{ s.source.equations_flattened }} of them the text layer loses the structure (fractions, scripts, roots), so a screen reader gets a flat string.
+    {% if s.source.bold_maths_letters %}{{ s.source.bold_maths_letters }} bold letters in maths appear in the text layer as plain letters, so a vector can read as a plain number.{% endif %}</li>
+  {% endif %}
+</ul>
+<p class="measure"><strong>Honest scope.</strong> These are the stored proposals as the tool made
+  them. The review decisions below were never taken: this page shows what a person would be asked.</p>
+
+<h2 id="side-by-side">The PDF beside the HTML</h2>
+<p class="measure">Left, a page of the PDF as printed. Right, the HTML the tool made from that page,
+  using the tool's own styles. The equations are MathML, so they are real text a screen reader can
+  speak. Heading levels are shifted down in these excerpts so they nest under this page's own
+  headings; the full converted page has the real levels.
+  <a href="converted.html">Open the full converted page</a>.</p>
+{% for p in example.pairs %}
+<section aria-labelledby="pair-{{ p.number }}">
+  <h3 id="pair-{{ p.number }}">Page {{ p.number }}</h3>
+  <div class="pair">
+    <figure class="pdf-page">
+      <img src="{{ p.image }}" width="{{ p.width }}" height="{{ p.height }}" loading="lazy" alt="Page {{ p.number }} of the source PDF, as printed. The same content is in the converted HTML beside it.">
+      <figcaption>PDF page {{ p.number }}</figcaption>
+    </figure>
+    <div>
+      <p class="out-label">Converted HTML, page {{ p.number }}</p>
+      <div class="converted">
+{{ p.html|safe }}
+      </div>
+    </div>
+  </div>
+</section>
+{% endfor %}
+
+<h2 id="checks">What the checks found</h2>
+<p class="measure">Two kinds of check run on every conversion. They find some problems. They do not
+  show that a page is accessible.</p>
+<h3>Checks on the whole page</h3>
+<details class="measure">
+  <summary>{{ page_checks|selectattr("passed")|list|length }} of {{ page_checks|length }} page rules passed. Show the list.</summary>
+<div class="table-scroll" role="region" aria-labelledby="pc-cap" tabindex="0">
+<table>
+  <caption id="pc-cap">Page checks (static rules the tool runs on its own HTML)</caption>
+  <thead><tr><th scope="col">Rule</th><th scope="col">Result</th></tr></thead>
+  <tbody>
+  {% for c in page_checks %}
+  <tr><td>{{ c.text }}</td><td>{% if c.passed %}Passed{% elif c.severity == "error" %}Failed{% else %}Warning{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+</details>
+<p class="small muted measure">The full axe-core test is run on the tool's own test documents in
+  its test suite, not on each conversion shown here.</p>
+
+<h3>Checks on single items</h3>
+{% if findings %}
+<div class="table-scroll" role="region" aria-labelledby="fc-cap" tabindex="0">
+<table>
+  <caption id="fc-cap">Item checks that did not pass, and what happened to those items</caption>
+  <thead><tr><th scope="col">What the check found</th><th scope="col">Items</th><th scope="col">Asked a person</th><th scope="col">Optional note</th><th scope="col">Accepted without a question</th></tr></thead>
+  <tbody>
+  {% for f in findings %}
+  <tr><td>{{ f.text }} <span class="small muted">({{ f.code }})</span></td><td class="num">{{ f.count }}</td><td class="num">{{ f.asked }}</td><td class="num">{{ f.note }}</td><td class="num">{{ f.accepted }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+<p class="small muted measure">An item can fail more than one check, so the rows can add up to
+  more than the number of items.</p>
+{% else %}
+<p class="measure">Every item check passed.</p>
+{% endif %}
+{% if notices %}
+<h3>Notices about the document</h3>
+<ul class="measure">
+  {% for n in notices %}<li>{{ n }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<h2 id="decisions">Decisions a person would see</h2>
+<p class="measure">The app shows these on its review screen, one at a time, beside the page. Here
+  they are as a static list. Each card has the original, the proposal, why the tool is asking, and
+  what each choice would do. The buttons are not live.</p>
+{% if example.cards %}
+<ol class="decisions">
+  {% for c in example.cards %}
+  <li class="decision {{ c.tier }}" id="{{ c.anchor }}">
+    <h3>{{ c.title }}</h3>
+    <p class="meta">{{ c.kind }}. {{ c.meta }}</p>
+    {% if c.crop %}
+    <p class="part-label">In the PDF</p>
+    <img class="crop" src="{{ c.crop }}" width="{{ c.crop_size[0] }}" height="{{ c.crop_size[1] }}" loading="lazy" alt="{{ c.crop_alt }}" style="max-width:100%;height:auto">
+    {% endif %}
+    {% if c.mathml %}
+    <p class="part-label">Proposal</p>
+    <div class="proposal" tabindex="0" role="group" aria-label="Proposed equation">{{ c.mathml|safe }}</div>
+    {% elif c.proposal_text %}
+    <p class="part-label">{{ c.proposal_label }}</p>
+    <p class="proposal">{{ c.proposal_text }}</p>
+    {% endif %}
+    {% if c.said_plain %}
+    <p class="said"><span class="lab">Read aloud roughly as:</span> “{% if c.said %}{% for s in c.said %}{% if s.differs %}<mark class="said-diff">{{ s.text }}</mark>{% else %}{{ s.text }}{% endif %}{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ c.said_plain }}{% endif %}”</p>
+    {% if c.pdf_text %}
+    <p class="said"><span class="lab">From the PDF's text a screen reader gets:</span> “{{ c.pdf_text }}”{% if c.pdf_said_plain %}, roughly “{% if c.pdf_said %}{% for s in c.pdf_said %}{% if s.differs %}<mark class="said-diff">{{ s.text }}</mark>{% else %}{{ s.text }}{% endif %}{% if not loop.last %} {% endif %}{% endfor %}{% else %}{{ c.pdf_said_plain }}{% endif %}”{% endif %}</p>
+    {% if c.said %}<p class="small muted">Marked: the words where the two readings differ.</p>{% endif %}
+    {% else %}
+    <p class="said"><span class="lab">From the PDF's text a screen reader gets:</span> nothing here. The PDF has no text for this equation.</p>
+    {% endif %}
+    {% endif %}
+    {% if c.diff_rows %}
+    <div class="table-scroll" role="region" aria-label="What differs, {{ c.title }}" tabindex="0">
+    <table>
+      <caption>What differs</caption>
+      <thead><tr><th scope="col">Symbol</th><th scope="col">In the PDF</th><th scope="col">Proposal</th><th scope="col">Changes the meaning</th></tr></thead>
+      <tbody>
+      {% for r in c.diff_rows %}
+      <tr><th scope="row">{{ r.symbol }} <span class="small muted">{{ r.what|lower }}</span></th><td>{{ r.pdf }}</td><td>{{ r.proposal }}</td><td>{% if r.meaning %}<strong>Yes</strong>{% else %}No{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% endif %}
+    <p class="part-label">Why the tool is asking</p>
+    <ul>
+      {% for w in c.why %}<li>{{ w }}</li>{% endfor %}
+    </ul>
+    <p class="part-label">What each choice does</p>
+    <ul class="choices">
+      {% for name, what in c.choices %}<li><strong>{{ name }}.</strong> {{ what }}</li>{% endfor %}
+    </ul>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="measure">The tool asked for no decisions on this document.</p>
+{% endif %}
+
+{% if example.optional_lines %}
+<h3>Optional notes</h3>
+<p class="measure">These items were accepted. The tool left a note for a person who wants to look.</p>
+<ul class="measure">
+  {% for line in example.optional_lines %}<li>{{ line }}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<h2 id="spoken">How some equations are read aloud</h2>
+{% if speech_rows %}
+<p class="measure">Two readings of the same equation. “From the PDF's text” is the PDF's own text
+  layer read by the tool's speech rules. “From the HTML” is the MathML read the same way. These are
+  approximations, not recordings of a screen reader. <a href="{{ root }}before-after/index.html">See all of them with the printed equation</a>.</p>
+<div class="table-scroll" role="region" aria-labelledby="sp-cap" tabindex="0">
+<table>
+  <caption id="sp-cap">Spoken readings, {{ example.meta.short }}</caption>
+  <thead><tr><th scope="col">Equation</th><th scope="col">From the PDF's text</th><th scope="col">From the HTML</th></tr></thead>
+  <tbody>
+  {% for r in speech_rows %}
+  <tr>
+    <th scope="row"><span class="small muted">Page {{ r.page }}</span> <div class="proposal" tabindex="0" role="group" aria-label="Equation as MathML">{{ r.mathml|safe }}</div></th>
+    <td>“{{ r.pdf_said }}”</td>
+    <td>“{{ r.html_said }}”</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="measure">No equations were chosen for this example.</p>
+{% endif %}
+
+<h2 id="files">Files and credit</h2>
+<ul class="measure">
+  <li><a href="converted.html">The full converted HTML page</a> (one self-contained file).</li>
+  <li><a href="source.pdf">The source PDF</a>{% if example.meta.kind == "openstax" %}, printed from the OpenStax web page by this project{% endif %}.</li>
+  <li><a href="report.json">The stored result</a> (JSON): every item, its checks and its confidence.</li>
+</ul>
+{% if example.meta.kind == "openstax" %}
+<p class="measure small">“{{ d.page_title }}” from <cite>{{ d.book_title }}</cite> by {{ d.authors|join(", ") }}, OpenStax, is under
+  <a href="{{ d.license_url }}">{{ d.license_name }} (CC BY 4.0)</a>. Changes: printed to PDF, converted by a11y-stem, and
+  shown here with review notes. Wording was not edited. Some figures in OpenStax books carry their own credits.
+  <a href="{{ root }}attribution/index.html">All credits</a>.</p>
+{% endif %}
+{% endblock %}

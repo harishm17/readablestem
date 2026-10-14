@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Worked examples</h1>
+<p class="lede measure">{{ examples|length }} documents, each converted once and stored. Each page
+  shows the PDF beside the HTML it became.</p>
+<p class="measure">Three are pages from OpenStax <cite>Physics</cite>, used while the tool was
+  built (development pages). One is a small fixture written for this project's tests. The model
+  that made each result is named on its page. Costs are list prices for the model calls.</p>
+
+<div class="table-scroll" role="region" aria-labelledby="ex-caption" tabindex="0">
+<table>
+  <caption id="ex-caption">The examples and what came out</caption>
+  <thead>
+    <tr>
+      <th scope="col">Example</th><th scope="col">Made with</th><th scope="col">PDF pages</th>
+      <th scope="col">Headings</th><th scope="col">Equations</th><th scope="col">Figures</th>
+      <th scope="col">Decisions asked</th><th scope="col">Cost</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for e in examples %}
+  {% set s = summaries[e.id] %}
+  <tr>
+    <th scope="row"><a href="{{ e.id }}/index.html">{{ e.meta.short }}</a></th>
+    <td>{{ providers[e.id] }}, {{ e.demo.date }}</td>
+    <td class="num">{{ s.pages }}</td>
+    <td class="num">{{ s.headings }}</td>
+    <td class="num">{{ s.equations }}</td>
+    <td class="num">{{ s.figures }}</td>
+    <td class="num">{{ s.asked }}</td>
+    <td class="num">${{ s.cost }}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<ul class="grid">
+  {% for e in examples %}
+  <li class="card">
+    <h2><a href="{{ e.id }}/index.html">{{ e.title }}</a></h2>
+    <p>{{ e.meta.blurb }}</p>
+    <p class="small muted">Set: {{ e.meta.set }}.</p>
+  </li>
+  {% endfor %}
+</ul>
+
+<h2>How to read an example</h2>
+<ul class="measure">
+  <li><strong>Decisions asked</strong> counts the things the tool would ask a person to decide.
+    A group of repeated headings counts once.</li>
+  <li>An item the tool accepts without asking can still be wrong. The decisions shown are the
+    tool's choice of where a person should look first.</li>
+  <li>The PDFs of the OpenStax pages were printed from OpenStax's web pages by this project, not
+    taken from the publisher's own PDFs.</li>
+</ul>
+{% endblock %}

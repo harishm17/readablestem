@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% if current != "home" and title %}{{ title }} | {% endif %}a11y-stem demo</title>
+<meta name="description" content="{% block description %}A static demo of a11y-stem, which helps instructors turn STEM course PDFs into accessible web pages. Real OpenStax pages, no sign-in.{% endblock %}">
+{% block head %}{% endblock %}
+<link rel="stylesheet" href="{{ root }}assets/site.css">
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to the content</a>
+<header class="site-header">
+  <div class="bar">
+    <a class="brand" href="{{ root }}index.html">a11y-stem <span class="visually-hidden">reviewer demo, home</span></a>
+    <nav class="site-nav" aria-label="Site">
+      <ul>
+        {% for key, label, href in nav %}
+        <li><a href="{{ root }}{{ href }}"{% if key == current %} aria-current="page"{% endif %}>{{ label }}</a></li>
+        {% endfor %}
+      </ul>
+    </nav>
+  </div>
+</header>
+<main id="main">
+{% block content %}{% endblock %}
+</main>
+<footer class="site-footer">
+  <p>Made by {{ author }}. The code, and the text and code of this site, are under the MIT licence.
+    The OpenStax pages, figures and equations shown here are under
+    <a href="{{ cc_by }}">CC BY 4.0</a>; credits are on the
+    <a href="{{ root }}attribution/index.html">attribution page</a>.
+    <a href="{{ stemcheck_url }}">stemcheck</a> is a separate project, also MIT.</p>
+  <p>This is a demonstration. a11y-stem assists a person who makes course material
+    accessible. It does not certify anything. It is not affiliated with or endorsed by
+    OpenStax.</p>
+  <p><a href="{{ repo_url }}">Source repository</a> ·
+    <a href="{{ repo_url }}/blob/main/README.md">README</a> ·
+    <a href="{{ repo_url }}/blob/main/PROOF.md">PROOF.md</a></p>
+</footer>
+</body>
+</html>
