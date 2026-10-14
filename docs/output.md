@@ -563,6 +563,19 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
+### One h1 (T3-13)
+
+A file should have one top-level heading. A slide deck has one per slide, so when the
+repaired outline would write two or more `<h1>` the assembler writes the document's title
+as the only `<h1>` (the title students hear, see "One self-contained file": the one the
+instructor typed on the job page, else the PDF's title without its section number) and
+moves every heading one level down, so the slide titles are `<h2>` (capped at `<h6>`). A
+file with at most one `<h1>` is written as before. The move comes after the repair above,
+so the review screen's levels (`would_write`) are the levels before it. The "About this
+version" title is a labelled paragraph, not a heading: the `<footer>` is named by it
+(`aria-labelledby`), so a screen reader user reaches it as a landmark, and it is not a
+section of the document's outline.
+
 ## The note for students ("About this version")
 
 The file ends with a short note for the people who read it, in a `<footer>` after
@@ -604,7 +617,7 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 About 35 lines of inline CSS:
 
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
-  (about 17:1 contrast);
+  (about 17:1 contrast; a dark scheme follows below);
 - images at their printed size (PDF points x 96/72) and never wider than the column;
 - display equations scroll sideways inside their `.equation` box when wider than the
   screen (see "Wide equations");

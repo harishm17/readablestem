@@ -603,6 +603,9 @@ class _Renderer:
     styles: dict[str, str] = field(default_factory=dict)
     # Write the stored speech as each <math>'s alttext (Settings.mathml_alttext).
     math_alttext: bool = False
+    # Levels added to every heading written (T3-13): 1 when the document has several
+    # top-level headings (slides), so its title can be the one h1 above them.
+    demote: int = 0
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -814,7 +817,7 @@ class _Renderer:
                 attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
-        level = self.outline.write(level)
+        level = min(6, self.outline.write(level) + self.demote)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
         return f"<h{level}{attrs}>{self.rich(text, element)}</h{level}>"
 
@@ -1038,7 +1041,7 @@ def _about_section(
     return (
         f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
-        f'<h2 id="{ABOUT_TITLE_ID}">{ABOUT_TITLE}</h2>\n'
+        f'<p id="{ABOUT_TITLE_ID}" class="about-title">{ABOUT_TITLE}</p>\n'
         f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
         f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
     )
@@ -1117,6 +1120,7 @@ figcaption { margin-top: 0.5em; }
 .about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
   border-top: 2px solid #1b1b1b; }
 @media (min-width: 44rem) { .about { margin: 0 auto; } }
+.about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
 """
@@ -1159,6 +1163,9 @@ _FIXED_ALT_IMG = re.compile(
     + r')")'
 )
 _DATA_TABLE_CAPTION = re.compile(r'(<caption id="[^"<>]*-data-caption")')
+
+
+_H1 = re.compile(r"<h1[\s>]")
 
 
 def _authored_in_english(part: str, lang: str) -> str:
@@ -1210,11 +1217,25 @@ def render_html(
         first_fix.setdefault(fix.element_id, fix)
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
-    renderer = _Renderer(
-        fixes=first_fix, crops=crops, equations=equations, math_alttext=math_alttext
-    )
-    renderer.placed = _placed_equations(ordered, renderer, set(equations))
-    body = renderer.render_all(ordered)
+
+    def render_body(demote: int) -> tuple[_Renderer, list[str]]:
+        made = _Renderer(
+            fixes=first_fix,
+            crops=crops,
+            equations=equations,
+            math_alttext=math_alttext,
+            demote=demote,
+        )
+        made.placed = _placed_equations(ordered, made, set(equations))
+        return made, made.render_all(ordered)
+
+    renderer, body = render_body(0)
+    # Several top-level headings (a slide deck: one per slide) are not an outline: the
+    # document's title becomes the one h1 and every heading moves one level down, so the
+    # slide titles are h2 (T3-13). Rendered again so ids and styles are claimed afresh.
+    several_tops = sum(len(_H1.findall(part)) for part in body) >= 2
+    if several_tops:
+        renderer, body = render_body(1)
     kept_pages = [
         e.page
         for e in ordered
@@ -1238,7 +1259,7 @@ def render_html(
         if level is not None
     ]
     page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
-    if title_set and not any("<h1" in part for part in body):
+    if (title_set or several_tops) and not any("<h1" in part for part in body):
         body = [f"<h1>{_escape(page_title)}</h1>", *body]
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
