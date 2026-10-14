@@ -378,6 +378,45 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   text-layer checks compare the model's answer with. A row that already starts a list
   item (siblings `17.`, `19.` confirmed it) is untouched, and so are `2.5` (a decimal) and
   `A)` (a letter).
+  A number that is a row of its own (`6.`, `14)`, in a text font, one or two tokens: OpenStax
+  sets it above or beside the first line of an exercise that is only a stacked fraction or a
+  system) is marked the same way (`_lone_exercise_number`, `_Row.exercise_number`); read as
+  a fragment it was drawn into the equation by `_math_neighbours`.
+- **Rows of a table, braced systems (T2-2).** Two whole equations also join when they are
+  set at most 0.7 x font size apart and share a left edge, a right edge or a centre
+  within 0.3 x font size (`_table_rows`: OpenStax centres each row of a system; a row may
+  line up with any earlier row of its equation, not only the last). Two numbered rows still
+  stay apart. A system's opening brace is part of the equation: a brace in the text font on
+  the first row after prose ("Solve the system by substitution. { 2x + y = 7") is cut from
+  the sentence (`_split_braced_systems`: maths follows it, there is no closing brace, and
+  a maths row sits under that maths), and a brace that is a row of its own, level with the
+  middle of the rows, joins them whatever its distance to the left (`_Line.opens_system`);
+  alignment ignores it (`_Line.body_x0`).
+- **Inline stacked fractions (T2-1, T2-11).** A fraction set in a line of text has its
+  numerator and denominator on either side of a thin bar in a smaller size, and the text
+  extractor cuts them into the lines above and below, each among the words of its line.
+  `_lift_stacked_fractions` takes the glyphs over and under each short bar out of those
+  lines and puts them back as one fragment (numerator, space, denominator, each glyph
+  marked `stacked`) on the baseline of the text beside the bar (the nearest letter or
+  digit, not a tall bracket). It applies only when the line of the bar has three plain
+  letters (a display equation's fractions are read with their rows), the glyphs are
+  smaller than the text and not wider than the bar, and no other bar lies among them (a
+  complex fraction is left as it was). `stacked` glyphs count as maths and are evidence of
+  an inline equation (`"stacked fraction"`); they do not set a row's size or baseline.
+  `_lift_stacked_pairs` does the same for a binomial or a column of two (`( 5 over 3 )`:
+  brackets round one short token above and one below, nothing between them on the line of
+  the brackets). A lone bracket that is a row of its own (TeX sets a tall bracket lowered)
+  joins the line it stands in (`_attach_big_operators`), and a closing bracket followed by
+  a sub- or superscript is evidence of maths (`(x)ₙ`).
+- **Half a fraction (T2-11).** An equation whose box ends at a thin bar with glyphs on the
+  other side of the bar gets the reason `"half a fraction"` (`_flag_half_fractions`). The
+  equation step adds the warning `equation.region: half_fraction`, holds the confidence
+  under the accept bar and never accepts without a decision.
+- **Inline maths split or merged (T2-6).** A middle dot `·` or `∙` in the text font (Chromium
+  prints a product so) is an operator, so a run goes on through it. A blank in a text font
+  between maths-font glyphs ends the run (`_between_formulas`): Chromium puts the spaces
+  inside a formula in the maths font and the space between two formulas ("B = 0, C = 1")
+  in the text font.
 - **Equation numbers.** A row that reads as an equation number and touches no rule goes
   to the line it sits beside (`_number_beside`, nearest vertical centre first), unless
   that line ends with a relation or operator (`x =   2.4`: the number is its right-hand
