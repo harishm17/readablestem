@@ -1162,7 +1162,7 @@ def _join_rows(left: _Row, right: _Row) -> _Row:
 # denominator at most this far (x font size) above and below it.
 MAX_INLINE_BAR = 8.0
 INLINE_FRACTION_REACH = 1.1
-PROSE_LETTERS_BESIDE_BAR = 3  # plain letters near a bar that say it stands in running text
+PROSE_LETTERS_ON_LINE = 3  # plain letters on a bar's line that say it stands in running text
 
 
 def _lift_stacked_fractions(frags: list[_Row], rules: Sequence[_Path]) -> list[_Row]:
@@ -1255,7 +1255,8 @@ def _fraction_at(
     middle = (y0 + y1) / 2
     reach = 1.6 * index.largest
     candidates: list[tuple[_Row, int, _Char]] = []
-    beside: list[_Char] = []
+    beside: list[_Char] = []  # glyphs level with the bar, near it
+    line: list[_Char] = []  # ... or anywhere on its line
     for row in index.near(middle - reach, middle + reach):
         for i, c in enumerate(row.chars):
             if c.blank or id(c) in claimed:
@@ -1263,13 +1264,15 @@ def _fraction_at(
             centre_x = (c.x0 + c.x1) / 2
             if x0 - 1.0 <= centre_x <= x1 + 1.0:
                 candidates.append((row, i, c))
-            elif c.y0 <= middle <= c.y1 and abs(centre_x - (x0 + x1) / 2) <= 6 * c.size + (x1 - x0):
-                beside.append(c)
+            elif c.y0 <= middle <= c.y1:
+                line.append(c)
+                if abs(centre_x - (x0 + x1) / 2) <= 6 * c.size + (x1 - x0):
+                    beside.append(c)
     # Only inside running text: a fraction in a display equation is read with its rows
-    # (`_equation_regions`), and lifting it would cut those rows. Three plain letters
-    # within a few font sizes of the bar are words.
-    words = sum(c.c.isalpha() and not c.math for c in beside)
-    if words < PROSE_LETTERS_BESIDE_BAR:
+    # (`_equation_regions`), and lifting it would cut those rows. Three plain letters on
+    # the line of the bar are words.
+    words = sum(c.c.isalpha() and not c.math for c in line)
+    if words < PROSE_LETTERS_ON_LINE:
         return None
     # The text around the bar must be set bigger than the glyphs on it: that is what makes
     # it an inline fraction (a display fraction's own line has glyphs of the same size).
@@ -1293,7 +1296,9 @@ def _fraction_at(
     if width > MAX_INLINE_BAR * size or covered < 0.6 * width or covered > width + 2.0:
         return None
     nearest = min(
-        (c for c in beside if c.size >= size / SCRIPT_RATIO),
+        (
+            c for c in beside if c.size >= size / SCRIPT_RATIO and c.c.isalnum()
+        ),  # not a tall bracket
         key=lambda c: abs((c.x0 + c.x1) / 2 - (x0 + x1) / 2),
         default=None,
     )
