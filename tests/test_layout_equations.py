@@ -258,3 +258,174 @@ def test_a_prefixed_equation_number_close_to_the_maths_becomes_its_label(label, 
     assert equation.equation_label == label
     assert nospace(equation.text) == "v=d/t"
     assert equation.bbox[2] < 250 + width + gap  # the number is not in the crop
+
+
+# ---------------------------------------------------------------- rows of a table
+
+
+def centred_rows(page: pymupdf.Page, rows: list[str], pitch: float) -> None:
+    """Whole equations, each centred on x = 300 (OpenStax prints a system so)."""
+    for i, text in enumerate(rows):
+        width = pymupdf.get_text_length(text, fontname="helv", fontsize=BODY)
+        page.insert_text((300 - width / 2, 140 + i * pitch), text, fontsize=BODY)
+
+
+def test_centred_rows_set_close_together_are_one_system():
+    def fill(page):
+        prose(page, 100, "Set up a system of equations for the coefficients.")
+        centred_rows(page, ["3 = A + B", "0 = - A + 2 B", "5 = 4 A + 3 B"], pitch=13.5)
+        prose(page, 230, "Adding the first two equations eliminates the first unknown.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
+    assert nospace(elements[1].text) == "3=A+B0=-A+2B5=4A+3B"
+
+
+def test_centred_whole_equations_set_an_em_apart_stay_separate():
+    def fill(page):
+        prose(page, 100, "Set up a system of equations for the coefficients.")
+        centred_rows(page, ["3 = A + B", "0 = - A + 2 B"], pitch=26)
+        prose(page, 230, "Adding the two equations eliminates the first unknown.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements].count(Kind.EQUATION) == 2
+
+
+# ---------------------------------------------------------------- a braced system
+
+
+def braced_system(page: pymupdf.Page, number: str | None, brace_row: int) -> None:
+    """OpenStax: the brace is in the text font, on the first row, after the prose; or
+    it is a glyph of its own at the left, level with the middle of the two rows."""
+    prose(page, 100, "Work through the next exercise carefully.")
+    if number:
+        page.insert_text((72, 128), number, fontsize=BODY, fontname="helv")
+    if brace_row == 0:
+        page.insert_text(((number and 100) or 72, 140), "Solve the system.", fontsize=BODY)
+        page.insert_text(((number and 190) or 162, 140), "{", fontsize=BODY)
+    else:
+        page.insert_text((176, 147), "{", fontsize=BODY)
+    page.insert_text(((number and 200) or 172, 140), "2 a + b = 7", fontsize=BODY, fontname="symb")
+    page.insert_text(((number and 200) or 172, 154), "a - 2 b = 6", fontsize=BODY, fontname="symb")
+    prose(page, 230, "Then check the answer in both original equations as well.")
+
+
+def test_a_brace_after_prose_keeps_both_rows_of_the_system_in_one_equation():
+    elements = analyze(one_page(lambda page: braced_system(page, None, 0))).elements
+    blocks = equations(elements)
+    assert [nospace(e.text) for e in blocks] == ["{2a+b=7a-2b=6"]
+    assert blocks[0].display == "block"
+    assert any(e.kind == Kind.PARAGRAPH and "Solve the system." in (e.text or "") for e in elements)
+
+
+def test_a_brace_beside_the_middle_of_the_rows_is_part_of_the_system():
+    elements = analyze(one_page(lambda page: braced_system(page, "87.", 1))).elements
+    blocks = equations(elements)
+    assert len(blocks) == 1
+    assert sorted(nospace(blocks[0].text)) == sorted("{2a+b=7a-2b=6")
+    assert "87." in [e.text for e in elements if e.kind != Kind.EQUATION]
+
+
+def test_a_set_in_braces_is_not_cut_from_its_sentence():
+    def fill(page):
+        prose(page, 100, "The solution set is { 1, 2, 3 } and nothing else.")
+        page.insert_text((230, 140), "x = 7", fontsize=BODY, fontname="tiit")
+        prose(page, 230, "That is the end of the example for this page of text.")
+
+    elements = analyze(one_page(fill)).elements
+    assert "{ 1, 2, 3 }" in (elements[0].text or "")
+
+
+# ---------------------------------------------------------------- cases with words
+
+
+def row_of(text: str, x: float, y0: float, size: float = BODY) -> layout._Row:
+    chars, at = [], x
+    for ch in text:
+        width = 0.5 * size
+        chars.append(
+            layout._Char(ch, at, y0, at + width, y0 + size, y0 + size - 2, size, "CMR10", 0)
+        )
+        at += width
+    return layout._Row(chars)
+
+
+def cases_rows() -> tuple[list[layout._Row], list[layout._Row]]:
+    """g(t) = { 9t for t > 0 / 45 for t < 5 / 7t otherwise }: the brace as three abutting
+    pieces (the CMEX glyphs TeX builds a tall one from), one row each for value and
+    condition, a wide gap between them."""
+    brace = [row_of("\uf8f1", 250, 130), row_of("\uf8f2", 250, 141), row_of("\uf8f3", 250, 152)]
+    values = [row_of("9t", 270, 132), row_of("45", 270, 147), row_of("7t", 270, 160)]
+    conditions = [row_of("for t > 0", 360, 132), row_of("for t < 5", 360, 147),
+                  row_of("otherwise", 360, 160)]  # fmt: skip
+    return brace, [*values, *conditions]
+
+
+def test_rows_beside_a_tall_brace_are_maths_whatever_words_they_hold():
+    brace, rest = cases_rows()
+    rows = [*brace, *rest]
+    for row in rows:
+        layout._classify_row(row)
+    assert all(r.kind != "math" for r in rest if "for" in r.text or "other" in r.text)
+    layout._mark_case_rows(rows)
+    assert all(r.kind == "math" and r.case_row for r in rows)
+
+
+def test_a_brace_with_one_row_beside_it_is_not_cases():
+    brace, _ = cases_rows()
+    one = [row_of("9t", 270, 140), row_of("for t > 0", 360, 140)]
+    rows = [*brace, *one]
+    for row in rows:
+        layout._classify_row(row)
+    layout._mark_case_rows(rows)
+    assert not any(r.case_row for r in rows)
+
+
+def test_a_set_in_braces_is_not_cases():
+    brace, rest = cases_rows()
+    closing = row_of("}", 400, 140)
+    rows = [*brace, *rest, closing]
+    for row in rows:
+        layout._classify_row(row)
+    layout._mark_case_rows(rows)
+    assert not any(r.case_row for r in rows)
+
+
+def test_stacked_list_braces_are_not_one_tall_brace():
+    # "2. { ... " and "3. { ... " in a list: braces at one x, a line apart, not abutting.
+    rows = [row_of("{", 250, 130), row_of("a b", 270, 130), row_of("{", 250, 145),
+            row_of("c d", 270, 145)]  # fmt: skip
+    for row in rows:
+        layout._classify_row(row)
+    layout._mark_case_rows(rows)
+    assert not any(r.case_row for r in rows)
+
+
+def test_a_display_fraction_over_a_close_equation_is_not_a_table_row():
+    """2-2 of the OpenStax Physics: "time = distance / v" with its fraction at the size of
+    its line, directly over "distance = v x time", centred like it, a few points apart:
+    two equations, as the source has them."""
+
+    def fill(page):
+        prose(page, 100, "You can rearrange the equation to solve for either quantity")
+        page.insert_text((276, 140), "t =", fontsize=12)
+        fraction(page, 298, 136, "d", "v", 8, size=12)
+        page.insert_text((266, 164), "d = v x t", fontsize=12)
+        prose(page, 206, "Suppose, for example, a car travels 150 kilometers in 3.2 hours.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements].count(Kind.EQUATION) == 2
+
+
+def test_rows_with_small_fractions_set_close_together_are_one_system():
+    def fill(page):
+        prose(page, 100, "Solve the system of two equations in two unknowns here.")
+        for i, (a, b) in enumerate([("1", "4"), ("1", "5")]):
+            y = 140 + i * 24
+            page.insert_text((250, y), "x +", fontsize=12)
+            fraction(page, 278, y - 3, a, b, 5, size=8)
+            page.insert_text((290, y), "y = 7", fontsize=12)
+        prose(page, 230, "Adding the two equations eliminates the first unknown.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements].count(Kind.EQUATION) == 1

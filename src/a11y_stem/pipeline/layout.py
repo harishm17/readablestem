@@ -279,7 +279,10 @@ _STRONG_MATH = frozenset(
     "\u2208\u2209\u2282\u2286\u2283\u2287\u222a\u2229\u2200\u2203"  # sets and quantifiers
     "\u2032\u2033\u2220\u22a5\u2225\u27e8\u27e9"  # primes angle perp parallel brackets
 )
-_OPERATORS = frozenset("+-*/=<>^_|~")
+# "+-*/=<>^_|~", and the middle dot a body font draws for a product (Chromium prints
+# "7 · 6 · 5" with U+00B7 in the text font, TeX writes it U+22C5 in a maths font): an
+# operator, so a run of maths goes on through it instead of being cut there.
+_OPERATORS = frozenset("+-*/=<>^_|~\u00b7\u2219")
 _SIGNS = frozenset("\u2212\u00b1\u2213")  # minus, plus-minus, minus-plus
 _BRACKETS = frozenset("()[]{}")
 _OPENING = frozenset("([{")
@@ -833,6 +836,9 @@ class _Char:
     font: str
     flags: int
     colour: int = 0  # the span's sRGB colour (0xRRGGBB)
+    # A glyph of an inline stacked fraction (numerator or denominator on a thin bar inside
+    # a line of text): evidence that its run is maths (`_lift_stacked_fractions`).
+    stacked: bool = False
 
     @property
     def blank(self) -> bool:
@@ -1014,6 +1020,9 @@ class _Row:
     # A line of a table of contents with its leaders and page number cut off
     # (`_contents_rows`): an entry of its own, at this nesting level (1 = outermost).
     contents_level: int = 0
+    # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
+    # twice as far apart as those of an aligned row.
+    case_row: bool = False
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -1029,21 +1038,28 @@ class _Row:
         )
 
     @cached_property
+    def plain(self) -> list[_Char]:
+        """The ink without the glyphs of inline fractions: they set the row's size and
+        baseline no more than a sub- or superscript does."""
+        return [c for c in self.ink if not c.stacked] or self.ink
+
+    @cached_property
     def size(self) -> float:
-        """Font size covering most characters. A row whose small glyphs are all scripts of
+        """Font size covering most characters (the glyphs of inline fractions left out, as in
+        `baseline`). A row whose small glyphs are all scripts of
         its larger ones (a nuclide's "92 U -> 234": five script glyphs, two full-size) is set
         in the larger size: the small glyphs are at least `SCRIPT_MIN_RATIO` of it, sit off
         its baseline by at least 4 % and at most `SCRIPT_MAX_LIFT` of it, and no more than
         60 % of it from a larger glyph; and the larger glyphs hold a letter and no word of three
         letters. The numbers of a fraction (beside an operator, or in a sentence) are not
         scripts of anything."""
-        counts = Counter(round(c.size * 2) / 2 for c in self.ink)
+        counts = Counter(round(c.size * 2) / 2 for c in self.plain)
         size = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
         larger = [s for s in counts if SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
         if not larger:
             return size
         big = max(larger, key=lambda s: (counts[s], s))
-        large = [c for c in self.ink if round(c.size * 2) / 2 == big]
+        large = [c for c in self.plain if round(c.size * 2) / 2 == big]
         if not any(c.c.isalpha() for c in large):
             return size  # nothing to hang scripts on: an operator and the numbers of a fraction
         letters = 0  # a word in the larger size: a sentence with small numbers in it (a fraction)
@@ -1054,7 +1070,7 @@ class _Row:
         base = statistics.median(c.baseline for c in large)
         reach = 0.6 * big  # a script sits next to its base, with at most a space between
         run: list[_Char] = []  # small glyphs side by side: one script, the end glyphs touch
-        for c in [*sorted(self.ink, key=lambda g: g.x0), None]:
+        for c in [*sorted(self.plain, key=lambda g: g.x0), None]:
             if c is not None and round(c.size * 2) / 2 == size:
                 if not SCRIPT_OFFSET * big <= abs(c.baseline - base) <= SCRIPT_MAX_LIFT * big:
                     return size
@@ -1069,8 +1085,8 @@ class _Row:
 
     @cached_property
     def baseline(self) -> float:
-        main = [c.baseline for c in self.ink if abs(c.size - self.size) <= 0.5]
-        return statistics.median(main or [c.baseline for c in self.ink])
+        main = [c.baseline for c in self.plain if abs(c.size - self.size) <= 0.5]
+        return statistics.median(main or [c.baseline for c in self.plain])
 
     @cached_property
     def text(self) -> str:
@@ -1245,8 +1261,294 @@ def _join_rows(left: _Row, right: _Row) -> _Row:
     return _Row(chars, column=left.column)
 
 
-def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> list[_Row]:
+# An inline fraction's bar is at most this many font sizes wide, and its numerator and
+# denominator at most this far (x font size) above and below it.
+MAX_INLINE_BAR = 8.0
+INLINE_FRACTION_REACH = 1.1
+PROSE_LETTERS_ON_LINE = 3  # plain letters on a bar's line that say it stands in running text
+
+
+def _lift_stacked_fractions(frags: list[_Row], rules: Sequence[_Path]) -> list[_Row]:
+    """Take the glyphs of inline stacked fractions out of the lines they were read into.
+
+    A fraction set in a line of text ("of 1/5 of a pool", "P(x)/Q(x)") has a numerator and
+    a denominator in a smaller size on either side of a thin bar. The text extractor cuts
+    them into lines by position: the numerator ends up in the line above, the denominator
+    in the line below or the next one, each beside the words of its line, and a fraction
+    wider than its neighbour overlaps it and is never merged back. The inline maths then
+    came out as two pieces ("P(x)" and "Q(x)"), or, for plain digits, not at all.
+
+    For each short bar: the glyphs over it (numerator) and under it (denominator), in a
+    smaller size than the text around the bar and not wider than the bar, are one
+    stacked fragment (numerator, a space, denominator, each glyph marked `stacked`) on
+    the baseline of the text beside the bar, so it merges into that line. A bar with
+    glyphs on one side only (an underline, a table rule), with big glyphs on both (a
+    fraction set at the size of its text: a display equation, handled by its rows), or
+    wider than a fraction of this size, is left alone.
+    """
+    bars = [
+        p
+        for p in rules
+        if p.kind == "hrule" and p.bbox[3] - p.bbox[1] <= 1.5 and p.bbox[2] - p.bbox[0] >= 2.0
+    ]
+    if not bars or not frags:
+        return frags
+    index = _RowIndex([f for f in frags if not f.vertical])
+    # A bar with another bar among its numerator or denominator is a complex fraction
+    # ("(1/2 + 1/3) / (1/4 - 1/5)"): it and the bars it holds are left as they were.
+    found_at = {id(b): _fraction_at(b, index, set()) for b in bars}
+    complex_bars: set[int] = set()
+    for bar in bars:
+        found = found_at[id(bar)]
+        if found is None:
+            continue
+        glyphs = [c for _, _, c in (*found[0], *found[1])]
+        top, bottom = min(c.y0 for c in glyphs), max(c.y1 for c in glyphs)
+        for other in bars:
+            overlap = min(bar.bbox[2], other.bbox[2]) - max(bar.bbox[0], other.bbox[0])
+            if other is not bar and overlap > 0 and top <= other.bbox[1] <= bottom:
+                complex_bars.update((id(bar), id(other)))
+    claimed: set[int] = set()
+    lifted: list[_Row] = []
+    removed: dict[int, set[int]] = {}
+    for bar in bars:
+        found = None if id(bar) in complex_bars else _fraction_at(bar, index, claimed)
+        if found is None:
+            continue
+        numerator, denominator, baseline = found
+        for row, i, _ in (*numerator, *denominator):
+            removed.setdefault(id(row), set()).add(i)
+        claimed.update(id(c) for _, _, c in (*numerator, *denominator))
+        top = sorted((c for _, _, c in numerator), key=lambda c: c.x0)
+        bottom = sorted((c for _, _, c in denominator), key=lambda c: c.x0)
+        last = top[-1]
+        chars = [replace(c, stacked=True) for c in top]
+        chars.append(
+            _Char(
+                " ", last.x1, last.y0, bottom[0].x0, last.y1, last.baseline, last.size, last.font, 0
+            )
+        )
+        chars.extend(replace(c, stacked=True) for c in bottom)
+        piece = _Row(chars)
+        piece.__dict__["baseline"] = baseline  # the line of text it stands in
+        lifted.append(piece)
+    if not lifted:
+        return frags
+    return [*_without(frags, removed), *lifted]
+
+
+def _fraction_at(
+    bar: _Path, index: _RowIndex, claimed: set[int]
+) -> tuple[list[tuple[_Row, int, _Char]], list[tuple[_Row, int, _Char]], float] | None:
+    """(numerator glyphs, denominator glyphs, baseline of the text beside) of the inline
+    fraction on `bar`, each glyph with its row and place in it; None when the bar is not
+    one (see `_lift_stacked_fractions`)."""
+    x0, y0, x1, y1 = bar.bbox
+    middle = (y0 + y1) / 2
+    reach = 1.6 * index.largest
+    candidates: list[tuple[_Row, int, _Char]] = []
+    beside: list[_Char] = []  # glyphs level with the bar, near it
+    line: list[_Char] = []  # ... or anywhere on its line
+    for row in index.near(middle - reach, middle + reach):
+        for i, c in enumerate(row.chars):
+            if c.blank or id(c) in claimed:
+                continue
+            centre_x = (c.x0 + c.x1) / 2
+            if x0 - 1.0 <= centre_x <= x1 + 1.0:
+                candidates.append((row, i, c))
+            elif c.y0 <= middle <= c.y1:
+                line.append(c)
+                if abs(centre_x - (x0 + x1) / 2) <= 6 * c.size + (x1 - x0):
+                    beside.append(c)
+    # Only inside running text: a fraction in a display equation is read with its rows
+    # (`_equation_regions`), and lifting it would cut those rows. Three plain letters on
+    # the line of the bar are words.
+    words = sum(c.c.isalpha() and not c.math for c in line)
+    if words < PROSE_LETTERS_ON_LINE:
+        return None
+    # The text around the bar must be set bigger than the glyphs on it: that is what makes
+    # it an inline fraction (a display fraction's own line has glyphs of the same size).
+    text = max(c.size for c in beside)
+    over: list[tuple[_Row, int, _Char]] = []
+    under: list[tuple[_Row, int, _Char]] = []
+    for row, i, c in candidates:
+        if c.size > SCRIPT_RATIO * text:
+            continue
+        centre_y = (c.y0 + c.y1) / 2
+        if 0 < middle - centre_y <= INLINE_FRACTION_REACH * c.size:
+            over.append((row, i, c))
+        elif 0 < centre_y - middle <= INLINE_FRACTION_REACH * c.size:
+            under.append((row, i, c))
+    if not over or not under:
+        return None
+    size = max(c.size for _, _, c in (*over, *under))
+    glyphs = [c for _, _, c in (*over, *under)]
+    width = x1 - x0
+    covered = max(c.x1 for c in glyphs) - min(c.x0 for c in glyphs)
+    if width > MAX_INLINE_BAR * size or covered < 0.6 * width or covered > width + 2.0:
+        return None
+    nearest = min(
+        (
+            c for c in beside if c.size >= size / SCRIPT_RATIO and c.c.isalnum()
+        ),  # not a tall bracket
+        key=lambda c: abs((c.x0 + c.x1) / 2 - (x0 + x1) / 2),
+        default=None,
+    )
+    if nearest is None:
+        return None
+    return over, under, nearest.baseline
+
+
+def _lift_stacked_pairs(frags: list[_Row]) -> list[_Row]:
+    """Take the glyphs of inline binomials out of the lines they were read into.
+
+    "( 5 over 3 )", a binomial coefficient or a column of two entries, has no bar: a
+    bracket, two short pieces of text one above the other, a bracket. They arrive as
+    three lines (the bracket and the numerator in the line of text, the denominator and
+    the closing bracket in the next), and the maths came out cut in pieces, without its
+    brackets and with half of its entries. The glyphs between a bracket and its closing
+    one are the pair when nothing stands on the line of the brackets between them, one
+    short token stands above it and one below, and the two overlap in x; they become one
+    stacked fragment, like the glyphs of a fraction (`_lift_stacked_fractions`).
+    """
+    rows = [f for f in frags if not f.vertical]
+    index = _RowIndex(rows)
+    claimed: set[int] = set()
+    lifted: list[_Row] = []
+    removed: dict[int, set[int]] = {}
+    for row in rows:
+        for i, bracket in enumerate(row.chars):
+            if bracket.c not in "([" or id(bracket) in claimed:
+                continue
+            found = _binomial_at(row, i, index, claimed)
+            if found is None:
+                continue
+            members, baseline = found
+            for owner, place, glyph in members:
+                removed.setdefault(id(owner), set()).add(place)
+                claimed.add(id(glyph))
+            glyphs = [g for _, _, g in members]
+            gap = next(k for k, g in enumerate(glyphs) if g.y0 > bracket.y0 + 0.25 * bracket.size)
+            chars = [replace(g, stacked=True) for g in glyphs]
+            before = chars[gap - 1]
+            chars.insert(  # a space between the top and the bottom
+                gap,
+                _Char(
+                    " ",
+                    before.x1,
+                    before.y0,
+                    before.x1,
+                    before.y1,
+                    before.baseline,
+                    before.size,
+                    before.font,
+                    0,
+                ),
+            )
+            piece = _Row(chars)
+            piece.__dict__["baseline"] = baseline
+            lifted.append(piece)
+    if not lifted:
+        return frags
+    return [*_without(frags, removed), *lifted]
+
+
+def _without(frags: list[_Row], removed: dict[int, set[int]]) -> list[_Row]:
+    """`frags` without the characters at the given places (a row left with no ink goes)."""
+    out: list[_Row] = []
+    for frag in frags:
+        gone = removed.get(id(frag))
+        if not gone:
+            out.append(frag)
+            continue
+        kept = [c for i, c in enumerate(frag.chars) if i not in gone]
+        if any(not c.blank for c in kept):
+            out.append(
+                _Row(kept, vertical=frag.vertical, diagonal=frag.diagonal, column=frag.column)
+            )
+    return out
+
+
+def _binomial_at(
+    row: _Row, place: int, index: _RowIndex, claimed: set[int]
+) -> tuple[list[tuple[_Row, int, _Char]], float] | None:
+    """The glyphs (bracket, top, bottom, closing bracket, each with its row and place) of
+    the inline binomial that the opening bracket at `place` of `row` starts, with the
+    baseline of the text beside it; None when it starts none."""
+    opening = row.chars[place]
+    closing = ")" if opening.c == "(" else "]"
+    size = opening.size
+    middle = (opening.y0 + opening.y1) / 2
+    near: list[tuple[_Row, int, _Char]] = []
+    for other in index.near(opening.y0 - 1.3 * size, opening.y1 + 1.3 * size):
+        for i, c in enumerate(other.chars):
+            if c.blank or c is opening or id(c) in claimed:
+                continue
+            centre_x = (c.x0 + c.x1) / 2
+            if (
+                opening.x1 - 0.3 * size <= centre_x <= opening.x1 + 8 * size
+                and c.y1 >= opening.y0 - 0.5 * size  # within reach of the bracket's height
+                and c.y0 <= opening.y1 + 0.5 * size
+            ):
+                near.append((other, i, c))
+    ends = [
+        m for m in near if m[2].c == closing and abs((m[2].y0 + m[2].y1) / 2 - middle) <= 0.6 * size
+    ]
+    if not ends:
+        return None
+    end = min(ends, key=lambda m: m[2].x0)
+    between = [m for m in near if m[2].x1 <= end[2].x0 + 0.3 * size and m is not end]
+    above = [m for m in between if (m[2].y0 + m[2].y1) / 2 < middle - 0.25 * size]
+    below = [m for m in between if (m[2].y0 + m[2].y1) / 2 > middle + 0.25 * size]
+    if not above or not below or len(above) + len(below) != len(between):
+        return None  # something stands on the line of the brackets, or one side is empty
+    if len(above) > 6 or len(below) > 6 or not (_one_token(above) and _one_token(below)):
+        return None
+    shared = min(max(m[2].x1 for m in above), max(m[2].x1 for m in below)) - max(
+        min(m[2].x0 for m in above), min(m[2].x0 for m in below)
+    )
+    narrow = min(
+        max(m[2].x1 for m in above) - min(m[2].x0 for m in above),
+        max(m[2].x1 for m in below) - min(m[2].x0 for m in below),
+    )
+    if shared < 0.5 * narrow:
+        return None
+    left = min(m[2].x0 for m in between)
+    right = max(m[2].x1 for m in between)
+    if left - opening.x1 > size or end[2].x0 - right > size:
+        return None
+    text = [
+        c
+        for r in index.near(middle, middle)
+        for c in r.chars
+        if c.c.isalnum()
+        and c.y0 <= middle <= c.y1
+        and c.size >= 0.9 * size
+        and c not in [m[2] for m in between]
+    ]
+    nearest = min(text, key=lambda c: abs((c.x0 + c.x1) / 2 - opening.x0), default=None)
+    baseline = nearest.baseline if nearest is not None else opening.baseline
+    key = lambda m: m[2].x0  # noqa: E731
+    members = [
+        (row, place, opening),
+        *sorted(above, key=key),
+        *sorted(below, key=key),
+        end,
+    ]
+    return members, baseline
+
+
+def _one_token(glyphs: list[tuple[_Row, int, _Char]]) -> bool:
+    """Do the glyphs form one token: no gap between neighbours of 0.3 x their size?"""
+    chars = sorted((m[2] for m in glyphs), key=lambda c: c.x0)
+    return all(b.x0 - a.x1 < 0.3 * a.size for a, b in pairwise(chars))
+
+
+def _merge_baselines(
+    frags: list[_Row], gutter: tuple[float, float] | None, rules: Sequence[_Path] = ()
+) -> list[_Row]:
     """Merge fragments that share a baseline into rows, never across the column gutter."""
+    frags = _lift_stacked_pairs(_lift_stacked_fractions(frags, rules))
     rows: list[_Row] = []
     horizontal = sorted((f for f in frags if not f.vertical), key=lambda f: f.baseline)
     bands: list[list[_Row]] = []
@@ -1331,8 +1633,16 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 
 
+def _tall_bracket(row: _Row) -> bool:
+    """Is the row a single bracket glyph? A bracket that is a row of its own is one the
+    line's baseline did not take in: TeX sets a tall bracket (a CMEX glyph) lowered, on a
+    baseline of its own, round a fraction or a stack, as in d/dx (7x^3 - 15x^2)."""
+    return len(row.ink) == 1 and row.ink[0].c in _BRACKETS
+
+
 def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
-    """Fold a short fragment led by a big operator into the line it sits in.
+    """Fold a short fragment led by a big operator, or a tall bracket, into the line it
+    sits in.
 
     TeX sets the integral sign of an inline $\\int_0^1 x^2\\,dx$ (and a text-style sum or
     root) on a baseline of its own, so it arrives as a separate row of an integral sign
@@ -1340,12 +1650,15 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     equation of its own and the inline equation's crop misses the sign. A fragment of at
     most four glyphs with a big operator in it joins the row whose vertical extent holds
     its centre and whose horizontal extent it lies within, before the first glyph to its
-    right.
+    right. So does a lone bracket (`_tall_bracket`): the opening bracket of
+    "d/dx (7x^3 - 15x^2)" stood in a row of its own, and the inline equation lost it and
+    kept the closing one, which was then cut off as unmatched.
     """
     pieces = [
         i
         for i, r in enumerate(rows)
-        if not r.vertical and len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)
+        if not r.vertical
+        and ((len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)) or _tall_bracket(r))
     ]
     if not pieces:
         return rows
@@ -1962,7 +2275,7 @@ class _CharInfo:
 
     @classmethod
     def of(cls, row: _Row) -> _CharInfo:
-        classes = [_char_class(c) for c in row.chars]
+        classes = ["M" if c.stacked else _char_class(c) for c in row.chars]
         first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
         if (
             first is not None
@@ -2387,6 +2700,8 @@ def _inline_runs(
             )
             inside = between_digits or (c == "," and depth > 0)
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
+            if chars[i].blank and _between_formulas(chars, i):
+                break
             if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
                 continue
@@ -2397,6 +2712,26 @@ def _inline_runs(
             if reasons:
                 runs.append((start, end, reasons))
     return runs
+
+
+def _between_formulas(chars: list[_Char], i: int) -> bool:
+    """Is the blank at `i` the space the page's text puts between two formulas?
+
+    Chromium prints each MathML formula in a maths font, with the spaces inside it in
+    that font too; the space between "B = 0," and "C = 1," (two formulas of one sentence)
+    is a character of the text font. A blank in a text font with maths-font glyphs on both
+    sides ends the run: they are two equations, as the source has them, not one.
+    """
+    if _font_traits(chars[i].font)[2]:
+        return False
+    before = next((c for c in reversed(chars[:i]) if not c.blank), None)
+    after = next((c for c in chars[i + 1 :] if not c.blank), None)
+    return (
+        before is not None
+        and after is not None
+        and _font_traits(before.font)[2]
+        and _font_traits(after.font)[2]
+    )
 
 
 def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tuple[int, int]:
@@ -2496,6 +2831,8 @@ def _inline_evidence(
     """
     own = kinds if kinds is not None else [None] * len(chars)
     idx = [i for i in range(start, end) if own[i] is None]
+    if any(chars[i].stacked for i in idx):
+        return ["stacked fraction"]
     if any(info.classes[i] == "M" for i in idx):
         return ["math font or symbol"]
     if _broken_brackets("".join(chars[i].c for i in range(start, end))):
@@ -2524,6 +2861,17 @@ def _inline_evidence(
         if own[i] is None
     ):
         return ["letter with sub/superscript"]
+    for i in range(start, end - 1):
+        if chars[i].c not in ")]" or own[i] is not None:
+            continue
+        after = next((k for k in range(i + 1, end) if not chars[k].blank), None)
+        if (
+            after is not None
+            and own[after] is None
+            and info.script[after]
+            and info.classes[after] in "LD"
+        ):
+            return ["bracket with sub/superscript"]  # (x)_n, [A]^2: a script only maths has
     if any(
         chars[i].c in _SIGNS and chars[i + 1].c.isdigit()
         for i in range(start, end - 1)
@@ -3855,8 +4203,11 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
 
 # Signs that continue the line above when a maths line starts with them ("= 250 m/s" under
 # "v = ...", "+ c" under a long sum).
+# A system's opening brace: the glyph, or the pieces TeX builds a tall one from (CMEX).
+_OPENING_BRACES = frozenset("{\uf8f1\uf8f2\uf8f3\uf8f4")
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
+TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table
 MAX_COLUMN_GAP = 6.0  # x font size: widest gap between the columns of an aligned row
 
 
@@ -3901,6 +4252,133 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
     return out
 
 
+def _mark_case_rows(rows: list[_Row]) -> None:
+    """Make the rows beside a tall opening brace maths, whatever words they hold.
+
+    A function defined by cases ("g(t) = {  9t for 0 <= t <= 5 / 45 for 5 < t <= 10") has
+    words in its rows ("for", "if", "otherwise", "elsewhere"), so each row reads as text
+    and the equation falls apart into a brace, a paragraph and several inline pieces. The
+    brace is the evidence: opening-brace glyphs (or the pieces TeX builds a tall one from,
+    stacked at one x) taller than two lines, with two or more lines of rows right of it,
+    level with it. Those rows are one equation with the brace; `_equation_regions` then
+    stacks them.
+    """
+    candidates = [r for r in rows if not r.vertical and not r.absorbed and not r.exercise_number]
+    glyphs = [(r, c) for r in candidates for c in r.ink if c.c in _OPENING_BRACES]
+    glyphs.sort(key=lambda rc: (rc[1].x0, rc[1].y0))
+    used: set[int] = set()
+    for i, (_, first) in enumerate(glyphs):
+        if i in used:
+            continue
+        group = [i]
+        for j in range(i + 1, len(glyphs)):
+            c = glyphs[j][1]
+            last = max((glyphs[k][1] for k in group), key=lambda g: g.y1)
+            if (
+                j not in used
+                and abs(c.x0 - first.x0) <= 0.6 * first.size
+                and -0.5 * first.size <= c.y0 - last.y1 <= 0.1 * first.size
+            ):
+                group.append(j)
+        used.update(group)
+        top = min(glyphs[k][1].y0 for k in group)
+        bottom = max(glyphs[k][1].y1 for k in group)
+        right = max(glyphs[k][1].x1 for k in group)
+        size = first.size
+        if bottom - top < 2.0 * size:
+            continue
+        holders = {id(glyphs[k][0]): glyphs[k][0] for k in group}
+        beside = []
+        for r in candidates:
+            content = [
+                c for c in r.ink if c.c not in _OPENING_BRACES and c.x0 >= right - 0.3 * size
+            ]
+            if not content or not 0 <= content[0].x0 - right <= 3 * size:
+                continue
+            if (
+                top - 0.5 * size
+                <= (min(c.y0 for c in content) + max(c.y1 for c in content)) / 2
+                <= bottom + 0.5 * size
+            ):
+                beside.append(r)
+        if len({round(r.baseline) for r in beside}) < 2:
+            continue
+        if any(
+            c.c == "}"
+            for r in candidates
+            if top - 0.5 * size <= (r.y0 + r.y1) / 2 <= bottom + 0.5 * size
+            for c in r.ink
+        ):
+            continue  # a set in braces, not cases
+        grown = True
+        while grown:  # the second column of a row ("for 0 <= t <= 5" after "9t")
+            grown = False
+            for r in candidates:
+                if r in beside or id(r) in holders:
+                    continue
+                if any(
+                    abs(r.baseline - b.baseline) <= 0.4 * size
+                    and 0 <= r.x0 - b.x1 <= 2 * MAX_COLUMN_GAP * size
+                    for b in [*beside, *holders.values()]
+                ):
+                    beside.append(r)
+                    grown = True
+        for r in [*holders.values(), *beside]:
+            r.kind = "math"
+            r.case_row = True
+
+
+def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
+    """Cut the text off the front of the first row of a braced system.
+
+    OpenStax prints "Solve the system by substitution. { 2x + y = 7" with the opening
+    brace in the text font, on the first row of the system, so the prose before it and
+    the first equation read as one row of text, and the equations below it as a display
+    equation of their own: the system comes out cut in two. The row is cut at its brace
+    when the brace is followed by maths with no closing brace (not a set "{1, 2}") and a
+    maths row sits right under that maths, overlapping it: the rows are a system.
+    The text before the brace (a sentence, an exercise number) stays a row of its own;
+    the brace goes with the equations, so the crop shows it.
+    """
+    index = _RowIndex([r for r in rows if not r.vertical])
+    out: list[_Row] = []
+    for row in rows:
+        cut = _brace_cut(row, index)
+        if cut is None:
+            out.append(row)
+            continue
+        out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
+        out.append(_Row(row.chars[cut:], column=row.column))
+    return out
+
+
+def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
+    """Index of the brace to cut `row` at (see `_split_braced_systems`), or None."""
+    chars = row.chars
+    if row.vertical or len(chars) < 4 or not any(c.c == "{" for c in chars):
+        return None
+    start = next(i for i, c in enumerate(chars) if c.c == "{")
+    if not any(not c.blank for c in chars[:start]) or any(c.c == "}" for c in chars[start:]):
+        return None
+    after = _Row(chars[start + 1 :], column=row.column)
+    if not after.ink or after.ink[0].blank:
+        return None
+    _classify_row(after)
+    if after.kind != "math" or after.x0 - chars[start].x1 > 1.5 * row.size:
+        return None
+    size = max(row.size, after.size)
+    for below in index.near(after.y1 - 0.3 * size, after.y1 + 1.0 * size):
+        if below is row or below.y0 < after.y1 - 0.3 * size or below.column != row.column:
+            continue
+        shared = min(below.x1, after.x1) - max(below.x0, after.x0)
+        if shared >= 0.5 * min(below.x1 - below.x0, after.x1 - after.x0):
+            probe = _Row(below.chars, column=below.column)  # not classified yet
+            _classify_row(probe)
+            if probe.kind == "math":
+                return start
+    return None
+
+
 _EXERCISE_NUMBER = re.compile(r"^\d{1,3}[.)]$")
 
 
@@ -3920,6 +4398,10 @@ def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
     out: list[_Row] = []
     for row in rows:
         tokens = _tokens(row)
+        if _lone_exercise_number(row, tokens):
+            row.exercise_number = True
+            out.append(row)
+            continue
         if row.vertical or row.marker is not None or len(tokens) < 2:
             out.append(row)
             continue
@@ -3947,6 +4429,19 @@ def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
         out.append(_Row(number, column=row.column, exercise_number=True))
         out.append(_Row(row.chars[rest[0][0] :], column=row.column))
     return out
+
+
+def _lone_exercise_number(row: _Row, tokens: list[tuple[int, int]]) -> bool:
+    """Is the row only an exercise number ("6.", "14)", also "6 ." in two spans), drawn in a
+    text font? Where an exercise is only maths (a fraction, a system), the number sits on a
+    row of its own beside or above the first line of it; read as a fragment it would be
+    taken into the equation (`_math_neighbours`). A row that starts a list item
+    (`row.marker`) already has its number."""
+    if row.vertical or row.marker is not None or row.exercise_number or not 0 < len(tokens) <= 2:
+        return False
+    if not _EXERCISE_NUMBER.match("".join(c.c for c in row.ink)):
+        return False
+    return not any(c.math or c.mono for c in row.ink)
 
 
 @dataclass(eq=False)
@@ -3992,6 +4487,47 @@ class _Line:
         ]
 
     @cached_property
+    def big_fraction(self) -> bool:
+        """A fraction set at the size of the line (a display fraction): a glyph at the
+        size of the line's text on either side of one of its bars. The fractions of a
+        system's rows are set smaller than the rows' text."""
+        text = max(c.size for c in self.ink)  # rows are sized by their majority: not self.size
+        for rule in self.rules:
+            x0, y0, x1, y1 = rule.bbox
+            middle = (y0 + y1) / 2
+            above = below = False
+            relation = False  # "x + y = 2" over a rule: a step of a derivation, not a fraction
+            for glyph in self.ink:
+                centre_x, centre_y = (glyph.x0 + glyph.x1) / 2, (glyph.y0 + glyph.y1) / 2
+                if (
+                    x0 - 1 <= centre_x <= x1 + 1
+                    and abs(centre_y - middle) <= 1.2 * text
+                    and glyph.size >= 0.9 * text
+                ):
+                    above |= centre_y < middle
+                    below |= centre_y > middle
+                    relation |= glyph.c in _ROW_RELATIONS
+            if above and below and not relation:
+                return True
+        return False
+
+    @cached_property
+    def opens_system(self) -> bool:
+        """Only the brace of a system, standing left of its rows, level with their middle."""
+        return all(c.c in _OPENING_BRACES for c in self.ink)
+
+    @cached_property
+    def ink_x1(self) -> float:
+        """Right edge of the line's glyphs (not of the rules drawn with it)."""
+        return max(c.x1 for c in self.ink)
+
+    @cached_property
+    def body_x0(self) -> float:
+        """Left edge of the line without the brace that opens a system."""
+        ink = self.ink
+        return next((c.x0 for c in ink if c.c not in _OPENING_BRACES), ink[0].x0)
+
+    @cached_property
     def complete(self) -> bool:
         """An equation on its own: a relation with something on both sides."""
         ink = self.ink
@@ -4018,7 +4554,8 @@ def _same_line(a: _Row, b: _Row) -> bool:
         return False
     size = max(a.size, b.size)
     gap = max(a.x0 - b.x1, b.x0 - a.x1)
-    if abs(a.baseline - b.baseline) <= 0.4 * size and gap <= MAX_COLUMN_GAP * size:
+    columns = (2 if a.case_row and b.case_row else 1) * MAX_COLUMN_GAP
+    if abs(a.baseline - b.baseline) <= 0.4 * size and gap <= columns * size:
         return True
     lone = a if _punctuation_only(a) else b if _punctuation_only(b) else None
     if lone is None or gap > 1.5 * size:
@@ -4111,19 +4648,21 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
     return _stack_lines(lines)
 
 
-def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
+def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] = ()) -> bool:
     """Does `line` continue the display equation whose last line is `above` (box `box`)?
 
     A line that starts with "=" or an operator may sit a little further down (half as
     far again): nothing else starts a line that way. A line whose middle is above the
     bottom of the equation sits beside it, not under it: "f(t) =" level with the middle
     row of a cases brace, whose rows are whole equations ("1 if t > 0") of their own.
+    `earlier` are the lines of the equation above `above`: a row of a system may line up
+    with the one before the last ("z = 1" under "y - 12 z = -15" lines up with the first).
     """
     size = max(above.size, line.size)
     reach = MAX_LINE_GAP * size * (1.5 if line.continues else 1.0)
     if line.box[1] - box[3] > reach or line.rows[0].column != above.rows[0].column:
         return False
-    if line.box[0] > box[2] + size or line.box[2] < box[0] - size:
+    if line.box[0] > box[2] + size or (line.box[2] < box[0] - size and not line.opens_system):
         return False
     if above.labels and line.labels:
         return False  # two numbered equations
@@ -4133,30 +4672,53 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
         return True  # beside the equation: rows of a brace, a matrix or an array
     if min(above.size, line.size) <= SCRIPT_RATIO * size:
         return True  # limits under a big operator ("i = 1" under a sum) or over it
-    x0, x1 = above.relation_x, line.relation_x
-    return x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size
+    for peer in (above, *earlier):  # one row of the equation to line up with is enough
+        if _table_rows(peer, line, box, size):
+            return True
+        x0, x1 = peer.relation_x, line.relation_x
+        if x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size:
+            return True
+    return False
+
+
+def _table_rows(above: _Line, line: _Line, box: BBox, size: float) -> bool:
+    """Are two whole equations the rows of one table (a system, worked steps)?
+
+    A table sets its rows closer than separate displays are set (0.7 of a font size at
+    most, where a display gets an em or more above and below) and gives them one edge or
+    one centre: each row centred as OpenStax prints a system, or flush left or right.
+    """
+    if line.box[1] - box[3] > TABLE_ROW_GAP * size or above.big_fraction or line.big_fraction:
+        return False  # "time = d / v" over "d = v t": two display equations, not rows
+    tolerance = 0.3 * size
+    left, right = (above.body_x0 - line.body_x0), (above.ink_x1 - line.ink_x1)
+    return abs(left) <= tolerance or abs(right) <= tolerance or abs(left + right) <= 2 * tolerance
 
 
 def _stack_lines(lines: list[_Line]) -> list[_Region]:
     """Join lines into display equations top to bottom (see `_equation_regions`)."""
     regions: list[_Region] = []
     last: list[_Line] = []  # the lowest line of each region so far
+    peers: list[list[_Line]] = []  # every line of each region so far
     active: list[int] = []  # regions whose bottom is still within reach
     for line in sorted(lines, key=lambda ln: (ln.box[1], ln.box[0])):
         reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
         active = [k for k in active if regions[k].box[3] >= reach]
         host = next(
-            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line)), None
+            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line, peers[k])),
+            None,
         )
         if host is None:
             regions.append(_Region(box=line.box))
             last.append(line)
+            peers.append([])
             active.append(len(regions) - 1)
             host = len(regions) - 1
         region = regions[host]
         region.rows.extend(line.rows)
         region.rules.extend(p for p in line.rules if p not in region.rules)
         region.labels.extend(line.labels)
+        peers[host].append(line)
         region.box = _union([region.box, line.box])
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
@@ -6162,7 +6724,7 @@ class _PageBlocks:
 
 
 def _prepare_rows(
-    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter
+    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter, rules: Sequence[_Path] = ()
 ) -> tuple[list[_Row], tuple[float, float] | None, list[_Row]]:
     """The page's rows without its running headers, footers, page numbers and watermarks,
     its column gutter, and the rows so dropped (a figure may claim some back as labels:
@@ -6175,7 +6737,7 @@ def _prepare_rows(
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
-    return _merge_baselines(kept, gutter), gutter, _merge_baselines(dropped, gutter)
+    return _merge_baselines(kept, gutter, rules), gutter, _merge_baselines(dropped, gutter)
 
 
 def _page_blocks(
@@ -6199,10 +6761,11 @@ def _page_blocks(
     covers: Sequence[tuple[float, float]] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
-    rows = _split_exercise_numbers(_split_labels(rows))
+    rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
     for row in rows:
         _classify_row(row)
     rows = _contents_rows(rows)
+    _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
     used = {id(rule) for rule in used_rules}
@@ -6306,6 +6869,7 @@ def _page_blocks(
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
+    _flag_half_fractions(final, rules, text_rows)
     final = _key_term_lines(_term_items(final))
     origins = _column_origins(text_rows)
     for block in final:
@@ -6753,6 +7317,67 @@ def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
     return out
 
 
+REASON_HALF_FRACTION = "half a fraction"
+
+
+def _flag_half_fractions(
+    blocks: Sequence[_Block], rules: Sequence[_Path], rows: Sequence[_Row]
+) -> None:
+    """Mark the equations that sit against a fraction bar from one side only.
+
+    An equation whose box ends at a thin bar, with the bar's other side holding glyphs of
+    something else, is half a fraction: the numerator without its denominator or the
+    denominator without its numerator ("Q(x)" of P(x)/Q(x)). Its crop shows half of what
+    the page shows, and whatever is read from it is a plausible but wrong answer, so the
+    equation step asks for a decision (`equation_step.HALF_FRACTION_CODE`). Bars that
+    layout used (the equation's own, inside its box or touching both sides of it) never
+    mark anything.
+    """
+    bars = [
+        p
+        for p in rules
+        if p.kind == "hrule" and p.bbox[3] - p.bbox[1] <= 1.5 and p.bbox[2] - p.bbox[0] >= 2.0
+    ]
+    if not bars:
+        return
+    items: list[tuple[BBox, list[str], float]] = []
+    for block in blocks:
+        if block.kind == Kind.EQUATION:
+            items.append((block.bbox, block.reasons, block.font_size or 10.0))
+        else:
+            for piece in block.pieces:
+                if isinstance(piece, _Inline):
+                    items.append((piece.bbox, piece.reasons, piece.font_size))
+    if not items:
+        return
+    chars = [c for r in rows if not r.vertical for c in r.ink]
+    for bar in bars:
+        bx0, by0, bx1, by1 = bar.bbox
+        middle = (by0 + by1) / 2
+        for box, reasons, size in items:
+            width = min(bx1, box[2]) - max(bx0, box[0])
+            if width < 0.5 * min(bx1 - bx0, box[2] - box[0]) or bx1 - bx0 > 10 * size:
+                continue
+            if abs(middle - box[1]) <= 0.3 * size:  # the bar is at the top: denominator
+                other = (-1, middle)  # glyphs above the bar
+            elif abs(middle - box[3]) <= 0.3 * size:  # the bar is at the bottom: numerator
+                other = (1, middle)
+            else:
+                continue
+            if REASON_HALF_FRACTION in reasons or "fraction bar" in reasons:
+                continue
+            side, edge = other
+            touching = any(
+                bx0 - 1 <= (c.x0 + c.x1) / 2 <= bx1 + 1
+                and (
+                    0 <= edge - c.y1 <= 0.35 * size if side < 0 else 0 <= c.y0 - edge <= 0.35 * size
+                )
+                for c in chars
+            )
+            if touching:
+                reasons.append(REASON_HALF_FRACTION)
+
+
 def _add_rules(block: _Block, rules: list[_Path]) -> None:
     """Grow an equation's box over the fraction bars and radicals it uses."""
     size = block.font_size or 10.0
@@ -6855,7 +7480,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             ink = types[number].ink.ink_drawings
             paths[number] = [p for p in paths[number] if p.source not in ink]
         found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
-        prepared[number] = _prepare_rows(doc[number], frags[number], margins)
+        prepared[number] = _prepare_rows(doc[number], frags[number], margins, paths[number])
         # Axes with tick labels, an axis title or a curve from their corner are a plot's:
         # the rows the header and footer rules dropped count (tick labels in the bands).
         # Rulers with no labels whose ticks are an answer field's cells are not rulers.

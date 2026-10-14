@@ -161,3 +161,20 @@ def test_the_record_survives_the_json_round_trip_and_old_records_load():
 def test_the_second_check_shadow_record_is_kept_with_the_escalation_record():
     fix = run(by_model(cheap=out("x_0", 0.6), main=out("x_0", 0.96)))
     assert fix.escalation == "same" and fix.verifications == []  # offline: no verifier
+
+
+def test_half_a_fraction_is_never_accepted_without_a_decision():
+    # Layout found a bar against the region with glyphs on its other side: the crop shows
+    # half of a fraction. A confident, passing answer still waits for a decision, with the
+    # reason as a failed check, and its confidence is held under the accept bar.
+    client = by_model(cheap=out("Q(x)", 0.99), main=out("Q(x)", 0.99))
+    fix = run(client, text="Q(x)", reasons=["half a fraction"])
+    assert fix.status is Status.NEEDS_REVIEW and fix.review == "required"
+    assert [c.code for c in fix.failed_checks] == [equation_step.HALF_FRACTION_CODE]
+    assert fix.confidence is not None and fix.confidence < SETTINGS.auto_accept_confidence
+    assert models(client) == [CHEAP_MODEL]  # a second reading cannot show the other half
+
+
+def test_an_equation_without_the_reason_is_accepted_as_before():
+    fix = run(by_model(cheap=out("x_0", 0.99), main=out("x_0", 0.99)))
+    assert fix.status is Status.ACCEPTED

@@ -103,6 +103,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
     "no text to check the transcription against: compare it with the picture symbol by "
     "symbol.",
+    ("equation.region", "half_fraction"): "The part of the page this equation was read "
+    "from ends at a fraction bar and may hold only the top or the bottom of a fraction, so "
+    "compare it with the page and write the whole fraction if part is missing.",
     ("equation.single_reading", "single_reading"): "The model read this equation once, "
     "and its answer passed every check, so no second reading was made and it was accepted "
     "as it stands.",
