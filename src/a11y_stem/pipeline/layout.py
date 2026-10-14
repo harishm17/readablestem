@@ -800,6 +800,9 @@ class _Char:
     font: str
     flags: int
     colour: int = 0  # the span's sRGB colour (0xRRGGBB)
+    # A glyph of an inline stacked fraction (numerator or denominator on a thin bar inside
+    # a line of text): evidence that its run is maths (`_lift_stacked_fractions`).
+    stacked: bool = False
 
     @property
     def blank(self) -> bool:
@@ -984,15 +987,21 @@ class _Row:
         )
 
     @cached_property
+    def plain(self) -> list[_Char]:
+        """The ink without the glyphs of inline fractions: they set the row's size and
+        baseline no more than a sub- or superscript does."""
+        return [c for c in self.ink if not c.stacked] or self.ink
+
+    @cached_property
     def size(self) -> float:
         """Font size covering most characters."""
-        counts = Counter(round(c.size * 2) / 2 for c in self.ink)
+        counts = Counter(round(c.size * 2) / 2 for c in self.plain)
         return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
 
     @cached_property
     def baseline(self) -> float:
-        main = [c.baseline for c in self.ink if abs(c.size - self.size) <= 0.5]
-        return statistics.median(main or [c.baseline for c in self.ink])
+        main = [c.baseline for c in self.plain if abs(c.size - self.size) <= 0.5]
+        return statistics.median(main or [c.baseline for c in self.plain])
 
     @cached_property
     def text(self) -> str:
@@ -1149,8 +1158,155 @@ def _join_rows(left: _Row, right: _Row) -> _Row:
     return _Row(chars, column=left.column)
 
 
-def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> list[_Row]:
+# An inline fraction's bar is at most this many font sizes wide, and its numerator and
+# denominator at most this far (x font size) above and below it.
+MAX_INLINE_BAR = 8.0
+INLINE_FRACTION_REACH = 1.1
+PROSE_LETTERS_BESIDE_BAR = 3  # plain letters near a bar that say it stands in running text
+
+
+def _lift_stacked_fractions(frags: list[_Row], rules: Sequence[_Path]) -> list[_Row]:
+    """Take the glyphs of inline stacked fractions out of the lines they were read into.
+
+    A fraction set in a line of text ("of 1/5 of a pool", "P(x)/Q(x)") has a numerator and
+    a denominator in a smaller size on either side of a thin bar. The text extractor cuts
+    them into lines by position: the numerator ends up in the line above, the denominator
+    in the line below or the next one, each beside the words of its line, and a fraction
+    wider than its neighbour overlaps it and is never merged back. The inline maths then
+    came out as two pieces ("P(x)" and "Q(x)"), or, for plain digits, not at all.
+
+    For each short bar: the glyphs over it (numerator) and under it (denominator), in a
+    smaller size than the text around the bar and not wider than the bar, are one
+    stacked fragment (numerator, a space, denominator, each glyph marked `stacked`) on
+    the baseline of the text beside the bar, so it merges into that line. A bar with
+    glyphs on one side only (an underline, a table rule), with big glyphs on both (a
+    fraction set at the size of its text: a display equation, handled by its rows), or
+    wider than a fraction of this size, is left alone.
+    """
+    bars = [
+        p
+        for p in rules
+        if p.kind == "hrule" and p.bbox[3] - p.bbox[1] <= 1.5 and p.bbox[2] - p.bbox[0] >= 2.0
+    ]
+    if not bars or not frags:
+        return frags
+    index = _RowIndex([f for f in frags if not f.vertical])
+    # A bar with another bar among its numerator or denominator is a complex fraction
+    # ("(1/2 + 1/3) / (1/4 - 1/5)"): it and the bars it holds are left as they were.
+    found_at = {id(b): _fraction_at(b, index, set()) for b in bars}
+    complex_bars: set[int] = set()
+    for bar in bars:
+        found = found_at[id(bar)]
+        if found is None:
+            continue
+        glyphs = [c for _, _, c in (*found[0], *found[1])]
+        top, bottom = min(c.y0 for c in glyphs), max(c.y1 for c in glyphs)
+        for other in bars:
+            overlap = min(bar.bbox[2], other.bbox[2]) - max(bar.bbox[0], other.bbox[0])
+            if other is not bar and overlap > 0 and top <= other.bbox[1] <= bottom:
+                complex_bars.update((id(bar), id(other)))
+    claimed: set[int] = set()
+    lifted: list[_Row] = []
+    removed: dict[int, set[int]] = {}
+    for bar in bars:
+        found = None if id(bar) in complex_bars else _fraction_at(bar, index, claimed)
+        if found is None:
+            continue
+        numerator, denominator, baseline = found
+        for row, i, _ in (*numerator, *denominator):
+            removed.setdefault(id(row), set()).add(i)
+        claimed.update(id(c) for _, _, c in (*numerator, *denominator))
+        top = sorted((c for _, _, c in numerator), key=lambda c: c.x0)
+        bottom = sorted((c for _, _, c in denominator), key=lambda c: c.x0)
+        last = top[-1]
+        chars = [replace(c, stacked=True) for c in top]
+        chars.append(
+            _Char(
+                " ", last.x1, last.y0, bottom[0].x0, last.y1, last.baseline, last.size, last.font, 0
+            )
+        )
+        chars.extend(replace(c, stacked=True) for c in bottom)
+        piece = _Row(chars)
+        piece.__dict__["baseline"] = baseline  # the line of text it stands in
+        lifted.append(piece)
+    if not lifted:
+        return frags
+    out: list[_Row] = []
+    for frag in frags:
+        gone = removed.get(id(frag))
+        if not gone:
+            out.append(frag)
+            continue
+        kept = [c for i, c in enumerate(frag.chars) if i not in gone]
+        if any(not c.blank for c in kept):
+            out.append(
+                _Row(kept, vertical=frag.vertical, diagonal=frag.diagonal, column=frag.column)
+            )
+    return [*out, *lifted]
+
+
+def _fraction_at(
+    bar: _Path, index: _RowIndex, claimed: set[int]
+) -> tuple[list[tuple[_Row, int, _Char]], list[tuple[_Row, int, _Char]], float] | None:
+    """(numerator glyphs, denominator glyphs, baseline of the text beside) of the inline
+    fraction on `bar`, each glyph with its row and place in it; None when the bar is not
+    one (see `_lift_stacked_fractions`)."""
+    x0, y0, x1, y1 = bar.bbox
+    middle = (y0 + y1) / 2
+    reach = 1.6 * index.largest
+    candidates: list[tuple[_Row, int, _Char]] = []
+    beside: list[_Char] = []
+    for row in index.near(middle - reach, middle + reach):
+        for i, c in enumerate(row.chars):
+            if c.blank or id(c) in claimed:
+                continue
+            centre_x = (c.x0 + c.x1) / 2
+            if x0 - 1.0 <= centre_x <= x1 + 1.0:
+                candidates.append((row, i, c))
+            elif c.y0 <= middle <= c.y1 and abs(centre_x - (x0 + x1) / 2) <= 6 * c.size + (x1 - x0):
+                beside.append(c)
+    # Only inside running text: a fraction in a display equation is read with its rows
+    # (`_equation_regions`), and lifting it would cut those rows. Three plain letters
+    # within a few font sizes of the bar are words.
+    words = sum(c.c.isalpha() and not c.math for c in beside)
+    if words < PROSE_LETTERS_BESIDE_BAR:
+        return None
+    # The text around the bar must be set bigger than the glyphs on it: that is what makes
+    # it an inline fraction (a display fraction's own line has glyphs of the same size).
+    text = max(c.size for c in beside)
+    over: list[tuple[_Row, int, _Char]] = []
+    under: list[tuple[_Row, int, _Char]] = []
+    for row, i, c in candidates:
+        if c.size > SCRIPT_RATIO * text:
+            continue
+        centre_y = (c.y0 + c.y1) / 2
+        if 0 < middle - centre_y <= INLINE_FRACTION_REACH * c.size:
+            over.append((row, i, c))
+        elif 0 < centre_y - middle <= INLINE_FRACTION_REACH * c.size:
+            under.append((row, i, c))
+    if not over or not under:
+        return None
+    size = max(c.size for _, _, c in (*over, *under))
+    glyphs = [c for _, _, c in (*over, *under)]
+    width = x1 - x0
+    covered = max(c.x1 for c in glyphs) - min(c.x0 for c in glyphs)
+    if width > MAX_INLINE_BAR * size or covered < 0.6 * width or covered > width + 2.0:
+        return None
+    nearest = min(
+        (c for c in beside if c.size >= size / SCRIPT_RATIO),
+        key=lambda c: abs((c.x0 + c.x1) / 2 - (x0 + x1) / 2),
+        default=None,
+    )
+    if nearest is None:
+        return None
+    return over, under, nearest.baseline
+
+
+def _merge_baselines(
+    frags: list[_Row], gutter: tuple[float, float] | None, rules: Sequence[_Path] = ()
+) -> list[_Row]:
     """Merge fragments that share a baseline into rows, never across the column gutter."""
+    frags = _lift_stacked_fractions(frags, rules)
     rows: list[_Row] = []
     horizontal = sorted((f for f in frags if not f.vertical), key=lambda f: f.baseline)
     bands: list[list[_Row]] = []
@@ -1771,7 +1927,7 @@ class _CharInfo:
 
     @classmethod
     def of(cls, row: _Row) -> _CharInfo:
-        classes = [_char_class(c) for c in row.chars]
+        classes = ["M" if c.stacked else _char_class(c) for c in row.chars]
         first = next((i for i, c in enumerate(row.chars) if not c.blank), None)
         if (
             first is not None
@@ -1993,6 +2149,8 @@ def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) 
     an italic unit, not a formula).
     """
     idx = range(start, end)
+    if any(chars[i].stacked for i in idx):
+        return ["stacked fraction"]
     if any(info.classes[i] == "M" for i in idx):
         return ["math font or symbol"]
     if _broken_brackets("".join(chars[i].c for i in idx)):
@@ -3544,11 +3702,7 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
         reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
         active = [k for k in active if regions[k].box[3] >= reach]
         host = next(
-            (
-                k
-                for k in reversed(active)
-                if _joins_line(last[k], regions[k].box, line, peers[k])
-            ),
+            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line, peers[k])),
             None,
         )
         if host is None:
@@ -5224,7 +5378,7 @@ class _PageBlocks:
 
 
 def _prepare_rows(
-    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter
+    page: pymupdf.Page, frags: list[_Row], margins: _MarginFilter, rules: Sequence[_Path] = ()
 ) -> tuple[list[_Row], tuple[float, float] | None, list[_Row]]:
     """The page's rows without its running headers, footers, page numbers and watermarks,
     its column gutter, and the rows so dropped (a figure may claim some back as labels:
@@ -5237,7 +5391,7 @@ def _prepare_rows(
     # Margin lines (an unrepeated header, a centred footer) say nothing about columns.
     body = [f.bbox for f in kept if not f.vertical and _margin_zone(f, height) is None]
     gutter = _find_gutter(body)
-    return _merge_baselines(kept, gutter), gutter, _merge_baselines(dropped, gutter)
+    return _merge_baselines(kept, gutter, rules), gutter, _merge_baselines(dropped, gutter)
 
 
 def _page_blocks(
@@ -5900,7 +6054,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
             ink = types[number].ink.ink_drawings
             paths[number] = [p for p in paths[number] if p.source not in ink]
         found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
-        prepared[number] = _prepare_rows(doc[number], frags[number], margins)
+        prepared[number] = _prepare_rows(doc[number], frags[number], margins, paths[number])
         # Axes with tick labels, an axis title or a curve from their corner are a plot's:
         # the rows the header and footer rules dropped count (tick labels in the bands).
         # Rulers with no labels whose ticks are an answer field's cells are not rulers.

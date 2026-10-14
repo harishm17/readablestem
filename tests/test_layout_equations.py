@@ -301,12 +301,12 @@ def braced_system(page: pymupdf.Page, number: str | None, brace_row: int) -> Non
     if number:
         page.insert_text((72, 128), number, fontsize=BODY, fontname="helv")
     if brace_row == 0:
-        page.insert_text((number and 100 or 72, 140), "Solve the system.", fontsize=BODY)
-        page.insert_text((number and 190 or 162, 140), "{", fontsize=BODY)
+        page.insert_text(((number and 100) or 72, 140), "Solve the system.", fontsize=BODY)
+        page.insert_text(((number and 190) or 162, 140), "{", fontsize=BODY)
     else:
         page.insert_text((176, 147), "{", fontsize=BODY)
-    page.insert_text((number and 200 or 172, 140), "2 a + b = 7", fontsize=BODY, fontname="symb")
-    page.insert_text((number and 200 or 172, 154), "a - 2 b = 6", fontsize=BODY, fontname="symb")
+    page.insert_text(((number and 200) or 172, 140), "2 a + b = 7", fontsize=BODY, fontname="symb")
+    page.insert_text(((number and 200) or 172, 154), "a - 2 b = 6", fontsize=BODY, fontname="symb")
     prose(page, 230, "Then check the answer in both original equations as well.")
 
 
