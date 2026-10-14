@@ -294,3 +294,18 @@ def test_equations_are_shadow_even_when_enforcing():
         )
         assert fix.status is Status.ACCEPTED and not fix.failed_checks
         assert [(v.mode, v.flagged) for v in fix.verifications] == [("shadow", True)]
+
+
+def test_equations_waiting_for_review_are_checked_only_when_the_scope_is_all():
+    unsure = {"is_equation": True, "latex": "F = m a", "confidence": 0.7}  # needs review
+    for scope, asked in (("accepted", 0), ("all", 1)):
+        check = fake_check()
+        client = FakeVisionClient(responders={"equation": lambda r: unsure}, verifier=check)
+        fix = transcribe(
+            equation_element(),
+            PNG,
+            client=client,
+            settings=make_settings(claude_check_scope=scope),
+        )
+        assert fix.status is Status.NEEDS_REVIEW
+        assert len(fix.verifications) == len(check.requests) == asked

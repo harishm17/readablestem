@@ -133,6 +133,11 @@ class Settings(BaseSettings):
     # be independent; sonnet is neither by default.
     claude_check_model: str = "claude-sonnet-5-5"
     claude_check_effort: Effort = "low"
+    # Which equations the check looks at: "accepted" (the proposals that reach a student
+    # without a person's decision, which is what a second look is for; figures are always
+    # only accepted ones) or "all" (also those already waiting for review: more spend, used
+    # to measure the check against the first pass's own doubt).
+    claude_check_scope: Literal["accepted", "all"] = "accepted"
     # A slow check is skipped (fail-open), it never holds up a conversion; no retries.
     claude_check_timeout_s: float = Field(default=45.0, gt=0)
     # Daily canary of the Claude check on fixed synthetic cases with known answers

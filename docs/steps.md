@@ -603,6 +603,10 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Accents | "vector d" (arrow over), "x hat", "x bar", "x dot", "x tilde" |
 | Functions | "sine", "cosine", "natural log", ... |
 | Tables | "row 1: ...; row 2: ..." when there are several rows; cells of an aligned equation read as one line, matrix cells are comma-separated |
+| Matrices | a table inside parentheses or brackets: "the 2 by 2 matrix; row 1: a, b; row 2: c, d; end matrix"; one column "the 3 by 1 column matrix", one row "the 1 by 3 row matrix"; inside bars "the 2 by 2 determinant; ...; end determinant". A single fenced cell, an aligned table and brace-fenced tables are not matrices |
+| Cases | a table after an opening brace with no closing one: "cases: case 1: x squared, if x greater than 0; case 2: 0, otherwise; end cases". The second cell is the condition; "if" is added unless it starts with if, for, when, otherwise, ... |
+| Nuclides | scripts on an empty base before an element or particle: "carbon 14, atomic number 6", "uranium 235, atomic number 92", "neutron, mass number 1, atomic number 0", "electron, ... atomic number minus 1". Unknown letters read as written (`speech_nuclides.py`) |
+| Units | upright letters or text right after a number: "5 m/s" reads "5 meters per second", "9.8 m/s^2" "9.8 meters per second squared", "3 kg·m/s" "3 kilogram meters per second", "2.9 m/s" "2.9 meters per second", "25 °C" "25 degrees Celsius"; singular after 1. Italic letters (a variable `m`), ambiguous divisions (`J/kg K`) and unknown symbols read as before (`speech_units.py`) |
 | Text | verbatim, except words that are a single maths symbol ("time =" reads "time equals") |
 | Unknown symbols | their Unicode name, lower-cased |
 
