@@ -251,11 +251,18 @@ class Breakdown:
         return f"{kinds_phrase(self.as_image_kinds)} {verb} of the original."
 
 
+def shown_as_image(fix: Fix) -> bool:
+    """The original is kept as an image in the HTML file (T1-3). Not a heading: "Make bold
+    text" rejects a heading too (`Status.REJECTED`), but what the student file gets is the
+    heading's text as bold text, which a screen reader reads."""
+    return fix.kind is not Kind.HEADING and fix.status in KEPT_ORIGINAL_STATUSES
+
+
 def breakdown(fixes: list[Fix]) -> Breakdown:
     waiting = [f for f in fixes if f.pending]
     decided = [f for f in fixes if not f.pending and f.decided_by_reviewer]
     accepted = [f for f in fixes if not f.pending and not f.decided_by_reviewer]
-    images = [f for f in fixes if f.status in KEPT_ORIGINAL_STATUSES]
+    images = [f for f in fixes if shown_as_image(f)]
     grouped = [unit[0] for unit in triage.units(waiting) if len(unit) > 1]
     return Breakdown(
         items=len(fixes),
