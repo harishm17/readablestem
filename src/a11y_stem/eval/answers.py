@@ -32,7 +32,7 @@ from typing import Any
 
 from a11y_stem.config import Settings
 from a11y_stem.core.types import ModelCall
-from a11y_stem.models.base import T, VisionClient, VisionRequest
+from a11y_stem.models.base import T, VisionRequest
 from a11y_stem.proof.bundle import dump_line
 from a11y_stem.proof.replay import AnswerSet, request_key
 
@@ -69,12 +69,13 @@ class CachedClient:
 
     `inner` None (offline): a miss comes back refused, with no call and no cost."""
 
-    def __init__(self, inner: VisionClient | None, path: Path, settings: Settings) -> None:
+    def __init__(self, inner: Any, path: Path, settings: Settings) -> None:
         self._inner = inner
         self._path = path
         self._settings = settings
         self._lock = threading.Lock()
         self._answers = AnswerSet(load_rows(path))
+        self._local = threading.local()  # per thread: did the last first attempt only stage?
         self.verifier = getattr(inner, "verifier", None)
         self.hits = 0
         self.misses = 0
@@ -85,6 +86,18 @@ class CachedClient:
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
     ) -> tuple[T | None, ModelCall]:
         key = answer_key(self._settings, request)
+        if not is_fallback:
+            self._local.staged = False
+        elif getattr(self._local, "staged", False):
+            # The first attempt got a placeholder from a staged run, not a failure: its
+            # fallback is not a real request and must not be collected.
+            return None, ModelCall(
+                step=request.step,
+                model=request.model,
+                prompt_version=request.prompt_version,
+                is_fallback=True,
+                outcome="api_error",
+            )
         with self._lock:
             row = self._answers.model(key, request.step)
             if row is not None:
@@ -113,6 +126,9 @@ class CachedClient:
             )
             return None, call
         parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
+        if getattr(self._inner, "stages", False):
+            self._local.staged = True
+            return parsed, call
         self.live_cost_usd += call.cost_usd
         # An answer lost to an outage or a budget stop is not worth keeping: ask again later.
         if call.outcome in ("ok", "invalid_output", "refused"):
@@ -132,6 +148,11 @@ class CachedClient:
             self._path.parent.mkdir(parents=True, exist_ok=True)
             with self._path.open("a", encoding="utf-8") as handle:
                 handle.write(dump_line(row) + "\n")
+
+    def reset(self) -> None:
+        """Zero the counters (a staged run counts its last pass only)."""
+        self.hits = self.misses = 0
+        self.live_cost_usd = self.replayed_cost_usd = 0.0
 
     def summary(self) -> Mapping[str, Any]:
         return {

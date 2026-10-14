@@ -110,6 +110,7 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             main_model=args.main_model,
             cheap_model=args.cheap_model,
             chat_runs=args.chat_runs,
+            chat_batch=args.batch,
         )
         if args.add_systems:
             engine.add_systems(opts, args.add_systems, _say, arms=args.arms or None)
@@ -202,6 +203,13 @@ def register(sub: argparse._SubParsersAction) -> None:
         metavar="N",
         help="with --add-systems chatbot: make N runs of each arm, not the arm's own number "
         "(the recorded run says how many were made)",
+    )
+    live.add_argument(
+        "--batch",
+        action="store_true",
+        help="with --add-systems chatbot --provider anthropic: send the Claude arms and the "
+        "figure judge as Message Batches (half the price; the same requests, answered when "
+        "the batch ends)",
     )
     live.add_argument(
         "--resume",

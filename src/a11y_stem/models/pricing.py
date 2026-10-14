@@ -165,6 +165,8 @@ PRICES.update(
         ),
     }
 )
+# The Message Batches API bills every token at half the standard rate (re-read 2026-10-14).
+BATCH_DISCOUNT = 0.5
 ANTHROPIC_MODELS: frozenset[str] = frozenset(m for m in PRICES if m.startswith("claude-"))
 
 

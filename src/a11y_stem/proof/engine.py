@@ -75,6 +75,10 @@ class ProofOptions:
     # With `--add-systems chatbot`: make this many runs of each arm instead of the arm's
     # own number (None: the arm's own). The bundle records the number that was made.
     chat_runs: int | None = None
+    # With `--add-systems chatbot --provider anthropic`: send the chatbot arms and the figure
+    # judge as Message Batches (half the price, hours instead of minutes): the same requests
+    # (`proof.chatbot_batch`, `models.anthropic_batch`).
+    chat_batch: bool = False
 
 
 @dataclass
@@ -473,7 +477,14 @@ def add_systems(
             say("checking the model API with one small request")
             runner.probe_api(runner.proof_settings(opts.provider), send=opts.probe)
         gold_dir = resolve_gold(pset, opts, bundle.gold_dir, work, say)
-        summary = chatbot.record_arms(
+        if opts.chat_batch and opts.provider != "anthropic":
+            raise ProofError("--batch needs --provider anthropic (the Message Batches API)")
+        record = chatbot.record_arms
+        if opts.chat_batch:
+            from a11y_stem.proof import chatbot_batch
+
+            record = chatbot_batch.record_arms_batch
+        summary = record(
             pdfs,
             out,
             arms=selected,
@@ -529,9 +540,21 @@ def add_systems(
                 client = judge_client
                 judge_info = {"provider": "anthropic", "model": settings.main_model}
         loaded = systems.load_arms_dir(out)
-        judge_cost = judging.judge_arms(
-            loaded, golds, client=client, settings=settings, image_for=images.png, say=say
-        )
+        if opts.chat_batch and judge_client is None:
+            judge_cost = judging.judge_arms_batched(
+                loaded,
+                golds,
+                client=client,
+                settings=settings,
+                budget=budget,
+                answers=work / "systems-out" / "judge-answers.jsonl",
+                image_for=images.png,
+                say=say,
+            )
+        else:
+            judge_cost = judging.judge_arms(
+                loaded, golds, client=client, settings=settings, image_for=images.png, say=say
+            )
         extra = {
             "systems_spend": {
                 "chatbot_usd": spent,

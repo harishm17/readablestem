@@ -95,10 +95,12 @@ def judge_arms(
     settings: Settings,
     image_for: Callable[[str], bytes],
     say: Callable[[str], None] = print,
+    write: bool = True,
 ) -> float:
     """Judge every ok output that has not been judged; rewrite its JSON. Returns the
     judge cost. `BudgetExceeded` from the client propagates (nothing is half-written: a
-    JSON is rewritten only when all its figures were judged)."""
+    JSON is rewritten only when all its figures were judged). `write` False judges
+    and writes nothing (a pass of a staged run that is only collecting requests)."""
     total = 0.0
     for arm, sections in arms.items():
         for section, runs in sections.items():
@@ -109,14 +111,51 @@ def judge_arms(
                 done = judge_run(
                     run, golds[section], client=client, settings=settings, image_for=image_for
                 )
+                total += done["judge_cost_usd"]
+                if not write:
+                    continue
                 data = json.loads(path.read_text(encoding="utf-8"))
                 data.update(done)
                 path.write_text(dumps(data), encoding="utf-8")
-                total += done["judge_cost_usd"]
                 say(
                     f"judged {arm} {section} run{run.run}: {len(done['figure_judgements'])} figures"
                 )
     return total
+
+
+def judge_arms_batched(
+    arms: dict[str, dict[str, list[SystemRun]]],
+    golds: dict[str, SectionGold],
+    *,
+    client: Any,
+    settings: Settings,
+    budget: Any,
+    answers: Path,
+    image_for: Callable[[str], bytes],
+    say: Callable[[str], None] = print,
+) -> float:
+    """`judge_arms` with the judge's requests sent as Message Batches (Claude judge only).
+
+    The same requests, answered when the batches end: passes that only collect what the
+    answers file cannot yet answer (`eval.staged`), then one pass that writes the verdicts.
+    `answers` keeps the judge's answers, so an interrupted step does not pay for them again."""
+    from a11y_stem.eval import staged
+    from a11y_stem.eval.answers import CachedClient
+    from a11y_stem.models.anthropic_batch import BatchRunner, PendingPool, StagingClient
+
+    pool = PendingPool()
+    staging = StagingClient(client, pool)
+    cached = CachedClient(staging, answers, settings)
+    staging.owner = cached
+    runner = BatchRunner(budget, say=say)
+
+    def collect() -> float:
+        return judge_arms(
+            arms, golds, client=cached, settings=settings, image_for=image_for, say=say, write=False
+        )
+
+    staged.drive(collect, pool, runner, say=say)
+    return judge_arms(arms, golds, client=cached, settings=settings, image_for=image_for, say=say)
 
 
 def _meta_path(run: SystemRun) -> Path:

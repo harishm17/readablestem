@@ -83,6 +83,7 @@ from a11y_stem.models.openai_client import (
     fenced_context,
 )
 from a11y_stem.models.pricing import (
+    BATCH_DISCOUNT,
     PRICES,
     ceiling_cost_usd,
     cost_usd,
@@ -230,6 +231,49 @@ class AnthropicVisionClient:
         )
         _log_call(call, last, sends=len(replies))
         return cast("T | None", last.parsed), call
+
+    def sdk_client(self) -> anthropic.Anthropic:
+        """The SDK client this object sends with (built on first use)."""
+        return self._client()
+
+    def batch_params(self, request: VisionRequest, schema: type[T]) -> dict[str, Any]:
+        """The Messages parameters of `request` for one entry of a Message Batch: what `run`
+        would send, less the refusal fallback (the Batches API takes none). Raises
+        `ValueError` for a malformed request, as `run` does."""
+        context = fenced_context(request.context_text)
+        return self._params(request, schema, _user_content(request, context))
+
+    def batch_estimate_usd(self, request: VisionRequest) -> float:
+        """The worst case of `request` at the Batches price, for the reservation."""
+        context = fenced_context(request.context_text)
+        return BATCH_DISCOUNT * estimate_max_cost_usd(
+            request.model,
+            n_images=len(request.images),
+            text_chars=len(context or ""),
+            max_output_tokens=request.max_output_tokens,
+            images=request.images,
+        )
+
+    def read_batch_message(
+        self, request: VisionRequest, schema: type[T], message: Any
+    ) -> tuple[T | None, ModelCall]:
+        """The parsed answer and the `ModelCall` for a message a batch returned. The call's
+        cost is at list price (what `run` would have recorded); the batch bills
+        `BATCH_DISCOUNT` of it, and the caller settles its reservation at that."""
+        reply = self._read_message(request, schema, message)
+        call = ModelCall(
+            step=request.step,
+            model=request.model,
+            prompt_version=request.prompt_version,
+            input_tokens=reply.usage.input_tokens,
+            cached_input_tokens=reply.usage.cached_input_tokens,
+            cache_creation_input_tokens=reply.usage.cache_creation_input_tokens,
+            output_tokens=reply.usage.output_tokens,
+            reasoning_tokens=reply.usage.reasoning_tokens,
+            cost_usd=_charge(request.model, reply, 0.0),
+            outcome=reply.outcome,
+        )
+        return cast("T | None", reply.parsed), call
 
     def _client(self) -> anthropic.Anthropic:
         """The SDK client with this app's timeout, created once. Retries are done in run()."""
