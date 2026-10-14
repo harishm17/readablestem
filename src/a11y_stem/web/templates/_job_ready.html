@@ -10,6 +10,21 @@
     <li><a class="button" href="/jobs/{{ job.id }}/download">Download the HTML file</a></li>
     <li><a href="/jobs/{{ job.id }}/view">Preview the student version</a></li>
   </ul>
+  {# For Canvas (pipeline/export_canvas.py): a plain GET form, so it works without
+     JavaScript. The course number is optional; with it the zip also holds a page to paste. #}
+  <form class="canvas-download" method="get" action="/jobs/{{ job.id }}/download/canvas"
+        aria-labelledby="canvas-heading">
+    <h3 id="canvas-heading">For Canvas</h3>
+    <p id="canvas-help" class="hint">Canvas removes the pictures and styles from a pasted page,
+      so this zip keeps each picture as its own file; add your course number (the number after
+      /courses/ in your course's web address) and it also holds a page to paste.</p>
+    <div class="field">
+      <label for="canvas-course">Canvas course number (optional)</label>
+      <input type="text" id="canvas-course" name="course" class="input-short" inputmode="numeric"
+             pattern="[0-9]{1,20}" maxlength="20" autocomplete="off">
+    </div>
+    <button type="submit" class="button-secondary" aria-describedby="canvas-help">For Canvas (zip with images)</button>
+  </form>
   <h3 id="before-heading">Before you share</h3>
   <ul aria-labelledby="before-heading">
     <li>Read the student version through once. The automatic checks look at the structure
@@ -31,7 +46,8 @@
   <p><a href="/help/posting">How to post it in your course</a>: upload the HTML file to your
     course as a file and link to it where the PDF was linked, so it is the main version;
     keep the PDF only as a print copy, labelled as such. Do not paste it into a page
-    editor: course sites remove the images and the layout the equations need.</p>
+    editor: course sites remove the images and the layout the equations need. In Canvas,
+    the zip above is the way to make a page.</p>
   {# ux-a's part under the download (the two questions); its posting link is the one
      above. #}
   {% with posting_link = false %}{% include "_after_download.html" %}{% endwith %}

@@ -205,6 +205,12 @@
     if (!(event.target instanceof Element)) return;
     if (event.target.closest('a[href$="/download"]')) questions.hidden = false;
   });
+  // The Canvas download is a form (a course number can go with it).
+  document.addEventListener("submit", function (event) {
+    if (event.target instanceof Element && event.target.closest("form.canvas-download")) {
+      questions.hidden = false;
+    }
+  });
 })();
 
 /* Review screen (review_split.html). Everything there works without this; it only:

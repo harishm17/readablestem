@@ -97,6 +97,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/draft` | owner | Asked before a download while decisions are open: what students would get, "Review N decisions first" or "Download the draft anyway"; with none open, 303 to the finish line |
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
+| GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
 | GET `/jobs/{id}/review?item=&page=&accepted=1&cell=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table |
@@ -598,7 +599,9 @@ From top to bottom:
    through; the notes, optional; what is not handled) and "Put it in your course"
    ("How to post it in your course" links the Canvas steps on `/help/posting`; upload it
    as a file and link it where the PDF was, as the main version, the PDF kept only as a
-   labelled print copy, as the help page says; do not paste it into a page editor; the
+   labelled print copy, as the help page says; do not paste it into a page editor; for a
+   Canvas page, "For Canvas (zip with images)" below the download, a plain form with an optional
+   course number; the
    tested steps per
    LMS are `TODO(Harish)`), then the two questions after a download ("After a
    download"). Deleting is a quiet button at the end of the page.
