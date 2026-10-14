@@ -399,3 +399,33 @@ def test_stacked_list_braces_are_not_one_tall_brace():
         layout._classify_row(row)
     layout._mark_case_rows(rows)
     assert not any(r.case_row for r in rows)
+
+
+def test_a_display_fraction_over_a_close_equation_is_not_a_table_row():
+    """2-2 of the OpenStax Physics: "time = distance / v" with its fraction at the size of
+    its line, directly over "distance = v x time", centred like it, a few points apart:
+    two equations, as the source has them."""
+
+    def fill(page):
+        prose(page, 100, "You can rearrange the equation to solve for either quantity")
+        page.insert_text((276, 140), "t =", fontsize=12)
+        fraction(page, 298, 136, "d", "v", 8, size=12)
+        page.insert_text((266, 164), "d = v x t", fontsize=12)
+        prose(page, 206, "Suppose, for example, a car travels 150 kilometers in 3.2 hours.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements].count(Kind.EQUATION) == 2
+
+
+def test_rows_with_small_fractions_set_close_together_are_one_system():
+    def fill(page):
+        prose(page, 100, "Solve the system of two equations in two unknowns here.")
+        for i, (a, b) in enumerate([("1", "4"), ("1", "5")]):
+            y = 140 + i * 24
+            page.insert_text((250, y), "x +", fontsize=12)
+            fraction(page, 278, y - 3, a, b, 5, size=8)
+            page.insert_text((290, y), "y = 7", fontsize=12)
+        prose(page, 230, "Adding the two equations eliminates the first unknown.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements].count(Kind.EQUATION) == 1

@@ -3770,6 +3770,31 @@ class _Line:
         ]
 
     @cached_property
+    def big_fraction(self) -> bool:
+        """A fraction set at the size of the line (a display fraction): a glyph at the
+        size of the line's text on either side of one of its bars. The fractions of a
+        system's rows are set smaller than the rows' text."""
+        text = max(c.size for c in self.ink)  # rows are sized by their majority: not self.size
+        for rule in self.rules:
+            x0, y0, x1, y1 = rule.bbox
+            middle = (y0 + y1) / 2
+            above = below = False
+            relation = False  # "x + y = 2" over a rule: a step of a derivation, not a fraction
+            for glyph in self.ink:
+                centre_x, centre_y = (glyph.x0 + glyph.x1) / 2, (glyph.y0 + glyph.y1) / 2
+                if (
+                    x0 - 1 <= centre_x <= x1 + 1
+                    and abs(centre_y - middle) <= 1.2 * text
+                    and glyph.size >= 0.9 * text
+                ):
+                    above |= centre_y < middle
+                    below |= centre_y > middle
+                    relation |= glyph.c in _ROW_RELATIONS
+            if above and below and not relation:
+                return True
+        return False
+
+    @cached_property
     def opens_system(self) -> bool:
         """Only the brace of a system, standing left of its rows, level with their middle."""
         return all(c.c in _OPENING_BRACES for c in self.ink)
@@ -3946,8 +3971,8 @@ def _table_rows(above: _Line, line: _Line, box: BBox, size: float) -> bool:
     most, where a display gets an em or more above and below) and gives them one edge or
     one centre: each row centred as OpenStax prints a system, or flush left or right.
     """
-    if line.box[1] - box[3] > TABLE_ROW_GAP * size:
-        return False
+    if line.box[1] - box[3] > TABLE_ROW_GAP * size or above.big_fraction or line.big_fraction:
+        return False  # "time = d / v" over "d = v t": two display equations, not rows
     tolerance = 0.3 * size
     left, right = (above.body_x0 - line.body_x0), (above.ink_x1 - line.ink_x1)
     return abs(left) <= tolerance or abs(right) <= tolerance or abs(left + right) <= 2 * tolerance

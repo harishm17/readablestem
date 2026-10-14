@@ -385,8 +385,10 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
 - **Rows of a table, braced systems (T2-2).** Two whole equations also join when they are
   set at most 0.7 x font size apart and share a left edge, a right edge or a centre
   within 0.3 x font size (`_table_rows`: OpenStax centres each row of a system; a row may
-  line up with any earlier row of its equation, not only the last). Two numbered rows still
-  stay apart. A system's opening brace is part of the equation: a brace in the text font on
+  line up with any earlier row of its equation, not only the last). A row with a fraction set
+  at the size of its line (a glyph that size on both sides of a bar, with no relation among
+  them) is never a table row: `time = d / v` over `d = v t` are two equations, where the
+  small fractions of a system's rows are not. Two numbered rows still stay apart. A system's opening brace is part of the equation: a brace in the text font on
   the first row after prose ("Solve the system by substitution. { 2x + y = 7") is cut from
   the sentence (`_split_braced_systems`: maths follows it, there is no closing brace, and
   a maths row sits under that maths), and a brace that is a row of its own, level with the
