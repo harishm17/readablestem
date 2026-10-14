@@ -137,7 +137,11 @@ log = logging.getLogger(__name__)
 # runs, passage languages, notices and source facts on the result, conversion options.
 # Results from 0.3.0 load unchanged (every new field has a default); a table detected by
 # 0.4.0 is a required decision ("table_not_rebuilt") until rebuilding is switched on.
-PIPELINE_VERSION = "0.4.0"
+# 0.5.0 (2026-10-14): the Tier 1 and Tier 2 changes of the launch integration (CHANGELOG.md):
+# layout and structure rules, the Claude second check, speech readings, review rules for
+# equations as pictures and half fractions, and the model-cost settings. Results from 0.4.0
+# load unchanged; their numbers were made under the old rules.
+PIPELINE_VERSION = "0.5.0"
 
 ProgressFn = Callable[[int, int], None]  # (pages_done, pages_total)
 # Live progress by stage, for the job page (content-free; see `ProgressEvent`).

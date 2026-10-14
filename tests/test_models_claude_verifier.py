@@ -202,6 +202,16 @@ def test_a_missing_key_is_skipped_not_raised():
     assert verdict.reason_code == "skipped"
 
 
+def test_the_check_keeps_its_prompt_whatever_the_notice_setting_is():
+    """`anthropic_notice_in_system` (model-cost, on by default) is for the conversion steps:
+    the second check sends the system block and the user message it was measured with."""
+    settings = make_settings(anthropic_notice_in_system=True)
+    check = make_claude_verifier(settings, make_budget())
+    inner = check._client  # type: ignore[attr-defined]
+    assert settings.anthropic_notice_in_system is True
+    assert inner._settings.anthropic_notice_in_system is False
+
+
 # ---------------------------------------------------------------- the factories
 
 
