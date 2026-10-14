@@ -86,8 +86,8 @@ from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendG
 from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from a11y_stem.ops import limits
 from a11y_stem.web import events
-from a11y_stem.web.database import rowcount
-from a11y_stem.web.db import Blob, Job, JobStatus, User, session_scope, utcnow
+from a11y_stem.web.database import as_utc, rowcount
+from a11y_stem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
 from a11y_stem.web.logsafe import log_event, log_exception
 from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
 
@@ -908,6 +908,7 @@ class Worker:
                 or job.attempts != attempt.claim.attempt
             ):
                 return False
+            earlier = self._earlier_version(session, job)  # before its crops are replaced
             session.execute(delete(Blob).where(Blob.job_id == job.id, Blob.kind == "crop"))
             for element_id, png in output.crops.items():
                 session.add(
@@ -919,6 +920,8 @@ class Worker:
                         content=png,
                     )
                 )
+            if earlier is not None:
+                self._carry_decisions(session, job, result, output.crops, earlier)
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
             job.html_stale = False  # the file is made from this result
@@ -936,6 +939,83 @@ class Worker:
             job.finished_at = self.clock()
             job.lease_until = None
         return True
+
+    # ------------------------------------------------------------------ earlier decisions
+
+    def _earlier_version(
+        self, session: Session, job: Job
+    ) -> tuple[DocumentResult, dict[str, bytes], str] | None:
+        """The result whose decisions this one inherits (T3-2, `web.carry`): the earlier
+        version the upload said it revises, if it is still the owner's, finished and not
+        past its deletion time. (result, its crops, its file name), or None."""
+        if not job.revises_job_id:
+            return None
+        before = session.get(Job, job.revises_job_id)
+        if (
+            before is None
+            or before.user_id != job.user_id
+            or before.status != JobStatus.DONE
+            or not before.result_json
+            or (retain := as_utc(before.retain_until)) is None
+            or retain <= self.clock()
+        ):
+            return None
+        try:
+            earlier = DocumentResult.model_validate(before.result_json)
+        except ValueError:
+            return None
+        blobs = session.scalars(select(Blob).where(Blob.job_id == before.id, Blob.kind == "crop"))
+        return earlier, {b.element_id: b.content for b in blobs if b.element_id}, before.filename
+
+    def _carry_decisions(
+        self,
+        session: Session,
+        job: Job,
+        result: DocumentResult,
+        crops: dict[str, bytes],
+        earlier: tuple[DocumentResult, dict[str, bytes], str],
+    ) -> None:
+        """Put the earlier version's decisions on the new result (`carry.carry_decisions`),
+        make the HTML file again from it, record a `ReviewEdit` per carried decision and
+        keep the report on the job. Never fails the conversion: a problem here leaves the
+        result as the pipeline made it, with every decision to be made again."""
+        from a11y_stem.web import carry
+        from a11y_stem.web.review import rerender_job_html
+
+        before, before_crops, name = earlier
+        try:
+            report, changes = carry.carry_decisions(before, before_crops, result, crops)
+            if changes:
+                from a11y_stem.web import notation
+
+                with notation.in_force(self.factory, self.settings, job.id):
+                    result.html = rerender_job_html(
+                        job, result, crops, math_alttext=self.settings.mathml_alttext
+                    )
+        except Exception as exc:  # the result is as the pipeline made it, or half-carried
+            log_exception(logger, "carry_failed", exc, job_id=job.id)
+            return
+        for change in changes:
+            session.add(
+                ReviewEdit(
+                    job_id=job.id,
+                    user_id=job.user_id,
+                    element_id=change.element_id,
+                    action=carry.CARRIED_ACTION,
+                    before=change.before,
+                    after=change.after,
+                )
+            )
+        job.carried_json = report.to_json() | {"from_name": name}
+        log_event(
+            logger,
+            "decisions_carried",
+            job_id=job.id,
+            carried=len(report.carried),
+            changed=len(report.changed) + len(report.suggestion_changed),
+            new=len(report.new),
+            removed=report.removed,
+        )
 
     # ------------------------------------------------------------------ loop
 

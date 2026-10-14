@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
+from a11y_stem.web import carry as carry_rules
 from a11y_stem.web import job_page, titles
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User
@@ -163,6 +164,11 @@ class JobView:
     title_override: str | None = None
     contact_line: str | None = None
     retention_mode: str = "day"
+    # What happened to the decisions of the earlier version this one revises (T3-2):
+    # `carry.CarrySummary` and the earlier file's name; None for a job that revises nothing.
+    carry: CarryView | None = None
+    # Elements whose decision was copied from the earlier version (the review screen says so).
+    carried_ids: frozenset[str] = frozenset()
 
     @property
     def finished(self) -> bool:
@@ -206,6 +212,15 @@ class JobView:
         if self.status == JobStatus.DONE:
             return "The HTML file is ready."
         return job_error_message(self.error_code)
+
+
+@dataclass
+class CarryView:
+    """The carry-over card of a revised document (`templates/_job_carry.html`)."""
+
+    from_name: str
+    summary: carry_rules.CarrySummary
+    first_waiting: str | None = None  # review link target: the first changed or new item
 
 
 DECISION_NOUNS = {
@@ -387,9 +402,11 @@ def job_view(
         queue_wait(session, job) if with_page and job.status == JobStatus.QUEUED else (0, None)
     )
     page = None
+    carried = None
     if with_page and job.status == JobStatus.DONE and job.result_json:
         result = DocumentResult.model_validate(job.result_json)
         page = job_page.page_data(result, last_decision(session, job))
+        carried = carry_view(job, result)
     return JobView(
         id=job.id,
         filename=job.filename,
@@ -418,4 +435,30 @@ def job_view(
         title_override=job.title_override,
         contact_line=job.contact_line,
         retention_mode=job.retention_mode,
+        carry=carried,
+        carried_ids=_carried_ids(job),
     )
+
+
+def carry_view(job: Job, result: DocumentResult) -> CarryView | None:
+    """The carry-over card's data for a revised document, or None (it revises nothing, or
+    nothing was recorded: the earlier version was gone when this one finished)."""
+    if not job.revises_job_id:
+        return None
+    data = job.carried_json
+    name = data.get("from_name") if isinstance(data, dict) else None
+    if not isinstance(data, dict) or not isinstance(name, str):
+        return CarryView("", carry_rules.summary(carry_rules.CarryReport(), result))
+    report = carry_rules.CarryReport.from_json(data)
+    summary = carry_rules.summary(report, result)
+    fixes = {f.element_id: f for f in result.fixes}
+    waiting = [
+        i for i in [*summary.changed_ids, *summary.new_ids] if i in fixes and fixes[i].pending
+    ]
+    return CarryView(name, summary, waiting[0] if waiting else None)
+
+
+def _carried_ids(job: Job) -> frozenset[str]:
+    data = job.carried_json
+    ids = data.get("carried") if isinstance(data, dict) else None
+    return frozenset(i for i in ids if isinstance(i, str)) if isinstance(ids, list) else frozenset()

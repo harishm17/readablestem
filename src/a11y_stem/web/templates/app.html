@@ -20,7 +20,17 @@
 {% endif %}
 
 <section aria-labelledby="upload-heading">
+  {% if revises|default(none) %}
+  {# T3-2: a new version of a document already converted. Its decisions carry over to the
+     items that have not changed (web/carry.py). #}
+  <h2 id="upload-heading">Upload a revised version</h2>
+  <p id="revises-note">This replaces nothing: <a href="/jobs/{{ revises.id }}">{{ revises.title }}</a>
+    stays as it is. The decisions you made on it are copied to the items in the new file
+    that are exactly the same. Anything that changed, and anything new, asks you again.
+    <a href="/app#upload-heading">Convert a different PDF instead</a></p>
+  {% else %}
   <h2 id="upload-heading">Convert a PDF</h2>
+  {% endif %}
   {% if spend_closed %}
   {# The form would only send the whole file to be refused (UX review MF20): say when
      uploads open again instead. #}
@@ -38,6 +48,7 @@
   {% else %}
   <form method="post" action="/jobs" enctype="multipart/form-data" novalidate class="upload-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% if revises|default(none) %}<input type="hidden" name="revises" value="{{ revises.id }}">{% endif %}
     {% set pdf_error = field_errors.get("pdf") %}
     <div class="field{% if pdf_error %} field-error{% endif %}">
       <label for="pdf">PDF file</label>
@@ -60,7 +71,7 @@
     {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
        shown and never the result. #}
     <div class="field checkbox-field exam-choice">
-      <input type="checkbox" id="exam" name="exam" value="on" aria-describedby="exam-hint">
+      <input type="checkbox" id="exam" name="exam" value="on" aria-describedby="exam-hint"{% if exam_default|default(false) %} checked{% endif %}>
       <label for="exam">Exam or quiz: describe figures without giving answers</label>
       <p class="hint" id="exam-hint">Figure descriptions then say what is shown, such as the
         axes and labels, and leave out values, trends and results a student is asked to work

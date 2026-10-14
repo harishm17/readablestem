@@ -88,7 +88,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/auth/microsoft/callback` | Microsoft | Finishes sign-in; 403 page if the organisation is not set up for the beta or the person is not allowlisted, 400 for any token that fails a check. With `admin_consent` (an IT admin back from the approval link, deploy.md step 3b): a thank-you notice on `/login`, nothing else |
 | GET, POST `/dev-login` | dev/test only | Any email, no password; the allowlist still applies |
 | POST `/logout` | signed in | Clears the session |
-| GET `/app` | signed in | My documents as a to-do list (below), then the upload form |
+| GET `/app?revises=` | signed in | My documents as a to-do list (below), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
 | GET `/app/documents?v=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged) |
 | POST `/jobs` | signed in | Upload: checks, quota, queue; 303 to `/jobs/{id}` |
 | GET `/jobs/{id}` | owner | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
@@ -424,6 +424,48 @@ as ids and counts (`course_created`, `course_renamed`, `course_deleted`,
 model only as the fenced course notation block, and erased with the user
 (`ops.retention.erase_user`). Every form is a plain POST with the CSRF token, with an
 error summary linked to the field, so it all works without JavaScript.
+
+## Revised versions (`web/carry.py`)
+
+An instructor who fixes a typo and uploads the PDF again should not decide the same
+equations twice. The job page's "If you change the PDF" links to `GET /app?revises=<job id>`,
+the ordinary upload form with a hidden `revises` field (and the earlier document's course and
+exam choice as its starting values); `POST /jobs` accepts the field only for a finished,
+still-kept document of the same person (else the form comes back with "was not found", status
+400, and nothing is queued). The new job stores `jobs.revises_job_id`. Nothing else about the
+upload changes: its pages count against the daily quota like any other conversion.
+
+When the new job has been converted, the worker (`Worker._carry_decisions`, in the same
+transaction that stores the result) reads the earlier version's result and crops, if it is
+still the owner's, finished and not past its deletion time, and carries the decisions over
+(`carry.carry_decisions`):
+
+- An item is **the same item** only if its kind and content fingerprint are equal: for an
+  equation, figure or table the SHA-256 of its crop, plus an equation's display mode and a
+  figure's caption (the alt text is written for it); for a heading its words (case and
+  spacing ignored), size and weight. One pixel of difference is a different item, and a
+  changed item never inherits a decision.
+- **Position** chooses among items with one fingerprint (a small figure repeated on every
+  page): the nearest pairs (page first, then place on the page) are matched first, one earlier
+  item to one new item. It also finds the items that **changed**: a decided earlier item with
+  no match, and a new item waiting for a decision at least half inside its box, are reported
+  as "changed, decide again".
+- A person's decision is carried, the tool's own acceptance is not. An *accept* is carried
+  only if the tool proposes the same thing again; an *edit* or a *rejection* belongs to the
+  picture and is carried either way. A heading level is carried only if the output would still
+  write that level there (`review.heading_level_written`). Whatever is not carried stays
+  waiting, and says why in the report: `suggestion_changed` (same picture, another proposal),
+  `changed`, `new` (waiting, nothing like it before) and `removed` (an earlier decision whose
+  item is gone).
+
+The HTML file is made again with the carried decisions; each carried decision is a
+`ReviewEdit` with action `carried` and no write number (so Undo never takes back a whole
+carry, and usage counts show `review:carried`). The report is `jobs.carried_json`: element
+ids and counts, and the earlier file's name for the owner's page; no text of the document.
+The job page's "Compared with the earlier version" card says how many decisions were carried
+over, how many items changed or are new, and links to the first that needs a decision; the
+review screen marks a decision it carried. If the earlier document was deleted before the new
+one finished, the card says so and every decision is new.
 
 ## Spend cap (`web/spend.py`)
 

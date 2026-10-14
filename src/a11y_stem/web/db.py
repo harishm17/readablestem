@@ -145,6 +145,13 @@ class Job(Base):
     # render, not one each (`web.routes.jobs.current_html`). True: `html` and the checks in
     # `result_json` are from before the last review write.
     html_stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # A revised upload (T3-2): the id of the earlier version whose decisions were to be
+    # carried over (`web.carry`), not a foreign key (the earlier version may be deleted
+    # first), and what happened to them: element ids and counts, never text
+    # (`carry.CarryReport.to_json`, with "from_name", the earlier file's name, shown to the
+    # owner only). Both document-derived: deleted with the job.
+    revises_job_id: Mapped[str | None] = mapped_column(String(32))
+    carried_json: Mapped[dict | None] = mapped_column(JSON)
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(

@@ -244,7 +244,10 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert facts is not None and facts.down_revision == EXAM_REVISION
     stale = script.get_revision(STALE_REVISION)
     assert stale is not None and stale.down_revision == FACTS_REVISION
-    assert migration_heads() == {STALE_REVISION}  # one head, the newest
+    # One head, the newest: later migrations (tests/test_web_jobs_migrations.py) follow it.
+    heads = migration_heads()
+    assert heads is not None and len(heads) == 1
+    assert STALE_REVISION in {r.revision for r in script.walk_revisions()}
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):

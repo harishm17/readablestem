@@ -1,0 +1,26 @@
+{# T3-2: what became of the earlier version's decisions (web/carry.py, views.CarryView).
+   Shown on a document uploaded as a revised version. Counts are decisions, as everywhere
+   on the job page; the file name is the owner's. #}
+{% set c = job.carry %}
+<section aria-labelledby="carry-heading" id="carry">
+  <h2 id="carry-heading">Compared with the earlier version</h2>
+  {% if not c.from_name %}
+  <p>You uploaded this as a new version of another document, but that document was gone
+    before this one finished converting, so no decisions could be copied. Every decision
+    here is a new one.</p>
+  {% else %}
+  <p>You uploaded this as a new version of <strong>{{ c.from_name }}</strong>. A decision is
+    copied only to an item that is exactly the same as before: the same picture on the page.
+    Anything that changed asks you again.</p>
+  {% set s = c.summary %}
+  <ul>
+    <li>{{ s.carried }} {{ "decision was" if s.carried == 1 else "decisions were" }} carried over; you do not need to make {{ "it" if s.carried == 1 else "them" }} again.</li>
+    {% if s.changed %}<li>{{ s.changed }} {{ "item changed" if s.changed == 1 else "items changed" }} since the earlier version, so {{ "it asks" if s.changed == 1 else "they ask" }} for a decision again.</li>{% endif %}
+    {% if s.new %}<li>{{ s.new }} {{ "item is" if s.new == 1 else "items are" }} new and {{ "asks" if s.new == 1 else "ask" }} for a decision.</li>{% endif %}
+    {% if s.removed %}<li>{{ s.removed }} earlier {{ "decision has" if s.removed == 1 else "decisions have" }} no matching item in this file, so {{ "it was" if s.removed == 1 else "they were" }} not used.</li>{% endif %}
+  </ul>
+  {% if c.first_waiting and job.page and job.page.counts.decisions %}
+  <p><a href="/jobs/{{ job.id }}/review?item={{ c.first_waiting }}">Review the {{ s.waiting }} {{ "item" if s.waiting == 1 else "items" }} that {{ "needs" if s.waiting == 1 else "need" }} you</a></p>
+  {% endif %}
+  {% endif %}
+</section>

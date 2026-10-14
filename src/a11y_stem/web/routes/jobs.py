@@ -139,6 +139,9 @@ def upload_error_message(
         "(LaTeX, Word or PowerPoint), upload that instead.",
         "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
         "chose the right file.",
+        "unknown_revision": "The document you wanted to replace with a new version was not "
+        f"found. It may have been deleted. Upload {name} as a new document, or choose "
+        "another document to revise.",
         "too_many_active": f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or "
         f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
         "uploaded.",
@@ -315,8 +318,33 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
 
 
 @router.get("/app")
-def app_home(request: Request, user: UserDep) -> Response:
-    return render(request, "app.html", app_context(get_ctx(request), user))
+def app_home(request: Request, user: UserDep, revises: str = "") -> Response:
+    ctx = get_ctx(request)
+    context = app_context(ctx, user)
+    if revises:
+        context |= revision_context(ctx, user, revises)
+    return render(request, "app.html", context)
+
+
+def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[str, Any]:
+    """The upload form for a revised version of one of the person's finished documents
+    (T3-2): its title, and its course and exam choice as the form's starting values.
+    Nothing when the document is not theirs, is gone or is not finished (a plain upload
+    form, as without the link)."""
+    if not JOB_ID.match(job_id):
+        return {}
+    with session_scope(ctx.factory) as session:
+        job = session.get(Job, job_id)
+        if job is None or job.user_id != user.id or expired(job) or job.status != JobStatus.DONE:
+            return {}
+        title = documents.display_title(
+            (job.result_json or {}).get("title"), job.filename, job.title_override
+        )
+        return {
+            "revises": {"id": job.id, "title": title, "filename": job.filename},
+            "chosen_course": job.course_id or "",
+            "exam_default": bool(job.exam_mode),
+        }
 
 
 @router.get("/app/documents")
@@ -348,6 +376,7 @@ def _upload_error_page(
     left: int | None = None,
     headers: dict[str, str] | None = None,
     course: str = "",
+    revises: str = "",
 ) -> Response:
     ctx = get_ctx(request)
     log_event(logger, "upload_rejected", code=code)
@@ -356,6 +385,8 @@ def _upload_error_page(
     # The course chosen stays chosen (the form marks it only among the user's courses),
     # so the file chosen again is read with the course's notation.
     context["chosen_course"] = course
+    if revises:  # the form stays the revised version's
+        context |= revision_context(ctx, user, revises) | {"chosen_course": course}
     # With no pages left the form is replaced by a notice (app.html): the summary's link
     # goes there instead of to a file field that is not on the page.
     field_id = "upload-closed" if context["pages_left"] == 0 else "pdf"
@@ -422,9 +453,33 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     # Course choice (notation memory): one of the user's own courses, or none.
     course_id = (form.fields.get("course") or None) if notation.enabled(ctx.settings) else None
     chosen = course_id or ""
+    # A revised version of one of the person's documents (T3-2): its decisions are carried
+    # over when this one has been converted. Checked now, before the file is opened.
+    revises = form.fields.get("revises") or None
+    if revises is not None and not await run_in_threadpool(_users_revision, ctx, user, revises):
+        return await run_in_threadpool(
+            partial(
+                _upload_error_page,
+                request,
+                user,
+                "unknown_revision",
+                400,
+                form.filename,
+                course=chosen,
+                revises=revises or "",
+            )
+        )
     if form.data is None:
         return await run_in_threadpool(
-            partial(_upload_error_page, request, user, "missing_file", 400, course=chosen)
+            partial(
+                _upload_error_page,
+                request,
+                user,
+                "missing_file",
+                400,
+                course=chosen,
+                revises=revises or "",
+            )
         )
     if course_id is not None and not await run_in_threadpool(_users_course, ctx, user, course_id):
         return await run_in_threadpool(_course_error_page, request, user)
@@ -443,6 +498,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 form.filename,
                 exc.pages,
                 course=chosen,
+                revises=revises or "",
             )
         )
     mode = retention.mode_for_upload(
@@ -452,7 +508,16 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     exam = form.fields.get("exam") == "on"
     try:
         job_id = await run_in_threadpool(
-            _store_upload, ctx, user, form.filename, form.data, pages, mode, course_id, exam
+            _store_upload,
+            ctx,
+            user,
+            form.filename,
+            form.data,
+            pages,
+            mode,
+            course_id,
+            exam,
+            revises,
         )
     except TooManyJobs as exc:
         return await run_in_threadpool(
@@ -465,6 +530,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 form.filename,
                 headers={"Retry-After": "60"},
                 course=chosen,
+                revises=revises or "",
             )
         )
     except QuotaRefused as exc:
@@ -480,6 +546,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 left=exc.left,
                 headers={"Retry-After": "3600"},
                 course=chosen,
+                revises=revises or "",
             )
         )
     log_event(
@@ -513,6 +580,20 @@ def _users_course(ctx: AppContext, user: CurrentUser, course_id: str) -> bool:
         return notation.owned_course(session, course_id, user.id) is not None
 
 
+def _users_revision(ctx: AppContext, user: CurrentUser, job_id: str) -> bool:
+    """The id is one of the person's finished documents that is still kept."""
+    if not JOB_ID.match(job_id):
+        return False
+    with session_scope(ctx.factory) as session:
+        job = session.get(Job, job_id)
+        return (
+            job is not None
+            and job.user_id == user.id
+            and not expired(job)
+            and job.status == JobStatus.DONE
+        )
+
+
 def _course_error_page(request: Request, user: CurrentUser) -> Response:
     """The upload form again when its course is not one of the user's (deleted meanwhile
     in another tab, or a changed form). Nothing was uploaded."""
@@ -533,6 +614,7 @@ def _store_upload(
     mode: str,
     course_id: str | None = None,
     exam: bool = False,
+    revises: str | None = None,
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction."""
     s = ctx.settings
@@ -570,6 +652,7 @@ def _store_upload(
             created_at=now,
             course_id=course_id,
             exam_mode=exam,
+            revises_job_id=revises,
         )
         session.add(job)
         session.flush()
