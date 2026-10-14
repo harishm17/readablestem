@@ -117,7 +117,7 @@ script injected into an app page is refused by the policy.
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` | `web/quota.py` |
 | Waiting or running documents per person | 10 | `routes/jobs.py` |
-| Kept documents per person | 40 | `routes/jobs.py` |
+| Kept documents per person | 40 | `routes/jobs.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
 | Sign-in starts, per address | 10 per 5 minutes | `web/abuse.py` |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |

@@ -23,15 +23,25 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web import retention, titles
-from a11y_stem.web.db import Job, session_scope
-from a11y_stem.web.deps import CurrentUser, UserDep, flash, get_ctx, render, require_csrf
+from a11y_stem.web.db import Job, session_scope, utcnow
+from a11y_stem.web.deps import (
+    CurrentUser,
+    PageError,
+    UserDep,
+    flash,
+    get_ctx,
+    render,
+    require_csrf,
+)
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.review import rerender_job_html
 from a11y_stem.web.routes.jobs import (
     AUTO_RELOAD_S,
+    MAX_LIVE_JOBS_PER_USER,
     _crops,
     _job_course,
     after_download_state,
+    live_job_count,
     load_job_status,
     owned_job,
     require_done,
@@ -141,10 +151,24 @@ def set_contact(
 
 @router.post("/jobs/{job_id}/keep", dependencies=[Depends(require_csrf)])
 def keep_longer(request: Request, job_id: str, user: UserDep) -> Response:
-    """ "Keep 7 more days": seven days from now, only the owner sees it."""
+    """ "Keep 7 more days": seven days from now, only the owner sees it. Refused (429, nothing
+    changed) when keeping this document would put the person over the number of documents
+    they may keep (`MAX_LIVE_JOBS_PER_USER`, the cap the upload also enforces)."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user, lock=True)
+        if retention.can_keep_longer(job):
+            others = live_job_count(session, user.id, utcnow(), excluding=job.id)
+            if others + 1 > MAX_LIVE_JOBS_PER_USER:
+                log_event(logger, "keep_refused", logging.WARNING, job_id=job_id)
+                raise PageError(
+                    429,
+                    "This document was not kept longer",
+                    f"You are keeping {others + 1} documents, and the most allowed is "
+                    f"{MAX_LIVE_JOBS_PER_USER}. Delete one you no longer need, then choose "
+                    "Keep 7 more days again. Nothing was changed.",
+                    context={"job_id": job_id},
+                )
         changed = retention.keep_seven_more_days(job)
     if changed:
         log_event(logger, "kept_longer", job_id=job_id)

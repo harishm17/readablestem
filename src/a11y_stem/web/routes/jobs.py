@@ -179,6 +179,17 @@ MAX_ACTIVE_JOBS_PER_USER = 10
 MAX_LIVE_JOBS_PER_USER = 40
 
 
+def live_job_count(session: Session, user_id: str, now: datetime, *, excluding: str = "") -> int:
+    """The documents the person is keeping now: finished or not, until their deletion time
+    (what `MAX_LIVE_JOBS_PER_USER` caps), without the job `excluding`."""
+    query = (
+        select(func.count()).select_from(Job).where(Job.user_id == user_id, Job.retain_until > now)
+    )
+    if excluding:
+        query = query.where(Job.id != excluding)
+    return int(session.scalar(query) or 0)
+
+
 class TooManyJobs(Exception):
     """The person already has as many documents as they may (`_store_upload`)."""
 
@@ -408,9 +419,11 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     mode = retention.mode_for_upload(
         keep=form.fields.get("keep") == "on", share=form.fields.get("share") == "on"
     )
+    # "Exam or quiz": figures are described without giving answers (T1-14).
+    exam = form.fields.get("exam") == "on"
     try:
         job_id = await run_in_threadpool(
-            _store_upload, ctx, user, form.filename, form.data, pages, mode, course_id
+            _store_upload, ctx, user, form.filename, form.data, pages, mode, course_id, exam
         )
     except TooManyJobs as exc:
         return await run_in_threadpool(
@@ -490,6 +503,7 @@ def _store_upload(
     pages: int,
     mode: str,
     course_id: str | None = None,
+    exam: bool = False,
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction."""
     s = ctx.settings
@@ -506,12 +520,7 @@ def _store_upload(
         )
         if (active or 0) >= MAX_ACTIVE_JOBS_PER_USER:
             raise TooManyJobs("too_many_active")
-        live = session.scalar(
-            select(func.count())
-            .select_from(Job)
-            .where(Job.user_id == user.id, Job.retain_until > now)
-        )
-        if (live or 0) >= MAX_LIVE_JOBS_PER_USER:
+        if live_job_count(session, user.id, now) >= MAX_LIVE_JOBS_PER_USER:
             raise TooManyJobs("too_many_stored")
         if not try_consume_pages(
             session, user.id, pages, quota=s.per_user_daily_page_quota, day=utc_today(now)
@@ -531,6 +540,7 @@ def _store_upload(
             retain_until=retention.retain_until_at_upload(s, mode, now),
             created_at=now,
             course_id=course_id,
+            exam_mode=exam,
         )
         session.add(job)
         session.flush()
