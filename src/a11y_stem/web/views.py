@@ -24,7 +24,7 @@ from a11y_stem.web import carry as carry_rules
 from a11y_stem.web import job_page, titles
 from a11y_stem.web import retry as retry_rules
 from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User
+from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from a11y_stem.web.messages import Explained, explain_check, severity_label
 from a11y_stem.web.outcome import FAILED_MESSAGES
 
@@ -76,9 +76,10 @@ JOB_ERROR_MESSAGES = {
     "lease_expired": "The conversion was interrupted several times and has been stopped. "
     "Use “Try again”: what was already converted is kept.",
     "timeout": "The conversion took longer than a document of this size is allowed and was "
-    "stopped. Try splitting it into smaller parts.",
-    "store_failed": "The conversion finished but its results could not be saved. Please "
-    "upload the document again.",
+    "stopped. You can use “Try again”: what was already converted is kept. If it stops "
+    "again, try splitting the PDF into smaller parts.",
+    "store_failed": "The conversion finished but its results could not be saved. Use "
+    "“Try again”: what was already converted is kept.",
     "upload_missing": "The uploaded file was no longer available.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
     "of your document's content. You can use “Try again”: what was already converted is kept.",
@@ -175,6 +176,13 @@ class JobView:
     carry: CarryView | None = None
     # Elements whose decision was copied from the earlier version (the review screen says so).
     carried_ids: frozenset[str] = frozenset()
+    # A part of a larger file converted in parts (T3-3): the pages this one holds and the
+    # parts of the same file still kept (this one included), in page order.
+    part_label: str = ""
+    parts: list[PartLink] = field(default_factory=list)
+    # The recorded sample document (T3-9, `web.sample`) and, for its page, where it comes from.
+    is_sample: bool = False
+    sample: SampleView | None = None
 
     @property
     def finished(self) -> bool:
@@ -218,6 +226,27 @@ class JobView:
         if self.status == JobStatus.DONE:
             return "The HTML file is ready."
         return job_error_message(self.error_code)
+
+
+@dataclass
+class SampleView:
+    """Where the sample document comes from, for the notice on its page."""
+
+    title: str
+    source_url: str
+    licence: str
+    licence_url: str
+    authors: str
+
+
+@dataclass
+class PartLink:
+    """One part of a larger file, for the list on each part's page."""
+
+    id: str
+    label: str
+    status: str
+    current: bool
 
 
 @dataclass
@@ -452,6 +481,10 @@ def job_view(
         retention_mode=job.retention_mode,
         carry=carried,
         carried_ids=_carried_ids(job),
+        part_label=job.part_label or "",
+        is_sample=bool(job.is_sample),
+        sample=sample_view() if job.is_sample and with_page else None,
+        parts=part_links(session, job) if with_page and job.part_group else [],
     )
 
 
@@ -477,3 +510,40 @@ def _carried_ids(job: Job) -> frozenset[str]:
     data = job.carried_json
     ids = data.get("carried") if isinstance(data, dict) else None
     return frozenset(i for i in ids if isinstance(i, str)) if isinstance(ids, list) else frozenset()
+
+
+def part_links(session: Session, job: Job) -> list[PartLink]:
+    """The parts of the same larger file that the person still keeps, in page order (the
+    pages are the label's first number)."""
+    rows = session.execute(
+        select(Job.id, Job.part_label, Job.status, Job.created_at)
+        .where(
+            Job.part_group == job.part_group,
+            Job.user_id == job.user_id,
+            Job.retain_until > utcnow(),
+        )
+        .order_by(Job.created_at, Job.id)
+    ).all()
+
+    def first_page(label: str | None) -> int:
+        digits = "".join(ch if ch.isdigit() else " " for ch in (label or "")).split()
+        return int(digits[0]) if digits else 0
+
+    ordered = sorted(rows, key=lambda r: (first_page(r.part_label), r.created_at))
+    return [PartLink(r.id, r.part_label or "", str(r.status), r.id == job.id) for r in ordered]
+
+
+def sample_view() -> SampleView | None:
+    """The sample's attribution, or None when its files are not in this build."""
+    from a11y_stem.web import sample
+
+    if not sample.available():
+        return None
+    recorded = sample.load()
+    return SampleView(
+        title=recorded.title,
+        source_url=recorded.source_url,
+        licence=recorded.licence,
+        licence_url=recorded.licence_url,
+        authors=", ".join(recorded.authors),
+    )

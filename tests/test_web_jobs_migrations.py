@@ -20,10 +20,19 @@ from test_web_migrations import INSERT_JOB, INSERT_USER, migrate, upgrade
 STALE = "c4a7e9b05d18"
 REVISED = "e2b6d1f84a30"
 REVISED_COLUMNS = {"revises_job_id", "carried_json"}
+RETRY = "f7a3c9d20b15"
+RETRY_COLUMNS = {"retries", "attempts_at_retry"}
+PARTS = "a8c4e0b61d97"
+PARTS_COLUMNS = {"part_group", "part_label"}
+SAMPLE = "b1d5f7a29c46"
+SAMPLE_COLUMNS = {"is_sample"}
 
 # (revision, the one before it, columns it adds to jobs, tables it adds)
 CHAIN = [
     (REVISED, STALE, REVISED_COLUMNS, set()),
+    (RETRY, REVISED, RETRY_COLUMNS, {"step_records"}),
+    (PARTS, RETRY, PARTS_COLUMNS, {"pending_uploads"}),
+    (SAMPLE, PARTS, SAMPLE_COLUMNS, set()),
 ]
 
 
@@ -81,5 +90,49 @@ def test_each_migration_downgrades_and_upgrades_again(tmp_path, revision, before
         assert columns(engine) >= added
         with engine.connect() as conn:
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_downgrading_the_sample_migration_deletes_sample_documents_and_keeps_the_rest(tmp_path):
+    """An older release would count a sample document as the person's own file (their cap,
+    the beta's numbers): the downgrade deletes it with what hangs off it."""
+    url = f"sqlite:///{tmp_path}/sample-down.db"
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "real"})
+            conn.execute(text(INSERT_JOB), {"id": "sample"})
+            conn.execute(text("UPDATE jobs SET is_sample = 1 WHERE id = 'sample'"))
+            for job in ("real", "sample"):
+                conn.execute(
+                    text(
+                        "INSERT INTO blobs "
+                        "(id, job_id, kind, media_type, content, created_at) "
+                        "VALUES (:id, :job, 'upload', 'application/pdf', x'25', "
+                        "'2026-10-09 00:00:00')"
+                    ),
+                    {"id": f"b-{job}", "job": job},
+                )
+                conn.execute(
+                    text(
+                        "INSERT INTO review_edits "
+                        "(id, job_id, user_id, element_id, action, created_at) "
+                        "VALUES (:id, :job, 'u1', 'e1', 'accept', '2026-10-09 00:00:00')"
+                    ),
+                    {"id": f"r-{job}", "job": job},
+                )
+    finally:
+        engine.dispose()
+    migrate(url, PARTS, down=True)
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            assert [r[0] for r in conn.execute(text("SELECT id FROM jobs"))] == ["real"]
+            assert [r[0] for r in conn.execute(text("SELECT job_id FROM blobs"))] == ["real"]
+            assert [r[0] for r in conn.execute(text("SELECT job_id FROM review_edits"))] == ["real"]
+        assert "is_sample" not in columns(engine)
     finally:
         engine.dispose()

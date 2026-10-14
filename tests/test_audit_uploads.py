@@ -136,7 +136,13 @@ def test_a_streamed_body_with_no_length_is_cut_off_at_the_limit(tmp_path):
 
 def test_too_many_parts_or_files_is_a_bad_form_not_a_crash(web):
     csrf = token(web.browser)
-    files = [("pdf", (f"{n}.pdf", make_pdf(1), "application/pdf")) for n in range(3)]
+    from a11y_stem.web.uploads import MAX_FILES_PER_UPLOAD
+
+    # Several files are allowed (T3-4, tests/test_web_multiupload.py); a flood of them is not.
+    files = [
+        ("pdf", (f"{n}.pdf", make_pdf(1), "application/pdf"))
+        for n in range(MAX_FILES_PER_UPLOAD + 5)
+    ]
     response = web.browser.post("/jobs", data={"csrf_token": csrf}, files=files)
     assert response.status_code in {400, 413}
     many = {f"f{n}": "x" for n in range(60)} | {"csrf_token": csrf}

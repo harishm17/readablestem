@@ -72,7 +72,16 @@ def terms(request: Request) -> Response:
 
 @router.get("/limits")
 def limits(request: Request) -> Response:
-    return render(request, "limits.html", {"active": "limits"})
+    settings = get_ctx(request).settings
+    context = {
+        "active": "limits",
+        # A bigger file is kept so its pages can be chosen and converted in parts (T3-3).
+        "in_parts": settings.upload_limit_mb > settings.max_upload_mb
+        or settings.source_page_limit > settings.max_pages_per_job,
+        "upload_limit_mb": settings.upload_limit_mb,
+        "source_pages": settings.source_page_limit,
+    }
+    return render(request, "limits.html", context)
 
 
 @router.get("/help/posting")

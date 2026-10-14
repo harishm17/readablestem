@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{# T3-3: a file over the page or size limit is kept for a while and the person chooses which
+   pages to convert, in parts that each fit (web/routes/parts.py, web/ranges.py). Every part
+   becomes its own document. #}
+{% set field_errors = field_errors|default({}) %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}Choose which pages to convert{% endblock %}
+{% block content %}
+<h1>Choose which pages to convert</h1>
+{% include "_error_summary.html" %}
+{% if started|default([]) %}
+<div class="notice" id="parts-started" role="status" tabindex="-1">
+  <p><strong>{{ started|length }} {{ "part is" if started|length == 1 else "parts are" }} converting.</strong>
+    Each part is its own document:</p>
+  <ul>
+    {% for part in started %}<li><a href="/jobs/{{ part.id }}">Pages {{ part.label }}</a></li>{% endfor %}
+  </ul>
+</div>
+{% endif %}
+<p><strong>{{ pending.filename }}</strong> has {{ pending.pages }} pages and is {{ size_mb }} MB.
+  One conversion takes up to {{ limit }} pages and {{ max_upload_mb }} MB, so a larger file is converted
+  in parts. Nothing has been converted yet, and no pages have been taken from your daily count.</p>
+{% if done_label %}
+<p id="parts-done">Pages {{ done_label }} {{ "is" if done_count == 1 else "are" }} already sent to be converted; they are left out below.</p>
+{% endif %}
+{% if remaining %}
+<form method="post" action="/uploads/{{ pending.id }}" novalidate class="upload-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  {% set parts_error = field_errors.get("parts") %}
+  <div class="field{% if parts_error %} field-error{% endif %}">
+    <label for="parts">Pages for each part</label>
+    <p class="hint" id="parts-hint">One part on each line. Pages are numbered from 1, as in a PDF
+      viewer. Write a range with a hyphen, and join ranges in one part with a comma: <code>1-30</code>
+      or <code>5-12, 20</code>. A part can have up to {{ limit }} pages. The parts below are a
+      suggestion that covers the {{ "page" if remaining == 1 else "pages" }} not yet sent; change them as you like.
+      {% if pages_left is not none %}You can convert {{ pages_left }} more {{ "page" if pages_left == 1 else "pages" }}
+      today; the count starts again at {{ next_reset|utc }}. Parts that do not fit today are not started, and
+      you can choose them later.{% endif %}</p>
+    {% if parts_error %}<p class="error-message" id="parts-error"><span class="visually-hidden">Error: </span>{{ parts_error.message }}</p>{% endif %}
+    <textarea id="parts" name="parts" rows="{{ [3, [suggestion_lines, 8]|min]|max }}" spellcheck="false" autocomplete="off"
+      aria-describedby="parts-hint{% if parts_error %} parts-error{% endif %}"{% if parts_error %} aria-invalid="true"{% endif %}>{{ typed_parts }}</textarea>
+  </div>
+  <div class="field checkbox-field">
+    <input type="checkbox" id="shrink" name="shrink" value="on" aria-describedby="shrink-hint"{% if shrink %} checked{% endif %}>
+    <label for="shrink">Shrink large pictures first</label>
+    <p class="hint" id="shrink-hint">{% if heavy %}This file is large because of its pictures, so this is ticked. {% endif %}Pictures
+      sharper than {{ shrink_from }} dots per inch are saved at {{ shrink_to }}, which makes each part much smaller. Text and
+      equations are not changed. A figure in the converted file can look a little less sharp.</p>
+  </div>
+  <button type="submit" class="button">Convert these parts</button>
+</form>
+{% else %}
+<p>All the pages of this file have been sent to be converted.</p>
+<p><a href="/app">Go to My documents</a></p>
+{% endif %}
+<p class="hint">This file is kept until {{ pending.retain_until|utc }}, then deleted.</p>
+<form method="post" action="/uploads/{{ pending.id }}/delete" class="inline-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <button type="submit" class="button-secondary">Discard this file</button>
+</form>
+{% endblock %}

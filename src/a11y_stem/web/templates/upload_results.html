@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{# T3-4: the answer to an upload of several files: what was queued, and what was not, and
+   why. Shown instead of a redirect because the reasons name the files (document-derived
+   text never goes in the session cookie). #}
+{% block title %}{{ received }} of {{ total }} {{ "file" if total == 1 else "files" }} uploaded{% endblock %}
+{% block content %}
+<h1>{{ received }} of {{ total }} {{ "file" if total == 1 else "files" }} uploaded</h1>
+{% if queued %}
+<section aria-labelledby="queued-heading">
+  <h2 id="queued-heading">Converting</h2>
+  <ul>
+    {% for item in queued %}
+    <li><a href="/jobs/{{ item.id }}">{{ item.filename }}</a>, {{ item.pages }} {{ "page" if item.pages == 1 else "pages" }}</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% if choose %}
+<section aria-labelledby="choose-heading">
+  <h2 id="choose-heading">Choose which pages to convert</h2>
+  <p>{{ "This file is" if choose|length == 1 else "These files are" }} larger than one conversion takes. Nothing has been converted yet.</p>
+  <ul>
+    {% for item in choose %}
+    <li><a href="/uploads/{{ item.id }}">Choose pages of {{ item.filename }}</a>, {{ item.pages }} pages</li>
+    {% endfor %}
+  </ul>
+</section>
+{% endif %}
+{% if refused %}
+<section aria-labelledby="refused-heading">
+  <h2 id="refused-heading">Not uploaded</h2>
+  <p>{{ "This file was" if refused|length == 1 else "These files were" }} not uploaded. {{ "It" if refused|length == 1 else "They" }}
+    did not use any of your pages for today.</p>
+  <ul>
+    {% for item in refused %}<li>{{ item.message }}</li>{% endfor %}
+  </ul>
+</section>
+{% endif %}
+<p><a class="button" href="/app">Go to My documents</a></p>
+{% endblock %}

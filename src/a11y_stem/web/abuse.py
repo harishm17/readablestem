@@ -46,6 +46,7 @@ RULES: dict[str, Rule] = {
     "retry": Rule(20, 600),  # "Try again" on a stopped document, per address
     "retry_user": Rule(10, 600),  # ... per signed-in person
     "cron": Rule(10, 300),  # the scheduler's endpoint, per address
+    "sample": Rule(10, 600),  # opening the sample document, per address
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound
 

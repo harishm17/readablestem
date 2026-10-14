@@ -101,12 +101,13 @@
   document.addEventListener("htmx:afterSettle", localise);
 })();
 
-/* Upload form (app.html, UX review MF21). Says at once when the chosen file is not a
- * PDF, is empty or is larger than the limit, instead of after sending all of it (35 s
- * at 5 Mbit/s for a refusal the browser can make instantly). While a good file is
- * sent, says so ("Uploading notes.pdf. Keep this tab open.") and keeps a second click
- * from sending it twice. The server checks everything again; without this file the
- * form works the same, only slower to say no.
+/* Upload form (app.html, UX review MF21). Says at once when a chosen file is not a PDF,
+ * is empty or is larger than the limit, instead of after sending all of it (35 s at
+ * 5 Mbit/s for a refusal the browser can make instantly). The form takes several files
+ * (T3-4): too many, or more than the request may carry together, is said the same way.
+ * While good files are sent, says so ("Uploading notes.pdf. Keep this tab open.") and keeps
+ * a second click from sending them twice. The server checks everything again; without this
+ * file the form works the same, only slower to say no.
  */
 (function () {
   "use strict";
@@ -119,21 +120,43 @@
   var button = form.querySelector('button[type="submit"]');
   var field = input.closest(".field");
   var maxBytes = Number(input.getAttribute("data-max-bytes"));
-  var maxMb = input.getAttribute("data-max-mb");
+  var limitBytes = Number(input.getAttribute("data-limit-bytes") || maxBytes);
+  var limitMb = input.getAttribute("data-limit-mb") || input.getAttribute("data-max-mb");
+  var maxFiles = Number(input.getAttribute("data-max-files") || 1);
   var describedBy = input.getAttribute("aria-describedby") || "";
   var serverError = input.getAttribute("aria-invalid") === "true";
   if (!box || !status || !button || !field) return;
 
+  // A file between the two sizes is allowed: the server keeps it so its pages can be chosen.
   function problem(file) {
-    if (!file) return "";
     var pdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
     if (!pdf) return file.name + " is not a PDF. Choose a PDF file.";
     if (file.size === 0) return file.name + " is empty. Choose a PDF that has content.";
-    if (file.size > maxBytes) {
+    if (file.size > limitBytes) {
       return (
-        file.name + " is larger than " + maxMb + " MB. Split it into smaller PDFs and " +
+        file.name + " is larger than " + limitMb + " MB. Split it into smaller PDFs and " +
         "upload each one."
       );
+    }
+    return "";
+  }
+
+  function problems(files) {
+    if (!files || !files.length) return "";
+    if (files.length > maxFiles) {
+      return (
+        "You chose " + files.length + " files. Upload " + maxFiles +
+        (maxFiles === 1 ? " file" : " or fewer") + " at a time."
+      );
+    }
+    var total = 0;
+    for (var i = 0; i < files.length; i++) {
+      var message = problem(files[i]);
+      if (message) return message;
+      total += files[i].size;
+    }
+    if (total > limitBytes) {
+      return "These files add up to more than " + limitMb + " MB. Upload fewer of them at a time.";
     }
     return "";
   }
@@ -164,24 +187,27 @@
   }
 
   input.addEventListener("change", function () {
-    show(problem(input.files && input.files[0]));
+    show(problems(input.files));
   });
 
   form.addEventListener("submit", function (event) {
-    var file = input.files && input.files[0];
-    var message = problem(file);
+    var files = input.files;
+    var message = problems(files);
     if (message) {
       event.preventDefault();
       show(message);
       input.focus();
       return;
     }
-    if (!file) return; // the server answers "Choose a PDF file to upload."
+    if (!files || !files.length) return; // the server answers "Choose a PDF file to upload."
     if (button.getAttribute("aria-disabled") === "true") {
       event.preventDefault(); // already sending
       return;
     }
-    status.textContent = "Uploading " + file.name + ". Keep this tab open.";
+    status.textContent =
+      files.length === 1
+        ? "Uploading " + files[0].name + ". Keep this tab open."
+        : "Uploading " + files.length + " files. Keep this tab open.";
     button.setAttribute("aria-disabled", "true");
   });
 

@@ -133,6 +133,15 @@ class Job(Base):
     # The upload form's "Exam or quiz" box: the figure step describes what is shown and
     # never the result (`ConversionOptions.exam_mode`, read by `web.notation.conversion_options`).
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # One part of a larger file converted in parts (T3-3, `web.routes.parts`): the id of the
+    # waiting file it was cut from (the same for every part, not a foreign key: the waiting
+    # file is deleted when its last page has been sent) and the pages it holds ("31-59").
+    part_group: Mapped[str | None] = mapped_column(String(32), index=True)
+    part_label: Mapped[str | None] = mapped_column(String(64))
+    # The sample document (T3-9, `web.sample`): a recorded conversion put in a person's list so
+    # they can practise on the review screen before uploading a real file. Outside the quota,
+    # the spend and the caps on documents, and outside the usage numbers.
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     # What the documents list needs from `result_json`, kept beside it so the list (polled
     # every few seconds while anything converts) never loads a result's fixes: the decisions
     # still open (a heading group is one) and the title. Both are set whenever `result_json`
@@ -247,6 +256,32 @@ class QuotaDay(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     pages: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PendingUpload(Base):
+    """A large file kept while the person chooses which of its pages to convert (T3-3,
+    `web.pending`). Document content: deleted at `retain_until`, when its last page has been
+    sent, by the person, and with the person (`ops.retention`)."""
+
+    __tablename__ = "pending_uploads"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    pages: Mapped[int] = mapped_column(Integer)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+    # The choices made with the upload, applied to every part: the course, exam mode, how
+    # long to keep the documents.
+    course_id: Mapped[str | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL", name="fk_pending_uploads_course_id_courses")
+    )
+    exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    retention_mode: Mapped[str] = mapped_column(String(8), default="day", server_default="day")
+    # The 0-based pages already sent to be converted, so the rest can be chosen later.
+    done_pages: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    retain_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class ErrorAggregate(Base):

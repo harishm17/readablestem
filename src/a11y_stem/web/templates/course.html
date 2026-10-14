@@ -11,6 +11,19 @@
   reads documents you convert for this course. The review screen says a bold vector or
   matrix by its meaning (“vector d” for a bold d that is a vector).</p>
 
+<section aria-labelledby="course-documents-heading" id="course-documents">
+  <h2 id="course-documents-heading">Documents in this course</h2>
+  {% if documents.rows %}
+  {% include "_documents.html" %}
+  {% if ready_documents %}
+  <p><a id="download-all" href="/courses/{{ course.id }}/download">Download all {{ ready_documents }} ready {{ "document" if ready_documents == 1 else "documents" }} (zip)</a></p>
+  {% endif %}
+  {% else %}
+  <p>No documents yet. Choose this course when you <a href="/app#upload-heading">convert a PDF</a>
+    and the document is listed here, and read with this course's notation.</p>
+  {% endif %}
+</section>
+
 <section aria-labelledby="entries-heading">
   <h2 id="entries-heading">Notation</h2>
   {% if entries %}

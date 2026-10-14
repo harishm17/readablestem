@@ -65,6 +65,9 @@ class DocumentRow:
     badge: str = ""  # status-<badge> (app.css): the colour only repeats the words
     open_decisions: int = 0
     partial: bool = False
+    # One part of a larger file converted in parts (T3-3): the pages it holds, "31-59".
+    part_label: str = ""
+    is_sample: bool = False  # the recorded sample document (T3-9)
 
     @property
     def group(self) -> str:
@@ -174,16 +177,25 @@ def decided_by_you(fixes: object) -> int:
     return len(triage.units(f for f in _fixes(fixes) if f.decided_by_reviewer))
 
 
-def _live(user_id: str, now: datetime):
+def _live(user_id: str, now: datetime, course_id: str | None = None):
     # Expired jobs count as deleted before the purge removes them (`routes.jobs.owned_job`).
-    return (Job.user_id == user_id, Job.retain_until > now)
+    # With `course_id`, only the documents converted for that course (T3-4).
+    where = (Job.user_id == user_id, Job.retain_until > now)
+    return (*where, Job.course_id == course_id) if course_id else where
 
 
-def list_version(session: Session, user_id: str, *, now: datetime, budget_closed: bool) -> str:
+def list_version(
+    session: Session,
+    user_id: str,
+    *,
+    now: datetime,
+    budget_closed: bool,
+    course_id: str | None = None,
+) -> str:
     """Changes whenever the list would look different, from the jobs' columns alone."""
     rows = session.execute(
         select(Job.id, Job.status, Job.pages_done, Job.result_version, Job.error_code)
-        .where(*_live(user_id, now))
+        .where(*_live(user_id, now, course_id))
         .order_by(Job.id)
     ).all()
     return _version([tuple(row) for row in rows], budget_closed)
@@ -196,7 +208,12 @@ def _version(rows: list[tuple[Any, ...]], budget_closed: bool) -> str:
 
 
 def documents(
-    session: Session, user_id: str, *, now: datetime, budget_closed: bool
+    session: Session,
+    user_id: str,
+    *,
+    now: datetime,
+    budget_closed: bool,
+    course_id: str | None = None,
 ) -> DocumentList:
     jobs = session.execute(
         select(
@@ -209,8 +226,10 @@ def documents(
             Job.created_at,
             Job.retain_until,
             Job.result_version,
+            Job.part_label,
+            Job.is_sample,
         )
-        .where(*_live(user_id, now))
+        .where(*_live(user_id, now, course_id))
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
     stored = _stored_facts(session, [job.id for job in jobs if job.status == JobStatus.DONE])
@@ -232,6 +251,8 @@ def documents(
             created_at=as_utc(job.created_at),
             retain_until=as_utc(job.retain_until),
             open_decisions=open_count,
+            part_label=job.part_label or "",
+            is_sample=bool(job.is_sample),
         )
         _label(row, job.error_code, budget_closed)
         by_key[row.group].rows.append(row)

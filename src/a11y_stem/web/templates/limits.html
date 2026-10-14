@@ -28,7 +28,9 @@
   <li><strong>Two-column pages and slides</strong> convert less well than single-column
     notes: check the reading order.</li>
   <li><strong>Size.</strong> Up to {{ max_pages }} pages and {{ max_upload_mb }} MB per upload.
-    Split longer documents.</li>
+    {% if in_parts %}A bigger file, up to {{ source_pages }} pages and {{ upload_limit_mb }} MB, is kept
+    for a day so you can choose which pages to convert; each part becomes a document of its
+    own, and the parts are not joined into one file.{% else %}Split longer documents.{% endif %}</li>
   <li><strong>Your documents are deleted</strong> {{ retention_hours }} hours after you last
     worked on them (7 days if you choose to keep them, {{ opt_in_days }} if you also let the
     developer look). Download the file before then.</li>

@@ -37,6 +37,13 @@ The review screen uses the same child, with the same memory cap, for two more th
   in the child), so no slice of a line or a word shows; `--trim 1` paints over the words
   its left and right edges cut, leaving the region as asked (an equation's compare
   crop). On any failure it writes nothing and exits with status 2.
+- `python -m a11y_stem.web.pdf_probe extract PAGES SHRINK` writes a new PDF of the listed
+  0-based pages (comma-separated, in that order) to stdout, for converting a large file in
+  parts (`web.routes.parts`); with SHRINK `1` the pictures sharper than `SHRINK_ABOVE_DPI`
+  are saved at `SHRINK_TO_DPI` first (`Document.rewrite_images`), which is what makes a part
+  of a heavy file small enough to convert. Unused objects of the pages left out are dropped,
+  so the part is smaller than the file in proportion. On any failure it writes nothing and
+  exits with status 2.
 - `python -m a11y_stem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
 
@@ -365,6 +372,33 @@ def render(
         doc.close()
 
 
+# "Shrink large pictures first": pictures sharper than this are saved at the second number,
+# as JPEG at this quality. Text and vector drawings (equations set as text, charts drawn as
+# lines) are not pictures and are not touched. 150 dpi is what the conversion reads figures
+# at, so it loses nothing the model or the review screen would have used.
+SHRINK_ABOVE_DPI = 200
+SHRINK_TO_DPI = 150
+SHRINK_QUALITY = 80
+
+
+def extract(data: bytes, pages: list[int], *, shrink: bool = False) -> bytes:
+    """A PDF of just `pages` (0-based, no repeats, in this order). Raises ProbeRejected."""
+    doc = _open(data)
+    try:
+        if not pages or len(set(pages)) != len(pages):
+            raise ProbeRejected("no_such_page")
+        if any(p < 0 or p >= doc.page_count for p in pages):
+            raise ProbeRejected("no_such_page")
+        doc.select(pages)
+        if shrink:
+            doc.rewrite_images(
+                dpi_threshold=SHRINK_ABOVE_DPI, dpi_target=SHRINK_TO_DPI, quality=SHRINK_QUALITY
+            )
+        return doc.tobytes(garbage=3, deflate=True)
+    finally:
+        doc.close()
+
+
 def _rect(value: str) -> tuple[float, float, float, float]:
     x0, y0, x1, y1 = (float(v) for v in value.split(","))
     return x0, y0, x1, y1
@@ -392,6 +426,14 @@ def _render_main(args: list[str], data: bytes) -> int:
 
 def main(argv: list[str] | None = None) -> int:
     args = sys.argv[1:] if argv is None else argv
+    if args and args[0] == "extract":
+        data = sys.stdin.buffer.read()
+        try:
+            part = extract(data, [int(p) for p in args[1].split(",")], shrink=args[2] == "1")
+        except Exception:  # ProbeRejected, bad arguments, anything MuPDF raises
+            return RENDER_FAILED
+        sys.stdout.buffer.write(part)
+        return 0
     if args and args[0] in {"render", "sizes"}:
         data = sys.stdin.buffer.read()
         try:

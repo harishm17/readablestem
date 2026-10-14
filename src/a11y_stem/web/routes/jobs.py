@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import logging
 import re
+import time
 import unicodedata
+from dataclasses import dataclass
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Annotated, Any
@@ -29,7 +31,7 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.pipeline import export_canvas, text_pass
 from a11y_stem.pipeline import language as languages
-from a11y_stem.web import documents, events, notation, retention
+from a11y_stem.web import documents, events, notation, pending, retention, sample
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web import retry as retry_rules
@@ -52,11 +54,23 @@ from a11y_stem.web.deps import (
     render,
     require_csrf,
 )
+from a11y_stem.web.intake import (  # noqa: F401  (re-exported: the caps are documented here)
+    MAX_ACTIVE_JOBS_PER_USER,
+    MAX_LIVE_JOBS_PER_USER,
+    QuotaRefused,
+    TooManyJobs,
+    live_job_count,
+    store_job,
+)
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.outcome import JobOutcome, job_outcome
-from a11y_stem.web.quota import next_day_start, pages_left, try_consume_pages
+from a11y_stem.web.pending import MAX_PENDING_PER_USER
+from a11y_stem.web.quota import next_day_start, pages_left
 from a11y_stem.web.security import VIEW_CSP
 from a11y_stem.web.uploads import (
+    INSPECT_TIMEOUT_S,
+    MAX_FILES_PER_UPLOAD,
+    UploadedFile,
     UploadRejected,
     inspect_pdf_isolated,
     max_upload_bytes,
@@ -98,7 +112,7 @@ def upload_error_message(
     "page_quota"."""
     s = ctx.settings
     name = filename or "This file"
-    limit = s.max_pages_per_job
+    limit = s.source_page_limit
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
     if code == "page_quota":
         return _quota_message(name, pages, left, s.per_user_daily_page_quota)
@@ -107,8 +121,18 @@ def upload_error_message(
         "bad_form": "The upload did not arrive complete. Please try again.",
         "empty": f"{name} is empty. Choose a PDF that has content.",
         "not_pdf": f"{name} is not a PDF. Choose a PDF file.",
-        "too_large": f"{name} is larger than {s.max_upload_mb} MB. Split it into smaller "
+        "too_large": f"{name} is larger than {s.upload_limit_mb} MB. Split it into smaller "
         "PDFs and upload each one.",
+        "too_many_files": f"You chose more than {MAX_FILES_PER_UPLOAD} files. Upload "
+        f"{MAX_FILES_PER_UPLOAD} or fewer at a time.",
+        "revise_one_file": "A revised version replaces one document: choose one file. To "
+        "upload several documents, use “Convert a PDF” on My documents.",
+        "revision_too_large": f"{name} has more pages or is larger than one conversion takes, "
+        "so it cannot be a revised version. Upload it as a new document and choose which "
+        "pages to convert.",
+        "too_many_pending": f"You already have {MAX_PENDING_PER_USER} large files waiting for "
+        f"you to choose their pages. Choose or discard one, then upload {name} again. Nothing "
+        "was uploaded.",
         "encrypted": f"{name} is password-protected. Save a copy without a password (for "
         "example with Print to PDF) and upload that.",
         "unreadable": f"{name} could not be opened. It may be damaged. {FRESH_COPY}",
@@ -174,41 +198,6 @@ def _quota_message(name: str, pages: int | None, left: int | None, quota: int | 
         f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
         "count starts again at midnight UTC. Nothing was uploaded."
     )
-
-
-# Per person, on top of the daily page count: documents waiting or being converted, and
-# documents kept (finished or not, until their deletion time). A person with a full queue
-# would hold everyone else back; a person with hundreds of kept files would fill the database.
-MAX_ACTIVE_JOBS_PER_USER = 10
-MAX_LIVE_JOBS_PER_USER = 40
-
-
-def live_job_count(session: Session, user_id: str, now: datetime, *, excluding: str = "") -> int:
-    """The documents the person is keeping now: finished or not, until their deletion time
-    (what `MAX_LIVE_JOBS_PER_USER` caps), without the job `excluding`."""
-    query = (
-        select(func.count()).select_from(Job).where(Job.user_id == user_id, Job.retain_until > now)
-    )
-    if excluding:
-        query = query.where(Job.id != excluding)
-    return int(session.scalar(query) or 0)
-
-
-class TooManyJobs(Exception):
-    """The person already has as many documents as they may (`_store_upload`)."""
-
-    def __init__(self, code: str) -> None:
-        super().__init__(code)
-        self.code = code
-
-
-class QuotaRefused(Exception):
-    """The upload has more pages than are left today (`_store_upload`)."""
-
-    def __init__(self, pages: int, left: int) -> None:
-        super().__init__("page_quota")
-        self.pages = pages
-        self.left = left
 
 
 def owned_job(session: Session, job_id: str, user: CurrentUser, *, lock: bool = False) -> Job:
@@ -306,6 +295,19 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         courses = (
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
         )
+        # The recorded sample document the person already has, if any (T3-9).
+        sample_job = sample.live_sample(session, user.id, now)
+        # Large files waiting for their pages to be chosen (T3-3).
+        waiting = [
+            {
+                "id": row.id,
+                "filename": row.filename,
+                "pages": row.pages,
+                "size_mb": f"{row.size_bytes / (1024 * 1024):.1f}",
+                "retain_until": as_utc(row.retain_until),
+            }
+            for row in pending.live(session, user.id, now)
+        ]
     return {
         "documents": listing,
         "pages_left": left,
@@ -315,6 +317,16 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "next_reset": next_day_start(now),
         "active": "app",
         "courses": courses,
+        "pending": waiting,
+        "sample_available": sample.available(),
+        "sample_job": sample_job,
+        "own_documents": any(not row.is_sample for row in listing.rows),
+        "max_files": MAX_FILES_PER_UPLOAD,
+        "upload_limit_mb": ctx.settings.upload_limit_mb,
+        "source_pages": ctx.settings.source_page_limit,
+        "ready_documents": sum(
+            1 for row in listing.rows if row.status == JobStatus.DONE and not row.open_decisions
+        ),
     }
 
 
@@ -336,7 +348,13 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
         return {}
     with session_scope(ctx.factory) as session:
         job = session.get(Job, job_id)
-        if job is None or job.user_id != user.id or expired(job) or job.status != JobStatus.DONE:
+        if (
+            job is None
+            or job.user_id != user.id
+            or expired(job)
+            or job.status != JobStatus.DONE
+            or job.is_sample
+        ):
             return {}
         title = documents.display_title(
             (job.result_json or {}).get("title"), job.filename, job.title_override
@@ -349,7 +367,7 @@ def revision_context(ctx: AppContext, user: CurrentUser, job_id: str) -> dict[st
 
 
 @router.get("/app/documents")
-def app_documents(request: Request, user: UserDep, v: str = "") -> Response:
+def app_documents(request: Request, user: UserDep, v: str = "", course: str = "") -> Response:
     """The documents list alone, polled by htmx while a document is waiting or
     converting. 204 (no swap) while nothing changed, so an open tab costs one small
     query every few seconds; when something did, the whole list, with a `<title>` that
@@ -357,11 +375,20 @@ def app_documents(request: Request, user: UserDep, v: str = "") -> Response:
     ctx = get_ctx(request)
     spend_closed = ctx.guard.cap_reached(ctx.min_headroom_usd)
     now = utcnow()
+    # The list of one course's documents (the course page, T3-4) polls with its own id.
+    course_id = course if JOB_ID.match(course) else None
     with session_scope(ctx.factory) as session:
-        if v and v == documents.list_version(session, user.id, now=now, budget_closed=spend_closed):
+        if v and v == documents.list_version(
+            session, user.id, now=now, budget_closed=spend_closed, course_id=course_id
+        ):
             return Response(status_code=204)
-        listing = documents.documents(session, user.id, now=now, budget_closed=spend_closed)
-    context: dict[str, Any] = {"documents": listing}
+        listing = documents.documents(
+            session, user.id, now=now, budget_closed=spend_closed, course_id=course_id
+        )
+    context: dict[str, Any] = {
+        "documents": listing,
+        "list_url": f"/app/documents?course={course_id}" if course_id else "/app/documents",
+    }
     if request.headers.get("HX-Request") == "true":
         context["page_title"] = listing.page_title
     return render(request, "_documents.html", context)
@@ -441,11 +468,36 @@ UPLOAD_BUSY = {
 }
 
 
+@dataclass
+class Placed:
+    """What became of one file of an upload: queued as a job (`job_id`), kept for the
+    person to choose its pages (`pending_id`), or refused (`code`, with the `status` and
+    the page counts its message needs)."""
+
+    filename: str
+    pages: int = 0
+    job_id: str = ""
+    pending_id: str = ""
+    code: str = ""
+    status: int = 0
+    left: int | None = None
+    retry_after: str = ""
+
+
+# How long the probes of one upload may take in all: each file has its own 30 s, but ten
+# files that hang must not hold the person's upload slot for five minutes.
+INSPECT_BUDGET_S = 120.0
+
+
 async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> Response:
-    """Read, check and store one upload (inside the upload gate)."""
+    """Read, check and store an upload of one or several files (inside the upload gate)."""
+    s = ctx.settings
     try:
         form = await read_upload_form(
-            request, max_bytes=max_upload_bytes(ctx.settings.max_upload_mb)
+            request,
+            max_bytes=s.upload_limit_bytes,
+            max_total_bytes=s.upload_limit_bytes,
+            max_files=MAX_FILES_PER_UPLOAD,
         )
     except UploadRejected as exc:
         return await run_in_threadpool(_upload_error_page, request, user, exc.code, exc.status_code)
@@ -457,110 +509,215 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     # A revised version of one of the person's documents (T3-2): its decisions are carried
     # over when this one has been converted. Checked now, before the file is opened.
     revises = form.fields.get("revises") or None
+
+    def refuse(code: str, status: int = 400, filename: str = "") -> Any:
+        return run_in_threadpool(
+            partial(
+                _upload_error_page,
+                request,
+                user,
+                code,
+                status,
+                filename,
+                course=chosen,
+                revises=revises or "",
+            )
+        )
+
     if revises is not None and not await run_in_threadpool(_users_revision, ctx, user, revises):
-        return await run_in_threadpool(
-            partial(
-                _upload_error_page,
-                request,
-                user,
-                "unknown_revision",
-                400,
-                form.filename,
-                course=chosen,
-                revises=revises or "",
-            )
-        )
-    if form.data is None:
-        return await run_in_threadpool(
-            partial(
-                _upload_error_page,
-                request,
-                user,
-                "missing_file",
-                400,
-                course=chosen,
-                revises=revises or "",
-            )
-        )
+        return await refuse("unknown_revision", 400, form.filename)
+    if revises is not None and len(form.files) > 1:
+        return await refuse("revise_one_file")
+    if not form.files:
+        return await refuse("missing_file")
     if course_id is not None and not await run_in_threadpool(_users_course, ctx, user, course_id):
         return await run_in_threadpool(_course_error_page, request, user)
-    try:
-        pages = await run_in_threadpool(
-            lambda: inspect_pdf_isolated(form.data or b"", max_pages=ctx.settings.max_pages_per_job)
-        )
-    except UploadRejected as exc:
-        return await run_in_threadpool(
-            partial(
-                _upload_error_page,
-                request,
-                user,
-                exc.code,
-                exc.status_code,
-                form.filename,
-                exc.pages,
-                course=chosen,
-                revises=revises or "",
-            )
-        )
+    for _ in form.files[1:]:  # every file after the first is an upload for the rate limits
+        enforce(request, "upload_user", user.id)
     mode = retention.mode_for_upload(
         keep=form.fields.get("keep") == "on", share=form.fields.get("share") == "on"
     )
     # "Exam or quiz": figures are described without giving answers (T1-14).
     exam = form.fields.get("exam") == "on"
+    placed = await run_in_threadpool(
+        _place_files, ctx, user, form.files, mode, course_id, exam, revises
+    )
+    if len(placed) == 1:
+        return await _answer_one(request, user, placed[0], chosen, revises or "")
+    return await run_in_threadpool(_results_page, request, ctx, user, placed)
+
+
+def _place_files(
+    ctx: AppContext,
+    user: CurrentUser,
+    files: list[UploadedFile],
+    mode: str,
+    course_id: str | None,
+    exam: bool,
+    revises: str | None,
+) -> list[Placed]:
+    """Check each file and queue it, or keep it for choosing its pages, or say why not.
+    A refusal of one file does not stop the others: each is its own document."""
+    s = ctx.settings
+    deadline = time.monotonic() + INSPECT_BUDGET_S
+    placed: list[Placed] = []
+    for file in files:
+        remaining = deadline - time.monotonic()
+        try:
+            if remaining < 1.0:
+                raise UploadRejected("unreadable")
+            pages = inspect_pdf_isolated(
+                file.data,
+                max_pages=s.source_page_limit,
+                timeout_s=min(INSPECT_TIMEOUT_S, remaining),
+            )
+        except UploadRejected as exc:
+            placed.append(
+                Placed(file.filename, exc.pages or 0, code=exc.code, status=exc.status_code)
+            )
+            continue
+        too_big = len(file.data) > max_upload_bytes(s.max_upload_mb)
+        if pages > s.max_pages_per_job or too_big:
+            placed.append(_keep_for_parts(ctx, user, file, pages, mode, course_id, exam, revises))
+            continue
+        try:
+            job_id = store_job(
+                ctx.factory,
+                s,
+                user.id,
+                file.filename,
+                file.data,
+                pages,
+                mode,
+                course_id=course_id,
+                exam=exam,
+                revises=revises,
+                now=utcnow(),
+            )
+        except TooManyJobs as exc:
+            placed.append(Placed(file.filename, code=exc.code, status=429, retry_after="60"))
+            continue
+        except QuotaRefused as exc:
+            placed.append(
+                Placed(
+                    file.filename,
+                    exc.pages,
+                    code="page_quota",
+                    status=429,
+                    left=exc.left,
+                    retry_after="3600",
+                )
+            )
+            continue
+        log_event(
+            logger,
+            "job_created",
+            job_id=job_id,
+            pages=pages,
+            opt_in=mode == "dev",
+            retention=mode,
+            files=len(files),
+        )
+        events.record_upload(
+            ctx.factory, s, user_id=user.id, job_id=job_id, data=file.data, pages=pages
+        )
+        placed.append(Placed(file.filename, pages, job_id=job_id))
+    return placed
+
+
+def _keep_for_parts(
+    ctx: AppContext,
+    user: CurrentUser,
+    file: UploadedFile,
+    pages: int,
+    mode: str,
+    course_id: str | None,
+    exam: bool,
+    revises: str | None,
+) -> Placed:
+    """A file over the page or size limit is kept for the person to choose its pages
+    (T3-3, `web.pending`); nothing is converted or counted until they do."""
+    if revises is not None:
+        return Placed(file.filename, pages, code="revision_too_large", status=422)
     try:
-        job_id = await run_in_threadpool(
-            _store_upload,
-            ctx,
+        with session_scope(ctx.factory) as session:
+            row = pending.create(
+                session,
+                ctx.settings,
+                user_id=user.id,
+                filename=file.filename,
+                data=file.data,
+                pages=pages,
+                mode=mode,
+                course_id=course_id,
+                exam=exam,
+            )
+            pending_id = row.id
+    except pending.TooManyPending:
+        return Placed(file.filename, pages, code="too_many_pending", status=429, retry_after="60")
+    log_event(logger, "upload_kept_for_parts", pending_id=pending_id, pages=pages)
+    return Placed(file.filename, pages, pending_id=pending_id)
+
+
+async def _answer_one(
+    request: Request, user: CurrentUser, item: Placed, chosen: str, revises: str
+) -> Response:
+    """The answer to an upload of one file: its job page, the page for choosing its pages,
+    or the upload form again with the reason."""
+    if item.job_id:
+        return RedirectResponse(f"/jobs/{item.job_id}", status_code=303)
+    if item.pending_id:
+        return RedirectResponse(f"/uploads/{item.pending_id}", status_code=303)
+    headers = {"Retry-After": item.retry_after} if item.retry_after else None
+    return await run_in_threadpool(
+        partial(
+            _upload_error_page,
+            request,
             user,
-            form.filename,
-            form.data,
-            pages,
-            mode,
-            course_id,
-            exam,
-            revises,
-        )
-    except TooManyJobs as exc:
-        return await run_in_threadpool(
-            partial(
-                _upload_error_page,
-                request,
-                user,
-                exc.code,
-                429,
-                form.filename,
-                headers={"Retry-After": "60"},
-                course=chosen,
-                revises=revises or "",
-            )
-        )
-    except QuotaRefused as exc:
-        return await run_in_threadpool(
-            partial(
-                _upload_error_page,
-                request,
-                user,
-                "page_quota",
-                429,
-                form.filename,
-                exc.pages,
-                left=exc.left,
-                headers={"Retry-After": "3600"},
-                course=chosen,
-                revises=revises or "",
-            )
-        )
-    log_event(
-        logger, "job_created", job_id=job_id, pages=pages, opt_in=mode == "dev", retention=mode
-    )
-    # Usage events (web/events.py): `uploaded`, and `reuploaded` for the same file again.
-    data = form.data or b""
-    await run_in_threadpool(
-        lambda: events.record_upload(
-            ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, data=data, pages=pages
+            item.code,
+            item.status,
+            item.filename,
+            item.pages or None,
+            left=item.left,
+            headers=headers,
+            course=chosen,
+            revises=revises,
         )
     )
-    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+def _results_page(
+    request: Request, ctx: AppContext, user: CurrentUser, placed: list[Placed]
+) -> Response:
+    """The answer to an upload of several files: what was queued, what waits for the
+    person to choose its pages, and what was refused and why. A page, not a redirect: the
+    reasons name the files, and file names never go in the session cookie."""
+    for item in placed:
+        if item.code:
+            log_event(logger, "upload_rejected", code=item.code)
+    queued = [i for i in placed if i.job_id]
+    choose = [i for i in placed if i.pending_id]
+    refused = [
+        {"message": upload_error_message(i.code, ctx, i.filename, i.pages or None, i.left)}
+        for i in placed
+        if i.code
+    ]
+    status = 200
+    headers: dict[str, str] | None = None
+    if not queued and not choose:  # nothing came of it: the first reason's status
+        first = next(i for i in placed if i.code)
+        status = first.status
+        if first.retry_after:
+            headers = {"Retry-After": first.retry_after}
+    context = {
+        "queued": [{"id": i.job_id, "filename": i.filename, "pages": i.pages} for i in queued],
+        "choose": [{"id": i.pending_id, "filename": i.filename, "pages": i.pages} for i in choose],
+        "refused": refused,
+        "received": len(queued) + len(choose),  # a large file kept for its pages is uploaded
+        "total": len(placed),
+        "active": "app",
+    }
+    return render(request, "upload_results.html", context, status_code=status, headers=headers)
 
 
 def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, str] | None:
@@ -592,6 +749,7 @@ def _users_revision(ctx: AppContext, user: CurrentUser, job_id: str) -> bool:
             and job.user_id == user.id
             and not expired(job)
             and job.status == JobStatus.DONE
+            and not job.is_sample
         )
 
 
@@ -604,61 +762,6 @@ def _course_error_page(request: Request, user: CurrentUser) -> Response:
     errors = [{"field_id": "course", "message": message}]
     context = app_context(ctx, user) | {"errors": errors, "field_errors": {"course": errors[0]}}
     return render(request, "app.html", context, status_code=400)
-
-
-def _store_upload(
-    ctx: AppContext,
-    user: CurrentUser,
-    filename: str,
-    data: bytes,
-    pages: int,
-    mode: str,
-    course_id: str | None = None,
-    exam: bool = False,
-    revises: str | None = None,
-) -> str:
-    """Count the pages against today's quota and queue the job, in one transaction."""
-    s = ctx.settings
-    now = utcnow()
-    with session_scope(ctx.factory) as session:
-        # Checked before the pages are counted: a refusal costs nothing.
-        active = session.scalar(
-            select(func.count())
-            .select_from(Job)
-            .where(
-                Job.user_id == user.id,
-                Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
-            )
-        )
-        if (active or 0) >= MAX_ACTIVE_JOBS_PER_USER:
-            raise TooManyJobs("too_many_active")
-        if live_job_count(session, user.id, now) >= MAX_LIVE_JOBS_PER_USER:
-            raise TooManyJobs("too_many_stored")
-        if not try_consume_pages(
-            session, user.id, pages, quota=s.per_user_daily_page_quota, day=utc_today(now)
-        ):
-            left = pages_left(
-                session, user.id, quota=s.per_user_daily_page_quota, day=utc_today(now)
-            )
-            # The upload page again, with the file named (`_take_upload`).
-            raise QuotaRefused(pages, left or 0)
-        job = Job(
-            user_id=user.id,
-            status=JobStatus.QUEUED,
-            filename=filename,
-            page_count=pages,
-            opt_in_retention=mode == "dev",
-            retention_mode=mode,
-            retain_until=retention.retain_until_at_upload(s, mode, now),
-            created_at=now,
-            course_id=course_id,
-            exam_mode=exam,
-            revises_job_id=revises,
-        )
-        session.add(job)
-        session.flush()
-        session.add(Blob(job_id=job.id, kind="upload", media_type="application/pdf", content=data))
-        return job.id
 
 
 # --------------------------------------------------------------------------- status

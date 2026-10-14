@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Discard {{ filename }}?{% endblock %}
+{% block content %}
+<h1>Discard {{ filename }}?</h1>
+<p>This deletes the copy of the file kept here while you choose its pages. Parts you have already
+  sent to be converted are not affected. It cannot be undone; your own copy of the file is
+  not changed.</p>
+<form method="post" action="/uploads/{{ upload_id }}/delete" class="inline-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <input type="hidden" name="confirm" value="yes">
+  <button type="submit" class="button-danger">Yes, discard it</button>
+</form>
+<p><a href="/uploads/{{ upload_id }}">No, keep it</a></p>
+{% endblock %}

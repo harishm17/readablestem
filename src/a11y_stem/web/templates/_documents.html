@@ -5,7 +5,8 @@
    changes the tab title ("My documents (4 of 6 finished)"), not what is being read. #}
 {% if page_title|default("") %}<title>{{ page_title }} | a11y-stem</title>
 {% endif %}
-<div id="documents" class="documents"{% if documents.unfinished %} hx-get="/app/documents?v={{ documents.version }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
+{% set list_url = list_url|default("/app/documents") %}
+<div id="documents" class="documents"{% if documents.unfinished %} hx-get="{{ list_url }}{{ "&" if "?" in list_url else "?" }}v={{ documents.version }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>
   <p class="documents-summary">{{ documents.summary }}.</p>
   {% set next = documents.review_next %}
   {% if next %}
@@ -29,8 +30,8 @@
       {% for row in group.rows %}
       <tr role="row">
         <th scope="row" role="rowheader">
-          <a id="doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.title }}</a>
-          <span class="doc-file">{% if row.title != row.filename %}{{ row.filename }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }} · uploaded {{ row.created_at|utc }}</span>
+          {% if row.is_sample %}<span class="status-badge status-sample">Sample</span> {% endif %}<a id="doc-{{ row.id }}" href="/jobs/{{ row.id }}">{{ row.title }}</a>
+          <span class="doc-file">{% if row.part_label %}Pages {{ row.part_label }} of a larger file · {% endif %}{% if row.title != row.filename %}{{ row.filename }} · {% endif %}{{ row.pages }} {{ "page" if row.pages == 1 else "pages" }} · uploaded {{ row.created_at|utc }}</span>
         </th>
         <td role="cell" data-label="Status">
           <span class="status-badge status-{{ row.badge }}">{{ row.label }}</span>

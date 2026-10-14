@@ -170,6 +170,13 @@ class Settings(BaseSettings):
     max_model_calls_per_page: int = Field(default=80, gt=0)
     max_pages_per_job: int = Field(default=30, gt=0)
     max_upload_mb: int = Field(default=20, gt=0)
+    # Larger than a conversion takes (MAX_PAGES_PER_JOB pages, MAX_UPLOAD_MB): a file up to
+    # this many MB and pages is kept so the person can choose which pages to convert, in
+    # parts that each fit (web/pending.py). Also the most one upload request may carry, files
+    # together: Cloud Run takes at most 32 MiB in a request. Equal to the limits above, it
+    # turns the feature off (the file is refused, as before).
+    max_large_upload_mb: int = Field(default=30, gt=0)
+    max_source_pages: int = Field(default=300, gt=0)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
 
@@ -330,6 +337,22 @@ class Settings(BaseSettings):
     @property
     def admin_email_list(self) -> list[str]:
         return [e.strip() for e in self.admin_emails.split(",") if e.strip()]
+
+    @property
+    def upload_limit_mb(self) -> int:
+        """The most one upload request may carry, in MB: a file between `max_upload_mb` and
+        this is kept for choosing its pages (never below `max_upload_mb`)."""
+        return max(self.max_large_upload_mb, self.max_upload_mb)
+
+    @property
+    def upload_limit_bytes(self) -> int:
+        return self.upload_limit_mb * 1024 * 1024
+
+    @property
+    def source_page_limit(self) -> int:
+        """The most pages of a file that can be kept for choosing its pages (never below
+        `max_pages_per_job`)."""
+        return max(self.max_source_pages, self.max_pages_per_job)
 
     @property
     def ms_sign_in_enabled(self) -> bool:
