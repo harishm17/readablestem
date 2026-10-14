@@ -219,7 +219,7 @@ def test_the_card_shows_the_image_and_the_table_as_the_student_gets_it(tables):
     assert "Keep as image: Students see a picture of the table, marked “not converted”" in body
     # Every form that changes something carries the job's version and the view.
     forms = post_forms(body)
-    assert len(forms) == 4  # headers, use this grid, accept, reject
+    assert len(forms) == 5  # headers, use this grid, accept, reject, "not a table" (T3-11)
     for form in forms:
         assert '<input type="hidden" name="version" value="0">' in form
         assert 'name="view" value="split"' in form

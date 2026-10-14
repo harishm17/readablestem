@@ -69,6 +69,20 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/keep"): USER,  # T1-8: CSRF, owner only, per-person kept cap
     ("POST", "/jobs/{job_id}/language"): USER,
     ("GET", "/jobs/{job_id}/pages/{number}.png"): USER,
+    # T3-16: leave a page out of review and of the student file, and put it back. CSRF,
+    # owner only, review version checked; not rate limited (like a decision).
+    ("POST", "/jobs/{job_id}/pages/{number}/omit"): USER,
+    ("POST", "/jobs/{job_id}/pages/{number}/restore"): USER,
+    # T3-5: change what the tool did not propose. CSRF, owner only, review version checked.
+    # Adding a region is rate limited (the crop; and the model's read of an equation, which
+    # is also one at a time per person and under the job's and the day's spend caps).
+    ("POST", "/jobs/{job_id}/edit/{element_id}"): USER,  # the words; a paragraph made a heading
+    ("POST", "/jobs/{job_id}/pages/{number}/add"): USER,  # rate limited, spend capped
+    ("GET", "/jobs/{job_id}/pages/{number}/region.png"): USER,  # the region as it would be cut
+    # T3-11: accept the clean tables in one write; read a table's maths cell with the model
+    # (rate limited, one at a time, spend capped).
+    ("POST", "/jobs/{job_id}/tables/accept-clean"): USER,
+    ("POST", "/jobs/{job_id}/tables/{element_id}/read-cell"): USER,
     ("GET", "/jobs/{job_id}/progress"): USER,
     ("GET", "/jobs/{job_id}/regions/{element_id}.png"): USER,
     ("GET", "/jobs/{job_id}/review"): USER,

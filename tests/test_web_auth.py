@@ -296,11 +296,17 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs",
         "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
         "/jobs/{job_id}/delete",
+        "/jobs/{job_id}/edit/{element_id}",  # the words of a paragraph; a heading made (T3-5)
         "/jobs/{job_id}/feedback",
         "/jobs/{job_id}/keep",  # keep 7 more days (T1-8)
         "/jobs/{job_id}/language",
+        "/jobs/{job_id}/pages/{number}/add",  # a picture or an equation the tool missed (T3-5)
+        "/jobs/{job_id}/pages/{number}/omit",  # a page left out (T3-16)
+        "/jobs/{job_id}/pages/{number}/restore",
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
+        "/jobs/{job_id}/tables/accept-clean",  # the clean tables, in one write (T3-11)
+        "/jobs/{job_id}/tables/{element_id}/read-cell",  # a maths cell read by the model (T3-11)
         "/jobs/{job_id}/title",  # the title students hear (T1-7)
         "/jobs/{job_id}/undo",
         "/login",
@@ -309,7 +315,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     ]
     for path in posts:
         url = path.replace("{job_id}", JOB).replace("{element_id}", "p1-e1")
-        url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB)
+        url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB).replace("{number}", "1")
         if path == "/jobs":
             response = web.browser.post(
                 url, data={"csrf_token": "forged"}, files={"pdf": ("a.pdf", b"%PDF-1.4", "x")}

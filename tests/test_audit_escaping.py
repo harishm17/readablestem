@@ -96,7 +96,9 @@ def inspect(html: str) -> Inspect:
     return parser
 
 
-def assert_inert(html: str, where: str = "") -> Inspect:
+def assert_inert(html: str, where: str = "", *, text_scan: bool = True) -> Inspect:
+    """`text_scan` False leaves out the two scans of the raw text: an alt text may hold
+    "onerror" as (escaped) text inside an <img>, which only the parsed attributes can judge."""
     parsed = inspect(html)
     assert not FORBIDDEN_TAGS & set(parsed.tags), (where, FORBIDDEN_TAGS & set(parsed.tags))
     for tag, name, value in parsed.attrs:
@@ -113,8 +115,9 @@ def assert_inert(html: str, where: str = "") -> Inspect:
         if name == "src":
             assert tag == "img" and value.startswith("data:image/png;base64,"), (where, tag, value)
         assert name != "data", (where, tag)
-    assert "<script" not in html.lower().replace("&lt;script", ""), where
-    assert re.search(r"<(?:img|svg|iframe)[^>]*onerror", html, re.I) is None, where
+    if text_scan:
+        assert "<script" not in html.lower().replace("&lt;script", ""), where
+        assert re.search(r"<(?:img|svg|iframe)[^>]*onerror", html, re.I) is None, where
     return parsed
 
 
@@ -301,3 +304,87 @@ def test_hostile_latex_is_refused_or_becomes_inert_mathml(latex):
     html = f"<main>{mathml}</main>"
     assert_inert(html, latex[:30])
     assert "javascript" not in html and "evil" not in html and "passwd" not in html
+
+
+# --------------------------------------------------------------------------- review edits
+
+
+@pytest.mark.parametrize("payload", PAYLOADS)
+def test_a_description_in_words_is_escaped_where_it_is_the_alt_text(payload):
+    """T3-16: the text an instructor types for an image reaches the file as an alt text."""
+    from fixtures.web.support import PNG
+
+    elements, fixes = build("plain")
+    for fix in fixes:
+        if fix.element_id in {"p1-e3", "p1-e5"}:  # a block equation and a table kept as images
+            fix.status = Status.REJECTED
+            fix.described = payload
+    html = render_html(
+        title="t",
+        lang="en",
+        elements=elements,
+        fixes=fixes,
+        crops={"p1-e3": PNG, "p1-e5": PNG},
+    )
+    assert_inert(html, payload[:20], text_scan=False)
+    assert "<script" not in html.lower().replace("&lt;script", "")
+    images = [value for tag, name, value in inspect(html).attrs if (tag, name) == ("img", "alt")]
+    visible = re.sub(r"[\x00-\x08\x0b-\x1f]", "", payload)
+    assert images.count(visible) >= 2, (payload[:20], images)
+
+
+def test_the_review_edits_show_hostile_text_as_text(tmp_path):
+    """T3-5, T3-16: words, a heading, an added picture, a description and a page left out,
+    all with markup in what was typed: the pages and the file hold it only as text."""
+    from fixtures.web.review_doc import review_output, review_pdf
+    from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+
+    evil = '"><script>alert(1)</script><img src=x onerror=alert(2)>'
+    env = WebEnv(tmp_path)
+    env.converter.output = review_output()
+    with env.running() as client:
+        env.allow(ALICE)
+        login(client, ALICE)
+        job = job_id_from(upload(client, review_pdf()))
+        env.run_worker()
+        env.browser, env.job_id = client, job
+
+        def version() -> str:
+            return str(env.job(job).result_version or 0)
+
+        def post(path: str, **fields):
+            data = {"csrf_token": token(client, f"/jobs/{job}/review"), "version": version()}
+            return client.post(f"/jobs/{job}{path}", data=data | fields)
+
+        post("/edit/p1-e4", action="text", text=evil)
+        post("/edit/p1-e4", action="heading", level="2")
+        post("/review/p1-e2", action="reject", view="split")
+        post("/review/p1-e2", action="describe", description=evil, view="split")
+        post("/review/p1-e2", action="describe", description='quote " and <b>', view="split")
+        post(
+            "/pages/1/add",
+            kind="picture",
+            alt='a "quoted" & <b>bold</b>',
+            left="10",
+            top="55",
+            right="50",
+            bottom="70",
+        )
+        post("/pages/2/omit")
+        for path in (
+            f"/jobs/{job}/review?page=1&tools=1&change=p1-e4",
+            f"/jobs/{job}/review?page=1&tools=1",
+            f"/jobs/{job}/review?item=p1-e2",
+            f"/jobs/{job}/review?item=p1-x1",
+            f"/jobs/{job}/review?page=2&tools=1",
+            f"/jobs/{job}/review/list",
+            f"/jobs/{job}",
+        ):
+            page = client.get(path).text
+            assert "<script>alert" not in page, path
+            for tag, name, _value in inspect(page).attrs:
+                assert not name.startswith("on"), (path, tag, name)
+        document = with_file(env).html or ""
+        assert_inert(document)
+        assert "<script>alert" not in document
+        assert "&lt;script&gt;alert(1)&lt;/script&gt;" in document  # the heading's words, as text
