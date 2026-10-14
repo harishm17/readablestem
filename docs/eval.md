@@ -1762,7 +1762,7 @@ What each result says:
 - **T3-24, figure crops at 768 px: off, needs a test the sets cannot give.** The gold figures
   are OpenStax web images of at most 500 px, so on the figures task the setting changes nothing
   (the requests are the baseline's). In the document task the crops are 200 dpi renders of the
-  page: the 16 figures cost 14% less per page, the 13 captioned ones all pass the figure judge
+  page: a page costs 14% less, the 13 captioned ones all pass the figure judge
   (mean score 4.77 to 4.69, one figure one point lower), and the status and confidence of every
   figure are the same. No dense chart or slide is in the sets, which is where a smaller picture
   loses text, so it stays off until such a figure is tested; 1,024 is the safer first value.
@@ -1789,8 +1789,8 @@ What each result says:
   `ANTHROPIC_MAIN_MODEL`. Not run on any held-out set.
 - **T3-21, batches.** The same requests as a live call (`batch_params`), less the refusal
   fallback. Batch against live on the same 10 equations: 8 of 10 the same LaTeX and the same
-  correctness for all 10 (two live runs differ as much). A staged run takes minutes per stage
-  (3-5 stages for the document task) and half the price; a stage once took 45 minutes. A dropped
+  correctness for all 10 (two live runs differ as much). A staged run takes several stages of minutes each and half the price; one stage took 45
+  minutes when the queue was long. A dropped
   connection while polling lost the results of one batch (about $0.05) before the runner
   retried such calls; it does now.
 
