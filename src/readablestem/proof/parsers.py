@@ -1,4 +1,4 @@
-"""Stage: a11y-stem against the open PDF parsers (preregistration 6.3, PARSERS-PLAN.md).
+"""Stage: ReadableSTEM against the open PDF parsers (preregistration 6.3, PARSERS-PLAN.md).
 
 The parsers are Docling (default settings; a second arm with formula recognition on was
 registered and, if it is not in the bundle, was not carried out), MinerU (basic tier on CPU,
@@ -6,7 +6,7 @@ which is not the tier its documentation names as the default) and PyMuPDF4LLM. T
 `proof/parsers` (a separate uv project, one pinned environment per tool); their Markdown
 exports are in the bundle's `systems/`, and a time and memory record of each run.
 
-Family B of the claims (section 8.3): a11y-stem against each parser on
+Family B of the claims (section 8.3): ReadableSTEM against each parser on
 `end_to_end_exact_lenient` and heading F1, 2 x (number of parsers) comparisons, each judged
 at the Bonferroni level for that k. Two of the parsers write no LaTeX by design, so their
 equation number is 0 by construction: it says what the tool is built for, not how well it
@@ -53,7 +53,7 @@ PARSER_NOTES = {
 # Fixed text from PARSERS-PLAN.md (path in the research folder; not repeated here).
 BUILT_FOR = [
     [
-        "a11y-stem",
+        "readablestem",
         "accessible HTML from STEM course PDFs, with a review screen",
         "re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans",
     ],
@@ -110,7 +110,7 @@ class ParserStage:
 
     def record(self, ctx: RecordContext, writer: BundleWriter) -> None:
         ctx.say(
-            "parsers: recorded by `a11y-stem proof --add-systems parsers`; nothing recorded here"
+            "parsers: recorded by `readablestem proof --add-systems parsers`; nothing recorded here"
         )
 
     def run(self, ctx: StageContext) -> StageResult:
@@ -148,7 +148,7 @@ class ParserStage:
             "CPU, once per section, in a fresh process; a crash, an empty output or a "
             "30-minute limit scores the section as found nothing. Each parser's Markdown "
             "export is read by the same reader as the chatbot's HTML (`eval.invented.read`), "
-            "its maths converted and aligned to gold by the same code as a11y-stem's.",
+            "its maths converted and aligned to gold by the same code as ReadableSTEM's.",
             Table(
                 "What each system is built for (not failures: design differences)",
                 ["System", "Built for", "Not built for"],
@@ -169,7 +169,7 @@ class ParserStage:
                 ],
             ),
             systems_tables.claims_table(
-                "Family B: a11y-stem against each parser",
+                "Family B: ReadableSTEM against each parser",
                 comparisons,
                 a_name=A11Y,
                 k=k,
@@ -177,9 +177,9 @@ class ParserStage:
                 f"{_registered_k_note(len(names)) if k > len(FAMILY_B) * len(names) else ''}, the "
                 f"{100 * (1 - 0.05 / k):.3f}% paired cluster-bootstrap interval of the "
                 "difference decides. For a parser that writes no LaTeX by design "
-                "(`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool "
+                "(`docling`, `pymupdf4llm`) the equation row compares ReadableSTEM with a tool "
                 "that does not attempt equations; read it as a description of what the tool "
-                "is built for, not as evidence that a11y-stem transcribes better. Flat heading "
+                "is built for, not as evidence that ReadableSTEM transcribes better. Flat heading "
                 "levels in a parser's export are a property of that export.",
             ),
         ]
@@ -195,7 +195,7 @@ class ParserStage:
                 comparison.cost_totals(scored, names),
                 note="Parsers: wall clock of one fresh process per section divided by its PDF "
                 "pages, model load included, CPU only, API cost $0 (hosting not estimated); "
-                "peak memory is the process tree's maximum. a11y-stem: seconds of the "
+                "peak memory is the process tree's maximum. ReadableSTEM: seconds of the "
                 "document task at concurrency 4 (it waits on a hosted model, so its time is "
                 "not CPU time). Timings are from one machine; the load average at each "
                 "start is in the recorded run, and a busy machine makes a time an upper bound.",

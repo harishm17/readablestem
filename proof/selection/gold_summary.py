@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pymupdf
 
-from a11y_stem.eval.gold_scoring import iter_gold_records
+from readablestem.eval.gold_scoring import iter_gold_records
 
 OPS = set("=+−-×·÷/()[]<>≤≥≈±")
 

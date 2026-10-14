@@ -18,7 +18,7 @@
   "client": "anthropic",
   "dataset": {
     "gold_dir": "data/gold",
-    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "manifest_sha256": "b74e1fa4a67bd67ff37c048e992fdf518308ad0e063ed4522129aa43a82981de",
     "limit": null,
     "unit": "figure",
     "selection_sha256": "ff55fd8f6e2e932fd674df868a755e7871e91ca5d1143afb81cb92af979977d9"
@@ -49,7 +49,7 @@
       1.0
     ],
     "judge_pass_rate_answered": 1.0,
-    "judge_mean_score": 4.769230769230769,
+    "judge_mean_score": 4.6923076923076925,
     "judge_factual_error_rate": 0.0,
     "decorative_rate": 0.0,
     "second_check": {
@@ -92,28 +92,28 @@
         },
         "auroc_score_vs_judge_fail": null
       },
-      "cost_usd": 0.0216838,
-      "per_figure_usd": 0.00166798,
+      "cost_usd": 0.0191632,
+      "per_figure_usd": 0.00147409,
       "requests": 13
     }
   },
   "cost": {
-    "total_usd": 0.12321199999999999,
-    "pipeline_usd": 0.0716222,
-    "per_item_usd": 0.005509399999999999,
+    "total_usd": 0.1166946,
+    "pipeline_usd": 0.0621568,
+    "per_item_usd": 0.004781292307692308,
     "per_item_unit": "figure",
     "model_calls": 26,
-    "verifier_usd": 0.021683800000000003,
-    "verifier_per_item_usd": 0.0016679846153846156,
+    "verifier_usd": 0.019163200000000002,
+    "verifier_per_item_usd": 0.0014740923076923078,
     "verifier_requests": 13,
-    "judge_usd": 0.0515898,
-    "budget_spent_usd": 0.12321199999999997,
+    "judge_usd": 0.0545378,
+    "budget_spent_usd": 0.11669459999999998,
     "budget_calls": 26,
     "dropped_usd": 0.0
   },
   "latency_ms": {
-    "p50": 2000.0,
-    "p95": 2591.2,
+    "p50": 1981.0,
+    "p95": 3669.000000000001,
     "n": 13,
     "basis": "sum of model-call latencies per item (excludes rendering)"
   },
@@ -126,17 +126,35 @@
       "figure/claude-opus-5-5": {
         "calls": 13.0,
         "input": 23607.0,
-        "cached": 17712.0,
-        "written": 1476.0,
-        "output": 1067.0,
-        "usd": 0.049938,
-        "steady_usd": 0.042854
+        "cached": 19188.0,
+        "written": 0.0,
+        "output": 1074.0,
+        "usd": 0.042994,
+        "steady_usd": 0.042994
       }
     },
-    "steady_cost_usd": 0.042854,
+    "steady_cost_usd": 0.042994,
     "answers_file_hits": 0,
     "answers_file_misses": 13,
-    "live_cost_usd": 0.049938,
-    "replayed_cost_usd": 0.0
+    "live_cost_usd": 0.042994,
+    "replayed_cost_usd": 0.0,
+    "second_check": {
+      "by_step": {
+        "check/claude-sonnet-5-5": {
+          "calls": 13.0,
+          "input": 20395.0,
+          "cached": 14326.0,
+          "written": 0.0,
+          "output": 416.0,
+          "usd": 0.019163,
+          "steady_usd": 0.019163
+        }
+      },
+      "steady_cost_usd": 0.019163,
+      "answers_file_hits": 0,
+      "answers_file_misses": 13,
+      "live_cost_usd": 0.019163,
+      "replayed_cost_usd": 0.0
+    }
   }
 }

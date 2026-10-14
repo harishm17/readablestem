@@ -1,6 +1,6 @@
-"""Stage: a11y-stem against the chatbot recipe (preregistration sections 6.2, 7 and 8).
+"""Stage: ReadableSTEM against the chatbot recipe (preregistration sections 6.2, 7 and 8).
 
-Family A of the claims (section 8.3): a11y-stem against the Purdue-prompt chatbot on
+Family A of the claims (section 8.3): ReadableSTEM against the Purdue-prompt chatbot on
 gpt-6.1-sol, five comparisons, each judged at the Bonferroni level (the 99% interval of the
 paired cluster bootstrap for k = 5). The expert-prompt arm and the gpt-6-luna arm, and every
 single-system number, are descriptive.
@@ -159,8 +159,8 @@ def arm_block(
             note="`value [cluster 95% interval by section]`. A system that asks no questions "
             "has every wrong equation unflagged. G1 equations (operators packed into OpenStax "
             "text) can fail exact match when the answer is right. The allowlist-off row "
-            "converts a system's TeX without a11y-stem's LaTeX allowlist (descriptive; "
-            "a11y-stem's own allowlist is a product rule, so it has no such row).",
+            "converts a system's TeX without ReadableSTEM's LaTeX allowlist (descriptive; "
+            "ReadableSTEM's own allowlist is a product rule, so it has no such row).",
         ),
         systems_tables.metrics_table(
             f"{title_prefix}: headings (7.2)",
@@ -188,7 +188,7 @@ def arm_block(
             INVENTED_KEYS,
             cols,
             n_boot,
-            note="All text, including text a11y-stem wrote itself. A section a system failed "
+            note="All text, including text ReadableSTEM wrote itself. A section a system failed "
             "on has no units, so it adds nothing here; the raw rates include paraphrase the "
             "rule counts as unsupported, and the audit that measures that has not been done. "
             "A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): "
@@ -274,9 +274,9 @@ def pooled_note(ctx: StageContext, scored: Scored, primary: str) -> str:
     own = ctx.pset.repeats.get("document", 1)
     chat = f"The chatbot's {_count(runs)} run{'s are' if runs > 1 else ' is'} pooled; "
     if runs == own:
-        doc = f"a11y-stem's document task also has {_count(own)} run{'s' if own > 1 else ''}"
+        doc = f"ReadableSTEM's document task also has {_count(own)} run{'s' if own > 1 else ''}"
     else:
-        doc = f"a11y-stem's document task has {_count(own)} run{'s' if own > 1 else ''}"
+        doc = f"ReadableSTEM's document task has {_count(own)} run{'s' if own > 1 else ''}"
     return chat + doc + ", and its headings task one. "
 
 
@@ -286,7 +286,7 @@ class ChatbotStage:
 
     def record(self, ctx: RecordContext, writer: BundleWriter) -> None:
         ctx.say(
-            "chatbot: recorded by `a11y-stem proof --add-systems chatbot` "
+            "chatbot: recorded by `readablestem proof --add-systems chatbot` "
             "(its own spend cap); nothing recorded here"
         )
 
@@ -315,7 +315,7 @@ class ChatbotStage:
             send_text(scored) + " The HTML in the reply is "
             "scored as it comes: a reply that was cut off or empty is a failure of the "
             "section, not asked again. Equations are read from the reply's MathJax TeX or "
-            "MathML, converted the way a11y-stem converts its own model's LaTeX, and aligned "
+            "MathML, converted the way ReadableSTEM converts its own model's LaTeX, and aligned "
             "to the gold equations by the document task's code, so the same scorer reads "
             "both systems.",
             arms_text(ctx, scored),
@@ -345,7 +345,7 @@ class ChatbotStage:
             ]
             blocks.append(
                 systems_tables.claims_table(
-                    "Family A: a11y-stem against the Purdue-prompt chatbot on "
+                    "Family A: ReadableSTEM against the Purdue-prompt chatbot on "
                     + chatbot.ARM_BY_ID[primary].model,
                     comparisons,
                     a_name=A11Y,
@@ -371,7 +371,7 @@ class ChatbotStage:
                 "Cost and time per PDF page",
                 cost_totals(scored, names),
                 note="Chatbot: list-price cost of each call from its usage, and the call's "
-                "wall clock, per PDF page of the section. a11y-stem: pipeline plus second "
+                "wall clock, per PDF page of the section. ReadableSTEM: pipeline plus second "
                 "check per page, and the document task's wall clock at concurrency 4 on the "
                 "recording machine. Judge cost is not included for any system.",
             )

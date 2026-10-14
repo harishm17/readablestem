@@ -1,7 +1,7 @@
 """Stage: the invented-content rate of every system (preregistration section 7.5).
 
 The rules are `eval.invented` (frozen: its code fingerprint is printed below and recorded
-in the preregistration addendum before the run). a11y-stem's output is the HTML its own
+in the preregistration addendum before the run). ReadableSTEM's output is the HTML its own
 pipeline writes, rebuilt by the replay; the chatbot's and the parsers' outputs are the
 files in the bundle's `systems/`. Every output is scored against the text layer of the PDF
 it was made from.
@@ -31,8 +31,8 @@ class InventedStage:
         if scored.a11y_entries is None:
             return StageResult(
                 "skipped",
-                [Section(TITLE, ["Not computed: this replay produced no HTML for a11y-stem."])],
-                [f"{TITLE}: no a11y-stem HTML in this replay"],
+                [Section(TITLE, ["Not computed: this replay produced no HTML for ReadableSTEM."])],
+                [f"{TITLE}: no ReadableSTEM HTML in this replay"],
             )
         columns: list[tuple[str, list]] = [(systems_stage.A11Y, scored.a11y_entries)]
         for name in scored.arms:
@@ -41,7 +41,7 @@ class InventedStage:
             "Unsupported units / units, all text (the rate to quote)", columns
         )
         content = systems_tables.invented_pool_table(
-            "The same without the text a11y-stem wrote itself",
+            "The same without the text ReadableSTEM wrote itself",
             [(systems_stage.A11Y, scored.a11y_entries)],
             content_only=True,
         )
@@ -115,11 +115,11 @@ class InventedStage:
             "equation (hold a letter, digit or Greek letter the gold equation does not); "
             "equations with no gold partner and 3 or more symbols (no matching run of the "
             "PDF's symbols, ratio 0.8); table cells.",
-            "**Primary rows** are prose sentences and numbers. a11y-stem copies prose from "
+            "**Primary rows** are prose sentences and numbers. ReadableSTEM copies prose from "
             "the PDF's text layer, so for it those rows measure the copying, plus the "
             'sentences the tool writes itself (the "About this version" section and '
             "notices), which are counted in the first table and left out in the second. The "
-            "types where a11y-stem can invent are equations and figure descriptions.",
+            "types where ReadableSTEM can invent are equations and figure descriptions.",
             "Intervals: cluster bootstrap by section (the number to quote), shown as "
             "`rate (unsupported/units) [95% interval]`. With few sections that have units "
             "of a type the interval is not given.",
@@ -144,7 +144,7 @@ class InventedStage:
                     unchecked_table,
                     figures,
                     "Units counted per system and section, with the text of every flagged "
-                    "unit, are not part of this file; `a11y-stem eval invented score "
+                    "unit, are not part of this file; `readablestem eval invented score "
                     "--units` writes them for one output.",
                 ],
             )

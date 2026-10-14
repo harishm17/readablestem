@@ -16,10 +16,10 @@ from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from a11y_stem.core.types import Kind
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.eval.gold_scoring import iter_gold_records
-from a11y_stem.pipeline import layout
+from readablestem.core.types import Kind
+from readablestem.eval import pipeline_eval as pe
+from readablestem.eval.gold_scoring import iter_gold_records
+from readablestem.pipeline import layout
 
 
 @dataclass

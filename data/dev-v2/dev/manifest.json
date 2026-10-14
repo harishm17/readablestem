@@ -2,7 +2,7 @@
   "schema_version": 1,
   "set": "dev-v2",
   "part": "dev",
-  "generated_by": "a11y-stem gold build --set dev-v2",
+  "generated_by": "readablestem gold build --set dev-v2",
   "date": "2026-10-14",
   "files": [
     {
@@ -70,7 +70,7 @@
     },
     {
       "path": "authored/latex-chemistry/latex-chemistry.tex",
-      "sha256": "909b40eaddbcba3d39ad2a1c85be0a12d3397aa1808c41ec48a2e8e0554606d7",
+      "sha256": "2b58ac05d64feb4de7576af202f27a6d8bf5985f638c6b223e96272ea3a01572",
       "bytes": 27970
     },
     {
@@ -90,7 +90,7 @@
     },
     {
       "path": "authored/latex-exercises/latex-exercises.tex",
-      "sha256": "77a5b235780323473b5806835b89ad600797dee39d0f4fbb8462be8f77710562",
+      "sha256": "fc7e17b51b5760f57991cd15106c454187ed2a24ed562b704e1e43eae600f92b",
       "bytes": 12268
     },
     {
@@ -110,7 +110,7 @@
     },
     {
       "path": "authored/latex-hyphenation/latex-hyphenation.tex",
-      "sha256": "e0247ecfb7bc18a605cfe9ffbf638c65c24c2da775f5c1ebdfcd029b459ede99",
+      "sha256": "93a7842293752851f77373516ed6e5a6d514488cd880d1a35a5f0423815f97bb",
       "bytes": 21619
     },
     {
@@ -130,7 +130,7 @@
     },
     {
       "path": "authored/latex-matrices/latex-matrices.tex",
-      "sha256": "8a7cf14c6eaba18af9ac17cacbe455c0fe947e6dc24f0465409d5c3b205d06e1",
+      "sha256": "e8346b77a762fe45240bc5597370d408e17ebaaa9dccc364018e43bdb124c9e2",
       "bytes": 9389
     },
     {
@@ -150,7 +150,7 @@
     },
     {
       "path": "authored/latex-slides/latex-slides.tex",
-      "sha256": "86a0b490bfcedde4cb7028929a5600927ce19ce804215c5cc90d007ecb2ca88b",
+      "sha256": "dfdb1bf2fe7265af2d15804ced1804b6ca7a64c4f30eaf8cd8538f9b89f6c17d",
       "bytes": 6299
     },
     {
@@ -173,7 +173,7 @@
     },
     {
       "path": "authored/latex-structure/latex-structure.tex",
-      "sha256": "189db6b88b928fabce077b55503f8ee35564f8da7ba746a9ec1652759c12004a",
+      "sha256": "0efaac1b697cfa9c124fd614c74d88d78839a61e21b27d0d2a2051704c161846",
       "bytes": 23451
     },
     {
@@ -374,7 +374,7 @@
     },
     {
       "path": "authored/word-eq-images/word-eq-images.build.txt",
-      "sha256": "1895e929441d723feb0a26d1ad1d02afc1954bd7312a94be7adde2fd6972b0b2",
+      "sha256": "2ceef0a07b1b20a3078c8d1694db9403471f7f04dc173c40c67b1dac67e04350",
       "bytes": 334
     },
     {
@@ -403,7 +403,7 @@
     },
     {
       "path": "authored/word-lecture/word-lecture.build.txt",
-      "sha256": "1895e929441d723feb0a26d1ad1d02afc1954bd7312a94be7adde2fd6972b0b2",
+      "sha256": "2ceef0a07b1b20a3078c8d1694db9403471f7f04dc173c40c67b1dac67e04350",
       "bytes": 334
     },
     {

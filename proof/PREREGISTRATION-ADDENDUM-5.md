@@ -10,8 +10,8 @@ registered metric, and it registers nothing about a held-out run that has not ha
 Addendum 4 says the headings task ran at code commit `e9b5979f043b56b1bbb7b2f3742fd87a769e7e51`.
 It ran with the working tree at **`ca034adcd3595c0b9b8fb3252b9c3d95eb0e3bdc`**. The difference is
 the proof harness, tests and documents only: `git diff e9b5979 ca034ad --stat` is 51 files, of
-which four are under `src/` (`src/a11y_stem/proof/{chatbot,engine,labels,stages}.py`), and
-nothing under `src/a11y_stem/pipeline`, `core`, `models` or `eval`. The headings task's code
+which four are under `src/` (`src/readablestem/proof/{chatbot,engine,labels,stages}.py`), and
+nothing under `src/readablestem/pipeline`, `core`, `models` or `eval`. The headings task's code
 (`pipeline/`, `eval/pipeline_eval.py`) is also identical at `293160e`, apart from comments in
 `pipeline/page_type.py`. The fixes made in the review that prompted this addendum touch the
 proof harness, its tables, the interim report script and, in `eval/render.py`, the text of one
@@ -21,11 +21,11 @@ error message; none touches the pipeline.
 
 The registered rows are unchanged (the report script recomputes the same numbers; the previous
 report's SHA-256 was `a480c9ca86441b504e052b070a093003b8f5c6a8925438cd0ccdf02b7e0f54e0`, the
-rebuilt one is `96f2eab1c1fc6e5bb505c6d2277910f578a360c474c94b9d55d6aab67f98116e`; the data
+rebuilt one is `eece891bbf4fc55a126314176e2bbccb745aa969e04c37f703fed75ff133d776`; the data
 under `proof/interim/heldout-2026-10/` are untouched, tree hash `6273d2ad...` of Addendum 4).
 Added, and labelled in the report as added after the results were known:
 
-- the heading flags of a11y-stem's review screen (registration 7.4, which Addendum 4's report
+- the heading flags of ReadableSTEM's review screen (registration 7.4, which Addendum 4's report
   left out): 0 of 28 wrong headings were asked about, 0 of 29 required decisions pointed at one;
 - a sign-flip test of each heading comparison, printed beside the registered bootstrap interval.
   A "better" is no longer written where the sign-flip test (Bonferroni threshold 0.05 / 8)

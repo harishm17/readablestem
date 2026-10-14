@@ -17,7 +17,7 @@
   "dataset": {
     "gold_dir": "proof set heldout-2026-10",
     "limit": null,
-    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "manifest_sha256": "9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3",
     "selection_sha256": "8fd89b82e288ee1a8e5127fca4776488fff3556f53d0e6b411ab743dbb52e6f1",
     "unit": "equation"
   },

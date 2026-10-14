@@ -33,8 +33,8 @@ w("4. **Strata and draw** (`draw.py`). Per book, eligible sections sorted by mat
   f"{draw['seed']}, shuffles each tercile in a fixed order (book order as in section 3, "
   "then low, mid, high). The first section of each shuffled tercile is drawn; the rest "
   "of the order is that tercile's replacement queue. 5 books x 3 terciles = 15 sections.")
-w("5. **Page rules** (`budget.py`), on Letter prints made by `a11y-stem eval render` "
-  "after `a11y-stem gold fetch --allow-retired`: (A) a section printing to more than 30 "
+w("5. **Page rules** (`budget.py`), on Letter prints made by `readablestem eval render` "
+  "after `readablestem gold fetch --allow-retired`: (A) a section printing to more than 30 "
   "pages (the production `max_pages_per_job`; `convert_pdf` refuses more with "
   "`too_many_pages`) is replaced by the next in its queue; (B) while the total is above "
   "250 pages, the longest selected section is replaced the same way, and while it is "

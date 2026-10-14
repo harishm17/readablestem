@@ -13,7 +13,7 @@ from readablestem.proof.errors import BundleError, Drift, PinMismatch, ReplayMis
 @pytest.fixture
 def project(tmp_path, monkeypatch):
     root = make_project(tmp_path)
-    (root / "pyproject.toml").write_text('[project]\nname = "a11y-stem"\n')
+    (root / "pyproject.toml").write_text('[project]\nname = "readablestem"\n')
     monkeypatch.chdir(root)
     return root
 

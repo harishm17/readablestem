@@ -7,13 +7,13 @@ Addenda 1 to 3 stand.
 
 Only systems that need no model call:
 
-1. **a11y-stem, headings task** (registration 7.2, 6.1: no model call, run once).
-   `a11y-stem eval pipeline --task headings --set heldout --heldout-dir <dir with the
+1. **ReadableSTEM, headings task** (registration 7.2, 6.1: no model call, run once).
+   `readablestem eval pipeline --task headings --set heldout --heldout-dir <dir with the
    registered answer key> --max-usd 0.01 --cache <work>/eval-cache --date 2026-10-13`,
    code commit `e9b5979f043b56b1bbb7b2f3742fd87a769e7e51` (the pipeline behaves as
    `293160e`: comment edits only; later commits touch the proof harness, tests and docs). It reads the same 15
    PDFs the parsers read (SHA-256 sets compared equal). Result file `headings.json`
-   (sha256 `bcd5a5e250dcf6d31899eac6eb1fb32a45dc991d11c16648386df85d1194b598`), items
+   (sha256 `00d9a33255a5f034843b8577ff9bff1291f28c7d35c26126642bcebbe4d0037a`), items
    `headings-items.jsonl` (`b6b8c30530455c81ffe93f0a0978859fb3fae2c30823c37b9e5492e01dfb61cf`).
    0 model calls, $0.
 2. **Docling (defaults), MinerU (basic tier), PyMuPDF4LLM**, through `proof/parsers`
@@ -36,7 +36,7 @@ the sorted `path NUL sha256(file) newline` lines), the report is
 
 ## What was not run
 
-The a11y-stem document, equations and figures tasks, the chatbot arms and the figure judge:
+The ReadableSTEM document, equations and figures tasks, the chatbot arms and the figure judge:
 they need paid model calls (Addendum 3). The family A comparison and the equation half of
 family B cannot be made. The parsers' numbers are published as parser-only numbers, and the
 heading comparison is the heading half of family B only (k = 8 as in Addendum 1, D3).

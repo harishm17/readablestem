@@ -2,7 +2,7 @@
 # Nothing here touches the app's environment; the arms live in ~/.cache/a11y-proof/parsers-envs.
 .PHONY: sync setup plumbing proof test lint
 
-sync:       ## the harness itself (needs the a11y-stem checkout above this folder)
+sync:       ## the harness itself (needs the ReadableSTEM checkout above this folder)
 	uv sync
 
 setup: sync  ## one environment per parser from arms/*/uv.lock, plus MinerU's weights
@@ -22,7 +22,7 @@ lint: sync
 	uv run ruff format --check .
 	uv run ty check src
 
-# Called by `a11y-stem proof --live` and by hand. PDF_DIR holds <book>__<page>.pdf, OUT_DIR gets
+# Called by `readablestem proof --live` and by hand. PDF_DIR holds <book>__<page>.pdf, OUT_DIR gets
 # <arm>/<book>__<page>.{json,md}. ARMS="docling mineru-basic" limits the arms; WORK_DIR is scratch.
 WORK_DIR ?= $(HOME)/.cache/a11y-proof/parsers-proof-work
 proof: sync

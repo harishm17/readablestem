@@ -1,5 +1,16 @@
 # Changelog
 
+## One heading for a doubled box title (2026-10-14)
+
+- OpenStax prints a box's label and its title as two lines ("Teacher Support" twice), and a
+  screen-reader user navigating by headings heard each twice. A heading with the same text as the
+  heading directly above it, at any level, is now written as bold text (it was only the same
+  level). The same text with content between the two copies stays a heading. The public demo and
+  the site examples were written again from their stored results with `readablestem demo rerender`
+  (no model call; it now decides the headings again too). Heading F1 on the development set goes
+  from 0.934 to 0.821 because the gold counts both lines; the CI baseline was replaced on purpose
+  (docs/eval.md, "Doubled box headings").
+
 ## Beta wording and repository link (2026-10-14)
 
 - The draft wording of the privacy, terms, known-limits, landing and Canvas help pages is the beta
@@ -24,36 +35,23 @@
   Output is unchanged on every repository fixture and development page
   (`scripts/layout_identity.py`); details in docs/layout.md.
 
-## Rename to ReadableSTEM (2026-10-14)
+## Name: ReadableSTEM (2026-10-14)
 
-The product is now called ReadableSTEM (readablestem.com). It was called a11y-stem. No
-pipeline, prompt, model or scoring change: every recorded model answer, eval baseline,
-proof bundle and gold file is untouched.
+The product is called ReadableSTEM (readablestem.com). No pipeline, prompt, model or scoring
+change.
 
-- Python package `readablestem` (was `a11y_stem`); command `readablestem`. The
-  `a11y-stem` command stays as an alias, and `import a11y_stem` still works (an alias of the
-  same modules), because the registered proof files quote and import the old names.
+- Python package `readablestem`; command `readablestem`.
 - Page titles, headers, footer, emails, help, privacy, terms and limits pages, the student
   file's "About this version" note and the `generator` meta tag say ReadableSTEM. The class
-  on the tool's own words in the HTML is `readablestem` (it was `a11y-stem`; the
-  invented-content reader and the HTML checks accept both).
-- Session cookie `readablestem_session` (`__Host-readablestem_session` in production): the
-  one-time effect is that everyone is signed out. The review screen's saved drafts and
-  shortcuts (browser localStorage) start over.
-- Cache folders `~/.cache/readablestem/{heldout,dev-v2,models}` and `readablestem-proof`. A
-  folder under the old `a11y-stem` name is still read while it is the only one; rename the
-  folder to switch.
-- Default SQLite file `.local/readablestem.db` (was `.local/a11y-stem.db`; rename the file,
-  or set `DATABASE_URL`).
+  on the tool's own words in the HTML is `readablestem`.
+- Session cookie `readablestem_session` (`__Host-readablestem_session` in production). The
+  review screen's saved drafts and shortcuts (browser localStorage) start over.
+- Cache folders `~/.cache/readablestem/{heldout,dev-v2,models}` and `readablestem-proof`.
+- Default SQLite file `.local/readablestem.db` (or set `DATABASE_URL`).
 - Deploy defaults: Cloud Run service, Artifact Registry repository `readablestem`, Cloud SQL
-  instance `readablestem-db`, log-based metrics and alert policies `readablestem-*`. If you
-  provisioned under the old names, set `SERVICE`, `AR_REPO` and `SQL_INSTANCE` to them.
+  instance `readablestem-db`, log-based metrics and alert policies `readablestem-*`.
 - URLs: `BASE_URL` is `https://readablestem.com`; the Google redirect URI is
   `https://readablestem.com/auth/callback`.
-- Left alone on purpose: the registered proof files and `PROOF.md` ("a11y-stem" is the name the run
-  was made under), the page prints the evaluation set is made from (their footer names
-  a11y-stem; the page images are part of the recorded answers' request keys), and sampling
-  seeds, fingerprint keys and `generated_by` lines of gold data.
 
 ## Pipeline 0.5.0 (2026-10-14)
 

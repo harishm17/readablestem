@@ -30,7 +30,7 @@ MAX_PDF_BYTES = 300_000
 RETRIEVED_AT = "2026-10-14"
 LICENSE_NAME = "MIT License"
 LICENSE_URL = "https://opensource.org/licenses/MIT"
-AUTHOR = "a11y-stem contributors"
+AUTHOR = "ReadableSTEM contributors"
 
 # Set by the command line: paths of the tools the generators call themselves.
 CONFIG: dict = {"tectonic": "tectonic"}

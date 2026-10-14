@@ -713,6 +713,24 @@ def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
     return crops
 
 
+def refresh_heading_fixes(result: DocumentResult) -> bool:
+    """Decide the headings of a stored result again with today's heading step, in place;
+    True if anything changed. The heading step needs no model (`heading_step`), so a stored
+    result can follow a change to its rules without a new conversion: each heading's fix is
+    replaced (same element, same place in the list), and the review counts in `stats` are
+    counted again. Every other fix, and the models' answers, stay as stored."""
+    fresh = {f.element_id: f for f in heading_step.heading_fixes(result.elements)}
+    fixes = [fresh.get(f.element_id, f) if f.kind is Kind.HEADING else f for f in result.fixes]
+    if fixes == result.fixes:
+        return False
+    result.fixes = fixes
+    stats = result.stats
+    stats.by_status = dict(Counter(f.status.value for f in fixes))
+    stats.by_review = dict(Counter(f.review for f in fixes))
+    stats.required_decisions = triage.required_decisions(fixes)
+    return True
+
+
 @dataclass
 class _Run:
     """State of one conversion while its steps are in flight."""

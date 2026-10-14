@@ -168,7 +168,7 @@ def test_the_judge_sees_the_image_and_never_who_wrote_the_text():
     for request, item in zip(client.requests, items, strict=True):
         assert request.images == [item.image]
         assert "<candidate>\nA graph number" in (request.context_text or "")
-        assert "a11y-stem" not in (request.context_text or "") + request.instructions
+        assert "ReadableSTEM" not in (request.context_text or "") + request.instructions
         assert "ReadableSTEM" not in (request.context_text or "") + request.instructions
 
 

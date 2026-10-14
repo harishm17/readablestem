@@ -182,6 +182,6 @@ Original page: [https://openstax.org/books/introductory-statistics/pages/2-4-box
 
 Access for free at openstax.org.
 
-Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.
+Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited.
 
-a11y-stem is not affiliated with or endorsed by OpenStax.
+ReadableSTEM is not affiliated with or endorsed by OpenStax.

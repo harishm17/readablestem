@@ -1,4 +1,4 @@
-# Arm P2: MinerU 4.0.12, `basic` tier (ONNX, CPU). Not a dependency of a11y-stem.
+# Arm P2: MinerU 4.0.12, `basic` tier (ONNX, CPU). Not a dependency of ReadableSTEM.
 # Licence: "MinerU Open Source License" (Apache-2.0 plus extra terms); see proof/parsers/README.md.
 [project]
 name = "parsers-arm-mineru"

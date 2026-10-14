@@ -72,3 +72,24 @@ def test_a_fixture_is_written_without_the_demo_note(tmp_path):
     out = tmp_path / "out.html"
     rerender_demo(report, pdf, out, note=False)
     assert "About this demo" not in out.read_text(encoding="utf-8")
+
+
+def test_stale_heading_fixes_are_decided_again_and_the_counts_follow(tmp_path):
+    """The heading step needs no model, so a stored result follows its rules: a doubled box
+    title stored as two headings is written as one heading and one bold line."""
+    report, pdf, out = copy_of(DEMO, tmp_path)
+    data = json.loads(report.read_text(encoding="utf-8"))
+    fixes = data["result"]["fixes"]
+    bold = [f for f in fixes if f.get("reason") == "repeats_heading_above"]
+    assert bold, "the committed demo already has its doubled titles as bold text"
+    stale = bold[0]
+    stale["reason"], stale["heading"] = None, {"level": 3, "text": "Teacher Support"}
+    data["result"]["stats"]["by_review"] = {"none": 1}
+    report.write_text(json.dumps(data, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    rerender_demo(report, pdf, out)
+    again = json.loads(report.read_text(encoding="utf-8"))
+    fixed = next(f for f in again["result"]["fixes"] if f["element_id"] == stale["element_id"])
+    assert fixed["reason"] == "repeats_heading_above" and fixed["heading"] is None
+    assert sum(again["result"]["stats"]["by_review"].values()) == len(fixes)
+    rerender_demo(report, pdf, out)  # decided once: the second run changes nothing
+    assert json.loads(report.read_text(encoding="utf-8")) == again

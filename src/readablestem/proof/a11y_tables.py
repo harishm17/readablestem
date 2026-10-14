@@ -1,4 +1,4 @@
-"""The tables of the a11y-stem arm: what the four eval tasks measured, with intervals.
+"""The tables of the ReadableSTEM arm: what the four eval tasks measured, with intervals.
 
 Inputs are the per-item rows of `eval.pipeline_eval` (all repeats of a task pooled, a
 section's counts summed over its repeats). Every headline row has:
@@ -234,7 +234,7 @@ def document_section(arm: ArmResults, g1: frozenset[str], n_boot: int) -> Sectio
             "MathML for it; `fragment`: a piece of a gold equation or of a broken formula.",
         )
     )
-    return Section("a11y-stem on the whole section (document task)", blocks, level=3)
+    return Section("ReadableSTEM on the whole section (document task)", blocks, level=3)
 
 
 def section_table(

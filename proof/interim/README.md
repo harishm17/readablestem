@@ -6,11 +6,11 @@
 | Path | What |
 |---|---|
 | `pdfs/` | the 15 section PDFs every system was given (OpenStax retired first editions, CC BY 4.0, attribution in each PDF) |
-| `a11y-headings/` | `a11y-stem eval pipeline --task headings --set heldout` (no model call): report and per-section items |
+| `a11y-headings/` | `readablestem eval pipeline --task headings --set heldout` (no model call): report and per-section items |
 | `parsers/<arm>/` | what `proof/parsers` wrote for each section: `<book>__<page>.json` (status, wall time, memory, versions; no document text) and `.md` (the tool's Markdown export, images cut to a marker) |
 
 Why it exists, and why it is not a recorded proof run: the paid parts of the held-out run
-(a11y-stem's document, equations and figures tasks, the chatbot arms, the figure judge) could not
+(ReadableSTEM's document, equations and figures tasks, the chatbot arms, the figure judge) could not
 be made because the API account had no credit, so there is no bundle. See
 `../PREREGISTRATION-ADDENDUM-3.md` and `../PREREGISTRATION-ADDENDUM-4.md`, which say exactly what
 was run, and the top of the report, which says what it does not show.

@@ -872,6 +872,6 @@ Explain how you can multiply **4(\$5.97)** without paper or calculator by thinki
 
 “1.5 Properties of Real Numbers” from Intermediate Algebra by Lynn Marecek, OpenStax. Licensed under Creative Commons Attribution License (CC BY 4.0). [http://creativecommons.org/licenses/by/4.0/](http://creativecommons.org/licenses/by/4.0/)Original page: [https://openstax.org/books/intermediate-algebra/pages/1-5-properties-of-real-numbers](https://openstax.org/books/intermediate-algebra/pages/1-5-properties-of-real-numbers)Access for free at openstax.org.
 
-Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.
+Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited.
 
-a11y-stem is not affiliated with or endorsed by OpenStax.
+ReadableSTEM is not affiliated with or endorsed by OpenStax.

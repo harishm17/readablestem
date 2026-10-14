@@ -411,7 +411,6 @@ def extract_images(fragment: str, out: Out, base: str) -> str:
 
 
 MARKER = ".readablestem-site-build"
-OLD_MARKER = ".a11y-stem-site-build"  # folders built before the rename
 
 
 class Out:
@@ -427,9 +426,7 @@ class Out:
         """Replace `root` with the files. A folder that was not made by this script (it has
         no marker file) and is not empty is refused, so a wrong --out cannot delete work."""
         if root.exists():
-            if any(root.iterdir()) and not (
-                (root / MARKER).exists() or (root / OLD_MARKER).exists()
-            ):
+            if any(root.iterdir()) and not ((root / MARKER).exists()):
                 raise SystemExit(f"refusing to replace {root}: not a site build folder")
             shutil.rmtree(root)
         root.mkdir(parents=True)

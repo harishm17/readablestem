@@ -178,14 +178,18 @@ Element conventions:
   equation step, not to the outline. A line set bold as a whole keeps no bold in its text
   layer, since the weight is the heading's, not a vector's. `2.3 Units`, `Summary of
   results` and a title with a number but no relation sign stay headings.
-- **A heading with the same text and the same level as the heading directly above it**
-  (nothing between them, case, spacing and punctuation aside, level = layout's raw level
-  from font size and weight: `heading_step.repeated_above`) is not a second heading. Its
-  fix is ACCEPTED, review `none`, reason `repeats_heading_above`, with no `HeadingFix`,
-  and the assembler writes it as `<p><strong>`. It takes no part in levels, the outline
-  or the repeated-label groups. The same text one level down is a real sub-heading and
-  stays one: OpenStax's own outline has "Teacher Support" at h3 and again at h4, so the
-  public demo's doubled box titles (14 pt over 12 pt) are kept.
+- **A heading with the same text as the heading directly above it, at any level**
+  (nothing between them, case, spacing and punctuation aside: `heading_step.repeated_above`)
+  is not a second heading. OpenStax prints a box's label and its title as two lines
+  ("Teacher Support" at 14 pt over 12 pt); both are headings in the PDF, and a screen-reader
+  user navigating by headings would hear the pair twice. The second line's fix is ACCEPTED,
+  review `none`, reason `repeats_heading_above`, with no `HeadingFix`, and the assembler
+  writes it as `<p><strong>`. It takes no part in levels, the outline or the repeated-label
+  groups. The same text with a paragraph or any other element between the two copies is a
+  real second heading and stays one. History: T1-13 first demoted only same-level repeats,
+  because the development set's gold (OpenStax's own markup) counts both lines as headings
+  and the broader rule lowered heading F1; on 2026-10-14 the student-facing outline won
+  (docs/eval.md "2026-10-14, doubled box headings").
 - A bare chapter number (`4`, `Chapter 4`) in a large font directly above the title is
   merged into it (`4 Energy and Work`).
 - **Lines of one heading share a typeface and a size** (T2-8, 2026-10-14). Two bold lines

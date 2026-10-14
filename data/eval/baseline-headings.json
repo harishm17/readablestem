@@ -12,7 +12,7 @@
   "client": "anthropic",
   "dataset": {
     "gold_dir": "data/gold",
-    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "manifest_sha256": "b74e1fa4a67bd67ff37c048e992fdf518308ad0e063ed4522129aa43a82981de",
     "limit": null,
     "unit": "page",
     "selection_sha256": "92c3697eae341a202a89da0a855e4826cd40525ef1780d67ba648bf53de4dc95"
@@ -23,24 +23,24 @@
   "stopped_reason": null,
   "metrics": {
     "gold_headings": 121,
-    "predicted_headings": 138,
-    "matched": 121,
-    "precision": 0.8768115942028986,
-    "recall": 1.0,
+    "predicted_headings": 113,
+    "matched": 96,
+    "precision": 0.8495575221238938,
+    "recall": 0.7933884297520661,
     "recall_ci95": [
-      0.9692293015820281,
-      1.0
+      0.7127678362149311,
+      0.8559534895067548
     ],
-    "f1": 0.9343629343629344,
-    "level_accuracy": 0.9917355371900827,
+    "f1": 0.8205128205128206,
+    "level_accuracy": 0.7395833333333334,
     "precision_by_status": {
       "accepted": {
         "n": 97,
         "precision": 0.9690721649484536
       },
       "needs_review": {
-        "n": 41,
-        "precision": 0.6585365853658537
+        "n": 16,
+        "precision": 0.125
       }
     },
     "recall_by_context": {
@@ -66,7 +66,7 @@
       },
       "os-teacher": {
         "n": 50,
-        "recall": 1.0
+        "recall": 0.5
       },
       "snap-lab": {
         "n": 6,
@@ -100,63 +100,133 @@
     "per_page": [
       {
         "id": "physics/2-1-relative-motion-distance-and-displacement",
-        "precision": 0.9230769230769231,
-        "recall": 1.0,
+        "precision": 0.9024390243902439,
+        "recall": 0.7708333333333334,
         "n_gold": 48,
-        "n_pred": 52,
+        "n_pred": 41,
         "error": null
       },
       {
         "id": "physics/2-2-speed-and-velocity",
-        "precision": 0.84,
-        "recall": 1.0,
+        "precision": 0.813953488372093,
+        "recall": 0.8333333333333334,
         "n_gold": 42,
-        "n_pred": 50,
+        "n_pred": 43,
         "error": null
       },
       {
         "id": "physics/2-3-position-vs-time-graphs",
-        "precision": 0.8611111111111112,
-        "recall": 1.0,
+        "precision": 0.8275862068965517,
+        "recall": 0.7741935483870968,
         "n_gold": 31,
-        "n_pred": 36,
+        "n_pred": 29,
         "error": null
       }
     ],
     "page_errors": {},
     "review_load": {
-      "required_decisions": 9,
-      "required_fixes": 41,
+      "required_decisions": 6,
+      "required_fixes": 16,
       "optional": 20,
-      "none": 77,
+      "none": 102,
       "required_by_kind": {
-        "heading": 9
+        "heading": 6
       },
       "optional_by_kind": {
         "heading": 20
       },
       "required_by_reason": {
-        "heading.repeated_label": 41,
-        "heading.weak_evidence": 41
+        "heading.repeated_label": 16,
+        "heading.weak_evidence": 16
       },
       "optional_by_reason": {
         "heading.weak_evidence": 20
       },
       "sections": 3,
       "pdf_pages": 43,
-      "required_per_section": 3.0,
-      "required_per_pdf_page": 0.2093,
+      "required_per_section": 2.0,
+      "required_per_pdf_page": 0.1395,
       "optional_per_pdf_page": 0.4651,
       "flags": {
-        "units": 106,
-        "required_units": 9,
+        "units": 103,
+        "required_units": 6,
         "required_units_wrong": 5,
-        "wrong": 18,
+        "wrong": 42,
         "wrong_required": 14,
-        "flag_precision": 0.5555555555555556,
-        "flag_recall": 0.7777777777777778
+        "flag_precision": 0.8333333333333334,
+        "flag_recall": 0.3333333333333333
       },
       "wrong_not_required": [
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
         {
           "page": "physics/2-1-relative-motion-distance-and-displacement",
           "text": "Displacement Problems",
@@ -194,6 +264,136 @@
           "gold_level": null
         },
         {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-1-relative-motion-distance-and-displacement",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-2-speed-and-velocity",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
           "page": "physics/2-3-position-vs-time-graphs",
           "text": "Procedure",
           "level": 3,
@@ -204,6 +404,46 @@
           ],
           "why_wrong": "not_a_gold_heading",
           "gold_level": null
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
+        },
+        {
+          "page": "physics/2-3-position-vs-time-graphs",
+          "text": "Teacher Support",
+          "level": 2,
+          "status": "accepted",
+          "review": "none",
+          "reasons": [],
+          "why_wrong": "wrong_level",
+          "gold_level": 4
         }
       ]
     }

@@ -32,7 +32,7 @@ DEMO_MAKEFILE = (
 def test_the_default_stages_are_one_real_arm_and_four_stubs():
     names = [s.name for s in stages.active_stages()]
     assert names == [
-        "a11y_stem",
+        "readablestem",
         "invented_content",
         "chatbot_comparison",
         "parser_comparison",

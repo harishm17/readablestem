@@ -5,17 +5,17 @@ stand, except for the correction in section 2.
 
 ## 1. What blocks the run
 
-The OpenAI account behind the key in `a11y-stem/.env` has no credit. A probe call at 15:26
+The OpenAI account behind the key in `readablestem/.env` has no credit. A probe call at 15:26
 (one tiny request, `max_output_tokens` 16) returned HTTP 429, code `credit_balance_exhausted`,
-"You have no credits remaining". The run needs paid model calls (a11y-stem's pipeline, the
+"You have no credits remaining". The run needs paid model calls (ReadableSTEM's pipeline, the
 second check, the chatbot arms, the figure judge); none can be made. The integrator does not
 add credit and does not change billing; that is the author's.
 
-Consequence: **no a11y-stem run and no chatbot run exists for the held-out set.** No held-out
+Consequence: **no ReadableSTEM run and no chatbot run exists for the held-out set.** No held-out
 number for either system has been produced, none has been seen, and nothing about them can
 be said. The registration, its frozen files and the harness stand ready; once credit is added
 the run is the three commands in `docs/proof.md` ("Recording the held-out set"), with the
-caps of Addendum 1 (D5), and `--resume` makes the a11y-stem recording safe to interrupt.
+caps of Addendum 1 (D5), and `--resume` makes the ReadableSTEM recording safe to interrupt.
 
 ## 2. Correction to Addendum 2
 
@@ -31,7 +31,7 @@ mistaken.
 
 ## 3. Other attempts that produced nothing
 
-- Attempt 2 of the a11y-stem recording (15:05 to 15:20) and the first start of the chatbot
+- Attempt 2 of the ReadableSTEM recording (15:05 to 15:20) and the first start of the chatbot
   arms (4 workers, 15:08 to 15:19; all 56 jobs ended `crashed`, after 3 attempts each with a
   429) ran at the same time as the parsers. No run finished and no reply was received.
   Their files are kept apart, unused (`chatbot-attempt1-ratelimited`).
@@ -45,5 +45,5 @@ mistaken.
 
 The open parsers need no API. They are recorded for the held-out set (CPU, one section at a
 time) and their outputs scored against the held-out gold with the same code as in the plan;
-they are reported as parser-only numbers, without a11y-stem next to them, and not as the
-family B comparison, which needs a11y-stem's run.
+they are reported as parser-only numbers, without ReadableSTEM next to them, and not as the
+family B comparison, which needs ReadableSTEM's run.

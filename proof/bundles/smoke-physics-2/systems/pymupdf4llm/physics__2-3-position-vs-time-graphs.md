@@ -318,7 +318,7 @@ Original page: <u>https://openstax.org/books/physics/pages/2-3-position-vs-time-
 
 Access for free at openstax.org. 
 
-Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited. a11y-stem is not affiliated with or endorsed by OpenStax. 
+Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited. ReadableSTEM is not affiliated with or endorsed by OpenStax. 
 
 Access for free at openstax.org. Physics (OpenStax), CC BY 4.0. Page 13 of 13 
 

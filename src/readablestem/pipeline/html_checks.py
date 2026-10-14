@@ -70,7 +70,6 @@ from readablestem.pipeline import contrast
 from readablestem.pipeline.assemble import AUTHORED_CLASS
 from readablestem.pipeline.inline_text import COLOUR_CLASS_PREFIX
 from readablestem.pipeline.language import is_language_tag
-from readablestem.pipeline.table_html import LEGACY_AUTHORED_CLASS
 
 log = logging.getLogger(__name__)
 
@@ -209,9 +208,7 @@ class _Collector(HTMLParser):
         if not void:
             classes = (attrs.get("class") or "").split()
             inherited = bool(self._stack) and self._stack[-1][1]
-            self._stack.append(
-                (tag, inherited or AUTHORED_CLASS in classes or LEGACY_AUTHORED_CLASS in classes)
-            )
+            self._stack.append((tag, inherited or AUTHORED_CLASS in classes))
 
     def _img(self, attrs: dict[str, str | None]) -> None:
         alt = attrs.get("alt")

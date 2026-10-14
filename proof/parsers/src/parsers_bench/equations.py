@@ -1,10 +1,10 @@
-"""Equations: a parser's LaTeX through a11y-stem's own converter, then the shared scorer.
+"""Equations: a parser's LaTeX through ReadableSTEM's own converter, then the shared scorer.
 
 Four rows, all through `pipeline_eval.document_page_item` (the document task's alignment to
 gold in reading order, threshold 0.5, and `eval.equations.score_mathml`):
 
 - `primary`: PREREG section 7.1, unchanged. `equation_step.clean_latex`, the allowlist
-  (`check_latex`), `safe_latex_to_mathml`, `check_mathml`. This is what a11y-stem does to its
+  (`check_latex`), `safe_latex_to_mathml`, `check_mathml`. This is what ReadableSTEM does to its
   own model's LaTeX, and what the chatbot baseline did. The row that counts.
 - `allowlist_free`: the same without `check_latex` (PARSERS-PLAN 4.4a). The allowlist is a
   security rule of the product; this row shows how much of a parser's score it costs. Not a
@@ -26,10 +26,10 @@ import xml.etree.ElementTree as ET
 from collections import Counter
 from typing import Any, Literal
 
-from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.pipeline import equation_step as es
-from a11y_stem.pipeline.validate import (
+from readablestem.core.types import Element, EquationFix, Fix, Kind, Status
+from readablestem.eval import pipeline_eval as pe
+from readablestem.pipeline import equation_step as es
+from readablestem.pipeline.validate import (
     LatexConversionError,
     check_mathml,
     has_errors,
@@ -88,7 +88,7 @@ def normalise_plus(latex: str) -> str:
     """`normalise_plan` plus three proposals, each a markup difference and nothing more.
 
     3. an equation number written \\tag{...} is dropped: the number is a label beside the
-       equation, which a11y-stem keeps out of the maths (`Element.equation_label`);
+       equation, which ReadableSTEM keeps out of the maths (`Element.equation_label`);
     4. digits separated only by spaces are one number ("1 5 0" is 150): TeX ignores spaces in
        maths, but latex2mathml writes one <mn> per spaced digit, and MinerU spaces every token;
     5. a single upright letter in \\mathrm, \\mathsf or \\textrm becomes \\text{letter} (a unit

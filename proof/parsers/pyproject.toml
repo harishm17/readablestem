@@ -1,16 +1,16 @@
 # Parser comparison harness (optional; the app does not depend on it).
 #
-# This project reads the output of other PDF parsers and scores it with a11y-stem's own
+# This project reads the output of other PDF parsers and scores it with ReadableSTEM's own
 # evaluation code. The parsers themselves live in their own environments under arms/, one
 # per tool, so that their dependencies (torch, onnxruntime, ...) never meet the app's.
 [project]
 name = "a11y-parsers-bench"
 version = "0.1.0"
-description = "Runners, adapters and scoring glue for comparing PDF parsers with a11y-stem on OpenStax pages."
+description = "Runners, adapters and scoring glue for comparing PDF parsers with ReadableSTEM on OpenStax pages."
 license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
-    "a11y-stem",
+    "readablestem",
     "markdown-it-py>=3.0",
     "mdit-py-plugins>=0.4",
 ]
@@ -33,7 +33,7 @@ build-backend = "uv_build"
 module-name = "parsers_bench"
 
 [tool.uv.sources]
-a11y-stem = { path = "../..", editable = true }
+readablestem = { path = "../..", editable = true }
 
 [tool.ruff]
 extend = "../../pyproject.toml"

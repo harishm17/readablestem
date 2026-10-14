@@ -65,7 +65,7 @@ class Bundle:
         if not path.is_file():
             raise BundleError(
                 f"no recorded run at {root.name}/ (no {MANIFEST_NAME}). Record one with "
-                "`a11y-stem proof --live --max-usd N`, or point --bundle at an existing one"
+                "`readablestem proof --live --max-usd N`, or point --bundle at an existing one"
             )
         try:
             manifest = json.loads(path.read_text(encoding="utf-8"))

@@ -32,8 +32,8 @@ PREAMBLE = r"""\documentclass[11pt]{article}
 """
 
 HEADER = (
-    "% Authored for a11y-stem's development set (dev-v2). Original text, no third-party "
-    "material.\n% Licence: MIT. Author: a11y-stem contributors.\n"
+    "% Authored for ReadableSTEM's development set (dev-v2). Original text, no third-party "
+    "material.\n% Licence: MIT. Author: ReadableSTEM contributors.\n"
 )
 
 

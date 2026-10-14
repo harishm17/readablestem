@@ -35,8 +35,8 @@ from pathlib import Path
 from typing import Any
 
 import pymupdf
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.pipeline.figure_details import numbers_in
+from readablestem.eval import pipeline_eval as pe
+from readablestem.pipeline.figure_details import numbers_in
 
 from parsers_bench.intermediate import Intermediate
 from parsers_bench.symbols import MIN_SYMBOLS, SymbolStream, symbol_bag, symbol_sequence

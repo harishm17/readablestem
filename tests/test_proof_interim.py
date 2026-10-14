@@ -120,7 +120,7 @@ def test_the_readme_numbers_are_the_reports_numbers():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     proof = (ROOT / "PROOF.md").read_text(encoding="utf-8")
     pairs = {
-        "0.504": "0.5037",  # a11y-stem, equations through the whole pipeline
+        "0.504": "0.5037",  # ReadableSTEM, equations through the whole pipeline
         "0.622": "0.6216",  # the Opus chatbot
         "0.961": "0.9613",  # heading F1
         "0.971": "0.9710",  # figure judge pass rate

@@ -1,10 +1,10 @@
 """Held-out selection, step 3: print the drawn sections and apply the page rules.
 
-Run from the a11y-stem checkout (no model calls; OpenStax archive and images only):
+Run from the ReadableSTEM checkout (no model calls; OpenStax archive and images only):
     uv run python ~/.cache/a11y-proof/prereg/budget.py draw.json CAND_GOLD_DIR PDF_DIR OUT.json
 
-For each drawn section: `a11y-stem gold fetch --book B --page S --out CAND_GOLD_DIR
---allow-retired --date 2026-10-13`, then `a11y-stem eval render --book B --page S --gold
+For each drawn section: `readablestem gold fetch --book B --page S --out CAND_GOLD_DIR
+--allow-retired --date 2026-10-13`, then `readablestem eval render --book B --page S --gold
 CAND_GOLD_DIR --out PDF_DIR/B--S.pdf` (Letter), then the PDF's page count (PyMuPDF).
 
 Rules, applied in this order (fixed before the draw was run):
@@ -45,10 +45,10 @@ def pages_of(book: str, slug: str, gold: Path, pdfs: Path, cache: dict) -> int:
     key = f"{book}/{slug}"
     if key in cache:
         return cache[key]
-    run(["uv", "run", "--isolated", "--group", "browser", "a11y-stem", "gold", "fetch", "--book", book, "--page", slug,
+    run(["uv", "run", "--isolated", "--group", "browser", "readablestem", "gold", "fetch", "--book", book, "--page", slug,
          "--out", str(gold), "--allow-retired", "--date", "2026-10-13"])
     pdf = pdfs / f"{book}--{slug}.pdf"
-    run(["uv", "run", "--isolated", "--group", "browser", "a11y-stem", "eval", "render", "--book", book, "--page", slug,
+    run(["uv", "run", "--isolated", "--group", "browser", "readablestem", "eval", "render", "--book", book, "--page", slug,
          "--gold", str(gold), "--out", str(pdf)])
     with pymupdf.open(pdf) as doc:
         n = doc.page_count

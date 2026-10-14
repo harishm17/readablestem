@@ -4,7 +4,7 @@ The report is assembled from `Section`s (headings, paragraphs, tables) that the 
 return, and rendered to Markdown with fixed number formats, so the same inputs always
 give the same bytes. Nothing in here reads the clock, the host or the network.
 
-Wording guard: a11y-stem assists a person who makes course material accessible. The
+Wording guard: ReadableSTEM assists a person who makes course material accessible. The
 report never says that a document is "compliant", that anything is "verified", or that
 accessibility is "guaranteed", and never claims conformance with WCAG or ADA.
 `wording_problems` finds those words; text between `<!-- quote -->` and

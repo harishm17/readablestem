@@ -46,8 +46,6 @@ from readablestem.pipeline.safe_html import Display, escape_text, sanitize_mathm
 # The class of the tool's own words (`assemble.AUTHORED_CLASS`: `lang="en"` in a document
 # in another language).
 AUTHORED_CLASS = "readablestem"
-# The class before the rename (October 2026): HTML kept from earlier runs still carries it.
-LEGACY_AUTHORED_CLASS = "a11y-stem"
 # An id prefix must itself be a plain id, so every id made from it is one too.
 _ID_PREFIX = re.compile(r"[A-Za-z][A-Za-z0-9_.:\-]{0,63}")
 

@@ -7,7 +7,7 @@ A stage has two hooks:
 - `run(ctx)`: both modes. Reads the bundle and the gold set, returns `Section`s for
   PROOF.md and a status.
 
-The a11y-stem arm is built in (`A11yStage`). Four other parts are made by other work
+The ReadableSTEM arm is built in (`A11yStage`). Four other parts are made by other work
 packages and are stubs here: the invented-content rate, the comparison with the chatbot
 recipe, the comparison with the open parsers, and the human labels. A stub returns the
 status `not_wired` and a section that says so; it never prints a number. To wire one,
@@ -97,7 +97,7 @@ def register(stage: Stage) -> None:
     STAGES[stage.name] = stage
 
 
-# ------------------------------------------------------------------------ a11y-stem
+# ------------------------------------------------------------------------ ReadableSTEM
 
 
 def _settings_text(settings: Settings) -> str:
@@ -118,8 +118,8 @@ def _settings_text(settings: Settings) -> str:
 
 
 class A11yStage:
-    name = "a11y_stem"
-    title = "a11y-stem, production defaults"
+    name = "readablestem"
+    title = "ReadableSTEM, production defaults"
 
     def record(self, ctx: RecordContext, writer: BundleWriter) -> None:
         return None  # recorded by the runner
@@ -143,7 +143,7 @@ class A11yStage:
         blocks.append(a11y_tables.cost_section(arm, ctx.bundle.runs, ctx.settings))
         blocks.append(a11y_tables.failures_section(arm))
         intro = Section(
-            "Results: a11y-stem",
+            "Results: ReadableSTEM",
             [
                 _settings_text(ctx.settings) + " "
                 "Tables are off in production, so a detected data table is kept as an image "
@@ -216,7 +216,7 @@ def _stubs() -> list[StubStage]:
             "Comparison with the chatbot recipe",
             "readablestem.proof.comparison",
             [
-                "family A of the preregistration: a11y-stem against the Purdue-prompt "
+                "family A of the preregistration: ReadableSTEM against the Purdue-prompt "
                 "recipe on gpt-6.1-sol on end-to-end equation exact match, unflagged wrong "
                 "equations, invented prose sentences, invented numbers and heading F1, with "
                 "paired cluster intervals at the Bonferroni level;",
@@ -229,7 +229,7 @@ def _stubs() -> list[StubStage]:
             "Comparison with open PDF parsers",
             "readablestem.proof.parsers",
             [
-                "family B: a11y-stem against Docling, MinerU and PyMuPDF4LLM on shared "
+                "family B: ReadableSTEM against Docling, MinerU and PyMuPDF4LLM on shared "
                 "measures only (heading F1, equations for the parsers that emit LaTeX), "
                 "with what each tool is not built to do stated next to it;",
                 "equation content kept in any form, reading order, images kept, tables, "
@@ -303,7 +303,7 @@ PLUGIN_MODULES = (
 
 
 def default_stages() -> dict[str, Stage]:
-    stages: dict[str, Stage] = {"a11y_stem": A11yStage()}
+    stages: dict[str, Stage] = {"readablestem": A11yStage()}
     for stub in _stubs():
         stages[stub.name] = ParserHook(stub) if stub.name == "parser_comparison" else stub
     return stages

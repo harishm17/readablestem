@@ -1,9 +1,9 @@
 {
- "a11y_stem_systems": [
-  "a11y-stem"
+ "readablestem_systems": [
+  "ReadableSTEM"
  ],
- "chatbot_and_a11y_stem": {
-  "a11y-stem": {
+ "chatbot_and_readablestem": {
+  "ReadableSTEM": {
    "all_text": {
     "description_cell": {
      "cluster95": {
@@ -2422,7 +2422,7 @@
  ],
  "date": "2026-10-13",
  "figure_judge": {
-  "a11y-stem on Physics 2.2-2.3 (9 figures)": {
+  "ReadableSTEM on Physics 2.2-2.3 (9 figures)": {
    "answered": 9,
    "census": true,
    "factual_error": 0,
@@ -2441,7 +2441,7 @@
     0.299145051727044
    ]
   },
-  "a11y-stem with 4 of 9 alt texts replaced by wrong ones": {
+  "ReadableSTEM with 4 of 9 alt texts replaced by wrong ones": {
    "answered": 9,
    "census": true,
    "factual_error": 4,

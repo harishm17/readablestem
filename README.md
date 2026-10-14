@@ -3,7 +3,7 @@
 [![CI](https://github.com/harishm17/readablestem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/harishm17/readablestem/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 
-ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
+ReadableSTEM (formerly a11y-stem) assists instructors who need to turn a STEM course PDF into an accessible web
 page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
 headings and lists, writes short alt text for figures, and returns one self-contained HTML
 file. Every change it is unsure about goes to a review screen where the instructor accepts,
@@ -13,7 +13,6 @@ It assists; it does not certify. Nothing here establishes conformance with WCAG,
 any other standard, and the output still needs a person to look at it. That is what the
 review screen is for.
 
-ReadableSTEM was called a11y-stem until October 2026; the `a11y-stem` command still works.
 The site is at readablestem.com.
 
 **What it is not.** It is not a compliance checker. It is not an OCR engine for scans or
@@ -21,9 +20,9 @@ handwriting (those pages are kept as images and flagged). It is not a general PD
 converter, and it does not work from Word, LaTeX or PowerPoint sources: it starts from the
 PDF.
 
-**Status.** Pre-release. The code, the evaluation harness and the documentation are here; a
-hosted, allowlisted beta is planned for 9 November 2026.
-`uv run readablestem ops launch-check` lists the launch blockers that are still open.
+**Status.** Beta. The service is live at https://readablestem.com as an invite-only beta for
+instructors; the demo needs no sign-in. The code, the evaluation harness and the documentation
+are here. `uv run readablestem ops launch-check` lists the checks a deploy has to pass.
 
 ## See it
 
@@ -101,7 +100,7 @@ development-sample checks that priced the run (Addendum 7).
   which wrong equations change the meaning, so the development-sample statement that no
   meaning-level error was accepted silently cannot be repeated for these sections.
 - **Review load: 1.76 required decisions per PDF page** (853 decisions over 484 page-runs), against
-  0.33 on the development sample, plus 0.55 optional notes per page. Of the required fixes,
+  0.23 on the development sample, plus 0.55 optional notes per page. Of the required fixes,
   230 are repeated heading labels and 216 headings with weak evidence, 351 below the
   acceptance threshold and 296 symbol mismatches (a fix can have several reasons). At that rate a
   30-page document, the most the app takes, comes with about 53 decisions. This is the number
@@ -156,7 +155,7 @@ What was fixed before the run, and can be checked now:
 | Answer key | 1,369 equations, 509 headings, 70 figures (69 with an OpenStax alt text) |
 | Licence | the retired first editions, which are CC BY 4.0; the current editions are CC BY-NC-SA and were not used |
 | Choice | a seeded rule on input properties only, with every section used in development excluded; the rule's code, its inputs and its output are in [`proof/selection/`](proof/selection/), and `tests/test_proof_registered.py` re-runs the draw and compares it with the committed result |
-| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34` (version 2), and the answer key's manifest `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`, checked before a run. This is version 2 of the registration: it differs from version 1 only in wording (the names of the people who asked for this evidence, an authorship line and paths on my machine were removed), and version 1's hashes are kept. Addendum 6, which moved the model-dependent parts to Claude, has SHA-256 `7d6a69ff3e2dfb6acb14423e46371ece3ece59c27842daf0c426c6786b170184`, and Addendum 7, written after the run, `4248399dc05f217ca8751789b3cf7d94c0ee2a8179761052137d254c4b4e6b4f`. The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
+| Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec` (version 2), and the answer key's manifest `9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3`, checked before a run. This is version 2 of the registration: it differs from version 1 only in wording (the names of the people who asked for this evidence, an authorship line and paths on my machine were removed), and version 1's hashes are kept. Addendum 6, which moved the model-dependent parts to Claude, has SHA-256 `50fd995223017609e247bc9a2dc943f4fa9dd345d606cd075b851b32979e7c8a`, and Addendum 7, written after the run, `b38825ab165728273220e8685358328879db36437f1d1c3baafaaa6b817810d2`. The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
 | Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and a tool that writes LaTeX in its own style pays more (normalising markup alone moves MinerU from 0.174 to 0.197). I have not checked the 40 against the rendered gold yet |
 | Compared | ReadableSTEM against the chatbot recipe instructors copy (Purdue's one-sentence prompt, [quoted from its page](https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/) as of 2026-10-09, on claude-opus-5-5 and claude-haiku-5-5) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
 | Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are mine to make and do not exist yet |
@@ -177,13 +176,13 @@ SET=smoke-physics-2 PROOF_EXTRA="--out proof/PROOF-development-sample.md"`).
 
 Three sections of OpenStax *Physics* chapter 2 (CC BY 4.0). The detection and review
 rules were tuned on these pages, so these figures flatter the system. They are listed
-because they are committed and reproducible, and because the regression gate will compare
-against them once baselines are promoted.
+because they are committed and reproducible, and because the regression gate compares
+CI runs with them (`data/eval/baseline-*.json`).
 
 | Task | n | Result | Cost |
 |---|---|---|---|
 | Equations | 30 | `exact_lenient` 0.767 (95% CI 0.591 to 0.882); a perfect transcriber scores 0.833 here, because of known gaps in the scorer; mean TEDS 0.864 | $0.0017 per equation |
-| Headings | 121 | recall 1.000 (CI 0.969 to 1.000), level accuracy 0.992, precision 0.877 (138 predicted against 121 gold; the 41 least certain went to review) | no model call |
+| Headings | 121 | recall 0.793 (CI 0.713 to 0.856), level accuracy 0.740, precision 0.850 (113 predicted against 121 gold; the 16 least certain went to review). The gold counts the label and the title of an OpenStax box as two headings; the outline keeps one (docs/eval.md, "Doubled box headings") | no model call |
 | Figures | 13 | judge pass 1.000 (CI 0.772 to 1.000); the judge is a model and is not yet calibrated against human labels | $0.0039 per figure |
 | Whole pages | 3 sections, 43 PDF pages | equation recall 1.000, precision 0.545 (0.968 without prose maths); 0 static and 0 axe-core violations; 0.233 required decisions per PDF page, of which 6 of 10 pointed at a real error | $0.0034 per PDF page; median 33 s per section (n = 3) |
 | Tables (local mode, no model; off by default) | 197 tables | recall 0.909 (CI 0.857 to 0.958), precision 0.984 (CI 0.953 to 0.994), TEDS 0.866 | no model call |
@@ -201,6 +200,10 @@ What these numbers do not show is as important as the numbers.
 - **Automated HTML checks find only what a machine can find.** Zero violations does not
   mean a page is usable with a screen reader, and these numbers do not come from testing with
   screen-reader users.
+
+The CI baselines in `data/eval/` were recorded again on 2026-10-14 (pipeline 0.5.0, Claude):
+equations `exact_lenient` 0.733 (22 of 30; the table above has the earlier run's 0.767, and model output varies
+between runs), mean TEDS 0.870; figures judge pass 1.000; whole pages end to end 0.767.
 
 Method, definitions and every table: [docs/eval.md](docs/eval.md).
 
@@ -228,7 +231,7 @@ flowchart LR
   L --> E[Equations: crop, LaTeX, checks against the text layer, MathML, speech text]
   L --> F[Figures: classify, short alt text, checks]
   E & F --> R[Router: cheap model for simple inline equations, main model otherwise, escalation on doubt]
-  R --> M[OpenAI Responses API: gpt-6-luna and gpt-6.1-sol]
+  R --> M[Anthropic Claude API: claude-haiku-5-5 and claude-opus-5-5; second check on claude-sonnet-5-5]
   H & E & F --> A[Assemble one HTML file and a report]
   A --> C[Static and axe-core checks]
   A --> V[Review screen: accept, edit or reject]
@@ -254,7 +257,9 @@ uv run readablestem convert tests/fixtures/layout/latex/problem_set.pdf --out ou
 
 `--fake` answers every model request offline with placeholder output, so the whole flow runs
 for free and shows the plumbing, not the quality. For real conversions, copy
-`.env.example` to `.env`, set `OPENAI_API_KEY`, and give every run a spend cap:
+`.env.example` to `.env`, set `MODEL_PROVIDER=anthropic` and `ANTHROPIC_API_KEY` (Claude is the
+provider the beta and the held-out evaluation use; `MODEL_PROVIDER=openai` with `OPENAI_API_KEY` is an
+optional alternative), and give every run a spend cap:
 
 ```
 uv run readablestem convert my.pdf --out my.html --max-usd 1.00 --report my.json
@@ -298,16 +303,17 @@ The held-out run's commands are in [docs/proof.md](docs/proof.md).
 Tests: `make check` runs ruff and the offline test suite; `make ci-local` runs what CI runs,
 on Python 3.12 and 3.14. CI also runs the Postgres tests, the browser tests with axe-core,
 a Docker build and a secret scan over the full history. It has an eval regression gate too,
-which stays idle until baseline reports are promoted (`docs/eval.md`, "How to rerun").
+which compares each tracked metric with the committed baselines in `data/eval/` (`docs/eval.md`,
+"How to rerun").
 
 ## Limits
 
 - **PDF in, HTML out.** Word and PowerPoint files must be exported to PDF first. Uploads are
   limited to 30 pages and 20 MB by default; a bigger file (up to 300 pages and 30 MB) is kept so
   you can choose which pages to convert, in parts.
-- **A model is in the loop.** Document images and the text around them are sent to OpenAI's
-  API (with `store=False`), or to Anthropic's Claude API when `MODEL_PROVIDER=anthropic` is
-  set. Models are not deterministic, so two runs on the same file can differ.
+- **A model is in the loop.** Document images and the text around them are sent to Anthropic's
+  Claude API (the beta's provider, `MODEL_PROVIDER=anthropic`), or to OpenAI's API (with
+  `store=False`) if you set `MODEL_PROVIDER=openai`. Models are not deterministic, so two runs on the same file can differ.
 - **Equations are the hard part.** On the development sample 23 of 30 equations match the
   answer key under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in
   the transcription. On the held-out sections 1,379 of 2,738 (two runs, 0.504) match through
@@ -319,8 +325,9 @@ which stays idle until baseline reports are promoted (`docs/eval.md`, "How to re
   not on a broad set of real course PDFs.
 - **Figure alt text is short.** It describes; it does not replace a long description for a
   complex diagram.
-- **Beta.** Sign-in is by allowlist, with spend caps and daily quotas. The privacy, terms and
-  known-limits pages are drafts until I have reviewed them.
+- **Beta.** Sign-in is by invitation (an allowlist), with spend caps and daily quotas. The
+  privacy, terms and known-limits pages are the beta wording, written for a small group of
+  instructors.
 
 ## Documentation
 

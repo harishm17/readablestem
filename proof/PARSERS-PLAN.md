@@ -6,7 +6,7 @@ held-out sections are still unseen by every parser. No model calls were made ($0
 was committed, pushed or published. Not legal advice.
 
 This is the "parser plan" that `PREREGISTRATION.md` §6.3 asks for (file read at SHA-256
-`8127b143…`, version 1; version 2 differs only in wording and has `2c16815a…`). The pre-registration wins wherever the two overlap: the held-out set, primary
+`8127b143…`, version 1; version 2 differs only in wording and has `d4d3af03…`). The pre-registration wins wherever the two overlap: the held-out set, primary
 metrics, statistics, failure rules and the chatbot arms. This file adds what §6.3 leaves open:
 - which parsers run, at which versions and settings;
 - how each tool's output is mapped onto the shared intermediate form;
@@ -18,7 +18,7 @@ It is frozen (path and SHA-256 appended to `PREREG.sha256`) only after Harish's 
 in §11, and before any held-out output exists. Otherwise, by §6.3, the parser comparison
 does not run on this set.
 
-Ask 3 of 4 (the reviewers' requests): "how does a11y-stem compare with the PDF parsers
+Ask 3 of 4 (the reviewers' requests): "how does ReadableSTEM compare with the PDF parsers
 people already use?" The answer is given on shared measures only. Most of these parsers produce
 Markdown or JSON for LLM ingestion, not accessible HTML (§5). There is no overall score and no
 "winner".
@@ -27,7 +27,7 @@ Markdown or JSON for LLM ingestion, not accessible HTML (§5). There is no overa
 
 | Arm | System, pin | Settings | Decision |
 |---|---|---|---|
-| A0 | **a11y-stem**, as in PREREG §6.1 | production defaults | run by the main held-out run; the parser comparison reuses its outputs |
+| A0 | **ReadableSTEM**, as in PREREG §6.1 | production defaults | run by the main held-out run; the parser comparison reuses its outputs |
 | P1 | **Docling 2.138.0** (MIT) | CLI defaults: OCR on (RapidOCR), TableFormer accurate, image mode `embedded`, formula enrichment **off** | run |
 | P1f | Docling 2.138.0 + `--enrich-formula` | the one non-default switch, labelled as such | run, but see §7.3: at the measured ~136 s/page, the 30-minute section limit of PREREG §9 would cut 5-7 of the 15 sections. **Harish's call** (§11) |
 | P2 | **MinerU 4.0.12** (Apache-2.0 + extra terms) | `mineru-kit parse --tier basic` (ONNX, CPU). This is MinerU's own recommended tier for "Linux w/o modern accelerator" | run |
@@ -75,7 +75,7 @@ sections.
 
 **Input.** Pages 2-4 of `chatbot-baseline/inputs/2-2-speed-and-velocity.pdf` (CC BY 4.0,
 already dev gold), cut to `~/.cache/a11y-proof/parsers/in/dev3.pdf` (SHA-256 prefix
-`e2924257f8c580aa`). By a11y-stem's layout the 3 pages hold:
+`e2924257f8c580aa`). By ReadableSTEM's layout the 3 pages hold:
 - 6 display and 2 inline equations;
 - 1 figure;
 - 11 headings.
@@ -93,9 +93,9 @@ before the run.
 | P3 PyMuPDF4LLM | venv 252 MB (pymupdf 1.28.2, pymupdf-layout 1.28.2, onnxruntime 1.30.0) | conversion 1.2-1.3 s = **0.4 s/page**; wall 2.3-2.8 s | 0.35 GB | Markdown. 10 headings (6 `#`, 3 `##`, 1 `###`) wrapped in `**`. **The display equations of the first page are missing: blank lines where they were.** One equation came through as flattened text, with the fraction bars written as `<u>` underline (`𝑣avg = <u>distancetime</u> = ...`). Figure image dropped, caption kept |
 | P5 Nougat | venv 1.5 GB (Python 3.11, torch 2.4.1+cpu, transformers 4.38.2, timm 0.5.4, albumentations 1.3.1); weights 959 MB in `~/.cache/torch/hub/nougat-0.1.0-small` | **1 of 3 pages in 1,141 s (19 min)**, then killed by the 1,200 s timeout; its own estimate was 38 min more. User CPU 1,052 s (about one core) | 2.5 GB | none: Nougat writes its `.mmd` only at the end of a document |
 | P4 Marker (not run today) | earlier measurement, licence-deploy track 2026-10-08, `fast` mode with OCR **off**: venv 1.4 GB; surya_layout2 136 MB. The default CPU path also needs the `llama-server` binary (not installed here) and the surya-ocr-2 GGUF | then 1.3-1.8 s/page at 2 CPUs, with no equation OCR | 0.75-0.89 GB anon | HTML with LaTeX inside `<math>` tags, not MathML (Marker README) |
-| C1 / C2 chatbot | `openai` SDK only (3.26.0 in a11y-stem's lock) | earlier runs (`niche/chatbot-runs/usage.jsonl`, 27-page upload): sol 228 s (8.4 s/page), **$0.0149/page**; luna 62 s (2.3 s/page), **$0.0007/page** | n/a | one HTML file with MathJax from a CDN; prose re-typed; no images (`chatbot-baseline/report.txt` §6) |
+| C1 / C2 chatbot | `openai` SDK only (3.26.0 in ReadableSTEM's lock) | earlier runs (`niche/chatbot-runs/usage.jsonl`, 27-page upload): sol 228 s (8.4 s/page), **$0.0149/page**; luna 62 s (2.3 s/page), **$0.0007/page** | n/a | one HTML file with MathJax from a CDN; prose re-typed; no images (`chatbot-baseline/report.txt` §6) |
 
-Also checked: which of the parsers' LaTeX a11y-stem's allowlist accepts.
+Also checked: which of the parsers' LaTeX ReadableSTEM's allowlist accepts.
 - `\varDelta` (MinerU) and `\intertext` (Docling) fail `check_latex` (`unknown_command`), but
   latex2mathml converts them.
 - `\mathsf`, `aligned` and `\nu` pass both.
@@ -163,7 +163,7 @@ chatbot.
 ### 4.4 This plan's secondary measures (descriptive; never used for a claim)
 
 **(a) Allowlist-free row.** The same LaTeX through `clean_latex` and `safe_latex_to_mathml`
-only, skipping `check_latex`. This shows how much each arm loses to a11y-stem's allowlist, a
+only, skipping `check_latex`. This shows how much each arm loses to ReadableSTEM's allowlist, a
 security rule of the product rather than a fault of the parser. Allowlist refusals are counted
 per arm.
 
@@ -220,10 +220,10 @@ TeX that shows is what a no-script reader gets).
   not them.
 - Zero violations is never presented as "accessible".
 
-**(i) Automatic meaning-level pre-flag.** a11y-stem's text-layer checks
+**(i) Automatic meaning-level pre-flag.** ReadableSTEM's text-layer checks
 (`equation_step._evaluate` with confidence fixed at 0.95, as `score_baseline.py` did) are run
 on every arm's aligned equations.
-- This is a11y-stem's checker judging its competitors, so it is disclosed as such and is never
+- This is ReadableSTEM's checker judging its competitors, so it is disclosed as such and is never
   a label.
 - Harish's blind labels (§4.5) are the measure.
 
@@ -244,7 +244,7 @@ C2 is labelled like C1 (all wrong equations), or with the same 50-sample if Hari
 ### 4.6 Claims (family B of PREREG §8.3): proposal
 
 PREREG §8.3 says "`end_to_end_exact_lenient` and heading F1 per parser (2 x number of
-parsers)". Applied literally, that would let a11y-stem "beat" P1 and P3 on equations they do
+parsers)". Applied literally, that would let ReadableSTEM "beat" P1 and P3 on equations they do
 not attempt. Proposed instead (needs a PREREG v2 or an addendum before the run):
 
 | Measure | A0 against | Comparisons |
@@ -261,7 +261,7 @@ not attempt. Proposed instead (needs a PREREG v2 or an addendum before the run):
 
 | Arm | Built for | Not built for: do not read these as failures |
 |---|---|---|
-| a11y-stem | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans; PPTX |
+| ReadableSTEM | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans; PPTX |
 | Docling | lossless document conversion for gen-AI pipelines (DoclingDocument, Markdown, JSON). HTML is one export of that model | accessibility remediation: no alt on pictures, flat heading levels in the export, and formula recognition off by default (opt-in, and slow on CPU) |
 | MinerU | high-quality extraction for LLM corpora, RAG and agent reading (Markdown, JSON), including Chinese | accessible HTML: empty alt, one heading level. Its tiers above `basic` want a GPU or a llama.cpp VLM |
 | PyMuPDF4LLM | fast text-layer-to-Markdown for LLM and RAG ingestion | maths: no formula recognition, no LaTeX. Images off by default |
@@ -305,9 +305,9 @@ From the weights' licence (fetched today: `~/.cache/a11y-proof/lic/surya2_LICENS
   otherwise makes available any product or service that competes with any product or service
   offered by or made available by Licensor".
   - Datalab sells hosted PDF conversion to Markdown, HTML and JSON.
-  - a11y-stem is a hosted PDF-to-HTML service whose beta opens Nov 9.
+  - ReadableSTEM is a hosted PDF-to-HTML service whose beta opens Nov 9.
   - Whether that "competes" is a legal judgement this plan cannot make. A published table
-    that ranks a11y-stem against Marker, next to the product, is the use most likely to be read
+    that ranks ReadableSTEM against Marker, next to the product, is the use most likely to be read
     as competitive.
 - **Sections 7 and 8:** attribution is required "in connection with any Output", and
   share-alike applies to the Output.
@@ -317,7 +317,7 @@ Options for Harish:
   balanced, 83.5% born-digital), labelled as vendor-reported on another benchmark.
 - **(b)** Ask Datalab in writing for permission to run and publish a non-commercial benchmark,
   and run only after a yes. **Recommended**, with (a) as the fallback.
-- **(c)** Decide that a11y-stem does not compete. Then run it, publish scores only with
+- **(c)** Decide that ReadableSTEM does not compete. Then run it, publish scores only with
   attribution and a licence link, and never publish Marker's outputs.
 
 The 2026-10-08 licence-deploy track already ran Marker (fast mode, OCR off) for timing.
@@ -395,10 +395,10 @@ the outputs differ, that arm runs R = 2 on the held-out set (PREREG §6.3).
 ### 7.6 Reproduction (ask 4)
 
 Inside the PREREG's `make heldout-score` / `make heldout-run`, which run from saved outputs,
-need no key and verify `PREREG.sha256` first. The parser part of a public a11y-stem
+need no key and verify `PREREG.sha256` first. The parser part of a public ReadableSTEM
 (MIT code, OpenStax inputs only):
 - `bench/parsers/<arm>/pyproject.toml` with `uv.lock`, one environment per tool, so that
-  a11y-stem's own dependencies do not change;
+  ReadableSTEM's own dependencies do not change;
 - `bench/parsers/adapters/`, with tests on dev pages;
 - `make parsers`, which converts the 15 PDFs with every local arm and writes the intermediate
   JSON that `heldout-score` reads.
@@ -409,12 +409,12 @@ CC BY).
 
 ## 8. Limits specific to the parser comparison (PREREG §13 covers the rest)
 
-- **Home advantage.** a11y-stem was developed on prints from the same Chromium printer:
+- **Home advantage.** ReadableSTEM was developed on prints from the same Chromium printer:
   Unicode maths alphanumerics in the text layer, untagged, raster figures. The held-out
   sections reduce that advantage but do not remove it. The parsers were trained on other
   material (arXiv, office documents, Chinese documents).
-- **Converter bias.** Every arm's LaTeX goes through a11y-stem's allowlist and converter, which
-  were tuned to a11y-stem's own prompt conventions (`array{rcl}`, `\mathbf`). Rows (a) to (c)
+- **Converter bias.** Every arm's LaTeX goes through ReadableSTEM's allowlist and converter, which
+  were tuned to ReadableSTEM's own prompt conventions (`array{rcl}`, `\mathbf`). Rows (a) to (c)
   of §4.4 bound the effect.
 - **Exact match punishes markup.** `aligned` against a three-column `mtable`, or `\mathsf`
   words, can fail exact match while being correct; on dev, a perfect transcriber scores
@@ -422,9 +422,9 @@ CC BY).
 - **Default settings.** They understate tools that people usually tune. Docling with formulas
   is shown; MinerU's VLM tiers and Marker's balanced mode (both want a GPU) are not.
 - **Timings come from one CPU box,** not a cloud deployment.
-- **Pre-flag bias.** a11y-stem's own checker pre-flags competitors' equations (§4.4 i):
+- **Pre-flag bias.** ReadableSTEM's own checker pre-flags competitors' equations (§4.4 i):
   disclosed, and never a label.
-- **No conformance claim.** a11y-stem assists people making course material accessible.
+- **No conformance claim.** ReadableSTEM assists people making course material accessible.
 
 ## 9. Not done here
 
@@ -454,7 +454,7 @@ CC BY).
    amended before the run, or keep the literal "2 x parsers".
 4. **C2 (luna):** keep it as a descriptive arm, with a $2 cap or inside the $50 cap.
 5. **Labels:** accept the 50-per-arm sample for parser arms (§4.5).
-6. Whether `bench/parsers/` goes into the public a11y-stem repo.
+6. Whether `bench/parsers/` goes into the public ReadableSTEM repo.
 7. **Freeze:** after 1-6, append this file's path and SHA-256 to `PREREG.sha256`, before any
    held-out output exists.
 8. **Scratch to delete when done** (the shell hook blocks `rm -rf` outside /tmp):
@@ -482,7 +482,7 @@ MINERU_HOME=... /usr/bin/time mineru-kit parse in/dev3.pdf -o out/mineru-basic -
 uv venv ~/.cache/a11y-proof/venvs/nougat --python 3.11
 uv pip install "nougat-ocr==0.1.17" torch==2.4.1 torchvision==0.19.1 transformers==4.38.2 timm==0.5.4 albumentations==1.3.1 "pypdfium2<5"   # CPU wheels
 /usr/bin/time timeout 1200 nougat in/dev3.pdf -o out/nougat-base --no-skipping   # default model 0.1.0-small
-cd a11y-stem && uv run python ~/.cache/a11y-proof/parsers/check_allow.py   # allowlist / converter on sample LaTeX
+cd readablestem && uv run python ~/.cache/a11y-proof/parsers/check_allow.py   # allowlist / converter on sample LaTeX
 ```
 
 Model revisions seen today:
@@ -505,8 +505,8 @@ Model revisions seen today:
   - `landscape/readme_olmocr.md`.
 - `chatbot-baseline/report.txt`, `score_baseline.py`, `structure.py` and `extract.py`;
   `niche/chatbot-runs/usage.jsonl` and `scripts/run_chat.py`; `niche/VERDICT-2026-10-10.md`.
-- `proof/PREREGISTRATION.md` (SHA-256 `8127b143…` for version 1, `2c16815a…` for version 2) and `proof/selection/`.
-- a11y-stem `README.md`, `docs/eval.md`, `docs/design/beta-architecture.md` and `docs/steps.md`.
+- `proof/PREREGISTRATION.md` (SHA-256 `8127b143…` for version 1, `d4d3af03…` for version 2) and `proof/selection/`.
+- ReadableSTEM `README.md`, `docs/eval.md`, `docs/design/beta-architecture.md` and `docs/steps.md`.
 - Licences fetched today (`~/.cache/a11y-proof/lic/`):
   - MinerU `LICENSE.md` and `README.md`;
   - Marker `LICENSE`, `MODEL_LICENSE` and `README.md`;

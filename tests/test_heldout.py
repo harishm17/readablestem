@@ -768,17 +768,6 @@ def test_default_folder_follows_xdg_cache_home(monkeypatch, tmp_path):
     assert heldout_cli.default_root() == tmp_path / "home" / ".cache" / "readablestem" / "heldout"
 
 
-def test_a_cache_folder_under_the_old_name_is_still_used_while_it_is_the_only_one(
-    monkeypatch, tmp_path
-):
-    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-    old = tmp_path / "a11y-stem" / "heldout"
-    old.mkdir(parents=True)
-    assert heldout_cli.default_root() == old
-    (tmp_path / "readablestem" / "heldout").mkdir(parents=True)
-    assert heldout_cli.default_root() == tmp_path / "readablestem" / "heldout"
-
-
 def test_inside_the_repository_means_the_checkout_this_runs_in(monkeypatch, tmp_path):
     monkeypatch.chdir(REPO / "tests")
     assert heldout_cli.outside_project(REPO / "data" / "eval", "--out") is not None

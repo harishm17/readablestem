@@ -1,6 +1,6 @@
 # Authored table documents (tables eval)
 
-Course-style documents with tables, written for a11y-stem: no third-party text, no
+Course-style documents with tables, written for ReadableSTEM: no third-party text, no
 student or instructor data. Licence: MIT, like the code (`LICENSE`). They complement the
 OpenStax table gold in `data/gold/tables/` (CC BY 4.0), whose tables all come from one
 web print: these come from other toolchains and cover what OpenStax lacks.

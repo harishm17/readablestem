@@ -1,4 +1,4 @@
-# Arm P1 / P1f: Docling, CPU only. Not a dependency of a11y-stem.
+# Arm P1 / P1f: Docling, CPU only. Not a dependency of ReadableSTEM.
 # Docling is MIT. Its models carry their own licences (proof/parsers/README.md).
 [project]
 name = "parsers-arm-docling"

@@ -24,12 +24,11 @@ from readablestem.cli import proof as proof_cli
 
 GOLD_DIR = Path("data/gold")
 CACHE_DIR = Path(".cache/openstax")
-# `a11y-stem` is the name before October 2026 (older checkouts and test trees still have it).
-_PROJECT_NAME_LINES = ('name = "readablestem"', 'name = "a11y-stem"')
+_PROJECT_NAME_LINE = 'name = "readablestem"'
 
 
 def names_this_project(pyproject_text: str) -> bool:
-    return any(line in pyproject_text for line in _PROJECT_NAME_LINES)
+    return _PROJECT_NAME_LINE in pyproject_text
 
 
 def project_root(start: Path | None = None) -> Path:

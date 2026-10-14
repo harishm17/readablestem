@@ -1,4 +1,4 @@
-# Arm P3: PyMuPDF4LLM 1.28.2 with the layout model on. Not a dependency of a11y-stem.
+# Arm P3: PyMuPDF4LLM 1.28.2 with the layout model on. Not a dependency of ReadableSTEM.
 # Licence: AGPL-3.0 or Artifex commercial; see proof/parsers/README.md.
 [project]
 name = "parsers-arm-pymupdf4llm"

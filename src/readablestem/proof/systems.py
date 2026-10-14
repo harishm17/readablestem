@@ -9,11 +9,11 @@ and the output itself next to it:
     systems/<arm>/<book>__<page>[.runN].md      the parser's Markdown export
 
 Every system is scored from that output file by one reader (`eval.invented.read`), against
-the same gold and the same PDF, with the same code that scores a11y-stem's own HTML where
+the same gold and the same PDF, with the same code that scores ReadableSTEM's own HTML where
 the measure is shared (preregistration section 7):
 
 - equations: the output's maths (MathJax TeX, `<math>`, Markdown `$...$`) is converted the
-  way a11y-stem converts its own model's LaTeX (`equation_step.clean_latex`, then the
+  way ReadableSTEM converts its own model's LaTeX (`equation_step.clean_latex`, then the
   allowlist and `latex2mathml`), then aligned to the gold equations by the document task's
   code (`pipeline_eval.document_page_item`), MathML signature only. A second row skips the
   allowlist (PARSERS-PLAN 4.4a), descriptive only;

@@ -4,7 +4,7 @@ import random
 import sys
 from pathlib import Path
 
-gold = Path(sys.argv[2]) if len(sys.argv) > 2 else Path.home() / ".cache" / "a11y-stem" / "heldout"
+gold = Path(sys.argv[2]) if len(sys.argv) > 2 else Path.home() / ".cache" / "ReadableSTEM" / "heldout"
 seed = int(hashlib.sha256(b"a11y-stem held-out scorer sample 2026-10-13").hexdigest()[:16], 16)
 rng = random.Random(seed)
 books = ["college-physics", "chemistry", "precalculus", "introductory-statistics", "intermediate-algebra"]

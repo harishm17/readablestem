@@ -91,6 +91,6 @@ a. P(M) = 0.52 b. P(F) = 0.48 c. P(R) = 0.87 d. P(L) = 0.13 e. P(M AND R) = 0.43
 
 Licensed under Creative Commons Attribution License (CC BY 4.0). http://creativecommons.org/licenses/by/4.0/
 
-Original page: https://openstax.org/books/introductory-statistics/pages/3-1-terminology Access for free at openstax.org. Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.
+Original page: https://openstax.org/books/introductory-statistics/pages/3-1-terminology Access for free at openstax.org. Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited.
 
-a11y-stem is not affiliated with or endorsed by OpenStax.
+ReadableSTEM is not affiliated with or endorsed by OpenStax.

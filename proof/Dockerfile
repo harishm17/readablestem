@@ -1,6 +1,6 @@
 # One-command reproduction of the public proof on a clean machine (docs/proof.md).
-#   docker build -f proof/Dockerfile -t a11y-stem-proof .
-#   docker run --rm -v "$PWD/out:/out" a11y-stem-proof a11y-stem proof --out /out/PROOF.md
+#   docker build -f proof/Dockerfile -t readablestem-proof .
+#   docker run --rm -v "$PWD/out:/out" readablestem-proof readablestem proof --out /out/PROOF.md
 #
 # Two targets:
 #   replay (default)  locked dependencies and the repository; no browser. Replays the
@@ -56,7 +56,7 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     A11Y_PROOF_CACHE=/tmp/a11y-proof
 USER 10001:10001
 WORKDIR /app
-CMD ["a11y-stem", "proof"]
+CMD ["readablestem", "proof"]
 
 # The default target is the last one: replay only, no browser.
 FROM build AS replay
@@ -70,4 +70,4 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     A11Y_PROOF_CACHE=/tmp/a11y-proof
 USER 10001:10001
 WORKDIR /app
-CMD ["a11y-stem", "proof"]
+CMD ["readablestem", "proof"]

@@ -590,7 +590,7 @@ replay with `--answers-offline` is free (the second check's answers excepted, se
 | equations (30) | exact_lenient 0.767, mean TEDS 0.867, proposals 30 of 30 | $0.098 ($0.0033 per equation, of which the Claude check $0.0010) |
 | figures (13) | judge pass 1.000, mean judge score 4.77 | $0.123 (figure step $0.050, Claude check $0.022, judge $0.052) |
 | document (43 PDF pages, 10 sections) | detection recall 1.000, precision 0.750, matched exact_lenient 0.767, axe violations 0 | $0.235 ($0.0055 per PDF page, check $0.0017) |
-| headings | precision 0.877, recall 1.000, F1 0.934, level accuracy 0.992 | no model |
+| headings | precision 0.877, recall 1.000, F1 0.934, level accuracy 0.992 (replaced 2026-10-14: F1 0.821, see "Doubled box headings") | no model |
 | tables (local) | 184 tables, flag recall 1.000, flag precision 0.223 | no model |
 
 Spend: $0.456 of the $6 cap. The pipeline's own model calls cost $0.069 (equations), $0.050
@@ -1514,10 +1514,10 @@ development numbers. The held-out set is 15 OpenStax sections that no developmen
 saw, fixed in a pre-registration before any system ran on them: 3 sections each from
 College Physics, Chemistry, Precalculus, Introductory Statistics and Intermediate Algebra,
 242 Letter pages, 1,369 equations, 70 figures (69 with OpenStax alt text), 27 tables and
-509 headings. The pre-registration (version 2, SHA-256 `2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34`)
+509 headings. The pre-registration (version 2, SHA-256 `d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec`)
 holds the selection rule, the metrics, the statistics and what counts as a failure, and is
 published with the results. The gold manifest's SHA-256 is
-`e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`.
+`9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3`.
 
 **Retired first editions.** Every live CC BY STEM book (Physics, Statistics) was used in
 development, and every current edition of the others is CC BY-NC-SA (`gold licenses`,
@@ -1668,7 +1668,7 @@ the most still-needed items per printed page until the class targets in `selecti
 met, prints each winner first (Chromium, as `eval render` does) and drops one longer than
 30 Letter pages, the most the pipeline accepts; sections that repeat a chosen section
 (8-gram overlap above 0.2) are skipped. Key-terms pages of the chosen chapters supply the
-glossary entries. The dev part is 17 sections and one key-terms page of OpenStax (233 Letter pages) and 10 authored documents (105 pages): 28 documents, 338 pages, `manifest.json` SHA-256 `8156ea5e66776bc5172ca8d2713046faf31ea592eb47cde6f146e289bf71f268`. The check part is 5 OpenStax sections and 4 authored documents, 101 pages. No section is over the limit (the longest is 30 pages).
+glossary entries. The dev part is 17 sections and one key-terms page of OpenStax (233 Letter pages) and 10 authored documents (105 pages): 28 documents, 338 pages, `manifest.json` SHA-256 `df760b3f59cdebe6c7eda3d6c13663d7ae5535881503f0b12da92fc60ecdf9c6`. The check part is 5 OpenStax sections and 4 authored documents, 101 pages. No section is over the limit (the longest is 30 pages).
 
 **Records.** OpenStax records are the four kinds `gold fetch` writes (equation, figure, table,
 heading; ids and fields unchanged) with `classes` added, equations also with
@@ -1791,7 +1791,7 @@ tables, local mode, detection recall 0.774 and precision 0.911, TEDS 0.718 (31 d
 53 gold data tables; 52 of 67 layout tables kept out); document, detection precision
 0.647 and recall 0.825 (the unmatched predictions are mostly prose maths and fragments).
 These are layout-only figures from one run, not a baseline anyone has agreed to; the gold
-manifest hashes are in the reports (`8156ea5e6677...` dev, `2cea9ea7f587...` check).
+manifest hashes are in the reports (`df760b3f59cd...` dev, `2cea9ea7f587...` check).
 
 **`symbol_mismatch` on perfect transcriptions (T2-14, 2026-10-14, no model).** The review
 found 97 `symbol_mismatch` flags on the held-out run, 40 of them on exactly-correct
@@ -2087,6 +2087,71 @@ Sample sizes: 30 equations is 3.3 points per equation, and the 13 and 14 figures
 judge's ceiling (1.00), so figure quality moves only when the judge fails one, which makes the
 figure comparison weak on both sets. The dev-v2 equation set was chosen to hold failures (its
 exact rate is 0.53), so its rates are not course PDFs' rates.
+
+## Doubled box headings (2026-10-14): heading F1 0.934 to 0.821 on purpose
+
+OpenStax prints a box's label and its title as two lines ("Teacher Support" at 14 pt, then
+"Teacher Support" again at 12 pt). Both are headings in the PDF and in OpenStax's own markup,
+which is the gold: 50 of the 121 gold headings on the original set are these pairs. A
+screen-reader user who navigates by headings hears the same name twice in a row, seven times
+on the public demo (OpenStax Physics 2.3). The heading step (`heading_step.repeated_above`)
+now writes a heading whose text equals the heading directly above it, with nothing between
+them, as bold text, whatever its level. The same text with any element between the two copies,
+repeated-label groups, the same-level rule and the sentence rule are as before. T1-13 had
+narrowed the rule to the same level only, because the gold counts both lines and the broader
+rule lowered the score; the product decision (2026-10-14) is that the outline a student hears
+matters more than agreement with that quirk of the gold. No model is called by the headings
+task, so these are exact re-runs (`eval pipeline --task headings --fake`; the fake client is
+not used by this task).
+
+| Headings, original set (3 pages) | before | after |
+|---|---|---|
+| precision | 0.877 | 0.850 |
+| recall | 1.000 | 0.793 |
+| F1 | 0.934 | 0.821 |
+| level accuracy | 0.992 | 0.740 |
+| predicted / matched (gold 121) | 138 / 121 | 113 / 96 |
+| required decisions | 9 | 6 |
+| flag precision / recall | 0.556 / 0.778 | 0.833 / 0.333 |
+
+| Headings, dev-v2 dev part (28 pages) | before | after |
+|---|---|---|
+| precision / recall / F1 | 0.921 / 0.919 / 0.920 | the same |
+| level accuracy | 0.898 | 0.898 |
+| required decisions | 59 | 59 |
+
+Where the drop is: `recall_by_context` for the Teacher Support boxes (`os-teacher`) goes from
+1.00 to 0.50, every other context stays at 1.00. The 25 missed gold headings are the second
+copies of the pairs. The level accuracy drop is the 24 surviving "Teacher Support" lines that
+the scorer pairs with the gold's second copy (gold h4, relative level 2 below the page's top
+heading, against our h2). The dev-v2 dev part does not move: the rule changes none of its headings.
+The eleven-fold "Teacher Support" group decision on the demo's h3 lines also goes: the demo's
+required decisions fall from 3 to 2 (its stored result is decided again by
+`readablestem demo rerender`, no model). `data/eval/baseline-headings.json` and
+`latest-headings.json` were replaced with the new run on purpose (the gate compares them with
+each other, `heading_recall` and `heading_precision`); their model fields are those of the
+earlier run because the task calls no model. Nothing under `proof/` or `PROOF.md` changed.
+
+## Baselines recorded again (2026-10-14, after the rename)
+
+The evaluation pages carry the product's name in their footer, so the rename changed the
+page images and every recorded model answer missed. The three model baselines were recorded
+again, once each, on Claude (`claude-opus-5-5` main, `claude-haiku-5-5` cheap, Opus as figure
+judge, the second check on `claude-sonnet-5-5`), with `--answers .local/answers-baseline.jsonl`,
+and promoted with `eval promote ... --out-dir data/eval` as baseline and latest:
+
+| Task | Result | Before (earlier run) | Cost of the run |
+|---|---|---|---|
+| equations (30) | exact_lenient 0.733 (22 of 30), mean TEDS 0.870 | 0.767, 0.867 | $0.0819 (second check $0.0223) |
+| figures (13) | judge pass 1.000, mean judge score 4.69 | 1.000, 4.77 | $0.1167 (judge $0.0545) |
+| document (43 PDF pages, 3 sections) | end to end exact_lenient 0.767, detection recall 1.000, precision 0.750, 0 axe violations | 0.767, 1.000, 0.750 | $0.2366 |
+
+The one-equation difference in the equations task is the run-to-run variation of the model,
+not a change of code. Headings and tables (local mode) call no model and were recorded again
+without cost. The public demo and the site examples were written again from a new conversion
+(`demo build`): $0.0955 (Physics 2.3), $0.0729 (2.1) and $0.0676 (2.2). A first set of
+conversions ($0.2744 in all) was discarded because the table-structure model was not found on
+the machine, which changed the layout of 2.1; it is not used.
 
 ## What the numbers do not show
 

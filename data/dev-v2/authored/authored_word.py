@@ -38,8 +38,8 @@ BUILD_NOTE = (
     "Made with python-docx (Word built-in styles, real superscript and subscript runs, "
     "automatic hyphenation on, en-US language), then exported to an untagged PDF by "
     "LibreOffice (writer_pdf_Export) with the hyph_en_US hyphenation dictionary.\n"
-    "Authored for a11y-stem's development set (dev-v2). Licence: MIT. Author: "
-    "a11y-stem contributors.\n"
+    "Authored for ReadableSTEM's development set (dev-v2). Licence: MIT. Author: "
+    "ReadableSTEM contributors.\n"
 )
 
 
@@ -93,10 +93,10 @@ def new_document(title: str, columns: int = 1, margin: float = 0.9) -> Document:
     hyph = OxmlElement("w:autoHyphenation")
     anchor = settings.find(qn("w:defaultTabStop"))
     anchor.addnext(hyph)
-    d.core_properties.author = "a11y-stem contributors"
+    d.core_properties.author = "ReadableSTEM contributors"
     d.core_properties.title = title
     d.core_properties.comments = ""
-    d.core_properties.last_modified_by = "a11y-stem contributors"
+    d.core_properties.last_modified_by = "ReadableSTEM contributors"
     import datetime
 
     fixed = datetime.datetime(2026, 10, 7, 0, 0, 0)

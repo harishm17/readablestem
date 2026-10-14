@@ -19,7 +19,7 @@
   "client": "openai",
   "dataset": {
     "gold_dir": "data/gold",
-    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "manifest_sha256": "b74e1fa4a67bd67ff37c048e992fdf518308ad0e063ed4522129aa43a82981de",
     "limit": null,
     "unit": "figure",
     "selection_sha256": "ff55fd8f6e2e932fd674df868a755e7871e91ca5d1143afb81cb92af979977d9"

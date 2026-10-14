@@ -863,10 +863,8 @@ def equation_contexts(xhtml: str) -> list[tuple[str, str | None]]:
 def attribution_lines(page: PageSource) -> list[tuple[str, str | None]]:
     """(text, link) pairs for the footer: what OpenStax's CC BY terms ask for.
 
-    The two lines that name the tool keep its old name, a11y-stem: they are printed on the
-    evaluation pages, and the pages (and the page images the models were shown) are part of
-    the recorded runs and the registered held-out proof. Changing the words would change the
-    pixels, so every recorded answer would miss.
+    The two lines that name the tool are printed on the evaluation pages, so they are part of
+    the page images the models are shown (and of the request keys of recorded answers).
     """
     authors = ", ".join(page.authors) if page.authors else "OpenStax authors"
     return [
@@ -875,11 +873,11 @@ def attribution_lines(page: PageSource) -> list[tuple[str, str | None]]:
         ("Original page:", page.page_url),
         ("Access for free at openstax.org.", None),
         (
-            "Changes: reformatted as a printable page for evaluating a11y-stem; image alt "
+            "Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt "
             "text left out of this print; no wording edited.",
             None,
         ),
-        ("a11y-stem is not affiliated with or endorsed by OpenStax.", None),
+        ("ReadableSTEM is not affiliated with or endorsed by OpenStax.", None),
     ]
 
 

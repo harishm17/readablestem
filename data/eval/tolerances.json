@@ -1,5 +1,5 @@
 {
-  "_comment": "Tracked metrics for `a11y-stem eval gate`. max_drop is an absolute drop in a rate (0.02 = 2 percentage points); max_rel_increase is a relative rise (0.25 = +25%); max_increase is an absolute rise of a count (0 = any increase fails). Entries replace the built-in defaults by name. See docs/eval.md.",
+  "_comment": "Tracked metrics for `readablestem eval gate`. max_drop is an absolute drop in a rate (0.02 = 2 percentage points); max_rel_increase is a relative rise (0.25 = +25%); max_increase is an absolute rise of a count (0 = any increase fails). Entries replace the built-in defaults by name. See docs/eval.md.",
   "tolerances": [
     {"name": "exact_lenient", "task": "equations", "path": "metrics.exact_lenient", "rule": "max_drop", "limit": 0.02},
     {"name": "mean_teds", "task": "equations", "path": "metrics.mean_teds", "rule": "max_drop", "limit": 0.02},
