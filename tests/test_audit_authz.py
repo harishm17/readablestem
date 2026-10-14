@@ -70,6 +70,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/delete"): USER,
     ("GET", "/jobs/{job_id}/download"): USER,
     ("GET", "/jobs/{job_id}/download/canvas"): USER,  # the same file, packaged for Canvas
+    ("GET", "/jobs/{job_id}/download/cartridge"): USER,  # T3-8: the same file as a cartridge
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("GET", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/feedback"): USER,

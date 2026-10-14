@@ -27,7 +27,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from a11y_stem.core.types import DocumentResult
-from a11y_stem.pipeline import export_canvas, text_pass
+from a11y_stem.pipeline import export_canvas, export_cartridge, text_pass
 from a11y_stem.pipeline import language as languages
 from a11y_stem.web import documents, events, notation, office_convert, retention
 from a11y_stem.web import feedback as feedback_questions
@@ -876,6 +876,50 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             context={"job_id": job_id},
         )
     ctx = get_ctx(request)
+    export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, number)
+    events.record_download(
+        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+    )
+    return Response(
+        export_canvas.build_zip(export),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(canvas_filename(title, job_ref)),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+
+
+def cartridge_filename(title: str, job_id: str) -> str:
+    """The Common Cartridge's name: the HTML file's name, with the cartridge ending."""
+    return download_filename(title, job_id).removesuffix(".html") + ".imscc"
+
+
+@router.get("/jobs/{job_id}/download/cartridge")
+def download_cartridge(request: Request, job_id: str, user: UserDep) -> Response:
+    """The same document as an IMS Common Cartridge 1.3 package (pipeline/export_cartridge.py),
+    which Canvas, Blackboard, Moodle and D2L import. A GET like the other downloads, for the
+    owner only."""
+    ctx = get_ctx(request)
+    export, title, job_ref, still_open = _canvas_export(ctx, user, job_id, None)
+    events.record_download(
+        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+    )
+    return Response(
+        export_cartridge.build_cartridge(export),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(cartridge_filename(title, job_ref)),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+
+
+def _canvas_export(
+    ctx: AppContext, user: CurrentUser, job_id: str, number: str | None
+) -> tuple[export_canvas.CanvasExport, str, str, int]:
+    """The finished document, exported for Canvas (the owner's, done, up to date). A
+    picture the export cannot hold is a 409 page, and the HTML file stays available."""
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
@@ -900,17 +944,7 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
             "still available from the job page.",
             context={"job_id": job_ref},
         ) from None
-    events.record_download(
-        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
-    )
-    return Response(
-        export_canvas.build_zip(export),
-        media_type="application/zip",
-        headers={
-            "Content-Disposition": content_disposition(canvas_filename(title, job_ref)),
-            "Content-Security-Policy": VIEW_CSP,
-        },
-    )
+    return export, title, job_ref, still_open
 
 
 @router.get("/jobs/{job_id}/view")

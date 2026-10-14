@@ -119,6 +119,18 @@ _VOID = frozenset(
 _IMAGE_TYPES = {"image/png": "png", "image/jpeg": "jpg", "image/gif": "gif", "image/webp": "webp"}
 _DATA_URI = re.compile(r"data:(?P<type>[A-Za-z0-9.+/-]+);base64,(?P<data>[A-Za-z0-9+/=\s]+)\Z")
 _COURSE_NUMBER = re.compile(r"[0-9]{1,20}\Z")
+# The fonts a `<math>` element asks for, in order (T3-8). Canvas keeps `font-family` in a
+# `style` attribute but has no `@font-face` or style block, so the stack can only name fonts
+# the reader's computer has. Native MathML in Chrome, Edge, Firefox and Safari needs one with
+# an OpenType MATH table; this list is the families that have one, most widely installed
+# last-resort first: Latin Modern Math and STIX Two Math (TeX distributions, Linux, recent
+# macOS), Cambria Math (Windows, Office for Mac), Noto Sans Math, Libertinus, TeX Gyre,
+# XITS, Asana and DejaVu (Linux packages), then the browser's own `math` family.
+MATH_FONT_STACK = (
+    "'Latin Modern Math','STIX Two Math','Cambria Math','Noto Sans Math','Libertinus Math',"
+    "'TeX Gyre Pagella Math','XITS Math','Asana Math','DejaVu Math TeX Gyre',math"
+)
+_MATH_RULE = f"\nmath {{ font-family: {MATH_FONT_STACK}; }}\n"
 HIDDEN_CLASS = "visually-hidden"
 CANVAS_HIDDEN_CLASS = "screenreader-only"  # Canvas's own class for the same thing
 
@@ -480,7 +492,7 @@ def export_canvas(
 
     notes = Notes()
     standalone = _parse(html)
-    rules = _parse_css(_styles_of(standalone), notes)
+    rules = _parse_css(_styles_of(standalone) + _MATH_RULE, notes)
     root_tag = _find(standalone, "html")
     lang = (root_tag.attrs.get("lang") if root_tag else None) or "en"
     notes.tables_with_headers = sum(
