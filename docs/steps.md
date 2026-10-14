@@ -66,7 +66,7 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `number_mismatch`, `case_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
 
 **The skipped second reading (equations).** A cheap answer whose only reason to be asked
@@ -209,8 +209,38 @@ sample equations, the document eval's 3 sections, and two runs each of OpenStax 
 and the LaTeX handout), the strict rule finds no difference once accents are dropped
 (the only one was the handout's `\hat{\mathbf{x}}`, a U+02C6 accent), so it adds about
 no decisions. Signs and relations are not symbols here; they have their own check ("Sign
-and relation check" below). Not covered: case (`N` read as `n`), because the bags are
-case-folded.
+and relation check" below). The bags are case-folded multisets of digits, so two further
+checks run when the bags agree exactly (next section).
+
+### Numbers and letter case (when the bags agree)
+
+`equation_step.text_layer_number_case_checks` (`pipeline/text_layer_compare.py`, ported from
+`stemcheck`; backlog T2-10 and T2-9) runs only when `text_layer_symbols_differ` is False, so
+it never repeats a symbol difference:
+
+- `equation.text_layer_numbers`, code `number_mismatch`: the digits are the same but not the
+  numbers. Each number of the PDF text (a run of digits with its decimal points) must be
+  made of the transcription's numbers, each used once, joined in any order: the PDF glues a
+  script to its base (`10^{23}` prints "1023", `v_0^2` prints "v20") and separates digits
+  only by a space (a thin space in "1 000", a flattened fraction's numerator and
+  denominator). So 36 for 63, 9.81 for 98.1, 8.5 for 85 and 10^23 for 10^32 are caught, and
+  "1.1 × 102" for `1.1 \times 10^2` is not. A point in front of digits (".42") is not part
+  of a number: flattened fractions leave stray dots. The search is bounded; past the bound
+  the check is left out, not failed. It is left out as well when the text layer has no
+  number.
+- `equation.text_layer_case`, code `case_mismatch`: letters are counted as (letter, capital)
+  on both sides, so W for w, S for s, A for a, a Greek capital for its small letter differ.
+  Modifier letters (accents) are not letters; pdfTeX's U+2206 is the capital Delta. Small
+  caps are not recognised: their text layer has the capital, so nothing is flagged.
+
+Both are failed warnings with a meaning-level code: the fix needs a decision, the confidence
+is scaled by 0.6 once (with the other meaning-level checks), and a cheap-model answer
+escalates, as for `symbol_mismatch`. A reviewer's edit gets them too (`web.edit_check`) and
+the compare table says them as "Number" and "Case" rows. Table cells are not covered here
+(`table.math_symbols` has its own number rule, docs/tables.md). Measured on dev-v2
+(docs/eval.md, "`symbol_mismatch` on perfect transcriptions"): 1 false number flag and 0
+case flags on 1,748 gold equations compared with their own print; on synthetic errors, 457
+of 481 digit swaps and 1,438 of 1,438 case flips are found.
 
 ## Letter-style check (equations)
 

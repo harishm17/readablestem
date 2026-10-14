@@ -153,6 +153,7 @@ with `element.text` = the equation's text layer and `element.display` = the gold
 | `exact_lenient_ci95` | Wilson 95% interval for `exact_lenient` |
 | `mean_teds` | mean of TEDS = 1 - TED / max(nodes), Zhang-Shasha tree edit distance on normalised trees; 0 with no proposal |
 | `proposal_rate` | share where the step proposed MathML at all |
+| `secondary_stream_v2` | the labelled secondary scorer (below): `exact` and `mean_similarity` of the symbol streams. Not a replacement: `exact_lenient` stays the primary number and `wrong` stays defined by it |
 | `by_status` | per `Fix.status` (accepted, needs_review, abstained, failed): `n`, `share`, `exact_lenient`, `mean_teds`. Shows whether "accepted" really is more accurate than "needs review" |
 | `by_route` | same, per route: `cheap` (cheap model only), `main` (main model only), `escalated` (cheap first, then main), `fallback` (any call made as a fallback), `none` (no call) |
 | `by_display` | same, per gold `display` (block, inline) |
@@ -168,6 +169,40 @@ Ceiling: scored with known-correct LaTeX for all 30 sample equations, the scorer
 exact_lenient 0.83, exact_strict 0.43, mean TEDS 0.87 (`make eval-latex-check`; 5 known
 normalisation gaps). A perfect transcriber cannot score higher on this sample until
 those gaps are closed.
+
+**Secondary scorer: stream v2** (`eval/equations_v2.py`, backlog T2-12). The gaps above
+are packing gaps: the answer key writes `<mtext>time =</mtext>`, `<mn>-5</mn>` or
+`<mtext>m/s)(46 s)</mtext>` where a transcription gives text plus `<mo>`, and uses other
+code points for the same dash, mu, prime or degree sign. The held-out run could not score
+230 of 1,217 matched equations exact for this reason (A4). So the equations and document
+tasks, `eval equations` and the reproduce check also score every equation as a *stream of
+symbols* and report it beside the primary scorer, labelled `secondary`; it never replaces
+it and the primary numbers, the gate and the committed reports do not change. Rules, in
+order: the same lenient normalisation as the primary scorer; every token split into atoms
+(a number, a letter, one other character; a word is its letters); look-alike characters
+unified (every dash and the minus sign, micro sign and mu, apostrophe, right quote and
+prime, degree sign and ring operator, middle dots, division slashes, a few relation and
+Greek-letter glyph variants; bold and double-struck styles stay); a degree sign or primes
+written as a superscript equal the inline character; a decimal point written as its own
+token joins its numbers; fractions, scripts, roots and tables stay as open and close
+markers, so `a/b` is not `a b`. The score is `exact` (equal streams) and a similarity
+(1 - edit distance / longer stream). Everything the primary lenient scorer calls exact is
+exact here too. On the 30 sample equations with known-correct LaTeX: primary 25 of 30,
+stream v2 30 of 30. On dev-v2's 1,809 gold equations it tells 1,442 distinct streams apart
+where the lenient trees give 1,443 (the one pair it merges is the same formula with the
+degree sign written inline or as a superscript). In the document task a gold equation
+that came out in pieces, or two that came out as one, is credited by
+`secondary_stream_v2.end_to_end_exact_with_credit` when the pieces' (or the merged
+equation's) streams, in order, equal the gold's (commas, semicolons, points, "and", "or"
+between them ignored); `credited_split` and `credited_merged` count those, and the split
+or merge is still a layout error in `split_gold_equations` and the detection numbers.
+On the 7 wrong dev equations of the recorded document run whose answers are stored
+(`data/eval/latest-document.json`, 2026-10-12), 5 are exact under stream v2 (all five are
+packing gaps), so that run's matched 0.733 (22 of 30) is 0.900 (27 of 30) on the secondary
+scorer; the eighth wrong equation, a required decision, has no stored answer. The two that
+stay wrong are real differences: a subscript the answer key sets bold
+(`\mathbf{v}_{\text{avg}}` against a bold `avg`), and a comma the model copied from the
+text layer.
 
 ### headings
 
@@ -277,6 +312,10 @@ lenient normalisation. Signatures are NFKC, case-folded, spaces removed, U+2212 
 | `end_to_end_exact_lenient` | exactly right equations / gold equations: detection and transcription together |
 | `unmatched_predicted`, `unmatched_by_reason` | predicted equations with no gold partner, by why: `prose_math` (maths OpenStax wrote as HTML text, which has no gold MathML; only with evidence of a formula, see docs/layout.md) or `other` |
 | `detection_precision_excluding_prose_math` | matched / (predicted - `prose_math`): an estimate, since the gold cannot confirm those are formulas |
+| `unmatched_text_layer_supported`, `unmatched_text_layer_supported_by_reason`, `unmatched_not_supported` | the unmatched predictions the PDF's own text supports: not a fragment, and the transcription uses the same letters, digits and Greek letters as the region's text layer (`text_layer_symbols_differ` is False). That is real maths the gold wrote as text (A15: 176 of the 439 unmatched on the held-out run), kept apart from fragments, which agree with their own text trivially and never count as supported. Needs a model run: without proposals (`--fake`) nothing is supported. Per unmatched entry: `text_layer_supported` |
+| `detection_precision_excluding_text_layer_supported` | matched / (predicted - supported extras): the detection precision with the artefact taken out, beside the unchanged `detection_precision` and the heuristic `..._excluding_prose_math` |
+| `secondary_stream_v2` | the labelled secondary scorer (see "equations"): `matched_exact`, `matched_mean_similarity`, `end_to_end_exact`, `end_to_end_exact_with_credit` (split and merged gold credited) and `credited_split`, `credited_merged` |
+| `prose_classes` | only with dev-v2 gold: the scripts, code, glossary and hyphen scorers (see "Extended development set") |
 | `split_gold_equations` | gold equations the pipeline found as several pieces |
 | `static_violations` | failed error-level checks from `html_checks.static_checks` on the output HTML, summed over pages (warnings excluded) |
 | `axe_violations` | same for `html_checks.axe_checks`, over the pages where axe ran |
@@ -1614,6 +1653,8 @@ uv run a11y-stem eval equations --set dev-v2 --self-check
 uv run a11y-stem eval pipeline --task document --set dev-v2 --fake
 uv run a11y-stem eval pipeline --task headings --set dev-v2 --part check --max-usd 2
 uv run a11y-stem eval pipeline --task tables --set dev-v2 --fake
+uv run a11y-stem eval classes --set dev-v2 --self-check     # scripts, code, glossary, hyphens
+uv run a11y-stem eval classes --set dev-v2 --html-dir DIR   # converted pages <book>__<page>.html
 # rebuild (needs network for the OpenStax archive, Chromium; the authored pool first):
 uv run python data/dev-v2/authored/build_authored.py --out /tmp/pool --tectonic PATH
 uv run a11y-stem gold devset build --authored-pool /tmp/pool --date 2026-10-14 --force
@@ -1625,6 +1666,51 @@ reports go to `.local/eval/dev-v2/` for dev, not to `data/eval/`), `eval equatio
 parts: a fake run still prints the sections and runs the layout and heading code, with every
 model call refused at zero cost (the cost lines of a fake run are simulated reservations,
 not spend).
+
+**Scorers for the classes without an equation or heading scorer** (`eval/prose_classes.py`,
+backlog T2-4, T2-5, T2-16, T1-9). Four kinds of dev-v2 gold had no scorer: sub- and
+superscript runs in prose (`prose_unit_power`, `prose_chem_script`, `prose_nuclide`,
+`prose_script_other`), code blocks, glossary entries and words hyphenated at a line end.
+They read the converted HTML of the document task (`DocumentResult.html`) and report
+`metrics.prose_classes` there (a per-page `prose_classes` in `--items`; the key is absent
+without such gold, so the committed reports are unchanged); `eval classes --set dev-v2
+--html-dir DIR` scores saved pages and `--self-check` scores HTML rendered from the gold.
+
+| Class | Results (the first is the right one) |
+|---|---|
+| script runs, per run class | `sub_sup` (a `<sub>`/`<sup>`) or `math` (a script in inline MathML), together `scripted` and `scripted_rate`; `flattened` (the letters around it are there, the script glued on as plain text: SO42-, cm3); `lost` |
+| code blocks | `exact` (a `<pre>` holds it line for line with its indentation), `in_pre` (a `<pre>` with other lines or indentation), `text_only` (the lines are in the page outside a `<pre>`), `missing`; `extra_pre` counts `<pre>` blocks matching no gold block |
+| glossary entries | `definition_list` (a `<dt>` with the term, a `<dd>` with the definition), `text_block` (term and definition in one paragraph or list item), `found_apart`, `missing` |
+| hyphenated words | `joined` (whole in the output; a compound keeps its hyphen), `kept_hyphen` (still "inves-tigates", or a compound that lost its hyphen), `split_words`, `missing` |
+
+A script run is found by the letters and digits around it (8 before, 4 after, taken from the
+gold paragraph's own `^{..}`/`_{..}` text), so a multiplication sign or space does not
+matter; a script is credited when an output script of the same kind and value stands at
+that place, once each. Hyphenated words are judged by count per word, and a wrong form
+anywhere in the page counts against the word, so an unbroken copy elsewhere cannot hide a
+broken one. A "lost" script can also be a run inside text the pipeline turned into an
+equation that the run could not transcribe (a `--fake` run has none), so read `lost` with
+the equation results. The self-check renders each gold record into the markup the scorers
+want (`<sup>`/`<sub>`, `<pre><code>`, `<dl>`, a plain word) and scores that: all four
+kinds, every class, 1.0 on 746 script runs, 40 code blocks, 126 glossary entries and 198
+hyphenated words. Negative control on the same words: the raw PDF text (hyphen then line
+break) scores `joined` 39 and `kept_hyphen` 137 on the LaTeX hyphenation document.
+
+Layout-only starting point on the dev part (`--fake`, 28 pages, the current layout and
+assembly, 2026-10-14; the model-free baseline other work packages measure against):
+
+| Class | n | Result |
+|---|---|---|
+| `prose_unit_power` | 146 | scripted 0, flattened 50, lost 96 |
+| `prose_chem_script` | 263 | scripted 0, flattened 128, lost 135 |
+| `prose_nuclide` | 79 | scripted 0, flattened 78, lost 1 |
+| `prose_script_other` | 258 | scripted 0, flattened 39, lost 219 |
+| `code_block` | 40 | exact 0, text_only 33, missing 7 |
+| `glossary_entry` | 126 | definition_list 0, text_block 57, found_apart 63, missing 6 |
+| `hyphen_break` | 198 | joined 198 |
+
+(The pipeline writes no `<sub>`, `<sup>`, `<pre>` or `<dl>` yet, hence the zeros; the
+hyphens are already joined by the 2026-10 hyphen rule, T1-9.)
 
 **Plumbing run (2026-10-14, `--fake`, no model call).** All five tasks ran with `--fake` on both parts and
 finished complete, without page errors: on dev equations 1,809 of 1,809, headings 28 of 28
@@ -1641,6 +1727,34 @@ tables, local mode, detection recall 0.774 and precision 0.911, TEDS 0.718 (31 d
 0.647 and recall 0.825 (the unmatched predictions are mostly prose maths and fragments).
 These are layout-only figures from one run, not a baseline anyone has agreed to; the gold
 manifest hashes are in the reports (`8156ea5e6677...` dev, `2cea9ea7f587...` check).
+
+**`symbol_mismatch` on perfect transcriptions (T2-14, 2026-10-14, no model).** The review
+found 97 `symbol_mismatch` flags on the held-out run, 40 of them on exactly-correct
+equations (A16). With no model to spend, the same question can be asked of dev-v2 by
+making the transcriber perfect: run the layout and the alignment of the `--fake` document
+task (no proposals), pair each region with its gold equation, and apply
+`text_layer_symbols_differ` to the region's text layer and the *gold* MathML. Any flag is
+then a region error or a text-layer artefact, never a misreading. Of 1,494 aligned pairs
+with a text layer, 458 (30.7%) are flagged. By class: inline fractions 196 of 269, numbered
+exercises 227 of 319, braced systems 55 of 89, unbraced multi-row 84 of 152, matrices 24 of
+63, determinants 25 of 86, nuclides 20 of 62, chemical formulas, charges and equations
+23-27%, slide formulas 2 of 45, unclassified 25 of 591. By what differs: 253 text layers
+are cut (the region holds fewer symbols than the equation: a stacked fraction or a script
+left in its own region), 189 carry extra symbols (181 of the 458 begin with an exercise
+number "NN. "; 173 of those pass once the number is removed: the fraction exercises the
+T1-5 rule does not catch, because the rest of the row alone is not a display equation), and
+16 are both. None is the check's own doing: gold printed alone by Chromium differs from its
+own text layer in 2 of 1,809 cases (both are wide equations clipped by the page edge). So
+the check is doing its job and the flags follow T1-5 (exercise numbers) and T2-1, T2-2 and
+T2-4 (region cuts); nothing in `symbol_mismatch` is separable from them, and it is left as
+it is. Re-measure after those land: the same run should fall towards the 4% of the
+unclassified class. The new number and case checks (T2-10, T2-9) on the same data: 1 false
+number flag in 1,748 gold equations whose letters agree with their own print (a flattened
+fraction whose numerator and denominator digits glue to a different number) and 0 case
+flags; on the aligned layout pairs 7 number flags and 0 case flags where the bags agree. On
+synthetic errors made in the same gold (two adjacent digits of a number swapped, one
+letter's case flipped, the text layer left alone) they find 457 of 481 swaps and 1,438 of
+1,438 case flips, none of which `symbol_mismatch` could see by construction.
 
 **What this set does not show.**
 

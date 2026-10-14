@@ -916,7 +916,7 @@ as for the proposal. What fails is said in plain words, in three kinds:
   not a command this tool supports");
 - *differs from the PDF where that changes the meaning* (the codes that make a proposal a
   required decision: `symbol_mismatch`, `text_layer_mismatch`, `style_mismatch`,
-  `sign_mismatch`): not used. The card says what differs, in the compare table's words
+  `sign_mismatch`, `number_mismatch`, `case_mismatch`): not used. The card says what differs, in the compare table's words
   ("The ω is bold in the PDF (a vector) but plain in your edit."), and offers **Use my
   edit anyway** (the PDF's text is sometimes wrong). Choosing it saves the edit with the
   failed checks kept on the fix, and its `ReviewEdit` records `"anyway": true`;
