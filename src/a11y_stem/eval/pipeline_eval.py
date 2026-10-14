@@ -1595,6 +1595,30 @@ def document_review_load(items: Sequence[dict]) -> dict:
     }
 
 
+def document_figures(result: Any) -> list[dict]:
+    """What the figure step made of each figure of a converted page (for comparing two runs
+    of the same page: element ids are stable between them)."""
+    elements = {e.id: e for e in result.elements}
+    rows = []
+    for fix in result.fixes:
+        if fix.kind is not Kind.FIGURE:
+            continue
+        element = elements.get(fix.element_id)
+        rows.append(
+            {
+                "element_id": fix.element_id,
+                "page": element.page if element is not None else None,
+                "caption": element.caption if element is not None else None,
+                "status": fix.status.value,
+                "confidence": fix.confidence,
+                "figure_type": fix.figure.figure_type if fix.figure else None,
+                "decorative": fix.figure.decorative if fix.figure else None,
+                "alt": fix.figure.alt if fix.figure else None,
+            }
+        )
+    return rows
+
+
 def _eval_document(
     cfg: EvalConfig, units: list[list[dict]], pdfs: list[bytes]
 ) -> tuple[list[dict], str | None]:
@@ -1626,6 +1650,7 @@ def _eval_document(
         for pair in item["pairs"]:
             pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
         item["review"] = load_counts(result.fixes)
+        item["figures"] = document_figures(result)
         headings = predicted_headings(result.fixes)
         heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
         item["heading_flags"] = heading_flags(heading_item, headings)
