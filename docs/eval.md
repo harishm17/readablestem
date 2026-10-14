@@ -1473,6 +1473,201 @@ The run itself (a11y-stem, the chatbot recipe, the open parsers), the cluster bo
 and the invented-content rate are specified in the pre-registration and happen once, after
 its sign-off items. Until then no number from this set exists.
 
+## Extended development set (dev-v2, T2-0)
+
+The original development set (`data/gold`: three Physics sections, 30 block equations at the
+scorer's ceiling) cannot show the failures the held-out run found: inline stacked fractions
+cut apart, systems and determinants cut into rows, exercise numbers glued onto equations,
+equations pasted as pictures, chemistry and nuclide notation, flattened sub- and
+superscripts, large slide formulas, repeated and sentence-like headings. Fixes found by
+looking at held-out errors must be checked on a new held-out set, so the development set
+has to contain those classes first (IMPROVEMENTS.md, T2-0). `data/dev-v2/` is that set.
+It is a development set: numbers on it say nothing about documents in general, and a rule
+tuned against it is not validated until it passes a set nobody tuned against.
+
+**What it holds.** Gold for OpenStax sections and authored documents, with every item
+labelled with the Tier 2 classes it belongs to. Items per class (the `summary.md` table;
+`a11y-stem gold devset summary` prints it; Check counts are totals of the sealed part):
+
+| Class | Item | Backlog | Target | OpenStax | Authored | Dev | Check |
+|---|---|---|---|---|---|---|---|
+| Determinants (`determinant`) | equation | T2-2 | 20 | 81 | 22 | 103 | 45 |
+| Large display formulas (slides) (`display_large`) | equation | T1-14 | 20 | 0 | 49 | 49 | 0 |
+| Inline stacked fractions (`inline_fraction`) | equation | T2-1 | 40 | 264 | 79 | 343 | 81 |
+| Matrices (`matrix`) | equation | T2-2 | 20 | 50 | 23 | 73 | 12 |
+| Multi-row equations (unbraced systems, worked steps) (`multirow_equations`) | equation | T2-2 | 20 | 149 | 13 | 162 | 44 |
+| Numbered exercises with equations (`numbered_exercise_eq`) | equation | T1-5 | 40 | 295 | 54 | 349 | 98 |
+| Piecewise functions with words (`piecewise_words`) | equation | T2-2 | 20 | 9 | 16 | 25 | 14 |
+| Systems of equations with a brace (`system_braced`) | equation | T2-2 | 20 | 65 | 28 | 93 | 21 |
+| Equations as pictures (`equation_image`) | equation | T2-3 | 20 | 0 | 37 | 37 | 38 |
+| Charges on ions (`chem_charge`) | equation | T2-4 | 20 | 69 | 42 | 111 | 58 |
+| Chemical equations (`chem_equation`) | equation | T2-4 | 20 | 91 | 57 | 148 | 65 |
+| Chemical formulas (`chem_formula`) | equation | T2-4 | 20 | 133 | 78 | 211 | 109 |
+| Nuclide notation (stacked prefix scripts) (`nuclide`) | equation | T2-5 | 20 | 59 | 39 | 98 | 36 |
+| Chemical subscripts and charges in prose (`prose_chem_script`) | script run | T2-4 | 40 | 113 | 150 | 263 | 165 |
+| Nuclide prefix scripts in prose (`prose_nuclide`) | script run | T2-5 | 20 | 24 | 55 | 79 | 57 |
+| Other sub- and superscripts in running text (`prose_script_other`) | script run | T2-4 | 40 | 119 | 139 | 258 | 161 |
+| Units with superscripts in prose (cm3, m/s2) (`prose_unit_power`) | script run | T2-4 | 40 | 40 | 106 | 146 | 102 |
+| Code blocks (`code_block`) | block | - | 20 | 0 | 40 | 40 | 0 |
+| Glossary and key terms (`glossary_entry`) | entry | - | 40 | 67 | 59 | 126 | 44 |
+| Headings long enough to wrap (`heading_multiline`) | heading | T2-8 | 20 | 33 | 14 | 47 | 5 |
+| Repeated heading labels (`heading_repeated_label`) | heading | T2-7 | 40 | 153 | 37 | 190 | 42 |
+| Headings that are sentences (bold lines) (`heading_sentence`) | heading | T2-7 | 40 | 80 | 49 | 129 | 33 |
+| Words hyphenated at a line end (`hyphen_break`) | line end | T1-9 | 40 | 0 | 198 | 198 | 32 |
+| Data tables (`table_data`) | table | - | 20 | 15 | 8 | 23 | 6 |
+| Layout tables (`table_layout`) | table | - | 10 | 20 | 7 | 27 | 11 |
+
+An item is an equation (record with `classes`), a sub- or superscript run in a paragraph
+(`script` records), a heading, a table, a code block, a glossary entry, or a word hyphenated
+at a line end (`hyphen_break` records, authored documents only). "Target" is the least wanted
+across the whole set (the maths classes 20 to 40).
+
+**Sources and licences.**
+
+| Part | Source | Licence | Toolchain |
+|---|---|---|---|
+| OpenStax sections | Algebra and Trigonometry, College Algebra, Elementary Algebra, Chemistry: Atoms First (retired first editions) | CC BY 4.0, attribution in `ATTRIBUTION.md` and in every record | Chromium print by `eval render` (the document, headings, equations and figures tasks print them as for any gold page) |
+| Authored documents | written for this project (`data/dev-v2/authored/build_authored.py`) | MIT | LaTeX built by Tectonic 0.17, Word files made with python-docx and exported by LibreOffice 26.2, HTML printed by Chromium |
+
+Every record carries `license_name`, `license_url` and its source URL. The books are CC BY in
+both the archive and the OpenStax catalogue (`check_public_license`); retired first
+editions are accepted by the decision of 2026-10-13
+(`proof/DECISION-retired-editions-2026-10-13.md`). Figures are referenced by URL, not stored.
+
+**Staying clear of the held-out set.** Three rules, all checked by code:
+
+1. None of the 15 registered sections is used, and no section of a book that has one
+   (College Physics, Chemistry, Precalculus, Introductory Statistics, Intermediate Algebra).
+   The candidate books are Algebra and Trigonometry, College Algebra, Elementary Algebra,
+   Prealgebra, Chemistry: Atoms First and Physics. Those share a text lineage with held-out
+   books (Precalculus, Chemistry, College Physics, Intermediate Algebra), so:
+2. Every chosen section is measured against the 15 registered sections' text: the share of
+   its word 8-grams (visible text, MathML removed; the measure of
+   `proof/selection/features.py`, a test checks the two agree) found in the held-out text
+   must be below 0.05. The measure does remove siblings: 15 of the 458 numbered sections of
+   the candidate books reach 0.05 or more (the highest value kept is 0.048), among them
+   Chemistry: Atoms First 19.3 and 14.7 (1.0), Algebra and Trigonometry 7.2 (0.82) and
+   Elementary Algebra 5.5 (0.65, a mixture-application section that repeats Intermediate
+   Algebra 4.3). The chosen sections' values are in
+   `selection.json` (highest: 0.031); `gold devset verify --overlap` recomputes
+   them against the held-out folder's archive cache.
+3. `gold devset verify` (and a test) fails if a dev file is from a held-out section or book.
+
+The held-out sections' archive pages are read from `~/.cache/a11y-stem/heldout/openstax` only
+to compute these numbers; none is stored in the repository or its caches.
+
+**How the sections are chosen** (`gold/devset.py`, `gold devset select`, deterministic and
+pinned to archive 20260604.144757): candidates are the numbered sections of the candidate
+books with at least 300 words and overlap below 0.05, not used in earlier development. Each
+candidate's items are classified (`gold/devset_classify.py`: MathML shape, the sup and sub
+elements of the page, heading text, `dl`/`pre` blocks). A greedy rule takes the section with
+the most still-needed items per printed page until the class targets in `selection.json` are
+met, prints each winner first (Chromium, as `eval render` does) and drops one longer than
+30 Letter pages, the most the pipeline accepts; sections that repeat a chosen section
+(8-gram overlap above 0.2) are skipped. Key-terms pages of the chosen chapters supply the
+glossary entries. The dev part is 17 sections and one key-terms page of OpenStax (233 Letter pages) and 10 authored documents (105 pages): 28 documents, 338 pages, `manifest.json` SHA-256 `8156ea5e66776bc5172ca8d2713046faf31ea592eb47cde6f146e289bf71f268`. The check part is 5 OpenStax sections and 4 authored documents, 101 pages. No section is over the limit (the longest is 30 pages).
+
+**Records.** OpenStax records are the four kinds `gold fetch` writes (equation, figure, table,
+heading; ids and fields unchanged) with `classes` added, equations also with
+`exercise_number` (the number printed in front of an equation that opens a numbered
+exercise) and `appearance`. New kinds: `script` (a paragraph's sub- and superscript runs:
+the text with `^{...}` and `_{...}` marks, each run's value, base and class), `code`,
+`glossary` (term and definition), and for authored documents `hyphen_break` (left and right
+fragments, the intended word, whether the hyphen belongs to it) and `exercise_text` (an
+exercise typed as text in Word). Authored records have `source: authored`, the `pdf` that
+the eval reads, `toolchain` and `variant`; their equations carry the LaTeX they were set from
+and its MathML (`latex_to_mathml`), the pictured ones the PNG as well.
+Only what has a scorer today is scored: equations (every class), headings and tables. The
+gold for prose sub- and superscripts (T2-4, T2-5) and for words hyphenated at a line end
+(T1-9) waits for the changes that need it; code blocks and glossary entries have no backlog
+item yet. Nothing here scores them.
+
+**Two parts.**
+
+- `dev` (`data/dev-v2/dev/`, `manifest.json` with every file's SHA-256 and the class counts)
+  is for building. It is what `--set dev-v2` runs by default.
+- `check` is small and sealed: `check.sealed.tar.gz`, whose SHA-256 is in `SEAL.json`
+  (SHA-256 `09cf01cd0e8f3d0760801c8773a7792b1456d4be478a12b2be7975f35eccdc75`, 689,154 bytes, 927 records in 62 files). Its OpenStax sections are the greedy choice among the 15% of candidates
+  whose SHA-256 of `salt:book/slug` falls below 0.15; its authored documents are fresh draws
+  from the same generators (the same templates, different numbers, words and terms, so it
+  checks plumbing and regressions more than new styles). It was written by the build script
+  and not read while the set was built. `SEAL.json` holds counts and hashes and no item
+  name. The tests compare hashes and section names (the dev part and the held-out
+  sections must not overlap it) without printing anything. `--part check` verifies the
+  archive against the seal, extracts it under `~/.cache/a11y-stem/dev-v2/`, keeps its
+  render cache, archive cache and report outside the repository, refuses `--items`, and its
+  report holds totals only. The seal is a hash and a rule of use, not secrecy: run it for
+  the totals before a merge and do not open it.
+
+**How inputs are rebuilt.** OpenStax sections as for any gold page (`eval/render.py`, page
+XHTML from the `gold fetch` cache). Authored documents are the PDFs committed beside their
+gold (`eval/devset_media.py`): `DevSetMedia.page_pdf` reads them and `equation_context`
+returns the sentence stored with the equation. The PDFs are untagged. Tectonic runs with
+`-Z deterministic-mode`; Word and LibreOffice output is rebuilt by the same script but
+depends on the installed fonts and hyphenation dictionaries, so the committed PDFs, not a
+rebuild, are the inputs.
+
+```
+uv run a11y-stem gold devset summary                  # items per class
+uv run a11y-stem gold devset verify [--overlap]       # manifest, seal, held-out rules
+uv run a11y-stem eval equations --set dev-v2 --self-check
+uv run a11y-stem eval pipeline --task document --set dev-v2 --fake
+uv run a11y-stem eval pipeline --task headings --set dev-v2 --part check --max-usd 2
+uv run a11y-stem eval pipeline --task tables --set dev-v2 --fake
+# rebuild (needs network for the OpenStax archive, Chromium; the authored pool first):
+uv run python data/dev-v2/authored/build_authored.py --out /tmp/pool --tectonic PATH
+uv run a11y-stem gold devset build --authored-pool /tmp/pool --date 2026-10-14 --force
+```
+
+`--set dev-v2` works on `eval pipeline` (equations, headings, figures, document and tables;
+reports go to `.local/eval/dev-v2/` for dev, not to `data/eval/`), `eval equations`
+(`--self-check`, dev only) and `eval render` (dev pages). `--fake` is allowed on both
+parts: a fake run still prints the sections and runs the layout and heading code, with every
+model call refused at zero cost (the cost lines of a fake run are simulated reservations,
+not spend).
+
+**Plumbing run (2026-10-14, `--fake`, no model call).** All five tasks ran with `--fake` on both parts and
+finished complete, without page errors: on dev equations 1,809 of 1,809, headings 28 of 28
+pages, figures 28 of 28, tables 31 of 31 documents, document 28 of 28 pages (338 Letter pages;
+0 static and 0 axe violations); on check equations 508, headings 10 pages, figures 11, tables 14
+documents, document 10 pages (101 pages). `eval equations --set dev-v2 --self-check` scores
+the 1,809 gold equations against themselves 1.0 with 0 errors. The fake client refuses every
+model call, so the model tasks score zero by construction (equations: every one `failed`,
+exact_lenient 0.000; document: matched_exact_lenient 0.000) and say nothing about quality. The two
+tasks that run no model give a first look at how the layout step does here, on the dev part:
+headings precision 0.890, recall 0.917, level accuracy 0.898 over 683 gold headings (28 pages);
+tables, local mode, detection recall 0.774 and precision 0.911, TEDS 0.718 (31 documents,
+53 gold data tables; 52 of 67 layout tables kept out); document, detection precision
+0.647 and recall 0.825 (the unmatched predictions are mostly prose maths and fragments).
+These are layout-only figures from one run, not a baseline anyone has agreed to; the gold
+manifest hashes are in the reports (`8156ea5e6677...` dev, `2cea9ea7f587...` check).
+
+**What this set does not show.**
+
+- It is a development set built to contain failures. Its rates are not estimates for
+  course PDFs, and which classes are covered is a choice: chemistry and algebra dominate
+  the OpenStax part (no section of the high-school Physics book was needed to reach the class
+  targets within the page limit), and calculus, statistics and scanned pages are not in it.
+- The classes are defined by structure (MathML shape, sup/sub markup, heading text), not by
+  what a reader sees. An equation counted as "inline fraction" is a fraction in a line of
+  MathML; whether the Chromium print stacks it as the held-out PDFs did is checked by the
+  tasks, not by the label. The class lists are not exhaustive and one item can be in
+  several classes.
+- OpenStax gold is Chromium-printed, so layout failures that need TeX or Word output
+  (equation numbers at the margin, glyphs built from pieces, Word superscript runs) come
+  from the authored documents, which are small and written by the project: they test the
+  classes by construction, with the same hand that wrote the code.
+- Piecewise functions with words are few in the OpenStax part (9 of 30 wanted;
+  the one section that holds them is 43 pages, over the page limit); the authored
+  documents supply the rest. In the sealed part the nuclide and piecewise items are all from
+  authored documents, and it has no large display formula and no code block (dev has 49 and 40,
+  all authored).
+- The check part is a regression screen, not a held-out set: its authored documents are
+  draws from templates the dev part was built from, and its sections come from the same
+  books.
+- Gold for the prose sub- and superscripts is the page's own markup. An OpenStax paragraph
+  that writes a unit with a plain digit (`cm3`) is not in it.
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
@@ -1538,6 +1733,10 @@ its sign-off items. Until then no number from this set exists.
 | `src/a11y_stem/gold/heldout.py` | the pre-registered held-out set: its 15 sections, registered hashes and page counts, pinned fetch, `verify_gold` |
 | `src/a11y_stem/cli/heldout.py` | `--set heldout`: where its files live (outside the repository), the guards |
 | `tests/test_heldout.py` | held-out registration, fetch, verification and CLI (offline; one `network` test rebuilds the registered gold) |
+| `src/a11y_stem/gold/devset.py`, `devset_classify.py`, `devset_build.py` | the extended development set: classes, selection against the held-out text, parts, seal, verification, build |
+| `src/a11y_stem/cli/devset.py`, `src/a11y_stem/eval/devset_media.py` | `gold devset ...`, `--set dev-v2`; authored PDFs as eval inputs |
+| `data/dev-v2/` | the extended development set (`README.md` there): dev gold, authored documents and their builder, sealed check archive, seal, selection |
+| `tests/test_devset*.py` | classes, selection, seal and the committed set (offline) |
 | `src/a11y_stem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
 | `src/a11y_stem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
 | `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
