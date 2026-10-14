@@ -1734,9 +1734,9 @@ writes `<mtext>`):
   `$\mathrm{H_2O}$ ` are the same glyphs in a TeX PDF) are text with `<sub>`/`<sup>` now, so
   they leave the equation counts: 20 formulas and 10 charges of the authored documents are
   found only as raised or lowered text (matched, exact and v2 fall by that much), and the model
-  is no longer asked about half a formula ("2O3", "34-"): 236 fewer model calls over the 17
-  documents (960 to 724), 50 fewer required decisions (212 to 162, with the 37 of the pictures
-  added), the recorded cost of the documents $1.665 to $1.463.
+  is no longer asked about half a formula ("2O3", "34-"): 238 fewer model calls over the 17
+  documents (960 to 722), 48 fewer required decisions (212 to 164, with the 37 of the pictures
+  added), the recorded cost of the documents $1.665 to $1.462.
 - **Nuclide notation.** A display nuclear equation used to be cut into four pieces (the mass
   numbers a heading, the symbol of the last nuclide lost); each is one equation now, and 45
   of 98 nuclide equations are content-equal against 36. 22 more are cells of the table
