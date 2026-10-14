@@ -23,7 +23,7 @@
 # rapid_table/table_matcher/main.py (TableMatch.decode_one_logic_points), the pre- and
 # post-processing around the SLANet-plus ONNX model.
 #
-# Changed for a11y-stem (2026-10-09):
+# Changed for ReadableSTEM (2026-10-09):
 # - the resize uses Pillow instead of OpenCV (cv2.resize), so OpenCV is not needed;
 # - one image at a time, already in BGR channel order (as RapidTable passes it);
 # - the cell boxes keep their order and count (RapidTable drops all-zero boxes, which

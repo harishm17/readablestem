@@ -922,7 +922,7 @@ answer is known by construction (`SHOULD_FLAG`) and counts the cases it gets wro
 than `CLAUDE_CANARY_MAX_MISSES` (1) is drift: one ERROR line `claude_canary_drift`. At most
 once a day in the hourly cron (claim row `canary/claude:run`, counts `claude:<status>`),
 fail-open, off with `CLAUDE_CANARY=false`, never with `ENV=test`, `FAKE_MODELS`, another
-provider or `CLAUDE_SECOND_CHECK=off`. By hand: `a11y-stem ops claude-canary --max-usd 0.25`
+provider or `CLAUDE_SECOND_CHECK=off`. By hand: `readablestem ops claude-canary --max-usd 0.25`
 (exit 0, 1 drift, 2 could not run). First live run: 12 of 12 right, $0.0166.
 
 | Test file | What it covers |

@@ -18,7 +18,7 @@ the cascade stays as a second guarantee.
 Review actions are counted at deletion because a reviewer can act any time until then, so
 each action is counted exactly once.
 
-Erasing a person (a data-deletion request, `a11y-stem users delete`) goes through
+Erasing a person (a data-deletion request, `readablestem users delete`) goes through
 `erase_user`: their jobs through `delete_jobs` (so counts are kept), then every row of
 every table that holds their user id, then the user. Only content-free aggregates and
 daily spend remain. A new table with a user id must be added there.

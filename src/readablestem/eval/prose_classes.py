@@ -31,7 +31,7 @@ records of the same page:
 `self_check` renders each gold record into the markup the scorers want and scores that: it
 must give 1.0 on every metric (wiring and rules, not quality). The metrics are the
 `prose_classes` block of the document task's report (`pipeline_eval.document_metrics`) and
-`a11y-stem eval classes --set dev-v2 --self-check`.
+`readablestem eval classes --set dev-v2 --self-check`.
 
 Pure functions of HTML text and gold records; no model, no network.
 """

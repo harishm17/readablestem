@@ -211,7 +211,7 @@ def committed_numbers(root: Path) -> list[str]:
 
 
 def _run_cli(root: Path, args: Sequence[str]) -> int:
-    """Run `a11y-stem <args>` in a child process; show its output only if it fails."""
+    """Run `ReadableSTEM <args>` in a child process; show its output only if it fails."""
     code = "import sys; from readablestem.cli.main import main; sys.exit(main())"
     done = subprocess.run(
         [sys.executable, "-c", code, *args],
@@ -272,11 +272,11 @@ LIVE_NOTE = """\
 Not re-run here: the model numbers (equations, figures, document). They need an OpenAI key
 and cost about $0.30 for all three on the sample (docs/eval.md, "How to rerun"):
 
-    uv run --env-file .env a11y-stem eval pipeline --task equations --max-usd 0.50 \\
+    uv run --env-file .env readablestem eval pipeline --task equations --max-usd 0.50 \\
         --out .local/eval/equations.json
-    uv run --env-file .env a11y-stem eval pipeline --task figures --max-usd 0.50 \\
+    uv run --env-file .env readablestem eval pipeline --task figures --max-usd 0.50 \\
         --out .local/eval/figures.json
-    uv run --env-file .env a11y-stem eval pipeline --task document --max-usd 2.00 \\
+    uv run --env-file .env readablestem eval pipeline --task document --max-usd 2.00 \\
         --out .local/eval/document.json
 
 A new run will differ a little (the models are not deterministic); compare it with the
@@ -297,7 +297,7 @@ def run_checks(root: Path, *, offline_rerun: bool = False) -> list[Check]:
 
 
 def render(checks: Sequence[Check], numbers: Sequence[str]) -> str:
-    out = ["a11y-stem: offline reproduction", ""]
+    out = ["ReadableSTEM: offline reproduction", ""]
     for check in checks:
         out.append(f"[{'ok' if check.ok else 'FAIL'}] {check.name}")
         if check.detail:

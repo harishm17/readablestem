@@ -90,7 +90,7 @@ def test_one_short_sentence_counts_decisions_not_fixes(split):
     for wordy in ("For each fix", "keeps the proposal as it is", "Only what could change"):
         assert wordy not in page
     assert "<title>Decision 1 of 3: Review review.pdf" not in page  # the upload's own name
-    assert re.search(r"<title>Decision 1 of 3: Review [^<]+ \| a11y-stem</title>", page)
+    assert re.search(r"<title>Decision 1 of 3: Review [^<]+ \| ReadableSTEM</title>", page)
 
 
 REST = "Everything else was accepted; optional checks are below."

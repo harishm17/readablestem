@@ -1,9 +1,9 @@
-# a11y-stem
+# ReadableSTEM
 
 [![CI](https://github.com/harishm17/a11y-stem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/harishm17/a11y-stem/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 
-a11y-stem assists instructors who need to turn a STEM course PDF into an accessible web
+ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
 page. It reads the PDF, rebuilds equations as MathML a screen reader can speak, restores
 headings and lists, writes short alt text for figures, and returns one self-contained HTML
 file. Every change it is unsure about goes to a review screen where the instructor accepts,
@@ -13,6 +13,9 @@ It assists; it does not certify. Nothing here establishes conformance with WCAG,
 any other standard, and the output still needs a person to look at it. That is what the
 review screen is for.
 
+ReadableSTEM was called a11y-stem until October 2026; the `a11y-stem` command still works.
+The site is at readablestem.com.
+
 **What it is not.** It is not a compliance checker. It is not an OCR engine for scans or
 handwriting (those pages are kept as images and flagged). It is not a general PDF-to-Markdown
 converter, and it does not work from Word, LaTeX or PowerPoint sources: it starts from the
@@ -20,7 +23,7 @@ PDF.
 
 **Status.** Pre-release. The code, the evaluation harness and the documentation are here; a
 hosted, allowlisted beta is planned for 9 November 2026.
-`uv run a11y-stem ops launch-check` lists the launch blockers that are still open.
+`uv run readablestem ops launch-check` lists the launch blockers that are still open.
 
 ## See it
 
@@ -50,7 +53,7 @@ which are approximate with this few and tend to be a little narrow.
 credit during the first attempt (Addendum 3), and every model call of this run went to Claude
 instead ([Addendum 6](proof/PREREGISTRATION-ADDENDUM-6.md), written before any model saw a
 held-out section; [Addendum 7](proof/PREREGISTRATION-ADDENDUM-7.md) records what happened
-during the run). a11y-stem ran with `claude-haiku-5-5` (cheap) and `claude-opus-5-5` (main), the
+during the run). ReadableSTEM ran with `claude-haiku-5-5` (cheap) and `claude-opus-5-5` (main), the
 production settings otherwise, and no second automated check (that is OpenAI's). The chatbot
 recipe is Purdue's one-sentence prompt, verbatim, on `claude-opus-5-5` (two runs) and on
 `claude-haiku-5-5` (two runs); the registration's expert-prompt arm was not run. Figures are
@@ -59,14 +62,14 @@ judged by `claude-opus-5-5`. The open parsers are the ones recorded earlier, wit
 arm with formula recognition was not carried out). The configuration was chosen on the
 development sample and frozen before the run. Nothing was tuned on these sections.
 
-Recorded model spend: a11y-stem $10.88 (its figure judge included), the opus chatbot arm
+Recorded model spend: ReadableSTEM $10.88 (its figure judge included), the opus chatbot arm
 $22.34 and its judge $0.72, the haiku arm $1.49 and its judge $0.78: $36.21, under the $45
 ceiling. About $1.3 more went to an interrupted run that was made again, and $1.08 to the
 development-sample checks that priced the run (Addendum 7).
 
-**Where a11y-stem loses, and where it does not.**
+**Where ReadableSTEM loses, and where it does not.**
 
-| Held-out, 15 sections | a11y-stem | Chatbot, Opus | Chatbot, Haiku | Docling | MinerU (basic) | PyMuPDF4LLM |
+| Held-out, 15 sections | ReadableSTEM | Chatbot, Opus | Chatbot, Haiku | Docling | MinerU (basic) | PyMuPDF4LLM |
 |---|---|---|---|---|---|---|
 | Equations right, end to end (document task) | 0.504 [0.376, 0.599] | **0.622** [0.464, 0.727] | 0.600 [0.437, 0.708] | 0 | 0.174 [0.108, 0.218] | 0 |
 | Wrong equations nobody is asked about, per 100 | 23.3 [19.0, 29.5] | 24.0 [16.1, 33.4] | 25.2 [18.2, 34.6] | 0 (writes none) | 27.6 [22.2, 34.7] | 0 (writes none) |
@@ -77,17 +80,17 @@ development-sample checks that priced the run (Addendum 7).
 | Cost per PDF page (median) | $0.0125 | $0.0477 | $0.0015 | $0 | $0 | $0 |
 | Seconds per PDF page (median) | 4.3 | 10.7 | 4.5 | 3.7 | 4.3 | 0.35 |
 
-- **Equations: the chatbot on Opus is ahead.** a11y-stem gets 1,379 of 2,738 equations (two runs)
+- **Equations: the chatbot on Opus is ahead.** ReadableSTEM gets 1,379 of 2,738 equations (two runs)
   exactly right through the whole pipeline; the Opus chatbot gets 1,702. The difference is
-  -0.118 for a11y-stem (registered 99% interval -0.199 to -0.025, which excludes 0; the sign-flip
+  -0.118 for ReadableSTEM (registered 99% interval -0.199 to -0.025, which excludes 0; the sign-flip
   test on the 15 section differences gives p = 0.023, above its 0.01 threshold), so the report
   writes "higher by point estimate" for the chatbot and not "better". Chemistry is near zero
   for every system (0.04 for all three), and the scorer's own ceiling on a hand-written sample is
-  0.70, so absolute numbers read low for everyone. a11y-stem's equations task, which hands it
+  0.70, so absolute numbers read low for everyone. ReadableSTEM's equations task, which hands it
   each equation as a picture with its text layer, scores 0.684 [0.553, 0.783]: the loss
   comes from finding and cutting out equations in a whole page (it finds 88.9% of them and
   writes 26.5% extra pieces with no gold partner), not only from reading them. Against
-  MinerU, the only parser that writes LaTeX, a11y-stem is better (0.504 against 0.174, registered
+  MinerU, the only parser that writes LaTeX, ReadableSTEM is better (0.504 against 0.174, registered
   99.4% interval 0.18 to 0.44). Docling and PyMuPDF4LLM write no equations by design, so their 0
   describes what they are built for.
 - **The review screen misses most wrong equations and every wrong heading.** 23.3 of every 100
@@ -103,35 +106,35 @@ development-sample checks that priced the run (Addendum 7).
   acceptance threshold and 296 symbol mismatches (a fix can have several reasons). At that rate a
   30-page document, the most the app takes, comes with about 53 decisions. This is the number
   to weigh the others against.
-- **Headings: a11y-stem leads, by less than the intervals need.** F1 0.961 against 0.910 to
+- **Headings: ReadableSTEM leads, by less than the intervals need.** F1 0.961 against 0.910 to
   0.932 for the others. The paired comparisons at the registered level (k = 8, 99.4%)
   exclude 0 against MinerU and PyMuPDF4LLM, and against neither does the sign-flip test agree
   (p = 0.0073 and 0.0088, thresholds 0.00625), so the report writes "higher by point estimate";
   they do not exclude 0 against Docling or the Opus chatbot. The clearest lead is in the levels:
-  a11y-stem gets the relative level of every matched heading right, the chatbots 34% and 51%,
+  ReadableSTEM gets the relative level of every matched heading right, the chatbots 34% and 51%,
   Docling and MinerU write one level.
-- **Figures: a11y-stem is ahead on the judge,** which is a model and is not calibrated against
+- **Figures: ReadableSTEM is ahead on the judge,** which is a model and is not calibrated against
   human labels (that pass is agreement with it, not accuracy). Parsers write no description.
 - **Invented content** (units the PDF's text layer does not hold; the rule's precision and recall
   are not audited, so these are text-layer mismatches, not proven inventions):
 
-  | Per unit | a11y-stem | Chatbot, Opus | Chatbot, Haiku | Docling | MinerU | PyMuPDF4LLM |
+  | Per unit | ReadableSTEM | Chatbot, Opus | Chatbot, Haiku | Docling | MinerU | PyMuPDF4LLM |
   |---|---|---|---|---|---|---|
   | Prose sentences | 0.079 | 0.040 | 0.037 | 0.009 | 0.008 | 0.030 |
   | Numbers | 0 of 3,672 | 5 of 3,088 | 5 of 3,058 | 42 of 3,054 | 2 of 2,160 | 116 of 5,179 |
   | Equations, an added symbol (aligned to gold) | 0.087 | 0.020 | 0.017 | | 0.264 | |
   | Equations with no gold partner | 0.027 | 0.294 | 0.226 | | 0.140 | |
 
-  a11y-stem's prose figure counts the sentences it writes itself ("About this version" and
+  ReadableSTEM's prose figure counts the sentences it writes itself ("About this version" and
   notices); without them it is 0 of 4,104. It copies prose, so its numbers there measure the
   copying. On equations it adds a symbol to 8.7% of the ones it writes, against 2% for the
   chatbots; the chatbots write many more equations the PDF has no match for.
-- **Coverage** of the PDF's text (word 6-grams): a11y-stem 0.653, the chatbots 0.646 and 0.621,
+- **Coverage** of the PDF's text (word 6-grams): ReadableSTEM 0.653, the chatbots 0.646 and 0.621,
   Docling 0.724, MinerU 0.674, PyMuPDF4LLM 0.800.
-- **Cost and time.** a11y-stem's document task cost $6.62 for the 15 sections twice ($0.0137 per
+- **Cost and time.** ReadableSTEM's document task cost $6.62 for the 15 sections twice ($0.0137 per
   page on average); the Opus chatbot cost $22.34 for two runs, 3.8 times as much per page; the
   Haiku chatbot $1.49. Parsers cost no API money. The time is wall clock on one machine, at
-  concurrency 4 for a11y-stem.
+  concurrency 4 for ReadableSTEM.
 
 **Not measured.** Whether a wrong equation changes the meaning, whether the figure judge agrees
 with a person, and the audit of the invented-content rule: those labels are mine to make and
@@ -155,11 +158,11 @@ What was fixed before the run, and can be checked now:
 | Choice | a seeded rule on input properties only, with every section used in development excluded; the rule's code, its inputs and its output are in [`proof/selection/`](proof/selection/), and `tests/test_proof_registered.py` re-runs the draw and compares it with the committed result |
 | Registration | [`proof/PREREGISTRATION.md`](proof/PREREGISTRATION.md), SHA-256 `2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34` (version 2), and the answer key's manifest `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`, checked before a run. This is version 2 of the registration: it differs from version 1 only in wording (the names of the people who asked for this evidence, an authorship line and paths on my machine were removed), and version 1's hashes are kept. Addendum 6, which moved the model-dependent parts to Claude, has SHA-256 `7d6a69ff3e2dfb6acb14423e46371ece3ece59c27842daf0c426c6786b170184`, and Addendum 7, written after the run, `4248399dc05f217ca8751789b3cf7d94c0ee2a8179761052137d254c4b4e6b4f`. The frozen files and how to check them are in [`proof/REGISTERED.md`](proof/REGISTERED.md); the only timestamps are the files' own and this repository's commits, there is no outside timestamp yet |
 | Scorer ceiling (answer key only, no model) | known-correct LaTeX written by hand for 40 of the 1,369 equations scores 28 of 40 under the lenient scorer (0.70, Wilson 95% 0.55 to 0.82), because OpenStax writes signs, degrees and units inside number or text tokens; a perfect transcriber is not scored 1.0, and a tool that writes LaTeX in its own style pays more (normalising markup alone moves MinerU from 0.174 to 0.197). I have not checked the 40 against the rendered gold yet |
-| Compared | a11y-stem against the chatbot recipe instructors copy (Purdue's one-sentence prompt, [quoted from its page](https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/) as of 2026-10-09, on claude-opus-5-5 and claude-haiku-5-5) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
+| Compared | ReadableSTEM against the chatbot recipe instructors copy (Purdue's one-sentence prompt, [quoted from its page](https://www.purdue.edu/innovativelearning/tools-resources/accessibility/digital-instructional-materials-accessibility-checklist/digital-math/) as of 2026-10-09, on claude-opus-5-5 and claude-haiku-5-5) and against Docling, MinerU and PyMuPDF4LLM, on equations, headings, figures and invented content |
 | Not measured | whether a wrong equation changes the meaning, and whether the figure judge agrees with a person: those labels are mine to make and do not exist yet |
 
 To make the recording again, `PROVIDER=anthropic ENV_FILE=/path/to/.env proof/record-heldout.sh`
-(the caps are in the script; this run's were $26 for a11y-stem and $13, $2.50 and $3.50
+(the caps are in the script; this run's were $26 for ReadableSTEM and $13, $2.50 and $3.50
 for the chatbot arms and their judge, within a $45 ceiling), or `PROVIDER=openai` for the
 registration's OpenAI models. The recording code, the caps and the reproduction path are
 described in [docs/proof.md](docs/proof.md). `make proof` replays the committed recording and
@@ -246,7 +249,7 @@ Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer.
 git clone https://github.com/harishm17/a11y-stem.git
 cd a11y-stem
 uv sync
-uv run a11y-stem convert tests/fixtures/layout/latex/problem_set.pdf --out out.html --fake
+uv run readablestem convert tests/fixtures/layout/latex/problem_set.pdf --out out.html --fake
 ```
 
 `--fake` answers every model request offline with placeholder output, so the whole flow runs
@@ -254,15 +257,15 @@ for free and shows the plumbing, not the quality. For real conversions, copy
 `.env.example` to `.env`, set `OPENAI_API_KEY`, and give every run a spend cap:
 
 ```
-uv run a11y-stem convert my.pdf --out my.html --max-usd 1.00 --report my.json
+uv run readablestem convert my.pdf --out my.html --max-usd 1.00 --report my.json
 ```
 
 To run the web app locally, with no sign-in provider and no key:
 
 ```
 cp .env.example .env     # then set ENV=dev, DEV_LOGIN_ENABLED=true, FAKE_MODELS=true
-uv run a11y-stem users allow you@example.org --admin
-uv run a11y-stem serve   # http://127.0.0.1:8000, sign in at /dev-login
+uv run readablestem users allow you@example.org --admin
+uv run readablestem serve   # http://127.0.0.1:8000, sign in at /dev-login
 ```
 
 Settings are listed in [`.env.example`](.env.example) and explained in
@@ -332,7 +335,7 @@ the service is offered under AGPL-3.0 terms and links this repository's complete
 every page footer. OpenStax material used as answer keys, in the demo and in test fixtures is
 CC BY 4.0 with attribution; documents under `data/authored/` are MIT. The full list of which
 files are under which licence, and the third-party packages, is in
-[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). a11y-stem is not affiliated with or
+[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md). ReadableSTEM is not affiliated with or
 endorsed by OpenStax.
 
 ## How it was built

@@ -12,8 +12,8 @@ Code: `src/readablestem/web/`. Tests: `tests/test_web_*.py`.
 ```
 uv sync --all-groups
 cp .env.example .env            # then set the values below
-uv run a11y-stem users allow you@example.org --admin
-uv run a11y-stem serve --reload # http://127.0.0.1:8000
+uv run readablestem users allow you@example.org --admin
+uv run readablestem serve --reload # http://127.0.0.1:8000
 ```
 
 A verbatim copy of `.env.example` loads (blank values mean "not set"). Minimal `.env`
@@ -36,7 +36,7 @@ are not set up on this server yet") rather than a generic error.
 test the tables are created on start-up; there is no session secret, so a random one is
 made per process and a restart (or `--reload`) signs everyone out.
 
-`a11y-stem serve` runs `uvicorn readablestem.web.app:create_app --factory`. Options:
+`readablestem serve` runs `uvicorn readablestem.web.app:create_app --factory`. Options:
 `--host` (default 127.0.0.1; use 0.0.0.0 in a container), `--port` (default `$PORT` or
 8000), `--reload`.
 
@@ -56,7 +56,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 | `FEATURE_TABLES`, `FEATURE_LONG_DESCRIPTIONS`, `FEATURE_COLOUR`, `FEATURE_NOTATION_MEMORY` | Content features, all off by default (docs/design/content-features.md "Flags") |
 | `FEEDBACK_QUESTIONS_ENABLED`, `EVENTS_ENABLED` | The two questions after a download, and content-free usage events (`events` table; see "Usage events"). Both on by default; the questions are stored as events, so they need both |
 | `FEEDBACK_URL` | Where the footer's "Send feedback" link goes (http or https only). Unset: an email to `CONTACT_EMAIL`. A form service here is a new data processor: name it in the privacy notice first |
-| `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft) |
+| `BASE_URL` | Builds the OAuth redirect URIs, `${BASE_URL}/auth/callback` (Google) and `${BASE_URL}/auth/microsoft/callback` (Microsoft). Production: `https://readablestem.com`, so Google's redirect URI is `https://readablestem.com/auth/callback` |
 | `ADMIN_EMAILS` | Comma-separated; made allowed admins at every start-up |
 | `DEV_LOGIN_ENABLED` | Enables `/dev-login` (only with `ENV=dev` or `test`) |
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
@@ -80,7 +80,7 @@ All live in `readablestem.config.Settings` (environment or `.env`).
 |---|---|---|
 | GET `/` | anyone | What the tool does, why now, how long, how accurate (numbers from docs/eval.md, linked), what to do with the file, sign-in, link to the demo |
 | GET `/demo` | anyone | `web/static/demo/index.html` if present (served with the sandbox CSP), else a "being prepared" page |
-| GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `a11y-stem ops launch-check` lists what is still unfinished on the public pages |
+| GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `readablestem ops launch-check` lists what is still unfinished on the public pages |
 | GET `/limits` | anyone | Known limits: the facts that hold today and the measured accuracy, marked "Draft, to be reviewed by Harish" until he writes the copy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
 | GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
@@ -212,7 +212,7 @@ yours to see". It is a 404 either way. The
 - **Other Google accounts for one instructor** (T3-10, `web/linked_emails.py`, table
   `linked_emails`). An instructor invited under a university address who can sign in with
   Google only as a personal one is linked by an admin (`/admin`, "Let an instructor sign in
-  with another Google account", or `a11y-stem users link EMAIL OTHER` and `users unlink
+  with another Google account", or `readablestem users link EMAIL OTHER` and `users unlink
   OTHER`). Signing in with the linked address, verified by Google as always, signs in the
   same user: same documents, courses and daily pages. Rules, each tested: the instructor
   must be on the allowlist and their own `is_allowed` decides on every request, so removing
@@ -236,7 +236,7 @@ yours to see". It is a 404 either way. The
   per target address in 15 minutes whoever asks, besides the per-address sign-in limits; a
   failing sender is logged by type and never shown. The link is in the URL, so Cloud Run's
   request logs and the mailbox hold it until it expires or is used.
-- **Allowlist.** `users.is_allowed`, managed with `a11y-stem users allow|deny|list` or on
+- **Allowlist.** `users.is_allowed`, managed with `readablestem users allow|deny|list` or on
   `/admin`. It is checked on every request, so removing someone ends their access at
   once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
   created for them.
@@ -352,7 +352,7 @@ one-page file with a Word equation took 5.5 s and $0.014 on Claude.
 Not done: Word fields are not evaluated (an `INCLUDETEXT` field did not read the local file
 it names, tested); no PowerPoint conversion could be run on the development box (Impress is
 not installed there), so that path is covered by the file checks and a stand-in only.
-`a11y-stem convert FILE.docx` takes Word and PowerPoint files too.
+`readablestem convert FILE.docx` takes Word and PowerPoint files too.
 
 A third box, off by default: "Exam or quiz: describe figures without giving answers"
 (`exam`). It is stored as `jobs.exam_mode` and the worker passes it to the conversion as
@@ -2031,19 +2031,19 @@ URL comes from `DATABASE_URL` (or the settings, which read `.env`).
 
 Besides jobs and their children, the schema holds a user's courses and their notation
 entries (user content), content-free usage events, sign-in identities and the daily
-counters (docs/design/content-features.md "Database"). `a11y-stem users delete` erases a
+counters (docs/design/content-features.md "Database"). `readablestem users delete` erases a
 person through `ops.retention.erase_user`: every job (counted first), then every row of
 every table that holds their user id, then the account; a test fails when a table with
 a user id is added without it.
 
 - Dev and test create tables directly on start-up. Production refuses to start when the
-  schema is missing or behind this release's migrations: run `uv run a11y-stem db
+  schema is missing or behind this release's migrations: run `uv run readablestem db
   upgrade` (same as `uv run alembic upgrade head`) before deploying. A schema at a
   revision this release does not know (a newer release migrated it) is accepted and
   logged as `schema_ahead`, so traffic can roll back to an older revision; see
   deploy.md, "Roll back".
 - A local SQLite database made by start-up cannot then be upgraded with Alembic (its
-  tables already exist). Delete `.local/a11y-stem.db` if you need to test migrations.
+  tables already exist). Delete `.local/readablestem.db` if you need to test migrations.
 - `7c1d9a4e2b60` adds `jobs.retention_mode` (server default `day`; old opt-in rows become
   `dev`), `jobs.title_override` and `jobs.contact_line`; the downgrade drops them.
 - `3b8e5f1a9d27` (after `7c1d9a4e2b60`) adds `jobs.exam_mode` (server default false); the

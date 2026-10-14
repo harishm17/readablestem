@@ -1,1 +1,1 @@
-"""a11y-stem observability."""
+"""ReadableSTEM observability."""

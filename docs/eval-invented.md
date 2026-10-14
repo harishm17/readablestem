@@ -1,8 +1,8 @@
 # Invented-content rate
 
 How much of a system's output says something the source PDF does not. It works on any
-output: a11y-stem HTML, a chatbot's HTML, a PDF parser's Markdown. Code:
-`src/readablestem/eval/invented/`; command: `a11y-stem eval invented ...`.
+output: ReadableSTEM HTML, a chatbot's HTML, a PDF parser's Markdown. Code:
+`src/readablestem/eval/invented/`; command: `readablestem eval invented ...`.
 
 The rules are the table in section 7.5 of the held-out pre-registration. This page says how
 each rule is read where that table leaves room, what was added next to it, what it found on
@@ -40,13 +40,13 @@ measures the judge against human labels.
   analysis read the flattened text of a MathML equation as a sentence: 134 of its 918 flagged
   "sentences" were equations. See the comparison below.)
 - **Numbers** are read from every prose block and heading, not only from sentences of 7 words.
-- **TeX** in a chatbot's HTML is converted with a11y-stem's own cleaner and converter
+- **TeX** in a chatbot's HTML is converted with ReadableSTEM's own cleaner and converter
   (`equation_step.clean_latex`, `_convert`) and macros the page defines are expanded. A span
   that does not convert is counted as *unchecked*, never as correct.
 - **Alignment** of output equations to gold equations is the document task's (weighted LCS on
   the MathML signature, threshold 0.5, reading order). With no gold directory every equation
   is "no gold partner".
-- **Text a11y-stem wrote itself** (elements with class `a11y-stem`: the "About this version"
+- **Text ReadableSTEM wrote itself** (elements with class `readablestem`: the "About this version"
   section, notices, labels) is scored like any other text and counted apart. Every table has
   two views: all text (the headline for an output shown to a reader, because a reader reads
   the notes too) and without the tool's own text.
@@ -81,25 +81,25 @@ only.
 
 ```
 # one output (no model call, no key); --units writes the text of every unit to the JSON
-a11y-stem eval invented score --pdf section.pdf --output out.html --system a11y-stem \
+readablestem eval invented score --pdf section.pdf --output out.html --system ReadableSTEM \
     --section 5-4 --run 1 --gold data/gold/... --pages <page slugs> --units --out rep.json
 
 # pool reports into rates with intervals; --compare A B gives a paired difference
-a11y-stem eval invented summary rep-*.json --out summary.json
+readablestem eval invented summary rep-*.json --out summary.json
 
 # figure descriptions: a seeded sample, image-aware judge, hard spend cap
-a11y-stem eval invented judge --output out.html --gold ... --pages ... --images <cache> \
+readablestem eval invented judge --output out.html --gold ... --pages ... --images <cache> \
     --sample 30 --max-usd 0.5 --out judge.json
 
 # the audit: a blind sheet and its key, then precision and recall from the labelled sheet
-a11y-stem eval invented audit-sheet --reports rep-*.json --pdf-dir pdfs/ --sheet s.csv --key k.json
-a11y-stem eval invented audit-score --key k.json --sheet s.csv --out audit.json
+readablestem eval invented audit-sheet --reports rep-*.json --pdf-dir pdfs/ --sheet s.csv --key k.json
+readablestem eval invented audit-score --key k.json --sheet s.csv --out audit.json
 
 # plant inventions by hand and see whether they are found (the development check)
-a11y-stem eval invented selfcheck --pdf p.pdf --output out.html --plan plan.json
+readablestem eval invented selfcheck --pdf p.pdf --output out.html --plan plan.json
 
 # the SHA-256 of the rules' code and thresholds
-a11y-stem eval invented fingerprint
+readablestem eval invented fingerprint
 ```
 
 Real model calls need `--max-usd` (or `--fake`) and the usual key. A report carries the
@@ -124,18 +124,18 @@ is no precision or recall to report yet.
 
 Data: saved chatbot runs from earlier development work, kept outside this repository (gpt-6-luna and gpt-6.1-sol, three
 prompts, 8 input PDFs: Physics 2.2-2.3 and 7 small authored documents, 40 PDF pages; some
-arms have 2 or 3 runs), and a11y-stem (pipeline 0.4.0, commit 293160e) run once on the same
+arms have 2 or 3 runs), and ReadableSTEM (pipeline 0.4.0, commit 293160e) run once on the same
 8 PDFs (default flags).
 The numbers are in `data/eval/invented-dev-2026-10-13.json` (counts only, no text), with the
 fingerprint of the code that produced them; `eval invented fingerprint` must print the same
 value for them to be reproduced.
 
-### a11y-stem against the chatbots (units unsupported / units, all text)
+### ReadableSTEM against the chatbots (units unsupported / units, all text)
 
 | System | Sentences | Numbers | Headings | Equations, aligned | Equations, no gold partner | Table cells |
 |---|---|---|---|---|---|---|
-| a11y-stem, all text | 45 / 436 | 0 / 274 | 8 / 132 | 0 / 22 | 0 / 59 | none |
-| a11y-stem, without its own text | 0 / 391 | 0 / 274 | 0 / 124 | 0 / 22 | 0 / 59 | none |
+| ReadableSTEM, all text | 45 / 436 | 0 / 274 | 8 / 132 | 0 / 22 | 0 / 59 | none |
+| ReadableSTEM, without its own text | 0 / 391 | 0 / 274 | 0 / 124 | 0 / 22 | 0 / 59 | none |
 | luna, expert prompt | 30 / 419 | 5 / 288 | 1 / 121 | 0 / 21 | 1 / 65 | 0 / 104 |
 | luna, naive prompt | 77 / 269 | 1 / 249 | 20 / 78 | none | 0 / 43 | 0 / 107 |
 | luna, short WCAG prompt | 61 / 248 | 1 / 174 | 16 / 88 | 5 / 17 | 4 / 67 | 0 / 95 |
@@ -150,12 +150,12 @@ naive and WCAG-prompt arms is mostly text they added (study aids, "In words:" re
 equations, accessibility notes, a contents list), which is what the metric is for, but a
 share of it is faithful paraphrase that the rule counts as unsupported (a known false
 positive). The audit, not this table, says what share. Wilson intervals for the sentence
-rate are, for example, a11y-stem all text 7.8 to 13.5%, sol naive 57.4 to 63.5%; the cluster
-intervals over 8 sections are far wider (a11y-stem 2.8 to 51.0%, sol naive 12.3 to 63.6%)
+rate are, for example, ReadableSTEM all text 7.8 to 13.5%, sol naive 57.4 to 63.5%; the cluster
+intervals over 8 sections are far wider (ReadableSTEM 2.8 to 51.0%, sol naive 12.3 to 63.6%)
 because the rate depends heavily on the document. With 8 documents this development set
 cannot rank the arms.
 
-What a11y-stem's 45 flagged sentences and 8 flagged headings are: every one is text the
+What ReadableSTEM's 45 flagged sentences and 8 flagged headings are: every one is text the
 tool wrote itself (the "About this version" section: 4 fixed sentences, 1 heading; and
 notices such as "This table is shown as an image of the original..."). Text copied from the
 PDF: 0 of 391 sentences, 0 of 274 numbers, 0 of 124 headings, 0 of 22 aligned equations
@@ -171,7 +171,7 @@ in copied sentences, and a symbol added to each of 5 real equations. They were p
 the sol/expert run on Physics 2.2-2.3 (62 units flagged before planting):
 
 ```
-a11y-stem eval invented selfcheck --pdf long_2-2_2-3.pdf --output sol-expert.html \
+readablestem eval invented selfcheck --pdf long_2-2_2-3.pdf --output sol-expert.html \
     --plan data/eval/invented-plants-physics-2-2-2-3.json --gold data/gold/openstax/physics \
     --pages 2-2-speed-and-velocity,2-3-position-vs-time-graphs
 ```
@@ -186,7 +186,7 @@ a11y-stem eval invented selfcheck --pdf long_2-2_2-3.pdf --output sol-expert.htm
 | symbol added to a real equation | 5 | 5 | 100% |
 
 No unit other than the planted ones became flagged. The same 20 sentences, 6 headings and 5
-equations planted in a11y-stem's output on the same document were found 31 of 31. These are
+equations planted in ReadableSTEM's output on the same document were found 31 of 31. These are
 easy cases written by the person who built the rules: they show the rules work as
 specified, not how often they are right on a system's own mistakes. Two numbers and one
 heading first planted coincided with text the PDF prints; they were replaced before the
@@ -201,9 +201,9 @@ swapped. Every 4-gram is in R, so the sentence is not flagged.
 
 | Descriptions | Judged | Factual error | Wilson 95% | Judge cost |
 |---|---|---|---|---|
-| a11y-stem, Physics 2.2-2.3 | 9 of 9 | 0 | 0 to 29.9% | $0.0377 |
+| ReadableSTEM, Physics 2.2-2.3 | 9 of 9 | 0 | 0 to 29.9% | $0.0377 |
 | sol/expert chatbot, same document (7 of 9 had an image) | 7 of 7 | 0 | 0 to 35.4% | $0.0227 |
-| a11y-stem with 4 of 9 alt texts replaced by wrong ones (a bar chart for a map, a sailboat for a jet car, a rising line made falling, a falling one made rising) | 9 of 9 | 4 (the 4 planted) | 18.9 to 73.3% | $0.0207 |
+| ReadableSTEM with 4 of 9 alt texts replaced by wrong ones (a bar chart for a map, a sailboat for a jet car, a rising line made falling, a falling one made rising) | 9 of 9 | 4 (the 4 planted) | 18.9 to 73.3% | $0.0207 |
 
 About $0.003 per judged description (gpt-6.1-sol, list price). 30 descriptions per system
 cost about $0.10. The judge was not calibrated against human labels for this check; the

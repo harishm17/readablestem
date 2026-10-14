@@ -95,7 +95,7 @@ def test_downgrade_removes_everything(tmp_path):
 def test_production_refuses_a_database_without_migrations(tmp_path):
     engine = db.make_engine(f"sqlite:///{tmp_path}/empty.db")
     settings = make_settings(tmp_path, env="prod")
-    with pytest.raises(ConfigError, match="a11y-stem db upgrade"):
+    with pytest.raises(ConfigError, match="readablestem db upgrade"):
         prepare_database(engine, settings)
     engine.dispose()
 

@@ -4,7 +4,7 @@ code from PaddleOCR's PP-Structure, Copyright (c) 2020 PaddlePaddle Authors. All
 Reserved. Both are licensed under the Apache License, Version 2.0
 (rapid_table-LICENSE.txt in this folder).
 
-The code was modified for a11y-stem on 2026-10-09; the changes are listed at the top of
+The code was modified for ReadableSTEM on 2026-10-09; the changes are listed at the top of
 rapid_table.py.
 
 The SLANet-plus model weights the code runs (slanet-plus.onnx, downloaded at build time,

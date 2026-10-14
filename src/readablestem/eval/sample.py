@@ -11,7 +11,7 @@ records as a small gold directory (same layout, with each book's `_book.json`), 
 or figures, or whole pages for headings and document. At least one unit is drawn.
 
 TODO(Harish): also sample opted-in production pages once their review labels exist as
-gold (`a11y-stem ops export-opted-in` writes labels; turning them into gold records is
+gold (`readablestem ops export-opted-in` writes labels; turning them into gold records is
 not built), and decide whether a scheduled workflow should spend on this every week
 (eval-live.yml is manual-only by design).
 """

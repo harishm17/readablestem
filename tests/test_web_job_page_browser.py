@@ -232,7 +232,7 @@ def test_the_steps_update_without_touching_the_live_region(site, browser, jobs):
     site.converter.output = card_output()  # 3 decisions open
     finish(site, job_id)
     page.locator("#job-status").get_by_role("link", name="Start the review").wait_for(timeout=15000)
-    assert page.title() == "Converted: SECRET-HEADING Kinematics | a11y-stem"
+    assert page.title() == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
     assert page.locator("#job-progress li").count() == 0
     context.close()
 

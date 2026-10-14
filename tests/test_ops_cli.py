@@ -1,4 +1,4 @@
-"""a11y-stem ops aggregate|purge|cron against a SQLite file named by DATABASE_URL."""
+"""readablestem ops aggregate|purge|cron against a SQLite file named by DATABASE_URL."""
 
 from __future__ import annotations
 
@@ -101,7 +101,7 @@ def test_weekly_report_prints_the_error_analysis_tables(database, capsys):
     capsys.readouterr()
     assert main(["ops", "report", "--days", "7"]) == 0
     out = capsys.readouterr().out
-    assert "a11y-stem error analysis" in out
+    assert "ReadableSTEM error analysis" in out
     assert "pages converted  2" in out and "cost per page    $0.0030" in out
     assert "equation: 3 fixes by status" in out
     assert "latex.allowed_commands:unknown_command" in out

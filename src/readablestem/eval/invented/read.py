@@ -1,6 +1,6 @@
 """Read a system's output (HTML or Markdown) into the units the rules judge.
 
-One reader for every system, so the rules see a11y-stem's HTML, the chatbot's HTML and a
+One reader for every system, so the rules see ReadableSTEM's HTML, the chatbot's HTML and a
 parser's Markdown the same way. What it hands over (`Output`):
 
 - `blocks`: prose, one per block element, with every maths span cut out (replaced by the
@@ -9,7 +9,7 @@ parser's Markdown the same way. What it hands over (`Output`):
   matching against a line of the PDF, and the plain text for its numbers;
 - `equations`: every `<math>` element and every TeX span MathJax would typeset
   (`\\( \\)`, `\\[ \\]`, `$$ $$`, equation environments, and `$ $` when the page's own
-  MathJax configuration lists it), in reading order, TeX converted with a11y-stem's own
+  MathJax configuration lists it), in reading order, TeX converted with ReadableSTEM's own
   clean-up and converter (`equation_step.clean_latex`, `_convert`). A TeX span that does
   not convert keeps `mathml=None` and is counted as unchecked, never as correct;
 - `cells`: the text of every table cell, maths as its tokens;
@@ -18,10 +18,11 @@ parser's Markdown the same way. What it hands over (`Output`):
   figure, an SVG's title and description, the label of a `role="img"` element. Each
   carries the image when the HTML holds it (a data URI) and the figure's caption.
 
-Text a11y-stem wrote itself (every element with the class `a11y-stem`, see
-`assemble.AUTHORED_CLASS`: the about section, notes, labels) is read like any other text
-and marked `authored`. A fragment of it inside a block of the document's own text (the
-hidden word "Equation" before an equation number) is dropped from the block and counted.
+Text ReadableSTEM wrote itself (every element with the class `readablestem`, or `a11y-stem`
+in earlier outputs, see `assemble.AUTHORED_CLASS`: the about section, notes, labels) is
+read like any other text and marked `authored`. A fragment of it inside a block of the
+document's own text (the hidden word "Equation" before an equation number) is dropped from
+the block and counted.
 Placeholder alt texts the tool writes for an image it could not convert are not figure
 descriptions and are counted apart (`placeholders`).
 
@@ -244,7 +245,7 @@ def expand_macros(latex: str, macros: dict[str, tuple[str, int]]) -> str:
 
 
 def tex_to_mathml(tex: str, display: Display, macros: dict[str, tuple[str, int]]) -> str | None:
-    """TeX to MathML the way a11y-stem does it for its own model output; None when the
+    """TeX to MathML the way ReadableSTEM does it for its own model output; None when the
     clean-up or the converter refuses it."""
     from readablestem.pipeline import equation_step
 
@@ -350,7 +351,7 @@ _MATH_ELEMENT = re.compile(r"<math\b.*?</math\s*>", re.S | re.I)
 
 
 def _placeholder_alts() -> list[re.Pattern[str]]:
-    """The alt texts a11y-stem writes for an image it did not convert."""
+    """The alt texts ReadableSTEM writes for an image it did not convert."""
     from readablestem.pipeline import assemble
 
     fixed = [assemble.EQUATION_NOT_CONVERTED_ALT, assemble.FIGURE_NOT_DESCRIBED_ALT]
@@ -690,7 +691,7 @@ class _HtmlReader(HTMLParser):
 
 
 def read_html(source: str, *, skip_labels: tuple[str, ...] = DEMO_BANNER_LABELS) -> Output:
-    """Read an HTML document (a11y-stem's, a chatbot's) into `Output`."""
+    """Read an HTML document (ReadableSTEM's, a chatbot's) into `Output`."""
     out = Output("html", hashlib.sha256(source.encode("utf-8")).hexdigest())
     maths = _Maths(out, dollars=mathjax_reads_dollars(source), macros=parse_macros(source))
     prepared = _MATH_ELEMENT.sub(lambda found: maths.placeholder(found.group(0)), source)

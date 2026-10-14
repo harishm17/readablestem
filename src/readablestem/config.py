@@ -219,7 +219,7 @@ class Settings(BaseSettings):
     google_client_id: str | None = None
     google_client_secret: SecretStr | None = None
     # Comma-separated emails created as allowed admins at startup (the allowlist itself
-    # lives in the database; manage it with `a11y-stem users allow EMAIL`).
+    # lives in the database; manage it with `readablestem users allow EMAIL`).
     admin_emails: str = ""
     # Local-only sign-in shortcut (any email, no password). Refused outside env=dev.
     dev_login_enabled: bool = False

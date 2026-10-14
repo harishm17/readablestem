@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Look at, and take, Cloud SQL backups of the readablestem database. Runbook: docs/operations.md,
+# Look at, and take, Cloud SQL backups of the ReadableSTEM database. Runbook: docs/operations.md,
 # "Backups and restore".
 #
 #   ./deploy/backups.sh status    # is the daily backup running, how old is the newest,

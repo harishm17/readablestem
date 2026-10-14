@@ -30,7 +30,7 @@ editions are CC BY, the current editions of the same books are CC BY-NC-SA); thi
 reading of public metadata, not legal advice. A book's licence does not change the credit of
 a photograph or figure inside it that OpenStax attributes to a third party (for example a
 Flickr credit in a figure caption): those figures keep their own licences, and the PDFs that
-embed them are published here for the evaluation of the tools, with the credits OpenStax gives. Books published under CC BY-NC-SA are not used. a11y-stem is not affiliated
+embed them are published here for the evaluation of the tools, with the credits OpenStax gives. Books published under CC BY-NC-SA are not used. ReadableSTEM is not affiliated
 with or endorsed by OpenStax. The PDFs under `tests/fixtures/` are built from sources in
 the repository (LaTeX, HTML, python-docx or a script) with invented text; the one
 OpenStax PDF is the demo's `source.pdf`.

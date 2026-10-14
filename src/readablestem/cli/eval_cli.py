@@ -1,4 +1,4 @@
-"""CLI: a11y-stem eval pipeline|gate|calibrate|render|invented, demo build (WP7).
+"""CLI: readablestem eval pipeline|gate|calibrate|render|invented, demo build (WP7).
 
 Commands that can call a model take `--max-usd` (a hard cap enforced by an
 `InMemorySpendGuard` before each request) or `--fake` (an offline `FakeVisionClient`
@@ -542,7 +542,7 @@ def _run_tables(
 
     gold_dir = devset[0] if devset else args.gold or _default(TABLE_GOLD_DIR)
     if not gold_dir.is_dir():
-        return _error(f"gold dir not found: {gold_dir} (run: a11y-stem gold fetch --set tables)")
+        return _error(f"gold dir not found: {gold_dir} (run: readablestem gold fetch --set tables)")
     styles = tuple(s.strip() for s in args.styles.split(",") if s.strip())
     unknown = [s for s in styles if s not in tables.TABLE_STYLES]
     if unknown or not styles:
@@ -1067,7 +1067,7 @@ def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: b
             xhtml="",
             authors=list(meta.get("authors") or []),
         )
-        # The note links to the source code (a11y-stem is AGPL: every page says where it is).
+        # The note links to the source code (ReadableSTEM is AGPL: every page says where it is).
         source_url = Settings(_env_file=None).source_url  # type: ignore[call-arg]
         html = render.wrap_demo_html(
             html, page, date=meta["date"], source_url=source_url, placeholder=False

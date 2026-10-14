@@ -221,7 +221,7 @@ say "up to 30 days" and the 2-year flagged-content exception in the notice, whet
 Anthropic for zero data retention, and a decision on the sentence "Uploads are never used to
 train AI models". The privacy page (`web/templates/privacy.html`) names Anthropic instead of
 OpenAI when the provider is anthropic, with the same words as for OpenAI plus a pointer to
-Anthropic's own policies; `a11y-stem ops launch-check` lists the page as a launch blocker on
+Anthropic's own policies; `readablestem ops launch-check` lists the page as a launch blocker on
 this provider if it does not name Anthropic.
 
 ## Rules every work package follows
@@ -250,7 +250,7 @@ this provider if it does not name Anthropic.
    compliant" anywhere in the UI, output or docs.
 8. **Public copy is the author's.** The README prose, the known-limits copy and the ADR
    "Consequences" sections are written or confirmed by the author. Unfinished wording is
-   marked `TODO(Harish)`, and `a11y-stem ops launch-check` lists what is left on the
+   marked `TODO(Harish)`, and `readablestem ops launch-check` lists what is left on the
    public pages.
 9. **Style.** Python 3.12+, ruff (line length 100), type hints that pass `ty check src`,
    docstrings that say why. No new runtime dependencies without a note in the PR.

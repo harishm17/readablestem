@@ -1,6 +1,6 @@
 """Tables eval: detection, structure (TEDS), headers, maths cells and text fidelity.
 
-The task (`a11y-stem eval pipeline --task tables`) prints the OpenStax pages of the table
+The task (`readablestem eval pipeline --task tables`) prints the OpenStax pages of the table
 gold set (`data/gold/tables/`, CC BY 4.0) in three table styles (`eval.render`
 `table_style`: grid, booktabs, norules), adds the authored documents
 (`data/authored/tables/`: LaTeX, Word, slide and HTML tables written for this project),
@@ -91,7 +91,7 @@ MATH_CELL_OK = 0.9  # a maths cell whose letter/digit F1 reaches this is "ok"
 BOOTSTRAP_SAMPLES = 2000
 BOOTSTRAP_SEED = 0
 # The 13 CC BY 4.0 OpenStax pages with tables (table-bench, 2026-10-08): 64 tables, 54 of
-# them data tables. `a11y-stem gold fetch --set tables` fetches them into data/gold/tables.
+# them data tables. `readablestem gold fetch --set tables` fetches them into data/gold/tables.
 TABLE_GOLD_PAGES: dict[str, tuple[str, ...]] = {
     "physics": (
         "1-3-the-language-of-physics-physical-quantities-and-units",

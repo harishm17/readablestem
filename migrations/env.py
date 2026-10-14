@@ -1,4 +1,4 @@
-"""Alembic environment for readablestem.
+"""Alembic environment for ReadableSTEM.
 
 The target schema is `readablestem.web.db.Base.metadata`. The database URL comes from, in
 order: an explicit `sqlalchemy.url` set by the caller (tests, `readablestem db upgrade`),

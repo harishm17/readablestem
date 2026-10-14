@@ -8,7 +8,7 @@ the gold, the OpenStax archive responses, the render cache (its printed PDFs and
 images) and the reports. Several research scripts read every PDF under the repository's
 `.cache/eval/pages/`, and `data/eval/` holds the development reports the CI gate compares,
 so a held-out file placed in either would flow into development or into the gate. The
-default folder is `$XDG_CACHE_HOME/a11y-stem/heldout` (`~/.cache/a11y-stem/heldout`):
+default folder is `$XDG_CACHE_HOME/readablestem/heldout` (`~/.cache/readablestem/heldout`):
 
     gold/        gold fetch --set heldout          (the 15 sections' answer key)
     openstax/    the archive responses behind it   (page XHTML the PDFs are printed from)
@@ -102,7 +102,7 @@ def unselected(gold_dir: Path) -> str | None:
 def gold_problem(problems: list[str], gold_dir: Path) -> str:
     lines = "".join(f"\n  - {p}" for p in problems)
     fetch = (
-        "fetch it with: a11y-stem gold fetch --set heldout --allow-retired "
+        "fetch it with: readablestem gold fetch --set heldout --allow-retired "
         f"--date {registry.REGISTERED.date}"
     )
     return f"{gold_dir} is not the pre-registered held-out gold:{lines}\n{fetch}"

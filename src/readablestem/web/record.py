@@ -344,7 +344,7 @@ def build(
         pages=result.stats.pages,
         converted_at=converted_at,
         made_at=made_at,
-        tool=f"a11y-stem {__version__}, pipeline {result.pipeline_version}",
+        tool=f"ReadableSTEM {__version__}, pipeline {result.pipeline_version}",
         owner=owner,
         language=job_page.language_line(result),
         title_chosen=title_chosen,

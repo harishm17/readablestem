@@ -394,7 +394,7 @@ def test_status_fragment_is_204_until_something_changes(web):
     assert "show the results" not in web.browser.get(f"/jobs/{job_id}").text
     # htmx takes the document title from the fragment, so the tab title follows it.
     assert finished.text.startswith(
-        "<title>Converted: SECRET-HEADING Kinematics | a11y-stem</title>"
+        "<title>Converted: SECRET-HEADING Kinematics | ReadableSTEM</title>"
     )
     assert "<title>" not in fragment.text  # not without htmx (it would be in <body>)
 

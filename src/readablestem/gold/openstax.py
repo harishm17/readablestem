@@ -18,7 +18,7 @@ where {site} is https://openstax.org and {archive} is {site} + release.json["arc
 
 License rule: the public gold set only takes books whose license is CC BY in BOTH the
 archive book JSON and the CMS (a missing license in either place is refused). Most current
-OpenStax editions are CC BY-NC-SA; `a11y-stem gold licenses` prints the full table.
+OpenStax editions are CC BY-NC-SA; `readablestem gold licenses` prints the full table.
 
 State rule: only books whose CMS state is "live" are fetched by default. Retired (and
 deprecated or unlisted) editions need `allow_retired=True` (`--allow-retired`), because
@@ -274,7 +274,7 @@ def check_public_license(book: Book) -> None:
         raise LicenseError(
             f"{book.slug!r} is not CC BY (archive: {book.license_name} {book.license_url}; "
             f"cms: {book.cms_license_name} {book.cms_license_url}). The public gold set "
-            "only takes CC BY books. Run `a11y-stem gold licenses --cc-by-only` for options."
+            "only takes CC BY books. Run `readablestem gold licenses --cc-by-only` for options."
         )
 
 

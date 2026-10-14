@@ -11,13 +11,13 @@ on it. The pipeline that feeds it is in `docs/design/beta-architecture.md`.
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="generator" content="a11y-stem 0.1.0">
+<meta name="generator" content="ReadableSTEM 0.1.0">
 <title>Speed and Velocity</title>
 <style>/* ~25 lines, see "Styling" */</style>
 </head>
 <body>
 <main>
-  <p class="notice a11y-stem" role="note">...</p>   (only when a notice is given)
+  <p class="notice readablestem" role="note">...</p>   (only when a notice is given)
   ... the document, in reading order ...
 </main>
 <footer id="about-conversion" ...>About this version (the note for students)</footer>
@@ -189,12 +189,12 @@ A trimmed excerpt of `tests/fixtures/assemble/sample_document.json` after assemb
   <mrow><mi>v</mi><mo>=</mo><mfrac>...</mfrac></mrow></math>, where
   <span class="flagged-inline" id="p1-e3" data-status="abstained" data-reason="low_confidence">
     <img src="data:image/png;base64,..." alt="Equation not converted" width="16" height="16">
-    <span class="flag-label a11y-stem" aria-hidden="true">(equation not converted)</span></span>
+    <span class="flag-label readablestem" aria-hidden="true">(equation not converted)</span></span>
   is the distance travelled.</p>
 <div class="equation" id="p1-e4"><math display="block">...</math></div>
 <div class="flagged" id="p1-e5" data-status="failed" data-reason="budget_job_usd">
   <img src="data:image/png;base64,..." alt="Equation not converted" width="213" height="53">
-  <p class="flag-note a11y-stem" role="note"><span class="flag-label">Not converted.</span>
+  <p class="flag-note readablestem" role="note"><span class="flag-label">Not converted.</span>
   This equation is shown as an image of the original, so screen readers cannot read it.
   Ask your instructor for a version you can read.</p></div>
 <figure id="p1-e6"><img src="data:image/png;base64,..." alt="Line graph of position against
@@ -240,7 +240,7 @@ right after the figure, folded, by `pipeline/figure_details.py render_details`:
 <figure id="p3-e0"><img src="data:image/png;base64,..." alt="Line graph of position
   against time: a straight line rising from 400 m." width="437" height="267">
   <figcaption>Figure 2.3 ...</figcaption></figure>
-<details class="figure-description"><summary class="a11y-stem">Description of Figure
+<details class="figure-description"><summary class="readablestem">Description of Figure
   2.3</summary><p>Line graph of the position of a car against time.</p><p>...</p>
   <div class="table-scroll" role="group" aria-labelledby="p3-e0-data-caption" tabindex="0">
   <table><caption id="p3-e0-data-caption">Data read from Figure 2.3; the values are
@@ -283,7 +283,7 @@ type, so a stored result re-renders to the same file. Equation images are not to
 | File | Before | After | Images |
 |---|---|---|---|
 | The public demo (OpenStax Physics 2.3, 7 figures; stored result re-rendered with its crops) | 2,210 KB (gzip 1,657 KB) | 666 KB (gzip 460 KB) | 3 JPEG (a photo, two raster charts), 4 PNG |
-| The committed demo page, rebuilt on 0.5.0 (2026-10-14, with Claude, 25 calls, $0.105; 2026-10-09 with OpenAI and the 0.3.0 build before), written again by the Tier 3 assembler from the stored result (`a11y-stem demo rerender`, no model call) | 2,211 KB (gzip 1,657 KB) | 668 KB (gzip 461 KB) | the same 3 JPEG and 4 PNG |
+| The committed demo page, rebuilt on 0.5.0 (2026-10-14, with Claude, 25 calls, $0.105; 2026-10-09 with OpenAI and the 0.3.0 build before), written again by the Tier 3 assembler from the stored result (`readablestem demo rerender`, no model call) | 2,211 KB (gzip 1,657 KB) | 668 KB (gzip 461 KB) | the same 3 JPEG and 4 PNG |
 | `tests/fixtures/layout/` PDFs converted offline (`lecture_notes`, `two_column`, `worked_example`; one small figure each) | 35, 14, 40 KB | the same | PNG kept: line art, smaller than JPEG |
 
 A page-sized crop (1700 x 2200 px) takes about 0.15-0.3 s to re-encode, so a document of
@@ -334,7 +334,7 @@ reader says "Equation (2.4)" rather than a bare number:
 
 ```html
 <div class="equation equation-labelled" id="p3-e5"><math display="block">...</math>
-  <span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>2.4</span></div>
+  <span class="equation-label"><span class="visually-hidden readablestem">Equation </span>2.4</span></div>
 ```
 
 The wrapper is a flex row that wraps: the maths takes the remaining width and stays
@@ -650,7 +650,7 @@ The file ends with a short note for the people who read it, in a `<footer>` afte
 review words ("needs review", "rejected"): those are for the instructor, on the job page
 (docs/web.md "The job page"). In order:
 
-- what this is: "This is a web version of a PDF from your course, made with a11y-stem, a
+- what this is: "This is a web version of a PDF from your course, made with ReadableSTEM, a
   tool that assists with accessibility.", plus "Its equations are written so that screen
   readers can read them aloud." when the file has converted equations;
 - whether the instructor has checked it: nothing when the tool asked nothing and nobody
@@ -675,7 +675,7 @@ challenge, 10.3 row 4, would say "decided by your instructor" instead, since the
 only knows that decisions were made). Model cost is not in the HTML: the file is meant for
 students. Cost is in the result JSON (`DocumentResult.stats`) and the CLI summary.
 
-Text the tool writes (notes, labels, the student note) carries `class="a11y-stem"`. The
+Text the tool writes (notes, labels, the student note) carries `class="readablestem"`. The
 `banned_wording` check reads only that text, so course content that legitimately uses
 words like "compliance" (beam flexibility in mechanics) is not flagged.
 
@@ -837,7 +837,7 @@ generation (with tokens and cost), so per-request cost shows in Langfuse's cost 
 ## CLI
 
 ```
-a11y-stem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
+readablestem convert FILE.pdf --out OUT.html (--max-usd X | --fake) [--pages 1,3] [--concurrency 4]
                   [--report OUT.json] [--axe]
 ```
 

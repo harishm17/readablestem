@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}{% endblock %} | a11y-stem</title>
+  <title>{% block title %}{% endblock %} | ReadableSTEM</title>
   <meta name="htmx-config" content='{"includeIndicatorStyles": false, "allowEval": false, "allowScriptTags": false, "historyCacheSize": 0, "refreshOnHistoryMiss": true, "selfRequestsOnly": true}'>
   <link rel="stylesheet" href="{{ static_url('app.css') }}">
   <script src="/static/vendor/htmx-2.0.11.min.js" integrity="sha384-2OatzQy1H+Zd/IIrjr1TcuDGqLXeHhbooAyJY1KdQMKnr4LZ22k31GBLdYKHmVjg" defer></script>
@@ -17,7 +17,7 @@
   {% set active = active|default("") %}
   <header class="site-header">
     <div class="{{ self.main_class() }} header-row">
-      <a class="brand" href="/">a11y-stem</a>
+      <a class="brand" href="/">ReadableSTEM</a>
       <nav aria-label="Main">
         <ul class="nav-list">
           <li><a href="/"{% if active == "home" %} aria-current="page"{% endif %}>Home</a></li>
@@ -68,12 +68,12 @@
           {% if feedback_url %}
           <li><a href="{{ feedback_url }}">Send feedback</a></li>
           {% elif contact_email %}
-          <li><a href="mailto:{{ contact_email }}?subject=a11y-stem%20feedback">Send feedback by email</a></li>
+          <li><a href="mailto:{{ contact_email }}?subject=ReadableSTEM%20feedback">Send feedback by email</a></li>
           {% endif %}
           <li><a href="{{ source_url }}">Source code</a></li>
         </ul>
       </nav>
-      <p class="small">a11y-stem is free, open-source software. It uses PyMuPDF, which is licensed
+      <p class="small">ReadableSTEM is free, open-source software. It uses PyMuPDF, which is licensed
         under the GNU Affero General Public License v3, so the complete source code of this
         service is published at the "Source code" link above.</p>
     </div>

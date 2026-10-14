@@ -52,7 +52,7 @@ CROP_MAX_ZOOM = 4.0
 CROP_MIN_ZOOM = 2.0
 CROP_CSS_PX_PER_PT = 2.0
 # The demo wrapper links back to the app ("/"); on this site it goes back to the example page.
-APP_HOME_LINK = '<a href="/">Back to a11y-stem</a>'
+APP_HOME_LINK = '<a href="/">Back to ReadableSTEM</a>'
 SITE_BACK_LINK = '<a href="index.html">Back to the example page</a>'
 HEADING_BASE = 4  # converted headings are shown from <h4>: the page has h1, h2 and h3 above
 
@@ -1014,7 +1014,7 @@ def build_site(out_dir: Path, *, proof_path: Path | None = None) -> list[str]:
         out.put(path, text)
 
     page(
-        "index.html", "home.html", "home", "a11y-stem reviewer demo",
+        "index.html", "home.html", "home", "ReadableSTEM reviewer demo",
         proof=proof, examples=examples, stemcheck=stemcheck,
     )  # fmt: skip
     page(

@@ -198,7 +198,7 @@ document text.
 - `jobs.course_id` (-> courses ON DELETE SET NULL, named `fk_jobs_course_id_courses`),
   `jobs.progress_json`, `jobs.result_version` (server default 0; bumped by every review
   write for the stale-tab guard).
-- Erasure: `ops.retention.erase_user` (used by `a11y-stem users delete`) deletes jobs
+- Erasure: `ops.retention.erase_user` (used by `readablestem users delete`) deletes jobs
   through `delete_jobs`, then every row with the user's id, without relying on cascades.
   A test lists every table with a user id: a new one must be added to `erase_user`.
 - A builder that needs another migration bases it on the head at merge time
@@ -318,7 +318,7 @@ ran after the last merge. The four feature flags stay **off by default**.
   questions; with decisions open, ux-a's part sits under the draft link.
 - **Static HTML rules**: the text work's four always run; the five table rules come last
   and only for documents with a `<table>` (15 rules, 20 with a table).
-- `a11y-stem convert` counts tables and lists notices and the language.
+- `readablestem convert` counts tables and lists notices and the language.
 
 ### Measured after integration
 

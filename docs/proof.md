@@ -1,19 +1,19 @@
 # One-command reproduction (`make proof`)
 
-`make proof` (or `uv run a11y-stem proof`) turns the recorded run in `proof/bundles/` into
+`make proof` (or `uv run readablestem proof`) turns the recorded run in `proof/bundles/` into
 `PROOF.md`: every table, with its intervals, its limits and the licence notices. It needs no
 API key, no network and no money, and it writes the same bytes on every machine that has
 the dependency versions in `uv.lock`.
 
-`PROOF.md` states what a machine can measure about a11y-stem's output on a set of OpenStax
+`PROOF.md` states what a machine can measure about ReadableSTEM's output on a set of OpenStax
 sections. It does not measure conformance with WCAG or any other standard, and nothing in it
-is a claim that a document is accessible. a11y-stem assists a person who makes course
+is a claim that a document is accessible. ReadableSTEM assists a person who makes course
 material accessible.
 
 ## Quick start
 
 ```
-git clone <this repository> && cd a11y-stem
+git clone <this repository> && cd ReadableSTEM
 make proof            # replay: uses the recorded run; no key, no network, no cost
 make proof-check      # only check the pins and the hashes of the recorded run
 make proof-list       # the proof sets in proof/sets/
@@ -200,18 +200,18 @@ or user data. Course material from other sources never goes into a bundle.
 
 ## The other systems and the other parts
 
-The a11y-stem arm is in the bundle as model answers. Everything else in `PROOF.md` is
+The ReadableSTEM arm is in the bundle as model answers. Everything else in `PROOF.md` is
 computed from files the bundle holds, by stages (`src/readablestem/proof/stages.py`):
 
 | Stage | Module | What it reads |
 |---|---|---|
-| invented-content rate | `proof/invented.py` | a11y-stem's HTML (rebuilt by the replay) and the outputs below, against each PDF's text layer; rules in `eval/invented/` ([eval-invented.md](eval-invented.md)) |
+| invented-content rate | `proof/invented.py` | ReadableSTEM's HTML (rebuilt by the replay) and the outputs below, against each PDF's text layer; rules in `eval/invented/` ([eval-invented.md](eval-invented.md)) |
 | comparison with the chatbot recipe | `proof/comparison.py` | `systems/chatbot-*/` |
 | comparison with open PDF parsers | `proof/parsers.py` | `systems/<parser>/` |
 | human labels and judge agreement | `proof/labels.py` | not written: those labels are the author's, and none exist yet; the stage prints "not computed" |
 
 `proof/systems.py` is the shared scorer: each output file is read by one reader
-(`eval.invented.read`), its maths converted the way a11y-stem converts its own model's LaTeX,
+(`eval.invented.read`), its maths converted the way ReadableSTEM converts its own model's LaTeX,
 aligned to the gold equations by the document task's code, and its headings matched by the
 headings task's code. The stages print the claims of preregistration section 8.3 (family A:
 the chatbot, 5 comparisons; family B: each parser, 2 comparisons each, Bonferroni-corrected)
@@ -228,7 +228,7 @@ The held-out set (`heldout-2026-10`, registered in `proof/PREREGISTRATION.md`) i
 three steps, each with its own spend cap, by one script:
 
 ```
-ENV_FILE=/path/to/.env proof/record-heldout.sh     # a11y-stem $12, chatbot arms and judge $10
+ENV_FILE=/path/to/.env proof/record-heldout.sh     # ReadableSTEM $12, chatbot arms and judge $10
 ```
 
 `PROVIDER=anthropic` does the same on Claude (Addendum 6: `ANTHROPIC_API_KEY` in the env file;
@@ -241,7 +241,7 @@ judges the figure descriptions and adds the arm to the recorded run (Addendum 7)
 It needs API credit, a clean checkout, Chromium and `make -C proof/parsers setup`, and nothing
 else may call the API while it runs (an empty balance or a rate limit makes calls fail, and a
 failed call is not a system's answer). Each step can be interrupted and started again:
-`--resume` reads back the a11y-stem runs that finished, and the chatbot and parser steps skip
+`--resume` reads back the ReadableSTEM runs that finished, and the chatbot and parser steps skip
 what they already recorded. Copy the result to `proof/bundles/heldout-2026-10/`, make that
 set the default in `proof/sets/index.json`, and `make proof` writes `PROOF.md` from it.
 The report of the development sample is then written with `make proof SET=smoke-physics-2
@@ -251,9 +251,9 @@ PROOF_EXTRA="--out proof/PROOF-development-sample.md"`.
 
 `make proof-interim` (after `make heldout-gold`, which needs the network; the report stops with
 that instruction if the answer key is missing) rebuilds `proof/interim/INTERIM-heldout-2026-10.md`
-from the printed PDFs, a11y-stem's headings task and the parsers' outputs committed under
+from the printed PDFs, ReadableSTEM's headings task and the parsers' outputs committed under
 `proof/interim/heldout-2026-10/`. It exists because the paid parts of the run could not be made
-(no API credit); it compares a11y-stem's heading detection with the parsers' and scores the
+(no API credit); it compares ReadableSTEM's heading detection with the parsers' and scores the
 parsers on equations, invented content and coverage, and it claims nothing else. It is not a
 recorded run in the sense of the bundles above and does not replace one. It is a record of
 what existed before the model runs; the recorded held-out run (on Claude, Addenda 6 and 7) is in
@@ -266,9 +266,9 @@ loses another:
 
 ```
 # the chatbot recipe: one cap for the calls and the figure judge together
-a11y-stem proof --set heldout-2026-10 --add-systems chatbot --max-usd 10
+readablestem proof --set heldout-2026-10 --add-systems chatbot --max-usd 10
 # the open parsers (CPU, hours, resumable; needs `make -C proof/parsers setup` once)
-a11y-stem proof --set heldout-2026-10 --add-systems parsers
+readablestem proof --set heldout-2026-10 --add-systems parsers
 ```
 
 `--arms` limits them, and `--chat-runs N` makes N runs of each arm instead of the arm's own
@@ -302,11 +302,11 @@ the repository, and needs no browser. `full` adds Chromium and the print fonts f
 
 ```
 docker build -f proof/Dockerfile -t a11y-stem-proof .
-docker run --rm -v "$PWD/out:/out" a11y-stem-proof a11y-stem proof --out /out/PROOF.md
+docker run --rm -v "$PWD/out:/out" a11y-stem-proof readablestem proof --out /out/PROOF.md
 
 docker build -f proof/Dockerfile --target full -t a11y-stem-proof:full .
 docker run --rm --env OPENAI_API_KEY -v "$PWD/out:/out" a11y-stem-proof:full \
-    a11y-stem proof --live --max-usd 2 --record /out/bundle --out /out/PROOF.md
+    readablestem proof --live --max-usd 2 --record /out/bundle --out /out/PROOF.md
 ```
 
 The container runs as a non-root user and keeps its working files in `/tmp`.

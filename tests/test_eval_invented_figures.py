@@ -169,6 +169,7 @@ def test_the_judge_sees_the_image_and_never_who_wrote_the_text():
         assert request.images == [item.image]
         assert "<candidate>\nA graph number" in (request.context_text or "")
         assert "a11y-stem" not in (request.context_text or "") + request.instructions
+        assert "ReadableSTEM" not in (request.context_text or "") + request.instructions
 
 
 def test_a_failed_call_is_left_unjudged_and_counted():

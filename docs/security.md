@@ -247,7 +247,7 @@ a wrong alt text or equation, which the instructor reviews.
   the job, its blobs and review edits. `test_audit_privacy.py` moves a clock through the
   upload route, the job page and the cron endpoint to check 23 h 59 min, 24 h 1 min, 29 days
   and 30 days 1 min. "Delete now" removes the same rows at once.
-- Erasure of a person (`a11y-stem users delete EMAIL --yes`, `ops.retention.erase_user`)
+- Erasure of a person (`readablestem users delete EMAIL --yes`, `ops.retention.erase_user`)
   removes their jobs, blobs, review edits, courses and notation, events, sign-in identities,
   quota rows and the user. Only content-free aggregates and global daily spend remain. A test
   fails when a table with a user id is added without being listed there.
@@ -346,7 +346,7 @@ Triage of what the scanners reported:
 ## How to report a problem
 
 Follow [SECURITY.md](../SECURITY.md): GitHub private vulnerability reporting first, otherwise
-email the address given there with "a11y-stem security" in the subject. Test against a local
+email the address given there with "ReadableSTEM security" in the subject. Test against a local
 checkout, use a synthetic PDF, and do not touch other people's documents. If you find a
 document of yours somewhere it should not be, say which page it was on and when; the
 maintainer can then check the logs, which hold ids and times but never content.

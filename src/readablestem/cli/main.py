@@ -1,5 +1,5 @@
-"""Command line: `a11y-stem gold ...`, `a11y-stem eval ...`, `a11y-stem parse ...`,
-`a11y-stem proof ...`.
+"""Command line: `readablestem gold ...`, `readablestem eval ...`, `readablestem parse ...`,
+`readablestem proof ...`.
 
 Default paths (data/gold, .cache/openstax) are resolved against the project root: the
 nearest parent of the working directory whose pyproject.toml names this project. Outside

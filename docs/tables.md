@@ -163,7 +163,7 @@ SLANet-plus is the 7.5 MB ONNX file RapidTable 3.0.2 ships (`slanet-plus.onnx`,
 |---|---|
 | Source | `https://www.modelscope.cn/models/RapidAI/RapidTable/resolve/v2.0.0/slanet-plus.onnx` (RapidTable 3.0.2's `default_models.yaml`, entry `slanet_plus`) |
 | SHA-256 | `d57a942af6a2f57d6a4a0372573c696a2379bf5857c45e2ac69993f3b334514b` (the same file) |
-| Where | `$TABLE_MODEL_DIR/slanet-plus.onnx`; default `~/.cache/a11y-stem/models` (or under `$XDG_CACHE_HOME`); the image sets `TABLE_MODEL_DIR=/app/models` |
+| Where | `$TABLE_MODEL_DIR/slanet-plus.onnx`; default `~/.cache/readablestem/models` (or under `$XDG_CACHE_HOME`); the image sets `TABLE_MODEL_DIR=/app/models` |
 | Fetch | the Docker build (`python -m readablestem.pipeline.table_model --dir /app/models`); for development `make table-model`; `--from FILE` installs a copy you already have |
 
 A download whose checksum differs is refused and nothing is installed; a file on disk
@@ -225,7 +225,7 @@ How to repeat: not from this repository. The benchmark, the labels and the scrip
 these numbers live in the author's private research folder, and the manuals are
 third-party documents that are not redistributed here, so the numbers measured on the
 manuals cannot be reproduced from a checkout. What can be reproduced is the same task on
-the OpenStax and authored table documents: `a11y-stem eval pipeline --task tables --mode
+the OpenStax and authored table documents: `readablestem eval pipeline --task tables --mode
 local` (docs/eval.md, "Tables").
 
 ### Known misses
@@ -518,7 +518,7 @@ After integration (2026-10-09, branch `feat/content-integration`, detection and 
 together): `test_live_latex_fixture_tables` rebuilt all 5 tables layout finds in
 `tables.pdf` (Table 3, the unruled all-number table, is the known detection miss) and
 every one was ACCEPTED on gpt-6-luna alone with every check passed ($0.0003 to $0.0005
-each; the drawn table again $0.0004). `a11y-stem convert` of the same PDF with every
+each; the drawn table again $0.0004). `readablestem convert` of the same PDF with every
 flag on gave the same 5 accepted tables for $0.0194 in all (13 equations included). The
 tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 

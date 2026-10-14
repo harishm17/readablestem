@@ -14,7 +14,7 @@ of the models in use and with the measured cost of a page (`PLANNING_USD_PER_PAG
 - an *error* is a setting under which a document cannot be converted as designed; the
   web app refuses to start with one in production (`Settings.check_production`);
 - a *warning* is a setting that works but is probably not what was meant (a normal
-  document close to a cap, a runaway job allowed far past a normal one); `a11y-stem ops
+  document close to a cap, a runaway job allowed far past a normal one); `readablestem ops
   launch-check` lists them.
 
 Measurements behind the numbers: docs/deploy.md, "Spend limits".

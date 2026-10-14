@@ -1,4 +1,4 @@
-"""PDF page -> raw elements: the quick, line-level view behind `a11y-stem parse`.
+"""PDF page -> raw elements: the quick, line-level view behind `readablestem parse`.
 
 This module is deliberately simple: PyMuPDF's text dictionary, one element per text run,
 image or maths-looking line, in PyMuPDF block order. It is a debugging aid and the home

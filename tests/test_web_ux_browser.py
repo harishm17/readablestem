@@ -325,11 +325,11 @@ def test_the_list_refreshes_in_place_and_keeps_focus(site, browser):
     sign_in(page, site.base, BOB)
     job_id = upload_pdf(page, site.base)
     page.goto(f"{site.base}/app")
-    assert page.title() == "My documents (0 of 1 finished) | a11y-stem"
+    assert page.title() == "My documents (0 of 1 finished) | ReadableSTEM"
     delete = page.locator(f"#del-{job_id}")
     delete.focus()
     assert site.run_worker() == job_id
-    page.wait_for_function("() => document.title === 'My documents | a11y-stem'", timeout=15000)
+    page.wait_for_function("() => document.title === 'My documents | ReadableSTEM'", timeout=15000)
     assert "decisions to make" in page.locator("#documents").inner_text()
     assert page.evaluate("document.activeElement.id") == f"del-{job_id}"
     assert page.locator("#documents[hx-get]").count() == 0  # nothing left to wait for

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy readablestem to Google Cloud Run. Walkthrough: docs/deploy.md.
+# Deploy ReadableSTEM to Google Cloud Run. Walkthrough: docs/deploy.md.
 #
 #   ./deploy/deploy.sh            # everything, in order (safe to re-run)
 #   ./deploy/deploy.sh STEP ...   # only some steps: apis iam registry build database
@@ -176,7 +176,7 @@ step_iam() {
   if exists iam service-accounts describe "$RUN_SA"; then
     note "$RUN_SA exists"
   else
-    gc iam service-accounts create "$SERVICE-run" --display-name="readablestem Cloud Run"
+    gc iam service-accounts create "$SERVICE-run" --display-name="ReadableSTEM Cloud Run"
   fi
   if [ "$DB_MODE" = cloudsql ]; then
     gc projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$RUN_SA" \
@@ -198,7 +198,7 @@ step_registry() {
     note "exists"
   else
     gc artifacts repositories create "$AR_REPO" --repository-format=docker \
-      --location="$REGION" --description="readablestem images"
+      --location="$REGION" --description="ReadableSTEM images"
   fi
 }
 
@@ -463,7 +463,7 @@ alert_channel() {
     --filter="type=\"email\" AND labels.email_address=\"$ALERT_EMAIL\"" \
     --format='value(name)' | head -n 1)
   if [ -z "$channel" ]; then
-    channel=$(gc beta monitoring channels create --display-name="readablestem alerts" \
+    channel=$(gc beta monitoring channels create --display-name="ReadableSTEM alerts" \
       --type=email --channel-labels="email_address=$ALERT_EMAIL" --format='value(name)')
   fi
   printf '%s' "$channel"

@@ -3,7 +3,7 @@
 Two jobs:
 
 - `prepare_database`: dev/test create tables directly; production refuses to start when
-  the schema is missing or behind this code's migrations (`a11y-stem db upgrade`), so a
+  the schema is missing or behind this code's migrations (`readablestem db upgrade`), so a
   deploy cannot silently run new code against an old schema. A schema ahead of this
   code (a newer release migrated it) is accepted with a warning, so rollbacks work.
 - Small portable SQL helpers. The spend guard, the page quota and the job queue all rely
@@ -91,7 +91,7 @@ def alembic_config(database_url: str | None = None):
 
     ini = alembic_ini_path()
     if ini is None:
-        raise ConfigError("alembic.ini not found; run from the a11y-stem checkout")
+        raise ConfigError("alembic.ini not found; run from the ReadableSTEM checkout")
     config = Config(str(ini))
     if database_url:
         config.set_main_option("sqlalchemy.url", database_url.replace("%", "%%"))
@@ -135,7 +135,7 @@ def require_migrated(engine: Engine) -> None:
     """
     current = current_revisions(engine)
     if not current:
-        raise ConfigError("database has no schema yet; run `a11y-stem db upgrade`")
+        raise ConfigError("database has no schema yet; run `readablestem db upgrade`")
     heads = migration_heads()
     if heads is None or current == heads:
         return
@@ -144,7 +144,7 @@ def require_migrated(engine: Engine) -> None:
         log_event(logger, "schema_ahead", logging.WARNING, unknown_revisions=len(current - known))
         return
     raise ConfigError(
-        "database schema is behind this release's migrations; run `a11y-stem db upgrade`"
+        "database schema is behind this release's migrations; run `readablestem db upgrade`"
     )
 
 

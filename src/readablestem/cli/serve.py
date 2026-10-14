@@ -1,5 +1,5 @@
-"""CLI: `a11y-stem serve`, `a11y-stem users allow|deny|link|unlink|delete|list`,
-`a11y-stem db upgrade`.
+"""CLI: `readablestem serve`, `readablestem users allow|deny|link|unlink|delete|list`,
+`readablestem db upgrade`.
 
 - serve: runs the web app with uvicorn (`create_app` as a factory, so settings are read
   at start-up, and `--reload` works).

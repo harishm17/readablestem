@@ -2,7 +2,7 @@ name: Uptime (weekly)
 
 # A second, outside-in check of the live app, independent of Google Cloud Monitoring.
 # Set the repository variable LIVE_URL (Settings > Secrets and variables > Actions >
-# Variables), e.g. https://a11y.example.org. Unset: the job passes and does nothing.
+# Variables), e.g. https://readablestem.com. Unset: the job passes and does nothing.
 # A failed scheduled run is emailed by GitHub (Settings > Notifications > Actions).
 
 on:

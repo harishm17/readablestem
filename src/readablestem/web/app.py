@@ -5,7 +5,7 @@ same-origin) only adds live status updates. One process serves the pages and, wh
 RUN_WORKER is on, runs the background worker thread (started and stopped with the app's
 lifespan).
 
-Run locally: `a11y-stem serve --reload` (see docs/web.md).
+Run locally: `readablestem serve --reload` (see docs/web.md).
 """
 
 from __future__ import annotations
@@ -371,7 +371,7 @@ def create_app(
             engine.dispose()
 
     app = FastAPI(
-        title="a11y-stem",
+        title="ReadableSTEM",
         lifespan=lifespan,
         docs_url=None,
         redoc_url=None,

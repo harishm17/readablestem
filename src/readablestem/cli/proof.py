@@ -1,24 +1,24 @@
-"""CLI: `a11y-stem proof`, one command that writes PROOF.md.
+"""CLI: `readablestem proof`, one command that writes PROOF.md.
 
-    a11y-stem proof                      replay the recorded run: no key, no network, no cost
-    a11y-stem proof --set ID             another proof set (see --list)
-    a11y-stem proof --verify-sources     also fetch the answer key from OpenStax and print
+    readablestem proof                      replay the recorded run: no key, no network, no cost
+    readablestem proof --set ID             another proof set (see --list)
+    readablestem proof --verify-sources     also fetch the answer key from OpenStax and print
                                          the PDFs again (network, Chromium)
-    a11y-stem proof --live --max-usd N   call the models again (OPENAI_API_KEY), record a
+    readablestem proof --live --max-usd N   call the models again (OPENAI_API_KEY), record a
                                          new bundle, then replay it to write PROOF.md
-    a11y-stem proof --live --provider anthropic --max-usd N --record DIR --out FILE
+    readablestem proof --live --provider anthropic --max-usd N --record DIR --out FILE
                                          the same with Claude (ANTHROPIC_API_KEY; models
                                          from ANTHROPIC_MAIN_MODEL / ANTHROPIC_CHEAP_MODEL
                                          or --main-model / --cheap-model); --out keeps
                                          PROOF.md, the OpenAI recording's report, as it is
-    a11y-stem proof --add-systems chatbot --max-usd N [--bundle DIR]
+    readablestem proof --add-systems chatbot --max-usd N [--bundle DIR]
                                          record the chatbot arms into a recorded run
                                          (--provider anthropic: the Claude arms, with the
                                          figure judge on claude-opus-5-5; --arms and
                                          --chat-runs choose what is run)
-    a11y-stem proof --add-systems parsers [--bundle DIR]
+    readablestem proof --add-systems parsers [--bundle DIR]
                                          record the open parsers (hours; resumable)
-    a11y-stem proof --check              check the pins and the bundle's hashes, run nothing
+    readablestem proof --check              check the pins and the bundle's hashes, run nothing
 
 Exit codes: 0 done; 1 incomplete (`--require-complete`) or a run stopped by its cap; 2 bad
 usage or setup; 3 a pin or a bundle file does not match; 4 the replay does not reproduce

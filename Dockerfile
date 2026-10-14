@@ -1,4 +1,4 @@
-# readablestem web app (FastAPI + worker thread) for Cloud Run.
+# ReadableSTEM web app (FastAPI + worker thread) for Cloud Run.
 #   docker build -t readablestem .
 #   docker run --rm -p 8080:8080 -e DATABASE_URL=sqlite:////tmp/a11y.db readablestem
 #

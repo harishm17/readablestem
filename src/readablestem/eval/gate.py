@@ -1,6 +1,6 @@
 """Regression gate: compare an eval report with a baseline and fail on tracked drops.
 
-`a11y-stem eval gate --current X.json --baseline Y.json` exits
+`readablestem eval gate --current X.json --baseline Y.json` exits
 
 - 0 when every tracked metric is within its tolerance,
 - 1 when at least one tracked metric regressed (or vanished from the current report),
@@ -331,7 +331,7 @@ def check_current(report: dict, versions: dict[str, str], models: dict[str, str]
             "stale_report",
             "the current report was not produced by this code: "
             + "; ".join(stale)
-            + ". Re-run `a11y-stem eval pipeline` for this task and commit the new report",
+            + ". Re-run `readablestem eval pipeline` for this task and commit the new report",
         )
 
 

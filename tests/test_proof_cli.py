@@ -1,4 +1,4 @@
-"""`a11y-stem proof`: arguments, exit codes, and what it prints. Offline."""
+"""`readablestem proof`: arguments, exit codes, and what it prints. Offline."""
 
 from __future__ import annotations
 

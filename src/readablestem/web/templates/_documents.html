@@ -3,7 +3,7 @@
    something changed (204 otherwise); every link keeps its id, so htmx puts focus back
    on the same link after a swap. The list is not a live region: a document finishing
    changes the tab title ("My documents (4 of 6 finished)"), not what is being read. #}
-{% if page_title|default("") %}<title>{{ page_title }} | a11y-stem</title>
+{% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
 {% set list_url = list_url|default("/app/documents") %}
 <div id="documents" class="documents"{% if documents.unfinished %} hx-get="{{ list_url }}{{ "&" if "?" in list_url else "?" }}v={{ documents.version }}" hx-trigger="every 5s" hx-swap="outerHTML"{% endif %}>

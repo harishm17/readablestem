@@ -1,4 +1,4 @@
-"""a11y-stem web app: FastAPI pages, Google sign-in, upload queue, worker, review screen.
+"""ReadableSTEM web app: FastAPI pages, Google sign-in, upload queue, worker, review screen.
 
 `create_app` is imported lazily so that `readablestem.web.db` (used by the CLI, ops and
 tests) does not pull in the whole web stack.

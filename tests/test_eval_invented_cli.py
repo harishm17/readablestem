@@ -1,4 +1,4 @@
-"""`a11y-stem eval invented ...` end to end on small files (offline)."""
+"""`readablestem eval invented ...` end to end on small files (offline)."""
 
 from __future__ import annotations
 

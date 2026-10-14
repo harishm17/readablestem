@@ -30,18 +30,18 @@ printed pages read differently.
 CLI:
 
 ```
-a11y-stem gold fetch --book SLUG --pages N [--chapter C] [--page SLUG ...] [--out DIR] [--date YYYY-MM-DD] [--no-cache] [--allow-retired]
-a11y-stem gold licenses [--cc-by-only] [--csv PATH]
-a11y-stem gold manifest [--out DIR]
-a11y-stem gold fetch --set heldout --allow-retired [--date 2026-10-13] [--heldout-dir DIR]   # the pre-registered held-out set (docs/eval.md)
-a11y-stem gold verify --set heldout [--gold DIR] [--heldout-dir DIR]
-a11y-stem eval equations --gold PATH (--pred PRED.jsonl | --self-check) [--display all|block|inline] [--report OUT.json]
-a11y-stem parse FILE.pdf [--pages 1,2] [--json]
-a11y-stem proof [--set ID] [--check | --verify-sources | --live --max-usd N] [--out PATH]
+readablestem gold fetch --book SLUG --pages N [--chapter C] [--page SLUG ...] [--out DIR] [--date YYYY-MM-DD] [--no-cache] [--allow-retired]
+readablestem gold licenses [--cc-by-only] [--csv PATH]
+readablestem gold manifest [--out DIR]
+readablestem gold fetch --set heldout --allow-retired [--date 2026-10-13] [--heldout-dir DIR]   # the pre-registered held-out set (docs/eval.md)
+readablestem gold verify --set heldout [--gold DIR] [--heldout-dir DIR]
+readablestem eval equations --gold PATH (--pred PRED.jsonl | --self-check) [--display all|block|inline] [--report OUT.json]
+readablestem parse FILE.pdf [--pages 1,2] [--json]
+readablestem proof [--set ID] [--check | --verify-sources | --live --max-usd N] [--out PATH]
 ```
 
 Default paths (`data/gold`, `.cache/openstax`) resolve against the project root (the
-nearest parent directory whose `pyproject.toml` names `a11y-stem`), so commands work from
+nearest parent directory whose `pyproject.toml` names `readablestem`), so commands work from
 any subdirectory. Outside a checkout they fall back to the working directory. Bad input
 (missing file, page out of range, malformed JSONL) prints `error: ...` and exits 2.
 
@@ -75,10 +75,10 @@ mean anything).
 | `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
 | `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
 | `src/readablestem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
-| `src/readablestem/pipeline/parse.py` | the quick line-level view behind `a11y-stem parse` (a debugging aid) and `equation_score`, which the layout step reuses |
+| `src/readablestem/pipeline/parse.py` | the quick line-level view behind `readablestem parse` (a debugging aid) and `equation_score`, which the layout step reuses |
 | `src/readablestem/pipeline/` | the conversion pipeline (layout, steps, assemble, run); see docs/layout.md, docs/steps.md, docs/tables.md, docs/output.md |
 | `src/readablestem/web/`, `src/readablestem/ops/` | the hosted app and its cron, retention and reports; see docs/web.md, docs/operations.md |
-| `src/readablestem/cli/main.py` | `a11y-stem` command |
+| `src/readablestem/cli/main.py` | `readablestem` command |
 | `src/readablestem/proof/`, `proof/` | the one-command reproduction: code, proof sets, recorded runs; see docs/proof.md |
 | `data/gold/` | Committed sample gold set, `manifest.json`, `ATTRIBUTION.md` |
 | `docs/decisions/` | Architecture decision records |
@@ -149,7 +149,7 @@ step) needs to account for this.
 - `gold fetch` refuses books whose OpenStax state is not `live` (retired, deprecated,
   unlisted) unless you pass `--allow-retired`. Open decision: ADR 0001, question 2.
 - The held-out set (`--set heldout`, docs/eval.md "Held-out set") is never written inside
-  the repository: its gold, caches and reports go to `~/.cache/a11y-stem/heldout`, and a
+  the repository: its gold, caches and reports go to `~/.cache/readablestem/heldout`, and a
   `--set heldout` command refuses a path inside the repository, `--fake`, and gold that
   is not the registered gold.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.

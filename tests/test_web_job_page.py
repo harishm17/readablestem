@@ -73,7 +73,7 @@ def test_a_job_stopped_early_says_so_in_the_title_status_and_results(web):
     job_id = convert(web, stopped_by="budget_daily")
     assert web.job(job_id).error_code == "budget_daily"
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Stopped early: SECRET-HEADING Kinematics | a11y-stem"
+    assert title(html) == "Stopped early: SECRET-HEADING Kinematics | ReadableSTEM"
     text = page_text(html)
     assert "1 of 4 equations and figures were not converted" in text
     assert "The accessible HTML is ready" not in text
@@ -89,7 +89,8 @@ def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
     job_id = convert(web, image_only_pages=[1])
     html = web.browser.get(f"/jobs/{job_id}").text
     assert (
-        title(html) == "Finished, with pages not converted: SECRET-HEADING Kinematics | a11y-stem"
+        title(html)
+        == "Finished, with pages not converted: SECRET-HEADING Kinematics | ReadableSTEM"
     )
     assert "Page 2 is a scanned image, so it was not converted." in page_text(html)
     assert 'id="partial-note"' in html
@@ -98,7 +99,9 @@ def test_a_job_with_scanned_pages_says_so_in_the_title_and_results(web):
 def test_a_complete_job_has_no_partial_note(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Converted: SECRET-HEADING Kinematics | a11y-stem"  # 3 decisions are open
+    assert (
+        title(html) == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
+    )  # 3 decisions are open
     assert 'id="partial-note"' not in html
 
 
@@ -110,7 +113,7 @@ def test_a_scanned_pdf_says_why_it_stopped_everywhere_on_the_page(web):
     job_id = convert(web, image_only_pages=[0])
     assert (web.job(job_id).status, web.job(job_id).error_code) == ("failed", "scanned")
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Stopped: notes.pdf | a11y-stem"
+    assert title(html) == "Stopped: notes.pdf | ReadableSTEM"
     why = page_text(section(html, "failed-heading"))
     assert "Every page of this PDF is a scanned image, so this tool cannot convert it." in why
     assert "OCR" not in why  # the old advice made exactly these files

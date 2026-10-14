@@ -105,7 +105,7 @@ FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
 # certificate; its alternative is "N parts were decided by your instructor" (CHECKED).
 ABOUT_TITLE = "About this version"
 ABOUT_WORDING = (
-    "This is a web version of a PDF from your course, made with a11y-stem, a tool that "
+    "This is a web version of a PDF from your course, made with ReadableSTEM, a tool that "
     "assists with accessibility."
 )
 MATHS_NOTE = "Its equations are written so that screen readers can read them aloud."
@@ -1350,7 +1350,7 @@ def render_html(
             "<head>",
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
-            f'<meta name="generator" content="a11y-stem {_escape(__version__)}">',
+            f'<meta name="generator" content="ReadableSTEM {_escape(__version__)}">',
             f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",

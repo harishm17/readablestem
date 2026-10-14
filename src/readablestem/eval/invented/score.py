@@ -27,7 +27,7 @@ leaves room (all listed in docs/eval-invented.md):
 - Numbers are read from every prose block and heading, not only from sentences of 7 words.
 - Without gold equations every equation is "unaligned". With them, alignment is the
   document task's (weighted LCS, MathML signature only, threshold 0.5, reading order).
-- Text a11y-stem wrote itself (class `a11y-stem`) is scored like the rest and counted
+- Text ReadableSTEM wrote itself (class `readablestem`) is scored like the rest and counted
   apart: every count has an `authored` part, so a rate with and without it is one subtraction.
 
 Nothing here calls a model. The rules cannot see a changed word in a sentence that keeps a
@@ -94,7 +94,7 @@ SNIPPET_CHARS = 300
 @dataclass
 class Counts:
     """Units of one type. `authored` counts are the part of `n` and `unsupported` that is
-    text a11y-stem wrote itself."""
+    text ReadableSTEM wrote itself."""
 
     n: int = 0
     unsupported: int = 0

@@ -53,7 +53,7 @@ class DatabaseCheck:
     def problems(self) -> list[str]:
         out = []
         if self.schema in {"none", "behind"}:
-            out.append(f"schema is {self.schema}: run `a11y-stem db upgrade`")
+            out.append(f"schema is {self.schema}: run `readablestem db upgrade`")
         if self.missing_tables:
             out.append("missing tables: " + ", ".join(self.missing_tables))
         elif self.admins == 0:

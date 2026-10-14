@@ -1,4 +1,4 @@
-"""`a11y-stem serve`, `users allow|deny|list` and `db upgrade` (offline, SQLite)."""
+"""`readablestem serve`, `users allow|deny|list` and `db upgrade` (offline, SQLite)."""
 
 from __future__ import annotations
 
@@ -110,7 +110,7 @@ def test_users_commands_refuse_an_unmigrated_production_database(tmp_path, monke
     prod = make_settings(tmp_path, env="prod")
     monkeypatch.setattr("readablestem.config.get_settings", lambda: prod)
     assert main(["users", "list"]) == 2
-    assert "a11y-stem db upgrade" in capsys.readouterr().err
+    assert "readablestem db upgrade" in capsys.readouterr().err
 
 
 def test_db_upgrade_applies_the_migrations(tmp_path, monkeypatch, capsys):

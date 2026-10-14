@@ -14,7 +14,7 @@ once the answers under them move.
   they ask exactly the questions the pipeline asks; the text cases are generic
   predicates.
 - Expected answers: `canary_expected.json`, recorded with
-  `a11y-stem ops decisions-canary --record --max-usd 0.02` and committed. Each case
+  `readablestem ops decisions-canary --record --max-usd 0.02` and committed. Each case
   carries the SHA-256 of its request as sent, so changed wording, framing or images
   cannot be compared with old answers (a test fails until the file is re-recorded).
 - Alert: any probability that moved by more than `TOLERANCE` (0.02), or an answer that

@@ -1,1 +1,1 @@
-"""a11y-stem core."""
+"""ReadableSTEM core."""

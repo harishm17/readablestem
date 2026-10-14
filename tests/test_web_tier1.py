@@ -266,7 +266,7 @@ def test_the_title_field_starts_with_the_pdf_title_without_its_section_number(ti
     assert title_field(html) == "Derivatives"
     assert "<h1>Derivatives</h1>" in html
     assert '<p class="doc-file">File: week3.pdf</p>' in html
-    assert "Derivatives | a11y-stem" in html_title(html) or "Derivatives" in html_title(html)
+    assert "Derivatives | ReadableSTEM" in html_title(html) or "Derivatives" in html_title(html)
     assert 'for="title">Title students hear</label>' in html
 
 

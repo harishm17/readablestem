@@ -106,7 +106,7 @@ def test_my_documents_is_a_to_do_list(web):
     # Partial results, failures and badges say it in words.
     for badge in re.findall(r'<span class="status-badge status-(\w+)">([^<]+)</span>', page):
         assert badge[1].strip(), badge
-    assert "<title>My documents (3 of 4 finished) | a11y-stem</title>" in page
+    assert "<title>My documents (3 of 4 finished) | ReadableSTEM</title>" in page
 
 
 def test_a_document_without_a_title_is_shown_by_its_file_name(web):
@@ -126,7 +126,7 @@ def test_the_list_refreshes_only_when_something_changed(web):
     assert web.run_worker() == waiting
     changed = web.browser.get(f"/app/documents?v={version}", headers={"HX-Request": "true"})
     assert changed.status_code == 200
-    assert changed.text.startswith("<title>My documents | a11y-stem</title>")
+    assert changed.text.startswith("<title>My documents | ReadableSTEM</title>")
     assert '<div id="documents" class="documents">' in changed.text  # finished: no polling
     assert "<html" not in changed.text
     assert "hx-get" not in web.browser.get("/app").text

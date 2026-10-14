@@ -1,4 +1,5 @@
-"""CLI: a11y-stem eval invented score|summary|judge|selfcheck|audit-sheet|audit-score|fingerprint.
+"""CLI: `readablestem eval invented` score|summary|judge|selfcheck|audit-sheet|audit-score
+|fingerprint.
 
 `score`, `summary`, the audit commands and `fingerprint` make no model call and need no
 key. `judge` calls the image-aware figure judge on a seeded sample of descriptions and

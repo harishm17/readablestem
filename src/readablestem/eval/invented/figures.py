@@ -13,7 +13,7 @@ Three things are done here, none of them by a model except the last:
 - `bind`: which gold figure a description belongs to, by the rule of section 7.3 of the
   pre-registration (its text or caption holds the figure's number, "Figure 12.3", or at
   least half of the gold caption's word 4-grams). A description whose own HTML holds the
-  image (a11y-stem's data URI) needs no gold figure for its image;
+  image (ReadableSTEM's data URI) needs no gold figure for its image;
 - `judge_sample`: a seeded sample of the descriptions that have an image, judged, with
   the rate's Wilson interval and what the judge cost (its list price, from the
   `ModelCall`s; never added to any system's cost).

@@ -1,6 +1,6 @@
 # The static reviewer demo
 
-`site/` builds a small website that shows what a11y-stem does on real pages, for people who
+`site/` builds a small website that shows what ReadableSTEM does on real pages, for people who
 will not sign in or run anything: technical reviewers and university staff. It is plain HTML
 and one stylesheet. It has no scripts, no frameworks, no web fonts, no trackers and no
 requests to other sites.
@@ -15,7 +15,7 @@ give the same bytes (CI builds it twice and compares).
 
 | Page | What it holds |
 |---|---|
-| `index.html` | What a11y-stem is, who it is for, what it does not do, the headline numbers from `PROOF.md` with the set labelled, links to the README, `PROOF.md`, the method and the limits |
+| `index.html` | What ReadableSTEM is, who it is for, what it does not do, the headline numbers from `PROOF.md` with the set labelled, links to the README, `PROOF.md`, the method and the limits |
 | `examples/index.html` | The worked examples in one table |
 | `examples/<id>/index.html` | For one document: the PDF pages beside the HTML they became, what the checks found, the decisions a person would see (a static view of the review screen), how some equations are read aloud, the files and the credit |
 | `examples/<id>/converted.html` | The tool's full output page, as stored |
@@ -33,7 +33,7 @@ Everything is committed. Nothing is fetched or generated at build time.
 
 - **Stored results.** Each example is a folder `site/examples/<id>/` with `meta.json` (title,
   the PDF pages to show, the equations for the spoken readings, a one-line description) and
-  the three files that `a11y-stem demo build` writes: `report.json` (the stored result),
+  the three files that `readablestem demo build` writes: `report.json` (the stored result),
   `converted.html` (the output) and `source.pdf` (the exact input). `meta.json` may point at
   the files elsewhere in the repository with `artefacts`, `html`, `pdf` and `report`: the
   Physics 2.3 example uses the app's own demo under `src/readablestem/web/static/demo/`, and the
@@ -62,7 +62,7 @@ When the output changes (the assembler, the stylesheet, the About region) and th
 answers do not, the stored results are still right and only the HTML has to be written again:
 
 ```
-uv run a11y-stem demo rerender <report.json> <source.pdf> <converted.html> [--no-note]
+uv run readablestem demo rerender <report.json> <source.pdf> <converted.html> [--no-note]
 ```
 
 It cuts the pictures from the PDF as a conversion does, writes the file with today's assembler
@@ -75,8 +75,8 @@ made this way: one `h1`, the dark colour scheme and the labelled "About this ver
 ## Adding an example
 
 1. Convert a page or a fixture with the Claude provider, with a spend cap:
-   `uv run --env-file <env file> a11y-stem demo build --page <slug> --provider anthropic --max-usd <cap> --out <folder>`
-   (OpenStax pages), or `MODEL_PROVIDER=anthropic ... a11y-stem convert <pdf> --out <html> --report <json> --max-usd <cap>`
+   `uv run --env-file <env file> readablestem demo build --page <slug> --provider anthropic --max-usd <cap> --out <folder>`
+   (OpenStax pages), or `MODEL_PROVIDER=anthropic ... readablestem convert <pdf> --out <html> --report <json> --max-usd <cap>`
    (a fixture; wrap the result as `{"demo": {...}, "result": ...}` as the other `report.json`
    files are). The spend cap is a ceiling on reservations, not on what is spent; a low cap
    stops a run part-way and the report says so (`stopped_by`).

@@ -861,7 +861,13 @@ def equation_contexts(xhtml: str) -> list[tuple[str, str | None]]:
 
 
 def attribution_lines(page: PageSource) -> list[tuple[str, str | None]]:
-    """(text, link) pairs for the footer: what OpenStax's CC BY terms ask for."""
+    """(text, link) pairs for the footer: what OpenStax's CC BY terms ask for.
+
+    The two lines that name the tool keep its old name, a11y-stem: they are printed on the
+    evaluation pages, and the pages (and the page images the models were shown) are part of
+    the recorded runs and the registered held-out proof. Changing the words would change the
+    pixels, so every recorded answer would miss.
+    """
     authors = ", ".join(page.authors) if page.authors else "OpenStax authors"
     return [
         (f"“{page.page_title}” from {page.book_title} by {authors}, OpenStax.", None),
@@ -999,7 +1005,7 @@ def demo_note_html(
         else ""
     )
     source = (
-        f' a11y-stem is free, open-source software; its complete <a href="'
+        f' ReadableSTEM is free, open-source software; its complete <a href="'
         f'{esc(source_url, quote=True)}">source code is on GitHub</a> (it uses PyMuPDF under the '
         "GNU Affero General Public License v3)."
         if source_url
@@ -1012,18 +1018,18 @@ def demo_note_html(
         "padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;"
         'overflow-wrap:anywhere;">\n'
         + fake
-        + "<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print "
+        + "<p><strong>Precomputed demo.</strong> This is ReadableSTEM's output for a PDF print "
         f"of “{esc(page.page_title)}” from <cite>{esc(page.book_title)}</cite> by "
         f"{esc(authors)} (OpenStax), converted on {esc(date)}. Equations, headings and "
         "image descriptions below are the tool's proposals; the ones marked for review "
-        "have not been checked by a person. a11y-stem assists with accessibility work; "
+        "have not been checked by a person. ReadableSTEM assists with accessibility work; "
         "it does not replace review.</p>\n"
         f'<p>Read <a href="{esc(page.page_url, quote=True)}">the original page on '
         "openstax.org</a>. Licensed under "
         f'<a href="{esc(page.license_url, quote=True)}">{esc(page.license_name)}</a> '
-        f"({esc(page.license_short)}). Access for free at openstax.org. a11y-stem is not "
+        f"({esc(page.license_short)}). Access for free at openstax.org. ReadableSTEM is not "
         "affiliated with or endorsed by OpenStax.</p>\n"
-        f'<p><a href="/">Back to a11y-stem</a>.{source}</p>\n'
+        f'<p><a href="/">Back to ReadableSTEM</a>.{source}</p>\n'
         "</aside>\n"
     )
 

@@ -1,1 +1,1 @@
-"""a11y-stem ops."""
+"""readablestem ops."""

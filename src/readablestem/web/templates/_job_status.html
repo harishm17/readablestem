@@ -3,7 +3,7 @@
    a screen reader hears each step once. Polled by htmx (204 while unchanged). #}
 {# Only in the htmx fragment: htmx moves a top-level <title> into the document title, so
    the tab title follows the status ("Converting: notes.pdf") as the box does. #}
-{% if page_title|default("") %}<title>{{ page_title }} | a11y-stem</title>
+{% if page_title|default("") %}<title>{{ page_title }} | ReadableSTEM</title>
 {% endif %}
 {% set counts = job.summary.counts if job.summary else none %}
 <div id="job-status" class="job-status"{% if not job.finished %} hx-get="/jobs/{{ job.id }}/status?v={{ status_version|default(job.version) }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>

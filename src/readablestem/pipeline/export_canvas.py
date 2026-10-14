@@ -552,7 +552,7 @@ def readme(export: CanvasExport) -> str:
     paste = export.page_html is not None
     lines = [
         f"Canvas version of: {' '.join(export.title.split())}",
-        "Made by a11y-stem, a tool that assists with accessibility. Read the result through",
+        "Made by ReadableSTEM, a tool that assists with accessibility. Read the result through",
         "once before you share it.",
         "",
         "WHAT IS IN THIS ZIP",

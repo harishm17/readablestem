@@ -1,4 +1,4 @@
-# Deploying a11y-stem to Google Cloud Run
+# Deploying ReadableSTEM to Google Cloud Run
 
 This walks through the first deploy, the parts that cannot be scripted (the model provider's
 spend limit, Google sign-in client, the optional Microsoft sign-in app, custom domain), and
@@ -13,7 +13,7 @@ What you end up with:
 Cloud Scheduler (hourly) ──POST /internal/cron/aggregate-and-purge──┐
 Uptime check (/readyz, every 5 min) ──────────────────────────────┤
                                                                     ▼
-Instructors ── https://your-domain ──> Cloud Run service "a11y-stem" (1-2 instances,
+Instructors ── https://your-domain ──> Cloud Run service "readablestem" (1-2 instances,
                                         web app + worker thread, CPU always on)
                                           │  secrets from Secret Manager
                                           ▼
@@ -39,20 +39,20 @@ other names are the ones in `deploy/.env.deploy`.
 
 ```sh
 gcloud auth login
-cd /path/to/a11y-stem && uv sync          # the deploy checks your spend limits with it
+cd /path/to/your/checkout && uv sync          # the deploy checks your spend limits with it
 ```
 
 **2. HARISH: Google Cloud project and billing** (step 1 has the reasoning):
 
 ```sh
 gcloud billing accounts list                         # note the ID: XXXXXX-XXXXXX-XXXXXX
-gcloud projects create a11y-stem-prod --name="a11y-stem"
-gcloud billing projects link a11y-stem-prod --billing-account=XXXXXX-XXXXXX-XXXXXX
-gcloud projects describe a11y-stem-prod --format='value(projectNumber)'   # note the number
+gcloud projects create readablestem-prod --name="ReadableSTEM"
+gcloud billing projects link readablestem-prod --billing-account=XXXXXX-XXXXXX-XXXXXX
+gcloud projects describe readablestem-prod --format='value(projectNumber)'   # note the number
 ```
 
 **3. HARISH: Anthropic workspace, key and hard limit** (step 2, "Using Claude"). In the
-Console: create a workspace "a11y-stem prod", create an API key inside it, then
+Console: create a workspace "ReadableSTEM prod", create an API key inside it, then
 **Settings > Limits** for that workspace: a monthly spend limit of **$100** (the app's own
 daily cap of $10 makes $300 the most a month could ever cost; a real month of 3-5
 instructors is under $15, see "Spend limits") and a usage alert at $25. Keep the key; you
@@ -62,7 +62,7 @@ note the workspace id (`wrkspc_...`).
 **4. HARISH: Google sign-in** (step 3). In the project's **Google Auth Platform**: Branding
 (app name, support email), Audience **External**, **Testing**, test users = the beta
 instructors; **Clients > Create client > Web application** with the authorized redirect
-URI `https://a11y-stem-PROJECT_NUMBER.REGION.run.app/auth/callback` (the number from
+URI `https://readablestem-PROJECT_NUMBER.REGION.run.app/auth/callback` (the number from
 item 2; Cloud Run's URL is predictable). Copy the client ID and the client secret.
 
 **5. HARISH: settings file.**
@@ -94,16 +94,16 @@ set -a; . deploy/.env.deploy; set +a
 **7. HARISH: check it** (step 6):
 
 ```sh
-URL=$(gcloud run services describe a11y-stem --project="$PROJECT_ID" --region="$REGION" \
+URL=$(gcloud run services describe ReadableSTEM --project="$PROJECT_ID" --region="$REGION" \
   --format='value(status.url)')
 curl -fsS "$URL/readyz"       # {"status":"ready","checks":{"database":"ok","worker":"ok","model_provider":"ok"}}
-gcloud scheduler jobs run a11y-stem-cron --project="$PROJECT_ID" --location="$REGION"
+gcloud scheduler jobs run readablestem-cron --project="$PROJECT_ID" --location="$REGION"
 ```
 
 Open `$URL`, sign in with your admin email, convert a two-page PDF with an equation and a
 figure, download it, delete it. Then open **Monitoring > Alerting** and check the three
-policies exist (`a11y-stem readyz failing`, `a11y-stem cron not running`, `a11y-stem cron
-or purge problem`) and **Billing > Budgets** shows `a11y-stem monthly budget`.
+policies exist (`readablestem readyz failing`, `readablestem cron not running`, `readablestem cron
+or purge problem`) and **Billing > Budgets** shows `readablestem monthly budget`.
 
 **8. HARISH: add the instructors.** Sign in as admin, open **Admin**, add each email under
 Allowlist. They must also be test users in item 4 while the consent screen is in Testing.
@@ -122,7 +122,7 @@ mapping, add the DNS records, then set `BASE_URL`, add the new redirect URI to t
 client and re-run `./deploy/deploy.sh service`.
 
 **11. HARISH: before you invite anyone.** From your machine, with the production settings in
-the environment, `uv run a11y-stem ops launch-check` must list nothing (it names the draft
+the environment, `uv run readablestem ops launch-check` must list nothing (it names the draft
 copy, the demo, the eval baseline, and any spend-limit warning). Put the weekly reminders
 in your calendar: `./deploy/backups.sh status` and a look at the **Admin** page.
 
@@ -144,11 +144,11 @@ A dedicated project keeps the bill, the IAM grants and the alerts about this app
 and tearing it all down later is one command (`gcloud projects delete PROJECT_ID`).
 
 ```sh
-gcloud projects create a11y-stem-prod --name="a11y-stem"
-gcloud billing projects link a11y-stem-prod --billing-account=XXXXXX-XXXXXX-XXXXXX
+gcloud projects create readablestem-prod --name="ReadableSTEM"
+gcloud billing projects link readablestem-prod --billing-account=XXXXXX-XXXXXX-XXXXXX
 ```
 
-Project IDs are global; pick another if `a11y-stem-prod` is taken.
+Project IDs are global; pick another if `readablestem-prod` is taken.
 
 ## 2. Cap spend in the model provider's dashboard
 
@@ -158,7 +158,7 @@ anyone who deploys on OpenAI.
 The app has its own daily cap (`DAILY_SPEND_CAP_USD`) and per-job caps, but the provider's
 limit is the only one that survives a bug in this code. Set it before the first deploy.
 
-1. Create an OpenAI project for the app (for example "a11y-stem prod") and create the API
+1. Create an OpenAI project for the app (for example "ReadableSTEM prod") and create the API
    key inside that project, so the limit below applies to every call the app makes.
    Use a different project and key for GitHub's live eval (step 10).
 2. In that project: **Project settings > Limits > Spend > Edit spend limit**. Enter a
@@ -181,10 +181,10 @@ assembled with the originals kept, and the fixes that could not run are flagged.
 `MODEL_PROVIDER=anthropic` answers every model request with the Claude API instead
 (`models/anthropic_client.py`); OpenAI is then not called at all. Anthropic becomes a data
 processor for the app, so the privacy page changes with the setting and
-`a11y-stem ops launch-check` flags a deployment whose page does not name Anthropic
+`readablestem ops launch-check` flags a deployment whose page does not name Anthropic
 (`docs/design/beta-architecture.md`, "Data path and retention with Anthropic").
 
-1. In the Anthropic Console, create a workspace for the app (for example "a11y-stem prod")
+1. In the Anthropic Console, create a workspace for the app (for example "ReadableSTEM prod")
    and an API key inside it. **Use a workspace-scoped key.** A key that is not scoped to a
    workspace (an organisation-level key) is refused with HTTP 400 "This API key is not
    scoped to a workspace" unless every request carries the workspace id. The id is
@@ -193,7 +193,7 @@ processor for the app, so the privacy page changes with the setting and
    (the key text does not say), so a deployment with an organisation-level key and no id
    starts, and then fails each model call with that 400 (`call:<model>:outcome:api_error`
    in the aggregates, HTTP status 400 in the log lines). The proof's one-request API check
-   (`a11y-stem proof --live --provider anthropic`) names the missing id.
+   (`readablestem proof --live --provider anthropic`) names the missing id.
 2. Cap spend in the Console: **Settings > Limits** for the workspace (a monthly spend limit)
    and usage alerts, the same two layers as step 2 above. The app's own caps still apply.
 3. In `deploy/.env.deploy` set `MODEL_PROVIDER=anthropic`, leave `ANTHROPIC_API_KEY` empty
@@ -250,7 +250,7 @@ Things that differ from OpenAI, all on by default and safe to leave:
 
 How the numbers were chosen, so they can be re-chosen. Every figure is Claude
 (`claude-opus-5-5` main at effort medium, `claude-haiku-5-5` cheap at effort low, the
-Decisions second check off), measured with `a11y-stem convert` on 1 vCPU
+Decisions second check off), measured with `readablestem convert` on 1 vCPU
 (`taskset -c 0`) on 2026-10-14, plus the existing development reports in
 `.local/eval/claude-dev/`.
 
@@ -282,13 +282,13 @@ workspace limit ($100, checklist item 3) is the hard stop above that. A realisti
 
 `Settings.check_production` refuses to start (and `deploy.sh` stops before touching
 anything) when a number cannot work for the provider: a page or job cap below one call's
-reservation, or a daily cap below `MODEL_CONCURRENCY` calls held at once. `a11y-stem ops
+reservation, or a daily cap below `MODEL_CONCURRENCY` calls held at once. `readablestem ops
 launch-check` lists the softer problems too: a job cap a normal document comes near or a runaway would run far past (over
 25x), a daily cap under one job's cap or one user's quota, a quota under one full-size
 document. Turning on `FEATURE_TABLES` makes the reservation $0.53 a call; the check then
 asks for `MAX_USD_PER_PAGE` of at least $2.20 and `MAX_USD_PER_JOB` of at least $2.60.
 
-To measure again: `uv run --env-file .env a11y-stem convert FILE.pdf --out out.html
+To measure again: `uv run --env-file .env readablestem convert FILE.pdf --out out.html
 --max-usd 1.5`. Without `--concurrency` the command runs as many steps at once as the cap
 can hold; with one given, a small `--max-usd` stops a Claude run early, because the calls
 in flight each hold a reservation against it (use at least $1, or `--concurrency 1`).
@@ -422,12 +422,12 @@ turns it off where it is installed. One conversion runs at a time per instance.
 1. In the Cloud console for the new project, open **Google Auth Platform**. Under
    **Branding** set the app name and support email; under **Audience** choose
    **External** and leave it in **Testing**, then add each beta instructor as a test
-   user. Only allowlisted accounts can use the app anyway (`a11y-stem users allow`).
+   user. Only allowlisted accounts can use the app anyway (`readablestem users allow`).
 2. **Clients > Create client**, application type **Web application**.
 3. **Authorized redirect URIs**: add the service's own URL,
-   `https://a11y-stem-PROJECT_NUMBER.REGION.run.app/auth/callback` (Cloud Run's
+   `https://readablestem-PROJECT_NUMBER.REGION.run.app/auth/callback` (Cloud Run's
    predictable URL; `gcloud projects describe PROJECT_ID --format='value(projectNumber)'`
-   gives the number), and `https://YOUR_DOMAIN/auth/callback` if you will map a domain.
+   gives the number), and `https://readablestem.com/auth/callback` once the domain is mapped.
    Google requires https (only localhost may use http), an exact match, and no
    wildcards. For local development add `http://localhost:8000/auth/callback`.
 4. Copy the **client ID** (goes in `GOOGLE_CLIENT_ID`) and the **client secret** (you
@@ -450,13 +450,13 @@ from the Microsoft Entra admin center as documented on learn.microsoft.com (chec
 1. Sign in to the Microsoft Entra admin center (entra.microsoft.com) with an account
    that may register apps (at least **Application Developer**) in the directory that
    will own the app: your own (a free Microsoft Entra tenant works), not a university's.
-2. **Entra ID > App registrations > New registration.** Name: `a11y-stem` (people see it
+2. **Entra ID > App registrations > New registration.** Name: `ReadableSTEM` (people see it
    on Microsoft's sign-in and consent pages). **Supported account types: Multiple Entra
    ID tenants** (older wording: "Accounts in any organizational directory", multitenant).
    Not the option that adds personal Microsoft accounts. **Register.**
 3. On **Overview**, copy the **Application (client) ID**: it goes in `MS_CLIENT_ID`.
 4. **Authentication > Redirect URI configuration > Add Redirect URI > Web**, and add
-   `https://a11y-stem-PROJECT_NUMBER.REGION.run.app/auth/microsoft/callback`, and
+   `https://readablestem-PROJECT_NUMBER.REGION.run.app/auth/microsoft/callback`, and
    `https://YOUR_DOMAIN/auth/microsoft/callback` if you will map a domain (step 7), and
    for local development `http://localhost:8000/auth/microsoft/callback` (Microsoft
    allows http only for localhost). The app sends `BASE_URL + /auth/microsoft/callback`;
@@ -483,7 +483,7 @@ from the Microsoft Entra admin center as documented on learn.microsoft.com (chec
    (the id in `issuer`). Someone from a university that is not listed sees "Your
    organisation is not set up for this beta" with their directory id to send you. List
    the ids, comma-separated, in `MS_ALLOWED_TENANTS` (step 4). People still have to be
-   on the allowlist (`a11y-stem users allow EMAIL`), with the address their university
+   on the allowlist (`readablestem users allow EMAIL`), with the address their university
    account has.
 10. **Admin consent from the university's IT.** Many universities do not let staff
     approve a multi-tenant app themselves; then the first person to sign in sees "Need
@@ -528,7 +528,7 @@ directory ids, comma-separated; the script checks they look like ids). Leave
 offers Google only, as before.
 
 `BASE_URL` for the first deploy: the service's own URL,
-`https://a11y-stem-PROJECT_NUMBER.REGION.run.app`. A custom domain is not serving until
+`https://readablestem-PROJECT_NUMBER.REGION.run.app`. A custom domain is not serving until
 step 7 (DNS and the managed certificate can take up to a day), and sign-in only works on
 the `BASE_URL` host (step 3), so start with the run.app URL, check everything there
 (step 6), and switch `BASE_URL` to the domain in step 8. Without a custom domain, keep
@@ -553,14 +553,14 @@ in order (run any subset with `./deploy/deploy.sh STEP ...`):
 | Step | What it does |
 |---|---|
 | `apis` | Enables Cloud Run, Artifact Registry, Cloud Build, Compute, Secret Manager, Cloud SQL Admin, Cloud Scheduler, Monitoring, Billing Budgets and IAM |
-| `iam` | Creates the `a11y-stem-run` service account (Cloud SQL client, secret accessor); gives the build account `roles/cloudbuild.builds.builder` |
+| `iam` | Creates the `readablestem-run` service account (Cloud SQL client, secret accessor); gives the build account `roles/cloudbuild.builds.builder` |
 | `registry` | Creates the Docker repository in Artifact Registry |
 | `build` | `gcloud builds submit --tag ...`: Cloud Build builds the `Dockerfile` (tag = git commit). This runs a plain `docker build` in Cloud Build's docker 20.10 image, which may use the legacy builder, so the Dockerfile uses no BuildKit-only syntax (CI builds it both ways) |
 | `database` | Cloud SQL Postgres 16, `db-f1-micro`, Enterprise edition (shared-core tiers need it; Postgres 16+ defaults to Enterprise Plus); database `a11y`. Daily backups, of which only `SQL_RETAINED_BACKUPS` (default 1) are kept, and no point-in-time recovery (see "Backups and deleted documents" below). An existing instance is patched down to that count. Skipped with `DB_MODE=external` |
 | `secrets` | `anthropic-api-key` (or `openai-api-key`; prompted), `google-client-secret` (prompted), `session-secret`, `cron-token` (random), `database-url` (built from a random database password, or your external URL), and `ms-client-secret` (prompted) only when `MS_CLIENT_ID` is set. Existing secrets are kept |
-| `migrate` | Cloud Run job `a11y-stem-migrate` runs `a11y-stem db upgrade`, and waits for it |
+| `migrate` | Cloud Run job `readablestem-migrate` runs `readablestem db upgrade`, and waits for it |
 | `service` | `gcloud run deploy` with `--cpu=1 --memory=1Gi --min-instances=1 --max-instances=2 --no-cpu-throttling --concurrency=20 --timeout=300` (each from `deploy.env`; "Sizing"), a `/healthz` startup probe, the env vars (including the content-feature switches) and the five secrets (six with Microsoft sign-in) |
-| `cron` | Cloud Scheduler job `a11y-stem-cron`: hourly POST to `/internal/cron/aggregate-and-purge` with the `X-Cron-Token` header |
+| `cron` | Cloud Scheduler job `readablestem-cron`: hourly POST to `/internal/cron/aggregate-and-purge` with the `X-Cron-Token` header |
 | `monitoring` | Email notification channel; uptime check on `/readyz` (database, worker, model provider) every 5 minutes with an alert; three log-based metrics and two alert policies for the hourly cron: no `cron_done` for 2 hours, and any `cron_refused`, `aggregate_failed`, purge-backstop line or failed Cloud Scheduler attempt |
 | `budget` | Monthly billing budget (`BUDGET_USD`, default 90) with alerts at 50%, 90%, 100% and forecast 100%. Needs `BILLING_ACCOUNT_ID`; the script stops unless it is set or `SKIP_BUDGET=true` |
 
@@ -585,7 +585,7 @@ transaction logs would keep deleted documents for days as well.
 TODO(Harish): pick the trade-off and make the privacy page agree with it. Either keep one
 backup and say so ("deleted documents can remain in a database backup for up to one more
 day"), or set `SQL_RETAINED_BACKUPS` higher and state that window, or turn automated
-backups off for the beta (`gcloud sql instances patch a11y-stem-db --no-backup`) and keep
+backups off for the beta (`gcloud sql instances patch readablestem-db --no-backup`) and keep
 the current wording. The privacy page today promises deletion after `RETENTION_HOURS`
 without mentioning backups.
 
@@ -606,11 +606,11 @@ token is stored in the Cloud Scheduler job's header, readable by project viewers
 ## 6. Check it
 
 ```sh
-URL=$(gcloud run services describe a11y-stem --project="$PROJECT_ID" --region="$REGION" \
+URL=$(gcloud run services describe ReadableSTEM --project="$PROJECT_ID" --region="$REGION" \
   --format='value(status.url)')
 curl -fsS "$URL/healthz"    # the process and the database answer
 curl -fsS "$URL/readyz"     # ready: database, worker thread alive, model provider configured
-gcloud scheduler jobs run a11y-stem-cron --project="$PROJECT_ID" --location="$REGION"
+gcloud scheduler jobs run readablestem-cron --project="$PROJECT_ID" --location="$REGION"
 ```
 
 Then sign in at `$URL` (the same host as `BASE_URL`) with an admin email and convert a
@@ -629,25 +629,25 @@ Cloud Run offers three ways; for a 3-5 instructor beta the first is enough:
 With domain mapping:
 
 ```sh
-gcloud domains verify example.org          # once per domain; opens Search Console
-gcloud beta run domain-mappings create --service=a11y-stem --domain=a11y.example.org \
+gcloud domains verify readablestem.com   # once per domain; opens Search Console
+gcloud beta run domain-mappings create --service=readablestem --domain=readablestem.com \
   --region="$REGION" --project="$PROJECT_ID"
-gcloud beta run domain-mappings describe --domain=a11y.example.org \
+gcloud beta run domain-mappings describe --domain=readablestem.com \
   --region="$REGION" --project="$PROJECT_ID"
 ```
 
 Add the DNS records listed under `resourceRecords` at your DNS provider. The managed
 certificate can take a while to issue after DNS resolves. When
-`https://a11y.example.org/readyz` answers, set `UPTIME_HOST=a11y.example.org` and
+`https://readablestem.com/readyz` answers, set `UPTIME_HOST=readablestem.com` and
 re-run `./deploy/deploy.sh monitoring` (it adds a check only if none exists; delete the
 old one in **Monitoring > Uptime checks** first, or keep both).
 
 ## 8. Point sign-in at the domain
 
-Once `https://a11y.example.org/readyz` answers: confirm
-`https://a11y.example.org/auth/callback` is in the client's authorized redirect URIs
-(step 3), and `https://a11y.example.org/auth/microsoft/callback` in the Entra app's
-(step 3b) if you use it; set `BASE_URL=https://a11y.example.org` in
+Once `https://readablestem.com/readyz` answers: confirm
+`https://readablestem.com/auth/callback` is in the client's authorized redirect URIs
+(step 3), and `https://readablestem.com/auth/microsoft/callback` in the Entra app's
+(step 3b) if you use it; set `BASE_URL=https://readablestem.com` in
 `deploy/.env.deploy` and re-run `./deploy/deploy.sh service`. Sign in again at the domain
 (sessions are per host). You can remove the `run.app` redirect URIs afterwards.
 
@@ -679,7 +679,7 @@ A second instance (`--max-instances=2`) only runs, and costs, under load.
 ## 10. GitHub settings
 
 - **Uptime from outside Google**: repository variable `LIVE_URL` (Settings > Secrets
-  and variables > Actions > Variables) = `https://a11y.example.org`. The weekly
+  and variables > Actions > Variables) = `https://readablestem.com`. The weekly
   `uptime.yml` workflow then fetches `/readyz` and `/demo` and fails (GitHub emails you)
   if either does not answer 2xx. In a public repository GitHub disables scheduled
   workflows after 60 days without activity; re-enable it from the Actions tab.
@@ -702,12 +702,12 @@ TODO(Harish): none of this has run yet; the code and CI are ready for it. In ord
    managed certificate.
 5. Decide the backup window and the privacy wording (see "Backups and deleted
    documents"), write the known-limits page, and remove the "Draft" notes:
-   `a11y-stem ops launch-check` lists what is still unfinished.
+   `readablestem ops launch-check` lists what is still unfinished.
 6. If you offer Microsoft sign-in: register the app (step 3b), get admin consent from
    each university's IT team, sign in once with a university account at the run.app
    URL, and add Microsoft sign-in to the privacy notice ("Your account": what Microsoft
    sends, the directory id, and that the account's id is kept to recognise it).
-   `a11y-stem ops launch-check` run with the production settings lists the privacy
+   `readablestem ops launch-check` run with the production settings lists the privacy
    notice until it mentions Microsoft. The notice should also say that the Google
    account's id is now kept with the account.
 
@@ -728,9 +728,9 @@ changes). Cloud Run sends all traffic to the new revision once its startup probe
 Code:
 
 ```sh
-gcloud run revisions list --service=a11y-stem --region="$REGION" --project="$PROJECT_ID"
-gcloud run services update-traffic a11y-stem --region="$REGION" --project="$PROJECT_ID" \
-  --to-revisions=a11y-stem-00012-abc=100
+gcloud run revisions list --service=readablestem --region="$REGION" --project="$PROJECT_ID"
+gcloud run services update-traffic ReadableSTEM --region="$REGION" --project="$PROJECT_ID" \
+  --to-revisions=readablestem-00012-abc=100
 ```
 
 Traffic stays pinned to that revision until you run `update-traffic --to-latest` (or
@@ -758,20 +758,20 @@ If data has to come back, restore a backup (this overwrites the instance's curre
 data):
 
 ```sh
-gcloud sql backups list --filter=instance:a11y-stem-db --project="$PROJECT_ID"
-gcloud sql backups restore BACKUP_ID --restore-instance=a11y-stem-db --project="$PROJECT_ID"
+gcloud sql backups list --filter=instance:readablestem-db --project="$PROJECT_ID"
+gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db --project="$PROJECT_ID"
 ```
 
 Only `SQL_RETAINED_BACKUPS` backups exist (one by default), so a restore goes back at
 most that many days. A restore also brings back documents that retention had already
 deleted; run
-`gcloud scheduler jobs run a11y-stem-cron --location="$REGION"` right after so they are
+`gcloud scheduler jobs run readablestem-cron --location="$REGION"` right after so they are
 purged again.
 
 Secrets: every secret keeps its old versions. To go back to version 3 of the Anthropic key:
 
 ```sh
-gcloud run services update a11y-stem --region="$REGION" --project="$PROJECT_ID" \
+gcloud run services update ReadableSTEM --region="$REGION" --project="$PROJECT_ID" \
   --update-secrets=ANTHROPIC_API_KEY=anthropic-api-key:3
 ```
 
@@ -791,11 +791,11 @@ For `cron-token`, also run `./deploy/deploy.sh cron` so the scheduler sends the 
 value. For `ms-client-secret`, make the new secret in the Entra app first (step 3b,
 item 6), add it as a version, deploy, check a Microsoft sign-in, then delete the old
 secret in the Entra app. For `database-url`, change the user's password first
-(`gcloud sql users set-password a11y --instance=a11y-stem-db --prompt-for-password`),
+(`gcloud sql users set-password a11y --instance=readablestem-db --prompt-for-password`),
 then add the new URL as a version.
 
 ## Tear down
 
-`gcloud projects delete a11y-stem-prod` removes everything (after a 30-day recovery
+`gcloud projects delete readablestem-prod` removes everything (after a 30-day recovery
 window). Delete the Anthropic workspace's key (or the OpenAI project's), the Google sign-in client and the Entra app
 registration (if any) separately.

@@ -1,4 +1,4 @@
-"""`a11y-stem convert`: happy path with --fake, spend flags, and error exits (offline)."""
+"""`readablestem convert`: happy path with --fake, spend flags, and error exits (offline)."""
 
 from __future__ import annotations
 

@@ -7,7 +7,7 @@ goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
 
 | What | When | Where |
 |---|---|---|
-| Aggregate, then purge | Hourly, Cloud Scheduler job `a11y-stem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
+| Aggregate, then purge | Hourly, Cloud Scheduler job `readablestem-cron` | `POST /internal/cron/aggregate-and-purge` (needs the `X-Cron-Token` header); logs `cron_done` |
 | Decisions canary | At most once per UTC day, inside the hourly cron, after the purge | `ops.canary.maybe_run_daily`: 20 fixed requests to the Decisions API, compared with committed answers; `decisions_canary_drift` (ERROR) on any move over 0.02. See "Decisions canary" below |
 | Claude canary | At most once per UTC day, inside the hourly cron, after the Decisions canary | `ops.claude_canary.maybe_run_daily`: the Claude second check asked about 12 synthetic cases with known answers; `claude_canary_drift` (ERROR) when more than `CLAUDE_CANARY_MAX_MISSES` are wrong. See docs/steps.md "Second check on Claude" |
 | Purge backstop | Hourly, the worker thread (first run 10 minutes after start) | `purge_expired` again, logged `purge_done source=worker`; `purge_backstop_deleted` (WARNING) if it found overdue jobs, i.e. the scheduler is late |
@@ -19,16 +19,16 @@ goes wrong. First deploy, rollback and secret rotation: [deploy.md](deploy.md).
 The same tasks run by hand:
 
 ```sh
-gcloud scheduler jobs run a11y-stem-cron --location="$REGION" --project="$PROJECT_ID"
+gcloud scheduler jobs run readablestem-cron --location="$REGION" --project="$PROJECT_ID"
 
 # or from a machine that can reach the database (prints counts only):
-DATABASE_URL=postgresql+psycopg://... uv run a11y-stem ops cron
-uv run a11y-stem ops aggregate
-uv run a11y-stem ops purge
-uv run --env-file .env a11y-stem ops decisions-canary --max-usd 0.02   # no database needed
-uv run a11y-stem ops launch-check      # unfinished copy, demo, baseline, settings and spend limits
-uv run a11y-stem ops backup-check      # DATABASE_URL could run the app? ("Backups and restore")
-uv run a11y-stem ops restore-drill     # pg_dump, restore into a scratch database, check, drop
+DATABASE_URL=postgresql+psycopg://... uv run readablestem ops cron
+uv run readablestem ops aggregate
+uv run readablestem ops purge
+uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02   # no database needed
+uv run readablestem ops launch-check      # unfinished copy, demo, baseline, settings and spend limits
+uv run readablestem ops backup-check      # DATABASE_URL could run the app? ("Backups and restore")
+uv run readablestem ops restore-drill     # pg_dump, restore into a scratch database, check, drop
 ```
 
 `ops cron` exits 1 if aggregation failed, but only after the purge has run.
@@ -92,7 +92,7 @@ deleted-document page uses them to tell an owner what happened), but not for eve
   Why 400: a whole academic year and the first weeks of the next, so a course taught
   again can be compared with its first run and the four-week return rate measured all
   year. Changing it means changing the privacy page, which names the number.
-- **With the user.** `a11y-stem users delete` (`ops.retention.erase_user`) deletes all of
+- **With the user.** `readablestem users delete` (`ops.retention.erase_user`) deletes all of
   a person's events at once.
 - **Off.** `EVENTS_ENABLED=false` writes no new events (and turns the two questions after
   a download off); events already kept follow the rules above.
@@ -192,7 +192,7 @@ SELECT sum(count) FILTER (WHERE category = 'cost_microusd') / 1e6
 FROM error_aggregates WHERE step = 'job' AND day >= current_date - 30;
 ```
 
-`a11y-stem ops report --days 7` prints the weekly error-analysis tables from these rows
+`readablestem ops report --days 7` prints the weekly error-analysis tables from these rows
 (through the Cloud SQL Auth Proxy, like the other `ops` commands), including the review
 load (required decisions and optional notes per page, by step) and, per step (equation,
 figure, table, heading: every reviewable kind), the tier mix and the most frequent
@@ -211,7 +211,7 @@ Every line on stdout is one JSON object. Cloud Logging reads `severity`, `messag
 ```
 
 Useful Logs Explorer queries (add `resource.type="cloud_run_revision" AND
-resource.labels.service_name="a11y-stem"`):
+resource.labels.service_name="readablestem"`):
 
 | Question | Query |
 |---|---|
@@ -317,7 +317,7 @@ of the model or the service, seen the day it happens.
   Decisions requests are not model calls, and the budget allows none); a run costs
   about $0.00075 and takes about 3 s; cases still unsent after 60 s count as failed
   (`deadline`), so a hanging API cannot hold the cron request. `ops cron` (the by-hand cron) does not run it; use the command below.
-- **By hand:** `uv run --env-file .env a11y-stem ops decisions-canary --max-usd 0.02`
+- **By hand:** `uv run --env-file .env readablestem ops decisions-canary --max-usd 0.02`
   (exit 0 no drift, 1 drift, 2 could not compare). After a deliberate change (new
   question wording, new canary cases) or a drift you have looked at and accept:
   `... ops decisions-canary --max-usd 0.02 --record`, review the diff of
@@ -378,7 +378,7 @@ every backup holds the documents present when it ran, so keeping seven would str
 "deleted after 24 hours" to a week, and the transaction logs of point-in-time recovery
 would do the same (deploy.md, "Backups and deleted documents"). The cost is a restore
 point up to a day old and no recovery to a chosen minute. If you need that, enable it on
-purpose and change the privacy page: `gcloud sql instances patch a11y-stem-db
+purpose and change the privacy page: `gcloud sql instances patch readablestem-db
 --enable-point-in-time-recovery --retained-transaction-log-days=3`.
 
 **Check it weekly** (a calendar reminder is enough; exits 1 when something needs you):
@@ -397,7 +397,7 @@ outlives the retention promise). `./deploy/backups.sh list` shows every backup.
 ```sh
 ./deploy/backups.sh now                      # one on-demand backup
 # ... make the change, check it ...
-gcloud sql backups delete BACKUP_ID --instance=a11y-stem-db --project="$PROJECT_ID"
+gcloud sql backups delete BACKUP_ID --instance=readablestem-db --project="$PROJECT_ID"
 ```
 
 **Prove a restore works (the drill; do it once before real use and after any big schema
@@ -406,23 +406,23 @@ instance, so the live database is never touched:
 
 ```sh
 ./deploy/backups.sh list                     # note the newest BACKUP_ID (status SUCCESSFUL)
-gcloud sql instances create a11y-stem-db-drill --database-version=POSTGRES_16 \
+gcloud sql instances create readablestem-db-drill --database-version=POSTGRES_16 \
   --edition=enterprise --tier=db-f1-micro --region="$REGION" --storage-size=10 \
   --project="$PROJECT_ID"
-gcloud sql backups restore BACKUP_ID --restore-instance=a11y-stem-db-drill \
-  --backup-instance=a11y-stem-db --project="$PROJECT_ID"
-gcloud sql users set-password postgres --instance=a11y-stem-db-drill \
+gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db-drill \
+  --backup-instance=readablestem-db --project="$PROJECT_ID"
+gcloud sql users set-password postgres --instance=readablestem-db-drill \
   --prompt-for-password --project="$PROJECT_ID"
 # in a second terminal: the Cloud SQL Auth Proxy to the drill instance
-cloud-sql-proxy "$PROJECT_ID:$REGION:a11y-stem-db-drill" --port 5433
+cloud-sql-proxy "$PROJECT_ID:$REGION:readablestem-db-drill" --port 5433
 ```
 
 then, from the checkout:
 
 ```sh
 read -rs PGPW; export DATABASE_URL="postgresql+psycopg://postgres:${PGPW}@127.0.0.1:5433/a11y"; unset PGPW
-uv run a11y-stem ops backup-check
-gcloud sql instances delete a11y-stem-db-drill --project="$PROJECT_ID"   # when done
+uv run readablestem ops backup-check
+gcloud sql instances delete readablestem-db-drill --project="$PROJECT_ID"   # when done
 ```
 
 `backup-check` reads the copy and prints table names and row counts only. It exits 1 unless
@@ -434,15 +434,15 @@ match the day the backup was taken.
 **Restoring for real.** To go back to a backup in place (this overwrites the instance):
 
 ```sh
-gcloud sql backups restore BACKUP_ID --restore-instance=a11y-stem-db --project="$PROJECT_ID"
-gcloud scheduler jobs run a11y-stem-cron --location="$REGION" --project="$PROJECT_ID"
+gcloud sql backups restore BACKUP_ID --restore-instance=readablestem-db --project="$PROJECT_ID"
+gcloud scheduler jobs run readablestem-cron --location="$REGION" --project="$PROJECT_ID"
 ```
 
 Run the cron right after: the restore brings back documents that retention had already
-deleted, and the purge removes them again. Then `uv run a11y-stem ops backup-check`
+deleted, and the purge removes them again. Then `uv run readablestem ops backup-check`
 against the instance (through the proxy) and a sign-in.
 
-**Any Postgres: the pg_dump drill.** `a11y-stem ops restore-drill` takes the database in
+**Any Postgres: the pg_dump drill.** `readablestem ops restore-drill` takes the database in
 `DATABASE_URL`, runs `pg_dump` (custom format) into a private temporary directory, runs
 `pg_restore` into a scratch database on the same server, runs the same checks as
 `backup-check` on the scratch copy, compares the row counts with the source and drops the
@@ -463,7 +463,7 @@ on without traces. Keep it off for any run on `private-inputs/`.
 
 Where the tracer comes from: `create_app` calls `make_tracer(settings)` once and the
 worker passes it to every `convert_pdf` (`app_started` logs `tracing=true|false`); it is
-flushed when the app shuts down. `a11y-stem convert` does the same for one run. With
+flushed when the app shuts down. `readablestem convert` does the same for one run. With
 tracing off the converter gets no tracer at all.
 
 Retention: traces hold ids, codes, token counts and costs, never document content, but
@@ -502,7 +502,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 |---|---|---|
 | Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
 | `/healthz` answers 503, or `/readyz` shows `database: unreachable` | The database: Cloud SQL instance state, connections. Users meanwhile see a calm "Not available right now" page (503 with `Retry-After`) | See "Too many connections" below |
-| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Deploy a new revision (`./deploy/deploy.sh service`) or `gcloud run services update a11y-stem --region="$REGION" --project="$PROJECT_ID" --update-env-vars=RESTARTED_AT=$(date +%s)` to replace the instance; the running job's lease expires and it is requeued |
+| `/readyz` shows `worker: stalled` or `stopped`, or documents wait for ever | `worker_loop_error`, `lease_refresh_failed` and `conversion_abandoned` in the logs | The worker thread is stuck or dead; documents are queued but nothing converts. Deploy a new revision (`./deploy/deploy.sh service`) or `gcloud run services update ReadableSTEM --region="$REGION" --project="$PROJECT_ID" --update-env-vars=RESTARTED_AT=$(date +%s)` to replace the instance; the running job's lease expires and it is requeued |
 | `/readyz` shows `model_provider: no_key` or `unpriced_model` | The `anthropic-api-key` secret has a version and the service reads `:latest`; `ANTHROPIC_MAIN_MODEL` names a model in `models/pricing.py` | Add the secret version and redeploy, or fix the model name |
 | Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
 | Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |
@@ -510,10 +510,10 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
 | Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |
 | `unaggregated_deleted` above 0 | The cron history | Some statistics are lost for those jobs; nothing else to do |
-| Purge itself failing | `purge_done` missing for over an hour (from both `source=cron` and `source=worker`), or `purge_backstop_failed` | Treat as a privacy incident: run `a11y-stem ops purge` by hand, then fix the cause. Job pages already answer 404 once `retain_until` has passed, purged or not |
+| Purge itself failing | `purge_done` missing for over an hour (from both `source=cron` and `source=worker`), or `purge_backstop_failed` | Treat as a privacy incident: run `readablestem ops purge` by hand, then fix the cause. Job pages already answer 404 once `retain_until` has passed, purged or not |
 | Too many connections | Cloud SQL connection count (25 on db-f1-micro) | Each instance pools up to 10 connections; keep `--max-instances=2` or move to `db-g1-small` (50) |
 | Weekly GitHub uptime run failed | The run's log | Same as the uptime alert; also check the custom domain and certificate |
-| `decisions_canary_drift` | The line's `drifted_cases` and `max_delta`; `a11y-stem ops decisions-canary --max-usd 0.02` to see each moved answer | The Decisions API's answers changed under the thresholds. Conversions are unaffected (the check is a note or a shadow and fails open); to stop the figure notes meanwhile set `DECISIONS_FIGURE_VERIFY=false`. Re-measure the thresholds (docs/eval.md), then re-record the canary |
+| `decisions_canary_drift` | The line's `drifted_cases` and `max_delta`; `readablestem ops decisions-canary --max-usd 0.02` to see each moved answer | The Decisions API's answers changed under the thresholds. Conversions are unaffected (the check is a note or a shadow and fails open); to stop the figure notes meanwhile set `DECISIONS_FIGURE_VERIFY=false`. Re-measure the thresholds (docs/eval.md), then re-record the canary |
 | Many `decision_call` WARNINGs or `verify:*:outcome:timeout` counts | `outcome`, `status`, `code` on the lines | Decisions API trouble. Nothing to do for conversions (fail-open); the check's answers are missing for those fixes |
 
 ## CI and dependency updates
@@ -526,7 +526,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | `postgres` | `pytest -m postgres` against a Postgres 16 service container |
 | `browser` | `pytest -m browser` with Playwright Chromium (axe-core checks) |
 | `docker` | Builds the image (no push) with BuildKit and again with the legacy builder (`DOCKER_BUILDKIT=0`, as Cloud Build's `--tag` build may use), and checks the entry point and non-root user |
-| `eval-gate` | `a11y-stem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
+| `eval-gate` | `readablestem eval gate --require-current` for every committed `data/eval/baseline-<task>.json` against its `latest-<task>.json` (skips while none is committed). Fails on a regression, a changed judge, or a latest report the current prompts did not produce |
 | `secret-scan` | gitleaks over the full history |
 
 Every action is pinned to a commit SHA with its tag in a comment; Dependabot proposes

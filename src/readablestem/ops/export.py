@@ -13,7 +13,7 @@ Only jobs whose owner ticked "Also let the developer look (30 days)"
 Not exported: the uploaded PDF, the file name, the owner's email, the output HTML.
 
 The export is a copy of document content outside the database, so it keeps the same
-deadline: `prune_exports(DIR)` (`a11y-stem ops export-opted-in --prune DIR`) deletes
+deadline: `prune_exports(DIR)` (`readablestem ops export-opted-in --prune DIR`) deletes
 every job directory whose `EXPIRES` has passed. TODO(Harish): before using this, make
 the privacy page say opted-in results may be copied to your own machine for analysis
 and are deleted by the same date, and decide whether reviewer decisions should outlive

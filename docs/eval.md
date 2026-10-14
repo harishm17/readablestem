@@ -1,6 +1,6 @@
 # Evaluation
 
-How a11y-stem measures its own output, on what data, and what the numbers leave out.
+How ReadableSTEM measures its own output, on what data, and what the numbers leave out.
 
 Status (2026-10-13): the harness is built and tested offline, and real-model runs on the
 sample are committed as `data/eval/latest-<task>.json` (pipeline 0.4.0; see "Results"
@@ -8,7 +8,7 @@ below). All of them come from three sections of one OpenStax book, the same samp
 checks were developed on. They are development numbers: none of them
 is a held-out result, and they should not be read as an estimate for documents in general.
 
-The invented-content rate (how much of an output the PDF does not support, for a11y-stem
+The invented-content rate (how much of an output the PDF does not support, for ReadableSTEM
 and for other systems) has its own page: [eval-invented.md](eval-invented.md).
 
 ## The idea
@@ -16,7 +16,7 @@ and for other systems) has its own page: [eval-invented.md](eval-invented.md).
 OpenStax publishes its textbooks as web pages with expert-written MathML, alt text and a
 real heading outline. That makes a page an answer key. The harness:
 
-1. takes the answers from the gold set (`data/gold/`, built by `a11y-stem gold fetch`),
+1. takes the answers from the gold set (`data/gold/`, built by `readablestem gold fetch`),
 2. rebuilds the question a user would bring: a PNG of an equation, or the page printed to
    an ordinary PDF (`eval/render.py`),
 3. runs the real pipeline code on it,
@@ -476,7 +476,7 @@ One-time setup:
 ```
 uv sync --all-groups
 uv run playwright install chromium
-uv run a11y-stem gold fetch --book physics --pages 3 --chapter 2 --date 2026-10-06
+uv run readablestem gold fetch --book physics --pages 3 --chapter 2 --date 2026-10-06
 ```
 
 `gold fetch` also fills `.cache/openstax/`, which holds the page XHTML the page PDFs are
@@ -517,20 +517,20 @@ by a Claude judge are two instruments and do not compare (the gate refuses, `jud
 The chatbot arms of the registered comparison stay on OpenAI.
 
 ```
-uv run a11y-stem eval pipeline --task equations --provider anthropic --limit 10 --max-usd 1.00 --out .local/eval/equations-claude.json
+uv run readablestem eval pipeline --task equations --provider anthropic --limit 10 --max-usd 1.00 --out .local/eval/equations-claude.json
 ```
 
 ```
-uv run a11y-stem eval pipeline --task equations --max-usd 0.50 --items data/eval/items-equations.jsonl
-uv run a11y-stem eval pipeline --task headings  --max-usd 0.01
-uv run a11y-stem eval pipeline --task figures   --max-usd 0.50 --items data/eval/judged.jsonl
-uv run a11y-stem eval pipeline --task document  --max-usd 2.00 --items data/eval/items-document.jsonl
+uv run readablestem eval pipeline --task equations --max-usd 0.50 --items data/eval/items-equations.jsonl
+uv run readablestem eval pipeline --task headings  --max-usd 0.01
+uv run readablestem eval pipeline --task figures   --max-usd 0.50 --items data/eval/judged.jsonl
+uv run readablestem eval pipeline --task document  --max-usd 2.00 --items data/eval/items-document.jsonl
 ```
 
 The figures task with long descriptions on (about $0.13 for the 13 gold figures):
 
 ```
-FEATURE_LONG_DESCRIPTIONS=true uv run a11y-stem eval pipeline --task figures --max-usd 1.00 --out .local/eval/figures-long.json --items .local/eval/figures-long.jsonl
+FEATURE_LONG_DESCRIPTIONS=true uv run readablestem eval pipeline --task figures --max-usd 1.00 --out .local/eval/figures-long.json --items .local/eval/figures-long.jsonl
 ```
 
 `--limit N` takes the first N equations or figures, or the first N pages. `--fake` swaps
@@ -548,17 +548,17 @@ keeps the default.
 Pre-render or inspect inputs:
 
 ```
-uv run a11y-stem eval render --equations
-uv run a11y-stem eval render --page 2-2-speed-and-velocity --out /tmp/page.pdf
+uv run readablestem eval render --equations
+uv run readablestem eval render --page 2-2-speed-and-velocity --out /tmp/page.pdf
 ```
 
 Judge calibration:
 
 ```
-uv run a11y-stem eval calibrate --judge data/eval/judged.jsonl --write-template data/eval/labels.csv
+uv run readablestem eval calibrate --judge data/eval/judged.jsonl --write-template data/eval/labels.csv
 # Label in a spreadsheet: human_pass = yes/no, notes optional. Do not look at the judge's verdict.
-uv run a11y-stem eval calibrate --judge data/eval/judged.jsonl --labels data/eval/labels.csv --out data/eval/calibration.json
-uv run a11y-stem eval calibrate --probes --max-usd 0.50 --out data/eval/probes.json
+uv run readablestem eval calibrate --judge data/eval/judged.jsonl --labels data/eval/labels.csv --out data/eval/calibration.json
+uv run readablestem eval calibrate --probes --max-usd 0.50 --out data/eval/probes.json
 ```
 
 Baselines and the gate: after reviewing a full run, promote it and commit the file
@@ -566,9 +566,9 @@ Baselines and the gate: after reviewing a full run, promote it and commit the fi
 prompts or models than the code):
 
 ```
-uv run a11y-stem eval promote .local/eval/equations-run3.json --as baseline
-uv run a11y-stem eval promote .local/eval/equations-run3.json --as latest
-uv run a11y-stem eval gate --require-current --current data/eval/latest-equations.json --baseline data/eval/baseline-equations.json
+uv run readablestem eval promote .local/eval/equations-run3.json --as baseline
+uv run readablestem eval promote .local/eval/equations-run3.json --as latest
+uv run readablestem eval gate --require-current --current data/eval/latest-equations.json --baseline data/eval/baseline-equations.json
 ```
 
 After a prompt or model change, re-run the task, promote the new report `--as latest`
@@ -621,8 +621,8 @@ first replay with the check on pays for them once (about $0.13). A `--batch` run
 check live.
 
 ```
-uv run a11y-stem eval pipeline --task equations --provider anthropic --max-usd 2 --answers .local/answers.jsonl
-uv run a11y-stem eval pipeline --task equations --provider anthropic --answers .local/answers.jsonl --answers-offline
+uv run readablestem eval pipeline --task equations --provider anthropic --max-usd 2 --answers .local/answers.jsonl
+uv run readablestem eval pipeline --task equations --provider anthropic --answers .local/answers.jsonl --answers-offline
 ```
 
 `--batch` (with `--answers` and `--provider anthropic`) sends what the file cannot answer to
@@ -643,8 +643,8 @@ the ISO week, scored like any other run (`eval/sample.py`). Reports go to
 `.local/eval/weekly/<week>-<task>.json` (git-ignored):
 
 ```
-uv run a11y-stem eval sample --task equations --max-usd 0.10
-uv run a11y-stem eval sample --task figures --fraction 0.05 --week 2026-W41 --max-usd 0.10
+uv run readablestem eval sample --task equations --max-usd 0.10
+uv run readablestem eval sample --task figures --fraction 0.05 --week 2026-W41 --max-usd 0.10
 ```
 
 TODO(Harish): decide whether to schedule it (it spends money; `eval-live.yml` is
@@ -667,7 +667,7 @@ TODO(Harish): keep this page or choose another, then rebuild with the command be
 `--fake` build is marked as a placeholder and `ops launch-check` flags it.
 
 ```
-uv run a11y-stem demo build --page 2-2-speed-and-velocity --max-usd 1.00
+uv run readablestem demo build --page 2-2-speed-and-velocity --max-usd 1.00
 ```
 
 It prints the page to PDF, converts it, and writes `index.html` (the converted page with a
@@ -934,7 +934,7 @@ private research notes, which are not in this repository.
 | OpenStax | `data/gold/tables/` (13 pages of *Physics* and *Statistics*, table records only) | CC BY 4.0 | 13 pages x 3 print styles = 39 | 54 x 3 = 162 | 10 x 3 = 30 (the "Key Terms" grids) |
 | Authored | `data/authored/tables/` (`README.md` there) | MIT | 6 | 35 (32 source tables; 3 run over two pages) | 3 |
 
-- **OpenStax pages.** `a11y-stem gold fetch --set tables --date 2026-10-08` fetches them
+- **OpenStax pages.** `readablestem gold fetch --set tables --date 2026-10-08` fetches them
   (the license and state gates of `gold fetch` apply; `ATTRIBUTION.md` is generated). They
   are table-bench's corrected gold (64 tables, 54 data tables): the committed records are
   line for line the ones table-bench scored. `data/gold/tables` is a gold set of its own
@@ -1046,7 +1046,7 @@ until then.
 
 ### Gate
 
-`a11y-stem eval gate --current data/eval/latest-tables-local.json` checks the floors with
+`readablestem eval gate --current data/eval/latest-tables-local.json` checks the floors with
 no baseline (with `--baseline` it also checks regressions: TEDS, recall and column-header
 exact may drop 0.02-0.03, precision 0.03, cost per table rise 25%; a baseline of the
 other mode or other authored documents is refused).
@@ -1075,10 +1075,10 @@ lower ends of its 95% intervals, and decide whether CI gates on the committed
 ### How to run
 
 ```
-uv run a11y-stem gold fetch --set tables --date 2026-10-08     # only to refresh the gold
-uv run a11y-stem eval pipeline --task tables --mode local --items .local/eval/tables-local.jsonl
-uv run a11y-stem eval pipeline --task tables --mode model --max-usd 1.00
-uv run a11y-stem eval gate --current data/eval/latest-tables-local.json
+uv run readablestem gold fetch --set tables --date 2026-10-08     # only to refresh the gold
+uv run readablestem eval pipeline --task tables --mode local --items .local/eval/tables-local.jsonl
+uv run readablestem eval pipeline --task tables --mode model --max-usd 1.00
+uv run readablestem eval gate --current data/eval/latest-tables-local.json
 ```
 
 `--styles grid,norules` prints fewer styles, `--no-authored` leaves the authored documents
@@ -1157,7 +1157,7 @@ $0.087 for both runs. Reports in `.local/eval/notation/` (not committed: the lis
 part of the gate's baseline).
 
 ```
-uv run --env-file .env a11y-stem eval pipeline --task equations --max-usd 0.15 \
+uv run --env-file .env readablestem eval pipeline --task equations --max-usd 0.15 \
   --notation "bold d" "bold v" "bold a" \
   --out .local/eval/notation/equations-notation.json --items .local/eval/notation/items-equations-notation.jsonl
 uv run python -m readablestem.eval.notation_flags .local/eval/notation/items-equations-notation.jsonl \
@@ -1509,7 +1509,7 @@ verdicts as before the fixes.
 
 ## Held-out set (pre-registered 2026-10-13)
 
-The sections above were used to build and tune a11y-stem, so their numbers are
+The sections above were used to build and tune ReadableSTEM, so their numbers are
 development numbers. The held-out set is 15 OpenStax sections that no development step
 saw, fixed in a pre-registration before any system ran on them: 3 sections each from
 College Physics, Chemistry, Precalculus, Introductory Statistics and Intermediate Algebra,
@@ -1529,7 +1529,7 @@ ADR 0001 question 2), and the ADR as a whole stays open. Fetching needs `--allow
 editions'.
 
 **The answer key is not in the repository.** The gold, the caches and the reports stay outside
-it, by default under `~/.cache/a11y-stem/heldout`
+it, by default under `~/.cache/readablestem/heldout`
 (`$XDG_CACHE_HOME`, or `--heldout-dir`): the research sweeps read every PDF in
 `.cache/eval/pages/`, and `data/eval/` feeds the CI gate, so a held-out file in either
 would flow into development or into the gate. The exception is `proof/interim/heldout-2026-10/`:
@@ -1539,11 +1539,11 @@ held-out section is under `data/` or `tests/fixtures/`, and the tests build thei
 small synthetic set.
 
 ```
-uv run a11y-stem gold fetch --set heldout --allow-retired --date 2026-10-13   # ~25 requests
-uv run a11y-stem gold verify --set heldout
-uv run a11y-stem eval render --set heldout --all            # prints 15 PDFs, counts pages
-uv run a11y-stem eval equations --set heldout --self-check  # plumbing only, always 1.0
-uv run a11y-stem eval pipeline --set heldout --task document --max-usd N
+uv run readablestem gold fetch --set heldout --allow-retired --date 2026-10-13   # ~25 requests
+uv run readablestem gold verify --set heldout
+uv run readablestem eval render --set heldout --all            # prints 15 PDFs, counts pages
+uv run readablestem eval equations --set heldout --self-check  # plumbing only, always 1.0
+uv run readablestem eval pipeline --set heldout --task document --max-usd N
 ```
 
 - **`gold fetch --set heldout`** writes what `gold fetch` writes for any set: one JSONL per
@@ -1572,7 +1572,7 @@ uv run a11y-stem eval pipeline --set heldout --task document --max-usd N
   SHA-256 values. It exits 1 if a Letter print has another page count than registered (242
   in all). Printing only counts pages; nothing converts the PDFs.
 
-The run itself (a11y-stem, the chatbot recipe, the open parsers), the cluster bootstrap
+The run itself (ReadableSTEM, the chatbot recipe, the open parsers), the cluster bootstrap
 and the invented-content rate are specified in the pre-registration and happen once, after
 its sign-off items. Until then no number from this set exists.
 
@@ -1590,7 +1590,7 @@ tuned against it is not validated until it passes a set nobody tuned against.
 
 **What it holds.** Gold for OpenStax sections and authored documents, with every item
 labelled with the Tier 2 classes it belongs to. Items per class (the `summary.md` table;
-`a11y-stem gold devset summary` prints it; Check counts are totals of the sealed part):
+`readablestem gold devset summary` prints it; Check counts are totals of the sealed part):
 
 | Class | Item | Backlog | Target | OpenStax | Authored | Dev | Check |
 |---|---|---|---|---|---|---|---|
@@ -1656,7 +1656,7 @@ editions are accepted by the decision of 2026-10-13
    them against the held-out folder's archive cache.
 3. `gold devset verify` (and a test) fails if a dev file is from a held-out section or book.
 
-The held-out sections' archive pages are read from `~/.cache/a11y-stem/heldout/openstax` only
+The held-out sections' archive pages are read from `~/.cache/readablestem/heldout/openstax` only
 to compute these numbers; none is stored in the repository or its caches.
 
 **How the sections are chosen** (`gold/devset.py`, `gold devset select`, deterministic and
@@ -1698,7 +1698,7 @@ of `feat/t2-scorers` replace it.
   and not read while the set was built. `SEAL.json` holds counts and hashes and no item
   name. The tests compare hashes and section names (the dev part and the held-out
   sections must not overlap it) without printing anything. `--part check` verifies the
-  archive against the seal, extracts it under `~/.cache/a11y-stem/dev-v2/`, keeps its
+  archive against the seal, extracts it under `~/.cache/readablestem/dev-v2/`, keeps its
   render cache, archive cache and report outside the repository, refuses `--items`, and its
   report holds totals only. The seal is a hash and a rule of use, not secrecy: run it for
   the totals before a merge and do not open it.
@@ -1712,17 +1712,17 @@ depends on the installed fonts and hyphenation dictionaries, so the committed PD
 rebuild, are the inputs.
 
 ```
-uv run a11y-stem gold devset summary                  # items per class
-uv run a11y-stem gold devset verify [--overlap]       # manifest, seal, held-out rules
-uv run a11y-stem eval equations --set dev-v2 --self-check
-uv run a11y-stem eval pipeline --task document --set dev-v2 --fake
-uv run a11y-stem eval pipeline --task headings --set dev-v2 --part check --max-usd 2
-uv run a11y-stem eval pipeline --task tables --set dev-v2 --fake
-uv run a11y-stem eval classes --set dev-v2 --self-check     # scripts, code, glossary, hyphens
-uv run a11y-stem eval classes --set dev-v2 --html-dir DIR   # converted pages <book>__<page>.html
+uv run readablestem gold devset summary                  # items per class
+uv run readablestem gold devset verify [--overlap]       # manifest, seal, held-out rules
+uv run readablestem eval equations --set dev-v2 --self-check
+uv run readablestem eval pipeline --task document --set dev-v2 --fake
+uv run readablestem eval pipeline --task headings --set dev-v2 --part check --max-usd 2
+uv run readablestem eval pipeline --task tables --set dev-v2 --fake
+uv run readablestem eval classes --set dev-v2 --self-check     # scripts, code, glossary, hyphens
+uv run readablestem eval classes --set dev-v2 --html-dir DIR   # converted pages <book>__<page>.html
 # rebuild (needs network for the OpenStax archive, Chromium; the authored pool first):
 uv run python data/dev-v2/authored/build_authored.py --out /tmp/pool --tectonic PATH
-uv run a11y-stem gold devset build --authored-pool /tmp/pool --date 2026-10-14 --force
+uv run readablestem gold devset build --authored-pool /tmp/pool --date 2026-10-14 --force
 ```
 
 `--set dev-v2` works on `eval pipeline` (equations, headings, figures, document and tables;
@@ -2129,7 +2129,7 @@ exact rate is 0.53), so its rates are not course PDFs' rates.
 - **Cost and latency.** Fake runs report fake costs and 1 ms latencies. Real latency
   depends on the provider's load on the day; cost excludes rendering, storage and the
   judge's own calls (reported separately).
-- **No conformance claim.** a11y-stem assists people making course material accessible.
+- **No conformance claim.** ReadableSTEM assists people making course material accessible.
   None of these numbers establishes conformance with WCAG or any other standard.
 
 ## Files

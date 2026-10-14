@@ -1,6 +1,6 @@
 """The weekly error-analysis report, from `error_aggregates` only (no document content).
 
-`a11y-stem ops report --days 7` prints, for the last N UTC days: jobs and their
+`readablestem ops report --days 7` prints, for the last N UTC days: jobs and their
 outcomes, pages, cost per page and conversion times; the review load (decisions a
 person had to make per page, optional notes per page, by step); per step (equation,
 figure, table, heading) the status and review-tier mix, the most frequent reasons for each tier,
@@ -110,7 +110,7 @@ def render_report(counts: dict[tuple[str, str], int], *, since: date, until: dat
     job = {c: n for (s, c), n in counts.items() if s == "job"}
     done, failed = job.get("status:done", 0), job.get("status:failed", 0)
     pages, micro = job.get("pages", 0), job.get("cost_microusd", 0)
-    lines = [f"a11y-stem error analysis, {since.isoformat()} to {until.isoformat()} (UTC)", ""]
+    lines = [f"ReadableSTEM error analysis, {since.isoformat()} to {until.isoformat()} (UTC)", ""]
     summary = [
         ("jobs finished", str(done + failed)),
         ("done", _share(done, done + failed)),

@@ -7,7 +7,7 @@ in the repository: the Docker build fetches it once, and developers fetch it wit
 refused instead of loaded.
 
 Where it is looked for: `$TABLE_MODEL_DIR/slanet-plus.onnx`, by default
-`~/.cache/a11y-stem/models` (`$XDG_CACHE_HOME` when set); the image sets
+`~/.cache/readablestem/models` (`$XDG_CACHE_HOME` when set); the image sets
 `TABLE_MODEL_DIR=/app/models`. When the file is missing, table detection still works and
 builds grids from PyMuPDF's own table grid instead (`tables.structure` says why, without
 content).

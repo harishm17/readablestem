@@ -142,7 +142,7 @@ class RequestSizeLimitMiddleware:
 
 _TOO_LARGE = (
     "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-    "<title>Request too large | a11y-stem</title></head><body><main>"
+    "<title>Request too large | ReadableSTEM</title></head><body><main>"
     "<h1>Request too large</h1><p>That request was larger than this page accepts. "
     "Go back to <a href='/'>the home page</a>.</p></main></body></html>"
 )
@@ -179,7 +179,7 @@ class SafeErrorMiddleware:
 def _plain_500() -> Response:
     return HTMLResponse(
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
-        "<title>Something went wrong | a11y-stem</title></head><body><main>"
+        "<title>Something went wrong | ReadableSTEM</title></head><body><main>"
         "<h1>Something went wrong</h1><p>The error has been recorded without any of your "
         "document's content. Please try again, or go back to <a href='/'>the home page</a>."
         "</p></main></body></html>",

@@ -6,7 +6,7 @@ gate skips without one). Given the settings, it also lists what a setting turns 
 the public pages do not describe yet (Microsoft sign-in and the privacy notice), and
 whether the production settings are complete and the spend limits fit the model provider
 (`ops.limits`: the same errors that stop a production start, plus warnings).
-`a11y-stem ops launch-check` prints the list and exits 1 while it is not empty; the web
+`readablestem ops launch-check` prints the list and exits 1 while it is not empty; the web
 app logs `launch_blockers` with the count at a production start.
 
 It does not refuse to start: a staging deploy runs with ENV=prod and must work before the
@@ -37,7 +37,7 @@ PUBLIC_TEMPLATES = (
     "_signin.html",
     "org_not_set_up.html",
 )
-# Written into a demo built with the offline client (`a11y-stem demo build --fake`);
+# Written into a demo built with the offline client (`readablestem demo build --fake`);
 # the same string as eval.render.PLACEHOLDER_ATTR (kept here so this module stays light).
 FAKE_DEMO_MARKER = 'data-readablestem-demo="placeholder"'
 
@@ -81,7 +81,7 @@ def launch_blockers(
         if 'class="draft-note"' in text:
             items.append(f"web/templates/{name}: still shows the draft note")
     if not DEMO_PAGE.is_file():
-        items.append("web/static/demo/index.html: no demo yet (a11y-stem demo build)")
+        items.append("web/static/demo/index.html: no demo yet (readablestem demo build)")
     elif FAKE_DEMO_MARKER in DEMO_PAGE.read_text(encoding="utf-8"):
         items.append("web/static/demo/index.html: placeholder output from --fake; rebuild it")
     if repo_root is not None:

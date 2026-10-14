@@ -170,7 +170,7 @@ def test_the_footer_links_to_feedback_by_email_or_a_configured_address(tmp_path)
     with env.running() as client:
         page = client.get("/").text
     assert (
-        '<a href="mailto:help@example.org?subject=a11y-stem%20feedback">'
+        '<a href="mailto:help@example.org?subject=ReadableSTEM%20feedback">'
         "Send feedback by email</a>" in page
     )
     other = WebEnv(tmp_path / "url", feedback_url="https://forms.example.edu/a11y")

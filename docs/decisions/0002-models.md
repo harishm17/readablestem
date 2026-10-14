@@ -48,4 +48,4 @@ Drafted from what the repository shows; the author confirms or edits.
   confidence intervals for this reason). Document images and the text around them are
   sent to that provider, which the privacy page has to say.
 - **When to revisit.** A price change, a model being retired, or a drop in the eval
-  gate's numbers after a model or prompt change (`a11y-stem eval gate`).
+  gate's numbers after a model or prompt change (`readablestem eval gate`).

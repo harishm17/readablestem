@@ -1,4 +1,4 @@
-"""CLI commands: a11y-stem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
+"""CLI commands: readablestem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
 report|export-opted-in|decisions-canary|claude-canary.
 
 The same tasks the web app runs on Cloud Scheduler's hourly call, for running by hand or
@@ -119,7 +119,7 @@ def _factory() -> sessionmaker[Session]:
 def _db_error(exc: SQLAlchemyError) -> int:
     print(
         f"error: database error ({type(exc).__name__}); check DATABASE_URL and that the "
-        "schema is migrated (a11y-stem db upgrade)",
+        "schema is migrated (readablestem db upgrade)",
         file=sys.stderr,
     )
     return 1
@@ -250,7 +250,7 @@ def _cmd_export(args: argparse.Namespace) -> int:
     except SQLAlchemyError as exc:
         return _db_error(exc)
     print(f"jobs={stats.jobs} crops={stats.crops} labels={stats.labels}")
-    print("delete them by their EXPIRES date: a11y-stem ops export-opted-in --prune DIR")
+    print("delete them by their EXPIRES date: readablestem ops export-opted-in --prune DIR")
     return 0
 
 

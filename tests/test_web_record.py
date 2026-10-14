@@ -119,7 +119,7 @@ def test_the_csv_has_the_same_facts(web):
     assert when.year >= 2026
     document = {r["item"]: r for r in rows if r["section"] == "document"}
     assert document["File name"]["detail"] == "secret-notes.pdf"
-    assert "a11y-stem" in document["Tool"]["detail"]
+    assert "ReadableSTEM" in document["Tool"]["detail"]
     assert "certif" not in response.text.lower()
 
 

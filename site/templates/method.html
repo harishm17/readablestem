@@ -10,7 +10,7 @@
     MathML, headings and figure descriptions that OpenStax publishes in its web editions.</li>
   <li>Each section is printed to a PDF from OpenStax's web page, using this project's own print
     stylesheet. These are not the publisher's PDFs.</li>
-  <li>a11y-stem converts the PDF. Its output is scored against the answer key.</li>
+  <li>ReadableSTEM converts the PDF. Its output is scored against the answer key.</li>
   <li>The run is recorded. <code>make proof</code> replays the recording with no key, no network
     and no cost, and writes <a href="{{ repo_url }}/blob/main/PROOF.md">PROOF.md</a>. A continuous
     integration job checks that the committed file is what the command writes.</li>
@@ -27,9 +27,9 @@
 <h2>How the examples were made</h2>
 <ul class="measure">
   <li>Each example is a stored result. This site calls no model when it is built or opened.</li>
-  <li>The OpenStax pages are printed to PDF, converted with <code>a11y-stem demo build</code>, and the
+  <li>The OpenStax pages are printed to PDF, converted with <code>readablestem demo build</code>, and the
     result is stored with the PDF and the HTML. The fixture was converted with
-    <code>a11y-stem convert</code>. Each page names the provider, the model and the date.</li>
+    <code>readablestem convert</code>. Each page names the provider, the model and the date.</li>
   <li>The pages and equations shown on each example were <strong>chosen</strong> to show different
     kinds of content. They are illustrations. They are not a sample and they are not evidence of how
     often the tool is right.</li>

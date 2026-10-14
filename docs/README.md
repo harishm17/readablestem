@@ -50,7 +50,7 @@ says how to report a vulnerability.
 - **"WP"** is a work package: a unit of the original build plan that owns one module
   contract.
 - **`TODO(Harish)`** marks wording or a decision that the author has not settled yet.
-  `uv run a11y-stem ops launch-check` lists the ones that still sit on the public pages
+  `uv run readablestem ops launch-check` lists the ones that still sit on the public pages
   of the web app.
 - **Private research.** Some evidence (the PDF-parser comparison, the handwriting corpus,
   the lab-manual table set) comes from the author's private research folder. Where a number

@@ -1,4 +1,4 @@
-"""a11y-stem: assists with making STEM course materials accessible.
+"""ReadableSTEM: assists with making STEM course materials accessible.
 
 Skeleton only: gold-set fetcher (OpenStax), equation scorer, PDF parse stub.
 """

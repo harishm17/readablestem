@@ -84,7 +84,7 @@ def stored(web, job_id: str) -> DocumentResult:
 def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Converted: SECRET-HEADING Kinematics | a11y-stem"
+    assert title(html) == "Converted: SECRET-HEADING Kinematics | ReadableSTEM"
     status = page_text(section_of_status(html))
     assert "Converted 3 decisions need you before you share it." in status
     actions = html[
@@ -111,7 +111,7 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
         fix.reviewed = False  # accepted by the pipeline: nothing needed a decision
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Ready to share: SECRET-HEADING Kinematics | a11y-stem"
+    assert title(html) == "Ready to share: SECRET-HEADING Kinematics | ReadableSTEM"
     ready = page_text(section(html, "ready-heading"))
     assert "Nothing in this file needed your decision." in ready
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
@@ -139,7 +139,7 @@ def test_after_the_last_decision_the_page_says_who_decided_and_when(web):
                                element_id="p1-e3", action="accept"))  # fmt: skip
     html = web.browser.get(f"/jobs/{job_id}").text
     # The abstained equation was kept as an image: ready, but said plainly.
-    assert title(html) == "Ready: SECRET-HEADING Kinematics | a11y-stem"
+    assert title(html) == "Ready: SECRET-HEADING Kinematics | ReadableSTEM"
     assert "1 equation is shown as an image that screen readers cannot read." in page_text(html)
     today = utcnow().date()
     ready = page_text(section(html, "ready-heading"))
@@ -160,7 +160,7 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
     html = web.browser.get(f"/jobs/{job_id}").text
     assert (
         title(html)
-        == "Stopped: the AI service did not answer: SECRET-HEADING Kinematics | a11y-stem"
+        == "Stopped: the AI service did not answer: SECRET-HEADING Kinematics | ReadableSTEM"
     )
     text = page_text(html)
     assert "did not answer for 4 of 4 equations and figures" in text
@@ -245,7 +245,7 @@ def test_a_running_job_shows_its_steps_outside_the_live_region(web):
     assert "Equations: 14 of 21 read and checked against your PDF's text (in progress)" in steps
     assert "Figures: 5 of 7 described (in progress)" in steps
     assert f'hx-get="/jobs/{job_id}/progress?v=' in html
-    assert title(html) == "Converting: notes.pdf | a11y-stem"
+    assert title(html) == "Converting: notes.pdf | ReadableSTEM"
 
 
 def test_the_status_fragment_waits_for_the_next_step_and_the_steps_for_any_change(web):

@@ -1,4 +1,4 @@
-"""`a11y-stem demo rerender`: today's output for a stored demo or example result, with no
+"""`readablestem demo rerender`: today's output for a stored demo or example result, with no
 model, no network and no cost; the stored result is left as it was written."""
 
 from __future__ import annotations
