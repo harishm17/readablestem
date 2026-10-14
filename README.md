@@ -329,6 +329,12 @@ starting points are [docs/eval.md](docs/eval.md) (how quality is measured and wh
 leave out), [docs/design/beta-architecture.md](docs/design/beta-architecture.md) and the
 [decision records](docs/decisions/).
 
+The history of this repository was rewritten once before it was made public, so the commit
+hashes cited in `PROOF.md` and in the registration addenda are not the hashes you see here.
+[docs/history-note.md](docs/history-note.md) maps each original hash to its public one, so the
+order of events (for example, that the held-out run's code was committed before any held-out call)
+can be checked.
+
 ## Licence
 
 The code is MIT ([LICENSE](LICENSE)). The hosted service links PyMuPDF, which is AGPL-3.0, so

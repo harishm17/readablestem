@@ -11,6 +11,7 @@ arrived at; read them by question, not front to back.
 | How is quality measured, on what data, with what error bars? | [eval.md](eval.md): "The idea", "Metrics", "Results", then "What the numbers do not show" |
 | Why does the app ask a person about some conversions and not others? | [design/beta-architecture.md](design/beta-architecture.md), "Review tiers"; [eval.md](eval.md), "Review load" |
 | How are equations and figures checked after the model has answered? | [steps.md](steps.md) |
+| The proof cites a commit hash that is not in this repository. | [history-note.md](history-note.md): original hash to public hash, for every cited commit |
 | How are headings, lists, equations and figures found in a PDF? | [layout.md](layout.md): "How a page is read" and "Known failure modes" |
 | How do tables work, and why are they off by default? | [tables.md](tables.md); [eval.md](eval.md), "Tables" |
 
