@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "84cf20ef786ba51389dd7037d42e6cc65fe5796fb7d6947f9640402736ef7417",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 5.62,
+    "load_before": 6.81,
+    "offline": false,
+    "peak_rss_mb": 3502.5,
+    "quiet_box": null,
+    "system_seconds": 3.784,
+    "timeout_seconds": 1800,
+    "user_seconds": 190.24,
+    "wall_seconds_per_page": 4.284
+  },
+  "output": {
+    "file": "college-physics__5-3-elasticity-stress-and-strain.md",
+    "format": "md"
+  },
+  "pdf_pages": 14,
+  "seconds": 59.972,
+  "section": "college-physics/5-3-elasticity-stress-and-strain",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

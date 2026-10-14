@@ -1,0 +1,38 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 1.089084,
+  "counted_input_tokens": 125246,
+  "error": null,
+  "figure_judgements": [],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.0,
+  "output": {
+    "file": "intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.run1.html",
+    "format": "html"
+  },
+  "output_chars": 52858,
+  "pdf_pages": 27,
+  "response_status": "end_turn",
+  "run": 1,
+  "seconds": 205.2,
+  "section": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 125246,
+    "output_tokens": 29405,
+    "reasoning_tokens": 2835
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

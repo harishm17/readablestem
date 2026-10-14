@@ -1,0 +1,99 @@
+{
+  "arm": "chatbot-haiku-purdue",
+  "attempts": [],
+  "cost_usd": 0.01082,
+  "counted_input_tokens": 43618,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0125714,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0094834,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0048674,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0053073999999999994,
+      "factual_error": true,
+      "figure_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/fig-003",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 2,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0044794,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/28-4-relativistic-addition-of-velocities/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.036709,
+  "output": {
+    "file": "college-physics__28-4-relativistic-addition-of-velocities.run2.html",
+    "format": "html"
+  },
+  "output_chars": 25787,
+  "pdf_pages": 9,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 48.2,
+  "section": "college-physics/28-4-relativistic-addition-of-velocities",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 43618,
+    "output_tokens": 12917,
+    "reasoning_tokens": 2782
+  },
+  "versions": {
+    "model_requested": "claude-haiku-5-5",
+    "model_served": "claude-haiku-5-5"
+  }
+}

@@ -1,0 +1,443 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>14.7 Acid-Base Titrations</title>
+
+  <!-- MathJax 3 configuration: must be defined before the MathJax script loads -->
+  <script>
+    window.MathJax = {
+      loader: { load: ['[tex]/mhchem'] },
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        packages: { '[+]': ['mhchem'] },
+        tags: 'none'
+      },
+      options: {
+        enableMenu: true,
+        enableAssistiveMml: true
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --link: #0b4a8b;
+      --border: #6b6b6b;
+      --focus: #005fcc;
+      --note-bg: #f4f6f8;
+    }
+    html { font-size: 100%; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 1rem;
+    }
+    h1, h2, h3 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.25;
+    }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; margin-top: 2rem; }
+    h3 { font-size: 1.2rem; margin-top: 1.5rem; }
+    a { color: var(--link); text-decoration: underline; }
+    a:focus-visible, .skip-link:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .skip-link {
+      position: absolute;
+      left: 1rem;
+      top: -3rem;
+      background: #ffffff;
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--focus);
+      z-index: 100;
+    }
+    .skip-link:focus { top: 1rem; }
+    .example, .check-learning {
+      border: 2px solid var(--border);
+      padding: 1rem 1.25rem;
+      margin: 2rem 0;
+      background: var(--bg);
+    }
+    .answer {
+      border: 1px solid var(--border);
+      background: var(--note-bg);
+      padding: 0.75rem 1rem;
+      margin-top: 1rem;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1.5rem 0;
+      font-size: 0.95rem;
+    }
+    caption {
+      text-align: left;
+      font-weight: bold;
+      padding: 0.5rem 0;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    thead th { background: var(--note-bg); }
+    figure {
+      margin: 2rem 0;
+      text-align: center;
+    }
+    figcaption {
+      text-align: left;
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+    }
+    .math-block { overflow-x: auto; padding: 0.25rem 0; }
+    .long-desc {
+      text-align: left;
+      font-size: 0.95rem;
+      border-left: 4px solid var(--border);
+      padding-left: 0.75rem;
+      margin: 0.75rem 0;
+    }
+    .eq-number { font-family: Arial, Helvetica, sans-serif; font-size: 0.9rem; }
+    footer {
+      margin-top: 3rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+      font-size: 0.9rem;
+    }
+    details summary {
+      cursor: pointer;
+      font-family: Arial, Helvetica, sans-serif;
+      padding: 0.25rem 0;
+    }
+    details summary:focus-visible { outline: 3px solid var(--focus); }
+  </style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<main id="main-content">
+
+<h1>14.7 Acid-Base Titrations</h1>
+
+<section aria-labelledby="learning-objectives">
+  <h2 id="learning-objectives">Learning Objectives</h2>
+  <p>By the end of this section, you will be able to:</p>
+  <ul>
+    <li>Interpret titration curves for strong and weak acid-base systems</li>
+    <li>Compute sample pH at important stages of a titration</li>
+    <li>Explain the function of acid-base indicators</li>
+  </ul>
+  <p>As seen in the chapter on the stoichiometry of chemical reactions, titrations can be used to quantitatively analyze solutions for their acid or base concentrations. In this section, we will explore the changes in the concentrations of the acidic and basic species present in a solution during the process of a titration.</p>
+</section>
+
+<section aria-labelledby="titration-curve">
+  <h2 id="titration-curve">Titration Curve</h2>
+  <p>Previously, when we studied acid-base reactions in solution, we focused only on the point at which the acid and base were stoichiometrically equivalent. No consideration was given to the pH of the solution before, during, or after the neutralization.</p>
+</section>
+
+<!-- ============ EXAMPLE 14.21 ============ -->
+<section class="example" aria-labelledby="ex1421">
+  <h2 id="ex1421">Example 14.21</h2>
+  <h3>Calculating pH for Titration Solutions: Strong Acid/Strong Base</h3>
+  <p>A titration is carried out for 25.00 mL of 0.100 <i>M</i> HCl (strong acid) with 0.100 <i>M</i> of a strong base NaOH. The titration curve is shown in Figure 14.21. Calculate the pH at these volumes of added base solution:</p>
+  <ol type="a">
+    <li>0.00 mL</li>
+    <li>12.50 mL</li>
+    <li>25.00 mL</li>
+    <li>37.50 mL</li>
+  </ol>
+
+  <h3>Solution</h3>
+  <p>Since HCl is a strong acid, we can assume that all of it dissociates. The initial concentration of H<sub>3</sub>O<sup>+</sup> is \([\ce{H3O+}]_0 = 0.100\ M\). When the base solution is added, it also dissociates completely, providing OH<sup>−</sup> ions. The H<sub>3</sub>O<sup>+</sup> and OH<sup>−</sup> ions neutralize each other, so only those of the two that were in excess remain, and their concentration determines the pH. Thus, the solution is initially acidic (pH &lt; 7), but eventually all the hydronium ions present from the original acid are neutralized, and the solution becomes neutral. As more base is added, the solution turns basic.</p>
+
+  <p>The total initial amount of the hydronium ions is:</p>
+  <div class="math-block">\[n(\ce{H+})_0 = [\ce{H3O+}]_0 \times 0.02500\ \text{L} = 0.002500\ \text{mol} \tag{14.195}\]</div>
+
+  <p>Once X mL of the 0.100-<i>M</i> base solution is added, the number of moles of the OH<sup>−</sup> ions introduced is:</p>
+  <div class="math-block">\[n(\ce{OH-})_0 = 0.100\ M \times X\ \text{mL} \times \left(\frac{1\ \text{L}}{1000\ \text{mL}}\right) \tag{14.196}\]</div>
+
+  <p>The total volume becomes:</p>
+  <div class="math-block">\[V = (25.00\ \text{mL} + X\ \text{mL})\left(\frac{1\ \text{L}}{1000\ \text{mL}}\right)\]</div>
+
+  <p>The number of moles of H<sub>3</sub>O<sup>+</sup> becomes:</p>
+  <div class="math-block">\[n(\ce{H+}) = n(\ce{H+})_0 - n(\ce{OH-})_0 = 0.002500\ \text{mol} - 0.100\ M \times X\ \text{mL} \times \left(\frac{1\ \text{L}}{1000\ \text{mL}}\right) \tag{14.197}\]</div>
+
+  <p>The concentration of H<sub>3</sub>O<sup>+</sup> is:</p>
+  <div class="math-block">\[[\ce{H3O+}] = \frac{n(\ce{H+})}{V} = \frac{0.002500\ \text{mol} - 0.100\ M \times X\ \text{mL} \times \left(\frac{1\ \text{L}}{1000\ \text{mL}}\right)}{(25.00\ \text{mL} + X\ \text{mL})\left(\frac{1\ \text{L}}{1000\ \text{mL}}\right)} = \frac{0.002500\ \text{mol} \times \left(\frac{1000\ \text{mL}}{1\ \text{L}}\right) - 0.100\ M \times X\ \text{mL}}{25.00\ \text{mL} + X\ \text{mL}} \tag{14.198}\]</div>
+
+  <div class="math-block">\[\text{pH} = -\log([\ce{H3O+}]) \tag{14.199}\]</div>
+
+  <p>The preceding calculations work if \(n(\ce{H+})_0 - n(\ce{OH-})_0 > 0\) and so \(n(\ce{H+}) > 0\). When \(n(\ce{H+})_0 = n(\ce{OH-})_0\), the H<sub>3</sub>O<sup>+</sup> ions from the acid and the OH<sup>−</sup> ions from the base mutually neutralize. At this point, the only hydronium ions left are those from the autoionization of water, and there are no OH<sup>−</sup> particles to neutralize them. Therefore, in this case:</p>
+  <div class="math-block">\[[\ce{H3O+}] = [\ce{OH-}], \quad [\ce{H3O+}] = K_\text{w} = 1.0 \times 10^{-14}; \quad [\ce{H3O+}] = 1.0 \times 10^{-7} \tag{14.200}\]</div>
+  <div class="math-block">\[\text{pH} = -\log(1.0 \times 10^{-7}) = 7.00 \tag{14.201}\]</div>
+
+  <p>Finally, when \(n(\ce{OH-})_0 > n(\ce{H+})_0\), there are not enough H<sub>3</sub>O<sup>+</sup> ions to neutralize all the OH<sup>−</sup> ions, and instead of \(n(\ce{H+}) = n(\ce{H+})_0 - n(\ce{OH-})_0\), we calculate \(n(\ce{OH-}) = n(\ce{OH-})_0 - n(\ce{H+})_0\). In this case:</p>
+  <div class="math-block">\[[\ce{OH-}] = \frac{n(\ce{OH-})}{V} = \frac{0.100\ M \times X\ \text{mL} \times \left(\frac{1\ \text{L}}{1000\ \text{mL}}\right) - 0.002500\ \text{mol}}{(25.00\ \text{mL} + X\ \text{mL})\left(\frac{1\ \text{L}}{1000\ \text{mL}}\right)} = \frac{0.100\ M \times X\ \text{mL} - 0.002500\ \text{mol} \times \left(\frac{1000\ \text{mL}}{1\ \text{L}}\right)}{25.00\ \text{mL} + X\ \text{mL}} \tag{14.202}\]</div>
+  <div class="math-block">\[\text{pH} = 14 - \text{pOH} = 14 + \log([\ce{OH-}]) \tag{14.203}\]</div>
+
+  <p>Let us now consider the four specific cases presented in this problem:</p>
+
+  <h4>(a) X = 0 mL</h4>
+  <div class="math-block">\[[\ce{H3O+}] = \frac{n(\ce{H+})}{V} = \frac{0.002500\ \text{mol} \times \left(\frac{1000\ \text{mL}}{1\ \text{L}}\right)}{25.00\ \text{mL}} = 0.1\ M \tag{14.204}\]</div>
+  <p>\(\text{pH} = -\log(0.100) = 1.000\)</p>
+
+  <h4>(b) X = 12.50 mL</h4>
+  <div class="math-block">\[[\ce{H3O+}] = \frac{n(\ce{H+})}{V} = \frac{0.002500\ \text{mol} \times \left(\frac{1000\ \text{mL}}{1\ \text{L}}\right) - 0.100\ M \times 12.50\ \text{mL}}{25.00\ \text{mL} + 12.50\ \text{mL}} = 0.0333\ M \tag{14.205}\]</div>
+  <p>\(\text{pH} = -\log(0.0333) = 1.477\)</p>
+
+  <h4>(c) X = 25.00 mL</h4>
+  <p>Since the volumes and concentrations of the acid and base solutions are the same, \(n(\ce{H+})_0 = n(\ce{OH-})_0\), and pH = 7.000, as described earlier.</p>
+
+  <h4>(d) X = 37.50 mL</h4>
+  <p>In this case:</p>
+  <div class="math-block">\[n(\ce{OH-})_0 > n(\ce{H+})_0 \tag{14.206}\]</div>
+  <div class="math-block">\[[\ce{OH-}] = \frac{n(\ce{OH-})}{V} = \frac{0.100\ M \times 35.70\ \text{mL} - 0.002500\ \text{mol} \times \left(\frac{1000\ \text{mL}}{1\ \text{L}}\right)}{25.00\ \text{mL} + 37.50\ \text{mL}} = 0.0200\ M \tag{14.207}\]</div>
+  <p>\(\text{pH} = 14 - \text{pOH} = 14 + \log(0.0200) = 12.30\)</p>
+
+  <aside class="check-learning" aria-labelledby="cyl1421">
+    <h3 id="cyl1421">Check Your Learning</h3>
+    <p>Calculate the pH for the strong acid/strong base titration between 50.0 mL of 0.100 <i>M</i> HNO<sub>3</sub>(<i>aq</i>) and 0.200 <i>M</i> NaOH (titrant) at the listed volumes of added base: 0.00 mL, 15.0 mL, 25.0 mL, and 40.0 mL.</p>
+    <div class="answer">
+      <p><strong>Answer:</strong> 0.00 mL: 1.000; 15.0 mL: 1.5111; 25.0 mL: 7; 40.0 mL: 12.523</p>
+    </div>
+  </aside>
+</section>
+
+<!-- ============ TABLE 14.4 ============ -->
+<section aria-labelledby="table144-heading">
+  <h2 id="table144-heading" class="visually-hidden" style="position:absolute;left:-9999px;">Table 14.4 Data</h2>
+  <p>In the example, we calculated pH at four points during a titration. Table 14.4 shows a detailed sequence of changes in the pH of a strong acid and a weak acid in a titration with NaOH.</p>
+
+  <table>
+    <caption>Table 14.4: pH Values in the Titrations of a Strong Acid with a Strong Base and of a Weak Acid with a Strong Base</caption>
+    <thead>
+      <tr>
+        <th scope="col">Volume of 0.100 <i>M</i> NaOH Added (mL)</th>
+        <th scope="col">Moles of NaOH Added</th>
+        <th scope="col">pH Values 0.100 <i>M</i> HCl<sup>(1)</sup>: Titration of 25.00 mL of 0.100 <i>M</i> HCl (0.00250 mol of HCl) with 0.100 <i>M</i> NaOH</th>
+        <th scope="col">pH Values 0.100 <i>M</i> CH<sub>3</sub>CO<sub>2</sub>H<sup>(2)</sup>: Titration of 25.00 mL of 0.100 <i>M</i> CH<sub>3</sub>CO<sub>2</sub>H (0.00250 mol of CH<sub>3</sub>CO<sub>2</sub>H) with 0.100 <i>M</i> NaOH</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td>0.0</td><td>0.0</td><td>1.00</td><td>2.87</td></tr>
+      <tr><td>5.0</td><td>0.00050</td><td>1.18</td><td>4.14</td></tr>
+      <tr><td>10.0</td><td>0.00100</td><td>1.37</td><td>4.57</td></tr>
+      <tr><td>15.0</td><td>0.00150</td><td>1.60</td><td>4.92</td></tr>
+      <tr><td>20.0</td><td>0.00200</td><td>1.95</td><td>5.35</td></tr>
+      <tr><td>22.0</td><td>0.00220</td><td>2.20</td><td>5.61</td></tr>
+      <tr><td>24.0</td><td>0.00240</td><td>2.69</td><td>6.13</td></tr>
+      <tr><td>24.5</td><td>0.00245</td><td>3.00</td><td>6.44</td></tr>
+      <tr><td>24.9</td><td>0.00249</td><td>3.70</td><td>7.14</td></tr>
+      <tr><td>25.0</td><td>0.00250</td><td>7.00</td><td>8.72</td></tr>
+      <tr><td>25.1</td><td>0.00251</td><td>10.30</td><td>10.30</td></tr>
+      <tr><td>25.5</td><td>0.00255</td><td>11.00</td><td>11.00</td></tr>
+      <tr><td>26.0</td><td>0.00260</td><td>11.29</td><td>11.29</td></tr>
+      <tr><td>28.0</td><td>0.00280</td><td>11.75</td><td>11.75</td></tr>
+      <tr><td>30.0</td><td>0.00300</td><td>11.96</td><td>11.96</td></tr>
+      <tr><td>35.0</td><td>0.00350</td><td>12.22</td><td>12.22</td></tr>
+      <tr><td>40.0</td><td>0.00400</td><td>12.36</td><td>12.36</td></tr>
+      <tr><td>45.0</td><td>0.00450</td><td>12.46</td><td>12.46</td></tr>
+      <tr><td>50.0</td><td>0.00500</td><td>12.52</td><td>12.52</td></tr>
+    </tbody>
+  </table>
+  <p><small>(1) Titration of 25.00 mL of 0.100 <i>M</i> HCl with 0.100 <i>M</i> NaOH. (2) Titration of 25.00 mL of 0.100 <i>M</i> CH<sub>3</sub>CO<sub>2</sub>H with 0.100 <i>M</i> NaOH.</small></p>
+
+  <p>The simplest acid-base reactions are those of a strong acid with a strong base. Table 14.4 shows data for the titration of a 25.0-mL sample of 0.100 <i>M</i> hydrochloric acid with 0.100 <i>M</i> sodium hydroxide. The values of the pH measured after successive additions of small amounts of NaOH are listed in the first column of this table, and are graphed in Figure 14.21, in a form that is called a titration curve. The pH increases slowly at first, increases rapidly in the middle portion of the curve, and then increases slowly again. The point of inflection (located at the midpoint of the vertical part of the curve) is observed when the amount of base added is equivalent to the amount of acid in the sample according to the stoichiometry of the titration reaction. The volume of titrant containing this stoichiometric amount of base is called the <strong>equivalence point</strong> for the titration (see the earlier chapter on stoichiometry). For the titration of a strong acid with a strong base, the equivalence point occurs at a pH of 7.00 and the points on the titration curve can be calculated using solution stoichiometry (Table 14.4 and Figure 14.21).</p>
+</section>
+
+<!-- ============ FIGURE 14.21 ============ -->
+<figure aria-labelledby="fig1421-cap">
+  <svg role="img" aria-labelledby="fig1421-title fig1421-desc" width="100%" viewBox="0 0 700 300" style="max-width:700px">
+    <title id="fig1421-title">Figure 14.21: Two titration curves, panel a for strong acid and panel b for weak acid</title>
+    <desc id="fig1421-desc">Panel a: titration of 25.00 mL of 0.100 M HCl with 0.100 M NaOH. pH starts near 1, rises slowly, then rises steeply near 25 mL, and levels off near 12.5 by 50 mL. The equivalence point is marked at 25 mL, pH 7.00. Panel b: titration of 25.00 mL of 0.100 M acetic acid with 0.100 M NaOH. pH starts near 2.9, rises more gradually, rises steeply near 25 mL, and levels off near 12.5 by 50 mL. The equivalence point is marked at 25 mL, pH 8.72.</desc>
+    <text x="10" y="20" font-size="14" font-weight="bold">(a) Titration of Strong Acid</text>
+    <text x="370" y="20" font-size="14" font-weight="bold">(b) Titration of Weak Acid</text>
+    <line x1="40" y1="260" x2="330" y2="260" stroke="#000"/>
+    <line x1="40" y1="40" x2="40" y2="260" stroke="#000"/>
+    <line x1="400" y1="260" x2="690" y2="260" stroke="#000"/>
+    <line x1="400" y1="40" x2="400" y2="260" stroke="#000"/>
+    <polyline fill="none" stroke="#b33a1e" stroke-width="2" points="40,250 120,245 180,235 220,220 240,200 250,150 255,100 265,70 290,60 330,55"/>
+    <polyline fill="none" stroke="#b33a1e" stroke-width="2" points="400,190 430,160 460,150 480,140 500,120 515,80 520,70 540,62 600,58 690,55"/>
+    <circle cx="250" cy="150" r="4" fill="#000"/>
+    <text x="260" y="145" font-size="12">Equivalence point, pH 7.00</text>
+    <circle cx="515" cy="110" r="4" fill="#000"/>
+    <text x="525" y="105" font-size="12">Equivalence point, pH 8.72</text>
+    <text x="150" y="285" font-size="12">Volume of 0.100 M NaOH added (mL), 0 to 50</text>
+    <text x="500" y="285" font-size="12">Volume of 0.100 M NaOH added (mL), 0 to 50</text>
+  </svg>
+  <figcaption id="fig1421-cap">
+    <strong>Figure 14.21</strong> (a) The titration curve for the titration of 25.00 mL of 0.100 <i>M</i> HCl (strong acid) with 0.100 <i>M</i> NaOH (strong base) has an equivalence point of 7.00 pH. (b) The titration curve for the titration of 25.00 mL of 0.100 <i>M</i> acetic acid (weak acid) with 0.100 <i>M</i> NaOH (strong base) has an equivalence point of 8.72 pH.
+  </figcaption>
+  <details class="long-desc">
+    <summary>Long description of Figure 14.21</summary>
+    <p>Both panels plot pH (vertical axis, 0 to 14) against volume of 0.100 M NaOH added (horizontal axis, 0 to 50 mL). In panel (a), the strong acid curve starts at about pH 1.00 at 0 mL, rises gradually to about pH 2 near 22 to 24 mL, rises steeply through the equivalence point at 25.00 mL (pH 7.00), and levels off near pH 12.5 at 50 mL. In panel (b), the weak acid curve starts at about pH 2.9 at 0 mL, rises gradually to about pH 4.5 to 5 between 5 and 15 mL, rises steeply near 25 mL, reaches the equivalence point at pH 8.72, and levels off near pH 12.5 at 50 mL. Both curves converge after the equivalence point.</p>
+  </details>
+</figure>
+
+<section aria-labelledby="weak-strong">
+  <h2 id="weak-strong">Titration of a Weak Acid with a Strong Base</h2>
+  <p>The titration of a weak acid with a strong base (or of a weak base with a strong acid) is somewhat more complicated than that just discussed, but it follows the same general principles. Let us consider the titration of 25.0 mL of 0.100 <i>M</i> acetic acid (a weak acid) with 0.100 <i>M</i> sodium hydroxide and compare the titration curve with that of the strong acid. Table 14.4 gives the pH values during the titration, and Figure 14.21 shows the titration curve.</p>
+  <p>Although the initial volume and molarity of the acids are the same, there are important differences between the two titration curves. The titration curve for the weak acid begins at a higher value (less acidic) and maintains higher pH values up to the equivalence point. This is because acetic acid is a weak acid, which is only partially ionized. The pH at the equivalence point is also higher (8.72 rather than 7.00) due to the hydrolysis of acetate, a weak base that raises the pH:</p>
+  <div class="math-block">\[\ce{CH3CO2^- (aq) + H2O(l) <=> CH3CO2H(l) + OH^- (aq)} \tag{14.208}\]</div>
+  <p>After the equivalence point, the two curves are identical because the pH is dependent on the excess of hydroxide ion in both cases.</p>
+</section>
+
+<!-- ============ EXAMPLE 14.22 ============ -->
+<section class="example" aria-labelledby="ex1422">
+  <h2 id="ex1422">Example 14.22</h2>
+  <h3>Titration of a Weak Acid with a Strong Base</h3>
+  <p>The titration curve shown in Figure 14.23 is for the titration of 25.00 mL of 0.100 <i>M</i> CH<sub>3</sub>CO<sub>2</sub>H with 0.100 <i>M</i> NaOH. The reaction can be represented as:</p>
+  <div class="math-block">\[\ce{CH3CO2H + OH^- -> CH3CO2^- + H2O} \tag{14.209}\]</div>
+  <ol type="a">
+    <li>What is the initial pH before any amount of the NaOH solution has been added? \(K_\text{a} = 1.8 \times 10^{-5}\) for CH<sub>3</sub>CO<sub>2</sub>H.</li>
+    <li>Find the pH after 25.00 mL of the NaOH solution have been added.</li>
+    <li>Find the pH after 12.50 mL of the NaOH solution has been added.</li>
+    <li>Find the pH after 37.50 mL of the NaOH solution has been added.</li>
+  </ol>
+
+  <h3>Solution</h3>
+  <p>(a) Assuming that the dissociated amount is small compared to 0.100 <i>M</i>, we find that:</p>
+  <div class="math-block">\[K_\text{a} = \frac{[\ce{H3O+}][\ce{CH3CO2^-}]}{[\ce{CH3CO2H}]} \approx \frac{[\ce{H3O+}]^2}{[\ce{CH3CO2H}]_0}, \text{ and}\]</div>
+  <div class="math-block">\[[\ce{H3O+}] = \sqrt{K_\text{a} \times [\ce{CH3CO2H}]} = \sqrt{1.8 \times 10^{-5} \times 0.100} = 1.3 \times 10^{-3}\]</div>
+  <div class="math-block">\[\text{pH} = -\log(1.3 \times 10^{-3}) = 2.87 \tag{14.210}\]</div>
+
+  <p>(b) After 25.00 mL of NaOH are added, the number of moles of NaOH and CH<sub>3</sub>CO<sub>2</sub>H are equal because the amounts of the solutions and their concentrations are the same. All of the CH<sub>3</sub>CO<sub>2</sub>H has been converted to CH<sub>3</sub>CO<sub>2</sub><sup>−</sup>. The concentration of the CH<sub>3</sub>CO<sub>2</sub><sup>−</sup> ion is:</p>
+  <div class="math-block">\[\frac{0.00250\ \text{mol}}{0.0500\ \text{L}} = 0.0500\ M\ \ce{CH3CO2^-} \tag{14.211}\]</div>
+  <p>The equilibrium that must be focused on now is the basicity equilibrium for CH<sub>3</sub>CO<sub>2</sub><sup>−</sup>:</p>
+  <div class="math-block">\[\ce{CH3CO2^- (aq) + H2O(l) <=> CH3CO2H(aq) + OH^- (aq)} \tag{14.212}\]</div>
+  <p>so we must determine \(K_\text{b}\) for the base by using the ion product constant for water:</p>
+  <div class="math-block">\[K_\text{b} = \frac{[\ce{CH3CO2H}][\ce{OH-}]}{[\ce{CH3CO2^-}]} \tag{14.213}\]</div>
+  <div class="math-block">\[K_\text{a} = \frac{[\ce{CH3CO2^-}][\ce{H+}]}{[\ce{CH3CO2H}]}, \text{ so } \frac{[\ce{CH3CO2H}]}{[\ce{CH3CO2^-}]} = \frac{[\ce{H+}]}{K_\text{a}}. \tag{14.214}\]</div>
+  <p>Since \(K_\text{w} = [\ce{H+}][\ce{OH-}]\):</p>
+  <div class="math-block">\[K_\text{b} = \frac{[\ce{H+}][\ce{OH-}]}{K_\text{a}} = \frac{K_\text{w}}{K_\text{a}} = \frac{1.0 \times 10^{-14}}{1.8 \times 10^{-5}} = 5.6 \times 10^{-10} \tag{14.215}\]</div>
+  <p>Let us denote the concentration of each of the products of this reaction, CH<sub>3</sub>CO<sub>2</sub>H and OH<sup>−</sup>, as <i>x</i>. Using the assumption that <i>x</i> is small compared to 0.0500 <i>M</i>, \(K_\text{b} = \frac{x^2}{0.0500\ M}\), and then:</p>
+  <div class="math-block">\[x = [\ce{OH-}] = 5.3 \times 10^{-6} \tag{14.216}\]</div>
+  <div class="math-block">\[\text{pOH} = -\log(5.3 \times 10^{-6}) = 5.28 \tag{14.217}\]</div>
+  <div class="math-block">\[\text{pH} = 14.00 - 5.28 = 8.72 \tag{14.218}\]</div>
+  <p>Note that the pH at the equivalence point of this titration is significantly greater than 7.</p>
+
+  <p>(c) In (b), 25.00 mL of the NaOH solution was added, and so practically all the CH<sub>3</sub>CO<sub>2</sub>H was converted into CH<sub>3</sub>CO<sub>2</sub><sup>−</sup>. In this case, only 12.50 mL of the base solution has been introduced, and so only half of all the CH<sub>3</sub>CO<sub>2</sub>H is converted into CH<sub>3</sub>CO<sub>2</sub><sup>−</sup>. The total initial number of moles of CH<sub>3</sub>CO<sub>2</sub>H is 0.02500 L × 0.100 <i>M</i> = 0.00250 mol, and so after adding the NaOH, the numbers of moles of CH<sub>3</sub>CO<sub>2</sub>H and CH<sub>3</sub>CO<sub>2</sub><sup>−</sup> are both approximately equal to \(\frac{0.00250\ \text{mol}}{2} = 0.00125\ \text{mol}\), and their concentrations are the same.</p>
+  <p>Since the amount of the added base is smaller than the original amount of the acid, the equivalence point has not been reached, the solution remains a buffer, and we can use the Henderson-Hasselbalch equation:</p>
+  <div class="math-block">\[\text{pH} = pK_\text{a} + \log\frac{[\text{Base}]}{[\text{Acid}]} = -\log(K_\text{a}) + \log\frac{[\ce{CH3CO2^-}]}{[\ce{CH3CO2H}]} = -\log(1.8 \times 10^{-5}) + \log(1) \tag{14.219}\]</div>
+  <p>(as the concentrations of CH<sub>3</sub>CO<sub>2</sub><sup>−</sup> and CH<sub>3</sub>CO<sub>2</sub>H are the same). Thus:</p>
+  <div class="math-block">\[\text{pH} = -\log(1.8 \times 10^{-5}) = 4.74 \tag{14.220}\]</div>
+  <p>(the pH = the p<i>K</i><sub>a</sub> at the halfway point in a titration of a weak acid)</p>
+
+  <p>(d) After 37.50 mL of NaOH is added, the amount of NaOH is 0.03750 L × 0.100 <i>M</i> = 0.003750 mol NaOH. Since this is past the equivalence point, the excess hydroxide ions will make the solution basic, and we can again use stoichiometric calculations to determine the pH:</p>
+  <div class="math-block">\[[\ce{OH-}] = \frac{0.003750\ \text{mol} - 0.00250\ \text{mol}}{0.06250\ \text{L}} = 2.00 \times 10^{-2}\ M \tag{14.221}\]</div>
+  <div class="math-block">\[\text{pOH} = -\log(2.00 \times 10^{-2}) = 1.70, \text{ and } \text{pH} = 14.00 - 1.70 = 12.30 \tag{14.222}\]</div>
+  <p>Note that this result is the same as for the strong acid-strong base titration example provided, since the amount of the strong base added moves the solution past the equivalence point.</p>
+
+  <aside class="check-learning" aria-labelledby="cyl1422">
+    <h3 id="cyl1422">Check Your Learning</h3>
+    <p>Calculate the pH for the weak acid/strong base titration between 50.0 mL of 0.100 <i>M</i> HCOOH(<i>aq</i>) (formic acid) and 0.200 <i>M</i> NaOH (titrant) at the listed volumes of added base: 0.00 mL, 15.0 mL, 25.0 mL, and 30.0 mL.</p>
+    <div class="answer">
+      <p><strong>Answer:</strong> 0.00 mL: 2.37; 15.0 mL: 3.92; 25.00 mL: 8.29; 30.0 mL: 12.097</p>
+    </div>
+  </aside>
+</section>
+
+<!-- ============ ACID-BASE INDICATORS ============ -->
+<section aria-labelledby="indicators">
+  <h2 id="indicators">Acid-Base Indicators</h2>
+  <p>Certain organic substances change color in dilute solution when the hydronium ion concentration reaches a particular value. For example, phenolphthalein is a colorless substance in any aqueous solution with a hydronium ion concentration greater than \(5.0 \times 10^{-9}\ M\) (pH &lt; 8.3). In more basic solutions where the hydronium ion concentration is less than \(5.0 \times 10^{-9}\ M\) (pH &gt; 8.3), it is red or pink. Substances such as phenolphthalein, which can be used to determine the pH of a solution, are called acid-base indicators. Acid-base indicators are either weak organic acids or weak organic bases.</p>
+
+  <p>The equilibrium in a solution of the acid-base indicator methyl orange, a weak acid, can be represented by an equation in which we use HIn as a simple representation for the complex methyl orange molecule:</p>
+  <div class="math-block">\[\ce{HIn(aq) + H2O(l) <=> H3O^+(aq) + In^-(aq)} \tag{14.223}\]</div>
+  <p>where HIn is red and In<sup>−</sup> is yellow.</p>
+  <div class="math-block">\[K_\text{a} = \frac{[\ce{H3O+}][\ce{In-}]}{[\ce{HIn}]} = 4.0 \times 10^{-4} \tag{14.224}\]</div>
+
+  <p>The anion of methyl orange, In<sup>−</sup>, is yellow, and the nonionized form, HIn, is red. When we add acid to a solution of methyl orange, the increased hydronium ion concentration shifts the equilibrium toward the nonionized red form, in accordance with Le Châtelier’s principle. If we add base, we shift the equilibrium towards the yellow form. This behavior is completely analogous to the action of buffers.</p>
+
+  <p>An indicator’s color is the visible result of the ratio of the concentrations of the two species In<sup>−</sup> and HIn. If most of the indicator (typically about 60–90% or more) is present as In<sup>−</sup>, then we see the color of the In<sup>−</sup> ion, which would be yellow for methyl orange. If most is present as HIn, then we see the color of the HIn molecule: red for methyl orange. For methyl orange, we can rearrange the equation for <i>K</i><sub>a</sub> and write:</p>
+  <div class="math-block">\[\frac{[\ce{In-}]}{[\ce{HIn}]} = \frac{[\text{substance with yellow color}]}{[\text{substance with red color}]} = \frac{K_\text{a}}{[\ce{H3O+}]} \tag{14.225}\]</div>
+  <p>This shows us how the ratio of \(\frac{[\ce{In-}]}{[\ce{HIn}]}\) varies with the concentration of hydronium ion.</p>
+
+  <p>The above expression describing the indicator equilibrium can be rearranged:</p>
+  <div class="math-block">\[\frac{[\ce{H3O+}]}{K_\text{a}} = \frac{[\ce{HIn}]}{[\ce{In-}]} \tag{14.226}\]</div>
+  <div class="math-block">\[\log\left(\frac{[\ce{H3O+}]}{K_\text{a}}\right) = \log\left(\frac{[\ce{HIn}]}{[\ce{In-}]}\right) \tag{14.227}\]</div>
+  <div class="math-block">\[\log([\ce{H3O+}]) - \log(K_\text{a}) = -\log\left(\frac{[\ce{In-}]}{[\ce{HIn}]}\right) \tag{14.228}\]</div>
+  <div class="math-block">\[-\text{pH} + pK_\text{a} = -\log\left(\frac{[\ce{In-}]}{[\ce{HIn}]}\right) \tag{14.229}\]</div>
+  <div class="math-block">\[\text{pH} = pK_\text{a} + \log\left(\frac{[\ce{In-}]}{[\ce{HIn}]}\right) \text{ or } \text{pH} = pK_\text{a} + \log\left(\frac{[\text{base}]}{[\text{acid}]}\right) \tag{14.230}\]</div>
+  <p>The last formula is the same as the Henderson-Hasselbalch equation, which can be used to describe the equilibrium of indicators.</p>
+
+  <p>When [H<sub>3</sub>O<sup>+</sup>] has the same numerical value as <i>K</i><sub>a</sub>, the ratio of [In<sup>−</sup>] to [HIn] is equal to 1, meaning that 50% of the indicator is present in the red form (HIn) and 50% is in the yellow ionic form (In<sup>−</sup>), and the solution appears orange in color. When the hydronium ion concentration increases to \(8 \times 10^{-4}\ M\) (a pH of 3.1), the solution turns red. No change in color is visible for any further increase in the hydronium ion concentration (decrease in pH). At a hydronium ion concentration of \(4 \times 10^{-5}\ M\) (a pH of 4.4), most of the indicator is in the yellow ionic form, and a further decrease in the hydronium ion concentration (increase in pH) does not produce a visible color change. The pH range between 3.1 (red) and 4.4 (yellow) is the color-change interval of methyl orange; the pronounced color change takes place between these pH values.</p>
+
+  <p>There are many different acid-base indicators that cover a wide range of pH values and can be used to determine the approximate pH of an unknown solution by a process of elimination. Universal indicators and pH paper contain a mixture of indicators and exhibit different colors at different pHs. Figure 14.22 presents several indicators, their colors, and their color-change intervals.</p>
+</section>
+
+<!-- ============ FIGURE 14.22 ============ -->
+<figure aria-labelledby="fig1422-cap">
+  <img src="fig-14-22-indicator-ranges.png"
+       width="640" height="420"
+       alt="Chart of color-change pH ranges for twenty acid-base indicators, plotted on a pH axis from 0 to 13. Each indicator is shown as a horizontal bar spanning its transition range. Approximate ranges, read from the chart: Crystal violet 0 to 1.8; Cresol red 1.0 to 2.0 and 7.2 to 8.8; Thymol blue 1.2 to 2.8 and 8.0 to 9.6; Erythrosin B 2.0 to 3.0; 2,4-Dinitrophenol 2.4 to 4.0; Bromphenol blue 3.0 to 4.6; Methyl orange 3.1 to 4.4; Bromcresol green 3.8 to 5.4; Methyl red 4.2 to 6.3; Eriochrome Black T 4.6 to 6.5; Bromcresol purple 5.2 to 6.8; Alizarin 5.6 to 7.2 and 11.0 to 12.4; Bromthymol blue 6.0 to 7.6; Phenol red 6.8 to 8.4; m-Nitrophenol 6.8 to 8.6; o-Cresolphthalein 8.2 to 9.8; Phenolphthalein 8.2 to 10.0; Thymolphthalein 9.4 to 10.6; Alizarin yellow R 10.1 to 12.0. Each bar shows a color gradient from one indicator color to another."
+       aria-describedby="fig1422-desc">
+  <figcaption id="fig1422-cap">
+    <strong>Figure 14.22</strong> This chart illustrates the ranges of color change for several acid-base indicators.
+  </figcaption>
+  <div id="fig1422-desc" class="long-desc">
+    <p>Text description of Figure 14.22: The chart lists twenty indicators on the vertical axis and plots their color-change ranges along a pH axis from 0 to 13. Ranges are approximate, read from the chart. Crystal violet changes at about pH 0 to 1.8. Cresol red changes at about pH 1.0 to 2.0 and again at about 7.2 to 8.8. Thymol blue changes at about pH 1.2 to 2.8 and 8.0 to 9.6. Erythrosin B changes at about pH 2.0 to 3.0. 2,4-Dinitrophenol changes at about pH 2.4 to 4.0. Bromphenol blue changes at about pH 3.0 to 4.6. Methyl orange changes at about pH 3.1 to 4.4. Bromcresol green changes at about pH 3.8 to 5.4. Methyl red changes at about pH 4.2 to 6.3. Eriochrome Black T changes at about pH 4.6 to 6.5. Bromcresol purple changes at about pH 5.2 to 6.8. Alizarin changes at about pH 5.6 to 7.2 and 11.0 to 12.4. Bromthymol blue changes at about pH 6.0 to 7.6. Phenol red changes at about pH 6.8 to 8.4. m-Nitrophenol changes at about pH 6.8 to 8.6. o-Cresolphthalein changes at about pH 8.2 to 9.8. Phenolphthalein changes at about pH 8.2 to 10.0. Thymolphthalein changes at about pH 9.4 to 10.6. Alizarin yellow R changes at about pH 10.1 to 12.0. Each bar is a color gradient between the indicator's acid and base colors.</p>
+  </div>
+</figure>
+
+<section aria-labelledby="choosing">
+  <h2 id="choosing">Choosing an Indicator</h2>
+  <p>Titration curves help us pick an indicator that will provide a sharp color change at the equivalence point. The best selection would be an indicator that has a color change interval that brackets the pH at the equivalence point of the titration.</p>
+  <p>Color change pH intervals for three different acid-base indicators are shown in Figure 14.23. Since the phenolphthalein color change interval occurs within the near-vertical portions of both titration curves, this indicator may be used to signal the end point in both strong and weak acid titrations.</p>
+</section>
+
+<!-- ============ FIGURE 14.23 ============ -->
+<figure aria-labelledby="fig1423-cap">
+  <img src="fig-14-23-titration-indicators.png"
+       width="640" height="520"
+       alt="Titration curves for 25.00 mL of 0.100 M acetic acid and 25.00 mL of 0.100 M HCl, each titrated with 0.100 M NaOH, with shaded pH ranges for three indicators. The weak acid curve (acetic acid) begins near pH 2.9, reaches equivalence at 25 mL and pH 8.72, and levels off near pH 12.5. The strong acid curve (HCl) begins near pH 1, reaches equivalence at 25 mL and pH 7.00, and levels off near pH 12.5. Shaded bands show the phenolphthalein range (about pH 8.3 to 10), the litmus range (about pH 4.5 to 8.0), and the methyl orange range (about pH 3.1 to 4.4)."
+       aria-describedby="fig1423-desc">
+  <figcaption id="fig1423-cap">
+    <strong>Figure 14.23</strong> The graph shows a titration curve for the titration of 25.00 mL of 0.100 <i>M</i> CH<sub>3</sub>CO<sub>2</sub>H (weak acid) with 0.100 <i>M</i> NaOH (strong base) and the titration curve for the titration of HCl (strong acid) with NaOH (strong base). The pH ranges for the color change of phenolphthalein, litmus, and methyl orange are indicated by the shaded areas.
+  </figcaption>
+  <div id="fig1423-desc" class="long-desc">
+    <p>Text description of Figure 14.23: Both titration curves plot pH (0 to 14) against volume of 0.100 M NaOH added (0 to 50 mL). The acetic acid curve begins at about pH 2.9, rises through about pH 4.6 near 10 mL, and rises steeply to an equivalence point at 25 mL, pH 8.72, before leveling off near pH 12.5. The HCl curve begins at about pH 1, rises slowly, rises steeply to an equivalence point at 25 mL, pH 7.00, and levels off near pH 12.5. Three shaded horizontal bands show pH ranges: the phenolphthalein range (about pH 8.3 to 10), the litmus range (about pH 4.5 to 8.0), and the methyl orange range (about pH 3.1 to 4.4).</p>
+  </div>
+</figure>
+
+<section aria-labelledby="indicator-choice">
+  <h2 id="indicator-choice" class="visually-hidden" style="position:absolute;left:-9999px;">Indicator Selection Discussion</h2>
+  <p>Litmus is a suitable indicator for the HCl titration because its color change brackets the equivalence point. However, we should not use litmus for the CH<sub>3</sub>CO<sub>2</sub>H titration because the pH is within the color-change interval of litmus when only about 12 mL of NaOH has been added, and it does not leave the range until 25 mL has been added. The color change would be very gradual, taking place during the addition of 13 mL of NaOH, making litmus useless as an indicator of the equivalence point.</p>
+
+  <p>We could use methyl orange for the HCl titration, but it would not give very accurate results: (1) It completes its color change slightly before the equivalence point is reached (but very close to it, so this is not too serious); (2) it changes color, as Figure 14.23 shows, during the addition of nearly 0.5 mL of NaOH, which is not so sharp a color change as that of litmus or phenolphthalein; and (3) it goes from yellow to orange to red, making detection of a precise endpoint much more challenging than the colorless to pink change of phenolphthalein. Figure 14.23 shows us that methyl orange would be completely useless as an indicator for the CH<sub>3</sub>CO<sub>2</sub>H titration. Its color change begins after about 1 mL of NaOH has been added and ends when about 8 mL has been added. The color change is completed long before the equivalence point (which occurs when 25.0 mL of NaOH has been added) is reached and hence provides no indication of the equivalence point.</p>
+
+  <p>We base our choice of indicator on a calculated pH, the pH at the equivalence point. At the equivalence point, equimolar amounts of acid and base have been mixed, and the calculation becomes that of the pH of a solution of the salt resulting from the titration.</p>
+</section>
+
+</main>
+
+<footer>
+  <p>“14.7 Acid-Base Titrations” from Chemistry by Paul Flowers, William R. Robinson, PhD, Richard Langley, Klaus Theopold, OpenStax. Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/chemistry/pages/14-7-acid-base-titrations">https://openstax.org/books/chemistry/pages/14-7-acid-base-titrations</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</body>
+</html>

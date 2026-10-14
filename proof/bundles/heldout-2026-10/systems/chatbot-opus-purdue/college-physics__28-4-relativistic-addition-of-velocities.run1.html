@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>28.4 Relativistic Addition of Velocities – College Physics (OpenStax)</title>
+  <meta name="description" content="Classical and relativistic velocity addition and the relativistic Doppler effect, from OpenStax College Physics section 28.4.">
+
+  <!-- MathJax configuration: must come before the MathJax script -->
+  <script>
+    window.MathJax = {
+      loader: {
+        load: ['[tex]/ams', 'a11y/assistive-mml', 'a11y/explorer']
+      },
+      tex: {
+        packages: {'[+]': ['ams']},
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true,
+        tags: 'none'
+      },
+      options: {
+        enableMenu: true,
+        enableAssistiveMml: true,
+        enableExplorer: true,
+        a11y: {
+          speech: true,
+          braille: true,
+          subtitles: false
+        },
+        renderActions: {
+          addMenu: [0, '', '']
+        }
+      },
+      chtml: {
+        scale: 1,
+        displayAlign: 'center',
+        matchFontHeight: true
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --link: #0645ad;
+      --link-visited: #5a2a8a;
+      --border: #555555;
+      --box-bg: #f7f7f7;
+      --focus: #b35900;
+    }
+    * { box-sizing: border-box; }
+    html { font-size: 100%; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 1.125rem;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      padding: 0.5rem 1rem;
+      background: #000;
+      color: #fff;
+      z-index: 100;
+    }
+    .skip-link:focus {
+      left: 0.5rem;
+      top: 0.5rem;
+    }
+    main {
+      max-width: 50rem;
+      margin: 0 auto;
+      padding: 1.5rem 1rem 3rem;
+    }
+    h1, h2, h3, h4 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.3;
+    }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; margin-top: 2rem; }
+    h3 { font-size: 1.3rem; }
+    h4 { font-size: 1.1rem; margin-bottom: 0.25rem; }
+    a { color: var(--link); text-decoration: underline; }
+    a:visited { color: var(--link-visited); }
+    a:focus, a:hover { outline: 3px solid var(--focus); outline-offset: 2px; }
+    :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+    figure {
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    figure img {
+      max-width: 100%;
+      height: auto;
+    }
+    figcaption {
+      text-align: left;
+      font-size: 1rem;
+      margin-top: 0.5rem;
+    }
+    .box {
+      border: 2px solid var(--border);
+      background: var(--box-bg);
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .box .box {
+      background: var(--bg);
+    }
+    .equation {
+      overflow-x: auto;
+      overflow-y: hidden;
+      padding: 0.25rem 0;
+    }
+    ol li { margin-bottom: 0.4rem; }
+    footer {
+      max-width: 50rem;
+      margin: 0 auto;
+      padding: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 1rem;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <main id="main-content">
+    <article>
+      <h1>28.4 Relativistic Addition of Velocities</h1>
+
+      <figure>
+        <img src="images/figure-28-13-kayak.jpg"
+             alt="A kayaker wearing a yellow helmet and orange life vest paddles an orange kayak down a fast-moving river with white, rippling water. A second kayaker is visible farther downstream, and the riverbanks are rocky and wooded.">
+        <figcaption>Figure 28.13 The total velocity of a kayak, like this one on the Deerfield River in Massachusetts, is its velocity relative to the water as well as the water’s velocity relative to the riverbank. (credit: abkfenris, Flickr)</figcaption>
+      </figure>
+
+      <p>If you’ve ever seen a kayak move down a fast-moving river, you know that remaining in the same place would be hard. The river current pulls the kayak along. Pushing the oars back against the water can move the kayak forward in the water, but that only accounts for part of the velocity. The kayak’s motion is an example of classical addition of velocities. In classical physics, velocities add as vectors. The kayak’s velocity is the vector sum of its velocity relative to the water and the water’s velocity relative to the riverbank.</p>
+
+      <section aria-labelledby="classical-heading">
+        <h2 id="classical-heading">Classical Velocity Addition</h2>
+
+        <p>For simplicity, we restrict our consideration of velocity addition to one-dimensional motion. Classically, velocities add like regular numbers in one-dimensional motion. (See Figure 28.14.) Suppose, for example, a girl is riding in a sled at a speed 1.0 m/s relative to an observer. She throws a snowball first forward, then backward at a speed of 1.5 m/s relative to the sled. We denote direction with plus and minus signs in one dimension; in this example, forward is positive. Let \(v\) be the velocity of the sled relative to the Earth, \(u\) the velocity of the snowball relative to the Earth-bound observer, and \(u'\) the velocity of the snowball relative to the sled.</p>
+
+        <figure>
+          <img src="images/figure-28-14-sled.jpg"
+               alt="Two-panel illustration. Top panel: a man pulls a girl on a sled to the right at v = 1.0 m/s toward a standing observer. The girl throws a snowball forward with u prime = 1.5 m/s relative to the sled, and the observer is labeled u = 2.5 m/s. Bottom panel: the same scene, but the girl throws the snowball backward with u prime = −1.5 m/s; the sled still moves at v = 1.0 m/s, and the observer is labeled u = −0.5 m/s.">
+          <figcaption>Figure 28.14 Classically, velocities add like ordinary numbers in one-dimensional motion. Here the girl throws a snowball forward and then backward from a sled. The velocity of the sled relative to the Earth is \(v = 1.0\ \text{m/s}\). The velocity of the snowball relative to the sled is \(u'\), while its velocity relative to the Earth is \(u\). Classically, \(u = v + u'\).</figcaption>
+        </figure>
+
+        <div class="box" role="note" aria-labelledby="classical-box-heading">
+          <h3 id="classical-box-heading">Classical Velocity Addition</h3>
+          <div class="equation">
+            \[ u = v + u' \tag{28.31} \]
+          </div>
+        </div>
+
+        <p>Thus, when the girl throws the snowball forward, \(u = 1.0\ \text{m/s} + 1.5\ \text{m/s} = 2.5\ \text{m/s}\). It makes good intuitive sense that the snowball will head towards the Earth-bound observer faster, because it is thrown forward from a moving vehicle. When the girl throws the snowball backward, \(u = 1.0\ \text{m/s} + (-1.5\ \text{m/s}) = -0.5\ \text{m/s}\). The minus sign means the snowball moves away from the Earth-bound observer.</p>
+      </section>
+
+      <section aria-labelledby="relativistic-heading">
+        <h2 id="relativistic-heading">Relativistic Velocity Addition</h2>
+
+        <p>The second postulate of relativity (verified by extensive experimental observation) says that classical velocity addition does not apply to light. Imagine a car traveling at night along a straight road, as in Figure 28.15. If classical velocity addition applied to light, then the light from the car’s headlights would approach the observer on the sidewalk at a speed \(u = v + c\). But we know that light will move away from the car at speed \(c\) relative to the driver of the car, and light will move towards the observer on the sidewalk at speed \(c\), too.</p>
+
+        <figure>
+          <img src="images/figure-28-15-car-headlights.jpg"
+               alt="A red car drives to the right along a street at dusk with velocity v. Light from its headlight, drawn as a wavy arrow labeled c, travels ahead of the car. Above the car is the label u prime = c. A man standing on the sidewalk ahead, under a streetlight, is labeled u = c.">
+          <figcaption>Figure 28.15 According to experiment and the second postulate of relativity, light from the car’s headlights moves away from the car at speed \(c\) and towards the observer on the sidewalk at speed \(c\). Classical velocity addition is not valid.</figcaption>
+        </figure>
+
+        <div class="box" role="note" aria-labelledby="relativistic-box-heading">
+          <h3 id="relativistic-box-heading">Relativistic Velocity Addition</h3>
+          <p>Either light is an exception, or the classical velocity addition formula only works at low velocities. The latter is the case. The correct formula for one-dimensional relativistic velocity addition is</p>
+          <div class="equation">
+            \[ u = \frac{v + u'}{1 + \dfrac{v u'}{c^2}}, \tag{28.32} \]
+          </div>
+          <p>where \(v\) is the relative velocity between two observers, \(u\) is the velocity of an object relative to one observer, and \(u'\) is the velocity relative to the other observer. (For ease of visualization, we often choose to measure \(u\) in our reference frame, while someone moving at \(v\) relative to us measures \(u'\).) Note that the term \(\frac{v u'}{c^2}\) becomes very small at low velocities, and \(u = \dfrac{v + u'}{1 + \frac{v u'}{c^2}}\) gives a result very close to classical velocity addition. As before, we see that classical velocity addition is an excellent approximation to the correct relativistic formula for small velocities. No wonder that it seems correct in our experience.</p>
+        </div>
+
+        <section class="box" aria-labelledby="ex283-heading">
+          <h3 id="ex283-heading">Example 28.3</h3>
+          <p><strong>Showing that the Speed of Light towards an Observer is Constant (in a Vacuum): The Speed of Light is the Speed of Light</strong></p>
+          <p>Suppose a spaceship heading directly towards the Earth at half the speed of light sends a signal to us on a laser-produced beam of light. Given that the light leaves the ship at speed \(c\) as observed from the ship, calculate the speed at which it approaches the Earth.</p>
+
+          <figure>
+            <img src="images/figure-28-16-spaceship-laser.jpg"
+                 alt="Two-panel diagram. Top: a spaceship moves to the right toward Earth at v = 0.500c and emits a red laser beam ahead of it, with a blue arrow labeled c pointing right toward Earth. Bottom: a spaceship pointing left moves to the left, away from Earth, at v = 0.500c, emitting a laser beam to the left with a blue arrow labeled c pointing left.">
+            <figcaption>Figure 28.16</figcaption>
+          </figure>
+
+          <h4>Strategy</h4>
+          <p>Because the light and the spaceship are moving at relativistic speeds, we cannot use simple velocity addition. Instead, we can determine the speed at which the light approaches the Earth using relativistic velocity addition.</p>
+
+          <h4>Solution</h4>
+          <ol>
+            <li>Identify the knowns. \(v = 0.500c\); \(u' = c\)</li>
+            <li>Identify the unknown. \(u\)</li>
+            <li>Choose the appropriate equation. \(u = \dfrac{v + u'}{1 + \frac{v u'}{c^2}}\)</li>
+            <li>Plug the knowns into the equation.</li>
+          </ol>
+          <div class="equation">
+            \[
+            \begin{aligned}
+            u &= \frac{v + u'}{1 + \dfrac{v u'}{c^2}} \\[4pt]
+              &= \frac{0.500c + c}{1 + \dfrac{(0.500c)(c)}{c^2}} \\[4pt]
+              &= \frac{(0.500 + 1)c}{1 + \dfrac{0.500c^2}{c^2}} \\[4pt]
+              &= \frac{1.500c}{1 + 0.500} \\[4pt]
+              &= \frac{1.500c}{1.500} \\[4pt]
+              &= c
+            \end{aligned}
+            \tag{28.33}
+            \]
+          </div>
+
+          <h4>Discussion</h4>
+          <p>Relativistic velocity addition gives the correct result. Light leaves the ship at speed \(c\) and approaches the Earth at speed \(c\). The speed of light is independent of the relative motion of source and observer, whether the observer is on the ship or Earth-bound.</p>
+        </section>
+
+        <p>Velocities cannot add to greater than the speed of light, provided that \(v\) is less than \(c\) and \(u'\) does not exceed \(c\). The following example illustrates that relativistic velocity addition is not as symmetric as classical velocity addition.</p>
+
+        <section class="box" aria-labelledby="ex284-heading">
+          <h3 id="ex284-heading">Example 28.4</h3>
+          <p><strong>Comparing the Speed of Light towards and away from an Observer: Relativistic Package Delivery</strong></p>
+          <p>Suppose the spaceship in the previous example is approaching the Earth at half the speed of light and shoots a canister at a speed of \(0.750c\). (a) At what velocity will an Earth-bound observer see the canister if it is shot directly towards the Earth? (b) If it is shot directly away from the Earth? (See Figure 28.17.)</p>
+
+          <figure>
+            <img src="images/figure-28-17-canister.jpg"
+                 alt="Two-panel diagram. Left panel, titled Canister toward Earth: a spaceship moves right toward Earth, where an observer stands, at v = 0.50c; a canister fired from the ship moves right toward Earth with u prime = 0.75c. Right panel, titled Canister away from Earth: the spaceship again moves right toward Earth at v = 0.50c, while a canister fired from the ship moves left, away from Earth, with u prime = −0.75c.">
+            <figcaption>Figure 28.17</figcaption>
+          </figure>
+
+          <h4>Strategy</h4>
+          <p>Because the canister and the spaceship are moving at relativistic speeds, we must determine the speed of the canister by an Earth-bound observer using relativistic velocity addition instead of simple velocity addition.</p>
+
+          <h4>Solution for (a)</h4>
+          <ol>
+            <li>Identify the knowns. \(v = 0.500c\); \(u' = 0.750c\)</li>
+            <li>Identify the unknown. \(u\)</li>
+            <li>Choose the appropriate equation. \(u = \dfrac{v + u'}{1 + \frac{v u'}{c^2}}\)</li>
+            <li>Plug the knowns into the equation.</li>
+          </ol>
+          <div class="equation">
+            \[
+            \begin{aligned}
+            u &= \frac{v + u'}{1 + \dfrac{v u'}{c^2}} \\[4pt]
+              &= \frac{0.500c + 0.750c}{1 + \dfrac{(0.500c)(0.750c)}{c^2}} \\[4pt]
+              &= \frac{1.250c}{1 + 0.375} \\[4pt]
+              &= 0.909c
+            \end{aligned}
+            \tag{28.34}
+            \]
+          </div>
+
+          <h4>Solution for (b)</h4>
+          <ol>
+            <li>Identify the knowns. \(v = 0.500c\); \(u' = -0.750c\)</li>
+            <li>Identify the unknown. \(u\)</li>
+            <li>Choose the appropriate equation. \(u = \dfrac{v + u'}{1 + \frac{v u'}{c^2}}\)</li>
+            <li>Plug the knowns into the equation.</li>
+          </ol>
+          <div class="equation">
+            \[
+            \begin{aligned}
+            u &= \frac{v + u'}{1 + \dfrac{v u'}{c^2}} \\[4pt]
+              &= \frac{0.500c + (-0.750c)}{1 + \dfrac{(0.500c)(-0.750c)}{c^2}} \\[4pt]
+              &= \frac{-0.250c}{1 - 0.375} \\[4pt]
+              &= -0.400c
+            \end{aligned}
+            \tag{28.35}
+            \]
+          </div>
+
+          <h4>Discussion</h4>
+          <p>The minus sign indicates velocity away from the Earth (in the opposite direction from \(v\)), which means the canister is heading towards the Earth in part (a) and away in part (b), as expected. But relativistic velocities do not add as simply as they do classically. In part (a), the canister does approach the Earth faster, but not at the simple sum of \(1.250c\). The total velocity is less than you would get classically. And in part (b), the canister moves away from the Earth at a velocity of \(-0.400c\), which is <em>faster</em> than the \(-0.250c\) you would expect classically. The velocities are not even symmetric. In part (a) the canister moves \(0.409c\) faster than the ship relative to the Earth, whereas in part (b) it moves \(0.900c\) slower than the ship.</p>
+        </section>
+      </section>
+
+      <section aria-labelledby="doppler-heading">
+        <h2 id="doppler-heading">Doppler Shift</h2>
+
+        <p>Although the speed of light does not change with relative velocity, the frequencies and wavelengths of light do. First discussed for sound waves, a Doppler shift occurs in any wave when there is relative motion between source and observer.</p>
+
+        <div class="box" role="note" aria-labelledby="doppler-box-heading">
+          <h3 id="doppler-box-heading">Relativistic Doppler Effects</h3>
+          <p>The observed wavelength of electromagnetic radiation is longer (called a red shift) than that emitted by the source when the source moves away from the observer and shorter (called a blue shift) when the source moves towards the observer.</p>
+          <div class="equation">
+            \[ \lambda_{\text{obs}} = \lambda_s \sqrt{\frac{1 + \dfrac{u}{c}}{1 - \dfrac{u}{c}}}. \tag{28.36} \]
+          </div>
+        </div>
+
+        <p>In the Doppler equation, \(\lambda_{\text{obs}}\) is the observed wavelength, \(\lambda_s\) is the source wavelength, and \(u\) is the relative velocity of the source to the observer. The velocity \(u\) is positive for motion away from an observer and negative for motion toward an observer. In terms of source frequency and observed frequency, this equation can be written</p>
+        <div class="equation">
+          \[ f_{\text{obs}} = f_s \sqrt{\frac{1 - \dfrac{u}{c}}{1 + \dfrac{u}{c}}}. \tag{28.37} \]
+        </div>
+        <p>Notice that the – and + signs are different than in the wavelength equation.</p>
+
+        <aside class="box" aria-labelledby="career-heading">
+          <h3 id="career-heading">Career Connection: Astronomer</h3>
+          <p>If you are interested in a career that requires a knowledge of special relativity, there’s probably no better connection than astronomy. Astronomers must take into account relativistic effects when they calculate distances, times, and speeds of black holes, galaxies, quasars, and all other astronomical objects. To have a career in astronomy, you need at least an undergraduate degree in either physics or astronomy, but a Master’s or doctoral degree is often required. You also need a good background in high-level mathematics.</p>
+        </aside>
+
+        <section class="box" aria-labelledby="ex285-heading">
+          <h3 id="ex285-heading">Example 28.5</h3>
+          <p><strong>Calculating a Doppler Shift: Radio Waves from a Receding Galaxy</strong></p>
+          <p>Suppose a galaxy is moving away from the Earth at a speed \(0.825c\). It emits radio waves with a wavelength of \(0.525\ \text{m}\). What wavelength would we detect on the Earth?</p>
+
+          <h4>Strategy</h4>
+          <p>Because the galaxy is moving at a relativistic speed, we must determine the Doppler shift of the radio waves using the relativistic Doppler shift instead of the classical Doppler shift.</p>
+
+          <h4>Solution</h4>
+          <ol>
+            <li>Identify the knowns. \(u = 0.825c\); \(\lambda_s = 0.525\ \text{m}\)</li>
+            <li>Identify the unknown. \(\lambda_{\text{obs}}\)</li>
+            <li>Choose the appropriate equation. \(\lambda_{\text{obs}} = \lambda_s \sqrt{\dfrac{1 + \frac{u}{c}}{1 - \frac{u}{c}}}\)</li>
+            <li>Plug the knowns into the equation.</li>
+          </ol>
+          <div class="equation">
+            \[
+            \begin{aligned}
+            \lambda_{\text{obs}} &= \lambda_s \sqrt{\frac{1 + \dfrac{u}{c}}{1 - \dfrac{u}{c}}} \\[4pt]
+              &= (0.525\ \text{m}) \sqrt{\frac{1 + \dfrac{0.825c}{c}}{1 - \dfrac{0.825c}{c}}} \\[4pt]
+              &= 1.70\ \text{m}.
+            \end{aligned}
+            \tag{28.38}
+            \]
+          </div>
+
+          <h4>Discussion</h4>
+          <p>Because the galaxy is moving away from the Earth, we expect the wavelengths of radiation it emits to be redshifted. The wavelength we calculated is 1.70 m, which is redshifted from the original wavelength of 0.525 m.</p>
+        </section>
+
+        <p>The relativistic Doppler shift is easy to observe. This equation has everyday applications ranging from Doppler-shifted radar velocity measurements of transportation to Doppler-radar storm monitoring. In astronomical observations, the relativistic Doppler shift provides velocity information such as the motion and distance of stars.</p>
+
+        <section class="box" aria-labelledby="cyu-heading">
+          <h3 id="cyu-heading">Check Your Understanding</h3>
+          <div class="box">
+            <p>Suppose a space probe moves away from the Earth at a speed \(0.350c\). It sends a radio wave message back to the Earth at a frequency of 1.50 GHz. At what frequency is the message received on the Earth?</p>
+          </div>
+          <details class="box">
+            <summary><strong>Solution</strong></summary>
+            <div class="equation">
+              \[ f_{\text{obs}} = f_s \sqrt{\frac{1 - \dfrac{u}{c}}{1 + \dfrac{u}{c}}} = (1.50\ \text{GHz}) \sqrt{\frac{1 - \dfrac{0.350c}{c}}{1 + \dfrac{0.350c}{c}}} = 1.04\ \text{GHz} \tag{28.39} \]
+            </div>
+          </details>
+        </section>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>“28.4 Relativistic Addition of Velocities” from <cite>College Physics</cite> by Paul Peter Urone, Roger Hinrichs, OpenStax.</p>
+    <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+    <p>Original page: <a href="https://openstax.org/books/college-physics/pages/28-4-relativistic-addition-of-velocities">https://openstax.org/books/college-physics/pages/28-4-relativistic-addition-of-velocities</a></p>
+    <p>Access for free at openstax.org.</p>
+    <p>Changes: reformatted as a printable page for evaluating a11y-stem; no wording edited.</p>
+    <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+  </footer>
+</body>
+</html>

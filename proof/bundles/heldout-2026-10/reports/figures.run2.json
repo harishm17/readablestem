@@ -1,0 +1,104 @@
+{
+  "client": "anthropic",
+  "complete": true,
+  "cost": {
+    "budget_calls": 138,
+    "budget_spent_usd": 0.6478496000000001,
+    "dropped_usd": 1.1102230246251565e-16,
+    "judge_usd": 0.3454666,
+    "model_calls": 138,
+    "per_item_unit": "figure",
+    "per_item_usd": 0.00438236231884058,
+    "pipeline_usd": 0.302383,
+    "total_usd": 0.6478496,
+    "verifier_per_item_usd": 0.0,
+    "verifier_requests": 0,
+    "verifier_usd": 0
+  },
+  "dataset": {
+    "gold_dir": "proof set heldout-2026-10",
+    "limit": null,
+    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "selection_sha256": "cdcc38ef8e0083fb8fc62e70047f3a535b7b00e91adc8a138f378960a8491dc0",
+    "unit": "figure"
+  },
+  "date": "2026-10-13",
+  "latency_ms": {
+    "basis": "sum of model-call latencies per item (excludes rendering)",
+    "n": 69,
+    "p50": 2073.0,
+    "p95": 3351.3999999999987
+  },
+  "metrics": {
+    "by_status": {
+      "accepted": 60,
+      "needs_review": 9
+    },
+    "check_pass_rate": 1.0,
+    "decorative_rate": 0.0,
+    "failed_check_codes": {},
+    "figure_types": {
+      "chart": 22,
+      "diagram": 35,
+      "illustration": 1,
+      "photo": 9,
+      "table_image": 2
+    },
+    "judge_errors": 0,
+    "judge_factual_error_rate": 0.0,
+    "judge_mean_score": 4.6521739130434785,
+    "judge_measured": 69,
+    "judge_pass_rate": 0.9855072463768116,
+    "judge_pass_rate_answered": 0.9855072463768116,
+    "judge_pass_rate_ci95": [
+      0.9223687745949706,
+      0.997437075383743
+    ],
+    "proposal_rate": 1.0,
+    "second_check": {
+      "agreement_with_judge": {
+        "auroc_score_vs_judge_fail": null,
+        "confusion": {
+          "flag_and_judge_fail": 0,
+          "flag_and_judge_pass": 0,
+          "no_flag_and_judge_fail": 0,
+          "no_flag_and_judge_pass": 0
+        },
+        "kappa": null,
+        "n": 0,
+        "raw_agreement": null
+      },
+      "answered": 0,
+      "cost_usd": 0,
+      "flag_rate": null,
+      "flagged": 0,
+      "flagged_ids": [],
+      "mode": "note",
+      "outcomes": {},
+      "per_figure_usd": 0.0,
+      "ran": 0,
+      "requests": 0,
+      "scores": {},
+      "versions": []
+    },
+    "with_reference": 69
+  },
+  "models": {
+    "cheap": "claude-haiku-5-5",
+    "judge": "claude-opus-5-5",
+    "main": "claude-opus-5-5"
+  },
+  "models_used": [
+    "claude-opus-5-5"
+  ],
+  "n": 69,
+  "n_planned": 69,
+  "pipeline_version": "0.4.0",
+  "prompt_versions": {
+    "figure": "figure-ac51f42d",
+    "judge": "judge_figure-137e2607"
+  },
+  "schema_version": 1,
+  "stopped_reason": null,
+  "task": "figures"
+}

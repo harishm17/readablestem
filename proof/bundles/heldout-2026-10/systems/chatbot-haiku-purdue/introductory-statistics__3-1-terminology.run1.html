@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>3.1 Terminology | Introductory Statistics (OpenStax)</title>
+
+  <!-- MathJax configuration: must be defined before the MathJax script loads -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        enableAssistiveMml: true,
+        enableMenu: true
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async
+          src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    /* Base typography: relative units so text can be resized */
+    html {
+      font-size: 100%;
+    }
+    body {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-size: 1.125rem;
+      line-height: 1.6;
+      color: #1a1a1a;            /* contrast on white is well above 4.5:1 */
+      background-color: #ffffff;
+      margin: 0;
+      padding: 0;
+    }
+    h1, h2, h3 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.25;
+      color: #1a1a1a;
+    }
+    h1 { font-size: 2rem; margin-top: 0; }
+    h2 { font-size: 1.5rem; margin-top: 2rem; }
+    h3 { font-size: 1.25rem; margin-top: 1.25rem; }
+
+    .container {
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+
+    /* Skip link: hidden until focused */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: #ffffff;
+      color: #1a1a1a;
+      padding: 0.5rem 1rem;
+      border: 2px solid #1a1a1a;
+      z-index: 100;
+    }
+    .skip-link:focus {
+      left: 1rem;
+      top: 1rem;
+    }
+
+    /* Visible focus indicators */
+    a:focus, a:focus-visible,
+    button:focus, button:focus-visible,
+    [tabindex]:focus-visible {
+      outline: 3px solid #1a1a1a;
+      outline-offset: 3px;
+    }
+
+    /* Links: dark blue, underlined (not relying on color alone) */
+    a {
+      color: #0b4a8b;
+      text-decoration: underline;
+    }
+    a:visited {
+      color: #5a2a82;
+    }
+
+    /* Screen-reader-only utility */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    /* Bold for key terms; emphasis is also conveyed by text itself */
+    .key-term {
+      font-weight: bold;
+    }
+
+    /* Example / Try It containers */
+    .example {
+      border: 2px solid #4a4a4a;
+      padding: 1rem;
+      margin: 2rem 0;
+    }
+    .example-inner {
+      border: 1px solid #4a4a4a;
+      padding: 1rem;
+      margin: 1rem 0;
+    }
+    .example h2 {
+      margin-top: 0;
+    }
+    .example h3 {
+      margin-top: 0.5rem;
+    }
+
+    /* Fill-in blanks: a visible line plus a screen-reader label */
+    .blank {
+      display: inline-block;
+      min-width: 8rem;
+      border-bottom: 1px solid #1a1a1a;
+      text-align: center;
+    }
+
+    /* Tables */
+    table {
+      border-collapse: collapse;
+      margin: 1rem 0;
+    }
+    caption {
+      text-align: left;
+      font-weight: bold;
+      padding-bottom: 0.5rem;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    th, td {
+      border: 1px solid #4a4a4a;
+      padding: 0.5rem 1rem;
+      text-align: left;
+    }
+    th {
+      font-weight: bold;
+    }
+
+    /* Lists */
+    ol.lettered li, ul li {
+      margin-bottom: 0.25rem;
+    }
+
+    /* Footer / attribution */
+    .attribution {
+      border-top: 2px solid #4a4a4a;
+      margin-top: 2.5rem;
+      padding-top: 1rem;
+      font-size: 0.95rem;
+    }
+
+    /* MathJax display spacing */
+    mjx-container[display="true"] {
+      margin: 0.75rem 0 !important;
+      overflow-x: auto;
+      overflow-y: hidden;
+    }
+
+    /* Respect user preference for reduced motion (no animations used, but future-proof) */
+    @media (prefers-reduced-motion: reduce) {
+      * {
+        scroll-behavior: auto !important;
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header class="container">
+    <p class="sr-only">Introductory Statistics (OpenStax), Chapter 3: Probability Topics</p>
+  </header>
+
+  <main id="main-content" class="container">
+
+    <h1>3.1 Terminology</h1>
+
+    <p>
+      Probability is a measure that is associated with how certain we are of outcomes of a particular experiment or
+      activity. An experiment is a planned operation carried out under controlled conditions. If the result is not
+      predetermined, then the experiment is said to be a <span class="key-term">chance</span> experiment. Flipping one
+      fair coin twice is an example of an experiment.
+    </p>
+
+    <p>
+      A result of an experiment is called an outcome. The sample space of an experiment is the set of all possible
+      outcomes. Three ways to represent a sample space are: to list the possible outcomes, to create a tree diagram, or to
+      create a Venn diagram. The uppercase letter \(S\) is used to denote the sample space. For example, if you flip one fair
+      coin, \(S = \{H, T\}\) where \(H\) = heads and \(T\) = tails are the outcomes.
+    </p>
+
+    <p>
+      An event is any combination of outcomes. Upper case letters like \(A\) and \(B\) represent events. For example, if the
+      experiment is to flip one fair coin, event \(A\) might be getting at most one head. The probability of an event \(A\) is
+      written \(P(A)\).
+    </p>
+
+    <p>
+      The probability of any outcome is the long-term relative frequency of that outcome.
+      <span class="key-term">Probabilities are between zero and one, inclusive</span> (that is, zero and one and all numbers
+      between these values). \(P(A) = 0\) means the event \(A\) can never happen. \(P(A) = 1\) means the event \(A\) always
+      happens. \(P(A) = 0.5\) means the event \(A\) is equally likely to occur or not to occur. For example, if you flip one
+      fair coin repeatedly (from 20 to 2,000 to 20,000 times) the relative frequency of heads approaches 0.5 (the
+      probability of heads).
+    </p>
+
+    <p>
+      Equally likely means that each outcome of an experiment occurs with equal probability. For example, if you toss a
+      fair, six-sided die, each face (1, 2, 3, 4, 5, or 6) is as likely to occur as any other face. If you toss a fair coin,
+      a Head (\(H\)) and a Tail (\(T\)) are equally likely to occur. If you randomly guess the answer to a true/false question
+      on an exam, you are equally likely to select a correct answer or an incorrect answer.
+    </p>
+
+    <p>
+      <span class="key-term">To calculate the probability of an event \(A\) when all outcomes in the sample space are equally
+      likely</span>, count the number of outcomes for event \(A\) and divide by the total number of outcomes in the sample
+      space. For example, if you toss a fair dime and a fair nickel, the sample space is \(\{HH, TH, HT, TT\}\) where
+      \(T\) = tails and \(H\) = heads. The sample space has four outcomes. \(A\) = getting one head. There are two outcomes
+      that meet this condition \(\{HT, TH\}\), so \(P(A) = \dfrac{2}{4} = 0.5\).
+    </p>
+
+    <p>
+      Suppose you roll one fair six-sided die, with the numbers \(\{1, 2, 3, 4, 5, 6\}\) on its faces. Let event \(E\) = rolling a
+      number that is at least five. There are two outcomes \(\{5, 6\}\). \(P(E) = \dfrac{2}{6}\). If you were to roll the die only
+      a few times, you would not be surprised if your observed results did not match the probability. If you were to roll
+      the die a very large number of times, you would expect that, overall, \(\dfrac{2}{6}\) of the rolls would result in an
+      outcome of "at least five." You would not expect exactly \(\dfrac{2}{6}\). The long-term relative frequency of obtaining
+      this result would approach the theoretical probability of \(\dfrac{2}{6}\) as the number of repetitions grows larger and
+      larger.
+    </p>
+
+    <p>
+      This important characteristic of probability experiments is known as the <span class="key-term">law of large
+      numbers</span> which states that as the number of repetitions of an experiment is increased, the relative frequency
+      obtained in the experiment tends to become closer and closer to the theoretical probability. Even though the outcomes
+      do not happen according to any set pattern or order, overall, the long-term observed relative frequency will approach
+      the theoretical probability. (The word <span class="key-term">empirical</span> is often used instead of the word
+      observed.)
+    </p>
+
+    <p>
+      It is important to realize that in many situations, the outcomes are not equally likely. A coin or die may be unfair, or
+      <span class="key-term">biased</span>. Two math professors in Europe had their statistics students test the Belgian one
+      Euro coin and discovered that in 250 trials, a head was obtained 56% of the time and a tail was obtained 44% of the
+      time. The data seem to show that the coin is not a fair coin; more repetitions would be helpful to draw a more accurate
+      conclusion about such bias.
+    </p>
+
+    <p>
+      Some dice may be biased. Look at the dice in a game you have at home; the spots on each face are usually small holes
+      carved out and then painted to make the spots visible. Your dice may or may not be biased; it is possible that the
+      outcomes may be affected by the slight weight differences due to the different numbers of holes in the faces. Gambling
+      casinos make a lot of money depending on outcomes from rolling dice, so casino dice are made differently to eliminate
+      bias. Casino dice have flat faces; the holes are completely filled with paint having the same density as the material
+      that the dice are made out of so that each face is equally likely to occur. Later we will learn techniques to use to
+      work with probabilities for events that are not equally likely.
+    </p>
+
+    <section aria-labelledby="or-event-heading">
+      <h2 id="or-event-heading">"OR" Event</h2>
+      <p>
+        An outcome is in the event \(A\) OR \(B\) if the outcome is in \(A\) or is in \(B\) or is in both \(A\) and \(B\). For
+        example, let \(A = \{1, 2, 3, 4, 5\}\) and \(B = \{4, 5, 6, 7, 8\}\). \(A\) OR \(B = \{1, 2, 3, 4, 5, 6, 7, 8\}\). Notice
+        that 4 and 5 are NOT listed twice.
+      </p>
+    </section>
+
+    <section aria-labelledby="and-event-heading">
+      <h2 id="and-event-heading">"AND" Event</h2>
+      <p>
+        An outcome is in the event \(A\) AND \(B\) if the outcome is in both \(A\) and \(B\) at the same time. For example, let
+        \(A\) and \(B\) be \(\{1, 2, 3, 4, 5\}\) and \(\{4, 5, 6, 7, 8\}\), respectively. Then \(A\) AND \(B = \{4, 5\}\).
+      </p>
+      <p>
+        The complement of event \(A\) is denoted \(A'\) (read "\(A\) prime"). \(A'\) consists of all outcomes that are
+        <span class="key-term">NOT</span> in \(A\). Notice that \(P(A) + P(A') = 1\). For example, let
+        \(S = \{1, 2, 3, 4, 5, 6\}\) and let \(A = \{1, 2, 3, 4\}\). Then, \(A' = \{5, 6\}\). \(P(A) = \dfrac{4}{6}\),
+        \(P(A') = \dfrac{2}{6}\), and \(P(A) + P(A') = \dfrac{4}{6} + \dfrac{2}{6} = 1\).
+      </p>
+      <p>
+        The conditional probability of \(A\) given \(B\) is written \(P(A|B)\). \(P(A|B)\) is the probability that event \(A\)
+        will occur given that the event \(B\) has already occurred. <span class="key-term">A conditional reduces the sample
+        space</span>. We calculate the probability of \(A\) from the reduced sample space \(B\). The formula to calculate
+        \(P(A|B)\) is
+      </p>
+      <p>\[ P(A|B) = \frac{P(A \text{ AND } B)}{P(B)} \]</p>
+      <p>where \(P(B)\) is greater than zero.</p>
+      <p>
+        For example, suppose we toss one fair, six-sided die. The sample space \(S = \{1, 2, 3, 4, 5, 6\}\). Let \(A\) = face is 2
+        or 3 and \(B\) = face is even (2, 4, 6). To calculate \(P(A|B)\), we count the number of outcomes 2 or 3 in the sample
+        space \(B = \{2, 4, 6\}\). Then we divide that by the number of outcomes \(B\) (rather than \(S\)).
+      </p>
+      <p>We get the same result by using the formula. Remember that \(S\) has six outcomes.</p>
+      <p>
+        \[ P(A|B) = \frac{P(A \text{ AND } B)}{P(B)} = \frac{\dfrac{\text{(the number of outcomes that are 2 or 3 and even in } S)}{6}}{\dfrac{\text{(the number of outcomes that are even in } S)}{6}} = \frac{\frac{1}{6}}{\frac{3}{6}} = \frac{1}{3} \]
+      </p>
+    </section>
+
+    <section aria-labelledby="terminology-symbols-heading">
+      <h2 id="terminology-symbols-heading">Understanding Terminology and Symbols</h2>
+      <p>
+        It is important to read each problem carefully to think about and understand what the events are. Understanding the
+        wording is the first very important step in solving probability problems. Reread the problem several times if
+        necessary. Clearly identify the event of interest. Determine whether there is a condition stated in the wording that
+        would indicate that the probability is conditional; carefully identify the condition, if any.
+      </p>
+    </section>
+
+    <!-- Example 3.1 -->
+    <section class="example" aria-labelledby="example-3-1-heading">
+      <h2 id="example-3-1-heading">Example 3.1</h2>
+
+      <div class="example-inner">
+        <h3>Problem</h3>
+        <p>The sample space \(S\) is the whole numbers starting at one and less than 20.</p>
+        <ol type="a" class="lettered">
+          <li>\(S =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+        </ol>
+        <p>Let event \(A\) = the even numbers and event \(B\) = numbers greater than 13.</p>
+        <ol type="a" start="2" class="lettered">
+          <li>\(A =\) <span class="blank"><span class="sr-only">blank</span></span>, \(B =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A) =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(B) =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(A\) AND \(B =\) <span class="blank"><span class="sr-only">blank</span></span>, \(A\) OR \(B =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A \text{ AND } B) =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(A \text{ OR } B) =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(A' =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(A') =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A) + P(A') =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A|B) =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(B|A) =\) <span class="blank"><span class="sr-only">blank</span></span>; are the probabilities equal?</li>
+        </ol>
+      </div>
+
+      <div class="example-inner">
+        <h3>Solution</h3>
+        <ol type="a" class="lettered">
+          <li>\(S = \{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19\}\)</li>
+          <li>\(A = \{2, 4, 6, 8, 10, 12, 14, 16, 18\}\), \(B = \{14, 15, 16, 17, 18, 19\}\)</li>
+          <li>\(P(A) = \dfrac{9}{19}\), \(P(B) = \dfrac{6}{19}\)</li>
+          <li>\(A\) AND \(B = \{14, 16, 18\}\), \(A\) OR \(B = \{2, 4, 6, 8, 10, 12, 14, 15, 16, 17, 18, 19\}\)</li>
+          <li>\(P(A \text{ AND } B) = \dfrac{3}{19}\), \(P(A \text{ OR } B) = \dfrac{12}{19}\)</li>
+          <li>\(A' = \{1, 3, 5, 7, 9, 11, 13, 15, 17, 19\}\); \(P(A') = \dfrac{10}{19}\)</li>
+          <li>\(P(A) + P(A') = 1\) \(\left(\dfrac{9}{19} + \dfrac{10}{19} = 1\right)\)</li>
+          <li>\(P(A|B) = \dfrac{P(A \text{ AND } B)}{P(B)} = \dfrac{3}{6}\), \(P(B|A) = \dfrac{P(A \text{ AND } B)}{P(A)} = \dfrac{3}{9}\). No, the probabilities are not equal.</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Try It 3.1 -->
+    <section class="example" aria-labelledby="try-it-3-1-heading">
+      <h2 id="try-it-3-1-heading">Try It 3.1</h2>
+      <div class="example-inner">
+        <p>
+          The sample space \(S\) is all the ordered pairs of two whole numbers, the first from one to three and the second
+          from one to four (Example: (1, 4)).
+        </p>
+        <ol type="a" class="lettered">
+          <li>\(S =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+        </ol>
+        <p>Let event \(A\) = the sum is even and event \(B\) = the first number is prime.</p>
+        <ol type="a" start="2" class="lettered">
+          <li>\(A =\) <span class="blank"><span class="sr-only">blank</span></span>, \(B =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A) =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(B) =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(A\) AND \(B =\) <span class="blank"><span class="sr-only">blank</span></span>, \(A\) OR \(B =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A \text{ AND } B) =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(A \text{ OR } B) =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(B' =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(B') =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A) + P(A') =\) <span class="blank"><span class="sr-only">blank</span></span></li>
+          <li>\(P(A|B) =\) <span class="blank"><span class="sr-only">blank</span></span>, \(P(B|A) =\) <span class="blank"><span class="sr-only">blank</span></span>; are the probabilities equal?</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Example 3.2 -->
+    <section class="example" aria-labelledby="example-3-2-heading">
+      <h2 id="example-3-2-heading">Example 3.2</h2>
+
+      <div class="example-inner">
+        <h3>Problem</h3>
+        <p>
+          A fair, six-sided die is rolled. Describe the sample space \(S\), identify each of the following events with a subset
+          of \(S\) and compute its probability (an outcome is the number of dots that show up).
+        </p>
+        <ol type="a" class="lettered">
+          <li>Event \(T\) = the outcome is two.</li>
+          <li>Event \(A\) = the outcome is an even number.</li>
+          <li>Event \(B\) = the outcome is less than four.</li>
+          <li>The complement of \(A\).</li>
+          <li>\(A\) GIVEN \(B\)</li>
+          <li>\(B\) GIVEN \(A\)</li>
+          <li>\(A\) AND \(B\)</li>
+          <li>\(A\) OR \(B\)</li>
+          <li>\(A\) OR \(B'\)</li>
+          <li>Event \(N\) = the outcome is a prime number.</li>
+          <li>Event \(I\) = the outcome is seven.</li>
+        </ol>
+      </div>
+
+      <div class="example-inner">
+        <h3>Solution</h3>
+        <ol type="a" class="lettered">
+          <li>\(T = \{2\}\), \(P(T) = \dfrac{1}{6}\)</li>
+          <li>\(A = \{2, 4, 6\}\), \(P(A) = \dfrac{1}{2}\)</li>
+          <li>\(B = \{1, 2, 3\}\), \(P(B) = \dfrac{1}{2}\)</li>
+          <li>\(A' = \{1, 3, 5\}\), \(P(A') = \dfrac{1}{2}\)</li>
+          <li>\(A|B = \{2\}\), \(P(A|B) = \dfrac{1}{3}\)</li>
+          <li>\(B|A = \{2\}\), \(P(B|A) = \dfrac{1}{3}\)</li>
+          <li>\(A\) AND \(B = \{2\}\), \(P(A \text{ AND } B) = \dfrac{1}{6}\)</li>
+          <li>\(A\) OR \(B = \{1, 2, 3, 4, 6\}\), \(P(A \text{ OR } B) = \dfrac{5}{6}\)</li>
+          <li>\(A\) OR \(B' = \{2, 4, 5, 6\}\), \(P(A \text{ OR } B') = \dfrac{2}{3}\)</li>
+          <li>\(N = \{2, 3, 5\}\), \(P(N) = \dfrac{1}{2}\)</li>
+          <li>A six-sided die does not have seven dots. \(P(7) = 0\).</li>
+        </ol>
+      </div>
+    </section>
+
+    <!-- Example 3.3 -->
+    <section class="example" aria-labelledby="example-3-3-heading">
+      <h2 id="example-3-3-heading">Example 3.3</h2>
+
+      <p>
+        Table 3.1 describes the distribution of a random sample \(S\) of 100 individuals, organized by gender and whether
+        they are right- or left-handed.
+      </p>
+
+      <table>
+        <caption>Table 3.1: Handedness of a random sample of 100 individuals, by gender</caption>
+        <thead>
+          <tr>
+            <td><span class="sr-only">Gender</span></td>
+            <th scope="col">Right-handed</th>
+            <th scope="col">Left-handed</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Males</th>
+            <td>43</td>
+            <td>9</td>
+          </tr>
+          <tr>
+            <th scope="row">Females</th>
+            <td>44</td>
+            <td>4</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <div class="example-inner">
+        <h3>Problem</h3>
+        <p>
+          Let's denote the events \(M\) = the subject is male, \(F\) = the subject is female, \(R\) = the subject is right-handed,
+          \(L\) = the subject is left-handed. Compute the following probabilities:
+        </p>
+        <ol type="a" class="lettered">
+          <li>\(P(M)\)</li>
+          <li>\(P(F)\)</li>
+          <li>\(P(R)\)</li>
+          <li>\(P(L)\)</li>
+          <li>\(P(M \text{ AND } R)\)</li>
+          <li>\(P(F \text{ AND } L)\)</li>
+          <li>\(P(M \text{ OR } F)\)</li>
+          <li>\(P(M \text{ OR } R)\)</li>
+          <li>\(P(F \text{ OR } L)\)</li>
+          <li>\(P(M')\)</li>
+          <li>\(P(R|M)\)</li>
+          <li>\(P(F|L)\)</li>
+          <li>\(P(L|F)\)</li>
+        </ol>
+      </div>
+
+      <div class="example-inner">
+        <h3>Solution</h3>
+        <ol type="a" class="lettered">
+          <li>\(P(M) = 0.52\)</li>
+          <li>\(P(F) = 0.48\)</li>
+          <li>\(P(R) = 0.87\)</li>
+          <li>\(P(L) = 0.13\)</li>
+          <li>\(P(M \text{ AND } R) = 0.43\)</li>
+          <li>\(P(F \text{ AND } L) = 0.04\)</li>
+          <li>\(P(M \text{ OR } F) = 1\)</li>
+          <li>\(P(M \text{ OR } R) = 0.96\)</li>
+          <li>\(P(F \text{ OR } L) = 0.57\)</li>
+          <li>\(P(M') = 0.48\)</li>
+          <li>\(P(R|M) = 0.8269\) (rounded to four decimal places)</li>
+          <li>\(P(F|L) = 0.3077\) (rounded to four decimal places)</li>
+          <li>\(P(L|F) = 0.0833\)</li>
+        </ol>
+      </div>
+    </section>
+
+  </main>
+
+  <footer class="container attribution">
+    <p>
+      "3.1 Terminology" from Introductory Statistics by Barbara Illowsky, Susan Dean, OpenStax.
+    </p>
+    <p>
+      Licensed under Creative Commons Attribution License (CC BY 4.0).
+      <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a>
+    </p>
+    <p>
+      Original page:
+      <a href="https://openstax.org/books/introductory-statistics/pages/3-1-terminology">https://openstax.org/books/introductory-statistics/pages/3-1-terminology</a>
+    </p>
+    <p>
+      Access for free at openstax.org.
+    </p>
+    <p>
+      Changes: reformatted as an accessible HTML page; image content converted to text and MathJax notation; no wording
+      edited. This adaptation is not affiliated with or endorsed by OpenStax.
+    </p>
+  </footer>
+
+</body>
+</html>

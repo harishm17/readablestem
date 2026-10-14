@@ -214,12 +214,21 @@ three steps, each with its own spend cap, by one script:
 ENV_FILE=/path/to/.env proof/record-heldout.sh     # a11y-stem $12, chatbot arms and judge $10
 ```
 
+`PROVIDER=anthropic` does the same on Claude (Addendum 6: `ANTHROPIC_API_KEY` in the env file;
+`A11Y_USD`, `CHAT_USD`, `CHAT_RUNS` and `CHAT_ARMS` set the caps and what the chatbot step
+makes). The recorded Claude run was made in steps so that the number of runs of each chatbot arm
+could be decided from the spend so far: `proof/record-chat-runs.py` records one arm for a number
+of runs into the work folder with the same code, and `--add-systems chatbot --arms ...` then
+judges the figure descriptions and adds the arm to the recorded run (Addendum 7).
+
 It needs API credit, a clean checkout, Chromium and `make -C proof/parsers setup`, and nothing
 else may call the API while it runs (an empty balance or a rate limit makes calls fail, and a
 failed call is not a system's answer). Each step can be interrupted and started again:
 `--resume` reads back the a11y-stem runs that finished, and the chatbot and parser steps skip
 what they already recorded. Copy the result to `proof/bundles/heldout-2026-10/`, make that
 set the default in `proof/sets/index.json`, and `make proof` writes `PROOF.md` from it.
+The report of the development sample is then written with `make proof SET=smoke-physics-2
+PROOF_EXTRA="--out proof/PROOF-development-sample.md"`.
 
 ### The part of the held-out run that needs no model
 
@@ -229,7 +238,9 @@ from the printed PDFs, a11y-stem's headings task and the parsers' outputs commit
 `proof/interim/heldout-2026-10/`. It exists because the paid parts of the run could not be made
 (no API credit); it compares a11y-stem's heading detection with the parsers' and scores the
 parsers on equations, invented content and coverage, and it claims nothing else. It is not a
-recorded run in the sense of the bundles above and does not replace one.
+recorded run in the sense of the bundles above and does not replace one. It is a record of
+what existed before the model runs; the recorded held-out run (on Claude, Addenda 6 and 7) is in
+`proof/bundles/heldout-2026-10/` and its report is `PROOF.md`.
 
 ### Recording the other systems
 

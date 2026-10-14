@@ -1,0 +1,855 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>7.3 Lewis Symbols and Structures</title>
+
+  <!-- MathJax configuration and loader (MathJax v3, with assistive MathML enabled) -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true
+      },
+      chtml: { fontURL: 'https://cdn.jsdelivr.net/npm/mathjax@3/es5/output/chtml/fonts/woff-v2' },
+      options: {
+        enableMenu: false,
+        enableAssistiveMml: true
+      }
+    };
+  </script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    /* Base typography and contrast (text #1a1a1a on #ffffff exceeds 4.5:1) */
+    html { font-size: 100%; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+      color: #1a1a1a;
+      background: #ffffff;
+      margin: 0 auto;
+      max-width: 52rem;
+      padding: 1.5rem;
+    }
+    h1, h2, h3 { font-family: Arial, Helvetica, sans-serif; line-height: 1.25; }
+    h1 { font-size: 2rem; }
+    h2 { font-size: 1.5rem; margin-top: 2rem; }
+    h3 { font-size: 1.2rem; margin-top: 1.5rem; }
+    a { color: #0b4f9c; }
+    a:visited { color: #5a2d82; }
+
+    /* Visible focus indicator for keyboard users */
+    a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid #1a1a1a;
+      outline-offset: 2px;
+    }
+
+    /* Skip link */
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0.5rem;
+      background: #ffffff;
+      color: #1a1a1a;
+      padding: 0.5rem 1rem;
+      border: 2px solid #1a1a1a;
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0.5rem; }
+
+    /* Screen-reader-only text */
+    .sr-only {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0);
+      white-space: nowrap; border: 0;
+    }
+
+    /* Tables */
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.95rem;
+    }
+    caption {
+      caption-side: top;
+      text-align: left;
+      font-weight: bold;
+      padding-bottom: 0.5rem;
+      font-family: Arial, Helvetica, sans-serif;
+    }
+    th, td {
+      border: 1px solid #595959;
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e6ecf5; }
+
+    /* Figures and diagrams */
+    figure {
+      margin: 1.5rem 0;
+      padding: 0;
+    }
+    figcaption {
+      font-size: 0.95rem;
+      margin-top: 0.5rem;
+    }
+    .diagram {
+      background: #f4f6fa;
+      border: 1px solid #595959;
+      padding: 1rem;
+      overflow-x: auto;
+    }
+    .diagram p { margin: 0.25rem 0; }
+    .diagram-caption-label { font-weight: bold; }
+
+    /* Example and callout boxes */
+    .box {
+      border: 1px solid #595959;
+      padding: 1rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .box h2, .box h3 { margin-top: 0.5rem; }
+
+    .formula-line { margin: 0.25rem 0 0.25rem 1rem; }
+    .equation-note { font-size: 0.95rem; }
+
+    img { max-width: 100%; height: auto; }
+
+    footer {
+      margin-top: 2.5rem;
+      border-top: 1px solid #595959;
+      padding-top: 1rem;
+      font-size: 0.9rem;
+    }
+  </style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<main id="main-content">
+
+  <h1>7.3 Lewis Symbols and Structures</h1>
+
+  <section aria-labelledby="objectives-heading">
+    <h2 id="objectives-heading">Learning Objectives</h2>
+    <p>By the end of this section, you will be able to:</p>
+    <ul>
+      <li>Write Lewis symbols for neutral atoms and ions</li>
+      <li>Draw Lewis structures depicting the bonding in simple molecules</li>
+    </ul>
+    <p>
+      Thus far in this chapter, we have discussed the various types of bonds that form between atoms and/or ions.
+      In all cases, these bonds involve the sharing or transfer of valence shell electrons between atoms.
+      In this section, we will explore the typical method for depicting valence shell electrons and chemical bonds,
+      namely Lewis symbols and Lewis structures.
+    </p>
+  </section>
+
+  <section aria-labelledby="lewis-symbols-heading">
+    <h2 id="lewis-symbols-heading">Lewis Symbols</h2>
+    <p>
+      We use Lewis symbols to describe valence electron configurations of atoms and monatomic ions.
+      A Lewis symbol consists of an elemental symbol surrounded by one dot for each of its valence electrons:
+    </p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Lewis symbol for calcium: the symbol Ca with two dots, one on each side.">
+        <p>&#8226;Ca&#8226;</p>
+      </div>
+      <figcaption>Lewis symbol for calcium, which has two valence electrons.</figcaption>
+    </figure>
+
+    <p>Figure 7.9 shows the Lewis symbols for the elements of the third period of the periodic table.</p>
+
+    <figure>
+      <table>
+        <caption>Figure 7.9: Lewis symbols illustrating the number of valence electrons for each element in the third period of the periodic table.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Atom</th>
+            <th scope="col">Electronic Configuration</th>
+            <th scope="col">Lewis Symbol</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Sodium</th>
+            <td>\([\mathrm{Ne}]3s^1\)</td>
+            <td>Na&#8226; <span class="sr-only">(1 valence electron)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Magnesium</th>
+            <td>\([\mathrm{Ne}]3s^2\)</td>
+            <td>&#8226;Mg&#8226; <span class="sr-only">(2 valence electrons)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Aluminum</th>
+            <td>\([\mathrm{Ne}]3s^2 3p^1\)</td>
+            <td>&#8226;Al&#8226; <span class="sr-only">(3 valence electrons)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Silicon</th>
+            <td>\([\mathrm{Ne}]3s^2 3p^2\)</td>
+            <td>&#8226;Si&#8226; <span class="sr-only">(4 valence electrons)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Phosphorus</th>
+            <td>\([\mathrm{Ne}]3s^2 3p^3\)</td>
+            <td>&#8226;P&#8226; <span class="sr-only">(5 valence electrons)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Sulfur</th>
+            <td>\([\mathrm{Ne}]3s^2 3p^4\)</td>
+            <td>:S&#8226; <span class="sr-only">(6 valence electrons)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Chlorine</th>
+            <td>\([\mathrm{Ne}]3s^2 3p^5\)</td>
+            <td>:Cl&#8226; <span class="sr-only">(7 valence electrons)</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Argon</th>
+            <td>\([\mathrm{Ne}]3s^2 3p^6\)</td>
+            <td>:Ar: <span class="sr-only">(8 valence electrons)</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </figure>
+
+    <p>Lewis symbols can also be used to illustrate the formation of cations from atoms, as shown here for sodium and calcium:</p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Formation of a sodium cation: a sodium atom with one dot, Na dot, becomes a sodium cation, Na plus, plus an electron, e minus. Formation of a calcium cation: a calcium atom with two dots, Ca with dots on each side, becomes a calcium cation with two electrons removed, Ca with a 2 plus charge, plus two electrons, 2 e minus.">
+        <p><span aria-hidden="true">Na&#8226; &rarr; Na<sup>+</sup> + e<sup>&minus;</sup></span></p>
+        <p><span>sodium atom &rarr; sodium cation + electron</span></p>
+        <p><span aria-hidden="true">&#8226;Ca&#8226; &rarr; Ca<sup>2+</sup> + 2e<sup>&minus;</sup></span></p>
+        <p><span>calcium atom &rarr; calcium cation + 2 electrons</span></p>
+      </div>
+      <figcaption>Formation of cations from sodium and calcium atoms.</figcaption>
+    </figure>
+
+    <p>Likewise, they can be used to show the formation of anions from atoms, as shown here for chlorine and sulfur:</p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Formation of a chloride anion: a chlorine atom with seven valence electrons plus one electron gives a chloride anion with eight valence electrons and a 1 minus charge. Formation of a sulfide anion: a sulfur atom with six valence electrons plus two electrons gives a sulfide anion with eight valence electrons and a 2 minus charge.">
+        <p><span aria-hidden="true">:Cl&#8226; + e<sup>&minus;</sup> &rarr; :Cl:<sup>&minus;</sup></span></p>
+        <p><span>chlorine atom + electron &rarr; chloride anion</span></p>
+        <p><span aria-hidden="true">:S&#8226; + 2e<sup>&minus;</sup> &rarr; :S:<sup>2&minus;</sup></span></p>
+        <p><span>sulfur atom + 2 electrons &rarr; sulfide anion</span></p>
+      </div>
+      <figcaption>Formation of anions from chlorine and sulfur atoms.</figcaption>
+    </figure>
+
+    <figure>
+      <table>
+        <caption>Figure 7.10: Formation of ionic compounds from Lewis symbols showing the transfer of electrons.</caption>
+        <thead>
+          <tr>
+            <th scope="col">Metal</th>
+            <th scope="col">Nonmetal</th>
+            <th scope="col">Ionic Compound</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Na&#8226; (sodium atom)</td>
+            <td>:Cl&#8226; (chlorine atom)</td>
+            <td>Na<sup>+</sup> [:Cl:]<sup>&minus;</sup> (sodium chloride; sodium ion and chloride ion)</td>
+          </tr>
+          <tr>
+            <td>&#8226;Mg&#8226; (magnesium atom)</td>
+            <td>:O: (oxygen atom)</td>
+            <td>Mg<sup>2+</sup> [:O:]<sup>2&minus;</sup> (magnesium oxide; magnesium ion and oxide ion)</td>
+          </tr>
+          <tr>
+            <td>&#8226;Ca&#8226; (calcium atom)</td>
+            <td>2 :F&#8226; (fluorine atoms)</td>
+            <td>Ca<sup>2+</sup> 2[:F:]<sup>&minus;</sup> (calcium fluoride; calcium ion and two fluoride ions)</td>
+          </tr>
+        </tbody>
+      </table>
+      <figcaption>
+        Cations are formed when atoms lose electrons, represented by fewer Lewis dots, whereas anions are formed by atoms gaining electrons.
+        The total number of electrons does not change.
+      </figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="lewis-structures-heading">
+    <h2 id="lewis-structures-heading">Lewis Structures</h2>
+    <p>
+      We also use Lewis symbols to indicate the formation of covalent bonds, which are shown in Lewis structures,
+      drawings that describe the bonding in molecules and polyatomic ions.
+      For example, when two chlorine atoms form a chlorine molecule, they share one pair of electrons:
+    </p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Two chlorine atoms, each with seven valence electrons shown as dots, combine to form a chlorine molecule. In the molecule, the two atoms share one pair of electrons between them, and each atom has three lone pairs. The electrons contributed by the second chlorine atom are shown in red in the original figure.">
+        <p><span aria-hidden="true">:Cl&#8226; + &#8226;Cl: &rarr; :Cl:Cl:</span></p>
+        <p><span>chlorine atoms &rarr; chlorine molecule</span></p>
+      </div>
+      <figcaption>Formation of a chlorine molecule from two chlorine atoms. Each atom shares one pair of electrons.</figcaption>
+    </figure>
+
+    <p>
+      The Lewis structure indicates that each Cl atom has three pairs of electrons that are not used in bonding (called lone pairs)
+      and one shared pair of electrons (written between the atoms). A dash (or line) is sometimes used to indicate a shared pair of electrons:
+    </p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Two structures with dashes. The first is hydrogen molecule written H dash H, with one shared pair. The second is chlorine molecule with lone pairs as dots on each Cl atom and a dash between the two Cl atoms.">
+        <p>\(\mathrm{H{-}H}\)</p>
+        <p>:Cl&mdash;Cl:</p>
+      </div>
+      <figcaption>Lewis structures of H<sub>2</sub> and Cl<sub>2</sub> using dashes to show shared pairs.</figcaption>
+    </figure>
+
+    <p>
+      A single shared pair of electrons is called a single bond. Each Cl atom interacts with eight valence electrons:
+      the six in the lone pairs and the two in the single bond.
+    </p>
+
+    <section aria-labelledby="octet-rule-heading">
+      <h3 id="octet-rule-heading">The Octet Rule</h3>
+      <p>
+        The other halogen molecules (\(\mathrm{F_2}\), \(\mathrm{Br_2}\), \(\mathrm{I_2}\), and \(\mathrm{At_2}\)) form bonds like those in the chlorine molecule:
+        one single bond between atoms and three lone pairs of electrons per atom. This allows each halogen atom to have a noble gas electron configuration.
+        The tendency of main group atoms to form enough bonds to obtain eight valence electrons is known as the octet rule.
+      </p>
+      <p>
+        The number of bonds that an atom can form can often be predicted from the number of electrons needed to reach an octet (eight valence electrons);
+        this is especially true of the nonmetals of the second period of the periodic table (C, N, O, and F). For example, each atom of a group 14 element
+        has four electrons in its outermost shell and therefore requires four more electrons to reach an octet. These four electrons can be gained by
+        forming four covalent bonds, as illustrated here for carbon in \(\mathrm{CCl_4}\) (carbon tetrachloride) and silicon in \(\mathrm{SiH_4}\) (silane).
+        Because hydrogen only needs two electrons to fill its valence shell, it is an exception to the octet rule. The transition elements and inner
+        transition elements also do not follow the octet rule:
+      </p>
+
+      <figure>
+        <div class="diagram" role="img" aria-label="Two Lewis structures of carbon tetrachloride, CCl4, shown as alternatives. Each structure has a central carbon atom bonded to four chlorine atoms, and each chlorine atom has three lone pairs. In the first, the bonds are shown as shared pairs of dots; in the second, the bonds are shown as dashes. Next to them are two Lewis structures of silane, SiH4: a central silicon atom bonded to four hydrogen atoms, shown with dots and with dashes.">
+          <p>Carbon tetrachloride: \(\mathrm{CCl_4}\) (electron-dot form or dash form)</p>
+          <p>Silane: \(\mathrm{SiH_4}\) (electron-dot form or dash form)</p>
+        </div>
+        <figcaption>Lewis structures of carbon tetrachloride and silane, each showing a central atom with four covalent bonds.</figcaption>
+      </figure>
+
+      <p>
+        Group 15 elements such as nitrogen have five valence electrons in the atomic Lewis symbol: one lone pair and three unpaired electrons.
+        To obtain an octet, these atoms form three covalent bonds, as in \(\mathrm{NH_3}\) (ammonia). Oxygen and other atoms in group 16 obtain an octet
+        by forming two covalent bonds:
+      </p>
+
+      <figure>
+        <div class="diagram" role="img" aria-label="Three Lewis structures. Ammonia, NH3: a central nitrogen atom bonded to three hydrogen atoms, with one lone pair on nitrogen. Water, H2O: a central oxygen atom bonded to two hydrogen atoms, with two lone pairs on oxygen. Hydrogen fluoride, HF: a hydrogen atom bonded to a fluorine atom, with three lone pairs on fluorine.">
+          <p>Ammonia: H&ndash;N(:)&ndash;H with H below N</p>
+          <p>Water: H&ndash;O&ndash;H with two lone pairs on O</p>
+          <p>Hydrogen fluoride: H&ndash;F with three lone pairs on F</p>
+        </div>
+        <figcaption>Lewis structures of ammonia, water, and hydrogen fluoride.</figcaption>
+      </figure>
+    </section>
+  </section>
+
+  <section aria-labelledby="double-triple-heading">
+    <h2 id="double-triple-heading">Double and Triple Bonds</h2>
+    <p>
+      As previously mentioned, when a pair of atoms shares one pair of electrons, we call this a single bond. However, a pair of atoms may need to share more
+      than one pair of electrons in order to achieve the requisite octet. A double bond forms when two pairs of electrons are shared between a pair of atoms,
+      as between the carbon and oxygen atoms in \(\mathrm{CH_2O}\) (formaldehyde) and between the two carbon atoms in \(\mathrm{C_2H_4}\) (ethylene):
+    </p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Formaldehyde, CH2O, can be drawn with a carbon-oxygen double bond, shown as C double bond O with lone pairs on O, or with carbon-oxygen bonds drawn as C with two dots and O. Ethylene, C2H4, is drawn with a carbon-carbon double bond, each carbon bonded to two hydrogen atoms.">
+        <p>Formaldehyde: H<sub>2</sub>C&#8801;O (with two H atoms on carbon and lone pairs on oxygen)</p>
+        <p>Ethylene: H<sub>2</sub>C=CH<sub>2</sub> (each carbon bonded to two hydrogen atoms)</p>
+      </div>
+      <figcaption>Lewis structures of formaldehyde (CH<sub>2</sub>O) and ethylene (C<sub>2</sub>H<sub>4</sub>), each containing a double bond.</figcaption>
+    </figure>
+
+    <p>
+      A triple bond forms when three electron pairs are shared by a pair of atoms, as in carbon monoxide (CO) and the cyanide ion (CN<sup>&minus;</sup>):
+    </p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Carbon monoxide, CO, drawn with a carbon-oxygen triple bond and a lone pair on each atom, and as an alternative written with dots. Cyanide ion, CN with a negative charge, drawn with a carbon-nitrogen triple bond and a lone pair on each atom, and as an alternative written with dots.">
+        <p>Carbon monoxide: :C&equiv;O: (or :C:::O:)</p>
+        <p>Cyanide ion: :C&equiv;N:<sup>&minus;</sup> (or :C:::N:<sup>&minus;</sup>)</p>
+      </div>
+      <figcaption>Lewis structures of carbon monoxide and the cyanide ion, each containing a triple bond.</figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="writing-heading">
+    <h2 id="writing-heading">Writing Lewis Structures with the Octet Rule</h2>
+    <p>
+      For very simple molecules and molecular ions, we can write the Lewis structures by merely pairing up the unpaired electrons on the constituent atoms.
+      See these examples:
+    </p>
+
+    <figure>
+      <div class="diagram" role="img" aria-label="Three reactions. First, a hydrogen atom plus a bromine atom gives hydrogen bromide, HBr, with one shared pair. Second, two hydrogen atoms plus a sulfur atom give hydrogen sulfide, H2S, with two shared pairs. Third, two nitrogen atoms combine to form a nitrogen molecule, N2, with a triple bond and one lone pair on each nitrogen atom.">
+        <p>H&#8226; + :Br&#8226; &rarr; H:Br: (hydrogen bromide)</p>
+        <p>2H&#8226; + :S&#8226; &rarr; H:S:H (hydrogen sulfide)</p>
+        <p>&#8226;N&#8226; + &#8226;N&#8226; &rarr; :N&equiv;N: (nitrogen molecule)</p>
+      </div>
+      <figcaption>Simple Lewis structures formed by pairing unpaired electrons.</figcaption>
+    </figure>
+
+    <p>For more complicated molecules and molecular ions, it is helpful to follow the step-by-step procedure outlined here:</p>
+
+    <ol>
+      <li>Determine the total number of valence (outer shell) electrons. For cations, subtract one electron for each positive charge. For anions, add one electron for each negative charge.</li>
+      <li>Draw a skeleton structure of the molecule or ion, arranging the atoms around a central atom. (Generally, the least electronegative element should be placed in the center.) Connect each atom to the central atom with a single bond (one electron pair).</li>
+      <li>Distribute the remaining electrons as lone pairs on the terminal atoms (except hydrogen), completing an octet around each atom.</li>
+      <li>Place all remaining electrons on the central atom.</li>
+      <li>Rearrange the electrons of the outer atoms to make multiple bonds with the central atom in order to obtain octets wherever possible.</li>
+    </ol>
+
+    <p>
+      Let us determine the Lewis structures of \(\mathrm{SiH_4}\), \(\mathrm{CHO_2^-}\), \(\mathrm{NO^+}\), and \(\mathrm{OF_2}\) as examples in following this procedure:
+    </p>
+
+    <ol>
+      <li>
+        Determine the total number of valence (outer shell) electrons in the molecule or ion.
+        <ul>
+          <li>
+            For a molecule, we add the number of valence electrons on each atom in the molecule:
+            <p class="formula-line">\(\mathrm{SiH_4}\)</p>
+            \[
+              \begin{aligned}
+              \text{Si: } & 4 \text{ valence electrons/atom} \times 1 \text{ atom} = 4 \\
+              + \text{ H: } & 1 \text{ valence electron/atom} \times 4 \text{ atoms} = 4 \\
+              & = 8 \text{ valence electrons}
+              \end{aligned}
+            \]
+            <p class="equation-note">Equation 7.5</p>
+          </li>
+          <li>
+            For a negative ion, such as \(\mathrm{CHO_2^-}\), we add the number of valence electrons on the atoms to the number of negative charges on the ion
+            (one electron is gained for each single negative charge):
+            \[
+              \begin{aligned}
+              \mathrm{CHO_2^-} \\
+              \text{C: } & 4 \text{ valence electrons/atom} \times 1 \text{ atom} = 4 \\
+              \text{H: } & 1 \text{ valence electron/atom} \times 1 \text{ atom} = 1 \\
+              \text{O: } & 6 \text{ valence electrons/atom} \times 2 \text{ atoms} = 12 \\
+              + & \; 1 \text{ additional electron} = 1 \\
+              & = 18 \text{ valence electrons}
+              \end{aligned}
+            \]
+            <p class="equation-note">Equation 7.6</p>
+          </li>
+          <li>
+            For a positive ion, such as \(\mathrm{NO^+}\), we add the number of valence electrons on the atoms in the ion and then subtract the number of positive
+            charges on the ion (one electron is lost for each single positive charge) from the total number of valence electrons:
+            \[
+              \begin{aligned}
+              \mathrm{NO^+} \\
+              \text{N: } & 5 \text{ valence electrons/atom} \times 1 \text{ atom} = 5 \\
+              \text{O: } & 6 \text{ valence electrons/atom} \times 1 \text{ atom} = 6 \\
+              + & \; -1 \text{ electron (positive charge)} = -1 \\
+              & = 10 \text{ valence electrons}
+              \end{aligned}
+            \]
+            <p class="equation-note">Equation 7.7</p>
+          </li>
+          <li>
+            Since \(\mathrm{OF_2}\) is a neutral molecule, we simply add the number of valence electrons:
+            \[
+              \begin{aligned}
+              \mathrm{OF_2} \\
+              \text{O: } & 6 \text{ valence electrons/atom} \times 1 \text{ atom} = 6 \\
+              + \text{ F: } & 7 \text{ valence electrons/atom} \times 2 \text{ atoms} = 14 \\
+              & = 20 \text{ valence electrons}
+              \end{aligned}
+            \]
+            <p class="equation-note">Equation 7.8</p>
+          </li>
+        </ul>
+      </li>
+
+      <li>
+        Draw a skeleton structure of the molecule or ion, arranging the atoms around a central atom and connecting each atom to the central atom with a single
+        (one electron pair) bond. (Note that we denote ions with brackets around the structure, indicating the charge outside the brackets.)
+        <figure>
+          <div class="diagram" role="img" aria-label="Four skeleton structures. SiH4: a central Si bonded to four H atoms, one above, one below, and one on each side. CHO2 minus: a central C bonded to H, to one O above, and to one O below-right, enclosed in brackets with a minus charge outside. NO plus: N bonded to O, enclosed in brackets with a plus charge outside. OF2: O in the center bonded to two F atoms.">
+            <p>SiH<sub>4</sub>: H&ndash;Si&ndash;H with H above and below Si</p>
+            <p>[H&ndash;C(&ndash;O)&ndash;O]<sup>&minus;</sup> skeleton with C central</p>
+            <p>[N&ndash;O]<sup>+</sup></p>
+            <p>F&ndash;O&ndash;F</p>
+          </div>
+          <figcaption>Skeleton structures of SiH<sub>4</sub>, CHO<sub>2</sub><sup>&minus;</sup>, NO<sup>+</sup>, and OF<sub>2</sub>.</figcaption>
+        </figure>
+        <p>
+          When several arrangements of atoms are possible, as for \(\mathrm{CHO_2^-}\), we must use experimental evidence to choose the correct one.
+          In general, the less electronegative elements are more likely to be central atoms. In \(\mathrm{CHO_2^-}\), the less electronegative carbon atom occupies
+          the central position with the oxygen and hydrogen atoms surrounding it. Other examples include P in \(\mathrm{POCl_3}\), S in \(\mathrm{SO_2}\), and Cl in
+          \(\mathrm{ClO_4^-}\). An exception is that hydrogen is almost never a central atom. As the most electronegative element, fluorine also cannot be a central atom.
+        </p>
+      </li>
+
+      <li>
+        Distribute the remaining electrons as lone pairs on the terminal atoms (except hydrogen) to complete their valence shells with an octet of electrons.
+        <ul>
+          <li>There are no remaining electrons on \(\mathrm{SiH_4}\), so it is unchanged.</li>
+        </ul>
+        <figure>
+          <div class="diagram" role="img" aria-label="Four structures with electrons placed. SiH4 is unchanged. The CHO2 minus structure has three lone pairs on the terminal oxygen atoms, one oxygen bonded to carbon above, and the other oxygen bonded to carbon at the right, all within brackets with a minus charge. The NO plus structure has lone pairs on N and O within brackets with a plus charge. The OF2 structure has three lone pairs on each F atom, with O in the center bonded to both F atoms.">
+            <p>SiH<sub>4</sub>: unchanged</p>
+            <p>[H&ndash;C&ndash;O with lone pairs on each O]<sup>&minus;</sup></p>
+            <p>[:N&ndash;O:]<sup>+</sup></p>
+            <p>:F&ndash;O&ndash;F: (three lone pairs on each F)</p>
+          </div>
+          <figcaption>Lewis structures after the terminal atoms receive their lone pairs.</figcaption>
+        </figure>
+      </li>
+
+      <li>
+        Place all remaining electrons on the central atom.
+        <ul>
+          <li>For \(\mathrm{SiH_4}\), \(\mathrm{CHO_2^-}\), and \(\mathrm{NO^+}\), there are no remaining electrons; we already placed all of the electrons determined in Step 1.</li>
+          <li>For \(\mathrm{OF_2}\), we had 16 electrons remaining in Step 3, and we placed 12, leaving 4 to be placed on the central atom.</li>
+        </ul>
+        <figure>
+          <div class="diagram" role="img" aria-label="The OF2 structure with two lone pairs on the central oxygen atom, bonded to two fluorine atoms that each have three lone pairs.">
+            <p>:F&ndash;O(:)&ndash;F: (two lone pairs on O; three lone pairs on each F)</p>
+          </div>
+          <figcaption>Lewis structure of OF<sub>2</sub> after placing the remaining electrons on the central atom.</figcaption>
+        </figure>
+      </li>
+
+      <li>
+        Rearrange the electrons of the outer atoms to make multiple bonds with the central atom in order to obtain octets wherever possible.
+        <ul>
+          <li>\(\mathrm{SiH_4}\): Si already has an octet, so nothing needs to be done.</li>
+          <li>
+            \(\mathrm{CHO_2^-}\): We have distributed the valence electrons as lone pairs on the oxygen atoms, but the carbon atom lacks an octet.
+            A lone pair on one oxygen atom is moved to form a carbon&ndash;oxygen double bond, giving the structure in which carbon has an octet.
+          </li>
+        </ul>
+        <figure>
+          <div class="diagram" role="img" aria-label="Two structures in brackets with a minus charge. Left: H bonded to C, C bonded to an O at top with lone pairs, and C bonded to a second O with lone pairs and a curved arrow showing a lone pair moving to form a double bond. Arrow labeled gives. Right: the same structure with a carbon-oxygen double bond, so carbon has an octet.">
+            <p>[H&ndash;C(&ndash;O:)&ndash;O:]<sup>&minus;</sup> &nbsp; gives &nbsp; [H&ndash;C(=O:)&ndash;O:]<sup>&minus;</sup></p>
+          </div>
+          <figcaption>Formation of a carbon&ndash;oxygen double bond in CHO<sub>2</sub><sup>&minus;</sup>.</figcaption>
+        </figure>
+      </li>
+    </ol>
+
+    <section aria-labelledby="no-plus-heading">
+      <h3 id="no-plus-heading">Examples of Steps 1 to 5</h3>
+      <ul>
+        <li>
+          \(\mathrm{NO^+}\): For this ion, we added eight valence electrons, but neither atom has an octet. We cannot add any more electrons since we have already used
+          the total that we found in Step 1, so we must move electrons to form a multiple bond:
+          <div class="diagram" role="img" aria-label="Structure of NO plus in brackets with a plus charge: N bonded to O with a single bond, with lone pairs on each atom. A curved arrow shows a lone pair on O moving to form a bond. Arrow labeled gives. Resulting structure: N double bonded to O, with one lone pair on N and one on O.">
+            <p>[:N&ndash;O:]<sup>+</sup> &nbsp; gives &nbsp; [:N=O:]<sup>+</sup></p>
+          </div>
+          This still does not produce an octet, so we must move another pair, forming a triple bond:
+          <div class="diagram" role="img" aria-label="Final Lewis structure of NO plus in brackets with a plus charge: N triple bonded to O, with one lone pair on each atom.">
+            <p>[:N&equiv;O:]<sup>+</sup></p>
+          </div>
+        </li>
+        <li>In \(\mathrm{OF_2}\), each atom has an octet as drawn, so nothing changes.</li>
+      </ul>
+    </section>
+  </section>
+
+  <section aria-labelledby="example-74-heading" class="box">
+    <h2 id="example-74-heading">Example 7.4: Writing Lewis Structures</h2>
+    <p>
+      NASA&rsquo;s Cassini-Huygens mission detected a large cloud of toxic hydrogen cyanide (HCN) on Titan, one of Saturn&rsquo;s moons.
+      Titan also contains ethane (\(\mathrm{H_3CCH_3}\)), acetylene (HCCH), and ammonia (\(\mathrm{NH_3}\)). What are the Lewis structures of these molecules?
+    </p>
+
+    <h3>Solution</h3>
+    <ol>
+      <li>
+        Step 1. Calculate the number of valence electrons.
+        \[
+          \begin{aligned}
+          \mathrm{HCN}: & \; (1 \times 1) + (4 \times 1) + (5 \times 1) = 10 \\
+          \mathrm{H_3CCH_3}: & \; (1 \times 3) + (2 \times 4) + (1 \times 3) = 14 \\
+          \mathrm{HCCH}: & \; (1 \times 1) + (2 \times 4) + (1 \times 1) = 10 \\
+          \mathrm{NH_3}: & \; (5 \times 1) + (3 \times 1) = 8
+          \end{aligned}
+        \]
+      </li>
+      <li>
+        Step 2. Draw a skeleton and connect the atoms with single bonds. Remember that H is never a central atom.
+        <div class="diagram" role="img" aria-label="Four skeleton structures connected with single bonds. HCN: H bonded to C, C bonded to N. Ethane: two central C atoms, each bonded to three H atoms. Acetylene: H bonded to C, C bonded to C, C bonded to H. Ammonia: central N bonded to three H atoms.">
+          <p>HCN: H&ndash;C&ndash;N</p>
+          <p>H<sub>3</sub>C&ndash;CH<sub>3</sub>: each C bonded to three H atoms and to the other C</p>
+          <p>HCCH: H&ndash;C&ndash;C&ndash;H</p>
+          <p>NH<sub>3</sub>: N bonded to three H atoms</p>
+        </div>
+      </li>
+      <li>
+        Step 3. Where needed, distribute electrons to the terminal atoms.
+        <ul>
+          <li>HCN: six electrons placed on N</li>
+          <li>H<sub>3</sub>CCH<sub>3</sub>: no electrons remain</li>
+          <li>HCCH: no terminal atoms capable of accepting electrons</li>
+          <li>NH<sub>3</sub>: no terminal atoms capable of accepting electrons</li>
+        </ul>
+      </li>
+      <li>
+        Step 4. Where needed, place remaining electrons on the central atom.
+        <ul>
+          <li>HCN: no electrons remain</li>
+          <li>H<sub>3</sub>CCH<sub>3</sub>: no electrons remain</li>
+          <li>HCCH: four electrons placed on carbon</li>
+          <li>NH<sub>3</sub>: two electrons placed on nitrogen</li>
+        </ul>
+      </li>
+      <li>
+        Step 5. Where needed, rearrange electrons to form multiple bonds in order to obtain an octet on each atom.
+        <ul>
+          <li>HCN: form two more C&ndash;N bonds, giving H&ndash;C&equiv;N:</li>
+          <li>H<sub>3</sub>CCH<sub>3</sub>: all atoms have the correct number of electrons</li>
+          <li>HCCH: form a triple bond between the two carbon atoms, giving H&ndash;C&equiv;C&ndash;H</li>
+          <li>NH<sub>3</sub>: all atoms have the correct number of electrons</li>
+        </ul>
+        <div class="diagram" role="img" aria-label="Final Lewis structures. HCN: H bonded to C, C triple bonded to N, with a lone pair on N. Ethane: H3C-CH3, each carbon with three H atoms and single bond between carbons. HCCH: H-C triple bond C-H. Ammonia: N with three H atoms and one lone pair.">
+          <p>HCN: H&ndash;C&equiv;N:</p>
+          <p>H<sub>3</sub>C&ndash;CH<sub>3</sub></p>
+          <p>HCCH: H&ndash;C&equiv;C&ndash;H</p>
+          <p>NH<sub>3</sub>: N with three H atoms and one lone pair</p>
+        </div>
+      </li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="check1-heading" class="box">
+    <h2 id="check1-heading">Check Your Learning</h2>
+    <p>
+      Both carbon monoxide, CO, and carbon dioxide, CO<sub>2</sub>, are products of the combustion of fossil fuels. Both of these gases also cause problems:
+      CO is toxic and CO<sub>2</sub> has been implicated in global climate change. What are the Lewis structures of these two molecules?
+    </p>
+    <h3>Answer</h3>
+    <div class="diagram" role="img" aria-label="Answer: carbon monoxide is drawn as :C&equiv;O: with a carbon-oxygen triple bond and a lone pair on each atom. Carbon dioxide is drawn as :O=C=O: with two carbon-oxygen double bonds and two lone pairs on each oxygen atom.">
+      <p>Carbon monoxide: :C&equiv;O:</p>
+      <p>Carbon dioxide: :O=C=O:</p>
+    </div>
+  </section>
+
+  <section aria-labelledby="interconnect-heading" class="box">
+    <h2 id="interconnect-heading">How Sciences Interconnect: Fullerene Chemistry</h2>
+    <p>
+      Carbon soot has been known to man since prehistoric times, but it was not until fairly recently that the molecular structure of the main component of soot
+      was discovered. In 1996, the Nobel Prize in Chemistry was awarded to Richard Smalley (Figure 7.11), Robert Curl, and Harold Kroto for their work in
+      discovering a new form of carbon, the C<sub>60</sub> buckminsterfullerene molecule (Figure 7.1). An entire class of compounds, including spheres and tubes
+      of various shapes, were discovered based on C<sub>60</sub>. This type of molecule, called a fullerene, shows promise in a variety of applications.
+      Because of their size and shape, fullerenes can encapsulate other molecules, so they have shown potential in various applications from hydrogen storage
+      to targeted drug delivery systems. They also possess unique electronic and optical properties that have been put to good use in solar powered devices
+      and chemical sensors.
+    </p>
+    <figure>
+      <img src="richard-smalley.jpg" width="400" height="400"
+           alt="Photograph of Richard Smalley, a bald man with a white beard wearing a tweed jacket and blue shirt, speaking at a podium with a laptop in front of him.">
+      <figcaption>
+        Figure 7.11 Richard Smalley (1943&ndash;2005), a professor of physics, chemistry, and astronomy at Rice University, was one of the leading advocates
+        for fullerene chemistry. Upon his death in 2005, the US Senate honored him as the &ldquo;Father of Nanotechnology.&rdquo;
+        (credit: United States Department of Energy)
+      </figcaption>
+    </figure>
+  </section>
+
+  <section aria-labelledby="exceptions-heading">
+    <h2 id="exceptions-heading">Exceptions to the Octet Rule</h2>
+    <p>
+      Many covalent molecules have central atoms that do not have eight electrons in their Lewis structures. These molecules fall into three categories:
+    </p>
+    <ul>
+      <li>Odd-electron molecules have an odd number of valence electrons, and therefore have an unpaired electron.</li>
+      <li>Electron-deficient molecules have a central atom that has fewer electrons than needed for a noble gas configuration.</li>
+      <li>Hypervalent molecules have a central atom that has more electrons than needed for a noble gas configuration.</li>
+    </ul>
+
+    <section aria-labelledby="odd-electron-heading">
+      <h3 id="odd-electron-heading">Odd-electron Molecules</h3>
+      <p>
+        We call molecules that contain an odd number of electrons free radicals. Nitric oxide, NO, is an example of an odd-electron molecule; it is produced
+        in internal combustion engines when oxygen and nitrogen react at high temperatures.
+      </p>
+      <p>
+        To draw the Lewis structure for an odd-electron molecule like NO, we follow the same five steps we would for other molecules, but with a few minor changes:
+      </p>
+      <ol>
+        <li>
+          Determine the total number of valence (outer shell) electrons. The sum of the valence electrons is 5 (from N) + 6 (from O) = 11.
+          The odd number immediately tells us that we have a free radical, so we know that not every atom can have eight electrons in its valence shell.
+        </li>
+        <li>Draw a skeleton structure of the molecule. We can easily draw a skeleton with an N&ndash;O single bond: N&ndash;O</li>
+        <li>
+          Distribute the remaining electrons as lone pairs on the terminal atoms. In this case, there is no central atom, so we distribute the electrons around
+          both atoms. We give eight electrons to the more electronegative atom in these situations; thus oxygen has the filled valence shell:
+          <div class="diagram" role="img" aria-label="Structure of NO with one bond between N and O. N has five electrons: one lone pair and one unpaired electron. O has a filled octet of eight electrons: two lone pairs.">
+            <p>:N&ndash;O:</p>
+          </div>
+        </li>
+        <li>Place all remaining electrons on the central atom. Since there are no remaining electrons, this step does not apply.</li>
+        <li>
+          Rearrange the electrons to make multiple bonds with the central atom in order to obtain octets wherever possible. We know that an odd-electron molecule
+          cannot have an octet for every atom, but we want to get each atom as close to an octet as possible. In this case, nitrogen has only five electrons
+          around it. To move closer to an octet for nitrogen, we take one of the lone pairs from oxygen and use it to form a N=O double bond. (We cannot take
+          another lone pair of electrons on oxygen and form a triple bond because nitrogen would then have nine electrons.)
+          <div class="diagram" role="img" aria-label="Final Lewis structure of NO: N double bonded to O, with one lone pair on N, one unpaired electron on N, and two lone pairs on O.">
+            <p>:N=O:</p>
+          </div>
+        </li>
+      </ol>
+    </section>
+
+    <section aria-labelledby="electron-deficient-heading">
+      <h3 id="electron-deficient-heading">Electron-deficient Molecules</h3>
+      <p>
+        We will also encounter a few molecules that contain central atoms that do not have a filled valence shell. Generally, these are molecules with central
+        atoms from groups 2 and 13, outer atoms that are hydrogen, or other atoms that do not form multiple bonds. For example, in the Lewis structures of
+        beryllium dihydride, \(\mathrm{BeH_2}\), and boron trifluoride, \(\mathrm{BF_3}\), the beryllium and boron atoms each have only four and six electrons,
+        respectively. It is possible to draw a structure with a double bond between a boron atom and a fluorine atom in \(\mathrm{BF_3}\), satisfying the octet rule,
+        but experimental evidence indicates the bond lengths are closer to that expected for B&ndash;F single bonds. This suggests the best Lewis structure has
+        three B&ndash;F single bonds and an electron deficient boron. The reactivity of the compound is also consistent with an electron deficient boron.
+        However, the B&ndash;F bonds are slightly shorter than what is actually expected for B&ndash;F single bonds, indicating that some double bond character
+        is found in the actual molecule.
+      </p>
+      <figure>
+        <div class="diagram" role="img" aria-label="Left: beryllium dihydride, H-Be-H, with single bonds and no lone pairs on Be. Right: boron trifluoride, with a central boron atom bonded to three fluorine atoms by single bonds, each fluorine with three lone pairs, and boron with only six electrons.">
+          <p>BeH<sub>2</sub>: H&ndash;Be&ndash;H</p>
+          <p>BF<sub>3</sub>: F&ndash;B(F)&ndash;F with three lone pairs on each F, and B bearing only six electrons</p>
+        </div>
+        <figcaption>Lewis structures of beryllium dihydride and boron trifluoride, both electron-deficient at the central atom.</figcaption>
+      </figure>
+      <p>
+        An atom like the boron atom in \(\mathrm{BF_3}\), which does not have eight electrons, is very reactive. It readily combines with a molecule containing
+        an atom with a lone pair of electrons. For example, \(\mathrm{NH_3}\) reacts with \(\mathrm{BF_3}\) because the lone pair on nitrogen can be shared with the boron atom:
+      </p>
+      <figure>
+        <div class="diagram" role="img" aria-label="Reaction: BF3 plus NH3 gives an adduct in which the nitrogen lone pair forms a bond to boron. Boron is bonded to three F atoms and to N. N is bonded to three H atoms. The new N-B bond is highlighted in red in the original figure.">
+          <p>BF<sub>3</sub> + :NH<sub>3</sub> &rarr; F<sub>3</sub>B&larr;:NH<sub>3</sub> (new N&ndash;B bond formed from the lone pair on N)</p>
+        </div>
+        <figcaption>Reaction of BF<sub>3</sub> with NH<sub>3</sub>, in which the lone pair on nitrogen forms a bond to boron.</figcaption>
+      </figure>
+    </section>
+
+    <section aria-labelledby="hypervalent-heading">
+      <h3 id="hypervalent-heading">Hypervalent Molecules</h3>
+      <p>
+        Elements in the second period of the periodic table (<var>n</var> = 2) can accommodate only eight electrons in their valence shell orbitals because they
+        have only four valence orbitals (one 2<var>s</var> and three 2<var>p</var> orbitals). Elements in the third and higher periods (<var>n</var> &ge; 3) have
+        more than four valence orbitals and can share more than four pairs of electrons with other atoms because they have empty <var>d</var> orbitals in the
+        same shell. Molecules formed from these elements are sometimes called hypervalent molecules. Figure 7.12 shows the Lewis structures for two hypervalent
+        molecules, \(\mathrm{PCl_5}\) and \(\mathrm{SF_6}\).
+      </p>
+      <figure>
+        <div class="diagram" role="img" aria-label="Left: phosphorus pentachloride, PCl5. The central phosphorus atom is bonded to five chlorine atoms, which is five shared pairs. Right: sulfur hexafluoride, SF6. The central sulfur atom is bonded to six fluorine atoms, which is six shared pairs.">
+          <p>PCl<sub>5</sub>: central P shares five pairs of electrons with five Cl atoms</p>
+          <p>SF<sub>6</sub>: central S shares six pairs of electrons with six F atoms</p>
+        </div>
+        <figcaption>Figure 7.12: In PCl<sub>5</sub>, the central atom phosphorus shares five pairs of electrons. In SF<sub>6</sub>, sulfur shares six pairs of electrons.</figcaption>
+      </figure>
+      <p>In some hypervalent molecules, such as \(\mathrm{IF_5}\) and \(\mathrm{XeF_4}\), some of the electrons in the outer shell of the central atom are lone pairs:</p>
+      <figure>
+        <div class="diagram" role="img" aria-label="Left: iodine pentafluoride, IF5. The central iodine atom is bonded to five fluorine atoms and has one lone pair. Right: xenon tetrafluoride, XeF4. The central xenon atom is bonded to four fluorine atoms and has two lone pairs.">
+          <p>IF<sub>5</sub>: central I bonded to five F atoms, with one lone pair on I</p>
+          <p>XeF<sub>4</sub>: central Xe bonded to four F atoms, with two lone pairs on Xe</p>
+        </div>
+      </figure>
+      <p>
+        When we write the Lewis structures for these molecules, we find that we have electrons left over after filling the valence shells of the outer atoms with
+        eight electrons. These additional electrons must be assigned to the central atom.
+      </p>
+    </section>
+  </section>
+
+  <section aria-labelledby="example-75-heading" class="box">
+    <h2 id="example-75-heading">Example 7.5: Writing Lewis Structures: Octet Rule Violations</h2>
+    <p>
+      Xenon is a noble gas, but it forms a number of stable compounds. We examined \(\mathrm{XeF_4}\) earlier. What are the Lewis structures of \(\mathrm{XeF_2}\) and \(\mathrm{XeF_6}\)?
+    </p>
+
+    <h3>Solution</h3>
+    <p>
+      We can draw the Lewis structure of any covalent molecule by following the six steps discussed earlier. In this case, we can condense the last few steps,
+      since not all of them apply.
+    </p>
+    <ol>
+      <li>
+        Step 1. Calculate the number of valence electrons:
+        \[
+          \begin{aligned}
+          \mathrm{XeF_2}: & \; 8 + (2 \times 7) = 22 \\
+          \mathrm{XeF_6}: & \; 8 + (6 \times 7) = 50
+          \end{aligned}
+        \]
+      </li>
+      <li>
+        Step 2. Draw a skeleton joining the atoms by single bonds. Xenon will be the central atom because fluorine cannot be a central atom.
+        <div class="diagram" role="img" aria-label="Two skeleton structures. XeF2: F, Xe, F in a line with single bonds. XeF6: central Xe bonded to six F atoms, four in a square plane and two above and below.">
+          <p>XeF<sub>2</sub>: F&ndash;Xe&ndash;F</p>
+          <p>XeF<sub>6</sub>: Xe at center with six F atoms attached by single bonds</p>
+        </div>
+      </li>
+      <li>
+        Step 3. Distribute the remaining electrons.
+        <p>
+          XeF<sub>2</sub>: We place three lone pairs of electrons around each F atom, accounting for 12 electrons and giving each F atom 8 electrons. Thus,
+          six electrons (three lone pairs) remain. These lone pairs must be placed on the Xe atom. This is acceptable because Xe atoms have empty valence shell
+          <var>d</var> orbitals and can accommodate more than eight electrons. The Lewis structure of XeF<sub>2</sub> shows two bonding pairs and three lone
+          pairs of electrons around the Xe atom:
+        </p>
+        <div class="diagram" role="img" aria-label="Lewis structure of XeF2: F bonded to Xe bonded to F. Each F has three lone pairs. Xe has three lone pairs.">
+          <p>:F&ndash;Xe(:)(:)&ndash;F: (three lone pairs on each F; three lone pairs on Xe)</p>
+        </div>
+        <p>
+          XeF<sub>6</sub>: We place three lone pairs of electrons around each F atom, accounting for 36 electrons. Two electrons remain, and this lone pair is
+          placed on the Xe atom:
+        </p>
+        <div class="diagram" role="img" aria-label="Lewis structure of XeF6: central Xe with six F atoms attached by single bonds. Each F has three lone pairs. Xe has one lone pair.">
+          <p>XeF<sub>6</sub>: six F atoms bonded to Xe, each F with three lone pairs, and one lone pair on Xe</p>
+        </div>
+      </li>
+    </ol>
+
+    <h3>Check Your Learning</h3>
+    <p>
+      The halogens form a class of compounds called the interhalogens, in which halogen atoms covalently bond to each other. Write the Lewis structures for the
+      interhalogens \(\mathrm{BrCl_3}\) and \(\mathrm{ICl_4^-}\).
+    </p>
+    <h4>Answer</h4>
+    <div class="diagram" role="img" aria-label="Answer. Left: BrCl3, with a central Br atom bonded to three Cl atoms, each with three lone pairs, and Br with two lone pairs. Right: ICl4 minus, in brackets with a minus charge outside, with a central I atom bonded to four Cl atoms, each with three lone pairs, and I with two lone pairs.">
+      <p>BrCl<sub>3</sub>: central Br bonded to three Cl atoms, with two lone pairs on Br</p>
+      <p>[ICl<sub>4</sub>]<sup>&minus;</sup>: central I bonded to four Cl atoms, with two lone pairs on I</p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <p>
+    &ldquo;7.3 Lewis Symbols and Structures&rdquo; from Chemistry by Paul Flowers, William R. Robinson, PhD, Richard Langley, Klaus Theopold, OpenStax.
+  </p>
+  <p>
+    Licensed under Creative Commons Attribution License (CC BY 4.0).
+    <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a>
+  </p>
+  <p>
+    Original page:
+    <a href="https://openstax.org/books/chemistry/pages/7-3-lewis-symbols-and-structures">https://openstax.org/books/chemistry/pages/7-3-lewis-symbols-and-structures</a>
+  </p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</body>
+</html>

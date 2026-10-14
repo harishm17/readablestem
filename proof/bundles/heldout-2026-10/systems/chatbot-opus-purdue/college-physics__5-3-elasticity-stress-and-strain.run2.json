@@ -1,0 +1,135 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.658336,
+  "counted_input_tokens": 69289,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0068674,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0050034,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0040274,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0044713999999999995,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0030074,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0065314,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-005",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.005979399999999999,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-006",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0055274,
+      "factual_error": false,
+      "figure_id": "openstax/college-physics/5-3-elasticity-stress-and-strain/fig-007",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.041415,
+  "output": {
+    "file": "college-physics__5-3-elasticity-stress-and-strain.run2.html",
+    "format": "html"
+  },
+  "output_chars": 43518,
+  "pdf_pages": 14,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 140.6,
+  "section": "college-physics/5-3-elasticity-stress-and-strain",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 69289,
+    "output_tokens": 19059,
+    "reasoning_tokens": 2513
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

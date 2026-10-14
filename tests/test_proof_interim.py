@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import importlib.util
 import os
-import re
 from pathlib import Path
 
 import pytest
@@ -108,22 +107,32 @@ def test_no_bold_better_verdict_rests_on_the_bootstrap_alone():
             assert "higher by point estimate" in row and "is better" not in row
 
 
-def test_the_development_numbers_the_report_cites_are_in_proof_md():
-    text = (ROOT / "PROOF.md").read_text(encoding="utf-8")
+def test_the_development_numbers_the_report_cites_are_in_the_development_report():
+    text = (ROOT / "proof" / "PROOF-development-sample.md").read_text(encoding="utf-8")
     assert "| Heading flags: precision | 0.5556 |" in text
     assert "| Heading flags: recall | 0.7778 |" in text
     assert "precision 0.5556 and recall 0.7778" in REPORT.read_text(encoding="utf-8")
 
 
 def test_the_readme_numbers_are_the_reports_numbers():
+    """The numbers the README quotes from the held-out run are the ones in PROOF.md."""
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
-    report_text = REPORT.read_text(encoding="utf-8")
-    for needle in ("0.9613", "0.9104", "0.9228", "0.8297", "0.1738", "0.0073", "0.0088", "0.0186"):
-        assert needle in report_text, needle
-    for shown in ("0.961", "0.910", "0.923", "0.830", "0.174", "p = 0.0073, 0.0088 and 0.0186"):
+    proof = (ROOT / "PROOF.md").read_text(encoding="utf-8")
+    pairs = {
+        "0.504": "0.5037",  # a11y-stem, equations through the whole pipeline
+        "0.622": "0.6216",  # the Opus chatbot
+        "0.961": "0.9613",  # heading F1
+        "0.971": "0.9710",  # figure judge pass rate
+        "1.76 required decisions": "1.7624",
+        "p = 0.0073 and 0.0088": "0.0073",
+        "$36.21": None,
+    }
+    for shown, needle in pairs.items():
         assert shown in readme, shown
-    assert re.search(r"recall 0 of 28", readme) and "precision 0 of 29" in readme
-    assert "make heldout-gold" in readme
+        if needle is not None:
+            assert needle in proof, needle
+    assert "0.0088" in proof and "higher by point estimate" in proof
+    assert "make heldout-gold" in readme or "INTERIM-heldout-2026-10.md" in readme
 
 
 def test_the_report_is_what_the_committed_data_produce(report):

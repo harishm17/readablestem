@@ -1,0 +1,1089 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>5.4 Right Triangle Trigonometry | Precalculus (OpenStax)</title>
+
+<!-- MathJax configuration: TeX input, CommonHTML output, accessibility extensions -->
+<script>
+  window.MathJax = {
+    loader: {
+      load: ['[tex]/ams', 'a11y/semantic-enrich', 'a11y/explorer', 'a11y/assistive-mml']
+    },
+    tex: {
+      packages: {'[+]': ['ams']},
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']],
+      processEscapes: true,
+      tags: 'none'
+    },
+    options: {
+      enableMenu: true,
+      enableAssistiveMml: true,
+      enableEnrichment: true,
+      enableExplorer: true,
+      a11y: {
+        speech: true,
+        braille: true
+      },
+      menuOptions: {
+        settings: {
+          assistiveMml: true,
+          collapsible: false,
+          explorer: true
+        }
+      }
+    },
+    chtml: {
+      scale: 1,
+      displayAlign: 'center',
+      matchFontHeight: true
+    }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  :root {
+    --text: #1a1a1a;
+    --bg: #ffffff;
+    --accent: #0b4f8a;
+    --border: #595959;
+    --box-bg: #f7f9fc;
+    --focus: #b35900;
+  }
+  * { box-sizing: border-box; }
+  html { font-size: 100%; }
+  body {
+    margin: 0;
+    font-family: Georgia, "Times New Roman", serif;
+    font-size: 1.0625rem;
+    line-height: 1.6;
+    color: var(--text);
+    background: var(--bg);
+  }
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    padding: 0.5rem 1rem;
+    background: var(--accent);
+    color: #fff;
+    z-index: 100;
+  }
+  .skip-link:focus { left: 0.5rem; top: 0.5rem; }
+  a { color: var(--accent); text-decoration: underline; }
+  a:focus, [tabindex]:focus, button:focus {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  header, main, footer {
+    max-width: 52rem;
+    margin: 0 auto;
+    padding: 0 1.25rem;
+  }
+  h1, h2, h3, h4 {
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.3;
+    color: #111;
+  }
+  h1 { font-size: 2rem; margin-top: 1.5rem; }
+  h2 { font-size: 1.5rem; margin-top: 2.25rem; border-bottom: 2px solid var(--accent); padding-bottom: 0.25rem; }
+  h3 { font-size: 1.25rem; margin-top: 1.75rem; }
+  h4 { font-size: 1.1rem; margin-top: 1.25rem; }
+  .box {
+    border: 1px solid var(--border);
+    background: var(--box-bg);
+    padding: 0.75rem 1.25rem 1rem;
+    margin: 1.5rem 0;
+    border-radius: 4px;
+  }
+  .box > h3, .box > h4 { margin-top: 0.5rem; }
+  .solution {
+    border-top: 1px dashed var(--border);
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+  }
+  figure {
+    margin: 1.5rem 0;
+    text-align: center;
+  }
+  figure svg {
+    max-width: 100%;
+    height: auto;
+    background: #fff;
+  }
+  figcaption {
+    font-size: 0.95rem;
+    margin-top: 0.5rem;
+    text-align: left;
+  }
+  .fig-pair {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 1rem;
+  }
+  .mnemonic-letter {
+    font-weight: bold;
+    text-decoration: underline;
+  }
+  table {
+    border-collapse: collapse;
+    margin: 1rem 0;
+  }
+  caption {
+    text-align: left;
+    font-weight: bold;
+    padding-bottom: 0.4rem;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.9rem;
+    text-align: left;
+  }
+  th { background: #e8eef5; }
+  ol.exercises {
+    padding-left: 2.5rem;
+  }
+  ol.exercises > li {
+    margin: 1rem 0;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid #cccccc;
+    border-radius: 4px;
+  }
+  ol.exercises > li::marker {
+    font-weight: bold;
+  }
+  .attribution {
+    font-size: 0.95rem;
+    border-top: 2px solid var(--border);
+    margin-top: 3rem;
+    padding-top: 1rem;
+    padding-bottom: 2rem;
+  }
+  svg text {
+    font-family: Arial, Helvetica, sans-serif;
+    font-size: 16px;
+    fill: #000;
+  }
+  svg .var { font-style: italic; }
+  .mjx-chtml { outline: none; }
+  @media print {
+    .skip-link { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header>
+  <p><em>Precalculus</em> (OpenStax), Chapter 5: Trigonometric Functions</p>
+</header>
+
+<main id="main">
+
+<h1>5.4 Right Triangle Trigonometry</h1>
+
+<section aria-labelledby="objectives">
+  <h2 id="objectives">Learning Objectives</h2>
+  <p>In this section, you will:</p>
+  <ul>
+    <li>Use right triangles to evaluate trigonometric functions.</li>
+    <li>Find function values for \(30^\circ\left(\frac{\pi}{6}\right)\), \(45^\circ\left(\frac{\pi}{4}\right)\), and \(60^\circ\left(\frac{\pi}{3}\right)\).</li>
+    <li>Use cofunctions of complementary angles.</li>
+    <li>Use the definitions of trigonometric functions of any angle.</li>
+    <li>Use right triangle trigonometry to solve applied problems.</li>
+  </ul>
+
+  <p>We have previously defined the sine and cosine of an angle in terms of the coordinates of a point on the unit circle intersected by the terminal side of the angle:</p>
+  \[
+  \begin{aligned}
+  \cos t &= x\\
+  \sin t &= y
+  \end{aligned}
+  \]
+  <p>In this section, we will see another way to define trigonometric functions using properties of right triangles.</p>
+</section>
+
+<section aria-labelledby="using-right-triangles">
+  <h2 id="using-right-triangles">Using Right Triangles to Evaluate Trigonometric Functions</h2>
+  <p>In earlier sections, we used a unit circle to define the trigonometric functions. In this section, we will extend those definitions so that we can apply them to right triangles. The value of the sine or cosine function of \(t\) is its value at \(t\) radians. First, we need to create our right triangle. <a href="#fig1">Figure 1</a> shows a point on a unit circle of radius 1. If we drop a vertical line segment from the point \((x, y)\) to the \(x\)-axis, we have a right triangle whose vertical side has length \(y\) and whose horizontal side has length \(x\). We can use this right triangle to redefine sine, cosine, and the other trigonometric functions as ratios of the sides of a right triangle.</p>
+
+  <figure id="fig1">
+    <svg viewBox="0 0 280 260" width="280" height="260" role="img" aria-labelledby="fig1-title fig1-desc">
+      <title id="fig1-title">Right triangle inside the unit circle</title>
+      <desc id="fig1-desc">The first quadrant of a unit circle. A point labeled (x, y) lies on the circle. A segment of length 1 runs from the origin to the point, making angle t with the positive x-axis. A vertical segment of length y drops from the point to the x-axis, and the horizontal segment along the x-axis from the origin has length x, forming a right triangle with the right angle on the x-axis.</desc>
+      <line x1="40" y1="230" x2="260" y2="230" stroke="#000" stroke-width="1.5"/>
+      <line x1="40" y1="230" x2="40" y2="20" stroke="#000" stroke-width="1.5"/>
+      <path d="M40 50 A180 180 0 0 1 220 230" fill="none" stroke="#767676" stroke-width="1.5"/>
+      <polygon points="40,230 130,74 130,230" fill="none" stroke="#1a4f8b" stroke-width="3"/>
+      <rect x="118" y="218" width="12" height="12" fill="none" stroke="#1a4f8b" stroke-width="1.5"/>
+      <path d="M62 230 A22 22 0 0 0 51 211" fill="none" stroke="#000"/>
+      <circle cx="130" cy="74" r="5" fill="#000"/>
+      <text x="140" y="66">(<tspan class="var">x</tspan>, <tspan class="var">y</tspan>)</text>
+      <text x="72" y="150">1</text>
+      <text x="140" y="160" class="var">y</text>
+      <text x="82" y="252" class="var">x</text>
+      <text x="64" y="218" class="var">t</text>
+    </svg>
+    <figcaption>Figure 1</figcaption>
+  </figure>
+
+  <p>We know</p>
+  \[\cos t = \frac{x}{1} = x\]
+  <p>Likewise, we know</p>
+  \[\sin t = \frac{y}{1} = y\]
+
+  <p>These ratios still apply to the sides of a right triangle when no unit circle is involved and when the triangle is not in standard position and is not being graphed using \((x, y)\) coordinates. To be able to use these ratios freely, we will give the sides more general names: Instead of \(x\), we will call the side between the given angle and the right angle the <strong>adjacent side</strong> to angle \(t\). (Adjacent means &ldquo;next to.&rdquo;) Instead of \(y\), we will call the side most distant from the given angle the <strong>opposite side</strong> from angle \(t\). And instead of \(1\), we will call the side of a right triangle opposite the right angle the <strong>hypotenuse</strong>. These sides are labeled in <a href="#fig2">Figure 2</a>.</p>
+
+  <figure id="fig2">
+    <svg viewBox="0 0 380 200" width="380" height="200" role="img" aria-labelledby="fig2-title fig2-desc">
+      <title id="fig2-title">Sides of a right triangle relative to angle t</title>
+      <desc id="fig2-desc">A right triangle with acute angle t at the lower left and the right angle at the lower right. The horizontal side between angle t and the right angle is labeled adjacent. The vertical side across from angle t is labeled opposite. The slanted side across from the right angle is labeled hypotenuse.</desc>
+      <polygon points="30,160 300,160 300,40" fill="none" stroke="#000" stroke-width="2"/>
+      <rect x="288" y="148" width="12" height="12" fill="none" stroke="#000"/>
+      <path d="M70 160 A40 40 0 0 0 66.5 143.8" fill="none" stroke="#000"/>
+      <text x="150" y="85" text-anchor="middle">hypotenuse</text>
+      <text x="310" y="105">opposite</text>
+      <text x="165" y="185" text-anchor="middle">adjacent</text>
+      <text x="76" y="154" class="var">t</text>
+    </svg>
+    <figcaption>Figure 2: The sides of a right triangle in relation to angle \(t\).</figcaption>
+  </figure>
+
+  <div class="box" role="region" aria-labelledby="understanding">
+    <h3 id="understanding">Understanding Right Triangle Relationships</h3>
+    <p>Given a right triangle with an acute angle of \(t\),</p>
+    \[
+    \begin{aligned}
+    \sin(t) &= \frac{\text{opposite}}{\text{hypotenuse}}\\[4pt]
+    \cos(t) &= \frac{\text{adjacent}}{\text{hypotenuse}}\\[4pt]
+    \tan(t) &= \frac{\text{opposite}}{\text{adjacent}}
+    \end{aligned}
+    \]
+    <p>A common mnemonic for remembering these relationships is SohCahToa, formed from the first letters of &ldquo;<span class="mnemonic-letter">S</span>ine is <span class="mnemonic-letter">o</span>pposite over <span class="mnemonic-letter">h</span>ypotenuse, <span class="mnemonic-letter">C</span>osine is <span class="mnemonic-letter">a</span>djacent over <span class="mnemonic-letter">h</span>ypotenuse, <span class="mnemonic-letter">T</span>angent is <span class="mnemonic-letter">o</span>pposite over <span class="mnemonic-letter">a</span>djacent.&rdquo;</p>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="howto1">
+    <h3 id="howto1">How To</h3>
+    <p><strong>Given the side lengths of a right triangle and one of the acute angles, find the sine, cosine, and tangent of that angle.</strong></p>
+    <ol>
+      <li>Find the sine as the ratio of the opposite side to the hypotenuse.</li>
+      <li>Find the cosine as the ratio of the adjacent side to the hypotenuse.</li>
+      <li>Find the tangent as the ratio of the opposite side to the adjacent side.</li>
+    </ol>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="ex1">
+    <h3 id="ex1">Example 1: Evaluating a Trigonometric Function of a Right Triangle</h3>
+    <p>Given the triangle shown in <a href="#fig3">Figure 3</a>, find the value of \(\cos \alpha\).</p>
+    <figure id="fig3">
+      <svg viewBox="0 0 380 200" width="380" height="200" role="img" aria-labelledby="fig3-title fig3-desc">
+        <title id="fig3-title">Right triangle with sides 8, 15, and 17</title>
+        <desc id="fig3-desc">A right triangle with angle alpha at the lower left and the right angle at the lower right. The horizontal side adjacent to alpha has length 15, the vertical side opposite alpha has length 8, and the hypotenuse has length 17.</desc>
+        <polygon points="30,160 300,160 300,40" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="288" y="148" width="12" height="12" fill="none" stroke="#000"/>
+        <path d="M70 160 A40 40 0 0 0 66.5 143.8" fill="none" stroke="#000"/>
+        <text x="150" y="88" text-anchor="middle">17</text>
+        <text x="312" y="105">8</text>
+        <text x="165" y="185" text-anchor="middle">15</text>
+        <text x="76" y="154" class="var">α</text>
+      </svg>
+      <figcaption>Figure 3</figcaption>
+    </figure>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>The side adjacent to the angle is 15, and the hypotenuse of the triangle is 17, so:</p>
+      \[
+      \begin{aligned}
+      \cos(\alpha) &= \frac{\text{adjacent}}{\text{hypotenuse}}\\[4pt]
+      &= \frac{15}{17}
+      \end{aligned}
+      \]
+    </div>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="try1">
+    <h3 id="try1">Try It #1</h3>
+    <p>Given the triangle shown in <a href="#fig4">Figure 4</a>, find the value of \(\sin t\).</p>
+    <figure id="fig4">
+      <svg viewBox="0 0 380 200" width="380" height="200" role="img" aria-labelledby="fig4-title fig4-desc">
+        <title id="fig4-title">Right triangle with sides 7, 24, and 25</title>
+        <desc id="fig4-desc">A right triangle with the right angle at the lower left and angle t at the lower right. The vertical side on the left, opposite angle t, has length 7. The horizontal side, adjacent to angle t, has length 24. The hypotenuse has length 25.</desc>
+        <polygon points="40,40 40,160 340,160" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="40" y="148" width="12" height="12" fill="none" stroke="#000"/>
+        <path d="M305 160 A35 35 0 0 1 307.4 147" fill="none" stroke="#000"/>
+        <text x="28" y="105" text-anchor="end">7</text>
+        <text x="190" y="185" text-anchor="middle">24</text>
+        <text x="200" y="88" text-anchor="middle">25</text>
+        <text x="290" y="154" class="var">t</text>
+      </svg>
+      <figcaption>Figure 4</figcaption>
+    </figure>
+  </div>
+
+  <h3 id="relating">Relating Angles and Their Functions</h3>
+  <p>When working with right triangles, the same rules apply regardless of the orientation of the triangle. In fact, we can evaluate the six trigonometric functions of either of the two acute angles in the triangle in <a href="#fig5">Figure 5</a>. The side opposite one acute angle is the side adjacent to the other acute angle, and vice versa.</p>
+
+  <figure id="fig5">
+    <svg viewBox="0 0 440 260" width="440" height="260" role="img" aria-labelledby="fig5-title fig5-desc">
+      <title id="fig5-title">Opposite and adjacent sides for both acute angles</title>
+      <desc id="fig5-desc">A tilted right triangle with acute angles alpha (bottom) and beta (right) and the right angle at the top. The short side from alpha to the right angle is labeled "Adjacent to alpha, Opposite beta." The side from the right angle to beta is labeled "Adjacent to beta, Opposite alpha." The side from alpha to beta is labeled Hypotenuse.</desc>
+      <polygon points="80,230 120,50 360,140" fill="none" stroke="#000" stroke-width="2"/>
+      <polyline points="117,63.7 130.1,68.6 133.1,54.9" fill="none" stroke="#000"/>
+      <text x="92" y="135" text-anchor="end">Adjacent to α</text>
+      <text x="92" y="155" text-anchor="end">Opposite β</text>
+      <text x="200" y="45">Adjacent to β</text>
+      <text x="200" y="65">Opposite α</text>
+      <text x="240" y="218">Hypotenuse</text>
+      <text x="97" y="212" class="var">α</text>
+      <text x="328" y="143" class="var">β</text>
+    </svg>
+    <figcaption>Figure 5: The side adjacent to one angle is opposite the other.</figcaption>
+  </figure>
+
+  <p>We will be asked to find all six trigonometric functions for a given angle in a triangle. Our strategy is to find the sine, cosine, and tangent of the angles first. Then, we can find the other trigonometric functions easily because we know that the reciprocal of sine is cosecant, the reciprocal of cosine is secant, and the reciprocal of tangent is cotangent.</p>
+
+  <div class="box" role="region" aria-labelledby="howto2">
+    <h3 id="howto2">How To</h3>
+    <p><strong>Given the side lengths of a right triangle, evaluate the six trigonometric functions of one of the acute angles.</strong></p>
+    <ol>
+      <li>If needed, draw the right triangle and label the angle provided.</li>
+      <li>Identify the angle, the adjacent side, the side opposite the angle, and the hypotenuse of the right triangle.</li>
+      <li>Find the required function:
+        <ul>
+          <li>sine as the ratio of the opposite side to the hypotenuse</li>
+          <li>cosine as the ratio of the adjacent side to the hypotenuse</li>
+          <li>tangent as the ratio of the opposite side to the adjacent side</li>
+          <li>secant as the ratio of the hypotenuse to the adjacent side</li>
+          <li>cosecant as the ratio of the hypotenuse to the opposite side</li>
+          <li>cotangent as the ratio of the adjacent side to the opposite side</li>
+        </ul>
+      </li>
+    </ol>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="ex2">
+    <h3 id="ex2">Example 2: Evaluating Trigonometric Functions of Angles Not in Standard Position</h3>
+    <p>Using the triangle shown in <a href="#fig6">Figure 6</a>, evaluate \(\sin \alpha\), \(\cos \alpha\), \(\tan \alpha\), \(\sec \alpha\), \(\csc \alpha\), and \(\cot \alpha\).</p>
+    <figure id="fig6">
+      <svg viewBox="0 0 420 260" width="420" height="260" role="img" aria-labelledby="fig6-title fig6-desc">
+        <title id="fig6-title">Tilted right triangle with sides 3, 4, and 5</title>
+        <desc id="fig6-desc">A tilted right triangle with angle alpha at the bottom vertex and the right angle at the top. The side from alpha to the right angle, adjacent to alpha, has length 3. The side from the right angle to the third vertex, opposite alpha, has length 4. The hypotenuse has length 5.</desc>
+        <polygon points="80,230 120,50 360,140" fill="none" stroke="#000" stroke-width="2"/>
+        <polyline points="117,63.7 130.1,68.6 133.1,54.9" fill="none" stroke="#000"/>
+        <text x="90" y="145" text-anchor="end">3</text>
+        <text x="245" y="82">4</text>
+        <text x="225" y="210">5</text>
+        <text x="97" y="212" class="var">α</text>
+      </svg>
+      <figcaption>Figure 6</figcaption>
+    </figure>
+    <div class="solution">
+      <h4>Solution</h4>
+      \[
+      \begin{aligned}
+      \sin \alpha &= \frac{\text{opposite } \alpha}{\text{hypotenuse}} = \frac{4}{5}\\[4pt]
+      \cos \alpha &= \frac{\text{adjacent to } \alpha}{\text{hypotenuse}} = \frac{3}{5}\\[4pt]
+      \tan \alpha &= \frac{\text{opposite } \alpha}{\text{adjacent to } \alpha} = \frac{4}{3}\\[4pt]
+      \sec \alpha &= \frac{\text{hypotenuse}}{\text{adjacent to } \alpha} = \frac{5}{3}\\[4pt]
+      \csc \alpha &= \frac{\text{hypotenuse}}{\text{opposite } \alpha} = \frac{5}{4}\\[4pt]
+      \cot \alpha &= \frac{\text{adjacent to } \alpha}{\text{opposite } \alpha} = \frac{3}{4}
+      \end{aligned}
+      \]
+    </div>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="try2">
+    <h3 id="try2">Try It #2</h3>
+    <p>Using the triangle shown in <a href="#fig7">Figure 7</a>, evaluate \(\sin t\), \(\cos t\), \(\tan t\), \(\sec t\), \(\csc t\), and \(\cot t\).</p>
+    <figure id="fig7">
+      <svg viewBox="0 0 380 230" width="380" height="230" role="img" aria-labelledby="fig7-title fig7-desc">
+        <title id="fig7-title">Right triangle with sides 33, 56, and 65</title>
+        <desc id="fig7-desc">A right triangle with angle t at the upper left and the right angle at the upper right. The horizontal top side, adjacent to t, has length 56. The vertical side on the right, opposite t, has length 33. The hypotenuse has length 65.</desc>
+        <polygon points="40,40 320,40 320,200" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="308" y="40" width="12" height="12" fill="none" stroke="#000"/>
+        <path d="M75 40 A35 35 0 0 1 70.4 57.4" fill="none" stroke="#000"/>
+        <text x="180" y="30" text-anchor="middle">56</text>
+        <text x="330" y="125">33</text>
+        <text x="160" y="142" text-anchor="middle">65</text>
+        <text x="82" y="60" class="var">t</text>
+      </svg>
+      <figcaption>Figure 7</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section aria-labelledby="special-angles">
+  <h2 id="special-angles">Finding Trigonometric Functions of Special Angles Using Side Lengths</h2>
+  <p>We have already discussed the trigonometric functions as they relate to the special angles on the unit circle. Now, we can use those relationships to evaluate triangles that contain those special angles. We do this because when we evaluate the special angles in trigonometric functions, they have relatively friendly values, values that contain either no or just one square root in the ratio. Therefore, these are the angles often used in math and science problems. We will use multiples of \(30^\circ\), \(60^\circ\), and \(45^\circ\), however, remember that when dealing with right triangles, we are limited to angles between \(0^\circ \text{ and } 90^\circ\).</p>
+
+  <p>Suppose we have a \(30^\circ, 60^\circ, 90^\circ\) triangle, which can also be described as a \(\frac{\pi}{6}, \frac{\pi}{3}, \frac{\pi}{2}\) triangle. The sides have lengths in the relation \(s, \sqrt{3}s, 2s\). The sides of a \(45^\circ, 45^\circ, 90^\circ\) triangle, which can also be described as a \(\frac{\pi}{4}, \frac{\pi}{4}, \frac{\pi}{2}\) triangle, have lengths in the relation \(s, s, \sqrt{2}s\). These relations are shown in <a href="#fig8">Figure 8</a>.</p>
+
+  <figure id="fig8">
+    <div class="fig-pair">
+      <svg viewBox="0 0 260 260" width="260" height="260" role="img" aria-labelledby="fig8a-title fig8a-desc">
+        <title id="fig8a-title">30-60-90 triangle in a circle</title>
+        <desc id="fig8a-desc">A circle centered at the origin of a coordinate plane. A right triangle has one vertex at the origin with angle pi over 3, the right angle on the positive x-axis, and the third vertex on the circle with angle pi over 6. The horizontal leg has length s, the vertical leg has length square root of 3 times s, and the hypotenuse has length 2s.</desc>
+        <circle cx="130" cy="130" r="110" fill="none" stroke="#767676"/>
+        <line x1="10" y1="130" x2="250" y2="130" stroke="#000"/>
+        <line x1="130" y1="10" x2="130" y2="250" stroke="#000"/>
+        <polygon points="130,130 185,130 185,35" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="173" y="118" width="12" height="12" fill="none" stroke="#000"/>
+        <text x="148" y="78" text-anchor="end" class="var">2s</text>
+        <text x="192" y="88">√3<tspan class="var">s</tspan></text>
+        <text x="157" y="150" text-anchor="middle" class="var">s</text>
+        <text x="138" y="124" font-size="13">π/3</text>
+        <text x="182" y="62" text-anchor="end" font-size="13">π/6</text>
+      </svg>
+      <svg viewBox="0 0 260 260" width="260" height="260" role="img" aria-labelledby="fig8b-title fig8b-desc">
+        <title id="fig8b-title">45-45-90 triangle in a circle</title>
+        <desc id="fig8b-desc">A circle centered at the origin of a coordinate plane. A right triangle has one vertex at the origin with angle pi over 4, the right angle on the positive x-axis, and the third vertex on the circle with angle pi over 4. Both legs have length s and the hypotenuse has length square root of 2 times s.</desc>
+        <circle cx="130" cy="130" r="110" fill="none" stroke="#767676"/>
+        <line x1="10" y1="130" x2="250" y2="130" stroke="#000"/>
+        <line x1="130" y1="10" x2="130" y2="250" stroke="#000"/>
+        <polygon points="130,130 208,130 208,52" fill="none" stroke="#000" stroke-width="2"/>
+        <rect x="196" y="118" width="12" height="12" fill="none" stroke="#000"/>
+        <text x="163" y="83" text-anchor="end">√2<tspan class="var">s</tspan></text>
+        <text x="215" y="96" class="var">s</text>
+        <text x="169" y="150" text-anchor="middle" class="var">s</text>
+        <text x="146" y="124" font-size="13">π/4</text>
+        <text x="204" y="78" text-anchor="end" font-size="13">π/4</text>
+      </svg>
+    </div>
+    <figcaption>Figure 8: Side lengths of special triangles</figcaption>
+  </figure>
+
+  <p>We can then use the ratios of the side lengths to evaluate trigonometric functions of special angles.</p>
+
+  <div class="box" role="region" aria-labelledby="howto3">
+    <h3 id="howto3">How To</h3>
+    <p><strong>Given trigonometric functions of a special angle, evaluate using side lengths.</strong></p>
+    <ol>
+      <li>Use the side lengths shown in <a href="#fig8">Figure 8</a> for the special angle you wish to evaluate.</li>
+      <li>Use the ratio of side lengths appropriate to the function you wish to evaluate.</li>
+    </ol>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="ex3">
+    <h3 id="ex3">Example 3: Evaluating Trigonometric Functions of Special Angles Using Side Lengths</h3>
+    <p>Find the exact value of the trigonometric functions of \(\frac{\pi}{3}\), using side lengths.</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      \[
+      \begin{aligned}
+      \sin\left(\frac{\pi}{3}\right) &= \frac{\text{opp}}{\text{hyp}} = \frac{\sqrt{3}s}{2s} = \frac{\sqrt{3}}{2}\\[4pt]
+      \cos\left(\frac{\pi}{3}\right) &= \frac{\text{adj}}{\text{hyp}} = \frac{s}{2s} = \frac{1}{2}\\[4pt]
+      \tan\left(\frac{\pi}{3}\right) &= \frac{\text{opp}}{\text{adj}} = \frac{\sqrt{3}s}{s} = \sqrt{3}\\[4pt]
+      \sec\left(\frac{\pi}{3}\right) &= \frac{\text{hyp}}{\text{adj}} = \frac{2s}{s} = 2\\[4pt]
+      \csc\left(\frac{\pi}{3}\right) &= \frac{\text{hyp}}{\text{opp}} = \frac{2s}{\sqrt{3}s} = \frac{2}{\sqrt{3}} = \frac{2\sqrt{3}}{3}\\[4pt]
+      \cot\left(\frac{\pi}{3}\right) &= \frac{\text{adj}}{\text{opp}} = \frac{s}{\sqrt{3}s} = \frac{1}{\sqrt{3}} = \frac{\sqrt{3}}{3}
+      \end{aligned}
+      \]
+    </div>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="try3">
+    <h3 id="try3">Try It #3</h3>
+    <p>Find the exact value of the trigonometric functions of \(\frac{\pi}{4}\), using side lengths.</p>
+  </div>
+</section>
+
+<section aria-labelledby="cofunction">
+  <h2 id="cofunction">Using Equal Cofunction of Complements</h2>
+  <p>If we look more closely at the relationship between the sine and cosine of the special angles relative to the unit circle, we will notice a pattern. In a right triangle with angles of \(\frac{\pi}{6}\) and \(\frac{\pi}{3}\), we see that the sine of \(\frac{\pi}{3}\), namely \(\frac{\sqrt{3}}{2}\), is also the cosine of \(\frac{\pi}{6}\), while the sine of \(\frac{\pi}{6}\), namely \(\frac{1}{2}\), is also the cosine of \(\frac{\pi}{3}\).</p>
+  \[
+  \begin{aligned}
+  \sin\frac{\pi}{3} &= \cos\frac{\pi}{6} = \frac{\sqrt{3}s}{2s} = \frac{\sqrt{3}}{2}\\[4pt]
+  \sin\frac{\pi}{6} &= \cos\frac{\pi}{3} = \frac{s}{2s} = \frac{1}{2}
+  \end{aligned}
+  \]
+  <p>See <a href="#fig9">Figure 9</a>.</p>
+
+  <figure id="fig9">
+    <svg viewBox="0 0 260 260" width="300" height="300" role="img" aria-labelledby="fig9-title fig9-desc">
+      <title id="fig9-title">30-60-90 triangle showing sine of pi over 3 equals cosine of pi over 6</title>
+      <desc id="fig9-desc">A circle centered at the origin with a right triangle. The angle at the origin is pi over 3, and the angle at the top vertex on the circle is pi over 6. The horizontal leg has length s, the vertical leg has length square root of 3 times s, and the hypotenuse has length 2s. The vertical leg is opposite the pi over 3 angle and adjacent to the pi over 6 angle.</desc>
+      <circle cx="130" cy="130" r="110" fill="none" stroke="#767676"/>
+      <line x1="10" y1="130" x2="250" y2="130" stroke="#000"/>
+      <line x1="130" y1="10" x2="130" y2="250" stroke="#000"/>
+      <polygon points="130,130 185,130 185,35" fill="none" stroke="#000" stroke-width="2"/>
+      <rect x="173" y="118" width="12" height="12" fill="none" stroke="#000"/>
+      <text x="148" y="78" text-anchor="end" class="var">2s</text>
+      <text x="192" y="88">√3<tspan class="var">s</tspan></text>
+      <text x="157" y="150" text-anchor="middle" class="var">s</text>
+      <text x="138" y="124" font-size="13">π/3</text>
+      <text x="182" y="62" text-anchor="end" font-size="13">π/6</text>
+    </svg>
+    <figcaption>Figure 9: The sine of \(\frac{\pi}{3}\) equals the cosine of \(\frac{\pi}{6}\) and vice versa.</figcaption>
+  </figure>
+
+  <p>This result should not be surprising because, as we see from <a href="#fig9">Figure 9</a>, the side opposite the angle of \(\frac{\pi}{3}\) is also the side adjacent to \(\frac{\pi}{6}\), so \(\sin\left(\frac{\pi}{3}\right)\) and \(\cos\left(\frac{\pi}{6}\right)\) are exactly the same ratio of the same two sides, \(\sqrt{3}s\) and \(2s\). Similarly, \(\cos\left(\frac{\pi}{3}\right)\) and \(\sin\left(\frac{\pi}{6}\right)\) are also the same ratio using the same two sides, \(s\) and \(2s\).</p>
+
+  <p>The interrelationship between the sines and cosines of \(\frac{\pi}{6}\) and \(\frac{\pi}{3}\) also holds for the two acute angles in any right triangle, since in every case, the ratio of the same two sides would constitute the sine of one angle and the cosine of the other. Since the three angles of a triangle add to \(\pi\), and the right angle is \(\frac{\pi}{2}\), the remaining two angles must also add up to \(\frac{\pi}{2}\). That means that a right triangle can be formed with any two angles that add to \(\frac{\pi}{2}\)&mdash;in other words, any two complementary angles. So we may state a <em>cofunction identity</em>: If any two angles are complementary, the sine of one is the cosine of the other, and vice versa. This identity is illustrated in <a href="#fig10">Figure 10</a>.</p>
+
+  <figure id="fig10">
+    <svg viewBox="0 0 300 260" width="300" height="260" role="img" aria-labelledby="fig10-title fig10-desc">
+      <title id="fig10-title">Complementary angles alpha and beta in a right triangle</title>
+      <desc id="fig10-desc">A right triangle with angle alpha at the lower left, the right angle at the lower right, and angle beta at the top.</desc>
+      <polygon points="30,230 250,230 250,20" fill="none" stroke="#000" stroke-width="2"/>
+      <rect x="238" y="218" width="12" height="12" fill="none" stroke="#000"/>
+      <path d="M70 230 A40 40 0 0 0 58.9 202.4" fill="none" stroke="#000"/>
+      <path d="M250 60 A40 40 0 0 1 222.4 48.9" fill="none" stroke="#000"/>
+      <text x="74" y="222" class="var">α</text>
+      <text x="232" y="78" class="var">β</text>
+    </svg>
+    <p>\(\sin\alpha = \cos\beta\)<br>\(\sin\beta = \cos\alpha\)</p>
+    <figcaption>Figure 10: Cofunction identity of sine and cosine of complementary angles</figcaption>
+  </figure>
+
+  <p>Using this identity, we can state without calculating, for instance, that the sine of \(\frac{\pi}{12}\) equals the cosine of \(\frac{5\pi}{12}\), and that the sine of \(\frac{5\pi}{12}\) equals the cosine of \(\frac{\pi}{12}\). We can also state that if, for a certain angle \(t\), \(\cos t = \frac{5}{13}\), then \(\sin\left(\frac{\pi}{2} - t\right) = \frac{5}{13}\) as well.</p>
+
+  <div class="box" role="region" aria-labelledby="cofunction-identities">
+    <h3 id="cofunction-identities">Cofunction Identities</h3>
+    <p>The cofunction identities in radians are listed in <a href="#table1">Table 1</a>.</p>
+    <table id="table1">
+      <caption>Table 1: Cofunction identities</caption>
+      <thead>
+        <tr>
+          <th scope="col">Cosine, tangent, secant</th>
+          <th scope="col">Sine, cotangent, cosecant</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>\(\cos t = \sin\left(\frac{\pi}{2} - t\right)\)</td>
+          <td>\(\sin t = \cos\left(\frac{\pi}{2} - t\right)\)</td>
+        </tr>
+        <tr>
+          <td>\(\tan t = \cot\left(\frac{\pi}{2} - t\right)\)</td>
+          <td>\(\cot t = \tan\left(\frac{\pi}{2} - t\right)\)</td>
+        </tr>
+        <tr>
+          <td>\(\sec t = \csc\left(\frac{\pi}{2} - t\right)\)</td>
+          <td>\(\csc t = \sec\left(\frac{\pi}{2} - t\right)\)</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="howto4">
+    <h3 id="howto4">How To</h3>
+    <p><strong>Given the sine and cosine of an angle, find the sine or cosine of its complement.</strong></p>
+    <ol>
+      <li>To find the sine of the complementary angle, find the cosine of the original angle.</li>
+      <li>To find the cosine of the complementary angle, find the sine of the original angle.</li>
+    </ol>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="ex4">
+    <h3 id="ex4">Example 4: Using Cofunction Identities</h3>
+    <p>If \(\sin t = \frac{5}{12}\), find \(\cos\left(\frac{\pi}{2} - t\right)\).</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>According to the cofunction identities for sine and cosine,</p>
+      \[\sin t = \cos\left(\frac{\pi}{2} - t\right).\]
+      <p>So</p>
+      \[\cos\left(\frac{\pi}{2} - t\right) = \frac{5}{12}.\]
+    </div>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="try4">
+    <h3 id="try4">Try It #4</h3>
+    <p>If \(\csc\left(\frac{\pi}{6}\right) = 2\), find \(\sec\left(\frac{\pi}{3}\right)\).</p>
+  </div>
+</section>
+
+<section aria-labelledby="using-trig">
+  <h2 id="using-trig">Using Trigonometric Functions</h2>
+  <p>In previous examples, we evaluated the sine and cosine in triangles where we knew all three sides. But the real power of right-triangle trigonometry emerges when we look at triangles in which we know an angle but do not know all the sides.</p>
+
+  <div class="box" role="region" aria-labelledby="howto5">
+    <h3 id="howto5">How To</h3>
+    <p><strong>Given a right triangle, the length of one side, and the measure of one acute angle, find the remaining sides.</strong></p>
+    <ol>
+      <li>For each side, select the trigonometric function that has the unknown side as either the numerator or the denominator. The known side will in turn be the denominator or the numerator.</li>
+      <li>Write an equation setting the function value of the known angle equal to the ratio of the corresponding sides.</li>
+      <li>Using the value of the trigonometric function and the known side length, solve for the missing side length.</li>
+    </ol>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="ex5">
+    <h3 id="ex5">Example 5: Finding Missing Side Lengths Using Trigonometric Ratios</h3>
+    <p>Find the unknown sides of the triangle in <a href="#fig11">Figure 11</a>.</p>
+    <figure id="fig11">
+      <svg viewBox="0 0 320 250" width="320" height="250" role="img" aria-labelledby="fig11-title fig11-desc">
+        <title id="fig11-title">Right triangle with a 30 degree angle and opposite side 7</title>
+        <desc id="fig11-desc">A tilted right triangle. The 30 degree angle is at the top vertex. The side from the 30 degree angle down to the right angle is labeled a. The side from the right angle to the third vertex, opposite the 30 degree angle, has length 7. The hypotenuse, from the 30 degree angle to the third vertex, is labeled c.</desc>
+        <polygon points="90,20 150,230 280,180" fill="none" stroke="#000" stroke-width="2"/>
+        <polyline points="146.2,216.5 159.2,211.5 163.1,225" fill="none" stroke="#000"/>
+        <text x="100" y="68">30°</text>
+        <text x="108" y="140" text-anchor="end" class="var">a</text>
+        <text x="222" y="228">7</text>
+        <text x="200" y="92" class="var">c</text>
+      </svg>
+      <figcaption>Figure 11</figcaption>
+    </figure>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>We know the angle and the opposite side, so we can use the tangent to find the adjacent side.</p>
+      \[\tan(30^\circ) = \frac{7}{a}\]
+      <p>We rearrange to solve for \(a\).</p>
+      \[
+      \begin{aligned}
+      a &= \frac{7}{\tan(30^\circ)}\\
+      &\approx 12.1
+      \end{aligned}
+      \]
+      <p>We can use the sine to find the hypotenuse.</p>
+      \[\sin(30^\circ) = \frac{7}{c}\]
+      <p>Again, we rearrange to solve for \(c\).</p>
+      \[
+      \begin{aligned}
+      c &= \frac{7}{\sin(30^\circ)}\\
+      &\approx 14
+      \end{aligned}
+      \]
+    </div>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="try5">
+    <h3 id="try5">Try It #5</h3>
+    <p>A right triangle has one angle of \(\frac{\pi}{3}\) and a hypotenuse of 20. Find the unknown sides and angle of the triangle.</p>
+  </div>
+</section>
+
+<section aria-labelledby="applied">
+  <h2 id="applied">Using Right Triangle Trigonometry to Solve Applied Problems</h2>
+  <p>Right-triangle trigonometry has many practical applications. For example, the ability to compute the lengths of sides of a triangle makes it possible to find the height of a tall object without climbing to the top or having to extend a tape measure along its height. We do so by measuring a distance from the base of the object to a point on the ground some distance away, where we can look up to the top of the tall object at an angle. The <strong>angle of elevation</strong> of an object above an observer relative to the observer is the angle between the horizontal and the line from the object to the observer's eye. The right triangle this position creates has sides that represent the unknown height, the measured distance from the base, and the angled line of sight from the ground to the top of the object. Knowing the measured distance to the base of the object and the angle of the line of sight, we can use trigonometric functions to calculate the unknown height. Similarly, we can form a triangle from the top of a tall object by looking downward. The <strong>angle of depression</strong> of an object below an observer relative to the observer is the angle between the horizontal and the line from the object to the observer's eye. See <a href="#fig12">Figure 12</a>.</p>
+
+  <figure id="fig12">
+    <svg viewBox="0 0 460 300" width="460" height="300" role="img" aria-labelledby="fig12-title fig12-desc">
+      <title id="fig12-title">Angle of elevation and angle of depression</title>
+      <desc id="fig12-desc">A tower stands on level ground. A straight line of sight runs from the top of the tower down to a point on the ground some distance to the right. At the top of the tower, a horizontal line extends to the right; the angle between this horizontal line and the line of sight is labeled angle of depression. At the point on the ground, the angle between the ground and the line of sight is labeled angle of elevation.</desc>
+      <rect x="20" y="260" width="400" height="30" fill="#f5ead6"/>
+      <line x1="20" y1="260" x2="420" y2="260" stroke="#595959" stroke-width="1.5" stroke-dasharray="6 4"/>
+      <g stroke="#3d5a99" stroke-width="3" fill="none">
+        <polyline points="60,260 90,60 120,260"/>
+        <line x1="90" y1="60" x2="90" y2="260"/>
+        <line x1="75" y1="160" x2="105" y2="160"/>
+        <line x1="68" y1="210" x2="112" y2="210"/>
+        <line x1="82" y1="110" x2="98" y2="110"/>
+        <line x1="68" y1="210" x2="105" y2="160"/>
+        <line x1="112" y1="210" x2="75" y2="160"/>
+      </g>
+      <line x1="90" y1="60" x2="90" y2="30" stroke="#1a4f8b" stroke-width="3"/>
+      <line x1="90" y1="30" x2="420" y2="30" stroke="#000" stroke-width="2"/>
+      <line x1="90" y1="30" x2="400" y2="260" stroke="#000" stroke-width="2"/>
+      <path d="M120 30 A30 30 0 0 1 114.1 47.9" fill="none" stroke="#000"/>
+      <path d="M370 260 A30 30 0 0 1 375.9 242.1" fill="none" stroke="#000"/>
+      <text x="260" y="20" text-anchor="middle">Angle of depression</text>
+      <text x="440" y="285" text-anchor="end">Angle of elevation</text>
+    </svg>
+    <figcaption>Figure 12</figcaption>
+  </figure>
+
+  <div class="box" role="region" aria-labelledby="howto6">
+    <h3 id="howto6">How To</h3>
+    <p><strong>Given a tall object, measure its height indirectly.</strong></p>
+    <ol>
+      <li>Make a sketch of the problem situation to keep track of known and unknown information.</li>
+      <li>Lay out a measured distance from the base of the object to a point where the top of the object is clearly visible.</li>
+      <li>At the other end of the measured distance, look up to the top of the object. Measure the angle the line of sight makes with the horizontal.</li>
+      <li>Write an equation relating the unknown height, the measured distance, and the tangent of the angle of the line of sight.</li>
+      <li>Solve the equation for the unknown height.</li>
+    </ol>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="ex6">
+    <h3 id="ex6">Example 6: Measuring a Distance Indirectly</h3>
+    <p>To find the height of a tree, a person walks to a point 30 feet from the base of the tree. She measures an angle of \(57^\circ\) between a line of sight to the top of the tree and the ground, as shown in <a href="#fig13">Figure 13</a>. Find the height of the tree.</p>
+    <figure id="fig13">
+      <svg viewBox="0 0 300 260" width="300" height="260" role="img" aria-labelledby="fig13-title fig13-desc">
+        <title id="fig13-title">Measuring a tree's height</title>
+        <desc id="fig13-desc">A tree stands on level ground. A line of sight runs from a point on the ground 30 feet from the base of the tree up to the top of the tree. The angle between the ground and the line of sight is 57 degrees.</desc>
+        <line x1="40" y1="220" x2="200" y2="220" stroke="#000" stroke-width="2"/>
+        <polygon points="197,30 150,190 244,190" fill="#2e7d32" stroke="#1b4d1e"/>
+        <rect x="190" y="190" width="14" height="30" fill="#6b4226"/>
+        <line x1="40" y1="220" x2="197" y2="30" stroke="#000" stroke-width="2"/>
+        <path d="M70 220 A30 30 0 0 0 59.1 196.9" fill="none" stroke="#000"/>
+        <text x="76" y="208">57°</text>
+        <text x="120" y="245" text-anchor="middle">30 feet</text>
+      </svg>
+      <figcaption>Figure 13</figcaption>
+    </figure>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>We know that the angle of elevation is \(57^\circ\) and the adjacent side is 30 ft long. The opposite side is the unknown height.</p>
+      <p>The trigonometric function relating the side opposite to an angle and the side adjacent to the angle is the tangent. So we will state our information in terms of the tangent of \(57^\circ\), letting \(h\) be the unknown height.</p>
+      \[
+      \begin{aligned}
+      \tan\theta &= \frac{\text{opposite}}{\text{adjacent}} && \\[4pt]
+      \tan(57^\circ) &= \frac{h}{30} && \text{Solve for } h.\\[4pt]
+      h &= 30\tan(57^\circ) && \text{Multiply.}\\[4pt]
+      h &\approx 46.2 && \text{Use a calculator.}
+      \end{aligned}
+      \]
+      <p>The tree is approximately 46 feet tall.</p>
+    </div>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="try6">
+    <h3 id="try6">Try It #6</h3>
+    <p>How long a ladder is needed to reach a windowsill 50 feet above the ground if the ladder rests against the building making an angle of \(\frac{5\pi}{12}\) with the ground? Round to the nearest foot.</p>
+  </div>
+
+  <div class="box" role="region" aria-labelledby="media">
+    <h3 id="media">Media</h3>
+    <p>Access these online resources for additional instruction and practice with right triangle trigonometry.</p>
+    <ul>
+      <li>Finding Trig Functions on Calculator</li>
+      <li>Finding Trig Functions Using a Right Triangle</li>
+      <li>Relate Trig Functions to Sides of a Right Triangle</li>
+      <li>Determine Six Trig Functions from a Triangle</li>
+      <li>Determine Length of Right Triangle Side</li>
+    </ul>
+  </div>
+</section>
+
+<section aria-labelledby="exercises">
+  <h2 id="exercises">5.4 Section Exercises</h2>
+
+  <h3 id="verbal">Verbal</h3>
+  <ol class="exercises" start="1">
+    <li>
+      <p>For the given right triangle, label the adjacent side, opposite side, and hypotenuse for the indicated angle.</p>
+      <figure>
+        <svg viewBox="0 0 340 200" width="340" height="200" role="img" aria-labelledby="ex1-title ex1-desc">
+          <title id="ex1-title">Unlabeled right triangle for exercise 1</title>
+          <desc id="ex1-desc">A right triangle with the right angle at the lower left. The vertical side is on the left and the horizontal side is along the bottom. The indicated angle, marked with an arc, is at the lower right vertex. No sides are labeled.</desc>
+          <polygon points="30,30 30,170 310,170" fill="none" stroke="#000" stroke-width="2"/>
+          <rect x="30" y="158" width="12" height="12" fill="none" stroke="#000"/>
+          <path d="M270 170 A40 40 0 0 1 274.2 152.1" fill="none" stroke="#000"/>
+        </svg>
+      </figure>
+    </li>
+    <li><p>When a right triangle with a hypotenuse of 1 is placed in the unit circle, which sides of the triangle correspond to the \(x\)- and \(y\)-coordinates?</p></li>
+    <li><p>The tangent of an angle compares which sides of the right triangle?</p></li>
+    <li><p>What is the relationship between the two acute angles in a right triangle?</p></li>
+    <li><p>Explain the cofunction identity.</p></li>
+  </ol>
+
+  <h3 id="algebraic">Algebraic</h3>
+  <p>For the following exercises, use cofunctions of complementary angles.</p>
+  <ol class="exercises" start="6">
+    <li><p>\(\cos(34^\circ) = \sin(\underline{\quad\;}^\circ)\)</p></li>
+    <li><p>\(\cos\left(\frac{\pi}{3}\right) = \sin(\underline{\qquad})\)</p></li>
+    <li><p>\(\csc(21^\circ) = \sec(\underline{\qquad}^\circ)\)</p></li>
+    <li><p>\(\tan\left(\frac{\pi}{4}\right) = \cot(\underline{\quad\;})\)</p></li>
+  </ol>
+
+  <p>For the following exercises, find the lengths of the missing sides if side \(a\) is opposite angle \(A\), side \(b\) is opposite angle \(B\), and side \(c\) is the hypotenuse.</p>
+  <ol class="exercises" start="10">
+    <li><p>\(\cos B = \frac{4}{5},\ a = 10\)</p></li>
+    <li><p>\(\sin B = \frac{1}{2},\ a = 20\)</p></li>
+    <li><p>\(\tan A = \frac{5}{12},\ b = 6\)</p></li>
+    <li><p>\(\tan A = 100,\ b = 100\)</p></li>
+    <li><p>\(\sin B = \frac{1}{\sqrt{3}},\ a = 2\)</p></li>
+    <li><p>\(a = 5,\ \angle A = 60^\circ\)</p></li>
+    <li><p>\(c = 12,\ \angle A = 45^\circ\)</p></li>
+  </ol>
+
+  <h3 id="graphical">Graphical</h3>
+  <p>For the following exercises, use <a href="#fig14">Figure 14</a> to evaluate each trigonometric function of angle \(A\).</p>
+  <figure id="fig14">
+    <svg viewBox="0 0 380 200" width="380" height="200" role="img" aria-labelledby="fig14-title fig14-desc">
+      <title id="fig14-title">Right triangle with legs 4 and 10</title>
+      <desc id="fig14-desc">A right triangle with the right angle at the lower left. Angle A is at the top vertex. The vertical leg on the left, adjacent to angle A, has length 4. The horizontal leg along the bottom, opposite angle A, has length 10. The hypotenuse is not labeled.</desc>
+      <polygon points="40,30 40,170 340,170" fill="none" stroke="#000" stroke-width="2"/>
+      <rect x="40" y="158" width="12" height="12" fill="none" stroke="#000"/>
+      <text x="50" y="54" class="var">A</text>
+      <text x="28" y="105" text-anchor="end">4</text>
+      <text x="190" y="192" text-anchor="middle">10</text>
+    </svg>
+    <figcaption>Figure 14</figcaption>
+  </figure>
+  <ol class="exercises" start="17">
+    <li><p>\(\sin A\)</p></li>
+    <li><p>\(\cos A\)</p></li>
+    <li><p>\(\tan A\)</p></li>
+    <li><p>\(\csc A\)</p></li>
+    <li><p>\(\sec A\)</p></li>
+    <li><p>\(\cot A\)</p></li>
+  </ol>
+
+  <p>For the following exercises, use <a href="#fig15">Figure 15</a> to evaluate each trigonometric function of angle \(A\).</p>
+  <figure id="fig15">
+    <svg viewBox="0 0 260 300" width="260" height="300" role="img" aria-labelledby="fig15-title fig15-desc">
+      <title id="fig15-title">Right triangle with legs 10 and 8</title>
+      <desc id="fig15-desc">A right triangle with the right angle at the lower left. Angle A is at the lower right vertex. The vertical leg on the left, opposite angle A, has length 10. The horizontal leg along the bottom, adjacent to angle A, has length 8. The hypotenuse is not labeled.</desc>
+      <polygon points="40,20 40,260 230,260" fill="none" stroke="#000" stroke-width="2"/>
+      <rect x="40" y="248" width="12" height="12" fill="none" stroke="#000"/>
+      <text x="28" y="145" text-anchor="end">10</text>
+      <text x="135" y="285" text-anchor="middle">8</text>
+      <text x="196" y="252" class="var">A</text>
+    </svg>
+    <figcaption>Figure 15</figcaption>
+  </figure>
+  <ol class="exercises" start="23">
+    <li><p>\(\sin A\)</p></li>
+    <li><p>\(\cos A\)</p></li>
+    <li><p>\(\tan A\)</p></li>
+    <li><p>\(\csc A\)</p></li>
+    <li><p>\(\sec A\)</p></li>
+    <li><p>\(\cot A\)</p></li>
+  </ol>
+
+  <p>For the following exercises, solve for the unknown sides of the given triangle.</p>
+  <ol class="exercises" start="29">
+    <li>
+      <figure>
+        <svg viewBox="0 0 380 240" width="380" height="240" role="img" aria-labelledby="ex29-title ex29-desc">
+          <title id="ex29-title">Exercise 29 triangle</title>
+          <desc id="ex29-desc">A right triangle with the right angle at the lower left. Angle B is at the top vertex. The vertical leg on the left has length 7. The horizontal leg along the bottom is labeled b. The hypotenuse is labeled c. The angle at the lower right vertex is 30 degrees.</desc>
+          <polygon points="40,20 40,200 340,200" fill="none" stroke="#000" stroke-width="2"/>
+          <rect x="40" y="188" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="50" y="46" class="var">B</text>
+          <text x="28" y="115" text-anchor="end">7</text>
+          <text x="190" y="225" text-anchor="middle" class="var">b</text>
+          <text x="200" y="100" class="var">c</text>
+          <text x="282" y="192">30°</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <figure>
+        <svg viewBox="0 0 420 240" width="420" height="240" role="img" aria-labelledby="ex30-title ex30-desc">
+          <title id="ex30-title">Exercise 30 triangle</title>
+          <desc id="ex30-desc">A tilted right triangle with the right angle at the top. Angle A is at the lower left vertex and the angle at the lower right vertex is 60 degrees. The leg from A to the right angle has length 10. The leg from the right angle to the 60 degree vertex is labeled a. The hypotenuse along the bottom is labeled c.</desc>
+          <polygon points="20,210 300,40 390,210" fill="none" stroke="#000" stroke-width="2"/>
+          <polyline points="288,47.3 294.6,59.7 306.6,52.4" fill="none" stroke="#000"/>
+          <text x="150" y="110">10</text>
+          <text x="355" y="120" class="var">a</text>
+          <text x="205" y="232" text-anchor="middle" class="var">c</text>
+          <text x="60" y="202" class="var">A</text>
+          <text x="348" y="202">60°</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <figure>
+        <svg viewBox="0 0 320 300" width="320" height="300" role="img" aria-labelledby="ex31-title ex31-desc">
+          <title id="ex31-title">Exercise 31 triangle</title>
+          <desc id="ex31-desc">A right triangle with vertices A at the top left, C at the bottom left with the right angle, and B at the bottom right. The angle at B is 45 degrees. The hypotenuse from A to B has length 15 times the square root of 2. Legs AC and CB are unlabeled.</desc>
+          <polygon points="40,30 40,260 270,260" fill="none" stroke="#000" stroke-width="2"/>
+          <rect x="40" y="248" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="30" y="22" class="var">A</text>
+          <text x="22" y="282" class="var">C</text>
+          <text x="272" y="282" class="var">B</text>
+          <text x="170" y="135">15√2</text>
+          <text x="210" y="252">45°</text>
+        </svg>
+      </figure>
+    </li>
+  </ol>
+
+  <h3 id="technology">Technology</h3>
+  <p>For the following exercises, use a calculator to find the length of each side to four decimal places.</p>
+  <ol class="exercises" start="32">
+    <li>
+      <figure>
+        <svg viewBox="0 0 420 240" width="420" height="240" role="img" aria-labelledby="ex32-title ex32-desc">
+          <title id="ex32-title">Exercise 32 triangle</title>
+          <desc id="ex32-desc">A tilted right triangle with the right angle at the top. Angle A is at the lower left vertex and the angle at the lower right vertex is 62 degrees. The leg from A to the right angle has length 10. The leg from the right angle to the 62 degree vertex is labeled a. The hypotenuse along the bottom is labeled c.</desc>
+          <polygon points="20,210 300,40 390,210" fill="none" stroke="#000" stroke-width="2"/>
+          <polyline points="288,47.3 294.6,59.7 306.6,52.4" fill="none" stroke="#000"/>
+          <text x="150" y="110">10</text>
+          <text x="355" y="120" class="var">a</text>
+          <text x="205" y="232" text-anchor="middle" class="var">c</text>
+          <text x="60" y="202" class="var">A</text>
+          <text x="348" y="202">62°</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <figure>
+        <svg viewBox="0 0 380 240" width="380" height="240" role="img" aria-labelledby="ex33-title ex33-desc">
+          <title id="ex33-title">Exercise 33 triangle</title>
+          <desc id="ex33-desc">A right triangle with the right angle at the lower left. Angle B is at the top vertex. The vertical leg on the left has length 7. The horizontal leg along the bottom is labeled b. The hypotenuse is labeled c. The angle at the lower right vertex is 35 degrees.</desc>
+          <polygon points="40,20 40,200 340,200" fill="none" stroke="#000" stroke-width="2"/>
+          <rect x="40" y="188" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="50" y="46" class="var">B</text>
+          <text x="28" y="115" text-anchor="end">7</text>
+          <text x="190" y="225" text-anchor="middle" class="var">b</text>
+          <text x="200" y="100" class="var">c</text>
+          <text x="282" y="192">35°</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <figure>
+        <svg viewBox="0 0 440 260" width="440" height="260" role="img" aria-labelledby="ex34-title ex34-desc">
+          <title id="ex34-title">Exercise 34 triangle</title>
+          <desc id="ex34-desc">A tilted right triangle with the right angle at the top. Angle B is at the left vertex and the angle at the lower right vertex is 65 degrees. The leg from B to the right angle is labeled a. The leg from the right angle to the 65 degree vertex is labeled b. The hypotenuse from B to the 65 degree vertex has length 10.</desc>
+          <polygon points="30,140 330,20 400,240" fill="none" stroke="#000" stroke-width="2"/>
+          <polyline points="317,25.2 321.2,38.5 334.2,33.3" fill="none" stroke="#000"/>
+          <text x="170" y="70" class="var">a</text>
+          <text x="380" y="125" class="var">b</text>
+          <text x="215" y="212">10</text>
+          <text x="70" y="140" class="var">B</text>
+          <text x="352" y="226">65°</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <figure>
+        <svg viewBox="0 0 380 110" width="380" height="110" role="img" aria-labelledby="ex35-title ex35-desc">
+          <title id="ex35-title">Exercise 35 triangle</title>
+          <desc id="ex35-desc">A long, thin right triangle with the right angle at the lower left. Angle B is at the top left vertex. The short vertical leg on the left is labeled a. The long horizontal leg along the bottom is labeled b. The hypotenuse has length 12. The angle at the right vertex is 10 degrees.</desc>
+          <polygon points="30,20 30,80 340,80" fill="none" stroke="#000" stroke-width="2"/>
+          <rect x="30" y="68" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="20" y="56" text-anchor="end" class="var">a</text>
+          <text x="38" y="40" class="var">B</text>
+          <text x="190" y="40">12</text>
+          <text x="270" y="74">10°</text>
+          <text x="180" y="102" class="var">b</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <figure>
+        <svg viewBox="0 0 420 130" width="420" height="130" role="img" aria-labelledby="ex36-title ex36-desc">
+          <title id="ex36-title">Exercise 36 triangle</title>
+          <desc id="ex36-desc">A long, thin right triangle with vertices A at the left, C at the upper right with the right angle, and B at the lower right. The angle at B is 81 degrees. The short leg from C to B has length 16.5. The long leg from A to C is labeled b. The hypotenuse from A to B is labeled c.</desc>
+          <polygon points="20,100 360,50 370,100" fill="none" stroke="#000" stroke-width="2"/>
+          <polyline points="348.1,51.7 350.5,63.5 362.4,61.8" fill="none" stroke="#000"/>
+          <text x="14" y="106" text-anchor="end" class="var">A</text>
+          <text x="356" y="40" class="var">C</text>
+          <text x="372" y="122" class="var">B</text>
+          <text x="180" y="62" class="var">b</text>
+          <text x="190" y="122" class="var">c</text>
+          <text x="374" y="80">16.5</text>
+          <text x="352" y="94" text-anchor="end">81°</text>
+        </svg>
+      </figure>
+    </li>
+    <li><p>\(b = 15,\ \angle B = 15^\circ\)</p></li>
+    <li><p>\(c = 200,\ \angle B = 5^\circ\)</p></li>
+    <li><p>\(c = 50,\ \angle B = 21^\circ\)</p></li>
+    <li><p>\(a = 30,\ \angle A = 27^\circ\)</p></li>
+    <li><p>\(b = 3.5,\ \angle A = 78^\circ\)</p></li>
+  </ol>
+
+  <h3 id="extensions">Extensions</h3>
+  <ol class="exercises" start="42">
+    <li>
+      <p>Find \(x\).</p>
+      <figure>
+        <svg viewBox="0 0 380 240" width="380" height="240" role="img" aria-labelledby="ex42-title ex42-desc">
+          <title id="ex42-title">Exercise 42 triangle</title>
+          <desc id="ex42-desc">A triangle with a horizontal base of total length x. The base angle on the left is 63 degrees and the base angle on the right is 39 degrees. A dashed altitude of length 82 drops from the top vertex perpendicular to the base, splitting the triangle into two right triangles.</desc>
+          <polygon points="20,180 130,20 360,180" fill="none" stroke="#000" stroke-width="2"/>
+          <line x1="130" y1="20" x2="130" y2="180" stroke="#000" stroke-dasharray="6 4"/>
+          <rect x="130" y="168" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="140" y="100">82</text>
+          <text x="42" y="172">63°</text>
+          <text x="312" y="172">39°</text>
+          <line x1="20" y1="200" x2="360" y2="200" stroke="#000"/>
+          <line x1="20" y1="192" x2="20" y2="208" stroke="#000"/>
+          <line x1="360" y1="192" x2="360" y2="208" stroke="#000"/>
+          <text x="190" y="225" text-anchor="middle" class="var">x</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <p>Find \(x\).</p>
+      <figure>
+        <svg viewBox="0 0 420 240" width="420" height="240" role="img" aria-labelledby="ex43-title ex43-desc">
+          <title id="ex43-title">Exercise 43 triangle</title>
+          <desc id="ex43-desc">A triangle with a horizontal base of total length x. The base angle on the left is 36 degrees and the base angle on the right is 50 degrees. A dashed altitude of length 85 drops from the top vertex perpendicular to the base, splitting the triangle into two right triangles.</desc>
+          <polygon points="20,180 250,20 400,180" fill="none" stroke="#000" stroke-width="2"/>
+          <line x1="250" y1="20" x2="250" y2="180" stroke="#000" stroke-dasharray="6 4"/>
+          <rect x="250" y="168" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="260" y="100">85</text>
+          <text x="48" y="172">36°</text>
+          <text x="352" y="172">50°</text>
+          <line x1="20" y1="200" x2="400" y2="200" stroke="#000"/>
+          <line x1="20" y1="192" x2="20" y2="208" stroke="#000"/>
+          <line x1="400" y1="192" x2="400" y2="208" stroke="#000"/>
+          <text x="210" y="225" text-anchor="middle" class="var">x</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <p>Find \(x\).</p>
+      <figure>
+        <svg viewBox="0 0 420 250" width="420" height="250" role="img" aria-labelledby="ex44-title ex44-desc">
+          <title id="ex44-title">Exercise 44 figure</title>
+          <desc id="ex44-desc">A vertical segment of length 115 rises from a right angle at the lower left. Two lines run from the top of the segment down to two points on the horizontal base line. The nearer line meets the base at a 56 degree angle and the farther line meets the base at a 35 degree angle. The distance x is measured along the base between these two points.</desc>
+          <line x1="30" y1="20" x2="30" y2="200" stroke="#000" stroke-width="2"/>
+          <line x1="30" y1="200" x2="370" y2="200" stroke="#000" stroke-width="2"/>
+          <line x1="30" y1="20" x2="180" y2="200" stroke="#000" stroke-width="2"/>
+          <line x1="30" y1="20" x2="370" y2="200" stroke="#000" stroke-width="2"/>
+          <rect x="30" y="188" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="40" y="120">115</text>
+          <text x="134" y="192">56°</text>
+          <text x="322" y="192">35°</text>
+          <line x1="180" y1="218" x2="370" y2="218" stroke="#000"/>
+          <line x1="180" y1="210" x2="180" y2="226" stroke="#000"/>
+          <line x1="370" y1="210" x2="370" y2="226" stroke="#000"/>
+          <text x="275" y="242" text-anchor="middle" class="var">x</text>
+        </svg>
+      </figure>
+    </li>
+    <li>
+      <p>Find \(x\).</p>
+      <figure>
+        <svg viewBox="0 0 420 250" width="420" height="250" role="img" aria-labelledby="ex45-title ex45-desc">
+          <title id="ex45-title">Exercise 45 figure</title>
+          <desc id="ex45-desc">A vertical segment of length 119 rises from a right angle at the lower left. Two lines run from the top of the segment down to two points on the horizontal base line. The nearer line meets the base at a 70 degree angle and the farther line meets the base at a 26 degree angle. The distance x is measured along the base between these two points.</desc>
+          <line x1="30" y1="20" x2="30" y2="200" stroke="#000" stroke-width="2"/>
+          <line x1="30" y1="200" x2="400" y2="200" stroke="#000" stroke-width="2"/>
+          <line x1="30" y1="20" x2="100" y2="200" stroke="#000" stroke-width="2"/>
+          <line x1="30" y1="20" x2="400" y2="200" stroke="#000" stroke-width="2"/>
+          <rect x="30" y="188" width="12" height="12" fill="none" stroke="#000"/>
+          <text x="38" y="130">119</text>
+          <text x="92" y="192" text-anchor="end">70°</text>
+          <text x="352" y="192">26°</text>
+          <line x1="100" y1="218" x2="400" y2="218" stroke="#000"/>
+          <line x1="100" y1="210" x2="100" y2="226" stroke="#000"/>
+          <line x1="400" y1="210" x2="400" y2="226" stroke="#000"/>
+          <text x="250" y="242" text-anchor="middle" class="var">x</text>
+        </svg>
+      </figure>
+    </li>
+    <li><p>A radio tower is located 400 feet from a building. From a window in the building, a person determines that the angle of elevation to the top of the tower is \(36^\circ\), and that the angle of depression to the bottom of the tower is \(23^\circ\). How tall is the tower?</p></li>
+    <li><p>A radio tower is located 325 feet from a building. From a window in the building, a person determines that the angle of elevation to the top of the tower is \(43^\circ\), and that the angle of depression to the bottom of the tower is \(31^\circ\). How tall is the tower?</p></li>
+    <li><p>A 200-foot tall monument is located in the distance. From a window in a building, a person determines that the angle of elevation to the top of the monument is \(15^\circ\), and that the angle of depression to the bottom of the tower is \(2^\circ\). How far is the person from the monument?</p></li>
+    <li><p>A 400-foot tall monument is located in the distance. From a window in a building, a person determines that the angle of elevation to the top of the monument is \(18^\circ\), and that the angle of depression to the bottom of the monument is \(3^\circ\). How far is the person from the monument?</p></li>
+    <li><p>There is an antenna on the top of a building. From a location 300 feet from the base of the building, the angle of elevation to the top of the building is measured to be \(40^\circ\). From the same location, the angle of elevation to the top of the antenna is measured to be \(43^\circ\). Find the height of the antenna.</p></li>
+    <li><p>There is lightning rod on the top of a building. From a location 500 feet from the base of the building, the angle of elevation to the top of the building is measured to be \(36^\circ\). From the same location, the angle of elevation to the top of the lightning rod is measured to be \(38^\circ\). Find the height of the lightning rod.</p></li>
+  </ol>
+
+  <h3 id="real-world">Real-World Applications</h3>
+  <ol class="exercises" start="52">
+    <li><p>A 33-ft ladder leans against a building so that the angle between the ground and the ladder is \(80^\circ\). How high does the ladder reach up the side of the building?</p></li>
+    <li><p>A 23-ft ladder leans against a building so that the angle between the ground and the ladder is \(80^\circ\). How high does the ladder reach up the side of the building?</p></li>
+    <li><p>The angle of elevation to the top of a building in New York is found to be 9 degrees from the ground at a distance of 1 mile from the base of the building. Using this information, find the height of the building.</p></li>
+    <li><p>The angle of elevation to the top of a building in Seattle is found to be 2 degrees from the ground at a distance of 2 miles from the base of the building. Using this information, find the height of the building.</p></li>
+    <li><p>Assuming that a 370-foot tall giant redwood grows vertically, if I walk a certain distance from the tree and measure the angle of elevation to the top of the tree to be \(60^\circ\), how far from the base of the tree am I?</p></li>
+  </ol>
+</section>
+
+</main>
+
+<footer class="attribution">
+  <p>&ldquo;5.4 Right Triangle Trigonometry&rdquo; from <em>Precalculus</em> by Jay Abramson, OpenStax.</p>
+  <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/precalculus/pages/5-4-right-triangle-trigonometry">https://openstax.org/books/precalculus/pages/5-4-right-triangle-trigonometry</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+  <p>Accessible HTML version: converted to semantic HTML with MathJax-rendered mathematics; figures redrawn as SVG with text alternatives; the SohCahToa mnemonic's garbled underline markup was restored to underlined first letters.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</body>
+</html>

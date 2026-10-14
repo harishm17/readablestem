@@ -1,0 +1,175 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.966728,
+  "counted_input_tokens": 130037,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0028754,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-000",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0040714,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0024954,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0082714,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0026074,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-004",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0023954000000000002,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-005",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 1,
+      "source": "alt"
+    },
+    {
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-006",
+      "outcome": "no_description"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0102434,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-007",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.007783399999999999,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-008",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.006679399999999999,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-009",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0054034,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-010",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0101674,
+      "factual_error": false,
+      "figure_id": "openstax/precalculus/1-6-absolute-value-functions/fig-011",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 2,
+      "source": "alt"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.062993,
+  "output": {
+    "file": "precalculus__1-6-absolute-value-functions.run1.html",
+    "format": "html"
+  },
+  "output_chars": 44621,
+  "pdf_pages": 28,
+  "response_status": "end_turn",
+  "run": 1,
+  "seconds": 165.3,
+  "section": "precalculus/1-6-absolute-value-functions",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 130037,
+    "output_tokens": 22329,
+    "reasoning_tokens": 3189
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

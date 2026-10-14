@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "4cc8457f76095812893c27e3b8b248db4142ef47502c852832324ad80bbfaea5",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 1.12,
+    "load_before": 1.32,
+    "offline": false,
+    "peak_rss_mb": 346.5,
+    "quiet_box": null,
+    "system_seconds": 3.245,
+    "timeout_seconds": 1800,
+    "user_seconds": 101.111,
+    "wall_seconds_per_page": 0.422
+  },
+  "output": {
+    "file": "intermediate-algebra__4-6-solve-systems-of-equations-using-determinants.md",
+    "format": "md"
+  },
+  "pdf_pages": 27,
+  "seconds": 11.392,
+  "section": "intermediate-algebra/4-6-solve-systems-of-equations-using-determinants",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

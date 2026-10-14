@@ -1,0 +1,87 @@
+{
+  "arm": "chatbot-haiku-purdue",
+  "attempts": [],
+  "cost_usd": 0.015837,
+  "counted_input_tokens": 45603,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0073874,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-000",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 1,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.007567399999999999,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-001",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 2,
+      "source": "figure"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.005887399999999999,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0027954,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/7-3-lewis-symbols-and-structures/fig-003",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "aria"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.023638,
+  "output": {
+    "file": "chemistry__7-3-lewis-symbols-and-structures.run2.html",
+    "format": "html"
+  },
+  "output_chars": 49542,
+  "pdf_pages": 9,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 73.9,
+  "section": "chemistry/7-3-lewis-symbols-and-structures",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 45603,
+    "output_tokens": 22553,
+    "reasoning_tokens": 2173
+  },
+  "versions": {
+    "model_requested": "claude-haiku-5-5",
+    "model_served": "claude-haiku-5-5"
+  }
+}

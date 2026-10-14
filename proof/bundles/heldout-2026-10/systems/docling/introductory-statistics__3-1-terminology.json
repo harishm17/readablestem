@@ -1,0 +1,45 @@
+{
+  "arm": "docling",
+  "cost_usd": 0.0,
+  "input_sha256": "ea51bd3362b2303c8f010e4d0e464f035adf183a543494363f93493b52d05181",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 12.77,
+    "load_before": 12.36,
+    "offline": false,
+    "peak_rss_mb": 2231.7,
+    "quiet_box": null,
+    "system_seconds": 24.355,
+    "timeout_seconds": 1800,
+    "user_seconds": 78.153,
+    "wall_seconds_per_page": 4.864
+  },
+  "output": {
+    "file": "introductory-statistics__3-1-terminology.md",
+    "format": "md"
+  },
+  "pdf_pages": 8,
+  "seconds": 38.908,
+  "section": "introductory-statistics/3-1-terminology",
+  "settings": {
+    "command": "docling --to json --to html --to md",
+    "formula_enrichment": "off (the default)",
+    "image_export_mode": "embedded (the CLI default)",
+    "ocr": "on (RapidOCR)",
+    "tables": "TableFormer, accurate"
+  },
+  "status": "ok",
+  "versions": {
+    "docling": "2.138.0",
+    "docling-core": "2.101.1",
+    "docling-ibm-models": "4.0.3",
+    "docling-parse": "7.22.3",
+    "rapidocr": "3.10.0",
+    "torch": "2.14.1+cpu",
+    "transformers": "5.19.0"
+  }
+}

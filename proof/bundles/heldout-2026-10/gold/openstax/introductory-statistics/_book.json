@@ -1,0 +1,19 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Barbara Illowsky",
+    "Susan Dean"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/introductory-statistics",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-13",
+  "slug": "introductory-statistics",
+  "state": "retired",
+  "title": "Introductory Statistics",
+  "uuid": "30189442-6998-4686-ac05-ed152b91b9de",
+  "version": "1d23970"
+}

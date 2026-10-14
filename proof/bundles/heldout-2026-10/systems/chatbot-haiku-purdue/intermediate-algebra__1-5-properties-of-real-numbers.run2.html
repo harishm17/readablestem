@@ -1,0 +1,850 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>1.5 Properties of Real Numbers | Intermediate Algebra (OpenStax)</title>
+
+  <!-- MathJax 3 configuration: must appear before the MathJax script -->
+  <script>
+    window.MathJax = {
+      tex: {
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true
+      },
+      options: {
+        enableAssistiveMml: true,
+        enableMenu: true
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --heading: #0b3d5c;
+      --border: #4a4a4a;
+      --box-bg: #f4f7fa;
+      --focus: #005fcc;
+    }
+    html { font-size: 100%; }
+    body {
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 48rem;
+      margin: 0 auto;
+      padding: 1rem 1.25rem 3rem;
+    }
+    h1, h2, h3, h4 { font-family: Arial, Helvetica, sans-serif; color: var(--heading); line-height: 1.25; }
+    h1 { font-size: 2rem; margin-top: 1rem; }
+    h2 { font-size: 1.5rem; margin-top: 2rem; }
+    h3 { font-size: 1.2rem; margin-top: 1.5rem; }
+    h4 { font-size: 1.05rem; margin-top: 1rem; }
+    a { color: #0b4fa3; }
+    a:focus, button:focus, input:focus, [tabindex]:focus {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: #ffffff;
+      color: var(--text);
+      padding: 0.5rem 1rem;
+      border: 2px solid var(--focus);
+    }
+    .skip-link:focus { left: 1rem; top: 1rem; z-index: 10; }
+    .sr-only {
+      position: absolute;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0,0,0,0);
+      white-space: nowrap; border: 0;
+    }
+    .box {
+      border: 2px solid var(--border);
+      background: var(--box-bg);
+      padding: 1rem 1.25rem;
+      margin: 1.25rem 0;
+      border-radius: 4px;
+    }
+    .example, .tryit { border: 2px solid var(--border); padding: 1rem; margin: 1.5rem 0; border-radius: 4px; }
+    .example > .problem, .tryit > .problem {
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 0.5rem 0.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .solution { border: 1px solid #8a8a8a; background: #ffffff; padding: 0.5rem 0.75rem; }
+    .table-wrap { overflow-x: auto; margin: 0.75rem 0; }
+    table { border-collapse: collapse; margin: 0.5rem 0; min-width: 16rem; }
+    caption { text-align: left; font-family: Arial, Helvetica, sans-serif; font-weight: bold; padding: 0.25rem 0; color: var(--heading); }
+    th, td { border: 1px solid var(--border); padding: 0.4rem 0.7rem; text-align: left; vertical-align: top; }
+    th { background: #e6edf3; }
+    .center { text-align: center; }
+    figure { margin: 1rem 0; }
+    figcaption { font-size: 0.95rem; color: #333; }
+    .diagram-note { font-style: italic; }
+    .footer-note { font-size: 0.9rem; border-top: 1px solid var(--border); margin-top: 2.5rem; padding-top: 1rem; }
+    ol.exercises li { margin-bottom: 0.6rem; }
+  </style>
+</head>
+<body>
+
+<a class="skip-link" href="#main-content">Skip to main content</a>
+
+<main id="main-content">
+
+<h1>1.5 Properties of Real Numbers</h1>
+
+<h2 id="objectives">Learning Objectives</h2>
+<p>By the end of this section, you will be able to:</p>
+<ul>
+  <li>Use the commutative and associative properties</li>
+  <li>Use the properties of identity, inverse, and zero</li>
+  <li>Simplify expressions using the Distributive Property</li>
+</ul>
+
+<section class="box" aria-labelledby="prep-heading">
+  <h2 id="prep-heading">Be Prepared 1.5</h2>
+  <p>A more thorough introduction to the topics covered in this section can be found in the <em>Elementary Algebra</em> chapter, Foundations.</p>
+</section>
+
+<section aria-labelledby="commassoc-heading">
+  <h2 id="commassoc-heading">Use the Commutative and Associative Properties</h2>
+
+  <p>The order we add two numbers doesn’t affect the result. If we add \(8 + 9\) or \(9 + 8\), the results are the same—they both equal 17. So, \(8 + 9 = 9 + 8\). The order in which we add does not matter!</p>
+
+  <p>Similarly, when multiplying two numbers, the order does not affect the result. If we multiply \(9 \cdot 8\) or \(8 \cdot 9\), the results are the same—they both equal 72. So, \(9 \cdot 8 = 8 \cdot 9\). The order in which we multiply does not matter!</p>
+
+  <p>These examples illustrate the Commutative Property.</p>
+
+  <section class="box" aria-labelledby="commutative-heading">
+    <h3 id="commutative-heading">Commutative Property</h3>
+    <p><strong>Of addition:</strong> If \(a\) and \(b\) are real numbers, then \(a + b = b + a\).</p>
+    <p><strong>Of multiplication:</strong> If \(a\) and \(b\) are real numbers, then \(a \cdot b = b \cdot a\).</p>
+    <p>When adding or multiplying, changing the <em>order</em> gives the same result.</p>
+  </section>
+
+  <p>The Commutative Property has to do with order. We subtract \(9 - 8\) and \(8 - 9\), and see that \(9 - 8 \neq 8 - 9\). Since changing the order of the subtraction does not give the same result, we know that <em>subtraction is not commutative</em>.</p>
+
+  <p><em>Division is not commutative either.</em> Since \(12 \div 3 \neq 3 \div 12\), changing the order of the division did not give the same result. The commutative properties apply only to addition and multiplication!</p>
+
+  <ul>
+    <li>Addition and multiplication <em>are</em> commutative.</li>
+    <li>Subtraction and division are <em>not</em> commutative.</li>
+  </ul>
+
+  <p>When adding three numbers, changing the grouping of the numbers gives the same result. For example, \((7 + 8) + 2 = 7 + (8 + 2)\), since each side of the equation equals 17.</p>
+
+  <p>This is true for multiplication, too. For example, \(\left(5 \cdot \frac{1}{3}\right) \cdot 3 = 5 \cdot \left(\frac{1}{3} \cdot 3\right)\), since each side of the equation equals 5.</p>
+
+  <p>These examples illustrate the Associative Property.</p>
+
+  <section class="box" aria-labelledby="associative-heading">
+    <h3 id="associative-heading">Associative Property</h3>
+    <p><strong>Of addition:</strong> If \(a\), \(b\), and \(c\) are real numbers, then \((a + b) + c = a + (b + c)\).</p>
+    <p><strong>Of multiplication:</strong> If \(a\), \(b\), and \(c\) are real numbers, then \((a \cdot b) \cdot c = a \cdot (b \cdot c)\).</p>
+    <p>When adding or multiplying, changing the <em>grouping</em> gives the same result.</p>
+  </section>
+
+  <p>The Associative Property has to do with grouping. If we change how the numbers are grouped, the result will be the same. Notice it is the same three numbers in the same order—the only difference is the grouping.</p>
+
+  <p>We saw that subtraction and division were not commutative. They are not associative either.</p>
+  \[(10 - 3) - 2 \neq 10 - (3 - 2) \qquad\qquad (24 \div 4) \div 2 \neq 24 \div (4 \div 2)\]
+  \[7 - 2 \neq 10 - 1 \qquad\qquad 6 \div 2 \neq 24 \div 2\]
+  \[5 \neq 9 \qquad\qquad 3 \neq 12\]
+
+  <p>When simplifying an expression, it is always a good idea to plan what the steps will be. In order to combine like terms in the next example, we will use the Commutative Property of addition to write the like terms together.</p>
+
+  <section class="example" aria-labelledby="ex145">
+    <h3 id="ex145">Example 1.45</h3>
+    <div class="problem"><p>Simplify: \(18p + 6q + 15p + 5q\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.45</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Use the Commutative Property of addition to reorder so that like terms are together.</th><td>\(18p + 6q + 15p + 5q = 18p + 15p + 6q + 5q\)</td></tr>
+            <tr><th scope="row">Add like terms.</th><td>\(33p + 11q\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try189">
+    <h3 id="try189">Try It 1.89</h3>
+    <div class="problem"><p>Simplify: \(23r + 14s + 9r + 15s\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try190">
+    <h3 id="try190">Try It 1.90</h3>
+    <div class="problem"><p>Simplify: \(37m + 21n + 4m - 15n\).</p></div>
+  </section>
+
+  <p>When we have to simplify algebraic expressions, we can often make the work easier by applying the Commutative Property or Associative Property first.</p>
+
+  <section class="example" aria-labelledby="ex146">
+    <h3 id="ex146">Example 1.46</h3>
+    <div class="problem"><p>Simplify: \(\left(\frac{5}{13} + \frac{3}{4}\right) + \frac{1}{4}\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.46</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(\left(\frac{5}{13} + \frac{3}{4}\right) + \frac{1}{4}\)</td></tr>
+            <tr><th scope="row">Notice that the last 2 terms have a common denominator, so change the grouping.</th><td>\(\frac{5}{13} + \left(\frac{3}{4} + \frac{1}{4}\right)\)</td></tr>
+            <tr><th scope="row">Add in parentheses first.</th><td>\(\frac{5}{13} + \left(\frac{4}{4}\right)\)</td></tr>
+            <tr><th scope="row">Simplify the fraction.</th><td>\(\frac{5}{13} + 1\)</td></tr>
+            <tr><th scope="row">Add.</th><td>\(1\frac{5}{13}\)</td></tr>
+            <tr><th scope="row">Convert to an improper fraction.</th><td>\(\frac{18}{13}\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try191">
+    <h3 id="try191">Try It 1.91</h3>
+    <div class="problem"><p>Simplify: \(\left(\frac{7}{15} + \frac{5}{8}\right) + \frac{3}{8}\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try192">
+    <h3 id="try192">Try It 1.92</h3>
+    <div class="problem"><p>Simplify: \(\left(\frac{2}{9} + \frac{7}{12}\right) + \frac{5}{12}\).</p></div>
+  </section>
+</section>
+
+<section aria-labelledby="identity-heading">
+  <h2 id="identity-heading">Use the Properties of Identity, Inverse, and Zero</h2>
+
+  <p>What happens when we add 0 to any number? Adding 0 doesn’t change the value. For this reason, we call 0 the <em>additive identity</em>. The Identity Property of Addition states that for any real number \(a\), \(a + 0 = a\) and \(0 + a = a\).</p>
+
+  <p>What happens when we multiply any number by one? Multiplying by 1 doesn’t change the value. So we call 1 the <em>multiplicative identity</em>. The Identity Property of Multiplication states that for any real number \(a\), \(a \cdot 1 = a\) and \(1 \cdot a = a\).</p>
+
+  <p>We summarize the Identity Properties here.</p>
+
+  <section class="box" aria-labelledby="identity-box">
+    <h3 id="identity-box">Identity Property</h3>
+    <p><strong>Of addition:</strong> For any real number \(a\): \(a + 0 = a\) and \(0 + a = a\). The number 0 is the <strong>additive identity</strong>.</p>
+    <p><strong>Of multiplication:</strong> For any real number \(a\): \(a \cdot 1 = a\) and \(1 \cdot a = a\). The number 1 is the <strong>multiplicative identity</strong>.</p>
+  </section>
+
+  <p>What number added to 5 gives the additive identity, 0? We know</p>
+  \[5 + (-5) = 0\]
+  <p>The missing number was the opposite of the number!</p>
+
+  <p>We call \(-a\) the additive inverse of \(a\). The opposite of a number is its additive inverse. A number and its opposite add to zero, which is the additive identity. This leads to the Inverse Property of Addition, which states that for any real number \(a\), \(a + (-a) = 0\).</p>
+
+  <p>What number multiplied by \(\frac{2}{3}\) gives the multiplicative identity, 1? In other words, \(\frac{2}{3}\) times what results in 1? We know</p>
+  \[\frac{2}{3} \cdot \frac{3}{2} = 1\]
+  <p>The missing number was the reciprocal of the number!</p>
+
+  <p>We call \(\frac{1}{a}\) the multiplicative inverse of \(a\). The reciprocal of a number is its multiplicative inverse. This leads to the Inverse Property of Multiplication, which states that for any real number \(a\), \(a \neq 0\), \(a \cdot \frac{1}{a} = 1\).</p>
+
+  <p>We’ll formally state the inverse properties here.</p>
+
+  <section class="box" aria-labelledby="inverse-box">
+    <h3 id="inverse-box">Inverse Property</h3>
+    <p><strong>Of addition:</strong> For any real number \(a\), \(a + (-a) = 0\). The number \(-a\) is the <strong>additive inverse</strong> of \(a\). A number and its <em>opposite</em> add to zero.</p>
+    <p><strong>Of multiplication:</strong> For any real number \(a\), \(a \neq 0\), \(a \cdot \frac{1}{a} = 1\). The number \(\frac{1}{a}\) is the <strong>multiplicative inverse</strong> of \(a\). A number and its <em>reciprocal</em> multiply to one.</p>
+  </section>
+
+  <p>The Identity Property of addition says that when we add 0 to any number, the result is that same number. What happens when we multiply a number by 0? Multiplying by 0 makes the product equal zero.</p>
+
+  <p>What about division involving zero? What is \(0 \div 3\)? Think about a real example: If there are no cookies in the cookie jar and 3 people are to share them, how many cookies does each person get? There are no cookies to share, so each person gets 0 cookies. So, \(0 \div 3 = 0\).</p>
+
+  <p>We can check division with the related multiplication fact. So we know \(0 \div 3 = 0\) because \(0 \cdot 3 = 0\).</p>
+
+  <p>Now think about dividing <em>by</em> zero. What is the result of dividing 4 by 0? Think about the related multiplication fact:</p>
+  \[4 \div 0 = ? \quad\text{means}\quad ? \cdot 0 = 4\]
+
+  <p>Is there a number that multiplied by 0 gives 4? Since any real number multiplied by 0 gives 0, there is no real number that can be multiplied by 0 to obtain 4. We conclude that there is no answer to \(4 \div 0\), and so we say that division by 0 is <strong>undefined</strong>.</p>
+
+  <p>We summarize the properties of zero here.</p>
+
+  <section class="box" aria-labelledby="zero-box">
+    <h3 id="zero-box">Properties of Zero</h3>
+    <p><strong>Multiplication by zero:</strong> For any real number \(a\), \(a \cdot 0 = 0\) and \(0 \cdot a = 0\). The product of any number and 0 is 0.</p>
+    <p><strong>Division by zero:</strong> For any real number \(a\), \(a \neq 0\), \(\frac{0}{a} = 0\). Zero divided by any real number, except itself, is zero.</p>
+    <p>For any real number \(a\), \(\frac{a}{0}\) is undefined. Division by zero is undefined.</p>
+  </section>
+
+  <p>We will now practice using the properties of identities, inverses, and zero to simplify expressions.</p>
+
+  <section class="example" aria-labelledby="ex147">
+    <h3 id="ex147">Example 1.47</h3>
+    <div class="problem"><p>Simplify: \(-84n + (-73n) + 84n\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.47</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(-84n + (-73n) + 84n\)</td></tr>
+            <tr><th scope="row">Notice that the first and third terms are opposites; use the Commutative Property of addition to reorder the terms.</th><td>\(-84n + 84n + (-73n)\)</td></tr>
+            <tr><th scope="row">Add left to right.</th><td>\(0 + (-73n)\)</td></tr>
+            <tr><th scope="row">Add.</th><td>\(-73n\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try193">
+    <h3 id="try193">Try It 1.93</h3>
+    <div class="problem"><p>Simplify: \(-27a + (-48a) + 27a\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try194">
+    <h3 id="try194">Try It 1.94</h3>
+    <div class="problem"><p>Simplify: \(39x + (-92x) + (-39x)\).</p></div>
+  </section>
+
+  <p>Now we will see how recognizing reciprocals is helpful. Before multiplying left to right, look for reciprocals—their product is 1.</p>
+
+  <section class="example" aria-labelledby="ex148">
+    <h3 id="ex148">Example 1.48</h3>
+    <div class="problem"><p>Simplify: \(\frac{7}{15} \cdot \frac{8}{23} \cdot \frac{15}{7}\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.48</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(\frac{7}{15} \cdot \frac{8}{23} \cdot \frac{15}{7}\)</td></tr>
+            <tr><th scope="row">Notice the first and third terms are reciprocals, so use the Commutative Property of multiplication to reorder the factors.</th><td>\(\frac{7}{15} \cdot \frac{15}{7} \cdot \frac{8}{23}\)</td></tr>
+            <tr><th scope="row">Multiply left to right.</th><td>\(1 \cdot \frac{8}{23}\)</td></tr>
+            <tr><th scope="row">Multiply.</th><td>\(\frac{8}{23}\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try195">
+    <h3 id="try195">Try It 1.95</h3>
+    <div class="problem"><p>Simplify: \(\frac{9}{16} \cdot \frac{5}{49} \cdot \frac{16}{9}\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try196">
+    <h3 id="try196">Try It 1.96</h3>
+    <div class="problem"><p>Simplify: \(\frac{6}{17} \cdot \frac{11}{25} \cdot \frac{17}{6}\).</p></div>
+  </section>
+
+  <p>The next example makes us aware of the distinction between dividing 0 by some number or some number being divided by 0.</p>
+
+  <section class="example" aria-labelledby="ex149">
+    <h3 id="ex149">Example 1.49</h3>
+    <div class="problem"><p>Simplify:</p>
+      <ol type="a">
+        <li>\(\frac{0}{n + 5}\), where \(n \neq -5\)</li>
+        <li>\(\frac{10 - 3p}{0}\), where \(10 - 3p \neq 0\)</li>
+      </ol>
+    </div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <ol type="a">
+        <li>Zero divided by any real number except itself is 0. \(\frac{0}{n + 5} = 0\)</li>
+        <li>Division by 0 is undefined. \(\frac{10 - 3p}{0}\) is undefined.</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try197">
+    <h3 id="try197">Try It 1.97</h3>
+    <div class="problem"><p>Simplify:</p>
+      <ol type="a">
+        <li>\(\frac{0}{m + 7}\), where \(m \neq -7\)</li>
+        <li>\(\frac{18 - 6c}{0}\), where \(18 - 6c \neq 0\)</li>
+      </ol>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try198">
+    <h3 id="try198">Try It 1.98</h3>
+    <div class="problem"><p>Simplify:</p>
+      <ol type="a">
+        <li>\(\frac{0}{d - 4}\), where \(d \neq 4\)</li>
+        <li>\(\frac{15 - 4q}{0}\), where \(15 - 4q \neq 0\)</li>
+      </ol>
+    </div>
+  </section>
+</section>
+
+<section aria-labelledby="distributive-heading">
+  <h2 id="distributive-heading">Simplify Expressions Using the Distributive Property</h2>
+
+  <p>Suppose that three friends are going to the movies. They each need $9.25—that’s 9 dollars and 1 quarter—to pay for their tickets. How much money do they need all together?</p>
+
+  <p>You can think about the dollars separately from the quarters. They need 3 times $9, so $27, and 3 times 1 quarter, so 75 cents. In total, they need $27.75. If you think about doing the math in this way, you are using the Distributive Property.</p>
+
+  <section class="box" aria-labelledby="distrib-box">
+    <h3 id="distrib-box">Distributive Property</h3>
+    <p>If \(a\), \(b\), and \(c\) are real numbers, then</p>
+    \[a(b + c) = ab + ac \qquad (b + c)a = ba + ca\]
+    \[a(b - c) = ab - ac \qquad (b - c)a = ba - ca\]
+  </section>
+
+  <p>In algebra, we use the Distributive Property to remove parentheses as we simplify expressions.</p>
+
+  <section class="example" aria-labelledby="ex150">
+    <h3 id="ex150">Example 1.50</h3>
+    <div class="problem"><p>Simplify: \(3(x + 4)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.50</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Distribute.</th><td>\(3 \cdot x + 3 \cdot 4\)</td></tr>
+            <tr><th scope="row">Multiply.</th><td>\(3x + 12\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <p>Some students find it helpful to draw in arrows to remind them how to use the Distributive Property.</p>
+  <figure>
+    <p class="center">\(3(x + 4)\)</p>
+    <figcaption>Diagram: curved arrows connect the 3 outside the parentheses to the x and to the 4 inside. The first step of Example 1.50 multiplies the 3 by each term in the parentheses.</figcaption>
+  </figure>
+
+  <section class="tryit" aria-labelledby="try199">
+    <h3 id="try199">Try It 1.99</h3>
+    <div class="problem"><p>Simplify: \(4(x + 2)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1100">
+    <h3 id="try1100">Try It 1.100</h3>
+    <div class="problem"><p>Simplify: \(6(x + 7)\).</p></div>
+  </section>
+
+  <section class="example" aria-labelledby="ex151">
+    <h3 id="ex151">Example 1.51</h3>
+    <div class="problem"><p>Simplify: \(8\left(\frac{3}{8}x + \frac{1}{4}\right)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.51</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(8\left(\frac{3}{8}x + \frac{1}{4}\right)\)</td></tr>
+            <tr><th scope="row">Distribute.</th><td>\(8 \cdot \frac{3}{8}x + 8 \cdot \frac{1}{4}\)</td></tr>
+            <tr><th scope="row">Multiply.</th><td>\(3x + 2\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1101">
+    <h3 id="try1101">Try It 1.101</h3>
+    <div class="problem"><p>Simplify: \(6\left(\frac{5}{6}y + \frac{1}{2}\right)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1102">
+    <h3 id="try1102">Try It 1.102</h3>
+    <div class="problem"><p>Simplify: \(12\left(\frac{1}{3}n + \frac{3}{4}\right)\).</p></div>
+  </section>
+
+  <p>Using the Distributive Property as shown in the next example will be very useful when we solve money applications in later chapters.</p>
+
+  <section class="example" aria-labelledby="ex152">
+    <h3 id="ex152">Example 1.52</h3>
+    <div class="problem"><p>Simplify: \(100(0.3 + 0.25q)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.52</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(100(0.3 + 0.25q)\)</td></tr>
+            <tr><th scope="row">Distribute.</th><td>\(100(0.3) + 100(0.25q)\)</td></tr>
+            <tr><th scope="row">Multiply.</th><td>\(30 + 25q\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1103">
+    <h3 id="try1103">Try It 1.103</h3>
+    <div class="problem"><p>Simplify: \(100(0.7 + 0.15p)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1104">
+    <h3 id="try1104">Try It 1.104</h3>
+    <div class="problem"><p>Simplify: \(100(0.04 + 0.35d)\).</p></div>
+  </section>
+
+  <p><strong>Note:</strong> When we distribute a negative number, we need to be extra careful to get the signs correct!</p>
+
+  <section class="example" aria-labelledby="ex153">
+    <h3 id="ex153">Example 1.53</h3>
+    <div class="problem"><p>Simplify: \(-11(4 - 3a)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.53</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(-11(4 - 3a)\)</td></tr>
+            <tr><th scope="row">Distribute.</th><td>\(-11 \cdot 4 - (-11) \cdot 3a\)</td></tr>
+            <tr><th scope="row">Multiply.</th><td>\(-44 - (-33a)\)</td></tr>
+            <tr><th scope="row">Simplify.</th><td>\(-44 + 33a\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <p>Notice that you could also write the result as \(33a - 44\). Do you know why?</p>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1105">
+    <h3 id="try1105">Try It 1.105</h3>
+    <div class="problem"><p>Simplify: \(-5(2 - 3a)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1106">
+    <h3 id="try1106">Try It 1.106</h3>
+    <div class="problem"><p>Simplify: \(-7(8 - 15y)\).</p></div>
+  </section>
+
+  <p>In the next example, we will show how to use the Distributive Property to find the opposite of an expression.</p>
+
+  <section class="example" aria-labelledby="ex154">
+    <h3 id="ex154">Example 1.54</h3>
+    <div class="problem"><p>Simplify: \(-(y + 5)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.54</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start. Multiplying by −1 results in the opposite.</th><td>\(-(y + 5) = -1(y + 5)\)</td></tr>
+            <tr><th scope="row">Distribute.</th><td>\(-1 \cdot y + (-1) \cdot 5\)</td></tr>
+            <tr><th scope="row">Simplify.</th><td>\(-y + (-5)\)</td></tr>
+            <tr><th scope="row">Simplify.</th><td>\(-y - 5\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1107">
+    <h3 id="try1107">Try It 1.107</h3>
+    <div class="problem"><p>Simplify: \(-(z - 11)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1108">
+    <h3 id="try1108">Try It 1.108</h3>
+    <div class="problem"><p>Simplify: \(-(x - 4)\).</p></div>
+  </section>
+
+  <p>There will be times when we’ll need to use the Distributive Property as part of the order of operations. Start by looking at the parentheses. If the expression inside the parentheses cannot be simplified, the next step would be to multiply using the Distributive Property, which removes the parentheses. The next two examples will illustrate this.</p>
+
+  <section class="example" aria-labelledby="ex155">
+    <h3 id="ex155">Example 1.55</h3>
+    <div class="problem"><p>Simplify: \(8 - 2(x + 3)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>We follow the order of operations. Multiplication comes before subtraction, so we will distribute the 2 first and then subtract.</p>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.55</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Start.</th><td>\(8 - 2(x + 3)\)</td></tr>
+            <tr><th scope="row">Distribute.</th><td>\(8 - 2 \cdot x - 2 \cdot 3\)</td></tr>
+            <tr><th scope="row">Multiply.</th><td>\(8 - 2x - 6\)</td></tr>
+            <tr><th scope="row">Combine like terms.</th><td>\(-2x + 2\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1109">
+    <h3 id="try1109">Try It 1.109</h3>
+    <div class="problem"><p>Simplify: \(9 - 3(x + 2)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1110">
+    <h3 id="try1110">Try It 1.110</h3>
+    <div class="problem"><p>Simplify: \(7x - 5(x + 4)\).</p></div>
+  </section>
+
+  <section class="example" aria-labelledby="ex156">
+    <h3 id="ex156">Example 1.56</h3>
+    <div class="problem"><p>Simplify: \(4(x - 8) - (x + 3)\).</p></div>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+        <table>
+          <caption class="sr-only">Solution steps for Example 1.56</caption>
+          <thead><tr><th scope="col">Step</th><th scope="col">Expression</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Distribute.</th><td>\(4x - 32 - x - 3\)</td></tr>
+            <tr><th scope="row">Combine like terms.</th><td>\(3x - 35\)</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1111">
+    <h3 id="try1111">Try It 1.111</h3>
+    <div class="problem"><p>Simplify: \(6(x - 9) - (x + 12)\).</p></div>
+  </section>
+
+  <section class="tryit" aria-labelledby="try1112">
+    <h3 id="try1112">Try It 1.112</h3>
+    <div class="problem"><p>Simplify: \(8(x - 1) - (x + 5)\).</p></div>
+  </section>
+</section>
+
+<section aria-labelledby="summary-heading">
+  <h2 id="summary-heading">Summary of Properties of Real Numbers</h2>
+  <p>All the properties of real numbers we have used in this chapter are summarized here.</p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Properties of real numbers</caption>
+      <thead>
+        <tr><th scope="col">Property</th><th scope="col">Statement</th><th scope="col">Formula</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Commutative Property<br>(changing the order gives the same result)</th>
+          <td>
+            Of addition: if \(a, b\) are real numbers, then<br>
+            Of multiplication: if \(a, b\) are real numbers, then
+          </td>
+          <td>\(a + b = b + a\)<br>\(a \cdot b = b \cdot a\)</td>
+        </tr>
+        <tr>
+          <th scope="row">Associative Property<br>(changing the grouping gives the same result)</th>
+          <td>
+            Of addition: if \(a, b, c\) are real numbers, then<br>
+            Of multiplication: if \(a, b, c\) are real numbers, then
+          </td>
+          <td>\((a + b) + c = a + (b + c)\)<br>\((a \cdot b) \cdot c = a \cdot (b \cdot c)\)</td>
+        </tr>
+        <tr>
+          <th scope="row">Distributive Property</th>
+          <td>If \(a, b, c\) are real numbers, then</td>
+          <td>
+            \(a(b + c) = ab + ac\)<br>
+            \((b + c)a = ba + ca\)<br>
+            \(a(b - c) = ab - ac\)<br>
+            \((b - c)a = ba - ca\)
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Identity Property</th>
+          <td>
+            Of addition: for any real number \(a\), 0 is the additive identity.<br>
+            Of multiplication: for any real number \(a\), 1 is the multiplicative identity.
+          </td>
+          <td>
+            \(a + 0 = a\), \(0 + a = a\)<br>
+            \(a \cdot 1 = a\), \(1 \cdot a = a\)
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Inverse Property</th>
+          <td>
+            Of addition: for any real number \(a\), \(-a\) is the additive inverse of \(a\).<br>
+            Of multiplication: for any real number \(a\), \(a \neq 0\), \(\frac{1}{a}\) is the multiplicative inverse of \(a\).
+          </td>
+          <td>
+            \(a + (-a) = 0\)<br>
+            \(a \cdot \frac{1}{a} = 1\)
+          </td>
+        </tr>
+        <tr>
+          <th scope="row">Properties of Zero</th>
+          <td>
+            For any real number \(a\), the product of \(a\) and 0 is 0.<br>
+            For any real number \(a\), \(a \neq 0\), zero divided by \(a\) is 0.<br>
+            For any real number \(a\), division by zero is undefined.
+          </td>
+          <td>
+            \(a \cdot 0 = 0\), \(0 \cdot a = 0\)<br>
+            \(\frac{0}{a} = 0\)<br>
+            \(\frac{a}{0}\) is undefined
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<section aria-labelledby="exercises-heading">
+  <h2 id="exercises-heading">Section 1.5 Exercises</h2>
+  <h3>Practice Makes Perfect</h3>
+
+  <h4>Use the Commutative and Associative Properties</h4>
+  <p>In the following exercises, simplify.</p>
+  <ol class="exercises" start="313">
+    <li>\(43m + (-12n) + (-16m) + (-9n)\)</li>
+    <li>\(-22p + 17q + (-35p) + (-27q)\)</li>
+    <li>\(\frac{3}{8}g + \frac{1}{12}h + \frac{7}{8}g + \frac{5}{12}h\)</li>
+    <li>\(\frac{5}{6}a + \frac{3}{10}b + \frac{1}{6}a + \frac{9}{10}b\)</li>
+    <li>\(6.8p + 9.14q + (-4.37p) + (-0.88q)\)</li>
+    <li>\(9.6m + 7.22n + (-2.19m) + (-0.65n)\)</li>
+    <li>\(-24 \cdot 7 \cdot \frac{3}{8}\)</li>
+    <li>\(-36 \cdot 11 \cdot \frac{4}{9}\)</li>
+    <li>\(\left(\frac{5}{6} + \frac{8}{15}\right) + \frac{7}{15}\)</li>
+    <li>\(\left(\frac{11}{12} + \frac{4}{9}\right) + \frac{5}{9}\)</li>
+    <li>\(17(0.25)(4)\)</li>
+    <li>\(36(0.2)(5)\)</li>
+    <li>\([2.48(12)](0.5)\)</li>
+    <li>\([9.731(4)](0.75)\)</li>
+    <li>\(12\left(\frac{5}{6}p\right)\)</li>
+    <li>\(20\left(\frac{3}{5}q\right)\)</li>
+  </ol>
+
+  <h4>Use the Properties of Identity, Inverse and Zero</h4>
+  <p>In the following exercises, simplify.</p>
+  <ol class="exercises" start="329">
+    <li>\(19a + 44 - 19a\)</li>
+    <li>\(27c + 16 - 27c\)</li>
+    <li>\(\frac{1}{2} + \frac{7}{8} + \left(-\frac{1}{2}\right)\)</li>
+    <li>\(\frac{2}{5} + \frac{5}{12} + \left(-\frac{2}{5}\right)\)</li>
+    <li>\(10(0.1d)\)</li>
+    <li>\(100(0.01p)\)</li>
+    <li>\(\frac{3}{20} \cdot \frac{49}{11} \cdot \frac{20}{3}\)</li>
+    <li>\(\frac{13}{18} \cdot \frac{25}{7} \cdot \frac{18}{13}\)</li>
+    <li>\(\frac{0}{u - 4.99}\), where \(u \neq 4.99\)</li>
+    <li>\(0 \div \left(y - \frac{1}{6}\right)\), where \(x \neq \frac{1}{6}\)</li>
+    <li>\(\frac{32 - 5a}{0}\), where \(32 - 5a \neq 0\)</li>
+    <li>\(\frac{28 - 9b}{0}\), where \(28 - 9b \neq 0\)</li>
+    <li>\(\left(\frac{3}{4} + \frac{9}{10}m\right) \div 0\), where \(\frac{3}{4} + \frac{9}{10}m \neq 0\)</li>
+    <li>\(\left(\frac{5}{16}n - \frac{3}{7}\right) \div 0\), where \(\frac{5}{16}n - \frac{3}{7} \neq 0\)</li>
+  </ol>
+
+  <h4>Simplify Expressions Using the Distributive Property</h4>
+  <p>In the following exercises, simplify using the Distributive Property.</p>
+  <ol class="exercises" start="343">
+    <li>\(8(4y + 9)\)</li>
+    <li>\(9(3w + 7)\)</li>
+    <li>\(6(c - 13)\)</li>
+    <li>\(7(y - 13)\)</li>
+    <li>\(\frac{1}{4}(3q + 12)\)</li>
+    <li>\(\frac{1}{5}(4m + 20)\)</li>
+    <li>\(9\left(\frac{5}{9}y - \frac{1}{3}\right)\)</li>
+    <li>\(10\left(\frac{3}{10}x - \frac{2}{5}\right)\)</li>
+    <li>\(12\left(\frac{1}{4} + \frac{2}{3}r\right)\)</li>
+    <li>\(12\left(\frac{1}{6} + \frac{3}{4}s\right)\)</li>
+    <li>\(15 \cdot \frac{3}{5}(4d + 10)\)</li>
+    <li>\(18 \cdot \frac{5}{6}(15h + 24)\)</li>
+    <li>\(r(s - 18)\)</li>
+    <li>\(u(v - 10)\)</li>
+    <li>\((y + 4)p\)</li>
+    <li>\((a + 7)x\)</li>
+    <li>\(-7(4p + 1)\)</li>
+    <li>\(-9(9a + 4)\)</li>
+    <li>\(-3(x - 6)\)</li>
+    <li>\(-4(q - 7)\)</li>
+    <li>\(-(3x - 7)\)</li>
+    <li>\(-(5p - 4)\)</li>
+    <li>\(16 - 3(y + 8)\)</li>
+    <li>\(18 - 4(x + 2)\)</li>
+    <li>\(4 - 11(3c - 2)\)</li>
+    <li>\(9 - 6(7n - 5)\)</li>
+    <li>\(22 - (a + 3)\)</li>
+    <li>\(8 - (r - 7)\)</li>
+    <li>\((5m - 3) - (m + 7)\)</li>
+    <li>\((4y - 1) - (y - 2)\)</li>
+    <li>\(9(8x - 3) - (-2)\)</li>
+    <li>\(4(6x - 1) - (-8)\)</li>
+    <li>\(5(2n + 9) + 12(n - 3)\)</li>
+    <li>\(9(5u + 8) + 2(u - 6)\)</li>
+    <li>\(14(c - 1) - 8(c - 6)\)</li>
+    <li>\(11(n - 7) - 5(n - 1)\)</li>
+    <li>\(6(7y + 8) - (30y - 15)\)</li>
+    <li>\(7(3n + 9) - (4n - 13)\)</li>
+  </ol>
+
+  <h3>Writing Exercises</h3>
+  <ol class="exercises" start="381">
+    <li>In your own words, state the Associative Property of addition.</li>
+    <li>What is the difference between the additive inverse and the multiplicative inverse of a number?</li>
+    <li>Simplify \(8\left(x - \frac{1}{4}\right)\) using the Distributive Property and explain each step.</li>
+    <li>Explain how you can multiply \(4(\$5.97)\) without paper or calculator by thinking of \(\$5.97\) as \(6 - 0.03\) and then using the Distributive Property.</li>
+  </ol>
+
+  <h3>Self Check</h3>
+  <p>a. After completing the exercises, use this checklist to evaluate your mastery of the objectives of this section.</p>
+
+  <div class="table-wrap">
+    <table>
+      <caption>Self-check: I can…</caption>
+      <thead>
+        <tr>
+          <th scope="col">I can…</th>
+          <th scope="col">Confidently</th>
+          <th scope="col">With some help</th>
+          <th scope="col">No—I don’t get it!</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">Use the commutative and associative properties.</th>
+          <td class="center"><input type="checkbox" id="c1a" aria-label="Use the commutative and associative properties: Confidently"></td>
+          <td class="center"><input type="checkbox" id="c1b" aria-label="Use the commutative and associative properties: With some help"></td>
+          <td class="center"><input type="checkbox" id="c1c" aria-label="Use the commutative and associative properties: No, I don't get it"></td>
+        </tr>
+        <tr>
+          <th scope="row">Use the properties of identity, inverse and zero.</th>
+          <td class="center"><input type="checkbox" id="c2a" aria-label="Use the properties of identity, inverse and zero: Confidently"></td>
+          <td class="center"><input type="checkbox" id="c2b" aria-label="Use the properties of identity, inverse and zero: With some help"></td>
+          <td class="center"><input type="checkbox" id="c2c" aria-label="Use the properties of identity, inverse and zero: No, I don't get it"></td>
+        </tr>
+        <tr>
+          <th scope="row">Simplify expressions using the distributive property.</th>
+          <td class="center"><input type="checkbox" id="c3a" aria-label="Simplify expressions using the distributive property: Confidently"></td>
+          <td class="center"><input type="checkbox" id="c3b" aria-label="Simplify expressions using the distributive property: With some help"></td>
+          <td class="center"><input type="checkbox" id="c3c" aria-label="Simplify expressions using the distributive property: No, I don't get it"></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <p>b. After reviewing this checklist, what will you do to become confident for all objectives?</p>
+</section>
+
+<footer class="footer-note">
+  <p>“1.5 Properties of Real Numbers” from <em>Intermediate Algebra</em> by Lynn Marecek, OpenStax.</p>
+  <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/intermediate-algebra/pages/1-5-properties-of-real-numbers">https://openstax.org/books/intermediate-algebra/pages/1-5-properties-of-real-numbers</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as an accessible HTML page; no wording edited. Image content is described in text or alternative text; equations are typeset with MathJax.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</main>
+</body>
+</html>

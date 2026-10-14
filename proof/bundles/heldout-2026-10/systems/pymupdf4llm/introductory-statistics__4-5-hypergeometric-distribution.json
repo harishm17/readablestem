@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "96b79c680b69c236e76281b0f995807cd25d3da410f351882dc377f3304a21e4",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 0.95,
+    "load_before": 1.03,
+    "offline": false,
+    "peak_rss_mb": 341.8,
+    "quiet_box": null,
+    "system_seconds": 0.823,
+    "timeout_seconds": 1800,
+    "user_seconds": 22.719,
+    "wall_seconds_per_page": 0.437
+  },
+  "output": {
+    "file": "introductory-statistics__4-5-hypergeometric-distribution.md",
+    "format": "md"
+  },
+  "pdf_pages": 6,
+  "seconds": 2.619,
+  "section": "introductory-statistics/4-5-hypergeometric-distribution",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

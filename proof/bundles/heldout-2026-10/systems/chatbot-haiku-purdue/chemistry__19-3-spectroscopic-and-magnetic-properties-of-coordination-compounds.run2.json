@@ -1,0 +1,135 @@
+{
+  "arm": "chatbot-haiku-purdue",
+  "attempts": [],
+  "cost_usd": 0.011907,
+  "counted_input_tokens": 41328,
+  "error": null,
+  "figure_judgements": [
+    {
+      "bound_by": "number",
+      "conveys": false,
+      "cost_usd": 0.0103074,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-000",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0046714,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-001",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0065953999999999995,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-002",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0122914,
+      "factual_error": true,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-003",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.019487400000000002,
+      "factual_error": true,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-004",
+      "outcome": "judged",
+      "passed": false,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 3,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0038874,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-005",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0043514,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-006",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 4,
+      "source": "alt"
+    },
+    {
+      "bound_by": "number",
+      "conveys": true,
+      "cost_usd": 0.0045994,
+      "factual_error": false,
+      "figure_id": "openstax/chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds/fig-007",
+      "outcome": "judged",
+      "passed": true,
+      "prompt_version": "judge_figure-137e2607",
+      "score": 5,
+      "source": "alt"
+    }
+  ],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.066191,
+  "output": {
+    "file": "chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.run2.html",
+    "format": "html"
+  },
+  "output_chars": 35903,
+  "pdf_pages": 8,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 52.3,
+  "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 41328,
+    "output_tokens": 15549,
+    "reasoning_tokens": 1583
+  },
+  "versions": {
+    "model_requested": "claude-haiku-5-5",
+    "model_served": "claude-haiku-5-5"
+  }
+}

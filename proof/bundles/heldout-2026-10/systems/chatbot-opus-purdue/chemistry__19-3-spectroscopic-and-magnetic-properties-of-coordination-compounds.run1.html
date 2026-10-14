@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>19.3 Spectroscopic and Magnetic Properties of Coordination Compounds | Chemistry (OpenStax)</title>
+  <meta name="description" content="Crystal field theory, high- and low-spin complexes, magnetic moments, and colors of transition metal coordination compounds.">
+
+  <!-- MathJax 3 configuration -->
+  <script>
+    window.MathJax = {
+      loader: {
+        load: ['[tex]/mhchem', '[tex]/tagformat', 'a11y/semantic-enrich', 'a11y/explorer']
+      },
+      tex: {
+        packages: {'[+]': ['mhchem', 'tagformat']},
+        inlineMath: [['\\(', '\\)']],
+        displayMath: [['\\[', '\\]']],
+        processEscapes: true,
+        processEnvironments: true,
+        tags: 'none'
+      },
+      chtml: {
+        scale: 1,
+        minScale: 0.5,
+        matchFontHeight: true,
+        displayAlign: 'center'
+      },
+      options: {
+        enableMenu: true,
+        enableEnrichment: true,
+        enableExplorer: true,
+        enableAssistiveMml: true,
+        menuOptions: {
+          settings: {
+            assistiveMml: true,
+            collapsible: false,
+            explorer: true
+          }
+        },
+        sre: {
+          speech: 'deep',
+          domain: 'mathspeak',
+          style: 'default',
+          locale: 'en'
+        },
+        skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre', 'code']
+      },
+      startup: {
+        typeset: true
+      }
+    };
+  </script>
+  <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+  <style>
+    :root {
+      --text: #1a1a1a;
+      --bg: #ffffff;
+      --link: #0645ad;
+      --link-visited: #5a2d91;
+      --border: #555555;
+      --box-bg: #f5f7fa;
+      --focus: #b34700;
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { font-size: 100%; }
+    body {
+      margin: 0;
+      font-family: Georgia, "Times New Roman", serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg);
+    }
+    main, header, footer {
+      max-width: 60rem;
+      margin: 0 auto;
+      padding: 1rem 1.25rem;
+    }
+    h1, h2, h3, h4 {
+      font-family: Arial, Helvetica, sans-serif;
+      line-height: 1.3;
+    }
+    h1 { font-size: 1.75rem; }
+    h2 { font-size: 1.4rem; margin-top: 2rem; }
+    h3 { font-size: 1.2rem; }
+    h4 { font-size: 1.05rem; }
+    a { color: var(--link); }
+    a:visited { color: var(--link-visited); }
+    a:focus-visible, button:focus-visible, [tabindex]:focus-visible {
+      outline: 3px solid var(--focus);
+      outline-offset: 2px;
+    }
+    .skip-link {
+      position: absolute;
+      left: -9999px;
+      top: 0;
+      background: #000;
+      color: #fff;
+      padding: 0.5rem 1rem;
+      z-index: 100;
+    }
+    .skip-link:focus { left: 0.5rem; top: 0.5rem; color: #fff; }
+    figure {
+      margin: 1.5rem 0;
+      padding: 0.75rem;
+      border: 1px solid #cccccc;
+    }
+    figure img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 0 auto;
+    }
+    figcaption { font-size: 0.95rem; margin-top: 0.5rem; }
+    .example, .link-to-learning {
+      border: 2px solid var(--border);
+      background: var(--box-bg);
+      padding: 0.75rem 1.25rem;
+      margin: 1.5rem 0;
+    }
+    .answer {
+      border: 1px solid var(--border);
+      background: #ffffff;
+      padding: 0.5rem 1rem;
+      margin-top: 0.75rem;
+    }
+    .equation {
+      overflow-x: auto;
+      margin: 1rem 0;
+    }
+    .eq-label { font-size: 0.9rem; text-align: center; margin-top: 0.25rem; }
+    table {
+      border-collapse: collapse;
+      margin: 0.75rem 0;
+      width: 100%;
+    }
+    caption { text-align: left; font-weight: bold; padding-bottom: 0.25rem; }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.4rem 0.6rem;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #e8ecf2; }
+    .table-wrap { overflow-x: auto; }
+    .visually-hidden {
+      position: absolute !important;
+      width: 1px; height: 1px;
+      padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0);
+      white-space: nowrap; border: 0;
+    }
+    .note { font-size: 0.9rem; font-style: italic; }
+    footer { font-size: 0.9rem; border-top: 1px solid #cccccc; margin-top: 2rem; }
+    @media (prefers-reduced-motion: reduce) {
+      * { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+    }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main-content">Skip to main content</a>
+
+  <header>
+    <p>Chemistry (OpenStax), Chapter 19: Transition Metals and Coordination Chemistry</p>
+  </header>
+
+  <main id="main-content" tabindex="-1">
+    <article>
+      <h1>19.3 Spectroscopic and Magnetic Properties of Coordination Compounds</h1>
+
+      <section aria-labelledby="objectives-heading">
+        <h2 id="objectives-heading">Learning Objectives</h2>
+        <p>By the end of this section, you will be able to:</p>
+        <ul>
+          <li>Outline the basic premise of crystal field theory (CFT)</li>
+          <li>Identify molecular geometries associated with various d-orbital splitting patterns</li>
+          <li>Predict electron configurations of split d orbitals for selected transition metal atoms or ions</li>
+          <li>Explain spectral and magnetic properties in terms of CFT concepts</li>
+        </ul>
+        <p>The behavior of coordination compounds cannot be adequately explained by the same theories used for main group element chemistry. The observed geometries of coordination complexes are not consistent with hybridized orbitals on the central metal overlapping with ligand orbitals, as would be predicted by valence bond theory. The observed colors indicate that the <i>d</i> orbitals often occur at different energy levels rather than all being degenerate, that is, of equal energy, as are the three <i>p</i> orbitals. To explain the stabilities, structures, colors, and magnetic properties of transition metal complexes, a different bonding model has been developed. Just as valence bond theory explains many aspects of bonding in main group chemistry, crystal field theory is useful in understanding and predicting the behavior of transition metal complexes.</p>
+      </section>
+
+      <section aria-labelledby="cft-heading">
+        <h2 id="cft-heading">Crystal Field Theory</h2>
+        <p>To explain the observed behavior of transition metal complexes (such as how colors arise), a model involving electrostatic interactions between the electrons from the ligands and the electrons in the unhybridized <i>d</i> orbitals of the central metal atom has been developed. This electrostatic model is <dfn>crystal field theory (CFT)</dfn>. It allows us to understand, interpret, and predict the colors, magnetic behavior, and some structures of coordination compounds of transition metals.</p>
+        <p>CFT focuses on the nonbonding electrons on the central metal ion in coordination complexes not on the metal-ligand bonds. Like valence bond theory, CFT tells only part of the story of the behavior of complexes. However, it tells the part that valence bond theory does not. In its pure form, CFT ignores any covalent bonding between ligands and metal ions. Both the ligand and the metal are treated as infinitesimally small point charges.</p>
+        <p>All electrons are negative, so the electrons donated from the ligands will repel the electrons of the central metal. Let us consider the behavior of the electrons in the unhybridized <i>d</i> orbitals in an octahedral complex. The five <i>d</i> orbitals consist of lobe-shaped regions and are arranged in space, as shown in <a href="#fig-19-33">Figure 19.33</a>. In an octahedral complex, the six ligands coordinate along the axes.</p>
+
+        <figure id="fig-19-33" aria-labelledby="fig-19-33-caption">
+          <img src="images/figure-19-33.png"
+               alt="Five three-dimensional d orbital drawings on x, y, z axes. d x squared minus y squared: four lobes lying along the x and y axes. d z squared: two lobes along the z axis with a ring (torus) around the middle in the xy plane. d yz, d xz, and d xy: four lobes each, lying between the axes in the yz, xz, and xy planes respectively. In the last four drawings, a ligand labeled L sits at the end of each of the six axis directions. Lobes are shaded in two colors to show phase.">
+          <figcaption id="fig-19-33-caption"><strong>Figure 19.33</strong> The directional characteristics of the five <i>d</i> orbitals are shown here. The shaded portions indicate the phase of the orbitals. The ligands (L) coordinate along the axes. For clarity, the ligands have been omitted from the \(d_{x^2-y^2}\) orbital so that the axis labels could be shown.</figcaption>
+        </figure>
+
+        <p>In an uncomplexed metal ion in the gas phase, the electrons are distributed among the five <i>d</i> orbitals in accord with Hund's rule because the orbitals all have the same energy. However, when ligands coordinate to a metal ion, the energies of the <i>d</i> orbitals are no longer the same.</p>
+        <p>In octahedral complexes, the lobes in two of the five <i>d</i> orbitals, the \(d_{z^2}\) and \(d_{x^2-y^2}\) orbitals, point toward the ligands (<a href="#fig-19-33">Figure 19.33</a>). These two orbitals are called the <dfn>\(e_g\) orbitals</dfn> (the symbol actually refers to the symmetry of the orbitals, but we will use it as a convenient name for these two orbitals in an octahedral complex). The other three orbitals, the \(d_{xy}\), \(d_{xz}\), and \(d_{yz}\) orbitals, have lobes that point between the ligands and are called the <dfn>\(t_{2g}\) orbitals</dfn> (again, the symbol really refers to the symmetry of the orbitals). As six ligands approach the metal ion along the axes of the octahedron, their point charges repel the electrons in the <i>d</i> orbitals of the metal ion. However, the repulsions between the electrons in the \(e_g\) orbitals (the \(d_{z^2}\) and \(d_{x^2-y^2}\) orbitals) and the ligands are greater than the repulsions between the electrons in the \(t_{2g}\) orbitals (the \(d_{zy}\), \(d_{xz}\), and \(d_{yz}\) orbitals) and the ligands. This is because the lobes of the \(e_g\) orbitals point directly at the ligands, whereas the lobes of the \(t_{2g}\) orbitals point between them. Thus, electrons in the \(e_g\) orbitals of the metal ion in an octahedral complex have higher potential energies than those of electrons in the \(t_{2g}\) orbitals. The difference in energy may be represented as shown in <a href="#fig-19-34">Figure 19.34</a>.</p>
+
+        <figure id="fig-19-34" aria-labelledby="fig-19-34-caption">
+          <img src="images/figure-19-34.png"
+               alt="Energy diagram with an upward arrow labeled E. Two higher-energy boxes, d z squared and d x squared minus y squared, are labeled e g orbitals. Three lower-energy boxes, d xy, d xz, and d yz, are labeled t 2 g orbitals. A double-headed arrow between the two levels is labeled delta oct.">
+          <div class="table-wrap">
+            <table>
+              <caption>Text version of Figure 19.34: octahedral d-orbital energy levels</caption>
+              <thead>
+                <tr><th scope="col">Energy level</th><th scope="col">Set name</th><th scope="col">Orbitals</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Higher (raised by \(\Delta_{\text{oct}}\) relative to \(t_{2g}\))</td><td>\(e_g\)</td><td>\(d_{z^2}\), \(d_{x^2-y^2}\)</td></tr>
+                <tr><td>Lower</td><td>\(t_{2g}\)</td><td>\(d_{xy}\), \(d_{xz}\), \(d_{yz}\)</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <figcaption id="fig-19-34-caption"><strong>Figure 19.34</strong> In octahedral complexes, the \(e_g\) orbitals are destabilized (higher in energy) compared to the \(t_{2g}\) orbitals because the ligands interact more strongly with the <i>d</i> orbitals at which they are pointed directly.</figcaption>
+        </figure>
+
+        <p>The difference in energy between the \(e_g\) and the \(t_{2g}\) orbitals is called the <dfn>crystal field splitting</dfn> and is symbolized by \(\Delta_{\text{oct}}\), where oct stands for octahedral.</p>
+        <p>The magnitude of \(\Delta_{\text{oct}}\) depends on many factors, including the nature of the six ligands located around the central metal ion, the charge on the metal, and whether the metal is using 3<i>d</i>, 4<i>d</i>, or 5<i>d</i> orbitals. Different ligands produce different crystal field splittings. The increasing crystal field splitting produced by ligands is expressed in the <dfn>spectrochemical series</dfn>, a short version of which is given here:</p>
+
+        <div class="equation" role="group" aria-labelledby="eq-19-34-label">
+          \[
+            \ce{I-} \lt \ce{Br-} \lt \ce{Cl-} \lt \ce{F-} \lt \ce{H2O} \lt \ce{C2O4^2-} \lt \ce{NH3} \lt \mathit{en} \lt \ce{NO2-} \lt \ce{CN-}
+          \]
+          <p class="eq-label" id="eq-19-34-label">Equation 19.34: a few ligands of the spectrochemical series, in order of increasing field strength of the ligand</p>
+        </div>
+
+        <p>In this series, ligands on the left cause small crystal field splittings and are <dfn>weak-field ligands</dfn>, whereas those on the right cause larger splittings and are <dfn>strong-field ligands</dfn>. Thus, the \(\Delta_{\text{oct}}\) value for an octahedral complex with iodide ligands (\(\ce{I-}\)) is much smaller than the \(\Delta_{\text{oct}}\) value for the same metal with cyanide ligands (\(\ce{CN-}\)).</p>
+        <p>Electrons in the <i>d</i> orbitals follow the aufbau (“filling up”) principle, which says that the orbitals will be filled to give the lowest total energy, just as in main group chemistry. When two electrons occupy the same orbital, the like charges repel each other. The energy needed to pair up two electrons in a single orbital is called the <dfn>pairing energy (P)</dfn>. Electrons will always singly occupy each orbital in a degenerate set before pairing. P is similar in magnitude to \(\Delta_{\text{oct}}\). When electrons fill the <i>d</i> orbitals, the relative magnitudes of \(\Delta_{\text{oct}}\) and P determine which orbitals will be occupied.</p>
+        <p>In \(\ce{[Fe(CN)6]^4-}\), the strong field of six cyanide ligands produces a large \(\Delta_{\text{oct}}\). Under these conditions, the electrons require less energy to pair than they require to be excited to the \(e_g\) orbitals (\(\Delta_{\text{oct}} \gt \text{P}\)). The six 3<i>d</i> electrons of the \(\ce{Fe^2+}\) ion pair in the three \(t_{2g}\) orbitals (<a href="#fig-19-35">Figure 19.35</a>). Complexes in which the electrons are paired because of the large crystal field splitting are called <dfn>low-spin complexes</dfn> because the number of unpaired electrons (spins) is minimized.</p>
+
+        <figure id="fig-19-35" aria-labelledby="fig-19-35-caption">
+          <img src="images/figure-19-35.png"
+               alt="Three orbital-filling diagrams on a vertical energy axis. Left, Fe 2+ with no ligands: five degenerate boxes in a row, the first with a paired up-down arrow and the other four with a single up arrow each. Middle, [Fe(H2O)6] 2+, labeled high spin, small delta oct: lower t 2 g set of three boxes holding one pair and two single electrons; upper e g set of two boxes each holding one electron; the gap between the sets is small. Right, [Fe(CN)6] 4−, labeled low spin, large delta oct: three t 2 g boxes each holding a pair of electrons; the two e g boxes are empty and far above.">
+          <div class="table-wrap">
+            <table>
+              <caption>Text version of Figure 19.35: electron arrangements for iron(II), d<sup>6</sup></caption>
+              <thead>
+                <tr>
+                  <th scope="col">Species</th>
+                  <th scope="col">Splitting</th>
+                  <th scope="col">\(t_{2g}\) occupancy</th>
+                  <th scope="col">\(e_g\) occupancy</th>
+                  <th scope="col">Unpaired electrons</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <th scope="row">\(\ce{Fe^2+}\), no ligands</th>
+                  <td>None; all five <i>d</i> orbitals degenerate (1 pair, 4 single)</td>
+                  <td>Not applicable</td>
+                  <td>Not applicable</td>
+                  <td>4</td>
+                </tr>
+                <tr>
+                  <th scope="row">\(\ce{[Fe(H2O)6]^2+}\)</th>
+                  <td>High spin, small \(\Delta_{\text{oct}}\)</td>
+                  <td>1 pair + 2 single (4 electrons)</td>
+                  <td>2 single (2 electrons)</td>
+                  <td>4</td>
+                </tr>
+                <tr>
+                  <th scope="row">\(\ce{[Fe(CN)6]^4-}\)</th>
+                  <td>Low spin, large \(\Delta_{\text{oct}}\)</td>
+                  <td>3 pairs (6 electrons)</td>
+                  <td>Empty</td>
+                  <td>0</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <figcaption id="fig-19-35-caption"><strong>Figure 19.35</strong> Iron(II) complexes have six electrons in the 5<i>d</i> orbitals. In the absence of a crystal field, the orbitals are degenerate. For coordination complexes with strong-field ligands such as \(\ce{[Fe(CN)6]^4-}\), \(\Delta_{\text{oct}}\) is greater than P, and the electrons pair in the lower energy \(t_{2g}\) orbitals before occupying the <i>eg</i> orbitals. With weak-field ligands such as \(\ce{H2O}\), the ligand field splitting is less than the pairing energy, \(\Delta_{\text{oct}}\) less than P, so the electrons occupy all <i>d</i> orbitals singly before any pairing occurs.</figcaption>
+        </figure>
+
+        <p>In \(\ce{[Fe(H2O)6]^2+}\), on the other hand, the weak field of the water molecules produces only a small crystal field splitting (\(\Delta_{\text{oct}} \lt \text{P}\)). Because it requires less energy for the electrons to occupy the \(e_g\) orbitals than to pair together, there will be an electron in each of the five 3<i>d</i> orbitals before pairing occurs. For the six <i>d</i> electrons on the iron(II) center in \(\ce{[Fe(H2O)6]^2+}\), there will be one pair of electrons and four unpaired electrons (<a href="#fig-19-35">Figure 19.35</a>). Complexes such as the \(\ce{[Fe(H2O)6]^2+}\) ion, in which the electrons are unpaired because the crystal field splitting is not large enough to cause them to pair, are called <dfn>high-spin complexes</dfn> because the number of unpaired electrons (spins) is maximized.</p>
+        <p>A similar line of reasoning shows why the \(\ce{[Fe(CN)6]^3-}\) ion is a low-spin complex with only one unpaired electron, whereas both the \(\ce{[Fe(H2O)6]^3+}\) and \(\ce{[FeF6]^3-}\) ions are high-spin complexes with five unpaired electrons.</p>
+
+        <section class="example" aria-labelledby="ex-19-7-heading">
+          <h3 id="ex-19-7-heading">Example 19.7: High- and Low-Spin Complexes</h3>
+          <p>Predict the number of unpaired electrons.</p>
+          <ol type="a">
+            <li>\(\ce{K3[CrI6]}\)</li>
+            <li>\(\ce{[Cu(en)2(H2O)2]Cl2}\)</li>
+            <li>\(\ce{Na3[Co(NO2)6]}\)</li>
+          </ol>
+          <h4>Solution</h4>
+          <p>The complexes are octahedral.</p>
+          <ol type="a">
+            <li>\(\ce{Cr^3+}\) has a \(d^3\) configuration. These electrons will all be unpaired.</li>
+            <li>\(\ce{Cu^2+}\) is \(d^9\), so there will be one unpaired electron.</li>
+            <li>\(\ce{Co^3+}\) has \(d^6\) valence electrons, so the crystal field splitting will determine how many are paired. Nitrite is a strong-field ligand, so the complex will be low spin. Six electrons will go in the \(t_{2g}\) orbitals, leaving 0 unpaired.</li>
+          </ol>
+          <h4>Check Your Learning</h4>
+          <p>The size of the crystal field splitting only influences the arrangement of electrons when there is a choice between pairing electrons and filling the higher-energy orbitals. For which <i>d</i>-electron configurations will there be a difference between high- and low-spin configurations in octahedral complexes?</p>
+          <div class="answer">
+            <h5 class="visually-hidden">Answer to Check Your Learning, Example 19.7</h5>
+            <p><strong>Answer:</strong> \(d^4\), \(d^5\), \(d^6\), and \(d^7\)</p>
+          </div>
+        </section>
+
+        <section class="example" aria-labelledby="ex-19-8-heading">
+          <h3 id="ex-19-8-heading">Example 19.8: CFT for Other Geometries</h3>
+          <p>CFT is applicable to molecules in geometries other than octahedral. In octahedral complexes, remember that the lobes of the \(e_g\) set point directly at the ligands. For tetrahedral complexes, the <i>d</i> orbitals remain in place, but now we have only four ligands located between the axes (<a href="#fig-19-36">Figure 19.36</a>). None of the orbitals points directly at the tetrahedral ligands. However, the \(e_g\) set (along the Cartesian axes) overlaps with the ligands less than does the \(t_{2g}\) set. By analogy with the octahedral case, predict the energy diagram for the <i>d</i> orbitals in a tetrahedral crystal field. To avoid confusion, the octahedral \(e_g\) set becomes a tetrahedral <i>e</i> set, and the octahedral \(t_{2g}\) set becomes a \(t_2\) set.</p>
+
+          <figure id="fig-19-36" aria-labelledby="fig-19-36-caption">
+            <img src="images/figure-19-36.png"
+                 alt="A cube centered on the origin of x, y, and z axes. Four ligands, shown as red spheres, sit at four alternating corners of the cube, forming a tetrahedron, with lines joining each to the center. A four-lobed d orbital lies in the plane of the drawing with lobes pointing between the axes; none of the lobes points directly at a ligand.">
+            <figcaption id="fig-19-36-caption"><strong>Figure 19.36</strong> This diagram shows the orientation of the tetrahedral ligands with respect to the axis system for the orbitals.</figcaption>
+          </figure>
+
+          <h4>Solution</h4>
+          <p>Since CFT is based on electrostatic repulsion, the orbitals closer to the ligands will be destabilized and raised in energy relative to the other set of orbitals. The splitting is less than for octahedral complexes because the overlap is less, so \(\Delta_{\text{tet}}\) is usually small \(\left(\Delta_{\text{tet}} = \frac{4}{9}\Delta_{\text{oct}}\right)\):</p>
+
+          <figure id="fig-tet-diagram" aria-labelledby="fig-tet-caption">
+            <img src="images/tetrahedral-splitting.png"
+                 alt="Energy diagram with an upward arrow labeled E. Three higher-energy boxes are labeled t 2. Two lower-energy boxes are labeled e. A double-headed arrow between them is labeled small delta tet.">
+            <div class="table-wrap">
+              <table>
+                <caption id="fig-tet-caption">Text version: tetrahedral d-orbital energy levels</caption>
+                <thead>
+                  <tr><th scope="col">Energy level</th><th scope="col">Set name</th><th scope="col">Number of orbitals</th></tr>
+                </thead>
+                <tbody>
+                  <tr><td>Higher (raised by a small \(\Delta_{\text{tet}}\))</td><td>\(t_2\)</td><td>3</td></tr>
+                  <tr><td>Lower</td><td>\(e\)</td><td>2</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </figure>
+
+          <h4>Check Your Learning</h4>
+          <p>Explain how many unpaired electrons a tetrahedral \(d^4\) ion will have.</p>
+          <div class="answer">
+            <h5 class="visually-hidden">Answer to Check Your Learning, Example 19.8</h5>
+            <p><strong>Answer:</strong> 4; because \(\Delta_{\text{tet}}\) is small, all tetrahedral complexes are high spin and the electrons go into the \(t_2\) orbitals before pairing</p>
+          </div>
+        </section>
+
+        <p>The other common geometry is square planar. It is possible to consider a square planar geometry as an octahedral structure with a pair of <i>trans</i> ligands removed. The removed ligands are assumed to be on the <i>z</i>-axis. This changes the distribution of the <i>d</i> orbitals, as orbitals on or near the <i>z</i>-axis become more stable, and those on or near the <i>x</i>- or <i>y</i>-axes become less stable. This results in the octahedral \(t_{2g}\) and the \(e_g\) sets splitting and gives a more complicated pattern with no simple \(\Delta_{\text{oct}}\). The basic pattern is:</p>
+
+        <figure id="fig-square-planar" aria-label="d orbitals shown following the square planar discussion">
+          <img src="images/square-planar-orbitals.png"
+               alt="Four three-dimensional d orbital drawings on x, y, z axes with no ligands: d x squared minus y squared with lobes along the x and y axes; d z squared with lobes along the z axis and a ring in the xy plane; d yz with lobes between the y and z axes; and d xz with lobes between the x and z axes.">
+        </figure>
+      </section>
+
+      <section aria-labelledby="magnetic-heading">
+        <h2 id="magnetic-heading">Magnetic Moments of Molecules and Ions</h2>
+        <p>Experimental evidence of magnetic measurements supports the theory of high- and low-spin complexes. Remember that molecules such as \(\ce{O2}\) that contain unpaired electrons are paramagnetic. Paramagnetic substances are attracted to magnetic fields. Many transition metal complexes have unpaired electrons and hence are paramagnetic. Molecules such as \(\ce{N2}\) and ions such as \(\ce{Na+}\) and \(\ce{[Fe(CN)6]^4-}\) that contain no unpaired electrons are diamagnetic. Diamagnetic substances have a slight tendency to be repelled by magnetic fields.</p>
+        <p>When an electron in an atom or ion is unpaired, the magnetic moment due to its spin makes the entire atom or ion paramagnetic. The size of the magnetic moment of a system containing unpaired electrons is related directly to the number of such electrons: the greater the number of unpaired electrons, the larger the magnetic moment. Therefore, the observed magnetic moment is used to determine the number of unpaired electrons present. The measured magnetic moment of low-spin \(d^6\) \(\ce{[Fe(CN)6]^4-}\) confirms that iron is diamagnetic, whereas high-spin \(d^6\) \(\ce{[Fe(H2O)6]^2+}\) has four unpaired electrons with a magnetic moment that confirms this arrangement.</p>
+      </section>
+
+      <section aria-labelledby="colors-heading">
+        <h2 id="colors-heading">Colors of Transition Metal Complexes</h2>
+        <p>When atoms or molecules absorb light at the proper frequency, their electrons are excited to higher-energy orbitals. For many main group atoms and molecules, the absorbed photons are in the ultraviolet range of the electromagnetic spectrum, which cannot be detected by the human eye. For coordination compounds, the energy difference between the <i>d</i> orbitals often allows photons in the visible range to be absorbed.</p>
+        <p>The human eye perceives a mixture of all the colors, in the proportions present in sunlight, as white light. Complementary colors, those located across from each other on a color wheel, are also used in color vision. The eye perceives a mixture of two complementary colors, in the proper proportions, as white light. Likewise, when a color is missing from white light, the eye sees its complement. For example, when red photons are absorbed from white light, the eyes see the color green. When violet photons are removed from white light, the eyes see lemon yellow. The blue color of the \(\ce{[Cu(NH3)4]^2+}\) ion results because this ion absorbs orange and red light, leaving the complementary colors of blue and green (<a href="#fig-19-37">Figure 19.37</a>).</p>
+
+        <figure id="fig-19-37" aria-labelledby="fig-19-37-caption">
+          <img src="images/figure-19-37.png"
+               alt="Three-part figure. Part (a): four flat strips hit by rainbow-colored light rays. A black strip reflects no rays. A white strip reflects all rays. Two yellow strips: one reflects only yellow light, the other reflects all colors except indigo. Part (b): a color wheel divided into six segments with wavelength boundaries: red from 620 to 800 nanometers, orange from 580 to 620, yellow from 560 to 580, green from 490 to 560, blue from 430 to 490, and violet from 400 to 430. Part (c): white light, shown as arrows of all colors, enters a test tube of blue solution; the light leaving the other side, labeled blue-appearing light, contains violet, blue, green, and yellow arrows, with the red and orange arrows absorbed.">
+          <div class="table-wrap">
+            <table>
+              <caption>Text version of the color wheel in Figure 19.37(b)</caption>
+              <thead>
+                <tr><th scope="col">Color</th><th scope="col">Approximate wavelength range</th><th scope="col">Complementary color (directly across the wheel)</th></tr>
+              </thead>
+              <tbody>
+                <tr><th scope="row">Red</th><td>620–800 nm</td><td>Green</td></tr>
+                <tr><th scope="row">Orange</th><td>580–620 nm</td><td>Blue</td></tr>
+                <tr><th scope="row">Yellow</th><td>560–580 nm</td><td>Violet</td></tr>
+                <tr><th scope="row">Green</th><td>490–560 nm</td><td>Red</td></tr>
+                <tr><th scope="row">Blue</th><td>430–490 nm</td><td>Orange</td></tr>
+                <tr><th scope="row">Violet</th><td>400–430 nm</td><td>Yellow</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <figcaption id="fig-19-37-caption"><strong>Figure 19.37</strong> (a) An object is black if it absorbs all colors of light. If it reflects all colors of light, it is white. An object has a color if it absorbs all colors except one, such as this yellow strip. The strip also appears yellow if it absorbs the complementary color from white light (in this case, indigo). (b) Complementary colors are located directly across from one another on the color wheel. (c) A solution of \(\ce{[Cu(NH3)4]^2+}\) ions absorbs red and orange light, so the transmitted light appears as the complementary color, blue.</figcaption>
+        </figure>
+
+        <section class="example" aria-labelledby="ex-19-9-heading">
+          <h3 id="ex-19-9-heading">Example 19.9: Colors of Complexes</h3>
+          <p>The octahedral complex \(\ce{[Ti(H2O)6]^3+}\) has a single <i>d</i> electron. To excite this electron from the ground state \(t_{2g}\) orbital to the \(e_g\) orbital, this complex absorbs light from 450 to 600 nm. The maximum absorbance corresponds to \(\Delta_{\text{oct}}\) and occurs at 499 nm. Calculate the value of \(\Delta_{\text{oct}}\) in Joules and predict what color the solution will appear.</p>
+          <h4>Solution</h4>
+          <p>Using Planck's equation (refer to the section on electromagnetic energy), we calculate:</p>
+
+          <div class="equation" role="group" aria-labelledby="eq-19-35-label">
+            \[
+              \nu = \frac{c}{\lambda} \quad \text{so} \quad
+              \frac{3.00 \times 10^{8}\ \text{m/s}}{499\ \text{nm} \times \dfrac{1\ \text{m}}{10^{9}\ \text{nm}}}
+              = 6.01 \times 10^{14}\ \text{Hz}
+            \]
+            <p class="eq-label" id="eq-19-35-label">Equation 19.35</p>
+          </div>
+
+          <div class="equation" role="group" aria-labelledby="eq-19-36-label">
+            \[
+              E = h\nu \quad \text{so} \quad
+              6.63 \times 10^{-34}\ \text{J·s} \times 6.01 \times 10^{14}\ \text{Hz}
+              = 3.99 \times 10^{-19}\ \text{Joules/ion}
+            \]
+            <p class="eq-label" id="eq-19-36-label">Equation 19.36</p>
+          </div>
+
+          <p>Because the complex absorbs 600 nm (orange) through 450 (blue), the indigo, violet, and red wavelengths will be transmitted, and the complex will appear purple.</p>
+          <h4>Check Your Learning</h4>
+          <p>A complex that appears green, absorbs photons of what wavelengths?</p>
+          <div class="answer">
+            <h5 class="visually-hidden">Answer to Check Your Learning, Example 19.9</h5>
+            <p><strong>Answer:</strong> red, 620–800 nm</p>
+          </div>
+        </section>
+
+        <p>Small changes in the relative energies of the orbitals that electrons are transitioning between can lead to drastic shifts in the color of light absorbed. Therefore, the colors of coordination compounds depend on many factors. As shown in <a href="#fig-19-38">Figure 19.38</a>, different aqueous metal ions can have different colors. In addition, different oxidation states of one metal can produce different colors, as shown for the vanadium complexes in the link below.</p>
+
+        <figure id="fig-19-38" aria-labelledby="fig-19-38-caption">
+          <img src="images/figure-19-38.png"
+               alt="Photograph of three small capped glass vials of solution against a white background. Left vial: grayish violet. Center vial: orange-yellow. Right vial: red.">
+          <figcaption id="fig-19-38-caption"><strong>Figure 19.38</strong> The partially filled <i>d</i> orbitals of the stable ions \(\ce{Cr^3+}(aq)\), \(\ce{Fe^3+}(aq)\), and \(\ce{Co^2+}(aq)\) (left, center and right, respectively) give rise to various colors. (credit: Sahar Atwa)</figcaption>
+        </figure>
+
+        <p>The specific ligands coordinated to the metal center also influence the color of coordination complexes. For example, the iron(II) complex \(\ce{[Fe(H2O)6]SO4}\) appears blue-green because the high-spin complex absorbs photons in the red wavelengths (<a href="#fig-19-39">Figure 19.39</a>). In contrast, the low-spin iron(II) complex \(\ce{K4[Fe(CN)6]}\) appears pale yellow because it absorbs higher-energy violet photons.</p>
+
+        <figure id="fig-19-39" aria-labelledby="fig-19-39-caption">
+          <img src="images/figure-19-39.png"
+               alt="Two photographs. (a) Pale green crystals on a glass watch glass, darker green on one side. (b) A pile of pale yellow granular powder on a white surface.">
+          <figcaption id="fig-19-39-caption"><strong>Figure 19.39</strong> Both (a) hexaaquairon(II) sulfate and (b) potassium hexacyanoferrate(II) contain \(d^6\) iron(II) octahedral metal centers, but they absorb photons in different ranges of the visible spectrum.</figcaption>
+        </figure>
+
+        <aside class="link-to-learning" aria-labelledby="ltl-heading">
+          <h3 id="ltl-heading">Link to Learning</h3>
+          <p>Watch this video of the reduction of vanadium complexes to observe the colorful effect of changing oxidation states.</p>
+          <p class="note">The video link was not included in this printed version. It can be found on the original OpenStax page listed in the footer.</p>
+        </aside>
+
+        <p>In general, strong-field ligands cause a large split in the energies of <i>d</i> orbitals of the central metal atom (large \(\Delta_{\text{oct}}\)). Transition metal coordination compounds with these ligands are yellow, orange, or red because they absorb higher-energy violet or blue light. On the other hand, coordination compounds of transition metals with weak-field ligands are often blue-green, blue, or indigo because they absorb lower-energy yellow, orange, or red light.</p>
+        <p>A coordination compound of the \(\ce{Cu+}\) ion has a \(d^{10}\) configuration, and all the \(e_g\) orbitals are filled. To excite an electron to a higher level, such as the 4<i>p</i> orbital, photons of very high energy are necessary. This energy corresponds to very short wavelengths in the ultraviolet region of the spectrum. No visible light is absorbed, so the eye sees no change, and the compound appears white or colorless. A solution containing \(\ce{[Cu(CN)2]-}\), for example, is colorless. On the other hand, octahedral \(\ce{Cu^2+}\) complexes have a vacancy in the \(e_g\) orbitals, and electrons can be excited to this level. The wavelength (energy) of the light absorbed corresponds to the visible part of the spectrum, and \(\ce{Cu^2+}\) complexes are almost always colored—blue, blue-green violet, or yellow (<a href="#fig-19-40">Figure 19.40</a>). Although CFT successfully describes many properties of coordination complexes, molecular orbital explanations (beyond the introductory scope provided here) are required to understand fully the behavior of coordination complexes.</p>
+
+        <figure id="fig-19-40" aria-labelledby="fig-19-40-caption">
+          <img src="images/figure-19-40.png"
+               alt="Two photographs. (a) A small mound of off-white, beige powder on a glass dish over a dark background. (b) A pile of bright blue powder on a light gray surface.">
+          <figcaption id="fig-19-40-caption"><strong>Figure 19.40</strong> (a) Copper(I) complexes with \(d^{10}\) configurations such as CuI tend to be colorless, whereas (b) \(d^9\) copper(II) complexes such as \(\ce{Cu(NO3)2.5H2O}\) are brightly colored.</figcaption>
+        </figure>
+      </section>
+    </article>
+  </main>
+
+  <footer>
+    <p>“19.3 Spectroscopic and Magnetic Properties of Coordination Compounds” from <cite>Chemistry</cite> by Paul Flowers, William R. Robinson, PhD, Richard Langley, Klaus Theopold, OpenStax.</p>
+    <p>Licensed under Creative Commons Attribution License (CC BY 4.0): <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+    <p>Original page: <a href="https://openstax.org/books/chemistry/pages/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds">https://openstax.org/books/chemistry/pages/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds</a></p>
+    <p>Access for free at openstax.org.</p>
+    <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited. This HTML version adds alt text, text alternatives for diagrams, and MathJax markup.</p>
+    <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+  </footer>
+</body>
+</html>

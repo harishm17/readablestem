@@ -1,0 +1,38 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.969128,
+  "counted_input_tokens": 122587,
+  "error": null,
+  "figure_judgements": [],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.0,
+  "output": {
+    "file": "intermediate-algebra__1-5-properties-of-real-numbers.run1.html",
+    "format": "html"
+  },
+  "output_chars": 47792,
+  "pdf_pages": 26,
+  "response_status": "end_turn",
+  "run": 1,
+  "seconds": 177.0,
+  "section": "intermediate-algebra/1-5-properties-of-real-numbers",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 122587,
+    "output_tokens": 23939,
+    "reasoning_tokens": 2105
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}

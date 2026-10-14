@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "ae89112656cc4147d13c6553b47d8b2989bd11019c910e41d55a1e5c77240641",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 5.22,
+    "load_before": 2.8,
+    "offline": false,
+    "peak_rss_mb": 344.7,
+    "quiet_box": null,
+    "system_seconds": 2.564,
+    "timeout_seconds": 1800,
+    "user_seconds": 59.122,
+    "wall_seconds_per_page": 0.304
+  },
+  "output": {
+    "file": "precalculus__3-1-complex-numbers.md",
+    "format": "md"
+  },
+  "pdf_pages": 20,
+  "seconds": 6.083,
+  "section": "precalculus/3-1-complex-numbers",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

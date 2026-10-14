@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>4.6 Solve Systems of Equations Using Determinants – Intermediate Algebra (OpenStax)</title>
+
+<!-- MathJax configuration: accessible math (assistive MathML, speech, explorer, context menu) -->
+<script>
+  window.MathJax = {
+    loader: {
+      load: ['[tex]/ams', 'a11y/semantic-enrich', 'a11y/assistive-mml', 'a11y/explorer']
+    },
+    tex: {
+      packages: {'[+]': ['ams']},
+      inlineMath: [['\\(', '\\)']],
+      displayMath: [['\\[', '\\]']],
+      processEscapes: true
+    },
+    options: {
+      enableMenu: true,
+      enableAssistiveMml: true,
+      enableEnrichment: true,
+      enableExplorer: true,
+      sre: { speech: 'mathspeak', domain: 'mathspeak', style: 'default', locale: 'en' },
+      menuOptions: {
+        settings: {
+          assistiveMml: true,
+          collapsible: false,
+          explorer: true
+        }
+      }
+    },
+    chtml: {
+      scale: 1.05,
+      displayAlign: 'center'
+    },
+    startup: {
+      typeset: true
+    }
+  };
+</script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<style>
+  :root {
+    --text: #1a1a1a;
+    --bg: #ffffff;
+    --border: #555555;
+    --box-bg: #f7f7f7;
+    --head-bg: #dfe8ee;
+    --link: #0645ad;
+    --focus: #b35900;
+  }
+  html { font-size: 100%; }
+  body {
+    font-family: Georgia, "Times New Roman", serif;
+    color: var(--text);
+    background: var(--bg);
+    line-height: 1.6;
+    max-width: 60rem;
+    margin: 0 auto;
+    padding: 1rem 1.25rem 3rem;
+  }
+  h1, h2, h3, h4 {
+    font-family: Arial, Helvetica, sans-serif;
+    line-height: 1.3;
+  }
+  h1 { font-size: 2rem; }
+  h2 { font-size: 1.5rem; margin-top: 2.25rem; }
+  h3 { font-size: 1.25rem; margin-top: 1.75rem; }
+  h4 { font-size: 1.1rem; margin-top: 1.25rem; }
+  a { color: var(--link); }
+  a:focus, button:focus, input:focus, [tabindex]:focus {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+  }
+  .skip-link {
+    position: absolute;
+    left: -9999px;
+    top: 0;
+    background: #ffffff;
+    color: var(--link);
+    padding: 0.5rem 1rem;
+    border: 2px solid var(--focus);
+    z-index: 100;
+  }
+  .skip-link:focus { left: 1rem; top: 1rem; }
+  .visually-hidden {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    padding: 0; margin: -1px;
+    overflow: hidden; clip: rect(0, 0, 0, 0);
+    white-space: nowrap; border: 0;
+  }
+  .box {
+    border: 1px solid var(--border);
+    background: var(--box-bg);
+    padding: 0.75rem 1.25rem 1rem;
+    margin: 1.5rem 0;
+    border-radius: 4px;
+  }
+  .box > h3, .box > h4 { margin-top: 0.5rem; }
+  .solution {
+    border-top: 1px solid var(--border);
+    margin-top: 1rem;
+    padding-top: 0.5rem;
+  }
+  table {
+    border-collapse: collapse;
+    margin: 1rem 0;
+    background: #ffffff;
+    max-width: 100%;
+  }
+  caption {
+    text-align: left;
+    font-weight: bold;
+    padding: 0.25rem 0;
+    font-family: Arial, Helvetica, sans-serif;
+  }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 0.5rem 0.75rem;
+    vertical-align: middle;
+  }
+  thead th { background: var(--head-bg); text-align: left; }
+  tbody th { font-weight: normal; text-align: left; }
+  td.math { text-align: center; }
+  .table-wrap { overflow-x: auto; }
+  figure { margin: 1rem 0; }
+  figcaption { font-size: 0.95rem; font-style: italic; }
+  ol.steps { list-style: none; padding-left: 1rem; }
+  ol.exercises { padding-left: 3rem; }
+  ol.exercises > li { margin-bottom: 1.25rem; padding-left: 0.5rem; }
+  .attribution {
+    border-top: 1px solid var(--border);
+    margin-top: 2.5rem;
+    padding-top: 1rem;
+    font-size: 0.95rem;
+  }
+  .checklist td { text-align: center; }
+  .checklist input[type="checkbox"] { width: 1.25rem; height: 1.25rem; }
+  mjx-container { overflow-x: auto; overflow-y: hidden; max-width: 100%; }
+</style>
+</head>
+<body>
+
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header>
+  <p><small>Intermediate Algebra (OpenStax), CC BY 4.0. Access for free at openstax.org.</small></p>
+</header>
+
+<main id="main">
+
+<h1>4.6 Solve Systems of Equations Using Determinants</h1>
+
+<section aria-labelledby="objectives">
+  <h2 id="objectives">Learning Objectives</h2>
+  <p>By the end of this section, you will be able to:</p>
+  <ul>
+    <li>Evaluate the determinant of a \(2 \times 2\) matrix</li>
+    <li>Evaluate the determinant of a \(3 \times 3\) matrix</li>
+    <li>Use Cramer’s Rule to solve systems of equations</li>
+    <li>Solve applications using determinants</li>
+  </ul>
+</section>
+
+<section class="box" aria-labelledby="be-prepared">
+  <h2 id="be-prepared">Be Prepared 4.6</h2>
+  <p>Before you get started, take this readiness quiz.</p>
+  <ol>
+    <li>Simplify: \(5(-2) - (-4)(1)\).<br>
+      If you missed this problem, review Example 1.20.</li>
+    <li>Simplify: \(-3(8 - 10) + (-2)(6 - 3) - 4(-3 - (-4))\).<br>
+      If you missed this problem, review Example 1.19.</li>
+    <li>Simplify: \(\dfrac{-12}{-8}\).<br>
+      If you missed this problem, review Example 1.18.</li>
+  </ol>
+</section>
+
+<p>In this section we will learn of another method to solve systems of linear equations called Cramer’s rule. Before we can begin to use the rule, we need to learn some new definitions and notation.</p>
+
+<!-- ===================== 2x2 ===================== -->
+<section aria-labelledby="det-2x2">
+  <h2 id="det-2x2">Evaluate the Determinant of a \(2 \times 2\) Matrix</h2>
+  <p>If a matrix has the same number of rows and columns, we call it a square matrix. Each square matrix has a real number associated with it called its determinant. To find the determinant of the square matrix \(\begin{bmatrix} a & b \\ c & d \end{bmatrix}\), we first write it as \(\begin{vmatrix} a & b \\ c & d \end{vmatrix}\). To get the real number value of the determinate we subtract the products of the diagonals, as shown.</p>
+
+  <figure>
+    <p>\[\begin{vmatrix} a & b \\ c & d \end{vmatrix} = ad - bc\]</p>
+    <figcaption>Arrows cross the determinant along both diagonals: multiply \(a\) and \(d\) along one diagonal, multiply \(b\) and \(c\) along the other diagonal, then subtract the second product from the first.</figcaption>
+  </figure>
+
+  <div class="box" role="note" aria-labelledby="def-determinant">
+    <h3 id="def-determinant">Determinant</h3>
+    <p>The determinant of any square matrix \(\begin{bmatrix} a & b \\ c & d \end{bmatrix}\), where <i>a</i>, <i>b</i>, <i>c</i>, and <i>d</i> are real numbers, is</p>
+    <p>\[\begin{vmatrix} a & b \\ c & d \end{vmatrix} = ad - bc\]</p>
+  </div>
+
+  <section class="box" aria-labelledby="ex-4-45">
+    <h3 id="ex-4-45">Example 4.45</h3>
+    <p>Evaluate the determinate of ⓐ \(\begin{bmatrix} 4 & -2 \\ 3 & -1 \end{bmatrix}\) ⓑ \(\begin{bmatrix} -3 & -4 \\ -2 & 0 \end{bmatrix}\).</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+      <table>
+        <caption>Part ⓐ</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">Given matrix</span></th><td class="math">\(\begin{bmatrix} 4 & -2 \\ 3 & -1 \end{bmatrix}\)</td></tr>
+          <tr><th scope="row">Write the determinant.</th><td class="math">\(\begin{vmatrix} 4 & -2 \\ 3 & -1 \end{vmatrix}\)<br><small>(diagonals: 4 with −1, and 3 with −2)</small></td></tr>
+          <tr><th scope="row">Subtract the products of the diagonals.</th><td class="math">\(4(-1) - 3(-2)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-4 + 6\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(2\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <caption>Part ⓑ</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">Given matrix</span></th><td class="math">\(\begin{bmatrix} -3 & -4 \\ -2 & 0 \end{bmatrix}\)</td></tr>
+          <tr><th scope="row">Write the determinant.</th><td class="math">\(\begin{vmatrix} -3 & -4 \\ -2 & 0 \end{vmatrix}\)<br><small>(diagonals: −3 with 0, and −2 with −4)</small></td></tr>
+          <tr><th scope="row">Subtract the products of the diagonals.</th><td class="math">\(-3(0) - (-2)(-4)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(0 - 8\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-8\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-89">
+    <h3 id="try-4-89">Try It 4.89</h3>
+    <p>Evaluate the determinate of ⓐ \(\begin{bmatrix} 5 & -3 \\ 2 & -4 \end{bmatrix}\) ⓑ \(\begin{bmatrix} -4 & -6 \\ 0 & 7 \end{bmatrix}\).</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-90">
+    <h3 id="try-4-90">Try It 4.90</h3>
+    <p>Evaluate the determinate of ⓐ \(\begin{bmatrix} -1 & 3 \\ -2 & 4 \end{bmatrix}\) ⓑ \(\begin{bmatrix} -7 & -3 \\ -5 & 0 \end{bmatrix}\).</p>
+  </section>
+</section>
+
+<!-- ===================== 3x3 ===================== -->
+<section aria-labelledby="det-3x3">
+  <h2 id="det-3x3">Evaluate the Determinant of a \(3 \times 3\) Matrix</h2>
+  <p>To evaluate the determinant of a \(3 \times 3\) matrix, we have to be able to evaluate the minor of an entry in the determinant. The minor of an entry is the \(2 \times 2\) determinant found by eliminating the row and column in the \(3 \times 3\) determinant that contains the entry.</p>
+
+  <div class="box" role="note" aria-labelledby="def-minor">
+    <h3 id="def-minor">Minor of an entry in \(3 \times 3\) a Determinant</h3>
+    <p>The <strong>minor of an entry</strong> in a \(3 \times 3\) determinant is the \(2 \times 2\) determinant found by eliminating the row and column in the \(3 \times 3\) determinant that contains the entry.</p>
+  </div>
+
+  <p>To find the minor of entry \(a_1\), we eliminate the row and column which contain it. So we eliminate the first row and first column. Then we write the \(2 \times 2\) determinant that remains.</p>
+  <figure>
+    <p>\[\begin{vmatrix} a_1 & b_1 & c_1 \\ a_2 & b_2 & c_2 \\ a_3 & b_3 & c_3 \end{vmatrix} \qquad \text{minor of } a_1:\ \begin{vmatrix} b_2 & c_2 \\ b_3 & c_3 \end{vmatrix}\]</p>
+    <figcaption>Row 1 and column 1 are crossed out, leaving the entries \(b_2, c_2, b_3, c_3\).</figcaption>
+  </figure>
+
+  <p>To find the minor of entry \(b_2\), we eliminate the row and column that contain it. So we eliminate the 2<sup>nd</sup> row and 2<sup>nd</sup> column. Then we write the \(2 \times 2\) determinant that remains.</p>
+  <figure>
+    <p>\[\begin{vmatrix} a_1 & b_1 & c_1 \\ a_2 & b_2 & c_2 \\ a_3 & b_3 & c_3 \end{vmatrix} \qquad \text{minor of } b_2:\ \begin{vmatrix} a_1 & c_1 \\ a_3 & c_3 \end{vmatrix}\]</p>
+    <figcaption>Row 2 and column 2 are crossed out, leaving the entries \(a_1, c_1, a_3, c_3\).</figcaption>
+  </figure>
+
+  <section class="box" aria-labelledby="ex-4-46">
+    <h3 id="ex-4-46">Example 4.46</h3>
+    <p>For the determinant \(\begin{vmatrix} 4 & -2 & 3 \\ 1 & 0 & -3 \\ -2 & -4 & 2 \end{vmatrix}\), find and then evaluate the minor of ⓐ \(a_1\) ⓑ \(b_3\) ⓒ \(c_2\).</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+      <table>
+        <caption>Part ⓐ: minor of \(a_1\)</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">Given determinant</span></th><td class="math">\(\begin{vmatrix} 4 & -2 & 3 \\ 1 & 0 & -3 \\ -2 & -4 & 2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Eliminate the row and column that contains \(a_1\).</th><td>Row 1 and column 1 are crossed out.</td></tr>
+          <tr><th scope="row">Write the \(2 \times 2\) determinant that remains.</th><td class="math">minor of \(a_1\): \(\begin{vmatrix} 0 & -3 \\ -4 & 2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate.</th><td class="math">\(0(2) - (-3)(-4)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-12\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <caption>Part ⓑ: minor of \(b_3\)</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Eliminate the row and column that contains \(b_3\).</th><td>Row 3 and column 2 are crossed out.</td></tr>
+          <tr><th scope="row">Write the \(2 \times 2\) determinant that remains.</th><td class="math">minor of \(b_3\): \(\begin{vmatrix} 4 & 3 \\ 1 & -3 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate.</th><td class="math">\(4(-3) - (1)(3)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-15\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <div class="table-wrap">
+      <table>
+        <caption>Part ⓒ: minor of \(c_2\)</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">Given determinant</span></th><td class="math">\(\begin{vmatrix} 4 & -2 & 3 \\ 1 & 0 & -3 \\ -2 & -4 & 2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Eliminate the row and column that contains \(c_2\).</th><td>Row 2 and column 3 are crossed out.</td></tr>
+          <tr><th scope="row">Write the \(2 \times 2\) determinant that remains.</th><td class="math">minor of \(c_2\): \(\begin{vmatrix} 4 & -2 \\ -2 & 4 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate.</th><td class="math">\(4(4) - (-2)(-2)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(12\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-91">
+    <h3 id="try-4-91">Try It 4.91</h3>
+    <p>For the determinant \(\begin{vmatrix} 1 & -1 & 4 \\ 0 & 2 & -1 \\ -2 & -3 & 3 \end{vmatrix}\), find and then evaluate the minor of ⓐ \(a_1\) ⓑ \(b_2\) ⓒ \(c_3\).</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-92">
+    <h3 id="try-4-92">Try It 4.92</h3>
+    <p>For the determinant \(\begin{vmatrix} -2 & -1 & 0 \\ 3 & 0 & -1 \\ -1 & -2 & 3 \end{vmatrix}\), find and then evaluate the minor of ⓐ \(a_2\) ⓑ \(b_3\) ⓒ \(c_2\).</p>
+  </section>
+
+  <p>We are now ready to evaluate a \(3 \times 3\) determinant. To do this we expand by minors, which allows us to evaluate the \(3 \times 3\) determinant using \(2 \times 2\) determinants—which we already know how to evaluate!</p>
+  <p>To evaluate a \(3 \times 3\) determinant by expanding by minors along the first row, we use the following pattern:</p>
+  <p>\[\begin{vmatrix} a_1 & b_1 & c_1 \\ a_2 & b_2 & c_2 \\ a_3 & b_3 & c_3 \end{vmatrix} = a_1 \underbrace{\begin{vmatrix} b_2 & c_2 \\ b_3 & c_3 \end{vmatrix}}_{\text{minor of } a_1} - b_1 \underbrace{\begin{vmatrix} a_2 & c_2 \\ a_3 & c_3 \end{vmatrix}}_{\text{minor of } b_1} + c_1 \underbrace{\begin{vmatrix} a_2 & b_2 \\ a_3 & b_3 \end{vmatrix}}_{\text{minor of } c_1}\]</p>
+  <p>Remember, to find the minor of an entry we eliminate the row and column that contains the entry.</p>
+
+  <div class="box" role="note" aria-labelledby="def-expand-first-row">
+    <h3 id="def-expand-first-row">Expanding by Minors along the First Row to Evaluate a \(3 \times 3\) Determinant</h3>
+    <p>To evaluate a \(3 \times 3\) determinant by <strong>expanding by minors along the first row</strong>, the following pattern:</p>
+    <p>\[\begin{vmatrix} a_1 & b_1 & c_1 \\ a_2 & b_2 & c_2 \\ a_3 & b_3 & c_3 \end{vmatrix} = a_1 \underbrace{\begin{vmatrix} b_2 & c_2 \\ b_3 & c_3 \end{vmatrix}}_{\text{minor of } a_1} - b_1 \underbrace{\begin{vmatrix} a_2 & c_2 \\ a_3 & c_3 \end{vmatrix}}_{\text{minor of } b_1} + c_1 \underbrace{\begin{vmatrix} a_2 & b_2 \\ a_3 & b_3 \end{vmatrix}}_{\text{minor of } c_1}\]</p>
+  </div>
+
+  <section class="box" aria-labelledby="ex-4-47">
+    <h3 id="ex-4-47">Example 4.47</h3>
+    <p>Evaluate the determinant \(\begin{vmatrix} 2 & -3 & -1 \\ 3 & 2 & 0 \\ -1 & -1 & -2 \end{vmatrix}\) by expanding by minors along the first row.</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+      <table>
+        <caption>Expanding along the first row (entries 2, −3, −1)</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">Given determinant</span></th><td class="math">\(\begin{vmatrix} 2 & -3 & -1 \\ 3 & 2 & 0 \\ -1 & -1 & -2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Expand by minors along the first row</th><td class="math">\(2\underbrace{\begin{vmatrix} 2 & 0 \\ -1 & -2 \end{vmatrix}}_{\text{minor of } 2} - (-3)\underbrace{\begin{vmatrix} 3 & 0 \\ -1 & -2 \end{vmatrix}}_{\text{minor of } -3} + (-1)\underbrace{\begin{vmatrix} 3 & 2 \\ -1 & -1 \end{vmatrix}}_{\text{minor of } -1}\)</td></tr>
+          <tr><th scope="row">Evaluate each determinant.</th><td class="math">\(2(-4 - 0) + 3(-6 - 0) - 1(-3 - (-2))\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(2(-4) + 3(-6) - 1(-1)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-8 - 18 + 1\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-25\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-93">
+    <h3 id="try-4-93">Try It 4.93</h3>
+    <p>Evaluate the determinant \(\begin{vmatrix} 3 & -2 & 4 \\ 0 & -1 & -2 \\ 2 & 3 & -1 \end{vmatrix}\), by expanding by minors along the first row.</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-94">
+    <h3 id="try-4-94">Try It 4.94</h3>
+    <p>Evaluate the determinant \(\begin{vmatrix} 3 & -2 & -2 \\ 2 & -1 & 4 \\ -1 & 0 & -3 \end{vmatrix}\), by expanding by minors along the first row.</p>
+  </section>
+
+  <p>To evaluate a \(3 \times 3\) determinant we can expand by minors using any row or column. Choosing a row or column other than the first row sometimes makes the work easier.</p>
+  <p>When we expand by any row or column, we must be careful about the sign of the terms in the expansion. To determine the sign of the terms, we use the following sign pattern chart.</p>
+  <p>\[\begin{vmatrix} + & - & + \\ - & + & - \\ + & - & + \end{vmatrix}\]</p>
+
+  <div class="box" role="note" aria-labelledby="def-sign-pattern">
+    <h3 id="def-sign-pattern">Sign Pattern</h3>
+    <p>When expanding by minors using a row or column, the sign of the terms in the expansion follow the following pattern.</p>
+    <p>\[\begin{vmatrix} + & - & + \\ - & + & - \\ + & - & + \end{vmatrix}\]</p>
+  </div>
+
+  <p>Notice that the sign pattern in the first row matches the signs between the terms in the expansion by the first row.</p>
+  <figure>
+    <p>\[\begin{vmatrix} a_1 & b_1 & c_1 \\ a_2 & b_2 & c_2 \\ a_3 & b_3 & c_3 \end{vmatrix} = {+}\,a_1 \begin{vmatrix} b_2 & c_2 \\ b_3 & c_3 \end{vmatrix} - b_1 \begin{vmatrix} a_2 & c_2 \\ a_3 & c_3 \end{vmatrix} + c_1 \begin{vmatrix} a_2 & b_2 \\ a_3 & b_3 \end{vmatrix}\]</p>
+    <figcaption>Arrows connect the first row of the sign chart (+, −, +) to the signs in front of \(a_1\), \(b_1\), and \(c_1\) in the expansion.</figcaption>
+  </figure>
+
+  <p>Since we can expand by any row or column, how do we decide which row or column to use? Usually we try to pick a row or column that will make our calculation easier. If the determinant contains a 0, using the row or column that contains the 0 will make the calculations easier.</p>
+
+  <section class="box" aria-labelledby="ex-4-48">
+    <h3 id="ex-4-48">Example 4.48</h3>
+    <p>Evaluate the determinant \(\begin{vmatrix} 4 & -1 & -3 \\ 3 & 0 & 2 \\ 5 & -4 & -3 \end{vmatrix}\) by expanding by minors.</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>To expand by minors, we look for a row or column that will make our calculations easier. Since 0 is in the second row and second column, expanding by either of those is a good choice. Since the second row has fewer negatives than the second column, we will expand by the second row.</p>
+      <div class="table-wrap">
+      <table>
+        <caption>Expanding along the second row (entries 3, 0, 2)</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">Given determinant</span></th><td class="math">\(\begin{vmatrix} 4 & -1 & -3 \\ 3 & 0 & 2 \\ 5 & -4 & -3 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Expand using the second row.</th><td>The second row of the sign pattern is −, +, −.</td></tr>
+          <tr><th scope="row">Be careful of the signs.</th><td class="math">\(-3\underbrace{\begin{vmatrix} -1 & -3 \\ -4 & -3 \end{vmatrix}}_{\text{minor of } 3} + (0)\underbrace{\begin{vmatrix} 4 & -3 \\ 5 & -3 \end{vmatrix}}_{\text{minor of } 0} - 2\underbrace{\begin{vmatrix} 4 & -1 \\ 5 & -4 \end{vmatrix}}_{\text{minor of } 2}\)</td></tr>
+          <tr><th scope="row">Evaluate each determinant.</th><td class="math">\(-3(3 - 12) + 0(-12 - (-15)) - 2(-16 - (-5))\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(-3(-9) + 0 - 2(-11)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(27 + 0 + 22\)</td></tr>
+          <tr><th scope="row">Add.</th><td class="math">\(49\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-95">
+    <h3 id="try-4-95">Try It 4.95</h3>
+    <p>Evaluate the determinant \(\begin{vmatrix} 2 & -1 & -3 \\ 0 & 3 & -4 \\ 3 & -4 & -3 \end{vmatrix}\) by expanding by minors.</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-96">
+    <h3 id="try-4-96">Try It 4.96</h3>
+    <p>Evaluate the determinant \(\begin{vmatrix} -2 & -1 & -3 \\ -1 & 2 & 2 \\ 4 & -4 & 0 \end{vmatrix}\) by expanding by minors.</p>
+  </section>
+</section>
+
+<!-- ===================== Cramer's Rule ===================== -->
+<section aria-labelledby="cramer">
+  <h2 id="cramer">Use Cramer’s Rule to Solve Systems of Equations</h2>
+  <p>Cramer’s Rule is a method of solving systems of equations using determinants. It can be derived by solving the general form of the systems of equations by elimination. Here we will demonstrate the rule for both systems of two equations with two variables and for systems of three equations with three variables.</p>
+  <p>Let’s start with the systems of two equations with two variables.</p>
+
+  <div class="box" role="note" aria-labelledby="def-cramer-2">
+    <h3 id="def-cramer-2">Cramer’s Rule for Solving a System of Two Equations</h3>
+    <p>For the system of equations \(\begin{cases} a_1 x + b_1 y = k_1 \\ a_2 x + b_2 y = k_2 \end{cases}\), the solution \((x, y)\) can be determined by</p>
+    <p>\[x = \frac{D_x}{D} \quad \text{and} \quad y = \frac{D_y}{D}\]</p>
+    <ul>
+      <li>where \(D = \begin{vmatrix} a_1 & b_1 \\ a_2 & b_2 \end{vmatrix}\) use the coefficients of the variables.</li>
+      <li>\(D_x = \begin{vmatrix} k_1 & b_1 \\ k_2 & b_2 \end{vmatrix}\) replace the <i>x</i> coefficients with the constants.</li>
+      <li>\(D_y = \begin{vmatrix} a_1 & k_1 \\ a_2 & k_2 \end{vmatrix}\) replace the <i>y</i> coefficients with the constants.</li>
+    </ul>
+  </div>
+
+  <p>Notice that to form the determinant <i>D</i>, we use take the coefficients of the variables.</p>
+  <figure>
+    <p>\[\begin{cases} a_1 x + b_1 y = k_1 \\ a_2 x + b_2 y = k_2 \end{cases} \qquad D = \begin{vmatrix} a_1 & b_1 \\ a_2 & b_2 \end{vmatrix}\]</p>
+    <figcaption>The coefficients are highlighted in the system. In <i>D</i>, the first column holds the coefficients of <i>x</i> and the second column holds the coefficients of <i>y</i>.</figcaption>
+  </figure>
+
+  <p>Notice that to form the determinant \(D_x\) and \(D_y\), we substitute the constants for the coefficients of the variable we are finding.</p>
+  <figure>
+    <p>\[D_x = \begin{vmatrix} k_1 & b_1 \\ k_2 & b_2 \end{vmatrix} \qquad\qquad D_y = \begin{vmatrix} a_1 & k_1 \\ a_2 & k_2 \end{vmatrix}\]</p>
+    <figcaption>In \(D_x\), the first column holds the constants and the second column holds the coefficients of <i>y</i>. In \(D_y\), the first column holds the coefficients of <i>x</i> and the second column holds the constants.</figcaption>
+  </figure>
+
+  <section class="box" aria-labelledby="ex-4-49">
+    <h3 id="ex-4-49">Example 4.49</h3>
+    <p><strong>How to Solve a System of Equations Using Cramer’s Rule</strong></p>
+    <p>Solve using Cramer’s Rule: \(\begin{cases} 2x + y = -4 \\ 3x - 2y = -6 \end{cases}\).</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+      <table>
+        <caption>Solving with Cramer’s Rule, step by step</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Explanation</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr>
+            <th scope="row"><strong>Step 1.</strong> Evaluate the determinant <i>D</i>, using the coefficients of the variables.</th>
+            <td></td>
+            <td class="math">\(\begin{cases} 2x + y = -4 \\ 3x - 2y = -6 \end{cases}\)<br>\(D = \begin{vmatrix} 2 & 1 \\ 3 & -2 \end{vmatrix}\)<br>\(D = -4 - 3\)<br>\(D = -7\)</td>
+          </tr>
+          <tr>
+            <th scope="row"><strong>Step 2.</strong> Evaluate the determinant \(D_x\). Use the constants in place of the <i>x</i> coefficients.</th>
+            <td>We replace the coefficients of <i>x</i>, 2 and 3, with the constants, −4 and −6.</td>
+            <td class="math">\(D_x = \begin{vmatrix} -4 & 1 \\ -6 & -2 \end{vmatrix}\)<br>\(D_x = 8 - (-6)\)<br>\(D_x = 14\)</td>
+          </tr>
+          <tr>
+            <th scope="row"><strong>Step 3.</strong> Evaluate the determinant \(D_y\). Use the constants in place of the <i>y</i> coefficients.</th>
+            <td>We replace the coefficients of <i>y</i>, 1 and 2, with the constants, −4 and −6.</td>
+            <td class="math">\(D_y = \begin{vmatrix} 2 & -4 \\ 3 & -6 \end{vmatrix}\)<br>\(D_y = -12 - (-12)\)<br>\(D_y = 0\)</td>
+          </tr>
+          <tr>
+            <th scope="row"><strong>Step 4.</strong> Find <i>x</i> and <i>y</i>.</th>
+            <td>Substitute in the values of <i>D</i>, \(D_x\) and \(D_y\).</td>
+            <td class="math">\(x = \dfrac{D_x}{D}\) and \(y = \dfrac{D_y}{D}\)<br>\(x = \dfrac{14}{-7}\) and \(y = \dfrac{0}{-7}\)<br>\(x = -2\) and \(y = 0\)</td>
+          </tr>
+          <tr>
+            <th scope="row"><strong>Step 5.</strong> Write the solution as an ordered pair.</th>
+            <td>The ordered pair is (<i>x</i>, <i>y</i>).</td>
+            <td class="math">\((-2, 0)\)</td>
+          </tr>
+          <tr>
+            <th scope="row"><strong>Step 6.</strong> Check that the ordered pair is a solution to <strong>both</strong> original equations.</th>
+            <td>Substitute \(x = -2,\ y = 0\) into both equations and make sure they are both true.</td>
+            <td>\((-2, 0)\) is the solution to the system.</td>
+          </tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-97">
+    <h3 id="try-4-97">Try It 4.97</h3>
+    <p>Solve using Cramer’s rule: \(\begin{cases} 3x + y = -3 \\ 2x + 3y = 6 \end{cases}\).</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-98">
+    <h3 id="try-4-98">Try It 4.98</h3>
+    <p>Solve using Cramer’s rule: \(\begin{cases} -x + y = 2 \\ 2x + y = -4 \end{cases}\).</p>
+  </section>
+
+  <section class="box" aria-labelledby="howto-cramer-2">
+    <h3 id="howto-cramer-2">How To</h3>
+    <h4>Solve a system of two equations using Cramer’s rule.</h4>
+    <ol class="steps">
+      <li>Step 1. Evaluate the determinant <i>D</i>, using the coefficients of the variables.</li>
+      <li>Step 2. Evaluate the determinant \(D_x\). Use the constants in place of the <i>x</i> coefficients.</li>
+      <li>Step 3. Evaluate the determinant \(D_y\). Use the constants in place of the <i>y</i> coefficients.</li>
+      <li>Step 4. Find <i>x</i> and <i>y</i>. \(x = \dfrac{D_x}{D},\ y = \dfrac{D_y}{D}\)</li>
+      <li>Step 5. Write the solution as an ordered pair.</li>
+      <li>Step 6. Check that the ordered pair is a solution to both original equations.</li>
+    </ol>
+  </section>
+
+  <p>To solve a system of three equations with three variables with Cramer’s Rule, we basically do what we did for a system of two equations. However, we now have to solve for three variables to get the solution. The determinants are also going to be \(3 \times 3\) which will make our work more interesting!</p>
+
+  <div class="box" role="note" aria-labelledby="def-cramer-3">
+    <h3 id="def-cramer-3">Cramer’s Rule for Solving a System of Three Equations</h3>
+    <p>For the system of equations \(\begin{cases} a_1 x + b_1 y + c_1 z = k_1 \\ a_2 x + b_2 y + c_2 z = k_2 \\ a_3 x + b_3 y + c_3 z = k_3 \end{cases}\), the solution \((x, y, z)\) can be determined by</p>
+    <p>\[x = \frac{D_x}{D},\quad y = \frac{D_y}{D} \quad \text{and} \quad z = \frac{D_z}{D}\]</p>
+    <ul>
+      <li>where \(D = \begin{vmatrix} a_1 & b_1 & c_1 \\ a_2 & b_2 & c_2 \\ a_3 & b_3 & c_3 \end{vmatrix}\) use the coefficients of the variables.</li>
+      <li>\(D_x = \begin{vmatrix} k_1 & b_1 & c_1 \\ k_2 & b_2 & c_2 \\ k_3 & b_3 & c_3 \end{vmatrix}\) replace the <i>x</i> coefficients with the constants.</li>
+      <li>\(D_y = \begin{vmatrix} a_1 & k_1 & c_1 \\ a_2 & k_2 & c_2 \\ a_3 & k_3 & c_3 \end{vmatrix}\) replace the <i>y</i> coefficients with the constants.</li>
+      <li>\(D_z = \begin{vmatrix} a_1 & b_1 & k_1 \\ a_2 & b_2 & k_2 \\ a_3 & b_3 & k_3 \end{vmatrix}\) replace the <i>z</i> coefficients with the constants.</li>
+    </ul>
+  </div>
+
+  <section class="box" aria-labelledby="ex-4-50">
+    <h3 id="ex-4-50">Example 4.50</h3>
+    <p>Solve the system of equations using Cramer’s Rule: \(\begin{cases} 3x - 5y + 4z = 5 \\ 5x + 2y + z = 0 \\ 2x + 3y - 2z = 3 \end{cases}\).</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+      <table>
+        <caption>Solving a system of three equations with Cramer’s Rule</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Evaluate the determinant <i>D</i>.</th><td class="math">\(D = \begin{vmatrix} 3 & -5 & 4 \\ 5 & 2 & 1 \\ 2 & 3 & -2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Expand by minors using column 1. Be careful of the signs: column 1 of the sign pattern is +, −, +.</th><td class="math">\(D = 3\begin{vmatrix} 2 & 1 \\ 3 & -2 \end{vmatrix} - 5\begin{vmatrix} -5 & 4 \\ 3 & -2 \end{vmatrix} + 2\begin{vmatrix} -5 & 4 \\ 2 & 1 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate the determinants.</th><td class="math">\(D = 3(-4 - 3) - 5(10 - 12) + 2(-5 - 8)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D = 3(-7) - 5(-2) + 2(-13)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D = -21 + 10 - 26\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D = -37\)</td></tr>
+
+          <tr><th scope="row">Evaluate the determinant \(D_x\). Use the constants to replace the coefficients of <i>x</i>.</th><td class="math">\(D_x = \begin{vmatrix} 5 & -5 & 4 \\ 0 & 2 & 1 \\ 3 & 3 & -2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Expand by minors using column 1.</th><td class="math">\(D_x = 5\begin{vmatrix} 2 & 1 \\ 3 & -2 \end{vmatrix} - 0\begin{vmatrix} -5 & 4 \\ 3 & -2 \end{vmatrix} + 3\begin{vmatrix} -5 & 4 \\ 2 & 1 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate the determinants.</th><td class="math">\(D_x = 5(-4 - 3) - 0(10 - 12) + 3(-5 - 8)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_x = 5(-7) - 0 + 3(-13)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_x = -74\)</td></tr>
+
+          <tr><th scope="row">Evaluate the determinant \(D_y\). Use the constants to replace the coefficients of <i>y</i>.</th><td class="math">\(D_y = \begin{vmatrix} 3 & 5 & 4 \\ 5 & 0 & 1 \\ 2 & 3 & -2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Expand by minors using column 2. Be careful of the signs: column 2 of the sign pattern is −, +, −.</th><td class="math">\(D_y = -5\begin{vmatrix} 5 & 1 \\ 2 & -2 \end{vmatrix} + 0\begin{vmatrix} 5 & 4 \\ 3 & -2 \end{vmatrix} - 3\begin{vmatrix} 3 & 4 \\ 5 & 1 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate the determinants.</th><td class="math">\(D_y = -5(-10 - 2) + 0(-10 - 12) - 3(3 - 20)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_y = -5(-12) + 0 - 3(-17)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_y = 60 + 0 + 51\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_y = 111\)</td></tr>
+
+          <tr><th scope="row">Evaluate the determinant \(D_z\). Use the constants to replace the coefficients of <i>z</i>.</th><td class="math">\(D_z = \begin{vmatrix} 3 & -5 & 5 \\ 5 & 2 & 0 \\ 2 & 3 & 3 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Expand by minors using column 3. Be careful of the signs: column 3 of the sign pattern is +, −, +.</th><td class="math">\(D_z = 5\begin{vmatrix} 5 & 2 \\ 2 & 3 \end{vmatrix} - 0\begin{vmatrix} 3 & -5 \\ 2 & 3 \end{vmatrix} + 3\begin{vmatrix} 3 & -5 \\ 5 & 2 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate the determinants.</th><td class="math">\(D_z = 5(15 - 4) - 0(9 - (-10)) + 3(6 - (-25))\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_z = 5(11) - 0 + 3(31)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_z = 55 - 0 + 93\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(D_z = 148\)</td></tr>
+
+          <tr><th scope="row">Find <i>x</i>, <i>y</i>, and <i>z</i>.</th><td class="math">\(x = \dfrac{D_x}{D},\ y = \dfrac{D_y}{D}\) and \(z = \dfrac{D_z}{D}\)</td></tr>
+          <tr><th scope="row">Substitute in the values.</th><td class="math">\(x = \dfrac{-74}{-37},\ y = \dfrac{111}{-37}\) and \(z = \dfrac{148}{-37}\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(x = 2,\ y = -3\) and \(z = -4\)</td></tr>
+          <tr><th scope="row">Write the solution as an ordered triple.</th><td class="math">\((2, -3, -4)\)</td></tr>
+          <tr><th scope="row">Check that the ordered triple is a solution to <strong>all three</strong> original equations.</th><td>We leave the check to you.</td></tr>
+          <tr><th scope="row"><span class="visually-hidden">Conclusion</span></th><td>The solution is \((2, -3, -4)\).</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-99">
+    <h3 id="try-4-99">Try It 4.99</h3>
+    <p>Solve the system of equations using Cramer’s Rule: \(\begin{cases} 3x + 8y + 2z = -5 \\ 2x + 5y - 3z = 0 \\ x + 2y - 2z = -1 \end{cases}\).</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-100">
+    <h3 id="try-4-100">Try It 4.100</h3>
+    <p>Solve the system of equations using Cramer’s Rule: \(\begin{cases} 3x + y - 6z = -3 \\ 2x + 6y + 3z = 0 \\ 3x + 2y - 3z = -6 \end{cases}\).</p>
+  </section>
+
+  <p>Cramer’s rule does not work when the value of the <i>D</i> determinant is 0, as this would mean we would be dividing by 0. But when \(D = 0\), the system is either inconsistent or dependent.</p>
+  <p>When the value of \(D = 0\) and \(D_x\), \(D_y\) and \(D_z\) are all zero, the system is consistent and dependent and there are infinitely many solutions.</p>
+  <p>When the value of \(D = 0\) and \(D_x\), \(D_y\) and \(D_z\) are not all zero, the system is inconsistent and there is no solution.</p>
+
+  <div class="box" role="note" aria-labelledby="def-dep-incons">
+    <h3 id="def-dep-incons">Dependent and Inconsistent Systems of Equations</h3>
+    <p>For any system of equations, where the <strong>value of the determinant</strong> \(D = 0\),</p>
+    <div class="table-wrap">
+    <table>
+      <caption class="visually-hidden">Type of system and solution when D equals 0</caption>
+      <thead>
+        <tr><th scope="col">Value of determinants</th><th scope="col">Type of system</th><th scope="col">Solution</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">\(D = 0\) and \(D_x\), \(D_y\) and \(D_z\) are all zero</th><td>consistent and dependent</td><td>infinitely many solutions</td></tr>
+        <tr><th scope="row">\(D = 0\) and \(D_x\), \(D_y\) and \(D_z\) are not all zero</th><td>inconsistent</td><td>no solution</td></tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+
+  <p>In the next example, we will use the values of the determinants to find the solution of the system.</p>
+
+  <section class="box" aria-labelledby="ex-4-51">
+    <h3 id="ex-4-51">Example 4.51</h3>
+    <p>Solve the system of equations using Cramer’s rule: \(\begin{cases} x + 3y = 4 \\ -2x - 6y = 3 \end{cases}\).</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <p>\[\begin{cases} x + 3y = 4 \\ -2x - 6y = 3 \end{cases}\]</p>
+      <div class="table-wrap">
+      <table>
+        <caption class="visually-hidden">Evaluating D</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Evaluate the determinant <i>D</i>, using the coefficients of the variables.</th><td class="math">\(D = \begin{vmatrix} 1 & 3 \\ -2 & -6 \end{vmatrix}\)<br>\(D = -6 - (-6)\)<br>\(D = 0\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>We cannot use Cramer’s Rule to solve this system. But by looking at the value of the determinants \(D_x\) and \(D_y\), we can determine whether the system is dependent or inconsistent.</p>
+      <div class="table-wrap">
+      <table>
+        <caption class="visually-hidden">Evaluating D sub x</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row">Evaluate the determinant \(D_x\).</th><td class="math">\(D_x = \begin{vmatrix} 4 & 3 \\ 3 & -6 \end{vmatrix}\)<br>\(D_x = -24 - 9\)<br>\(D_x = 15\)</td></tr>
+        </tbody>
+      </table>
+      </div>
+      <p>Since all the determinants are not zero, the system is inconsistent. There is no solution.</p>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-101">
+    <h3 id="try-4-101">Try It 4.101</h3>
+    <p>Solve the system of equations using Cramer’s rule: \(\begin{cases} 4x - 3y = 8 \\ 8x - 6y = 14 \end{cases}\).</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-102">
+    <h3 id="try-4-102">Try It 4.102</h3>
+    <p>Solve the system of equations using Cramer’s rule: \(\begin{cases} x = -3y + 4 \\ 2x + 6y = 8 \end{cases}\).</p>
+  </section>
+</section>
+
+<!-- ===================== Applications ===================== -->
+<section aria-labelledby="applications">
+  <h2 id="applications">Solve Applications using Determinants</h2>
+  <p>An interesting application of determinants allows us to test if points are collinear. Three points \((x_1, y_1)\), \((x_2, y_2)\) and \((x_3, y_3)\) are collinear if and only if the determinant below is zero.</p>
+  <p>\[\begin{vmatrix} x_1 & y_1 & 1 \\ x_2 & y_2 & 1 \\ x_3 & y_3 & 1 \end{vmatrix} = 0\]</p>
+
+  <div class="box" role="note" aria-labelledby="def-collinear">
+    <h3 id="def-collinear">Test for Collinear Points</h3>
+    <p>Three points \((x_1, y_1)\), \((x_2, y_2)\) and \((x_3, y_3)\) are collinear if and only if</p>
+    <p>\[\begin{vmatrix} x_1 & y_1 & 1 \\ x_2 & y_2 & 1 \\ x_3 & y_3 & 1 \end{vmatrix} = 0\]</p>
+  </div>
+
+  <p>We will use this property in the next example.</p>
+
+  <section class="box" aria-labelledby="ex-4-52">
+    <h3 id="ex-4-52">Example 4.52</h3>
+    <p>Determine whether the points \((5, -5)\), \((4, -3)\), and \((3, -1)\) are collinear.</p>
+    <div class="solution">
+      <h4>Solution</h4>
+      <div class="table-wrap">
+      <table>
+        <caption>Testing three points for collinearity</caption>
+        <thead><tr><th scope="col">Step</th><th scope="col">Work</th></tr></thead>
+        <tbody>
+          <tr><th scope="row"><span class="visually-hidden">General determinant</span></th><td class="math">\(\begin{vmatrix} x_1 & y_1 & 1 \\ x_2 & y_2 & 1 \\ x_3 & y_3 & 1 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Substitute the values into the determinant. \((5, -5)\), \((4, -3)\), and \((3, -1)\)</th><td class="math">\(\begin{vmatrix} 5 & -5 & 1 \\ 4 & -3 & 1 \\ 3 & -1 & 1 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate the determinant by expanding by minors using column 3.</th><td class="math">\(1\begin{vmatrix} 4 & -3 \\ 3 & -1 \end{vmatrix} - 1\begin{vmatrix} 5 & -5 \\ 3 & -1 \end{vmatrix} + 1\begin{vmatrix} 5 & -5 \\ 4 & -3 \end{vmatrix}\)</td></tr>
+          <tr><th scope="row">Evaluate the determinants.</th><td class="math">\(1(-4 - (-9)) - 1(-5 - (-15)) + 1(-15 - (-20))\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(1(5) - 1(10) + 1(5)\)</td></tr>
+          <tr><th scope="row">Simplify.</th><td class="math">\(0\)</td></tr>
+          <tr><th scope="row"><span class="visually-hidden">Conclusion</span></th><td>The value of the determinate is 0, so the points are collinear.</td></tr>
+        </tbody>
+      </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-103">
+    <h3 id="try-4-103">Try It 4.103</h3>
+    <p>Determine whether the points \((3, -2)\), \((5, -3)\), and \((1, -1)\) are collinear.</p>
+  </section>
+
+  <section class="box" aria-labelledby="try-4-104">
+    <h3 id="try-4-104">Try It 4.104</h3>
+    <p>Determine whether the points \((-4, -1)\), \((-6, 2)\), and \((-2, -4)\) are collinear.</p>
+  </section>
+</section>
+
+<section class="box" aria-labelledby="media">
+  <h2 id="media">Media</h2>
+  <p>Access these online resources for additional instruction and practice with solving systems of linear inequalities by graphing.</p>
+  <ul>
+    <li>Solving Systems of Linear Inequalities by Graphing</li>
+    <li>Systems of Linear Inequalities</li>
+  </ul>
+</section>
+
+<!-- ===================== Exercises ===================== -->
+<section aria-labelledby="exercises">
+  <h2 id="exercises">Section 4.6 Exercises</h2>
+
+  <section aria-labelledby="practice">
+    <h3 id="practice">Practice Makes Perfect</h3>
+
+    <h4 id="ex-2x2">Evaluate the Determinant of a 2 × 2 Matrix</h4>
+    <p>In the following exercises, evaluate the determinate of each square matrix.</p>
+    <ol class="exercises" start="232" aria-labelledby="ex-2x2">
+      <li>\(\begin{bmatrix} 6 & -2 \\ 3 & -1 \end{bmatrix}\)</li>
+      <li>\(\begin{bmatrix} -4 & 8 \\ -3 & 5 \end{bmatrix}\)</li>
+      <li>\(\begin{bmatrix} -3 & 5 \\ 0 & -4 \end{bmatrix}\)</li>
+      <li>\(\begin{bmatrix} -2 & 0 \\ 7 & -5 \end{bmatrix}\)</li>
+    </ol>
+
+    <h4 id="ex-3x3">Evaluate the Determinant of a 3 × 3 Matrix</h4>
+    <p>In the following exercises, find and then evaluate the indicated minors.</p>
+    <ol class="exercises" start="236" aria-labelledby="ex-3x3">
+      <li>\(\begin{vmatrix} 3 & -1 & 4 \\ -1 & 0 & -2 \\ -4 & 1 & 5 \end{vmatrix}\)<br>Find the minor ⓐ \(a_1\) ⓑ \(b_2\) ⓒ \(c_3\)</li>
+      <li>\(\begin{vmatrix} -1 & -3 & 2 \\ 4 & -2 & -1 \\ -2 & 0 & -3 \end{vmatrix}\)<br>Find the minor ⓐ \(a_1\) ⓑ \(b_1\) ⓒ \(c_2\)</li>
+      <li>\(\begin{vmatrix} 2 & -3 & -4 \\ -1 & 2 & -3 \\ 0 & -1 & -2 \end{vmatrix}\)<br>Find the minor ⓐ \(a_2\) ⓑ \(b_2\) ⓒ \(c_2\)</li>
+      <li>\(\begin{vmatrix} -2 & -2 & 3 \\ 1 & -3 & 0 \\ -2 & 3 & -2 \end{vmatrix}\)<br>Find the minor ⓐ \(a_3\) ⓑ \(b_3\) ⓒ \(c_3\)</li>
+    </ol>
+
+    <p id="ex-first-row">In the following exercises, evaluate each determinant by expanding by minors along the first row.</p>
+    <ol class="exercises" start="240" aria-labelledby="ex-first-row">
+      <li>\(\begin{vmatrix} -2 & 3 & -1 \\ -1 & 2 & -2 \\ 3 & 1 & -3 \end{vmatrix}\)</li>
+      <li>\(\begin{vmatrix} 4 & -1 & -2 \\ -3 & -2 & 1 \\ -2 & -5 & 7 \end{vmatrix}\)</li>
+      <li>\(\begin{vmatrix} -2 & -3 & -4 \\ 5 & -6 & 7 \\ -1 & 2 & 0 \end{vmatrix}\)</li>
+      <li>\(\begin{vmatrix} 1 & 3 & -2 \\ 5 & -6 & 4 \\ 0 & -2 & -1 \end{vmatrix}\)</li>
+    </ol>
+
+    <p id="ex-any">In the following exercises, evaluate each determinant by expanding by minors.</p>
+    <ol class="exercises" start="244" aria-labelledby="ex-any">
+      <li>\(\begin{vmatrix} -5 & -1 & -4 \\ 4 & 0 & -3 \\ 2 & -2 & 6 \end{vmatrix}\)</li>
+      <li>\(\begin{vmatrix} 4 & -1 & 3 \\ 3 & -2 & 2 \\ -1 & 0 & 4 \end{vmatrix}\)</li>
+      <li>\(\begin{vmatrix} 3 & 5 & 4 \\ -1 & 3 & 0 \\ -2 & 6 & 1 \end{vmatrix}\)</li>
+      <li>\(\begin{vmatrix} 2 & -4 & -3 \\ 5 & -1 & -4 \\ 3 & 2 & 0 \end{vmatrix}\)</li>
+    </ol>
+
+    <h4 id="ex-cramer">Use Cramer’s Rule to Solve Systems of Equations</h4>
+    <p>In the following exercises, solve each system of equations using Cramer’s Rule.</p>
+    <ol class="exercises" start="248" aria-labelledby="ex-cramer">
+      <li>\(\begin{cases} -2x + 3y = 3 \\ x + 3y = 12 \end{cases}\)</li>
+      <li>\(\begin{cases} x - 2y = -5 \\ 2x - 3y = -4 \end{cases}\)</li>
+      <li>\(\begin{cases} x - 3y = -9 \\ 2x + 5y = 4 \end{cases}\)</li>
+      <li>\(\begin{cases} 2x + y = -4 \\ 3x - 2y = -6 \end{cases}\)</li>
+      <li>\(\begin{cases} x - 2y = -5 \\ 2x - 3y = -4 \end{cases}\)</li>
+      <li>\(\begin{cases} x - 3y = -9 \\ 2x + 5y = 4 \end{cases}\)</li>
+      <li>\(\begin{cases} 5x - 3y = -1 \\ 2x - y = 2 \end{cases}\)</li>
+      <li>\(\begin{cases} 3x + 8y = -3 \\ 2x + 5y = -3 \end{cases}\)</li>
+      <li>\(\begin{cases} 6x - 5y + 2z = 3 \\ 2x + y - 4z = 5 \\ 3x - 3y + z = -1 \end{cases}\)</li>
+      <li>\(\begin{cases} 4x - 3y + z = 7 \\ 2x - 5y - 4z = 3 \\ 3x - 2y - 2z = -7 \end{cases}\)</li>
+      <li>\(\begin{cases} 2x - 5y + 3z = 8 \\ 3x - y + 4z = 7 \\ x + 3y + 2z = -3 \end{cases}\)</li>
+      <li>\(\begin{cases} 11x + 9y + 2z = -9 \\ 7x + 5y + 3z = -7 \\ 4x + 3y + z = -3 \end{cases}\)</li>
+      <li>\(\begin{cases} x + 2z = 0 \\ 4y + 3z = -2 \\ 2x - 5y = 3 \end{cases}\)</li>
+      <li>\(\begin{cases} 2x + 5y = 4 \\ 3y - z = 3 \\ 4x + 3z = -3 \end{cases}\)</li>
+      <li>\(\begin{cases} 2y + 3z = -1 \\ 5x + 3y = -6 \\ 7x + z = 1 \end{cases}\)</li>
+      <li>\(\begin{cases} 3x - z = -3 \\ 5y + 2z = -6 \\ 4x + 3y = -8 \end{cases}\)</li>
+      <li>\(\begin{cases} 2x + y = 3 \\ 6x + 3y = 9 \end{cases}\)</li>
+      <li>\(\begin{cases} x - 4y = -1 \\ -3x + 12y = 3 \end{cases}\)</li>
+      <li>\(\begin{cases} -3x - y = 4 \\ 6x + 2y = -16 \end{cases}\)</li>
+      <li>\(\begin{cases} 4x + 3y = 2 \\ 20x + 15y = 5 \end{cases}\)</li>
+      <li>\(\begin{cases} x + y - 3z = -1 \\ y - z = 0 \\ -x + 2y = 1 \end{cases}\)</li>
+      <li>\(\begin{cases} 2x + 3y + z = 12 \\ x + y + z = 9 \\ 3x + 4y + 2z = 20 \end{cases}\)</li>
+      <li>\(\begin{cases} 3x + 4y - 3z = -2 \\ 2x + 3y - z = -12 \\ x + y - 2z = 6 \end{cases}\)</li>
+      <li>\(\begin{cases} x - 2y + 3z = 1 \\ x + y - 3z = 7 \\ 3x - 4y + 5z = 7 \end{cases}\)</li>
+    </ol>
+
+    <h4 id="ex-applications">Solve Applications Using Determinants</h4>
+    <p>In the following exercises, determine whether the given points are collinear.</p>
+    <ol class="exercises" start="272" aria-labelledby="ex-applications">
+      <li>\((0, 1)\), \((2, 0)\), and \((-2, 2)\).</li>
+      <li>\((0, -5)\), \((-2, -2)\), and \((2, -8)\).</li>
+      <li>\((4, -3)\), \((6, -4)\), and \((2, -2)\).</li>
+      <li>\((-2, 1)\), \((-4, 4)\), and \((0, -2)\).</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="writing">
+    <h3 id="writing">Writing Exercises</h3>
+    <ol class="exercises" start="276" aria-labelledby="writing">
+      <li>Explain the difference between a square matrix and its determinant. Give an example of each.</li>
+      <li>Explain what is meant by the minor of an entry in a square matrix.</li>
+      <li>Explain how to decide which row or column you will use to expand a \(3 \times 3\) determinant.</li>
+      <li>Explain the steps for solving a system of equations using Cramer’s rule.</li>
+    </ol>
+  </section>
+
+  <section aria-labelledby="self-check">
+    <h3 id="self-check">Self Check</h3>
+    <p>ⓐ After completing the exercises, use this checklist to evaluate your mastery of the objectives of this section.</p>
+    <div class="table-wrap">
+    <table class="checklist">
+      <caption>Self-check checklist</caption>
+      <thead>
+        <tr>
+          <th scope="col">I can…</th>
+          <th scope="col">Confidently</th>
+          <th scope="col">With some help</th>
+          <th scope="col">No-I don’t get it!</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <th scope="row">evaluate the determinant of a 2 × 2 matrix.</th>
+          <td><input type="checkbox" aria-label="Evaluate the determinant of a 2 by 2 matrix: confidently"></td>
+          <td><input type="checkbox" aria-label="Evaluate the determinant of a 2 by 2 matrix: with some help"></td>
+          <td><input type="checkbox" aria-label="Evaluate the determinant of a 2 by 2 matrix: no, I don't get it"></td>
+        </tr>
+        <tr>
+          <th scope="row">evaluate the determinant of a 3 × 3 matrix.</th>
+          <td><input type="checkbox" aria-label="Evaluate the determinant of a 3 by 3 matrix: confidently"></td>
+          <td><input type="checkbox" aria-label="Evaluate the determinant of a 3 by 3 matrix: with some help"></td>
+          <td><input type="checkbox" aria-label="Evaluate the determinant of a 3 by 3 matrix: no, I don't get it"></td>
+        </tr>
+        <tr>
+          <th scope="row">use Cramer’s rule to solve systems of equations.</th>
+          <td><input type="checkbox" aria-label="Use Cramer's rule to solve systems of equations: confidently"></td>
+          <td><input type="checkbox" aria-label="Use Cramer's rule to solve systems of equations: with some help"></td>
+          <td><input type="checkbox" aria-label="Use Cramer's rule to solve systems of equations: no, I don't get it"></td>
+        </tr>
+        <tr>
+          <th scope="row">solve applications using determinants.</th>
+          <td><input type="checkbox" aria-label="Solve applications using determinants: confidently"></td>
+          <td><input type="checkbox" aria-label="Solve applications using determinants: with some help"></td>
+          <td><input type="checkbox" aria-label="Solve applications using determinants: no, I don't get it"></td>
+        </tr>
+      </tbody>
+    </table>
+    </div>
+    <p>ⓑ After reviewing this checklist, what will you do to become confident for all objectives?</p>
+  </section>
+</section>
+
+</main>
+
+<footer class="attribution">
+  <p>“4.6 Solve Systems of Equations Using Determinants” from <cite>Intermediate Algebra</cite> by Lynn Marecek, OpenStax.</p>
+  <p>Licensed under Creative Commons Attribution License (CC BY 4.0). <a href="http://creativecommons.org/licenses/by/4.0/">http://creativecommons.org/licenses/by/4.0/</a></p>
+  <p>Original page: <a href="https://openstax.org/books/intermediate-algebra/pages/4-6-solve-systems-of-equations-using-determinants">https://openstax.org/books/intermediate-algebra/pages/4-6-solve-systems-of-equations-using-determinants</a></p>
+  <p>Access for free at openstax.org.</p>
+  <p>Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.</p>
+  <p>a11y-stem is not affiliated with or endorsed by OpenStax.</p>
+</footer>
+
+</body>
+</html>

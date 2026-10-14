@@ -1,0 +1,40 @@
+{
+  "arm": "mineru-basic",
+  "cost_usd": 0.0,
+  "input_sha256": "7809c1758041bbb39140b724dd4ce037433788d2e8b3ea455e47fbec2f30cf31",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 13.78,
+    "load_before": 12.84,
+    "offline": false,
+    "peak_rss_mb": 3054.9,
+    "quiet_box": null,
+    "system_seconds": 4.909,
+    "timeout_seconds": 1800,
+    "user_seconds": 332.933,
+    "wall_seconds_per_page": 13.138
+  },
+  "output": {
+    "file": "chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.md",
+    "format": "md"
+  },
+  "pdf_pages": 8,
+  "seconds": 105.106,
+  "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+  "settings": {
+    "command": "mineru-kit parse --tier basic --format zip",
+    "ocr_mode": "auto (the default)",
+    "tier": "basic (MinerU's own recommendation for a machine without an accelerator)"
+  },
+  "status": "ok",
+  "versions": {
+    "docvortex": "0.5.16",
+    "mineru": "4.0.12",
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0"
+  }
+}

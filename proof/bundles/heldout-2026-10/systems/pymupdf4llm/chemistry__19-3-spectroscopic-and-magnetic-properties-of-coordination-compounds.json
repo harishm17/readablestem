@@ -1,0 +1,41 @@
+{
+  "arm": "pymupdf4llm",
+  "cost_usd": 0.0,
+  "input_sha256": "7809c1758041bbb39140b724dd4ce037433788d2e8b3ea455e47fbec2f30cf31",
+  "measure": {
+    "host": {
+      "cpu_model": "AMD Ryzen 7 5800H with Radeon Graphics",
+      "logical_cpus": 16,
+      "mem_total_kb": 28053624
+    },
+    "load_after": 2.09,
+    "load_before": 2.1,
+    "offline": false,
+    "peak_rss_mb": 344.8,
+    "quiet_box": null,
+    "system_seconds": 1.183,
+    "timeout_seconds": 1800,
+    "user_seconds": 26.158,
+    "wall_seconds_per_page": 0.41
+  },
+  "output": {
+    "file": "chemistry__19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds.md",
+    "format": "md"
+  },
+  "pdf_pages": 8,
+  "seconds": 3.278,
+  "section": "chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds",
+  "settings": {
+    "call": "pymupdf4llm.to_markdown(path)",
+    "layout_model": "on (pymupdf-layout installed)",
+    "write_images": "off (the default)"
+  },
+  "status": "ok",
+  "versions": {
+    "numpy": "2.5.4",
+    "onnxruntime": "1.31.0",
+    "pymupdf": "1.28.2",
+    "pymupdf-layout": "1.28.2",
+    "pymupdf4llm": "1.28.2"
+  }
+}

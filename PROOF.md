@@ -1,8 +1,6 @@
-# Proof: Development sample: OpenStax Physics, chapter 2 (not held out)
+# Proof: Held-out OpenStax sections (pre-registered 2026-10-13)
 
 a11y-stem assists a person who makes course material accessible. Nothing here measures conformance with WCAG or any other standard, and no number below may be read as a claim that a document is accessible. Automated HTML checks are reported as what a machine can detect. Judge numbers are agreement with a model judge, not accuracy.
-
-> **Development set, not held out.** These sections were available while a11y-stem was built. The numbers show that the pipeline and this harness work end to end; they are not held-out results.
 
 > **Incomplete.** Not computed in this build: Human labels and judge agreement.
 
@@ -10,28 +8,30 @@ a11y-stem assists a person who makes course material accessible. Nothing here me
 
 |  |  |
 |---|---|
-| Proof set | `smoke-physics-2` (development) |
+| Proof set | `heldout-2026-10` (held out) |
 | Mode | replay of a recorded live run: no model call, no key, no cost |
-| Run recorded on | 2026-10-13 |
-| Code | commit `c2773682c1c9` |
+| Run recorded on | 2026-10-14 |
+| Code | commit `297126f34137` |
 | Pipeline version | 0.4.0 |
-| Models | main gpt-6.1-sol, cheap gpt-6-luna, second check gpt-6-luna |
+| Models | main claude-opus-5-5, cheap claude-haiku-5-5, no second check |
 | Prompt versions | equation equation-df0e12f1, figure figure-ac51f42d, judge judge_figure-137e2607, table table-b3769ce7 |
-| Recorded spend | $0.2807 |
-| Runs | document x1, equations x1, headings x1, figures x1 |
+| Recorded spend | $10.8775 |
+| Runs | document x2, headings x1, figures x2, equations x2 |
+| Recording | interrupted once and resumed: document.run1, document.run2, headings.run1, figures.run1, figures.run2, equations.run1 finished before the interruption and were read back |
 
 **Pins checked before the run**
 
 | Pin | Result | Detail |
 |---|---|---|
-| gold manifest | ok | sha256 63b5de054889 |
-| gold files | ok | 3 files match the manifest |
-| gold sections | ok | 3 sections |
-| recorded run | ok | 43 files match the manifest |
+| gold manifest | ok | sha256 e9e7e429a5ce |
+| gold files | ok | 15 files match the manifest |
+| gold sections | ok | 15 sections |
+| preregistration | ok | sha256 2c16815a6d18 |
+| recorded run | ok | 270 files match the manifest |
 
-Replay compared with the recorded reports: **identical** (4 report(s): every metric and cost, timing excluded).
+Replay compared with the recorded reports: **identical** (7 report(s): every metric and cost, timing excluded).
 
-Replayed 149 model requests and 134 second-check requests from the bundle; 0 had no recorded answer.
+Replayed 7,953 model requests and 0 second-check requests from the bundle; 0 had no recorded answer.
 
 **Parts of this proof**
 
@@ -43,24 +43,36 @@ Replayed 149 model requests and 134 second-check requests from the bundle; 0 had
 | Comparison with open PDF parsers | done |
 | Human labels and judge agreement | not computed |
 
-## The 3 sections
+## The 15 sections
 
-The three sections of OpenStax Physics (high school), chapter 2, that a11y-stem was developed on: the sample gold set in data/gold. This set exists so that the whole proof command, from the answer key to PROOF.md, can be run and checked by anyone and in CI. Its numbers say that the pipeline and the harness work end to end. They are not held-out results.
+Fifteen sections of five OpenStax books (242 Letter pages), chosen by rule and registered, with this set's answer key hashed, before any system ran on them. The books are retired first editions, which are CC BY 4.0 (the current editions are CC BY-NC-SA 4.0 and the live CC BY STEM books were used in development).
 
 | Section | Title | PDF pages | Equations (block / inline) | G1 | Figures (with OpenStax alt) | Tables | Headings (in boxes) | PDF sha256 |
 |---|---|---|---|---|---|---|---|---|
-| physics/2-1-relative-motion-distance-and-displacement | 2.1 Relative Motion, Distance, and Displacement | 16 | 8 (1 / 7) | 0 | 6 (6) | 1 | 48 (41) | `dd3f3d850ccd` |
-| physics/2-2-speed-and-velocity | 2.2 Speed and Velocity | 14 | 12 (10 / 2) | 7 | 2 (2) | 1 | 42 (35) | `5e2cf1e6f178` |
-| physics/2-3-position-vs-time-graphs | 2.3 Position vs. Time Graphs | 13 | 10 (6 / 4) | 4 | 5 (5) | 1 | 31 (25) | `80ca81e557fc` |
-| **Total** |  | **43** | **30** | **11** | **13** | **3** | **121** |  |
+| college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum | 29.3 Photon Energies and the Electromagnetic Spectrum | 10 | 47 (10 / 37) | 4 | 6 (5) | 1 | 23 (19) | `a150c2c0a643` |
+| college-physics/5-3-elasticity-stress-and-strain | 5.3 Elasticity: Stress and Strain | 14 | 121 (22 / 99) | 10 | 8 (8) | 1 | 31 (27) | `84cf20ef786b` |
+| college-physics/28-4-relativistic-addition-of-velocities | 28.4 Relativistic Addition of Velocities | 9 | 68 (9 / 59) | 13 | 5 (5) | 0 | 26 (22) | `657a9f3a8e97` |
+| chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds | 19.3 Spectroscopic and Magnetic Properties of Coordination Compounds | 8 | 9 (3 / 6) | 2 | 8 (8) | 0 | 21 (16) | `7809c1758041` |
+| chemistry/7-3-lewis-symbols-and-structures | 7.3 Lewis Symbols and Structures | 9 | 25 (4 / 21) | 4 | 4 (4) | 0 | 23 (12) | `08ee533f3e6b` |
+| chemistry/14-7-acid-base-titrations | 14.7 Acid-Base Titrations | 11 | 63 (36 / 27) | 10 | 3 (3) | 1 | 14 (10) | `bae853afb066` |
+| precalculus/5-4-right-triangle-trigonometry | 5.4 Right Triangle Trigonometry | 29 | 162 (21 / 141) | 1 | 15 (15) | 1 | 48 (32) | `92d90a5ea6c0` |
+| precalculus/1-6-absolute-value-functions | 1.6 Absolute Value Functions | 28 | 205 (19 / 186) | 1 | 12 (12) | 2 | 55 (42) | `34f9466cd9d0` |
+| precalculus/3-1-complex-numbers | 3.1 Complex Numbers | 20 | 206 (24 / 182) | 0 | 3 (3) | 1 | 68 (51) | `ae89112656cc` |
+| introductory-statistics/2-4-box-plots | 2.4 Box Plots | 9 | 0 (0 / 0) | 0 | 5 (5) | 0 | 13 (12) | `792ba6362f87` |
+| introductory-statistics/4-5-hypergeometric-distribution | 4.5 Hypergeometric Distribution | 6 | 4 (0 / 4) | 0 | 1 (1) | 0 | 17 (15) | `96b79c680b69` |
+| introductory-statistics/3-1-terminology | 3.1 Terminology | 8 | 31 (0 / 31) | 0 | 0 (0) | 1 | 11 (10) | `ea51bd3362b2` |
+| intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations | 4.3 Solve Mixture Applications with Systems of Equations | 28 | 65 (4 / 61) | 1 | 0 (0) | 6 | 40 (31) | `8cb8fcd4dc26` |
+| intermediate-algebra/4-6-solve-systems-of-equations-using-determinants | 4.6 Solve Systems of Equations Using Determinants | 27 | 183 (5 / 178) | 0 | 0 (0) | 9 | 55 (45) | `4cc8457f7609` |
+| intermediate-algebra/1-5-properties-of-real-numbers | 1.5 Properties of Real Numbers | 26 | 180 (6 / 174) | 2 | 0 (0) | 4 | 64 (55) | `9fb4330b5563` |
+| **Total** |  | **242** | **1369** | **48** | **70** | **27** | **509** |  |
 
 The PDF is the one every system was given. G1: equations whose gold MathML packs operators into text, which exact match can fail even when the answer is right.
 
-- OpenStax Physics is a live CC BY 4.0 book. These three sections are also the gold set in data/gold and the sample behind docs/eval.md.
+- Every section of this set is from a retired first edition. Whether such an edition is acceptable ground truth was decided before the run; the report states it.
 
 ## Results: a11y-stem
 
-Production settings (`Settings()` defaults: main model gpt-6.1-sol, cheap model gpt-6-luna, every content flag off, the second automated check on). Tables are off in production, so a detected data table is kept as an image with a required decision. Intervals: cluster bootstrap by section (B = 10,000, seed 0), which is approximate with this few sections and tends to be a little narrow; the Wilson interval is shown beside it for comparison and treats items as independent.
+Production settings with the Anthropic provider (main model claude-opus-5-5 at effort medium, cheap model claude-haiku-5-5 at effort low, the main model's server-side refusal fallback on, every content flag off, no second automated check: it is OpenAI's). Tables are off in production, so a detected data table is kept as an image with a required decision. Intervals: cluster bootstrap by section (B = 10,000, seed 0), which is approximate with this few sections and tends to be a little narrow; the Wilson interval is shown beside it for comparison and treats items as independent.
 
 ### a11y-stem on the whole section (document task)
 
@@ -68,13 +80,13 @@ Production settings (`Settings()` defaults: main model gpt-6.1-sol, cheap model 
 
 | Metric | Pooled | Count | Cluster 95% (by section) | Wilson 95% (items independent) | Per run |
 |---|---|---|---|---|---|
-| **end_to_end_exact_lenient (all gold equations)** | 0.7333 | 22/30 | [0.6000, 1.0000] | [0.5555, 0.8582] | 0.7333 |
-| end_to_end_exact_lenient, without G1 equations | 0.8947 | 17/19 | [0.8000, 1.0000] | [0.6861, 0.9706] | 0.8947 |
-| **unflagged_wrong_per_100 (wrong, not G1, not in a required decision)** | 3.33 | 1/30 | [0.00, 8.33] | n/a | 3.33 |
-| matched_exact_lenient (aligned pairs only) | 0.7333 | 22/30 | [0.6000, 1.0000] | [0.5555, 0.8582] | 0.7333 |
-| detection_recall | 1.0000 | 30/30 | [1.0000, 1.0000] | [0.8865, 1.0000] | 1.0000 |
-| detection_precision | 0.5455 | 30/55 | [0.3810, 0.8000] | [0.4152, 0.6697] | 0.5455 |
-| detection_precision, without prose maths | 0.9677 | 30/31 | [0.9091, 1.0000] | [0.8381, 0.9943] | 0.9677 |
+| **end_to_end_exact_lenient (all gold equations)** | 0.5037 | 1,379/2,738 | [0.3755, 0.5985] | [0.4849, 0.5224] | 0.5004 / 0.5069 |
+| end_to_end_exact_lenient, without G1 equations | 0.5204 | 1,375/2,642 | [0.3949, 0.6141] | [0.5014, 0.5394] | 0.5170 / 0.5238 |
+| **unflagged_wrong_per_100 (wrong, not G1, not in a required decision)** | 23.30 | 638/2,738 | [18.97, 29.46] | n/a | 22.86 / 23.74 |
+| matched_exact_lenient (aligned pairs only) | 0.5666 | 1,379/2,434 | [0.4361, 0.6619] | [0.5468, 0.5861] | 0.5629 / 0.5703 |
+| detection_recall | 0.8890 | 2,434/2,738 | [0.8454, 0.9176] | [0.8767, 0.9002] | 0.8890 / 0.8890 |
+| detection_precision | 0.7349 | 2,434/3,312 | [0.5974, 0.8295] | [0.7196, 0.7497] | 0.7349 / 0.7349 |
+| detection_precision, without prose maths | 0.8223 | 2,434/2,960 | [0.7532, 0.8853] | [0.8081, 0.8356] | 0.8223 / 0.8223 |
 
 Rates have every gold equation as denominator; an equation with no aligned output counts as wrong. G1 equations (operators packed into OpenStax text) can fail exact match even when the answer is right. `unflagged_wrong_per_100` is wrong aligned equations that no required decision pointed at, per 100 gold equations.
 
@@ -82,16 +94,16 @@ Rates have every gold equation as denominator; an equation with no aligned outpu
 
 | Measure | Value |
 |---|---|
-| PDF pages converted | 43 |
-| Required decisions | 10 |
-| Required fixes (several can share one decision) | 42 |
-| **Required decisions per PDF page** | **0.2326** |
-| Optional notes per PDF page | 0.5581 |
-| Equation flags: precision | 1.0000 |
-| Equation flags: recall | 0.1250 |
-| Heading flags: precision | 0.5556 |
-| Heading flags: recall | 0.7778 |
-| Wrong items not asked about | 11 |
+| PDF pages converted | 484 |
+| Required decisions | 853 |
+| Required fixes (several can share one decision) | 1,025 |
+| **Required decisions per PDF page** | **1.7624** |
+| Optional notes per PDF page | 0.5537 |
+| Equation flags: precision | 0.7891 |
+| Equation flags: recall | 0.3441 |
+| Heading flags: precision | 0.0000 |
+| Heading flags: recall | 0.0000 |
+| Wrong items not asked about | 748 |
 
 Flag precision is the share of required decisions that point at a real error; recall is the share of real errors a person is asked about. Both are measured against the gold set only; figures and equations with no gold partner have no answer key here.
 
@@ -99,9 +111,22 @@ Flag precision is the share of required decisions that point at a real error; re
 
 | Reason | Fixes |
 |---|---|
-| heading.repeated_label | 41 |
-| heading.weak_evidence | 41 |
-| style_mismatch | 1 |
+| below_accept | 351 |
+| conversion_failed | 1 |
+| heading.all_caps | 6 |
+| heading.repeated_label | 230 |
+| heading.very_short | 8 |
+| heading.weak_evidence | 216 |
+| invalid_latex | 6 |
+| low_confidence | 95 |
+| not_equation | 46 |
+| sign_mismatch | 70 |
+| style_mismatch | 8 |
+| symbol_mismatch | 296 |
+| table_not_rebuilt | 36 |
+| too_long | 10 |
+| unbalanced_braces | 1 |
+| unknown_command | 4 |
 
 Counted per fix, and a fix can have several reasons, so the counts add up to more than the number of required decisions.
 
@@ -109,9 +134,9 @@ Counted per fix, and a fix can have several reasons, so the counts add up to mor
 
 | Kind | Count |
 |---|---|
-| prose_math | 24 |
-| fragment | 0 |
-| other | 1 |
+| prose_math | 352 |
+| fragment | 182 |
+| other | 344 |
 
 `prose_math`: maths the source wrote as plain text, so the gold has no MathML for it; `fragment`: a piece of a gold equation or of a broken formula.
 
@@ -119,9 +144,21 @@ Counted per fix, and a fix can have several reasons, so the counts add up to mor
 
 | Section | PDF pages | Gold equations | Exact | Rate | Required | Calls | Cost |
 |---|---|---|---|---|---|---|---|
-| physics/2-1-relative-motion-distance-and-displacement | 16 | 8 | 8 | 1.0000 | 3 | 43 | $0.0594 |
-| physics/2-2-speed-and-velocity | 14 | 12 | 8 | 0.6667 | 3 | 17 | $0.0319 |
-| physics/2-3-position-vs-time-graphs | 13 | 10 | 6 | 0.6000 | 4 | 27 | $0.0509 |
+| college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum | 10 | 94 | 44 | 0.4681 | 32 | 152 | $0.2313 |
+| college-physics/5-3-elasticity-stress-and-strain | 14 | 242 | 161 | 0.6653 | 26 | 292 | $0.3527 |
+| college-physics/28-4-relativistic-addition-of-velocities | 9 | 136 | 60 | 0.4412 | 28 | 193 | $0.2587 |
+| chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds | 8 | 18 | 4 | 0.2222 | 24 | 230 | $0.3024 |
+| chemistry/7-3-lewis-symbols-and-structures | 9 | 50 | 0 | 0.0000 | 33 | 161 | $0.4096 |
+| chemistry/14-7-acid-base-titrations | 11 | 126 | 4 | 0.0317 | 39 | 220 | $0.4828 |
+| precalculus/5-4-right-triangle-trigonometry | 29 | 324 | 131 | 0.4043 | 188 | 681 | $1.1994 |
+| precalculus/1-6-absolute-value-functions | 28 | 410 | 271 | 0.6610 | 75 | 521 | $0.6057 |
+| precalculus/3-1-complex-numbers | 20 | 412 | 296 | 0.7184 | 59 | 477 | $0.5090 |
+| introductory-statistics/2-4-box-plots | 9 | 0 | 0 | n/a | 4 | 48 | $0.0487 |
+| introductory-statistics/4-5-hypergeometric-distribution | 6 | 8 | 2 | 0.2500 | 16 | 54 | $0.0600 |
+| introductory-statistics/3-1-terminology | 8 | 62 | 8 | 0.1290 | 22 | 179 | $0.0896 |
+| intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations | 28 | 130 | 65 | 0.5000 | 25 | 234 | $0.4001 |
+| intermediate-algebra/4-6-solve-systems-of-equations-using-determinants | 27 | 366 | 132 | 0.3607 | 156 | 579 | $1.0687 |
+| intermediate-algebra/1-5-properties-of-real-numbers | 26 | 360 | 201 | 0.5583 | 126 | 514 | $0.6053 |
 
 Counts are summed over the runs. Cost includes the second automated check.
 
@@ -129,7 +166,11 @@ Counts are summed over the runs. Cost includes the second automated check.
 
 | Book | Sections | End-to-end exact (lenient) | Count | Heading F1 |
 |---|---|---|---|---|
-| Physics | 3 | 0.7333 | 22/30 | 0.9344 |
+| College Physics | 3 | 0.5614 | 265/472 | 1.0000 |
+| Chemistry | 3 | 0.0412 | 8/194 | 1.0000 |
+| Precalculus | 3 | 0.6091 | 698/1,146 | 0.9524 |
+| Introductory Statistics | 3 | 0.1429 | 10/70 | 0.9398 |
+| Intermediate Algebra | 3 | 0.4650 | 398/856 | 0.9434 |
 
 ### Equations as pictures (equations task)
 
@@ -137,12 +178,12 @@ Counts are summed over the runs. Cost includes the second automated check.
 
 | Metric | Pooled | Count | Cluster 95% (by section) | Wilson 95% (items independent) | Per run |
 |---|---|---|---|---|---|
-| exact_lenient | 0.7667 | 23/30 | [0.6667, 1.0000] | [0.5907, 0.8821] | 0.7667 |
-| exact_lenient, without G1 equations | 0.9474 | 18/19 | [0.8000, 1.0000] | [0.7536, 0.9906] | 0.9474 |
-| exact_strict | 0.4000 | 12/30 | [0.1250, 0.5000] | [0.2459, 0.5768] | 0.4000 |
-| mean_teds | 0.8648 | 25.94/30 | [0.7625, 0.9039] | n/a | 0.8648 |
-| proposal_rate | 1.0000 | 30/30 | [1.0000, 1.0000] | [0.8865, 1.0000] | 1.0000 |
-| unflagged wrong per 100 equations | 3.33 | 1/30 | [0.00, 8.33] | n/a | 3.33 |
+| exact_lenient | 0.6841 | 1,873/2,738 | [0.5527, 0.7828] | [0.6664, 0.7012] | 0.6844 / 0.6837 |
+| exact_lenient, without G1 equations | 0.7051 | 1,863/2,642 | [0.5807, 0.8009] | [0.6875, 0.7222] | 0.7055 / 0.7048 |
+| exact_strict | 0.4503 | 1,233/2,738 | [0.3681, 0.5323] | [0.4318, 0.4690] | 0.4507 / 0.4500 |
+| mean_teds | 0.8086 | 2,213.98/2,738 | [0.7268, 0.8716] | n/a | 0.8097 / 0.8075 |
+| proposal_rate | 0.9701 | 2,656/2,738 | [0.9192, 1.0000] | [0.9630, 0.9758] | 0.9708 / 0.9693 |
+| unflagged wrong per 100 equations | 22.28 | 610/2,738 | [16.51, 29.70] | n/a | 22.28 / 22.28 |
 
 Each equation is rendered to an image with its text layer and its surrounding text, as the whole-document run would give it. The picture comes from a browser print of the gold MathML, so it is cleaner than a crop from a real PDF.
 
@@ -150,7 +191,10 @@ Each equation is rendered to an image with its text layer and its surrounding te
 
 | Status | n | Share | exact_lenient | mean TEDS |
 |---|---|---|---|---|
-| accepted | 30 | 1.0000 | 0.7667 | 0.8648 |
+| accepted | 2,527 | 0.9229 | 0.7333 | 0.8417 |
+| needs_review | 129 | 0.0471 | 0.1550 | 0.6736 |
+| abstained | 7 | 0.0026 | 0.0000 | 0.0000 |
+| failed | 75 | 0.0274 | 0.0000 | 0.0000 |
 
 Accepted answers should be more accurate than answers sent to review.
 
@@ -158,8 +202,8 @@ Accepted answers should be more accurate than answers sent to review.
 
 | Display | n | Share | exact_lenient | mean TEDS |
 |---|---|---|---|---|
-| block | 17 | 0.5667 | 0.5882 | 0.8634 |
-| inline | 13 | 0.4333 | 1.0000 | 0.8667 |
+| block | 326 | 0.1191 | 0.2853 | 0.7718 |
+| inline | 2,412 | 0.8809 | 0.7380 | 0.8136 |
 
 ### Headings (headings task)
 
@@ -167,10 +211,10 @@ Accepted answers should be more accurate than answers sent to review.
 
 | Metric | Pooled | Count | Cluster 95% (by section) | Wilson 95% (items independent) | Per run |
 |---|---|---|---|---|---|
-| **heading F1** | 0.9344 | n/a | [0.9130, 0.9600] | n/a | 0.9344 |
-| heading precision | 0.8768 | 121/138 | [0.8400, 0.9231] | [0.8116, 0.9216] | 0.8768 |
-| heading recall | 1.0000 | 121/121 | [1.0000, 1.0000] | [0.9692, 1.0000] | 1.0000 |
-| level_accuracy (among matched headings) | 0.9917 | 120/121 | [0.9792, 1.0000] | [0.9547, 0.9985] | 0.9917 |
+| **heading F1** | 0.9613 | n/a | [0.9474, 0.9772] | n/a | 0.9613 |
+| heading precision | 0.9467 | 497/525 | [0.9272, 0.9703] | [0.9240, 0.9628] | 0.9467 |
+| heading recall | 0.9764 | 497/509 | [0.9564, 0.9935] | [0.9592, 0.9865] | 0.9764 |
+| level_accuracy (among matched headings) | 1.0000 | 497/497 | [1.0000, 1.0000] | [0.9923, 1.0000] | 1.0000 |
 
 A PDF has no heading levels, so level accuracy compares each heading's level relative to the top level on its page. The headings task makes no model call and runs once. Most gold headings sit inside boxes (examples, notes, exercises); see recall by context.
 
@@ -178,19 +222,22 @@ A PDF has no heading levels, so level accuracy compares each heading's level rel
 
 | Context | Gold headings | Recall |
 |---|---|---|
-| body | 20 | 1.0000 |
-| learning-objectives | 3 | 1.0000 |
-| links-to-physics | 2 | 1.0000 |
-| note | 7 | 1.0000 |
-| os-exercise | 2 | 1.0000 |
-| os-teacher | 50 | 1.0000 |
-| snap-lab | 6 | 1.0000 |
-| teacher-demonstration | 2 | 1.0000 |
-| tips-for-success | 7 | 1.0000 |
-| virtual-physics | 2 | 1.0000 |
-| watch-physics | 4 | 1.0000 |
-| work-in-physics | 2 | 1.0000 |
-| worked-example | 14 | 1.0000 |
+| be-prepared | 3 | 1.0000 |
+| body | 110 | 0.9636 |
+| chemistry | 3 | 1.0000 |
+| commentary | 5 | 1.0000 |
+| example | 140 | 0.9929 |
+| how-to-notitle | 16 | 1.0000 |
+| howto | 2 | 1.0000 |
+| interactive | 4 | 1.0000 |
+| media-2 | 2 | 1.0000 |
+| note | 44 | 1.0000 |
+| precalculus | 28 | 1.0000 |
+| problem | 30 | 0.9667 |
+| solution | 58 | 0.9310 |
+| statistics | 9 | 1.0000 |
+| try | 54 | 0.9630 |
+| unnumbered | 1 | 1.0000 |
 
 ### Figure descriptions (figures task)
 
@@ -198,18 +245,19 @@ A PDF has no heading levels, so level accuracy compares each heading's level rel
 
 | Metric | Pooled | Count | Cluster 95% (by section) | Wilson 95% (items independent) | Per run |
 |---|---|---|---|---|---|
-| judge_pass_rate (agreement with a model judge) | 1.0000 | 13/13 | [1.0000, 1.0000] | [0.7719, 1.0000] | 1.0000 |
-| judge_factual_error_rate (among judged) | 0.0000 | 0/13 | [0.0000, 0.0000] | [0.0000, 0.2281] | 0.0000 |
-| proposal_rate | 1.0000 | 13/13 | [1.0000, 1.0000] | [0.7719, 1.0000] | 1.0000 |
-| check_pass_rate (the step's own deterministic checks) | 1.0000 | 13/13 | [1.0000, 1.0000] | [0.7719, 1.0000] | 1.0000 |
+| judge_pass_rate (agreement with a model judge) | 0.9710 | 134/138 | [0.9333, 1.0000] | [0.9278, 0.9887] | 0.9565 / 0.9855 |
+| judge_factual_error_rate (among judged) | 0.0000 | 0/138 | [0.0000, 0.0000] | [0.0000, 0.0271] | 0.0000 / 0.0000 |
+| proposal_rate | 1.0000 | 138/138 | [1.0000, 1.0000] | [0.9729, 1.0000] | 1.0000 / 1.0000 |
+| check_pass_rate (the step's own deterministic checks) | 1.0000 | 138/138 | [1.0000, 1.0000] | [0.9729, 1.0000] | 1.0000 / 1.0000 |
 
-The judge is a model (gpt-6.1-sol) that sees the image, the candidate, the OpenStax alt text and the caption, never which system wrote the candidate. Its pass rate is agreement with that judge, not accuracy; it is not yet calibrated against human labels. A figure with no proposal counts as a fail. Judge cost is reported apart.
+The judge is a model (claude-opus-5-5) that sees the image, the candidate, the OpenStax alt text and the caption, never which system wrote the candidate. Its pass rate is agreement with that judge, not accuracy; it is not yet calibrated against human labels. A figure with no proposal counts as a fail. Judge cost is reported apart.
 
 **Figures by status**
 
 | Status | n |
 |---|---|
-| accepted | 13 |
+| accepted | 121 |
+| needs_review | 17 |
 
 ### Cost and time
 
@@ -217,10 +265,13 @@ The judge is a model (gpt-6.1-sol) that sees the image, the candidate, the OpenS
 
 | Run | Items | Model calls | Pipeline cost | Judge cost | Pipeline cost per PDF page |
 |---|---|---|---|---|---|
-| document run 1 | 3 | 87 | $0.1421 | n/a | $0.00331 |
-| equations run 1 | 30 | 36 | $0.0509 | n/a | n/a |
-| headings run 1 | 3 | 0 | $0.0000 | n/a | n/a |
-| figures run 1 | 13 | 26 | $0.0471 | $0.0405 | n/a |
+| document run 1 | 15 | 2,267 | $3.3480 | n/a | $0.01383 |
+| document run 2 | 15 | 2,268 | $3.2760 | n/a | $0.01354 |
+| headings run 1 | 15 | 0 | $0.0000 | n/a | n/a |
+| figures run 1 | 69 | 138 | $0.3013 | $0.3427 | n/a |
+| figures run 2 | 69 | 138 | $0.3024 | $0.3455 | n/a |
+| equations run 1 | 1,369 | 1,579 | $1.4797 | n/a | n/a |
+| equations run 2 | 1,369 | 1,563 | $1.4819 | n/a | n/a |
 
 Pipeline cost includes the second automated check. Judge cost is never counted as the pipeline's. The per-page figure is for the document task only.
 
@@ -228,13 +279,13 @@ Pipeline cost includes the second automated check. Judge cost is never counted a
 
 | Median | p95 | Min | Max |
 |---|---|---|---|
-| 0.00371 | 0.00389 | 0.00228 | 0.00391 |
+| 0.01252 | 0.02249 | 0.00270 | 0.02316 |
 
 **Seconds per PDF page, as measured in the recorded live run (document task)**
 
 | Median | p95 | Min | Max |
 |---|---|---|---|
-| 3.58608 | 5.49811 | 2.88243 | 5.71056 |
+| 4.28087 | 5.94030 | 1.19000 | 6.18687 |
 
 Wall clock of each section's conversion divided by its PDF pages, with the production concurrency (4 threads) on the recording machine. A replay cannot measure this, so it is read from the bundle.
 
@@ -253,9 +304,12 @@ The eval spends from one run-level budget and does not apply the app's per-job l
 | Run | Complete | Stopped because | Sections the layout could not read |
 |---|---|---|---|
 | document run 1 | yes | none | none |
-| equations run 1 | yes | none | none |
+| document run 2 | yes | none | none |
 | headings run 1 | yes | none | none |
 | figures run 1 | yes | none | none |
+| figures run 2 | yes | none | none |
+| equations run 1 | yes | none | none |
+| equations run 2 | yes | none | none |
 
 ## Invented-content rate
 
@@ -271,44 +325,46 @@ Intervals: cluster bootstrap by section (the number to quote), shown as `rate (u
 
 **Unsupported units / units, all text (the rate to quote)**
 
-| Unit | a11y-stem | chatbot-luna-purdue | docling | mineru-basic | pymupdf4llm |
-|---|---|---|---|---|---|
-| prose sentences (7+ words) | 0.019 (12/632) [0.013, 0.026] | 0.054 (62/1153) [0.016, 0.162] | 0.000 (0/619) [0.000, 0.000] | 0.000 (0/620) [0.000, 0.000] | 0.002 (1/628) [0.000, 0.006] |
-| numbers in prose and headings | 0.000 (0/278) [0.000, 0.000] | 0.004 (2/477) [0.000, 0.011] | 0.000 (0/276) [0.000, 0.000] | 0.000 (0/273) [0.000, 0.000] | 0.000 (0/448) [0.000, 0.000] |
-| headings | 0.021 (3/141) [0.019, 0.027] | 0.177 (40/226) [0.087, 0.361] | 0.000 (0/146) [0.000, 0.000] | 0.000 (0/133) [0.000, 0.000] | 0.000 (0/146) [0.000, 0.000] |
-| equations aligned to gold (added symbol) | 0.000 (0/30) [0.000, 0.000] | 0.035 (2/57) [0.000, 0.111] | 0/0 | 0.375 (9/24) [0.286, 0.429] | 0/0 |
-| equations with no gold partner | 0.000 (0/9) [0.000, 0.000] | 0.339 (20/59) [0.000, 0.381] | 0/0 | 0.111 (2/18) [0.000, 0.500] | 0/0 |
-| table cells | 0/0 | 0.000 (0/8) interval n/a | 0.000 (0/18) [0.000, 0.000] | 0.000 (0/14) [0.000, 0.000] | 0.000 (0/11) [0.000, 0.000] |
+| Unit | a11y-stem | chatbot-haiku-purdue | chatbot-opus-purdue | docling | mineru-basic | pymupdf4llm |
+|---|---|---|---|---|---|---|
+| prose sentences (7+ words) | 0.079 (353/4457) [0.049, 0.122] | 0.037 (152/4139) [0.021, 0.058] | 0.040 (167/4146) [0.018, 0.070] | 0.009 (18/2090) [0.001, 0.021] | 0.008 (16/2046) [0.001, 0.019] | 0.030 (73/2439) [0.015, 0.047] |
+| numbers in prose and headings | 0.000 (0/3672) [0.000, 0.000] | 0.002 (5/3058) [0.000, 0.003] | 0.002 (5/3088) [0.000, 0.004] | 0.014 (42/3054) [0.004, 0.024] | 0.001 (2/2160) [0.000, 0.002] | 0.022 (116/5179) [0.007, 0.042] |
+| headings | 0.028 (30/1080) [0.022, 0.038] | 0.022 (23/1028) [0.009, 0.042] | 0.018 (18/998) [0.006, 0.034] | 0.000 (0/563) [0.000, 0.000] | 0.000 (0/475) [0.000, 0.000] | 0.000 (0/513) [0.000, 0.000] |
+| equations aligned to gold (added symbol) | 0.087 (208/2392) [0.048, 0.124] | 0.017 (40/2413) [0.005, 0.045] | 0.020 (49/2429) [0.006, 0.049] | 0/0 | 0.264 (171/647) [0.205, 0.321] | 0/0 |
+| equations with no gold partner | 0.027 (14/521) [0.000, 0.079] | 0.226 (218/964) [0.035, 0.479] | 0.294 (280/953) [0.049, 0.543] | 0/0 | 0.140 (57/408) [0.039, 0.259] | 0/0 |
+| table cells | 0/0 | 0.117 (216/1847) [0.062, 0.172] | 0.167 (388/2326) [0.116, 0.222] | 0.024 (10/409) [0.007, 0.046] | 0.083 (52/623) [0.043, 0.162] | 0.061 (27/443) [0.007, 0.115] |
 
 **The same without the text a11y-stem wrote itself**
 
 | Unit | a11y-stem |
 |---|---|
-| prose sentences (7+ words) | 0.000 (0/620) [0.000, 0.000] |
-| numbers in prose and headings | 0.000 (0/278) [0.000, 0.000] |
-| headings | 0.000 (0/138) [0.000, 0.000] |
-| equations aligned to gold (added symbol) | 0.000 (0/30) [0.000, 0.000] |
-| equations with no gold partner | 0.000 (0/9) [0.000, 0.000] |
+| prose sentences (7+ words) | 0.000 (0/4104) [0.000, 0.000] |
+| numbers in prose and headings | 0.000 (0/3672) [0.000, 0.000] |
+| headings | 0.000 (0/1050) [0.000, 0.000] |
+| equations aligned to gold (added symbol) | 0.087 (208/2392) [0.048, 0.124] |
+| equations with no gold partner | 0.027 (14/521) [0.000, 0.079] |
 | table cells | 0/0 |
 
 **Symbols added to aligned equations**
 
 | System | Added / output symbols | Per 1,000 | Per 1,000, less a kept equation number | Aligned equations |
 |---|---|---|---|---|
-| a11y-stem | 0/368 | 0.00 | 0.00 | 30 |
-| chatbot-luna-purdue | 6/721 | 8.32 | 8.32 | 57 |
+| a11y-stem | 464/17,213 | 26.96 | 26.67 | 2,392 |
+| chatbot-haiku-purdue | 120/14,565 | 8.24 | 8.24 | 2,413 |
+| chatbot-opus-purdue | 284/14,949 | 19.00 | 19.00 | 2,429 |
 | docling | 0/0 | n/a | n/a | 0 |
-| mineru-basic | 31/265 | 116.98 | 116.98 | 24 |
+| mineru-basic | 474/5,386 | 88.01 | 83.55 | 647 |
 | pymupdf4llm | 0/0 | n/a | n/a | 0 |
 
 **Equations the rule could not check**
 
 | System | TeX that did not convert | No gold partner and under 3 symbols |
 |---|---|---|
-| a11y-stem | 0 | 16 |
-| chatbot-luna-purdue | 0 | 105 |
+| a11y-stem | 0 | 252 |
+| chatbot-haiku-purdue | 197 | 1,045 |
+| chatbot-opus-purdue | 312 | 679 |
 | docling | 0 | 0 |
-| mineru-basic | 5 | 15 |
+| mineru-basic | 31 | 93 |
 | pymupdf4llm | 0 | 0 |
 
 These are counted, never scored as correct.
@@ -317,13 +373,14 @@ These are counted, never scored as correct.
 
 | System | Judge: factual error / descriptions judged | Rate [cluster 95%] |
 |---|---|---|
-| a11y-stem | 0/13 | 0.0000 [0.0000, 0.0000] |
-| chatbot-luna-purdue | 1/26 | 0.0385 [0.0000, 0.0833] |
+| a11y-stem | 0/138 | 0.0000 [0.0000, 0.0000] |
+| chatbot-haiku-purdue | 12/133 | 0.0902 [0.0385, 0.1532] |
+| chatbot-opus-purdue | 3/134 | 0.0224 [0.0000, 0.0612] |
 | docling | 0/0 | n/a |
 | mineru-basic | 0/0 | n/a |
 | pymupdf4llm | 0/0 | n/a |
 
-Agreement with a model judge reading the image (gpt-6.1-sol), not accuracy; the judge is not calibrated against human labels in this run. A figure with no description is not judged here (it is a fail in the figure tables).
+Agreement with a model judge reading the image (claude-opus-5-5), not accuracy; the judge is not calibrated against human labels in this run. A figure with no description is not judged here (it is a fail in the figure tables).
 
 Units counted per system and section, with the text of every flagged unit, are not part of this file; `a11y-stem eval invented score --units` writes them for one output.
 
@@ -335,144 +392,177 @@ The chatbot recipe is what an instructor does today: upload the PDF to a general
 > Convert to accessible HTML compliant with WCAG 2.2 AA with complete MathJax headers and remove [cite].
 <!-- /quote -->
 
-Each arm sends the PDF as a file and a 150 dpi image of every page, then the prompt; no system instructions, no tools, `store=False`, default reasoning effort, at most 64,000 output tokens (`proof.chatbot`). The HTML in the reply is scored as it comes: a reply that was cut off or empty is a failure of the section, not asked again. Equations are read from the reply's MathJax TeX or MathML, converted the way a11y-stem converts its own model's LaTeX, and aligned to the gold equations by the document task's code, so the same scorer reads both systems.
+Each arm sends the PDF as a document block and a 150 dpi image of every page, then the prompt; no system prompt, no tools, the model's default reasoning effort, at most 64,000 output tokens, streamed (`proof.chatbot`). The HTML in the reply is scored as it comes: a reply that was cut off or empty is a failure of the section, not asked again. Equations are read from the reply's MathJax TeX or MathML, converted the way a11y-stem converts its own model's LaTeX, and aligned to the gold equations by the document task's code, so the same scorer reads both systems.
 
-Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); `chatbot-sol-expert` is a longer, more careful prompt written for this project (one run; the text is `src/a11y_stem/proof/chat_prompts.json`) so that the comparison is not only against the weakest prompt an instructor might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper gpt-6-luna (two runs). The last two are descriptive.
+Arms: `chatbot-opus-purdue` is the primary arm (claude-opus-5-5, two runs); `chatbot-haiku-purdue` is the same Purdue prompt on the cheaper model (claude-haiku-5-5, two runs). The cheaper arm is descriptive. The registration's expert-prompt arm is not run on Claude (Addendum 6).
 
-**Not run in this recording:** `chatbot-sol-purdue`, `chatbot-sol-expert` (see the status table).
+**Family A: a11y-stem against the Purdue-prompt chatbot on claude-opus-5-5**
+
+| Measure | Against | a11y-stem | Other | Difference (a11y-stem minus other) | Cluster 99.000% (k = 5): the claim | Cluster 95% | Sign-flip p | Result |
+|---|---|---|---|---|---|---|---|---|
+| end_to_end_exact_lenient | chatbot-opus-purdue | 0.5037 | 0.6216 | -0.1180 | [-0.1992, -0.0254] | [-0.1796, -0.0490] | 0.0234 | **chatbot-opus-purdue is higher by point estimate: the registered interval excludes 0, the sign-flip test does not (p = 0.0234)** |
+| unflagged_wrong_per_100 | chatbot-opus-purdue | 23.30 | 24.00 | -0.69 | [-11.31, 13.19] | [-8.74, 8.90] | 0.5542 | **no difference this set can detect** |
+| invented prose sentence rate | chatbot-opus-purdue | 0.0792 | 0.0403 | 0.0389 | [-0.0135, 0.0949] | [-0.0012, 0.0803] | 0.0275 | **no difference this set can detect** |
+| invented number rate | chatbot-opus-purdue | 0.0000 | 0.0016 | -0.0016 | [-0.0044, 0.0000] | [-0.0037, 0.0000] | 0.5000 | **no difference this set can detect** |
+| heading F1 | chatbot-opus-purdue | 0.9613 | 0.9315 | 0.0298 | [-0.0119, 0.1022] | [-0.0036, 0.0803] | 0.0332 | **no difference this set can detect** |
+
+Paired cluster bootstrap by section: the same resampled sections for both systems, B = 10,000, seed 0. "X is better" is written only when the 99% interval (Bonferroni, k = 5) of the difference excludes 0; otherwise "no difference this set can detect". With 15 sections a percentile bootstrap is approximate and tends to be a little narrow. The chatbot's two runs are pooled; a11y-stem's document task also has two runs, and its headings task one. Every number here is a rate over all items, and a section that failed counts as a failure. Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section differences, a robustness check that is not part of the registered rule; the Bonferroni threshold for it is 0.01000. With fewer than 10 sections no verdict is written (a bootstrap over so few sections only returns the sections' own extremes), and a "better" that the sign-flip test does not support is written as "higher by point estimate".
 
 **All chatbot arms: equations (preregistration 7.1)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| end_to_end_exact_lenient (all gold equations) | 0.7333 [0.6000, 1.0000] | 0.5000 [0.3000, 1.0000] |
-| end_to_end_exact_lenient, without G1 equations | 0.8947 [0.8000, 1.0000] | 0.7368 [0.5000, 1.0000] |
-| unflagged_wrong_per_100 | 3.33 [0.00, 8.33] | 15.00 [0.00, 30.00] |
-| matched_exact_lenient (aligned pairs only) | 0.7333 [0.6000, 1.0000] | 0.5263 [0.3333, 1.0000] |
-| detection_recall | 1.0000 [1.0000, 1.0000] | 0.9500 [0.9000, 1.0000] |
-| detection_precision | 0.5455 [0.3810, 0.8000] | 0.2579 [0.1682, 0.4792] |
-| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0.5000 [0.3000, 1.0000] |
+| Metric | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| end_to_end_exact_lenient (all gold equations) | 0.5037 [0.3755, 0.5985] | 0.6216 [0.4640, 0.7274] | 0.5997 [0.4368, 0.7078] |
+| end_to_end_exact_lenient, without G1 equations | 0.5204 [0.3949, 0.6141] | 0.6404 [0.4898, 0.7431] | 0.6200 [0.4605, 0.7270] |
+| unflagged_wrong_per_100 | 23.30 [18.97, 29.46] | 24.00 [16.13, 33.43] | 25.24 [18.19, 34.56] |
+| matched_exact_lenient (aligned pairs only) | 0.5666 [0.4361, 0.6619] | 0.7007 [0.5788, 0.7865] | 0.6805 [0.5443, 0.7699] |
+| detection_recall | 0.8890 [0.8454, 0.9176] | 0.8871 [0.7436, 0.9648] | 0.8813 [0.7689, 0.9468] |
+| detection_precision | 0.7349 [0.5974, 0.8295] | 0.5555 [0.3672, 0.7141] | 0.5224 [0.3407, 0.6814] |
+| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0.6183 [0.4625, 0.7231] | 0.5913 [0.4292, 0.6980] |
 
 `value [cluster 95% interval by section]`. A system that asks no questions has every wrong equation unflagged. G1 equations (operators packed into OpenStax text) can fail exact match when the answer is right. The allowlist-off row converts a system's TeX without a11y-stem's LaTeX allowlist (descriptive; a11y-stem's own allowlist is a product rule, so it has no such row).
 
 **All chatbot arms: headings (7.2)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| heading F1 | 0.9344 [0.9130, 0.9600] | 0.4957 [0.4065, 0.5854] |
-| heading precision | 0.8768 [0.8400, 0.9231] | 0.5133 [0.4098, 0.6000] |
-| heading recall | 1.0000 [1.0000, 1.0000] | 0.4793 [0.4032, 0.5714] |
-| heading level_accuracy (among matched) | 0.9917 [0.9792, 1.0000] | 0.4397 [0.3958, 0.4800] |
+| Metric | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| heading F1 | 0.9613 [0.9474, 0.9772] | 0.9315 [0.8914, 0.9580] | 0.9140 [0.8724, 0.9449] |
+| heading precision | 0.9467 [0.9272, 0.9703] | 0.9409 [0.9059, 0.9682] | 0.9095 [0.8649, 0.9418] |
+| heading recall | 0.9764 [0.9564, 0.9935] | 0.9224 [0.8663, 0.9614] | 0.9185 [0.8707, 0.9558] |
+| heading level_accuracy (among matched) | 1.0000 [1.0000, 1.0000] | 0.3408 [0.2640, 0.4672] | 0.5080 [0.3602, 0.7143] |
 
 Levels are compared relative to each side's top level in the section. A system that writes an `h1` document title the PDF does not have gets a false positive for it.
 
 **All chatbot arms: figures (7.3)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| figure judge_pass_rate (no description = fail) | 1.0000 [1.0000, 1.0000] | 0.8846 [0.7500, 0.9167] |
-| figure judge_factual_error_rate (among judged) | 0.0000 [0.0000, 0.0000] | 0.0385 [0.0000, 0.0833] |
-| figures with no description | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
+| Metric | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| figure judge_pass_rate (no description = fail) | 0.9710 [0.9333, 1.0000] | 0.8043 [0.6797, 0.9048] | 0.8333 [0.7422, 0.9071] |
+| figure judge_factual_error_rate (among judged) | 0.0000 [0.0000, 0.0000] | 0.0224 [0.0000, 0.0612] | 0.0902 [0.0385, 0.1532] |
+| figures with no description | 0.0000 [0.0000, 0.0000] | 0.0290 [0.0000, 0.0727] | 0.0362 [0.0000, 0.0865] |
 
-Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.1-sol) that sees the image, the candidate, the OpenStax alt and the caption, never which system wrote the candidate; not accuracy, and not calibrated against human labels in this run. A figure with no description is a fail. Judge cost is reported apart.
+Over the figures with an OpenStax alt text. Agreement with a model judge (claude-opus-5-5) that sees the image, the candidate, the OpenStax alt and the caption, never which system wrote the candidate; not accuracy, and not calibrated against human labels in this run. A figure with no description is a fail. Judge cost is reported apart.
 
 **All chatbot arms: invented content (7.5; the units are in the invented-content section)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| invented prose sentences (text-layer mismatch, rule unaudited) | 0.0190 [0.0133, 0.0261] | 0.0538 [0.0155, 0.1621] |
-| invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0042 [0.0000, 0.0108] |
-| headings the PDF does not support | 0.0213 [0.0189, 0.0270] | 0.1770 [0.0875, 0.3607] |
-| aligned equations with an added symbol | 0.0000 [0.0000, 0.0000] | 0.0351 [0.0000, 0.1111] |
-| equations with no gold partner and no match in the PDF | 0.0000 [0.0000, 0.0000] | 0.3390 [0.0000, 0.3810] |
+| Metric | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| invented prose sentences (text-layer mismatch, rule unaudited) | 0.0792 [0.0493, 0.1224] | 0.0403 [0.0178, 0.0697] | 0.0367 [0.0214, 0.0583] |
+| invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0016 [0.0000, 0.0037] | 0.0016 [0.0004, 0.0029] |
+| headings the PDF does not support | 0.0278 [0.0216, 0.0378] | 0.0180 [0.0063, 0.0340] | 0.0224 [0.0093, 0.0424] |
+| aligned equations with an added symbol | 0.0870 [0.0481, 0.1236] | 0.0202 [0.0065, 0.0489] | 0.0166 [0.0054, 0.0449] |
+| equations with no gold partner and no match in the PDF | 0.0269 [0.0000, 0.0787] | 0.2938 [0.0491, 0.5431] | 0.2261 [0.0351, 0.4791] |
 
 All text, including text a11y-stem wrote itself. A section a system failed on has no units, so it adds nothing here; the raw rates include paraphrase the rule counts as unsupported, and the audit that measures that has not been done. A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): the Wilson upper bound in the last table is the bound to read.
 
 **All chatbot arms: coverage (7.6)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| coverage: PDF word 6-grams found in the output | 0.8060 [0.7788, 0.8232] | 0.5592 [0.2563, 0.6859] |
+| Metric | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| coverage: PDF word 6-grams found in the output | 0.6526 [0.5723, 0.7259] | 0.6461 [0.5576, 0.7260] | 0.6205 [0.5393, 0.6928] |
 
 **All chatbot arms: counts behind the rates**
 
-| Count | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| end_to_end_exact_lenient (all gold equations) | 22/30 | 30/60 |
-| end_to_end_exact_lenient, without G1 equations | 17/19 | 28/38 |
-| unflagged_wrong_per_100 | 1/30 | 9/60 |
-| matched_exact_lenient (aligned pairs only) | 22/30 | 30/57 |
-| detection_recall | 30/30 | 57/60 |
-| detection_precision | 30/55 | 57/221 |
-| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 30/60 |
-| heading F1 | 121/138 pred, 121/121 gold | 116/226 pred, 116/242 gold |
-| heading precision | 121/138 | 116/226 |
-| heading recall | 121/121 | 116/242 |
-| heading level_accuracy (among matched) | 120/121 | 51/116 |
-| figure judge_pass_rate (no description = fail) | 13/13 | 23/26 |
-| figure judge_factual_error_rate (among judged) | 0/13 | 1/26 |
-| figures with no description | 0/13 | 0/26 |
-| invented prose sentences (text-layer mismatch, rule unaudited) | 12/632 | 62/1,153 |
-| invented numbers (text-layer mismatch, rule unaudited) | 0/278 | 2/477 |
-| headings the PDF does not support | 3/141 | 40/226 |
-| aligned equations with an added symbol | 0/30 | 2/57 |
-| equations with no gold partner and no match in the PDF | 0/9 | 20/59 |
-| coverage: PDF word 6-grams found in the output | 9,010/11,178 | 12,501/22,356 |
+| Count | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| end_to_end_exact_lenient (all gold equations) | 1,379/2,738 | 1,702/2,738 | 1,642/2,738 |
+| end_to_end_exact_lenient, without G1 equations | 1,375/2,642 | 1,692/2,642 | 1,638/2,642 |
+| unflagged_wrong_per_100 | 638/2,738 | 657/2,738 | 691/2,738 |
+| matched_exact_lenient (aligned pairs only) | 1,379/2,434 | 1,702/2,429 | 1,642/2,413 |
+| detection_recall | 2,434/2,738 | 2,429/2,738 | 2,413/2,738 |
+| detection_precision | 2,434/3,312 | 2,429/4,373 | 2,413/4,619 |
+| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 1,693/2,738 | 1,619/2,738 |
+| heading F1 | 497/525 pred, 497/509 gold | 939/998 pred, 939/1,018 gold | 935/1,028 pred, 935/1,018 gold |
+| heading precision | 497/525 | 939/998 | 935/1,028 |
+| heading recall | 497/509 | 939/1,018 | 935/1,018 |
+| heading level_accuracy (among matched) | 497/497 | 320/939 | 475/935 |
+| figure judge_pass_rate (no description = fail) | 134/138 | 111/138 | 115/138 |
+| figure judge_factual_error_rate (among judged) | 0/138 | 3/134 | 12/133 |
+| figures with no description | 0/138 | 4/138 | 5/138 |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 353/4,457 | 167/4,146 | 152/4,139 |
+| invented numbers (text-layer mismatch, rule unaudited) | 0/3,672 | 5/3,088 | 5/3,058 |
+| headings the PDF does not support | 30/1,080 | 18/998 | 23/1,028 |
+| aligned equations with an added symbol | 208/2,392 | 49/2,429 | 40/2,413 |
+| equations with no gold partner and no match in the PDF | 14/521 | 280/953 | 218/964 |
+| coverage: PDF word 6-grams found in the output | 59,342/90,934 | 58,757/90,934 | 56,425/90,934 |
 
 **All chatbot arms: Wilson 95% intervals (items treated as independent; narrower than the cluster intervals)**
 
-| Wilson 95% (items treated as independent) | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| end_to_end_exact_lenient (all gold equations) | [0.5555, 0.8582] | [0.3774, 0.6226] |
-| end_to_end_exact_lenient, without G1 equations | [0.6861, 0.9706] | [0.5799, 0.8503] |
-| matched_exact_lenient (aligned pairs only) | [0.5555, 0.8582] | [0.3992, 0.6501] |
-| detection_recall | [0.8865, 1.0000] | [0.8630, 0.9829] |
-| detection_precision | [0.4152, 0.6697] | [0.2047, 0.3194] |
-| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | [0.3774, 0.6226] |
-| heading precision | [0.8116, 0.9216] | [0.4484, 0.5777] |
-| heading recall | [0.9692, 1.0000] | [0.4172, 0.5421] |
-| figure judge_pass_rate (no description = fail) | [0.7719, 1.0000] | [0.7102, 0.9600] |
-| figure judge_factual_error_rate (among judged) | [0.0000, 0.2281] | [0.0068, 0.1889] |
-| figures with no description | [0.0000, 0.2281] | [0.0000, 0.1287] |
-| invented prose sentences (text-layer mismatch, rule unaudited) | [0.0109, 0.0329] | [0.0422, 0.0683] |
-| invented numbers (text-layer mismatch, rule unaudited) | [0.0000, 0.0136] | [0.0012, 0.0152] |
-| headings the PDF does not support | [0.0073, 0.0607] | [0.1328, 0.2320] |
-| aligned equations with an added symbol | [0.0000, 0.1135] | [0.0097, 0.1192] |
-| equations with no gold partner and no match in the PDF | [0.0000, 0.2991] | [0.2314, 0.4663] |
+| Wilson 95% (items treated as independent) | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| end_to_end_exact_lenient (all gold equations) | [0.4849, 0.5224] | [0.6033, 0.6396] | [0.5812, 0.6179] |
+| end_to_end_exact_lenient, without G1 equations | [0.5014, 0.5394] | [0.6219, 0.6585] | [0.6013, 0.6383] |
+| matched_exact_lenient (aligned pairs only) | [0.5468, 0.5861] | [0.6822, 0.7186] | [0.6616, 0.6988] |
+| detection_recall | [0.8767, 0.9002] | [0.8747, 0.8985] | [0.8686, 0.8929] |
+| detection_precision | [0.7196, 0.7497] | [0.5407, 0.5701] | [0.5080, 0.5368] |
+| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | [0.6000, 0.6364] | [0.5728, 0.6096] |
+| heading precision | [0.9240, 0.9628] | [0.9245, 0.9539] | [0.8904, 0.9256] |
+| heading recall | [0.9592, 0.9865] | [0.9043, 0.9373] | [0.9000, 0.9337] |
+| figure judge_pass_rate (no description = fail) | [0.9278, 0.9887] | [0.7303, 0.8619] | [0.7623, 0.8863] |
+| figure judge_factual_error_rate (among judged) | [0.0000, 0.0271] | [0.0076, 0.0638] | [0.0524, 0.1511] |
+| figures with no description | [0.0000, 0.0271] | [0.0113, 0.0722] | [0.0156, 0.0820] |
+| invented prose sentences (text-layer mismatch, rule unaudited) | [0.0716, 0.0875] | [0.0347, 0.0467] | [0.0314, 0.0429] |
+| invented numbers (text-layer mismatch, rule unaudited) | [0.0000, 0.0010] | [0.0007, 0.0038] | [0.0007, 0.0038] |
+| headings the PDF does not support | [0.0195, 0.0394] | [0.0114, 0.0283] | [0.0150, 0.0333] |
+| aligned equations with an added symbol | [0.0763, 0.0989] | [0.0153, 0.0266] | [0.0122, 0.0225] |
+| equations with no gold partner and no match in the PDF | [0.0161, 0.0446] | [0.2658, 0.3235] | [0.2009, 0.2536] |
 
 **Each run on its own**
 
 | Run | end_to_end_exact_lenient | unflagged_wrong_per_100 | heading F1 | invented sentences | invented numbers |
 |---|---|---|---|---|---|
-| chatbot-luna-purdue run 1 | 0.5667 | 13.33 | 0.4828 | 0.0740 | 0.0043 |
-| chatbot-luna-purdue run 2 | 0.4333 | 16.67 | 0.5085 | 0.0332 | 0.0041 |
+| chatbot-opus-purdue run 1 | 0.6253 | 23.67 | 0.9296 | 0.0274 | 0.0013 |
+| chatbot-opus-purdue run 2 | 0.6180 | 24.32 | 0.9335 | 0.0528 | 0.0019 |
+| chatbot-haiku-purdue run 1 | 0.6026 | 24.76 | 0.9237 | 0.0361 | 0.0019 |
+| chatbot-haiku-purdue run 2 | 0.5968 | 25.71 | 0.9043 | 0.0373 | 0.0013 |
 
 **End-to-end exact match by section**
 
-| Section | Gold equations | a11y-stem | chatbot-luna-purdue |
-|---|---|---|---|
-| physics/2-1-relative-motion-distance-and-displacement | 8 | 1.0000 | 1.0000 |
-| physics/2-2-speed-and-velocity | 12 | 0.6667 | 0.3333 |
-| physics/2-3-position-vs-time-graphs | 10 | 0.6000 | 0.3000 |
+| Section | Gold equations | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|---|
+| college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum | 47 | 0.4681 | 0.4681 | 0.4468 |
+| college-physics/5-3-elasticity-stress-and-strain | 121 | 0.6653 | 0.8264 | 0.8099 |
+| college-physics/28-4-relativistic-addition-of-velocities | 68 | 0.4412 | 0.4853 | 0.4853 |
+| chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds | 9 | 0.2222 | 0.2222 | 0.2222 |
+| chemistry/7-3-lewis-symbols-and-structures | 25 | 0.0000 | 0.0000 | 0.0000 |
+| chemistry/14-7-acid-base-titrations | 63 | 0.0317 | 0.0317 | 0.0238 |
+| precalculus/5-4-right-triangle-trigonometry | 162 | 0.4043 | 0.7191 | 0.6759 |
+| precalculus/1-6-absolute-value-functions | 205 | 0.6610 | 0.8659 | 0.8488 |
+| precalculus/3-1-complex-numbers | 206 | 0.7184 | 0.7694 | 0.7524 |
+| introductory-statistics/2-4-box-plots | 0 | n/a | n/a | n/a |
+| introductory-statistics/4-5-hypergeometric-distribution | 4 | 0.2500 | 1.0000 | 1.0000 |
+| introductory-statistics/3-1-terminology | 31 | 0.1290 | 0.0968 | 0.0968 |
+| intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations | 65 | 0.5000 | 0.3923 | 0.2154 |
+| intermediate-algebra/4-6-solve-systems-of-equations-using-determinants | 183 | 0.3607 | 0.4699 | 0.4590 |
+| intermediate-algebra/1-5-properties-of-real-numbers | 180 | 0.5583 | 0.6722 | 0.6778 |
 
 **End-to-end exact match by book**
 
-| Book (point estimates; three sections each) | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| Physics | 0.7333 | 0.5000 |
+| Book (point estimates; three sections each) | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| College Physics | 0.5614 | 0.6568 | 0.6441 |
+| Chemistry | 0.0412 | 0.0412 | 0.0361 |
+| Precalculus | 0.6091 | 0.7897 | 0.7653 |
+| Introductory Statistics | 0.1429 | 0.2000 | 0.2000 |
+| Intermediate Algebra | 0.4650 | 0.5432 | 0.5140 |
 
 **Heading F1 by book**
 
-| Book (point estimates; three sections each) | a11y-stem | chatbot-luna-purdue |
-|---|---|---|
-| Physics | 0.9344 | 0.4957 |
+| Book (point estimates; three sections each) | a11y-stem | chatbot-opus-purdue | chatbot-haiku-purdue |
+|---|---|---|---|
+| College Physics | 1.0000 | 0.8867 | 0.9068 |
+| Chemistry | 1.0000 | 0.8037 | 0.7489 |
+| Precalculus | 0.9524 | 0.9701 | 0.9499 |
+| Introductory Statistics | 0.9398 | 0.9405 | 0.9240 |
+| Intermediate Algebra | 0.9434 | 0.9531 | 0.9370 |
 
 **Cost and time per PDF page**
 
 | System | Total API cost | Cost/page median | p95 | min | max | Seconds/page median | p95 | min | max | Peak memory (MB) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| a11y-stem (document task) | $0.1421 | 0.00371 | 0.00389 | 0.00228 | 0.00391 | 3.58608 | 5.49811 | 2.88243 | 5.71056 | n/a |
-| chatbot-luna-purdue | $0.0436 | 0.00050 | 0.00070 | 0.00031 | 0.00071 | 5.13819 | 5.56451 | 4.74615 | 5.57143 | n/a |
+| a11y-stem (document task) | $6.6240 | 0.01252 | 0.02249 | 0.00270 | 0.02316 | 4.28087 | 5.94030 | 1.19000 | 6.18687 | n/a |
+| chatbot-opus-purdue | $22.3407 | 0.04765 | 0.07367 | 0.03413 | 0.12942 | 10.70750 | 20.00340 | 5.72857 | 44.74444 | n/a |
+| chatbot-haiku-purdue | $1.4878 | 0.00147 | 0.00460 | 0.00097 | 0.00480 | 4.50079 | 7.73566 | 2.40357 | 9.03333 | n/a |
 
 Chatbot: list-price cost of each call from its usage, and the call's wall clock, per PDF page of the section. a11y-stem: pipeline plus second check per page, and the document task's wall clock at concurrency 4 on the recording machine. Judge cost is not included for any system.
 
@@ -480,7 +570,8 @@ Chatbot: list-price cost of each call from its usage, and the call's wall clock,
 
 | System | Outputs | Expected | ok | truncated | empty | timeout | crashed | not run |
 |---|---|---|---|---|---|---|---|---|
-| chatbot-luna-purdue | 6 | 6 | 6 | 0 | 0 | 0 | 0 | 0 |
+| chatbot-opus-purdue | 30 | 30 | 30 | 0 | 0 | 0 | 0 | 0 |
+| chatbot-haiku-purdue | 30 | 30 | 30 | 0 | 0 | 0 | 0 | 0 |
 
 A section that is not ok scores as found nothing: its gold items stay in every denominator.
 
@@ -513,33 +604,33 @@ The parsers solve a different problem: getting a PDF's text into an LLM. They ar
 | Arm | Versions | Equations written as TeX/MathML | Note |
 |---|---|---|---|
 | docling | docling 2.138.0 | 0 | default settings: a formula is not decoded, so no LaTeX is written (its Markdown holds `<!-- formula-not-decoded -->`); the registered arm with formula recognition on was not carried out (Addendum 4) |
-| mineru-basic | mineru 4.0.12 | 62 | the basic tier on CPU; MinerU's documentation names the standard tier as its default, and that tier was not run, so this is not MinerU at its default settings |
+| mineru-basic | mineru 4.0.12 | 1,179 | the basic tier on CPU; MinerU's documentation names the standard tier as its default, and that tier was not run, so this is not MinerU at its default settings |
 | pymupdf4llm | pymupdf4llm 1.28.2 | 0 | has no formula recognition |
 
 **Family B: a11y-stem against each parser**
 
-| Measure | Against | a11y-stem | Other | Difference (a11y-stem minus other) | Cluster 99.167% (k = 6): the claim | Cluster 95% | Sign-flip p | Result |
+| Measure | Against | a11y-stem | Other | Difference (a11y-stem minus other) | Cluster 99.375% (k = 8): the claim | Cluster 95% | Sign-flip p | Result |
 |---|---|---|---|---|---|---|---|---|
-| end_to_end_exact_lenient | docling | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | 0.2500 | **not tested, 3 sections** |
-| heading F1 | docling | 0.9344 | 0.8764 | 0.0580 | [0.0000, 0.1219] | [0.0000, 0.1219] | 0.5000 | **not tested, 3 sections** |
-| end_to_end_exact_lenient | mineru-basic | 0.7333 | 0.2000 | 0.5333 | [0.3000, 0.6667] | [0.3000, 0.6667] | 0.2500 | **not tested, 3 sections** |
-| heading F1 | mineru-basic | 0.9344 | 0.9055 | 0.0289 | [0.0098, 0.0433] | [0.0098, 0.0433] | 0.2500 | **not tested, 3 sections** |
-| end_to_end_exact_lenient | pymupdf4llm | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | 0.2500 | **not tested, 3 sections** |
-| heading F1 | pymupdf4llm | 0.9344 | 0.9064 | 0.0280 | [0.0000, 0.0543] | [0.0000, 0.0543] | 0.5000 | **not tested, 3 sections** |
+| end_to_end_exact_lenient | docling | 0.5037 | 0.0000 | 0.5037 | [0.3180, 0.6336] | [0.3755, 0.5985] | 0.0002 | **a11y-stem is better** |
+| heading F1 | docling | 0.9613 | 0.9104 | 0.0509 | [-0.0052, 0.1481] | [0.0043, 0.1173] | 0.0186 | **no difference this set can detect** |
+| end_to_end_exact_lenient | mineru-basic | 0.5037 | 0.1738 | 0.3298 | [0.1760, 0.4365] | [0.2225, 0.4148] | 0.0002 | **a11y-stem is better** |
+| heading F1 | mineru-basic | 0.9613 | 0.9228 | 0.0386 | [0.0047, 0.0789] | [0.0120, 0.0670] | 0.0073 | **a11y-stem is higher by point estimate: the registered interval excludes 0, the sign-flip test does not (p = 0.0073)** |
+| end_to_end_exact_lenient | pymupdf4llm | 0.5037 | 0.0000 | 0.5037 | [0.3180, 0.6336] | [0.3755, 0.5985] | 0.0002 | **a11y-stem is better** |
+| heading F1 | pymupdf4llm | 0.9613 | 0.8297 | 0.1316 | [0.0292, 0.2706] | [0.0509, 0.2229] | 0.0088 | **a11y-stem is higher by point estimate: the registered interval excludes 0, the sign-flip test does not (p = 0.0088)** |
 
-Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% paired cluster-bootstrap interval of the difference decides. For a parser that writes no LaTeX by design (`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool that does not attempt equations; read it as a description of what the tool is built for, not as evidence that a11y-stem transcribes better. Flat heading levels in a parser's export are a property of that export. Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section differences, a robustness check that is not part of the registered rule; the Bonferroni threshold for it is 0.00833. With fewer than 10 sections no verdict is written (a bootstrap over so few sections only returns the sections' own extremes), and a "better" that the sign-flip test does not support is written as "higher by point estimate".
+Preregistration 8.3 as written: 2 comparisons per parser, k = 8 (3 parsers ran; the registered four are counted, Addendum 1 D3), the 99.375% paired cluster-bootstrap interval of the difference decides. For a parser that writes no LaTeX by design (`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool that does not attempt equations; read it as a description of what the tool is built for, not as evidence that a11y-stem transcribes better. Flat heading levels in a parser's export are a property of that export. Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section differences, a robustness check that is not part of the registered rule; the Bonferroni threshold for it is 0.00625. With fewer than 10 sections no verdict is written (a bootstrap over so few sections only returns the sections' own extremes), and a "better" that the sign-flip test does not support is written as "higher by point estimate".
 
 **All parsers: equations (preregistration 7.1)**
 
 | Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| end_to_end_exact_lenient (all gold equations) | 0.7333 [0.6000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.2000 [0.0000, 0.3750] | 0.0000 [0.0000, 0.0000] |
-| end_to_end_exact_lenient, without G1 equations | 0.8947 [0.8000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.3158 [0.0000, 0.5000] | 0.0000 [0.0000, 0.0000] |
-| unflagged_wrong_per_100 | 3.33 [0.00, 8.33] | 0.00 [0.00, 0.00] | 33.33 [25.00, 50.00] | 0.00 [0.00, 0.00] |
-| matched_exact_lenient (aligned pairs only) | 0.7333 [0.6000, 1.0000] | n/a | 0.2500 [0.0000, 0.4286] | n/a |
-| detection_recall | 1.0000 [1.0000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.8000 [0.5833, 1.0000] | 0.0000 [0.0000, 0.0000] |
-| detection_precision | 0.5455 [0.3810, 0.8000] | n/a | 0.3871 [0.3333, 0.5000] | n/a |
-| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0.0000 [0.0000, 0.0000] | 0.1333 [0.0000, 0.3750] | 0.0000 [0.0000, 0.0000] |
+| end_to_end_exact_lenient (all gold equations) | 0.5037 [0.3755, 0.5985] | 0.0000 [0.0000, 0.0000] | 0.1738 [0.1081, 0.2177] | 0.0000 [0.0000, 0.0000] |
+| end_to_end_exact_lenient, without G1 equations | 0.5204 [0.3949, 0.6141] | 0.0000 [0.0000, 0.0000] | 0.1802 [0.1148, 0.2235] | 0.0000 [0.0000, 0.0000] |
+| unflagged_wrong_per_100 | 23.30 [18.97, 29.46] | 0.00 [0.00, 0.00] | 27.61 [22.15, 34.74] | 0.00 [0.00, 0.00] |
+| matched_exact_lenient (aligned pairs only) | 0.5666 [0.4361, 0.6619] | n/a | 0.3679 [0.2400, 0.4420] | n/a |
+| detection_recall | 0.8890 [0.8454, 0.9176] | 0.0000 [0.0000, 0.0000] | 0.4726 [0.3810, 0.5529] | 0.0000 [0.0000, 0.0000] |
+| detection_precision | 0.7349 [0.5974, 0.8295] | n/a | 0.5488 [0.3798, 0.6914] | n/a |
+| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0.0000 [0.0000, 0.0000] | 0.1709 [0.1070, 0.2132] | 0.0000 [0.0000, 0.0000] |
 
 `value [cluster 95% interval by section]`. A system that asks no questions has every wrong equation unflagged. G1 equations (operators packed into OpenStax text) can fail exact match when the answer is right. The allowlist-off row converts a system's TeX without a11y-stem's LaTeX allowlist (descriptive; a11y-stem's own allowlist is a product rule, so it has no such row).
 
@@ -547,10 +638,10 @@ Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% pai
 
 | Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| heading F1 | 0.9344 [0.9130, 0.9600] | 0.8764 [0.8381, 0.9254] | 0.9055 [0.8923, 0.9167] | 0.9064 [0.8986, 0.9130] |
-| heading precision | 0.8768 [0.8400, 0.9231] | 0.8014 [0.7719, 0.8611] | 0.8647 [0.8235, 0.9167] | 0.8288 [0.8158, 0.8400] |
-| heading recall | 1.0000 [1.0000, 1.0000] | 0.9669 [0.9167, 1.0000] | 0.9504 [0.9167, 1.0000] | 1.0000 [1.0000, 1.0000] |
-| heading level_accuracy (among matched) | 0.9917 [0.9792, 1.0000] | 0.0256 [0.0227, 0.0323] | 0.0261 [0.0227, 0.0345] | 1.0000 [1.0000, 1.0000] |
+| heading F1 | 0.9613 [0.9474, 0.9772] | 0.9104 [0.8418, 0.9576] | 0.9228 [0.8937, 0.9547] | 0.8297 [0.7384, 0.9185] |
+| heading precision | 0.9467 [0.9272, 0.9703] | 0.8668 [0.7599, 0.9444] | 0.9558 [0.9359, 0.9741] | 0.8265 [0.7284, 0.9258] |
+| heading recall | 0.9764 [0.9564, 0.9935] | 0.9587 [0.9338, 0.9805] | 0.8919 [0.8480, 0.9452] | 0.8330 [0.6753, 0.9706] |
+| heading level_accuracy (among matched) | 1.0000 [1.0000, 1.0000] | 0.0307 [0.0238, 0.0421] | 0.1652 [0.0522, 0.3262] | 1.0000 [1.0000, 1.0000] |
 
 Levels are compared relative to each side's top level in the section. A system that writes an `h1` document title the PDF does not have gets a false positive for it.
 
@@ -558,21 +649,21 @@ Levels are compared relative to each side's top level in the section. A system t
 
 | Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| figure judge_pass_rate (no description = fail) | 1.0000 [1.0000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
+| figure judge_pass_rate (no description = fail) | 0.9710 [0.9333, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
 | figure judge_factual_error_rate (among judged) | 0.0000 [0.0000, 0.0000] | n/a | n/a | n/a |
 | figures with no description | 0.0000 [0.0000, 0.0000] | 1.0000 [1.0000, 1.0000] | 1.0000 [1.0000, 1.0000] | 1.0000 [1.0000, 1.0000] |
 
-Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.1-sol) that sees the image, the candidate, the OpenStax alt and the caption, never which system wrote the candidate; not accuracy, and not calibrated against human labels in this run. A figure with no description is a fail. Judge cost is reported apart.
+Over the figures with an OpenStax alt text. Agreement with a model judge (claude-opus-5-5) that sees the image, the candidate, the OpenStax alt and the caption, never which system wrote the candidate; not accuracy, and not calibrated against human labels in this run. A figure with no description is a fail. Judge cost is reported apart.
 
 **All parsers: invented content (7.5; the units are in the invented-content section)**
 
 | Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| invented prose sentences (text-layer mismatch, rule unaudited) | 0.0190 [0.0133, 0.0261] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0016 [0.0000, 0.0056] |
-| invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
-| headings the PDF does not support | 0.0213 [0.0189, 0.0270] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
-| aligned equations with an added symbol | 0.0000 [0.0000, 0.0000] | n/a | 0.3750 [0.2857, 0.4286] | n/a |
-| equations with no gold partner and no match in the PDF | 0.0000 [0.0000, 0.0000] | n/a | 0.1111 [0.0000, 0.5000] | n/a |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 0.0792 [0.0493, 0.1224] | 0.0086 [0.0009, 0.0207] | 0.0078 [0.0005, 0.0188] | 0.0299 [0.0150, 0.0465] |
+| invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0138 [0.0038, 0.0237] | 0.0009 [0.0000, 0.0024] | 0.0224 [0.0067, 0.0424] |
+| headings the PDF does not support | 0.0278 [0.0216, 0.0378] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
+| aligned equations with an added symbol | 0.0870 [0.0481, 0.1236] | n/a | 0.2643 [0.2049, 0.3209] | n/a |
+| equations with no gold partner and no match in the PDF | 0.0269 [0.0000, 0.0787] | n/a | 0.1397 [0.0386, 0.2593] | n/a |
 
 All text, including text a11y-stem wrote itself. A section a system failed on has no units, so it adds nothing here; the raw rates include paraphrase the rule counts as unsupported, and the audit that measures that has not been done. A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): the Wilson upper bound in the last table is the bound to read.
 
@@ -580,76 +671,92 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 | Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| coverage: PDF word 6-grams found in the output | 0.8060 [0.7788, 0.8232] | 0.8583 [0.8242, 0.8912] | 0.8513 [0.8184, 0.8807] | 0.8939 [0.8793, 0.9108] |
+| coverage: PDF word 6-grams found in the output | 0.6526 [0.5723, 0.7259] | 0.7237 [0.6487, 0.7897] | 0.6742 [0.6004, 0.7418] | 0.7999 [0.7610, 0.8368] |
 
 **All parsers: counts behind the rates**
 
 | Count | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| end_to_end_exact_lenient (all gold equations) | 22/30 | 0/30 | 6/30 | 0/30 |
-| end_to_end_exact_lenient, without G1 equations | 17/19 | 0/19 | 6/19 | 0/19 |
-| unflagged_wrong_per_100 | 1/30 | 0/30 | 10/30 | 0/30 |
-| matched_exact_lenient (aligned pairs only) | 22/30 | 0/0 | 6/24 | 0/0 |
-| detection_recall | 30/30 | 0/30 | 24/30 | 0/30 |
-| detection_precision | 30/55 | 0/0 | 24/62 | 0/0 |
-| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0/30 | 4/30 | 0/30 |
-| heading F1 | 121/138 pred, 121/121 gold | 117/146 pred, 117/121 gold | 115/133 pred, 115/121 gold | 121/146 pred, 121/121 gold |
-| heading precision | 121/138 | 117/146 | 115/133 | 121/146 |
-| heading recall | 121/121 | 117/121 | 115/121 | 121/121 |
-| heading level_accuracy (among matched) | 120/121 | 3/117 | 3/115 | 121/121 |
-| figure judge_pass_rate (no description = fail) | 13/13 | 0/13 | 0/13 | 0/13 |
-| figure judge_factual_error_rate (among judged) | 0/13 | 0/0 | 0/0 | 0/0 |
-| figures with no description | 0/13 | 13/13 | 13/13 | 13/13 |
-| invented prose sentences (text-layer mismatch, rule unaudited) | 12/632 | 0/619 | 0/620 | 1/628 |
-| invented numbers (text-layer mismatch, rule unaudited) | 0/278 | 0/276 | 0/273 | 0/448 |
-| headings the PDF does not support | 3/141 | 0/146 | 0/133 | 0/146 |
-| aligned equations with an added symbol | 0/30 | 0/0 | 9/24 | 0/0 |
-| equations with no gold partner and no match in the PDF | 0/9 | 0/0 | 2/18 | 0/0 |
-| coverage: PDF word 6-grams found in the output | 9,010/11,178 | 9,594/11,178 | 9,516/11,178 | 9,992/11,178 |
+| end_to_end_exact_lenient (all gold equations) | 1,379/2,738 | 0/1,369 | 238/1,369 | 0/1,369 |
+| end_to_end_exact_lenient, without G1 equations | 1,375/2,642 | 0/1,321 | 238/1,321 | 0/1,321 |
+| unflagged_wrong_per_100 | 638/2,738 | 0/1,369 | 378/1,369 | 0/1,369 |
+| matched_exact_lenient (aligned pairs only) | 1,379/2,434 | 0/0 | 238/647 | 0/0 |
+| detection_recall | 2,434/2,738 | 0/1,369 | 647/1,369 | 0/1,369 |
+| detection_precision | 2,434/3,312 | 0/0 | 647/1,179 | 0/0 |
+| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0/1,369 | 234/1,369 | 0/1,369 |
+| heading F1 | 497/525 pred, 497/509 gold | 488/563 pred, 488/509 gold | 454/475 pred, 454/509 gold | 424/513 pred, 424/509 gold |
+| heading precision | 497/525 | 488/563 | 454/475 | 424/513 |
+| heading recall | 497/509 | 488/509 | 454/509 | 424/509 |
+| heading level_accuracy (among matched) | 497/497 | 15/488 | 75/454 | 424/424 |
+| figure judge_pass_rate (no description = fail) | 134/138 | 0/69 | 0/69 | 0/69 |
+| figure judge_factual_error_rate (among judged) | 0/138 | 0/0 | 0/0 | 0/0 |
+| figures with no description | 0/138 | 69/69 | 69/69 | 69/69 |
+| invented prose sentences (text-layer mismatch, rule unaudited) | 353/4,457 | 18/2,090 | 16/2,046 | 73/2,439 |
+| invented numbers (text-layer mismatch, rule unaudited) | 0/3,672 | 42/3,054 | 2/2,160 | 116/5,179 |
+| headings the PDF does not support | 30/1,080 | 0/563 | 0/475 | 0/513 |
+| aligned equations with an added symbol | 208/2,392 | 0/0 | 171/647 | 0/0 |
+| equations with no gold partner and no match in the PDF | 14/521 | 0/0 | 57/408 | 0/0 |
+| coverage: PDF word 6-grams found in the output | 59,342/90,934 | 32,906/45,467 | 30,656/45,467 | 36,369/45,467 |
 
 **All parsers: Wilson 95% intervals (items treated as independent; narrower than the cluster intervals)**
 
 | Wilson 95% (items treated as independent) | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| end_to_end_exact_lenient (all gold equations) | [0.5555, 0.8582] | [0.0000, 0.1135] | [0.0951, 0.3731] | [0.0000, 0.1135] |
-| end_to_end_exact_lenient, without G1 equations | [0.6861, 0.9706] | [0.0000, 0.1682] | [0.1536, 0.5399] | [0.0000, 0.1682] |
-| matched_exact_lenient (aligned pairs only) | [0.5555, 0.8582] | n/a | [0.1200, 0.4490] | n/a |
-| detection_recall | [0.8865, 1.0000] | [0.0000, 0.1135] | [0.6269, 0.9049] | [0.0000, 0.1135] |
-| detection_precision | [0.4152, 0.6697] | n/a | [0.2758, 0.5115] | n/a |
-| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | [0.0000, 0.1135] | [0.0531, 0.2968] | [0.0000, 0.1135] |
-| heading precision | [0.8116, 0.9216] | [0.7293, 0.8580] | [0.7962, 0.9126] | [0.7594, 0.8812] |
-| heading recall | [0.9692, 1.0000] | [0.9181, 0.9871] | [0.8960, 0.9771] | [0.9692, 1.0000] |
-| figure judge_pass_rate (no description = fail) | [0.7719, 1.0000] | [0.0000, 0.2281] | [0.0000, 0.2281] | [0.0000, 0.2281] |
-| figure judge_factual_error_rate (among judged) | [0.0000, 0.2281] | n/a | n/a | n/a |
-| figures with no description | [0.0000, 0.2281] | [0.7719, 1.0000] | [0.7719, 1.0000] | [0.7719, 1.0000] |
-| invented prose sentences (text-layer mismatch, rule unaudited) | [0.0109, 0.0329] | [0.0000, 0.0062] | [0.0000, 0.0062] | [0.0003, 0.0090] |
-| invented numbers (text-layer mismatch, rule unaudited) | [0.0000, 0.0136] | [0.0000, 0.0137] | [0.0000, 0.0139] | [0.0000, 0.0085] |
-| headings the PDF does not support | [0.0073, 0.0607] | [0.0000, 0.0256] | [0.0000, 0.0281] | [0.0000, 0.0256] |
-| aligned equations with an added symbol | [0.0000, 0.1135] | n/a | [0.2116, 0.5729] | n/a |
-| equations with no gold partner and no match in the PDF | [0.0000, 0.2991] | n/a | [0.0310, 0.3280] | n/a |
+| end_to_end_exact_lenient (all gold equations) | [0.4849, 0.5224] | [0.0000, 0.0028] | [0.1547, 0.1948] | [0.0000, 0.0028] |
+| end_to_end_exact_lenient, without G1 equations | [0.5014, 0.5394] | [0.0000, 0.0029] | [0.1604, 0.2018] | [0.0000, 0.0029] |
+| matched_exact_lenient (aligned pairs only) | [0.5468, 0.5861] | n/a | [0.3316, 0.4057] | n/a |
+| detection_recall | [0.8767, 0.9002] | [0.0000, 0.0028] | [0.4463, 0.4991] | [0.0000, 0.0028] |
+| detection_precision | [0.7196, 0.7497] | n/a | [0.5203, 0.5770] | n/a |
+| end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | [0.0000, 0.0028] | [0.1519, 0.1918] | [0.0000, 0.0028] |
+| heading precision | [0.9240, 0.9628] | [0.8362, 0.8924] | [0.9334, 0.9709] | [0.7913, 0.8568] |
+| heading recall | [0.9592, 0.9865] | [0.9378, 0.9729] | [0.8620, 0.9160] | [0.7981, 0.8629] |
+| figure judge_pass_rate (no description = fail) | [0.9278, 0.9887] | [0.0000, 0.0527] | [0.0000, 0.0527] | [0.0000, 0.0527] |
+| figure judge_factual_error_rate (among judged) | [0.0000, 0.0271] | n/a | n/a | n/a |
+| figures with no description | [0.0000, 0.0271] | [0.9473, 1.0000] | [0.9473, 1.0000] | [0.9473, 1.0000] |
+| invented prose sentences (text-layer mismatch, rule unaudited) | [0.0716, 0.0875] | [0.0055, 0.0136] | [0.0048, 0.0127] | [0.0239, 0.0375] |
+| invented numbers (text-layer mismatch, rule unaudited) | [0.0000, 0.0010] | [0.0102, 0.0185] | [0.0003, 0.0034] | [0.0187, 0.0268] |
+| headings the PDF does not support | [0.0195, 0.0394] | [0.0000, 0.0068] | [0.0000, 0.0080] | [0.0000, 0.0074] |
+| aligned equations with an added symbol | [0.0763, 0.0989] | n/a | [0.2318, 0.2996] | n/a |
+| equations with no gold partner and no match in the PDF | [0.0161, 0.0446] | n/a | [0.1094, 0.1767] | n/a |
 
 **End-to-end exact match by section**
 
 | Section | Gold equations | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|---|
-| physics/2-1-relative-motion-distance-and-displacement | 8 | 1.0000 | 0.0000 | 0.3750 | 0.0000 |
-| physics/2-2-speed-and-velocity | 12 | 0.6667 | 0.0000 | 0.0000 | 0.0000 |
-| physics/2-3-position-vs-time-graphs | 10 | 0.6000 | 0.0000 | 0.3000 | 0.0000 |
+| college-physics/29-3-photon-energies-and-the-electromagnetic-spectrum | 47 | 0.4681 | 0.0000 | 0.0000 | 0.0000 |
+| college-physics/5-3-elasticity-stress-and-strain | 121 | 0.6653 | 0.0000 | 0.2893 | 0.0000 |
+| college-physics/28-4-relativistic-addition-of-velocities | 68 | 0.4412 | 0.0000 | 0.0294 | 0.0000 |
+| chemistry/19-3-spectroscopic-and-magnetic-properties-of-coordination-compounds | 9 | 0.2222 | 0.0000 | 0.1111 | 0.0000 |
+| chemistry/7-3-lewis-symbols-and-structures | 25 | 0.0000 | 0.0000 | 0.0000 | 0.0000 |
+| chemistry/14-7-acid-base-titrations | 63 | 0.0317 | 0.0000 | 0.0000 | 0.0000 |
+| precalculus/5-4-right-triangle-trigonometry | 162 | 0.4043 | 0.0000 | 0.2284 | 0.0000 |
+| precalculus/1-6-absolute-value-functions | 205 | 0.6610 | 0.0000 | 0.2341 | 0.0000 |
+| precalculus/3-1-complex-numbers | 206 | 0.7184 | 0.0000 | 0.2476 | 0.0000 |
+| introductory-statistics/2-4-box-plots | 0 | n/a | n/a | n/a | n/a |
+| introductory-statistics/4-5-hypergeometric-distribution | 4 | 0.2500 | 0.0000 | 0.0000 | 0.0000 |
+| introductory-statistics/3-1-terminology | 31 | 0.1290 | 0.0000 | 0.0968 | 0.0000 |
+| intermediate-algebra/4-3-solve-mixture-applications-with-systems-of-equations | 65 | 0.5000 | 0.0000 | 0.0308 | 0.0000 |
+| intermediate-algebra/4-6-solve-systems-of-equations-using-determinants | 183 | 0.3607 | 0.0000 | 0.2295 | 0.0000 |
+| intermediate-algebra/1-5-properties-of-real-numbers | 180 | 0.5583 | 0.0000 | 0.0944 | 0.0000 |
 
 **Heading F1 by book**
 
 | Book (point estimates; three sections each) | a11y-stem | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
-| Physics | 0.9344 | 0.8764 | 0.9055 | 0.9064 |
+| College Physics | 1.0000 | 0.9565 | 0.9625 | 0.9693 |
+| Chemistry | 1.0000 | 0.9825 | 0.9913 | 0.9915 |
+| Precalculus | 0.9524 | 0.9284 | 0.9198 | 0.8532 |
+| Introductory Statistics | 0.9398 | 0.9286 | 0.9286 | 0.9647 |
+| Intermediate Algebra | 0.9434 | 0.8462 | 0.8771 | 0.6216 |
 
 **Time and memory per PDF page**
 
 | System | Total API cost | Cost/page median | p95 | min | max | Seconds/page median | p95 | min | max | Peak memory (MB) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| a11y-stem (document task) | $0.1421 | 0.00371 | 0.00389 | 0.00228 | 0.00391 | 3.58608 | 5.49811 | 2.88243 | 5.71056 | n/a |
-| docling | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 2.15413 | 2.30521 | 1.92700 | 2.32200 | 2454 |
-| mineru-basic | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 2.52886 | 2.53141 | 2.31869 | 2.53169 | 3563 |
-| pymupdf4llm | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 0.29557 | 0.29691 | 0.29531 | 0.29706 | 378 |
+| a11y-stem (document task) | $6.6240 | 0.01252 | 0.02249 | 0.00270 | 0.02316 | 4.28087 | 5.94030 | 1.19000 | 6.18687 | n/a |
+| docling | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 3.67345 | 7.93241 | 2.19993 | 8.67304 | 3327 |
+| mineru-basic | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 4.28371 | 13.79948 | 2.17400 | 15.34236 | 4235 |
+| pymupdf4llm | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 0.34993 | 0.44153 | 0.26852 | 0.45325 | 385 |
 
 Parsers: wall clock of one fresh process per section divided by its PDF pages, model load included, CPU only, API cost $0 (hosting not estimated); peak memory is the process tree's maximum. a11y-stem: seconds of the document task at concurrency 4 (it waits on a hosted model, so its time is not CPU time). Timings are from one machine; the load average at each start is in the recorded run, and a busy machine makes a time an upper bound.
 
@@ -657,13 +764,13 @@ Parsers: wall clock of one fresh process per section divided by its PDF pages, m
 
 | System | Outputs | Expected | ok | truncated | empty | timeout | crashed | not run |
 |---|---|---|---|---|---|---|---|---|
-| docling | 3 | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| mineru-basic | 3 | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
-| pymupdf4llm | 3 | 3 | 3 | 0 | 0 | 0 | 0 | 0 |
+| docling | 15 | 15 | 15 | 0 | 0 | 0 | 0 | 0 |
+| mineru-basic | 15 | 15 | 15 | 0 | 0 | 0 | 0 | 0 |
+| pymupdf4llm | 15 | 15 | 15 | 0 | 0 | 0 | 0 | 0 |
 
 A section that is not ok scores as found nothing: its gold items stay in every denominator.
 
-Parser timings: 9 runs started on a quiet machine (1-minute load under 1.5) and 0 did not. Host: AMD Ryzen 7 5800H with Radeon Graphics, 16 logical CPUs.
+Parser timings: 0 runs started on a quiet machine (1-minute load under 1.5) and 0 did not. Host: AMD Ryzen 7 5800H with Radeon Graphics, 16 logical CPUs.
 
 ## Human labels and judge agreement
 
@@ -675,11 +782,14 @@ Parser timings: 9 runs started on a quiet machine (1-minute load under 1.5) and 
 
 ## What these numbers leave out
 
-- Three sections of one book, all used while building a11y-stem: nothing here shows how it does on material it has not seen.
-- One run of each task (the held-out set repeats them), so run-to-run variation is not visible.
-- The paired comparisons need at least 10 sections to print a verdict; with three they print 'not tested', because a bootstrap over three sections returns only the sections' own extremes.
-- The review screen's heading flags look better here (precision 0.5556, recall 0.7778) than they did on the held-out headings, where it asked about none of the 28 wrong headings (proof/interim/INTERIM-heldout-2026-10.md): the rules were tuned on these pages, and the held-out miss is a limit of the pipeline that was not fixed afterwards.
+- Fifteen sections of five books: intervals come from resampling sections, which is approximate with this few clusters; per-book numbers are point estimates.
+- The sections come from retired first editions, whose text may differ from the current editions.
+- Any change to a11y-stem's prompts, rules, thresholds, models or scorers after the first held-out output exists means these numbers can no longer be quoted as held-out results for the changed system.
+- Docling is run in its default settings (a formula is not decoded); the registered arm with formula recognition on was not carried out (Addendum 4). MinerU is run at its basic tier, not the standard tier its documentation names as the default.
+- A paired verdict is written only when the registered Bonferroni interval excludes 0; where a sign-flip test on the section differences disagrees, the report says 'higher by point estimate'.
+- a11y-stem's review screen asked about none of the 28 wrong headings in the interim headings run: that is a limit of the pipeline, documented here and not fixed on the held-out data.
 - The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.
+- The model-dependent parts ran on Claude, not on the OpenAI models the registration names (Addendum 6): a11y-stem with claude-haiku-5-5 and claude-opus-5-5 and no second automated check, the Purdue-prompt chatbot arms on claude-opus-5-5 and claude-haiku-5-5, the figure judge on claude-opus-5-5. The expert-prompt chatbot arm was not run. Each arm's number of runs is the one this report states.
 - The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch.
 - Exact match of MathML is strict: a correct answer can fail on markup (see G1), and a wrong digit in a long equation costs little tree-edit similarity. It is not a measure of how a screen reader would speak the result.
 - With this few sections the bootstrap intervals are approximate and tend to be a little narrow. Per-book numbers are point estimates.
@@ -690,13 +800,17 @@ Parser timings: 9 runs started on a quiet machine (1-minute load under 1.5) and 
 
 ```
 uv sync --locked                      # Python 3.12+, uv; no key
-make proof SET=smoke-physics-2      # replay: writes this file, no network needed
-make proof-sources SET=smoke-physics-2   # also fetch the answer key from OpenStax and print the PDFs again (network, Chromium)
-make proof-live SET=smoke-physics-2 MAX_USD=N   # new live run with OPENAI_API_KEY, capped
+make proof SET=heldout-2026-10      # replay: writes this file, no network needed
+make proof-sources SET=heldout-2026-10   # also fetch the answer key from OpenStax and print the PDFs again (network, Chromium)
+make proof-live SET=heldout-2026-10 MAX_USD=N   # new live run with OPENAI_API_KEY, capped
 ```
 A replay writes byte-identical output on any machine with the same dependency versions. A live run calls the models again, so its numbers differ from the recorded ones by the usual run-to-run variation.
 
 ## Attribution
 
-- Physics by Paul Peter Urone, Roger Hinrichs, OpenStax, version dfdfd7a, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/physics.
+- Chemistry by Paul Flowers, William R. Robinson, PhD, Richard Langley, Klaus Theopold, OpenStax, version 741a7af, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/chemistry.
+- College Physics by Paul Peter Urone, Roger Hinrichs, OpenStax, version 1aa3e7a, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/college-physics.
+- Intermediate Algebra by Lynn Marecek, OpenStax, version eb2e29d, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/intermediate-algebra.
+- Introductory Statistics by Barbara Illowsky, Susan Dean, OpenStax, version 1d23970, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/introductory-statistics.
+- Precalculus by Jay Abramson, OpenStax, version ebc5beb, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/precalculus.
 - Changes: each section was reformatted as a printable page for evaluating a11y-stem, image alt text was left out of the print, and no wording was edited. a11y-stem is not affiliated with or endorsed by OpenStax.

@@ -1,0 +1,38 @@
+{
+  "arm": "chatbot-opus-purdue",
+  "attempts": [],
+  "cost_usd": 0.40136,
+  "counted_input_tokens": 39125,
+  "error": null,
+  "figure_judgements": [],
+  "incomplete_reason": null,
+  "judge_cost_usd": 0.0,
+  "output": {
+    "file": "introductory-statistics__3-1-terminology.run2.html",
+    "format": "html"
+  },
+  "output_chars": 24442,
+  "pdf_pages": 8,
+  "response_status": "end_turn",
+  "run": 2,
+  "seconds": 92.8,
+  "section": "introductory-statistics/3-1-terminology",
+  "settings": {
+    "dpi": 150,
+    "max_output_tokens": 64000,
+    "mode": "pages",
+    "prompt": "purdue"
+  },
+  "status": "ok",
+  "usage": {
+    "cache_creation_input_tokens": 0,
+    "cached_input_tokens": 0,
+    "input_tokens": 39125,
+    "output_tokens": 12243,
+    "reasoning_tokens": 1943
+  },
+  "versions": {
+    "model_requested": "claude-opus-5-5",
+    "model_served": "claude-opus-5-5"
+  }
+}
