@@ -163,6 +163,8 @@ def _first_model(element: Element, settings: Settings) -> str:
     text = (element.text or "").strip()
     if element.display == "inline" and len(text) <= SHORT_INLINE_CHARS:
         return settings.cheap_model
+    if settings.equation_display_first_cheap:
+        return settings.cheap_model
     return settings.main_model
 
 

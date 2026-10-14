@@ -90,6 +90,9 @@ class Settings(BaseSettings):
     # A figure crop is scaled down to this many pixels on its long side before it goes to the
     # model (T3-24); review and the HTML keep the full crop. None: sent as it is.
     figure_model_max_edge_px: int | None = Field(default=None, ge=256)
+    # Display equations start on the cheap model like short inline ones; the main model
+    # re-reads what it is unsure of (T3-29).
+    equation_display_first_cheap: bool = False
     # Server-side refusal fallback on claude-opus-5-5 and claude-sonnet-5-5 (`fallbacks:
     # "default"`, beta header server-side-fallback-2026-07-01): a request a safety
     # classifier declines is re-run by Anthropic on the model it recommends. Turn off to

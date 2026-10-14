@@ -171,3 +171,33 @@ def test_the_model_gets_the_reduced_figure_and_the_second_check_the_full_one():
     untouched = FakeVisionClient(defaults={"figure": fig()})
     describe(figure_element(), big, client=untouched, settings=claude())
     assert untouched.requests[0].images[0] == big
+
+
+# -------------------------------------------------------- T3-29 display equations
+
+
+def test_display_equations_start_on_the_cheap_model_only_when_asked():
+    answers = {OPUS: eq("x", 0.99), HAIKU: eq("x", 0.97)}
+
+    def run(**kw: Any) -> FakeVisionClient:
+        client = FakeVisionClient(responders={"equation": lambda req: answers[req.model]})
+        transcribe(
+            equation_element(display="block", text="x"), PNG, client=client, settings=claude(**kw)
+        )
+        return client
+
+    assert [r.model for r in run().requests] == [OPUS]
+    assert [r.model for r in run(equation_display_first_cheap=True).requests] == [HAIKU]
+
+
+def test_an_unsure_cheap_answer_to_a_display_equation_goes_to_the_main_model():
+    answers = {OPUS: eq("x^2", 0.99), HAIKU: eq("x", 0.5)}
+    client = FakeVisionClient(responders={"equation": lambda req: answers[req.model]})
+    fix = transcribe(
+        equation_element(display="block", text="x2"),
+        PNG,
+        client=client,
+        settings=claude(equation_display_first_cheap=True),
+    )
+    assert [r.model for r in client.requests] == [HAIKU, OPUS]
+    assert fix.equation is not None and fix.equation.latex == "x^2"
