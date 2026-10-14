@@ -39,3 +39,4 @@ proof/PROOF-sources.md
 
 # Static demo site build (make site)
 site/_build/
+site/_build_again/

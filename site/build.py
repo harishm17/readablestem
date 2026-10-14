@@ -51,6 +51,9 @@ CROP_MAX_SIDE_PX = 1400
 CROP_MAX_ZOOM = 4.0
 CROP_MIN_ZOOM = 2.0
 CROP_CSS_PX_PER_PT = 2.0
+# The demo wrapper links back to the app ("/"); on this site it goes back to the example page.
+APP_HOME_LINK = '<a href="/">Back to a11y-stem</a>'
+SITE_BACK_LINK = '<a href="index.html">Back to the example page</a>'
 HEADING_BASE = 4  # converted headings are shown from <h4>: the page has h1, h2 and h3 above
 
 VOID = frozenset(
@@ -525,7 +528,11 @@ class Pdf:
             matrix=pymupdf.Matrix(zoom, zoom), clip=pymupdf.Rect(x0, y0, x1, y1), alpha=False
         )
         # Shown at 2 CSS px per point; the file has more pixels, for a sharp image.
-        return pix.tobytes("png"), round(width * CROP_CSS_PX_PER_PT), round(height * CROP_CSS_PX_PER_PT)
+        return (
+            pix.tobytes("png"),
+            round(width * CROP_CSS_PX_PER_PT),
+            round(height * CROP_CSS_PX_PER_PT),
+        )
 
 
 # =============================================================================== examples
@@ -613,7 +620,7 @@ def load_example(folder: Path) -> Example:
         html_path=html_path,
         pdf_path=pdf_path,
         report_path=report_path,
-        document=html_path.read_text(encoding="utf-8"),
+        document=html_path.read_text(encoding="utf-8").replace(APP_HOME_LINK, SITE_BACK_LINK),
         models=models,
     )
 
@@ -766,10 +773,16 @@ def _card(
     return card
 
 
-def observations(pdf_said: str, html_said: str) -> list[str]:
+def observations(pdf_said: str, html_said: str, asked: bool = False) -> list[str]:
     """Plain statements about how the two readings differ, each one checked against the
     words of the readings themselves (no guess about what a screen reader does)."""
     notes: list[str] = []
+    if asked:
+        notes.append(
+            "The two readings differ in a symbol or its style, and the proposal may be the "
+            "wrong one. The tool asks a person about this equation (see the decisions on its "
+            "example page)."
+        )
     spelled = re.search(r"\b(?:[a-z] ){3,}[a-z]\b", pdf_said)
     if spelled:
         notes.append(
@@ -815,7 +828,12 @@ def build_speech(example: Example, pdf: Pdf, out: Out) -> None:
                 html_said=fix.equation.speech,
                 crop=f"{example.base}/{crop}",
                 crop_size=(width, height),
-                notes=observations(speech_diff.read_text_layer(element.text), fix.equation.speech),
+                notes=observations(
+                    speech_diff.read_text_layer(element.text),
+                    fix.equation.speech,
+                    asked=fix.review == "required"
+                    and speech_diff.spoken_diff(fix.equation.speech, element.text) is not None,
+                ),
             )
         )
 

@@ -1,5 +1,5 @@
 # Common tasks. Everything runs through uv; no global installs needed.
-.PHONY: sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
+.PHONY: site sync test test-network lint fmt check ci-local gold gold-licenses eval-plumbing eval-latex-check \
 	table-model fuzz-tables proof proof-check proof-list proof-sources proof-live proof-add-chatbot proof-add-parsers proof-interim reproduce reproduce-rerun
 
 # Sample gold set: 3 numbered sections of chapter 2 of OpenStax Physics (CC BY 4.0).
@@ -142,3 +142,10 @@ proof-interim:  ## the held-out results that need no model (headings, parsers): 
 
 proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)
 	uv run a11y-stem proof --add-systems parsers $(PROOF_ARGS)
+
+# The static reviewer demo (docs/site.md): plain HTML written from committed results and
+# PROOF.md into site/_build (OUT=<dir> for another folder). No key, no network, no model
+# call, no cost; the same inputs give the same bytes. Opening site/_build/index.html in a
+# browser is enough to look at it.
+site:  ## build the static demo site into site/_build
+	uv run python site/build.py $(if $(OUT),--out $(OUT))

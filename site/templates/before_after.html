@@ -23,7 +23,7 @@
 {% for e in examples %}
 <h2>{{ e.meta.short }}</h2>
 {% for r in e.speech %}
-<h3 id="{{ e.id }}-{{ r.element_id }}">Page {{ r.page }}, {{ r.element_id }}</h3>
+<h3 id="{{ e.id }}-{{ r.element_id }}">Page {{ r.page }}, equation {{ loop.index }}</h3>
 <p><img src="{{ root }}{{ r.crop }}" width="{{ r.crop_size[0] }}" height="{{ r.crop_size[1] }}" loading="lazy" style="max-width:100%;height:auto;border:1px solid var(--line)" alt="The equation as printed in the PDF, with the words around it."></p>
 <div class="ba">
   <section class="before">

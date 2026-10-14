@@ -23,8 +23,12 @@ BUILD = Path(__file__).resolve().parents[1] / "site" / "build.py"
 # WCAG 2.0, 2.1 and 2.2 levels A and AA, plus axe's own best-practice rules.
 TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"]
 RUN = """async (tags) => {
-  const r = await axe.run(document, {runOnly: {type: "tag", values: tags}, resultTypes: ["violations"]});
-  return r.violations.map(v => ({id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target.join(" ")).slice(0, 3)}));
+  const r = await axe.run(document, {
+    runOnly: {type: "tag", values: tags}, resultTypes: ["violations"],
+  });
+  return r.violations.map(v => ({
+    id: v.id, impact: v.impact, nodes: v.nodes.map(n => n.target.join(" ")).slice(0, 3),
+  }));
 }"""
 # Pages the site itself writes. The converted pages and the stemcheck report are other tools'
 # output that the site links to: they are checked too, in their own test.
@@ -143,7 +147,10 @@ def test_nothing_scrolls_sideways_at_320_px(site, browser):
 
 def test_text_spacing_does_not_clip_or_overflow(site, browser):
     """WCAG 1.4.12: with the author's spacing overridden, the page still reflows."""
-    css = "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }"
+    css = (
+        "* { line-height: 1.5 !important; letter-spacing: 0.12em !important; "
+        "word-spacing: 0.16em !important; } p { margin-bottom: 2em !important; }"
+    )
     context = browser.new_context(viewport={"width": 320, "height": 900}, offline=True)
     page = context.new_page()
     wide = {}
@@ -163,7 +170,10 @@ def test_skip_link_is_the_first_tab_stop_and_shows(site, browser):
     page.goto((site / "index.html").as_uri())
     page.keyboard.press("Tab")
     focused = page.evaluate("document.activeElement.textContent.trim()")
-    box = page.evaluate("(() => { const r = document.activeElement.getBoundingClientRect(); return [r.top, r.left]; })()")
+    box = page.evaluate(
+        "(() => { const r = document.activeElement.getBoundingClientRect();"
+        " return [r.top, r.left]; })()"
+    )
     context.close()
     assert focused == "Skip to the content"
     assert box[0] >= 0 and box[1] >= 0
@@ -173,7 +183,8 @@ def test_every_scrollable_region_can_be_reached_by_keyboard(site, browser):
     """A scrolling table or equation must be a tab stop, or a keyboard user cannot read it."""
     js = """() => [...document.querySelectorAll('body *')].filter(e => {
       const s = getComputedStyle(e);
-      return (s.overflowX === 'auto' || s.overflowX === 'scroll') && e.scrollWidth > e.clientWidth + 1
+      return (s.overflowX === 'auto' || s.overflowX === 'scroll')
+        && e.scrollWidth > e.clientWidth + 1
         && e.tabIndex < 0 && !e.querySelector('a, button, input, [tabindex]');
     }).map(e => e.tagName + '.' + e.className)"""
     context = browser.new_context(viewport={"width": 320, "height": 900}, offline=True)
