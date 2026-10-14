@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     # careful than the cheap one.
     anthropic_effort_main: Effort = "medium"
     anthropic_effort_cheap: Effort = "low"
+    # Effort of the equation and the figure step, whichever model answers (T3-22). Unset:
+    # the model's own effort above. The measurement is in docs/eval.md "Model cost".
+    anthropic_effort_equation: Effort | None = None
+    anthropic_effort_figure: Effort | None = None
     # Server-side refusal fallback on claude-opus-5-5 and claude-sonnet-5-5 (`fallbacks:
     # "default"`, beta header server-side-fallback-2026-07-01): a request a safety
     # classifier declines is re-run by Anthropic on the model it recommends. Turn off to

@@ -816,6 +816,7 @@ def transcribe(
             context_text=context_text,
             max_output_tokens=output_limit(model),
             image_detail="high",
+            effort=settings.anthropic_effort_equation,
         )
         if escalation:
             output, calls = _call_once(client, request, EquationOutput)

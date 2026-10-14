@@ -473,6 +473,7 @@ def describe(
             context_text=context,
             max_output_tokens=LONG_MAX_OUTPUT_TOKENS if long else MAX_OUTPUT_TOKENS,
             image_detail="low" if tiny else "high",
+            effort=settings.anthropic_effort_figure,
         )
         if escalation:
             output, calls = _call_once(client, request, schema)

@@ -378,7 +378,7 @@ class AnthropicVisionClient:
             ],
             "messages": [{"role": "user", "content": content}],
             "output_config": {
-                "effort": self._settings.anthropic_effort_for(request.model),
+                "effort": request.effort or self._settings.anthropic_effort_for(request.model),
                 "format": {"type": "json_schema", "schema": anthropic.transform_schema(schema)},
             },
         }
