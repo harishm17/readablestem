@@ -466,6 +466,10 @@ def _calls_summary(calls: Sequence[ModelCall]) -> dict:
     return {
         "cost_usd": sum(c.cost_usd for c in calls),
         "latency_ms": sum(c.latency_ms for c in calls),
+        "input_tokens": sum(c.input_tokens for c in calls),
+        "cached_input_tokens": sum(c.cached_input_tokens for c in calls),
+        "cache_creation_input_tokens": sum(c.cache_creation_input_tokens for c in calls),
+        "output_tokens": sum(c.output_tokens for c in calls),
         "model_calls": len(calls),
         "models": [c.model for c in calls],
         "call_outcomes": [c.outcome for c in calls],
