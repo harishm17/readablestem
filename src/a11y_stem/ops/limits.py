@@ -1,0 +1,150 @@
+"""Do the spend limits fit the model provider? One place that answers it.
+
+Every model call reserves its worst-case cost before it is sent (`core.budget`), and the
+reservations count against the job's and the day's caps like spend does. The worst case is
+not the same on every provider: a call on claude-opus-5-5 holds about $0.30 (a thinking
+allowance on top of the answer, and a large image), against about $0.03 on gpt-6.1-sol.
+Caps sized for one provider therefore break the other: with OpenAI's $0.30 per page, a
+one-page document on Claude could not hold two calls at once and its elements would come
+back "not converted" although the real cost was a cent.
+
+`spend_findings(settings)` compares the configured limits with the worst-case reservation
+of the models in use and with the measured cost of a page (`PLANNING_USD_PER_PAGE`):
+
+- an *error* is a setting under which a document cannot be converted as designed; the
+  web app refuses to start with one in production (`Settings.check_production`);
+- a *warning* is a setting that works but is probably not what was meant (a normal
+  document close to a cap, a runaway job allowed far past a normal one); `a11y-stem ops
+  launch-check` lists them.
+
+Measurements behind the numbers: docs/deploy.md, "Spend limits".
+"""
+
+from __future__ import annotations
+
+from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from a11y_stem.config import Settings
+
+# Steps that run at once inside one conversion (`pipeline.run.convert_pdf(concurrency=4)`);
+# each holds its own reservation while its request is out.
+CONCURRENT_STEPS = 4
+
+# What a dense page costs, rounded up from the measurements (docs/deploy.md): on Claude
+# (claude-opus-5-5 main, claude-haiku-5-5 cheap, effort medium and low) a development
+# page costs $0.0030-0.0047 and a dense held-out page about $0.014; on OpenAI $0.0037.
+PLANNING_USD_PER_PAGE = 0.015
+
+# A job cap this many times a full-size normal document is no longer "stops a runaway".
+RUNAWAY_FACTOR = 25
+
+
+@dataclass(frozen=True)
+class Finding:
+    severity: str  # "error" or "warning"
+    text: str
+
+    def __str__(self) -> str:
+        return f"{self.severity}: {self.text}"
+
+
+def largest_reservation_usd(settings: Settings) -> float:
+    """Worst-case cost of the dearest single call the enabled steps can make: equations
+    and figures always, long descriptions and tables only when their flags are on."""
+    from a11y_stem.models.base import fence_untrusted
+    from a11y_stem.models.pricing import UnknownModelError, estimate_max_cost_usd
+    from a11y_stem.pipeline import equation_step, figure_step, run, table_step
+
+    context = fence_untrusted("x" * (run.CONTEXT_CHARS + 64))
+    limits = [equation_step.MAX_OUTPUT_TOKENS, figure_step.MAX_OUTPUT_TOKENS]
+    if settings.feature_long_descriptions:
+        limits.append(figure_step.LONG_MAX_OUTPUT_TOKENS)
+    if settings.feature_tables:
+        limits.append(table_step.MAX_OUTPUT_TOKENS)
+    largest = 0.0
+    for model in (settings.main_model, settings.cheap_model):
+        for tokens in limits:
+            try:
+                cost = estimate_max_cost_usd(
+                    model, n_images=1, text_chars=len(context), max_output_tokens=tokens
+                )
+            except UnknownModelError:  # refused at the first call anyway
+                continue
+            largest = max(largest, cost)
+    return largest
+
+
+def in_flight_usd(settings: Settings) -> float:
+    """Most that can be held at once by one conversion: every concurrent step at the
+    dearest reservation."""
+    return CONCURRENT_STEPS * largest_reservation_usd(settings)
+
+
+def spend_findings(settings: Settings) -> list[Finding]:
+    """Errors and warnings about the spend limits for the provider in use."""
+    out: list[Finding] = []
+    largest = largest_reservation_usd(settings)
+    in_flight = CONCURRENT_STEPS * largest
+    who = f"MODEL_PROVIDER={settings.model_provider} (worst case ${largest:.2f} per call)"
+
+    def error(text: str) -> None:
+        out.append(Finding("error", f"{text}; {who}"))
+
+    def warning(text: str) -> None:
+        out.append(Finding("warning", f"{text}; {who}"))
+
+    normal_job = settings.max_pages_per_job * PLANNING_USD_PER_PAGE
+    if settings.max_usd_per_page < largest:
+        error(
+            f"MAX_USD_PER_PAGE ${settings.max_usd_per_page:.2f} is below one call's "
+            f"reservation, so no page could be converted"
+        )
+    elif settings.max_usd_per_page < in_flight:
+        warning(
+            f"MAX_USD_PER_PAGE ${settings.max_usd_per_page:.2f} is below "
+            f"{CONCURRENT_STEPS} calls held at once (${in_flight:.2f}): a short document "
+            f"can have elements left unconverted at a cost of a few cents"
+        )
+    if settings.max_usd_per_job < largest:
+        error(
+            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below one call's reservation"
+        )
+    elif settings.max_usd_per_job < normal_job + in_flight:
+        warning(
+            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below what a "
+            f"{settings.max_pages_per_job}-page dense document needs "
+            f"(${normal_job:.2f} spent plus ${in_flight:.2f} held at once)"
+        )
+    elif settings.max_usd_per_job > RUNAWAY_FACTOR * normal_job:
+        warning(
+            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is more than {RUNAWAY_FACTOR}x "
+            f"a {settings.max_pages_per_job}-page dense document (${normal_job:.2f}): a "
+            f"runaway job would run on far past a normal one"
+        )
+    daily = settings.daily_spend_cap_usd
+    if daily is not None:
+        if daily < in_flight:
+            error(
+                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below {CONCURRENT_STEPS} calls held "
+                f"at once (${in_flight:.2f}), so a document could not be converted"
+            )
+        elif daily < settings.max_usd_per_job:
+            warning(
+                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below one job's cap "
+                f"(${settings.max_usd_per_job:.2f})"
+            )
+        quota = settings.per_user_daily_page_quota
+        if quota is not None and daily < quota * PLANNING_USD_PER_PAGE + in_flight:
+            warning(
+                f"DAILY_SPEND_CAP_USD ${daily:.2f} is below what one user at the page quota "
+                f"needs ({quota} pages x ${PLANNING_USD_PER_PAGE} plus ${in_flight:.2f} held)"
+            )
+    quota = settings.per_user_daily_page_quota
+    if quota is not None and quota < settings.max_pages_per_job:
+        warning(
+            f"PER_USER_DAILY_PAGE_QUOTA {quota} is below MAX_PAGES_PER_JOB "
+            f"{settings.max_pages_per_job}: a full-size document is refused"
+        )
+    return out

@@ -3,7 +3,9 @@
 `launch_blockers()` lists unfinished public copy (a `TODO(Harish)` or a "Draft" note on a
 page anyone can open), a missing or placeholder demo, and a missing eval baseline (the CI
 gate skips without one). Given the settings, it also lists what a setting turns on that
-the public pages do not describe yet (Microsoft sign-in and the privacy notice).
+the public pages do not describe yet (Microsoft sign-in and the privacy notice), and
+whether the production settings are complete and the spend limits fit the model provider
+(`ops.limits`: the same errors that stop a production start, plus warnings).
 `a11y-stem ops launch-check` prints the list and exits 1 while it is not empty; the web
 app logs `launch_blockers` with the count at a production start.
 
@@ -45,6 +47,8 @@ def launch_blockers(
 ) -> list[str]:
     """Plain-language list of unfinished items, empty when the beta is ready to share."""
     items: list[str] = []
+    if settings is not None:
+        items.extend(_settings_items(settings))
     privacy = TEMPLATES_DIR / "privacy.html"
     notice = privacy.read_text(encoding="utf-8") if privacy.is_file() else None
     if settings is not None and notice is not None:
@@ -84,4 +88,24 @@ def launch_blockers(
         eval_dir = repo_root / "data" / "eval"
         if not list(eval_dir.glob("baseline-*.json")):
             items.append("data/eval: no baseline-<task>.json committed; the CI eval gate skips")
+    return items
+
+
+def _settings_items(settings: Settings) -> list[str]:
+    """What is wrong with the settings themselves (the first group is `check_production`)."""
+    from a11y_stem.config import ConfigError
+    from a11y_stem.ops.limits import spend_findings
+
+    items: list[str] = []
+    refused = ""
+    try:
+        settings.check_production()
+    except ConfigError as exc:
+        refused = str(exc)
+        items.append(f"settings: {refused}")
+    items.extend(
+        f"spend limits: {finding}"
+        for finding in spend_findings(settings)
+        if finding.text not in refused  # already named by the refusal above
+    )
     return items
