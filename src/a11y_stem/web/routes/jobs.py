@@ -272,7 +272,11 @@ def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
         result = DocumentResult.model_validate(job.result_json or {})
         with notation.in_force(ctx.factory, ctx.settings, job.id):
             job.html = rerender_job_html(
-                job, result, _crops(session, job.id), checked_on=last_decision(session, job)
+                job,
+                result,
+                _crops(session, job.id),
+                checked_on=last_decision(session, job),
+                math_alttext=ctx.settings.mathml_alttext,
             )
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = False
@@ -709,7 +713,13 @@ def set_language(
         crops = _crops(session, job.id)
         from a11y_stem.web.review import bump_result_version, rerender_job_html
 
-        job.html = rerender_job_html(job, result, crops, checked_on=last_decision(session, job))
+        job.html = rerender_job_html(
+            job,
+            result,
+            crops,
+            checked_on=last_decision(session, job),
+            math_alttext=get_ctx(request).settings.mathml_alttext,
+        )
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         job.html_stale = False  # made from the stored result, review writes included
         bump_result_version(job)  # review forms open in other tabs are now stale

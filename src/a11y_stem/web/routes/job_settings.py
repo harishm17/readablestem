@@ -20,6 +20,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy.orm import Session
 
+from a11y_stem.config import Settings
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web import retention, titles
@@ -68,11 +69,15 @@ def _job_page_with_errors(
     return render(request, "job.html", context, status_code=400)
 
 
-def _remake_html(session: Session, job: Job) -> DocumentResult:
+def _remake_html(session: Session, job: Job, settings: Settings) -> DocumentResult:
     """Make the HTML file again with the job's own choices (the caller holds the job)."""
     result = DocumentResult.model_validate(job.result_json or {})
     job.html = rerender_job_html(
-        job, result, _crops(session, job.id), checked_on=last_decision(session, job)
+        job,
+        result,
+        _crops(session, job.id),
+        checked_on=last_decision(session, job),
+        math_alttext=settings.mathml_alttext,
     )
     # The static checks of the new file replace the stored ones (they ran in the render).
     job.result_json = result.model_dump(mode="json", exclude={"html"})
@@ -103,7 +108,7 @@ def set_title(
             flash(request, "The title is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{job_id}", status_code=303)
         job.title_override = chosen
-        _remake_html(session, job)
+        _remake_html(session, job, ctx.settings)
         retention.restart_clock(job, ctx.settings)
         now_title = chosen or page_rules.suggested_title(result)
     log_event(logger, "title_set", job_id=job_id, own=chosen is not None)
@@ -135,7 +140,7 @@ def set_contact(
             flash(request, "The contact line is already set to that.", undo=False)
             return RedirectResponse(f"/jobs/{job_id}", status_code=303)
         job.contact_line = line or None
-        _remake_html(session, job)
+        _remake_html(session, job, ctx.settings)
         retention.restart_clock(job, ctx.settings)
     log_event(logger, "contact_set", job_id=job_id, has_contact=bool(line))
     message = (

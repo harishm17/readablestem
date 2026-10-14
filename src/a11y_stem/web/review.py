@@ -1409,6 +1409,7 @@ def rerender_html(
     checked_on: date | None = None,
     title_override: str | None = None,
     contact: str | None = None,
+    math_alttext: bool | None = None,
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
 
@@ -1417,6 +1418,8 @@ def rerender_html(
     `checked_on` is the day of the last decision for the student note ("checked by your
     instructor on ..." once no decision is open); by default today (UTC), since a
     re-render follows a decision. The assembler ignores it while a decision is open.
+    `math_alttext` is the app's `Settings.mathml_alttext`, the setting the first render used
+    (T2-24): the file made again must read like the first one (None: the process settings).
     """
     from a11y_stem.pipeline import assemble, html_checks
 
@@ -1436,20 +1439,27 @@ def rerender_html(
         crops=crops,
         source_note=None,
         checked_on=checked_on or datetime.now(UTC).date(),
+        math_alttext=math_alttext,
     )
     result.html_checks = html_checks.static_checks(html)
     return html
 
 
 def rerender_job_html(
-    job: Job, result: DocumentResult, crops: dict[str, bytes], *, checked_on: date | None = None
+    job: Job,
+    result: DocumentResult,
+    crops: dict[str, bytes],
+    *,
+    checked_on: date | None = None,
+    math_alttext: bool | None = None,
 ) -> str:
     """`rerender_html` with the job's own choices for the student file: the title the
-    instructor set and the contact line (T1-7, T1-17)."""
+    instructor set and the contact line (T1-7, T1-17), and the app's MathML setting."""
     return rerender_html(
         result,
         crops,
         checked_on=checked_on,
         title_override=job.title_override,
         contact=job.contact_line,
+        math_alttext=math_alttext,
     )
