@@ -173,6 +173,8 @@ def _first_model(element: Element, settings: Settings) -> str:
     text = (element.text or "").strip()
     if element.display == "inline" and len(text) <= SHORT_INLINE_CHARS:
         return settings.cheap_model
+    if settings.equation_display_first_cheap:
+        return settings.cheap_model
     return settings.main_model
 
 
@@ -718,6 +720,13 @@ def _evaluate(
     return candidate
 
 
+def _accept_at(candidate: _Candidate, settings: Settings) -> float:
+    """The confidence from which this candidate is accepted: the bar of the model that
+    wrote it (`Settings.accept_confidence_by_model`), else the common one."""
+    model = candidate.calls[-1].model if candidate.calls else None
+    return settings.accept_confidence_for(model)
+
+
 def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
     """Ask the main model again when the cheap answer is unsure, unusable, or disagrees
     with the text layer in any way, a cosmetic style difference included: the style rule
@@ -738,7 +747,7 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
         return False
     disagrees = any(not c.passed and c.code not in SPEECH_CODES for c in candidate.checks)
     return (
-        candidate.confidence < settings.auto_accept_confidence or not candidate.usable or disagrees
+        candidate.confidence < _accept_at(candidate, settings) or not candidate.usable or disagrees
     )
 
 
@@ -749,7 +758,7 @@ def _band_only(candidate: _Candidate, settings: Settings) -> bool:
     confidence = candidate.confidence
     return (
         confidence is not None
-        and SKIP_ESCALATION_FROM <= confidence < settings.auto_accept_confidence
+        and SKIP_ESCALATION_FROM <= confidence < _accept_at(candidate, settings)
         and candidate.usable
         and candidate.output is not None
         and candidate.output.is_equation
@@ -840,7 +849,7 @@ def _fix(
         return make(Status.ABSTAINED, "low_confidence")
     failed = [c for c in candidate.checks if not c.passed]
     single = ACCEPT_SINGLE_READING and any(c.code == SINGLE_READING_CODE for c in failed)
-    bar = SKIP_ESCALATION_FROM if single else settings.auto_accept_confidence
+    bar = SKIP_ESCALATION_FROM if single else _accept_at(candidate, settings)
     if confidence >= bar and all(c.code in NOTE_CODES for c in failed):
         # Notes only (a cosmetic style difference, no speech text): accepted, listed as
         # optional checks on the review screen.
@@ -882,9 +891,10 @@ def transcribe(
             prompt_version=prompt.version,
             instructions=prompt.text,
             images=[png],
-            context_text=context_text,
+            context_text=first_context if not escalation else context_text,
             max_output_tokens=output_limit(model),
             image_detail="high",
+            effort=settings.anthropic_effort_equation,
         )
         if escalation:
             output, calls = _call_once(client, request, EquationOutput)
@@ -893,6 +903,11 @@ def transcribe(
         return _evaluate(output, calls, element, display, course_bold=course_bold, spoken=spoken)
 
     first_model = _first_model(element, settings)
+    # The text around the equation goes to the main model only when it re-reads a cheap
+    # answer (`Settings.equation_context_on_escalation`); course notation always goes.
+    first_context = context_text
+    if settings.equation_context_on_escalation and first_model != settings.main_model:
+        first_context = None if not entries else context_text
     candidate = first = attempt(first_model)
     calls = list(candidate.calls)
     cheap_start = first_model != settings.main_model

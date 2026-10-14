@@ -270,7 +270,13 @@ def make_claude_verifier(settings: Settings, budget: JobBudget, *, fake: bool = 
         return FakeVerifier(budget=budget, reported_model=model)
     from a11y_stem.models.anthropic_client import AnthropicVisionClient
 
+    # The check keeps the prompt it was measured with: the untrusted-text notice stays in the
+    # user message beside the fenced text, not in the system block (`anthropic_notice_in_system`).
     own = settings.model_copy(
-        update={"model_timeout_s": settings.claude_check_timeout_s, "model_max_retries": 0}
+        update={
+            "model_timeout_s": settings.claude_check_timeout_s,
+            "model_max_retries": 0,
+            "anthropic_notice_in_system": False,
+        }
     )
     return ClaudeVerifier(AnthropicVisionClient(own, budget, count_calls=False), model)

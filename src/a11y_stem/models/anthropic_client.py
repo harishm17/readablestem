@@ -69,7 +69,7 @@ from pydantic import ValidationError
 from a11y_stem.config import Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation
 from a11y_stem.core.types import ModelCall, Outcome
-from a11y_stem.models.base import T, VisionRequest, rate_gate
+from a11y_stem.models.base import UNTRUSTED_NOTICE, T, VisionRequest, fence_untrusted, rate_gate
 from a11y_stem.models.openai_client import (
     _NOT_SENT_ERRORS,
     IMAGE_DETAILS,
@@ -80,9 +80,11 @@ from a11y_stem.models.openai_client import (
     _retry_delay_s,
     _safe_code,
     _status_is_retryable,
+    defang_context,
     fenced_context,
 )
 from a11y_stem.models.pricing import (
+    BATCH_DISCOUNT,
     PRICES,
     ceiling_cost_usd,
     cost_usd,
@@ -177,7 +179,7 @@ class AnthropicVisionClient:
         model. Raises `BudgetExceeded` when the first reservation is refused (nothing is
         sent). The returned `ModelCall` covers every send this call made.
         """
-        context = fenced_context(request.context_text)
+        context = self._context(request.context_text)
         content = _user_content(request, context)
         sdk = self._client()
         estimate = estimate_max_cost_usd(
@@ -242,6 +244,49 @@ class AnthropicVisionClient:
         )
         _log_call(call, last, sends=len(replies))
         return cast("T | None", last.parsed), call
+
+    def sdk_client(self) -> anthropic.Anthropic:
+        """The SDK client this object sends with (built on first use)."""
+        return self._client()
+
+    def batch_params(self, request: VisionRequest, schema: type[T]) -> dict[str, Any]:
+        """The Messages parameters of `request` for one entry of a Message Batch: what `run`
+        would send, less the refusal fallback (the Batches API takes none). Raises
+        `ValueError` for a malformed request, as `run` does."""
+        context = self._context(request.context_text)
+        return self._params(request, schema, _user_content(request, context))
+
+    def batch_estimate_usd(self, request: VisionRequest) -> float:
+        """The worst case of `request` at the Batches price, for the reservation."""
+        context = self._context(request.context_text)
+        return BATCH_DISCOUNT * estimate_max_cost_usd(
+            request.model,
+            n_images=len(request.images),
+            text_chars=len(context or ""),
+            max_output_tokens=request.max_output_tokens,
+            images=request.images,
+        )
+
+    def read_batch_message(
+        self, request: VisionRequest, schema: type[T], message: Any
+    ) -> tuple[T | None, ModelCall]:
+        """The parsed answer and the `ModelCall` for a message a batch returned. The call's
+        cost is at list price (what `run` would have recorded); the batch bills
+        `BATCH_DISCOUNT` of it, and the caller settles its reservation at that."""
+        reply = self._read_message(request, schema, message)
+        call = ModelCall(
+            step=request.step,
+            model=request.model,
+            prompt_version=request.prompt_version,
+            input_tokens=reply.usage.input_tokens,
+            cached_input_tokens=reply.usage.cached_input_tokens,
+            cache_creation_input_tokens=reply.usage.cache_creation_input_tokens,
+            output_tokens=reply.usage.output_tokens,
+            reasoning_tokens=reply.usage.reasoning_tokens,
+            cost_usd=_charge(request.model, reply, 0.0),
+            outcome=reply.outcome,
+        )
+        return cast("T | None", reply.parsed), call
 
     def _client(self) -> anthropic.Anthropic:
         """The SDK client with this app's timeout, created once. Retries are done in run()."""
@@ -340,16 +385,32 @@ class AnthropicVisionClient:
             "system": [
                 {
                     "type": "text",
-                    "text": request.instructions,
+                    "text": self._system_text(request),
                     "cache_control": {"type": "ephemeral"},
                 }
             ],
             "messages": [{"role": "user", "content": content}],
             "output_config": {
-                "effort": self._settings.anthropic_effort_for(request.model),
+                "effort": request.effort or self._settings.anthropic_effort_for(request.model),
                 "format": {"type": "json_schema", "schema": anthropic.transform_schema(schema)},
             },
         }
+
+    def _context(self, text: str | None) -> str | None:
+        """The fenced document text for the user message. With
+        `Settings.anthropic_notice_in_system` the fixed notice is not repeated here: it is
+        in the cached system block (`_system_text`)."""
+        if not self._settings.anthropic_notice_in_system:
+            return fenced_context(text)
+        return fence_untrusted(defang_context(text), notice=False) if text else None
+
+    def _system_text(self, request: VisionRequest) -> str:
+        """The instructions, and with `anthropic_notice_in_system` the untrusted-text notice
+        after them. It is added to every request, with document text or without, so the
+        cached prefix is the same for both."""
+        if not self._settings.anthropic_notice_in_system:
+            return request.instructions
+        return f"{request.instructions}\n\n{UNTRUSTED_NOTICE}"
 
     def _uses_fallback(self, model: str) -> bool:
         return self._settings.anthropic_refusal_fallback and model in FALLBACK_MODELS

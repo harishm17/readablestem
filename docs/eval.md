@@ -581,6 +581,36 @@ them and promote each as the baseline. Earlier runs were kept in a git-ignored
 `.local/eval/` and are not in the repository. figures-run1 was graded by the older text-only judge and cannot be a
 baseline for runs graded with the image.
 
+Recorded answers, replays and batches (`--answers`, `--batch`; development sets only). A live
+run is paid for once. `--answers FILE` keeps every model answer in a JSON-lines file keyed by
+everything the model is given (step, model, prompt version, instructions, the images by what
+they show, the text, the token limit, the thinking effort the client will send, and whether
+the untrusted-text notice rides in the system block). A request already in the file is
+answered from it, with the recorded tokens and cost, at no charge; any other goes to the model
+and is appended. So one baseline recording serves every experiment that asks the same
+thing, and an experiment pays only for requests that differ from the baseline's.
+`--answers-offline` turns a miss into a refusal instead of a call (a replay that cannot spend),
+and `--every N` takes every Nth equation or figure instead of the first few. `--answers` is
+refused for the held-out set and the sealed check part.
+
+```
+uv run a11y-stem eval pipeline --task equations --provider anthropic --max-usd 2 --answers .local/answers.jsonl
+uv run a11y-stem eval pipeline --task equations --provider anthropic --answers .local/answers.jsonl --answers-offline
+```
+
+`--batch` (with `--answers` and `--provider anthropic`) sends what the file cannot answer to
+the Message Batches API, which bills half the price and answers in minutes to an hour. A run
+is made in stages (`eval/staged.py`, `models/anthropic_batch.py`): a pass that only collects
+the requests it has no answer for, one batch, the same pass again (now reaching the
+escalations and the judge calls the first answers led to), until a pass asks for nothing new;
+that last pass is the run. The requests are the ones a live call sends (`batch_params`),
+less the server-side refusal fallback, which the Batches API does not take; an answer is
+recorded at list price, so runs made either way compare, and the cap is charged what the batch
+billed. A batch's prompt-cache hits are best effort: cache numbers come from live runs. The
+chatbot arms and the figure judge of a proof take `--batch` too
+(`proof --add-systems chatbot --provider anthropic --batch`, `proof/chatbot_batch.py`): the
+same message per section, `billed_usd` beside `cost_usd` (list price) in each record.
+
 Weekly sample (drift check between full runs): a 5% share of the gold units, seeded by
 the ISO week, scored like any other run (`eval/sample.py`). Reports go to
 `.local/eval/weekly/<week>-<task>.json` (git-ignored):
@@ -1929,6 +1959,107 @@ No gold file, golden output or held-out number changed. Three tests that encoded
 behaviour were rewritten (`test_layout_analyze`: an upright x with a raised 2 is raised text,
 not maths; `test_layout_fixtures`: "3 m/s2" in a text font is raised text; `test_layout_silent_loss`:
 a picture of maths is held as an equation, not as a figure).
+
+## Model cost (2026-10-14; T3-22, T3-23, T3-24, T3-29, T2-19, T3-21)
+
+Six cost levers for the Claude path, each a setting, each measured against one shared
+baseline on the development sets only (nothing here was run on the held-out set or the sealed
+check part). Baseline: `claude-opus-5-5` main at effort medium, `claude-haiku-5-5` cheap at low,
+the code and prompts of this branch before the settings (pipeline 0.4.0). Every arm changed one
+thing. A model answer was asked once and kept (`--answers`, above), so an arm paid only for
+requests the baseline had not asked; the runs were made as Message Batches (T3-21), at half
+price. Costs below are at list price, with the instructions read from the prompt cache
+(batch and live runs differ in whether a call found the cache warm, which depends on what ran
+before it; the "as billed" cost of two arms is not comparable, the cache-warm one is). The
+sets: the original development set (30 equations, 13 figures, 43 PDF pages in the document
+task), and the dev part of dev-v2 (302 equations, every 6th; 91 of them every 20th; 14 figures,
+every 2nd). Spend: about $2.0 of the $6 cap (billed), of which the baseline about $0.75, the
+effort arm $0.37, the Sonnet arm $0.39, the other arms under $0.05 each (they reused the
+baseline's requests), and the live cache and judge checks about $0.45.
+
+**Headings do not move.** The headings task calls no model, so none of these settings changes
+it: original set precision 0.877, recall 1.000, F1 0.934, level accuracy 0.992; dev-v2 dev
+precision 0.892, recall 0.917, F1 0.904, level accuracy 0.898 (all arms).
+
+Equations, `exact_lenient` / decisions asked of a person / cost per equation (n in brackets).
+"Silent" is a wrong equation (scorer gaps left out) that no one is asked about.
+
+| Arm | Original (30) | dev-v2 dev (302) | silent, dev-v2 | Document task, per PDF page (43 pages) |
+|---|---|---|---|---|
+| Baseline | 0.767 / 1 / $0.00207 | 0.533 / 21 / $0.00163 | 128 | $0.00430; equations 0.767; 10 decisions |
+| Effort low for equations and figures (T3-22) | 0.767 / 0 / $0.00207 | (91) 0.527 / 5 / $0.00187 vs baseline 0.527 / 7 / $0.00189 | (91) 39 vs 37 | $0.00429 |
+| Haiku first for display equations (T3-29) | 0.767 / 1 / $0.00050 | 0.520 / 12 / $0.00055 | 135 | $0.00313 (-27%); equations 0.767; 10 decisions |
+| Context only on escalation (T3-23) | 0.733 / 1 / $0.00206 | (91) 0.538 / 7 / $0.00191 vs 0.527 / 7 / $0.00189 | (91) 36 vs 37 | not run |
+| Sonnet 5.5 as main model (T2-19), bar 0.85 | 0.767 / 8 / $0.00116 | 0.546 / 39 / $0.00090 | 113 | $0.00236 (-45%); equations 0.767; 28 decisions |
+| Sonnet 5.5 with a bar of 0.80 for it | 0.767 / 0 / $0.00116 | 0.546 / 12 / $0.00090 | 129 | $0.00236; 12 decisions |
+| Figure crops at most 768 px (T3-24) | not run (see below) | not run | | $0.00369 (-14%); equations 0.767; 10 decisions |
+| Notice in the system block (T3-23) | 10 sampled: same answers | | | about $0.00405 (-5.6%, computed) |
+
+Figures, judge pass rate / mean judge score / accepted without review / cost per figure:
+
+| Arm | Original (13) | dev-v2 dev (14) |
+|---|---|---|
+| Baseline | 1.00 / 4.77 / 13 / $0.00352 | 1.00 / 4.50 / 11 / $0.00482 |
+| Effort low | 1.00 / 4.77 / 12 / $0.00350 | 1.00 / 4.50 / 13 / $0.00484 |
+| Figure crops at 768 px | identical to baseline (all images are smaller than 768 px) | not run |
+| Sonnet 5.5 as main model | 1.00 / 4.54 / 6 / $0.00194 | 0.83 / 4.17 / 8 / $0.00258 |
+| Notice in the system block (13, live) | 1.00 / 4.77 vs 4.69 / 12 vs 13 / -6.3% | not run |
+
+What each result says:
+
+- **T3-22, lower effort: no saving, leave it off.** The models think very little on these
+  crops (an equation answer is about 80 output tokens at medium as at low), so effort does not
+  move the bill: 0.0% on the original set, 1% on dev-v2, 0.2% per page. Answers are the same.
+  The setting stays (`ANTHROPIC_EFFORT_EQUATION`, `_FIGURE`), unset.
+- **T3-23, notice in the system block: kept, on by default.** The fixed notice (61 tokens) is
+  cached with the instructions instead of being billed as input in every request. Live, in order
+  and with the cache warm: an Opus equation call $0.00239 to $0.00216 (-9.6%), a 13-figure run
+  $0.0456 to $0.0427 (-6.3%), cache-read share of a call 87% to 90%, and the same answers (10
+  equations: the same correct and wrong ones; 8 of 10 the same LaTeX, as many as two live runs of
+  the baseline give; figures judged 13 of 13 either way). The first call of a new prefix writes
+  the cache (3,922 tokens at 1.25x); it did so in the baseline too, earlier. Turn off with
+  `ANTHROPIC_NOTICE_IN_SYSTEM=false`. The second part, **context only on escalation**, saved
+  nothing (a cheap call without the sentence is 100 tokens shorter, and one more equation in
+  dev-v2 was re-read), and on the original set one equation of 30 got worse: off.
+- **T3-24, figure crops at 768 px: off, needs a test the sets cannot give.** The gold figures
+  are OpenStax web images of at most 500 px, so on the figures task the setting changes nothing
+  (the requests are the baseline's). In the document task the crops are 200 dpi renders of the
+  page: a page costs 14% less, the 13 captioned ones all pass the figure judge
+  (mean score 4.77 to 4.69, one figure one point lower), and the status and confidence of every
+  figure are the same. No dense chart or slide is in the sets, which is where a smaller picture
+  loses text, so it stays off until such a figure is tested; 1,024 is the safer first value.
+- **T3-29, Haiku first for display equations: off.** Cost per equation falls 66-76% and per
+  page 27%, and accuracy is the same within noise (paired on dev-v2: 4 equations worse, none
+  better, of 302; original set identical). What it loses is the review signal: the cheap model
+  is confident more often than the main model, so fewer answers fall under the accept bar (12
+  decisions against 21) and 7 more wrong equations are not asked about (135 against 128 of 302).
+  The main model re-reads what the cheap one is unsure of, but not what it is wrongly sure of.
+  It becomes a good trade when a bar for the cheap model's display answers is calibrated.
+- **T2-19, Sonnet 5.5 as main model, dev sets only: cheaper and as accurate, but not at the
+  common bar, and weaker on figures.** Equations are as accurate (0.546 against 0.533 on dev-v2:
+  4 better, none worse), 45% cheaper, and per page $0.00430 to $0.00236. Its confidences sit
+  lower (many at 0.80-0.82 where Opus says 0.88-0.95; high or low, they do not separate right
+  from wrong in either model), so at the 0.85 bar it asks for 39 decisions instead of 21 on
+  dev-v2, 28 instead of 10 on the document task, and 5 of 16 figures need review. With
+  `ACCEPT_CONFIDENCE_BY_MODEL='{"claude-sonnet-5-5": 0.80}'` the load is the baseline's or less
+  (12 of 302, 12 of 43 pages) and the wrong equations nobody is asked about are 129 against 128.
+  Figures are the cost: judge pass 0.83 against 1.00 on dev-v2 and mean score 4.17 against 4.50
+  (4.54 against 4.77 on the original set), on 14 and 13 figures, so one or two figures. The page
+  crops in the document task passed the judge 13 of 13. So: 0.80 is evidence from three small
+  development sets and calibrates nothing; no default changed. The setting
+  (`accept_confidence_by_model`) is in and empty, and the main model is the existing
+  `ANTHROPIC_MAIN_MODEL`. Not run on any held-out set.
+- **T3-21, batches.** The same requests as a live call (`batch_params`), less the refusal
+  fallback. Batch against live on the same 10 equations: 8 of 10 the same LaTeX and the same
+  correctness for all 10 (two live runs differ as much). A staged run takes several stages of minutes each and half the price; one stage took 45
+  minutes when the queue was long. A dropped
+  connection while polling lost the results of one batch (about $0.05) before the runner
+  retried such calls; it does now.
+
+Sample sizes: 30 equations is 3.3 points per equation, and the 13 and 14 figures are at the
+judge's ceiling (1.00), so figure quality moves only when the judge fails one, which makes the
+figure comparison weak on both sets. The dev-v2 equation set was chosen to hold failures (its
+exact rate is 0.53), so its rates are not course PDFs' rates.
 
 ## What the numbers do not show
 

@@ -320,6 +320,76 @@ def _send(job: Job, client: Any, inp: Any) -> Reply:
     return _openai_reply(resp, model)
 
 
+def write_meta(
+    job: Job,
+    out_dir: Path,
+    *,
+    reply: Reply | None,
+    error: str | None,
+    attempts: list[str],
+    cost: float,
+    cost_estimated: bool,
+    seconds: float,
+    pdf_pages: int,
+    counted: int,
+    say: Callable[[str], None],
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Write the record of one job (its JSON and, when the model wrote HTML, the HTML) and
+    say what happened. `extra` is added to the record as it is (a batch run's price)."""
+    arm_dir = out_dir / job.arm.id
+    arm_dir.mkdir(parents=True, exist_ok=True)
+    meta: dict[str, Any] = {
+        "arm": job.arm.id,
+        "section": job.section,
+        "status": "crashed",
+        "seconds": round(seconds, 1),
+        "pdf_pages": pdf_pages,
+        "cost_usd": round(cost, 6),
+        "versions": {"model_requested": job.arm.model},
+        "settings": {
+            "prompt": job.arm.prompt,
+            "mode": "pages",
+            "dpi": RENDER_DPI,
+            "max_output_tokens": MAX_OUTPUT_TOKENS,
+            **({} if job.arm.provider == "anthropic" else {"store": False}),
+        },
+        "attempts": attempts,
+        "error": error,
+        "counted_input_tokens": counted,
+        "run": job.run,
+    }
+    if cost_estimated:
+        meta["cost_estimated"] = True
+    meta.update(extra or {})
+    if reply is not None:
+        text = reply.text
+        html = html_from(text)
+        if not text.strip():
+            status = "empty"
+        elif not reply.complete or CONTINUED in text:
+            status = "truncated"
+        else:
+            status = "ok"
+        meta.update(
+            status=status,
+            versions={"model_requested": job.arm.model, "model_served": reply.served_model},
+            usage=reply.usage,
+            response_status=reply.stop,
+            incomplete_reason=reply.reason,
+            output_chars=len(text),
+        )
+        if text.strip():
+            (arm_dir / f"{job.stem}.html").write_text(html, encoding="utf-8")
+            meta["output"] = {"file": f"{job.stem}.html", "format": "html"}
+    (arm_dir / f"{job.stem}.json").write_text(dumps(meta), encoding="utf-8")
+    say(
+        f"{job.arm.id} {job.section} run{job.run}: {meta['status']} "
+        f"${meta['cost_usd']:.4f} {meta['seconds']}s"
+    )
+    return meta
+
+
 def run_job(
     client: Any,
     guard: InMemorySpendGuard,
@@ -373,52 +443,18 @@ def run_job(
         if reply is not None:
             cost += reply.cost
         guard.settle(held, cost)
-    meta: dict[str, Any] = {
-        "arm": job.arm.id,
-        "section": job.section,
-        "status": "crashed",
-        "seconds": round(latency, 1),
-        "pdf_pages": len(pngs),
-        "cost_usd": round(cost, 6),
-        "versions": {"model_requested": job.arm.model},
-        "settings": {
-            "prompt": job.arm.prompt,
-            "mode": "pages",
-            "dpi": RENDER_DPI,
-            "max_output_tokens": MAX_OUTPUT_TOKENS,
-            **({} if job.arm.provider == "anthropic" else {"store": False}),
-        },
-        "attempts": attempts,
-        "error": error,
-        "counted_input_tokens": counted,
-        "run": job.run,
-    }
-    if cost_estimated:
-        meta["cost_estimated"] = True
-    if reply is not None:
-        text = reply.text
-        html = html_from(text)
-        if not text.strip():
-            status = "empty"
-        elif not reply.complete or CONTINUED in text:
-            status = "truncated"
-        else:
-            status = "ok"
-        meta.update(
-            status=status,
-            versions={"model_requested": job.arm.model, "model_served": reply.served_model},
-            usage=reply.usage,
-            response_status=reply.stop,
-            incomplete_reason=reply.reason,
-            output_chars=len(text),
-        )
-        if text.strip():
-            (arm_dir / f"{job.stem}.html").write_text(html, encoding="utf-8")
-            meta["output"] = {"file": f"{job.stem}.html", "format": "html"}
-    meta_path.write_text(dumps(meta), encoding="utf-8")
-    say(
-        f"{job.arm.id} {job.section} run{job.run}: {meta['status']} "
-        f"${meta['cost_usd']:.4f} {meta['seconds']}s"
+    write_meta(
+        job,
+        out_dir,
+        reply=reply,
+        error=error,
+        attempts=attempts,
+        cost=cost,
+        cost_estimated=cost_estimated,
+        seconds=latency,
+        pdf_pages=len(pngs),
+        counted=counted,
+        say=say,
     )
     return "done"
 

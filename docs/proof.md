@@ -277,7 +277,9 @@ added in steps, each with its own cap (an arm already in the recorded run is nev
 `--provider anthropic` records the Purdue prompt on `claude-opus-5-5` (`chatbot-opus-purdue`,
 the primary arm) and on `claude-haiku-5-5` (`chatbot-haiku-purdue`), and judges the figure
 descriptions with `claude-opus-5-5` (no refusal fallback), through the Messages API with the
-same PDF, page images and prompt (`proof/chatbot.py`). The chatbot recipe repeats `niche/chatbot-runs` of the research
+same PDF, page images and prompt (`proof/chatbot.py`). With `--batch` the Claude arms and the figure judge go through the Message Batches API
+(half the price, answered when the batch ends; `proof/chatbot_batch.py`): the same message per
+section, each record keeping `cost_usd` at list price and adding `billed_usd`. The chatbot recipe repeats `niche/chatbot-runs` of the research
 (`proof/chatbot.py`: the PDF as a file and a 150 dpi image of every page, one prompt, no
 system instructions, `store=False`, at most 64,000 output tokens). A reply that was cut off
 or empty is a failure of the section and is not asked again. The parsers run in

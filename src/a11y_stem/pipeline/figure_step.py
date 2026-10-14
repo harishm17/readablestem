@@ -106,6 +106,7 @@ from a11y_stem.core.types import (
 )
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
+from a11y_stem.models.images import shrink_png
 from a11y_stem.models.prompts import load_prompt
 from a11y_stem.models.verifier import figure_check_mode, figure_score, verifier_of
 from a11y_stem.pipeline import figure_details
@@ -338,10 +339,14 @@ def _conflicted(candidate: _Candidate) -> bool:
     return any(c.code == "decorative_conflict" for c in candidate.checks)
 
 
-def _accept_bar(output: FigureOutput, settings: Settings) -> float:
-    if output.decorative:
-        return max(settings.auto_accept_confidence, DECORATIVE_ACCEPT_CONFIDENCE)
-    return settings.auto_accept_confidence
+def _accept_bar(candidate: _Candidate, settings: Settings) -> float:
+    """The accept bar for this answer: the bar of the model that wrote it
+    (`Settings.accept_confidence_by_model`), raised for a decorative answer."""
+    model = candidate.calls[-1].model if candidate.calls else None
+    bar = settings.accept_confidence_for(model)
+    if candidate.output is not None and candidate.output.decorative:
+        return max(bar, DECORATIVE_ACCEPT_CONFIDENCE)
+    return bar
 
 
 def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
@@ -351,7 +356,7 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
     if candidate.calls and candidate.calls[-1].model == settings.main_model:
         return False
     return (
-        output.confidence < _accept_bar(output, settings)
+        output.confidence < _accept_bar(candidate, settings)
         or not candidate.usable
         or _conflicted(candidate)
     )
@@ -434,7 +439,7 @@ def _fix(
         )
     failed = [c for c in candidate.checks if not c.passed]
     notes_only = all(c.severity == "warning" and c.code in NOTE_CODES for c in failed)
-    if output.confidence >= _accept_bar(output, settings) and notes_only:
+    if output.confidence >= _accept_bar(candidate, settings) and notes_only:
         return make(Status.ACCEPTED, proposal=True, review="optional" if failed else "none")
     return make(Status.NEEDS_REVIEW, proposal=True)
 
@@ -502,6 +507,9 @@ def describe(
     schema: type[FigureOutput] = FigureLongOutput if long else FigureOutput
     tiny = is_tiny(element)
     context = figure_context(element, context_text, labels=long)
+    # The model reads a reduced copy when `figure_model_max_edge_px` is set; `png` itself is
+    # what the second check and everything a person sees keep using.
+    sent = shrink_png(png, settings.figure_model_max_edge_px)
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
@@ -509,10 +517,11 @@ def describe(
             model=model,
             prompt_version=prompt.version,
             instructions=prompt.text,
-            images=[png],
+            images=[sent],
             context_text=context,
             max_output_tokens=LONG_MAX_OUTPUT_TOKENS if long else MAX_OUTPUT_TOKENS,
             image_detail="low" if tiny else "high",
+            effort=settings.anthropic_effort_figure,
         )
         if escalation:
             output, calls = _call_once(client, request, schema)

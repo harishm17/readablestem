@@ -153,7 +153,7 @@ def _make_judge(
     from a11y_stem.eval import judge as judge_mod
 
     try:
-        return judge_mod.make_judge(
+        made = judge_mod.make_judge(
             settings,
             budget,
             run_client=client,
@@ -161,11 +161,32 @@ def _make_judge(
             model=getattr(args, "judge_model", None),
             fake=label == "fake",
         )
+        if made.client is not client:  # the judge's own client: behind the file as well
+            made = judge_mod.JudgeSetup(_cached(args, made.settings, made.client), made.settings)
+        return made
     except ValidationError as exc:
         reasons = "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
         return f"invalid judge settings: {reasons}"
     except ConfigError as exc:
         return str(exc)
+
+
+def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
+    """`client` behind the answers file when the run has one (`--answers`)."""
+    path = getattr(args, "answers", None)
+    if path is None:
+        return client
+    from a11y_stem.eval.answers import CachedClient
+
+    if getattr(args, "batch", False):
+        # A staged run: what the file cannot answer is collected, not sent (eval/staged.py).
+        from a11y_stem.models.anthropic_batch import StagingClient
+
+        staging = StagingClient(client, args.staged_pool)
+        cached = CachedClient(staging, path, settings)
+        staging.owner = cached
+        return cached
+    return CachedClient(None if args.answers_offline else client, path, settings)
 
 
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
@@ -178,6 +199,11 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
         return "--max-usd is required for real model calls (or pass --fake)"
     cap = args.max_usd if args.max_usd is not None else math.inf
     budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
+    if getattr(args, "batch", False):
+        from a11y_stem.models.anthropic_batch import BatchRunner, PendingPool
+
+        args.staged_pool = PendingPool()
+        args.staged_runner = BatchRunner(budget)
     if args.fake:
         return FakeVisionClient(budget=budget), budget, "fake"
     from a11y_stem.models import make_live_client
@@ -190,6 +216,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
         client = make_live_client(settings, budget)
     except ConfigError as exc:
         return str(exc)
+    client = _cached(args, settings, client)
     return client, budget, settings.model_provider
 
 
@@ -222,6 +249,16 @@ def _settings_for(args: argparse.Namespace) -> Any:
 
 
 def _cmd_pipeline(args: argparse.Namespace) -> int:
+    if (args.answers or args.answers_offline) and (
+        args.gold_set == "heldout" or (args.gold_set == "dev-v2" and args.part == "check")
+    ):
+        return _error("--answers is for development sets: not for the held-out or check parts")
+    if args.answers_offline and not args.answers:
+        return _error("--answers-offline needs --answers FILE")
+    if args.batch and not (args.answers and not args.answers_offline and not args.fake):
+        return _error("--batch needs --answers FILE, real model calls, and no --answers-offline")
+    if args.batch and (args.provider or _settings().model_provider) != "anthropic":
+        return _error("--batch is for --provider anthropic (the Message Batches API)")
     if args.gold_set == "dev-v2":
         return _run_devset(args)
     if args.gold_set:
@@ -422,6 +459,7 @@ def _run_pipeline(
             date=args.date,
             gold_dir=gold_dir,
             limit=getattr(args, "limit", None),
+            every=getattr(args, "every", None),
             client_label=label,
             gold_label=gold_label,
             concurrency=args.concurrency,
@@ -433,18 +471,39 @@ def _run_pipeline(
             else frozenset(),
         )
         try:
-            run = pe.run_pipeline_eval(config)
+            if getattr(args, "batch", False):
+                from a11y_stem.eval import staged
+
+                def one_pass() -> Any:
+                    client.reset()
+                    return pe.run_pipeline_eval(config)
+
+                run = staged.drive(one_pass, args.staged_pool, args.staged_runner)
+            else:
+                run = pe.run_pipeline_eval(config)
         except RenderError as exc:  # raised while building inputs, before any model call
             return _error(f"could not build the eval input (no model calls made): {exc}")
+        except staged_error() as exc:
+            return _error(str(exc))
         except NotImplementedError as exc:
             return _error(f"a pipeline module is still a stub ({exc}); integrate it first")
     run.report.update(extra or {})
+    if hasattr(client, "summary"):
+        run.report["answers_file"] = client.summary()
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
     print(pe.format_markdown(run.report), end="")
     print(f"\nwrote {_shown(out)}" + (f" and {_shown(args.items)}" if args.items else ""))
+    if hasattr(client, "summary"):
+        print(f"answers file: {dict(client.summary())}")
     return 0
+
+
+def staged_error() -> type[Exception]:
+    from a11y_stem.eval.staged import StageError
+
+    return StageError
 
 
 def _run_tables(
@@ -1054,6 +1113,12 @@ def register(
         help="private real documents with labels.json (default: private-inputs/tables "
         "when it has one; counts only are reported)",
     )
+    pipeline.add_argument(
+        "--every",
+        type=_positive_int,
+        help="equations and figures: every Nth item, from the first (a spread over the set "
+        "where --limit takes only its start); with --limit, the first N of those",
+    )
     pipeline.add_argument("--items", type=Path, help="also write per-item rows as JSONL")
     pipeline.add_argument("--date", type=_iso_date, default=today, help="run date to record")
     pipeline.add_argument("--cache", type=Path, help="render cache (default: .cache/eval)")
@@ -1068,6 +1133,26 @@ def register(
         help="document task: sections converted at once (default 1, one after the other). "
         "Shortens a live run, which waits on a hosted model; a section's latency in the "
         "report then includes its wait for the others, so keep 1 for a run that is timed",
+    )
+    pipeline.add_argument(
+        "--answers",
+        type=Path,
+        help="a file of recorded model answers (eval/answers.py): a request already in it is "
+        "answered from it at no cost, any other goes to the model and is appended. One "
+        "baseline recording serves every experiment that asks the same thing. Development "
+        "sets only",
+    )
+    pipeline.add_argument(
+        "--batch",
+        action="store_true",
+        help="with --answers and --provider anthropic: send what the file cannot answer as "
+        "Message Batches (half price, minutes to wait) in stages, the same requests as a "
+        "live run less the refusal fallback (models/anthropic_batch.py)",
+    )
+    pipeline.add_argument(
+        "--answers-offline",
+        action="store_true",
+        help="with --answers: a request not in the file is refused, not sent (spends nothing)",
     )
     pipeline.add_argument(
         "--notation",

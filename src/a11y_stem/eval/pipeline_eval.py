@@ -269,10 +269,13 @@ def manifest_sha256(gold_dir: Path) -> str:
     return digest.hexdigest()
 
 
-def select_units(task: str, records: list[dict], limit: int | None) -> list[Any]:
+def select_units(
+    task: str, records: list[dict], limit: int | None, every: int | None = None
+) -> list[Any]:
     """What one task iterates over: equation or figure records, or pages of records.
 
-    `limit` counts those units: equations, figures, or pages (headings, document).
+    `limit` counts those units: equations, figures, or pages (headings, document). `every`
+    keeps every Nth unit from the first, before `limit` is applied.
     """
     units: list[Any]
     if task == "equations":
@@ -289,6 +292,8 @@ def select_units(task: str, records: list[dict], limit: int | None) -> list[Any]
         units = group_pages(records)
     else:
         raise ValueError(f"unknown task {task!r}; expected one of {', '.join(TASKS)}")
+    if every:
+        units = units[::every]
     return units[:limit] if limit is not None else units
 
 
@@ -407,6 +412,7 @@ class EvalConfig:
     date: str  # YYYY-MM-DD, passed in by the caller
     gold_dir: Path
     limit: int | None = None
+    every: int | None = None  # every Nth unit (`select_units`)
     client_label: str = "openai"  # "fake" for FakeVisionClient runs
     gold_label: str | None = None  # how to show gold_dir in the report (no home paths)
     concurrency: int = 4  # document task: convert_pdf's thread pool
@@ -470,6 +476,10 @@ def _calls_summary(calls: Sequence[ModelCall]) -> dict:
     return {
         "cost_usd": sum(c.cost_usd for c in calls),
         "latency_ms": sum(c.latency_ms for c in calls),
+        "input_tokens": sum(c.input_tokens for c in calls),
+        "cached_input_tokens": sum(c.cached_input_tokens for c in calls),
+        "cache_creation_input_tokens": sum(c.cache_creation_input_tokens for c in calls),
+        "output_tokens": sum(c.output_tokens for c in calls),
         "model_calls": len(calls),
         "models": [c.model for c in calls],
         "call_outcomes": [c.outcome for c in calls],
@@ -1734,6 +1744,30 @@ def document_review_load(items: Sequence[dict]) -> dict:
     }
 
 
+def document_figures(result: Any) -> list[dict]:
+    """What the figure step made of each figure of a converted page (for comparing two runs
+    of the same page: element ids are stable between them)."""
+    elements = {e.id: e for e in result.elements}
+    rows = []
+    for fix in result.fixes:
+        if fix.kind is not Kind.FIGURE:
+            continue
+        element = elements.get(fix.element_id)
+        rows.append(
+            {
+                "element_id": fix.element_id,
+                "page": element.page if element is not None else None,
+                "caption": element.caption if element is not None else None,
+                "status": fix.status.value,
+                "confidence": fix.confidence,
+                "figure_type": fix.figure.figure_type if fix.figure else None,
+                "decorative": fix.figure.decorative if fix.figure else None,
+                "alt": fix.figure.alt if fix.figure else None,
+            }
+        )
+    return rows
+
+
 def _eval_document(
     cfg: EvalConfig, units: list[list[dict]], pdfs: list[bytes]
 ) -> tuple[list[dict], str | None]:
@@ -1801,6 +1835,7 @@ def _document_section(
     for pair in item["pairs"]:
         pair["scorer_gap"] = pair["gold_id"] in cfg.scorer_gaps
     item["review"] = load_counts(result.fixes)
+    item["figures"] = document_figures(result)
     headings = predicted_headings(result.fixes)
     heading_item = heading_page_item(_page_id(page), _of_kind(page, "heading"), headings)
     item["heading_flags"] = heading_flags(heading_item, headings)
@@ -1946,6 +1981,7 @@ def build_report(
             "gold_dir": cfg.gold_label or cfg.gold_dir.name,
             "manifest_sha256": manifest_sha256(cfg.gold_dir),
             "limit": cfg.limit,
+            **({"every": cfg.every} if cfg.every else {}),
             "unit": {"equations": "equation", "figures": "figure"}.get(task, "page"),
             "selection_sha256": hashlib.sha256("\n".join(planned_ids).encode()).hexdigest(),
         },
@@ -1971,7 +2007,7 @@ def run_pipeline_eval(cfg: EvalConfig) -> EvalRun:
     """
     if cfg.task not in RUNNERS:
         raise ValueError(f"unknown task {cfg.task!r}; expected one of {', '.join(TASKS)}")
-    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit)
+    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit, cfg.every)
     planned = unit_ids(cfg.task, units)
     # All inputs before the first model call (see the module docstring): a RenderError
     # raises here, with nothing spent. Then the browser goes, before any step runs.
