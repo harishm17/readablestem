@@ -334,3 +334,68 @@ def test_a_set_in_braces_is_not_cut_from_its_sentence():
 
     elements = analyze(one_page(fill)).elements
     assert "{ 1, 2, 3 }" in (elements[0].text or "")
+
+
+# ---------------------------------------------------------------- cases with words
+
+
+def row_of(text: str, x: float, y0: float, size: float = BODY) -> layout._Row:
+    chars, at = [], x
+    for ch in text:
+        width = 0.5 * size
+        chars.append(
+            layout._Char(ch, at, y0, at + width, y0 + size, y0 + size - 2, size, "CMR10", 0)
+        )
+        at += width
+    return layout._Row(chars)
+
+
+def cases_rows() -> tuple[list[layout._Row], list[layout._Row]]:
+    """g(t) = { 9t for t > 0 / 45 for t < 5 / 7t otherwise }: the brace as three abutting
+    pieces (the CMEX glyphs TeX builds a tall one from), one row each for value and
+    condition, a wide gap between them."""
+    brace = [row_of("\uf8f1", 250, 130), row_of("\uf8f2", 250, 141), row_of("\uf8f3", 250, 152)]
+    values = [row_of("9t", 270, 132), row_of("45", 270, 147), row_of("7t", 270, 160)]
+    conditions = [row_of("for t > 0", 360, 132), row_of("for t < 5", 360, 147),
+                  row_of("otherwise", 360, 160)]  # fmt: skip
+    return brace, [*values, *conditions]
+
+
+def test_rows_beside_a_tall_brace_are_maths_whatever_words_they_hold():
+    brace, rest = cases_rows()
+    rows = [*brace, *rest]
+    for row in rows:
+        layout._classify_row(row)
+    assert all(r.kind != "math" for r in rest if "for" in r.text or "other" in r.text)
+    layout._mark_case_rows(rows)
+    assert all(r.kind == "math" and r.case_row for r in rows)
+
+
+def test_a_brace_with_one_row_beside_it_is_not_cases():
+    brace, _ = cases_rows()
+    one = [row_of("9t", 270, 140), row_of("for t > 0", 360, 140)]
+    rows = [*brace, *one]
+    for row in rows:
+        layout._classify_row(row)
+    layout._mark_case_rows(rows)
+    assert not any(r.case_row for r in rows)
+
+
+def test_a_set_in_braces_is_not_cases():
+    brace, rest = cases_rows()
+    closing = row_of("}", 400, 140)
+    rows = [*brace, *rest, closing]
+    for row in rows:
+        layout._classify_row(row)
+    layout._mark_case_rows(rows)
+    assert not any(r.case_row for r in rows)
+
+
+def test_stacked_list_braces_are_not_one_tall_brace():
+    # "2. { ... " and "3. { ... " in a list: braces at one x, a line apart, not abutting.
+    rows = [row_of("{", 250, 130), row_of("a b", 270, 130), row_of("{", 250, 145),
+            row_of("c d", 270, 145)]  # fmt: skip
+    for row in rows:
+        layout._classify_row(row)
+    layout._mark_case_rows(rows)
+    assert not any(r.case_row for r in rows)

@@ -975,6 +975,9 @@ class _Row:
     region: _Region | None = None  # the display equation it belongs to (_equation_regions)
     # An exercise number ("18.", "4)") cut off the front of a maths row: text, never maths.
     exercise_number: bool = False
+    # A row of a function defined by cases (`_mark_case_rows`): its columns may stand
+    # twice as far apart as those of an aligned row.
+    case_row: bool = False
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -3532,6 +3535,82 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
     return out
 
 
+def _mark_case_rows(rows: list[_Row]) -> None:
+    """Make the rows beside a tall opening brace maths, whatever words they hold.
+
+    A function defined by cases ("g(t) = {  9t for 0 <= t <= 5 / 45 for 5 < t <= 10") has
+    words in its rows ("for", "if", "otherwise", "elsewhere"), so each row reads as text
+    and the equation falls apart into a brace, a paragraph and several inline pieces. The
+    brace is the evidence: opening-brace glyphs (or the pieces TeX builds a tall one from,
+    stacked at one x) taller than two lines, with two or more lines of rows right of it,
+    level with it. Those rows are one equation with the brace; `_equation_regions` then
+    stacks them.
+    """
+    candidates = [r for r in rows if not r.vertical and not r.absorbed and not r.exercise_number]
+    glyphs = [(r, c) for r in candidates for c in r.ink if c.c in _OPENING_BRACES]
+    glyphs.sort(key=lambda rc: (rc[1].x0, rc[1].y0))
+    used: set[int] = set()
+    for i, (_, first) in enumerate(glyphs):
+        if i in used:
+            continue
+        group = [i]
+        for j in range(i + 1, len(glyphs)):
+            c = glyphs[j][1]
+            last = max((glyphs[k][1] for k in group), key=lambda g: g.y1)
+            if (
+                j not in used
+                and abs(c.x0 - first.x0) <= 0.6 * first.size
+                and -0.5 * first.size <= c.y0 - last.y1 <= 0.1 * first.size
+            ):
+                group.append(j)
+        used.update(group)
+        top = min(glyphs[k][1].y0 for k in group)
+        bottom = max(glyphs[k][1].y1 for k in group)
+        right = max(glyphs[k][1].x1 for k in group)
+        size = first.size
+        if bottom - top < 2.0 * size:
+            continue
+        holders = {id(glyphs[k][0]): glyphs[k][0] for k in group}
+        beside = []
+        for r in candidates:
+            content = [
+                c for c in r.ink if c.c not in _OPENING_BRACES and c.x0 >= right - 0.3 * size
+            ]
+            if not content or not 0 <= content[0].x0 - right <= 3 * size:
+                continue
+            if (
+                top - 0.5 * size
+                <= (min(c.y0 for c in content) + max(c.y1 for c in content)) / 2
+                <= bottom + 0.5 * size
+            ):
+                beside.append(r)
+        if len({round(r.baseline) for r in beside}) < 2:
+            continue
+        if any(
+            c.c == "}"
+            for r in candidates
+            if top - 0.5 * size <= (r.y0 + r.y1) / 2 <= bottom + 0.5 * size
+            for c in r.ink
+        ):
+            continue  # a set in braces, not cases
+        grown = True
+        while grown:  # the second column of a row ("for 0 <= t <= 5" after "9t")
+            grown = False
+            for r in candidates:
+                if r in beside or id(r) in holders:
+                    continue
+                if any(
+                    abs(r.baseline - b.baseline) <= 0.4 * size
+                    and 0 <= r.x0 - b.x1 <= 2 * MAX_COLUMN_GAP * size
+                    for b in [*beside, *holders.values()]
+                ):
+                    beside.append(r)
+                    grown = True
+        for r in [*holders.values(), *beside]:
+            r.kind = "math"
+            r.case_row = True
+
+
 def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
     """Cut the text off the front of the first row of a braced system.
 
@@ -3733,7 +3812,8 @@ def _same_line(a: _Row, b: _Row) -> bool:
         return False
     size = max(a.size, b.size)
     gap = max(a.x0 - b.x1, b.x0 - a.x1)
-    if abs(a.baseline - b.baseline) <= 0.4 * size and gap <= MAX_COLUMN_GAP * size:
+    columns = (2 if a.case_row and b.case_row else 1) * MAX_COLUMN_GAP
+    if abs(a.baseline - b.baseline) <= 0.4 * size and gap <= columns * size:
         return True
     lone = a if _punctuation_only(a) else b if _punctuation_only(b) else None
     if lone is None or gap > 1.5 * size:
@@ -5599,6 +5679,7 @@ def _page_blocks(
     rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
     for row in rows:
         _classify_row(row)
+    _mark_case_rows(rows)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
     used_rules = _resolve_fragments(rows, rules)
     used = {id(rule) for rule in used_rules}
