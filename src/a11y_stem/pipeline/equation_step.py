@@ -187,11 +187,20 @@ _WRAPPERS = [
 _DISPLAYSTYLE = re.compile(r"\\(?:displaystyle|textstyle)(?![A-Za-z])")
 
 
+# A script with nothing before it: at the start, or after a sign or an opening bracket. LaTeX
+# hangs it on the previous symbol, so the numbers of a nuclide after a plus ("+ ^{4}_{2}He")
+# become the plus's own; an empty group gives it an empty base (the nuclide's prefix scripts).
+_BARE_SCRIPT = re.compile(r"(?:^|(?<=[+\-=(\[,<>]))(\s*)(?=[\^_])")
+
+
 def clean_latex(latex: str) -> str:
     r"""Remove wrappers the prompt forbids but models still add ($...$, \[...\],
-    equation environments, \displaystyle), and escape bare `%` signs. Never changes the
-    mathematics: a bare `%` in one transcribed equation is a percent sign, but the
-    converter would treat it as a comment and silently drop the rest of the line."""
+    equation environments, \displaystyle), escape bare `%` signs, and give a script that
+    has nothing before it an empty base (`^{14}_{6}C` -> `{}^{14}_{6}C`, `+ ^{4}_{2}He` ->
+    `+ {}^{4}_{2}He`). Never changes the mathematics: a bare `%` in one transcribed equation
+    is a percent sign, but the converter would treat it as a comment and silently drop the
+    rest of the line; a script with no base belongs to no symbol, and the converter would
+    give it to the sign before it."""
     text = latex.strip()
     for pattern in _WRAPPERS:
         match = pattern.match(text)
@@ -199,6 +208,7 @@ def clean_latex(latex: str) -> str:
             text = match.group(1).strip()
     text = _DISPLAYSTYLE.sub("", text)
     text = text.removesuffix("\\\\").strip()
+    text = _BARE_SCRIPT.sub(lambda m: m.group(1) + "{}", text)
     return escape_percent_signs(text)
 
 

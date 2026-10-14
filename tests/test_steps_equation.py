@@ -110,6 +110,13 @@ def test_wrappers_the_prompt_forbids_are_removed():
         (r"x = 50\% + y", r"x = 50\% + y"),
         (r"\text{25% yield}", r"\text{25\% yield}"),
         ("a \\\\% b", "a \\\\\\% b"),  # row break, then a bare %
+        # A script with nothing before it gets an empty base: LaTeX would give it to the sign.
+        (r"^{14}_{6}\text{C}", r"{}^{14}_{6}\text{C}"),
+        (r"\text{U} + ^{4}_{2}\text{He}", r"\text{U} + {}^{4}_{2}\text{He}"),
+        (r"(^{25}_{12}\text{Mg})", r"({}^{25}_{12}\text{Mg})"),
+        (r"{}^{14}_{6}\text{C}", r"{}^{14}_{6}\text{C}"),
+        (r"x^2 + y_1 - e^{-kt}", r"x^2 + y_1 - e^{-kt}"),
+        (r"\alpha^2 = (a+b)^2", r"\alpha^2 = (a+b)^2"),
     ],
 )
 def test_clean_latex(raw, clean):
