@@ -5,7 +5,8 @@
 - `anthropic_client`: `AnthropicVisionClient` (Messages API, same contract and accounting)
 - `fake`: `FakeVisionClient` (deterministic, offline)
 - `router`: `call_with_fallback` (main model, then the other one once)
-- `verifier`, `decisions_client`: the second automated check (OpenAI Decisions API)
+- `verifier`, `decisions_client`, `claude_verifier`: the second automated check (OpenAI
+  Decisions API; a different Claude model with an audit prompt under Anthropic)
 - `pricing`, `prompts`: prices and versioned prompt text
 
 `make_vision_client` is the one place that picks the real or the offline client, so the
@@ -28,7 +29,7 @@ from a11y_stem.models.router import (
     call_with_fallback,
     calls_made,
 )
-from a11y_stem.models.verifier import any_check_enabled, make_verifier
+from a11y_stem.models.verifier import any_check_enabled, job_verifier, make_verifier
 
 __all__ = [
     "OFFLINE_DEFAULTS",
@@ -108,12 +109,12 @@ def make_vision_client(
     Otherwise the client of `settings.model_provider`: an `OpenAIVisionClient` or an
     `AnthropicVisionClient`; it reads the API key on its first call, not here.
 
-    The OpenAI client carries the job's second automated check (`models.verifier`, the
-    Decisions API; offline, the fake) on the same budget, unless both uses of it are
-    switched off in the settings. The check is OpenAI's, so with the Anthropic provider
-    there is none (`any_check_enabled` is False).
+    The client carries the job's second automated check on the same budget (offline, the
+    fake): with the OpenAI provider the Decisions API (`models.verifier`) unless both
+    uses of it are switched off in the settings; with the Anthropic provider the Claude
+    check (`models.claude_verifier`, shadow mode by default) unless CLAUDE_SECOND_CHECK=off.
     """
-    verifier = make_verifier(settings, budget, fake=fake) if any_check_enabled(settings) else None
+    verifier = job_verifier(settings, budget, fake=fake)
     if fake:
         defaults = copy.deepcopy(OFFLINE_DEFAULTS)
         return FakeVisionClient(
@@ -125,7 +126,7 @@ def make_vision_client(
     if settings.model_provider == "anthropic":
         from a11y_stem.models.anthropic_client import AnthropicVisionClient
 
-        return AnthropicVisionClient(settings, budget)
+        return AnthropicVisionClient(settings, budget, verifier=verifier)
     from a11y_stem.models.openai_client import OpenAIVisionClient
 
     return OpenAIVisionClient(settings, budget, verifier=verifier)
@@ -144,7 +145,8 @@ def make_live_client(
     if settings.model_provider == "anthropic":
         from a11y_stem.models.anthropic_client import AnthropicVisionClient
 
-        return AnthropicVisionClient(settings, budget)
+        verifier = job_verifier(settings, budget) if second_check else None
+        return AnthropicVisionClient(settings, budget, verifier=verifier)
     from a11y_stem.models.openai_client import OpenAIVisionClient
 
     verifier = (

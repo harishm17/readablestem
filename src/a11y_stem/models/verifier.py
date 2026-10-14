@@ -44,7 +44,7 @@ import re
 import unicodedata
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Protocol, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, runtime_checkable
 
 from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
@@ -394,7 +394,8 @@ class FakeVerifier:
     responder: Callable[[str, str], Mapping[str, float] | None] | None = None
     outcomes: dict[str, str] = field(default_factory=dict)
     budget: JobBudget | None = None
-    model: str = "gpt-6-luna"
+    model: str = "gpt-6-luna"  # the Decisions model its requests are priced as
+    reported_model: str = ""  # the model named on its verdicts, when not `model`
     requests: list[tuple[str, str]] = field(default_factory=list)
 
     def figure_alt(self, png: bytes, *, alt: str, caption: str | None) -> VerifierVerdict:
@@ -426,23 +427,24 @@ class FakeVerifier:
         from a11y_stem.models.decisions_client import reservation_usd
         from a11y_stem.models.pricing import decisions_cost_usd
 
+        shown = self.reported_model or self.model
         cost = 0.0
         if self.budget is not None:
             estimate = reservation_usd(self.model, request)
             try:
                 reservation = self.budget.reserve(estimate, count_call=False)
             except BudgetExceeded:
-                return VerifierVerdict(check, {}, "budget_exceeded", self.model, version)
+                return VerifierVerdict(check, {}, "budget_exceeded", shown, version)
             cost = decisions_cost_usd(self.model, FAKE_INPUT_TOKENS)
             self.budget.settle(reservation, cost)
         self.requests.append((check, text))
         reason = self.outcomes.get(check, "ok")
         if reason != "ok":
-            return VerifierVerdict(check, {}, reason, self.model, version, 0, cost, 1)
+            return VerifierVerdict(check, {}, reason, shown, version, 0, cost, 1)
         answer = self.responder(check, text) if self.responder is not None else None
         probabilities = dict(default if answer is None else answer)
         return VerifierVerdict(
-            check, probabilities, "ok", self.model, version, FAKE_INPUT_TOKENS, cost, 1
+            check, probabilities, "ok", shown, version, FAKE_INPUT_TOKENS, cost, 1
         )
 
 
@@ -459,9 +461,46 @@ def make_verifier(settings: Settings, budget: JobBudget, *, fake: bool = False) 
 
 
 def any_check_enabled(settings: Settings) -> bool:
-    """The second automated check runs on OpenAI's Decisions API, so it is used only with
-    the OpenAI provider: with MODEL_PROVIDER=anthropic it is skipped (nothing is sent to
-    OpenAI, no OpenAI key is needed) whatever the DECISIONS_* settings say."""
+    """The Decisions API check is used only with the OpenAI provider: with
+    MODEL_PROVIDER=anthropic it is skipped (nothing is sent to OpenAI, no OpenAI key is
+    needed) whatever the DECISIONS_* settings say. The Claude check
+    (`claude_check_enabled`) is its counterpart there."""
     if settings.model_provider != "openai":
         return False
     return settings.decisions_figure_verify or settings.decisions_equation_shadow
+
+
+def claude_check_enabled(settings: Settings) -> bool:
+    """The second check on Claude (`models.claude_verifier`, T2-20) is used only with the
+    Anthropic provider, and unless CLAUDE_SECOND_CHECK=off."""
+    return settings.model_provider == "anthropic" and settings.claude_second_check != "off"
+
+
+CheckMode = Literal["off", "note", "shadow"]
+
+
+def figure_check_mode(settings: Settings) -> CheckMode:
+    """What the figure step does with the job's check: "note" (a flag adds an optional
+    note), "shadow" (the answer is recorded and changes nothing) or "off"."""
+    if settings.model_provider == "anthropic":
+        return {"off": "off", "shadow": "shadow", "enforce": "note"}[settings.claude_second_check]
+    return "note" if settings.decisions_figure_verify else "off"
+
+
+def equation_check_on(settings: Settings) -> bool:
+    """Whether the equation step records the check's answer (always shadow only)."""
+    if settings.model_provider == "anthropic":
+        return settings.claude_second_check != "off"
+    return settings.decisions_equation_shadow
+
+
+def job_verifier(settings: Settings, budget: JobBudget, *, fake: bool = False) -> Verifier | None:
+    """The second check for one job: the Decisions API's with the OpenAI provider, the
+    Claude one with the Anthropic provider, else None."""
+    if any_check_enabled(settings):
+        return make_verifier(settings, budget, fake=fake)
+    if claude_check_enabled(settings):
+        from a11y_stem.models.claude_verifier import make_claude_verifier
+
+        return make_claude_verifier(settings, budget, fake=fake)
+    return None

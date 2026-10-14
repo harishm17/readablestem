@@ -120,7 +120,7 @@ class Check(BaseModel):
     code: str | None = None  # category when it fails, e.g. "unknown_command"
 
 
-Step = Literal["equation", "figure", "judge", "table"]
+Step = Literal["equation", "figure", "judge", "table", "check"]
 
 Outcome = Literal[
     "ok", "refused", "invalid_output", "timeout", "api_error", "budget_exceeded", "skipped"

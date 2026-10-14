@@ -385,10 +385,14 @@ def replay_arm(
 
 def live_client(settings: Settings, budget: JobBudget, *, fake: bool) -> VisionClient:
     """The real client of the settings' provider (or the offline one). With the OpenAI
-    provider it carries the second check on the same budget; with Anthropic there is none."""
+    provider it carries the second check on the same budget; with Anthropic there is none
+    in a proof, whatever CLAUDE_SECOND_CHECK says: a recording must replay exactly, and the
+    replay (`ReplayClient`) carries no Claude check."""
     if fake:
-        return make_vision_client(settings, budget, fake=True)
-    return make_live_client(settings, budget)  # checks the key before any work
+        quiet = settings.model_copy(update={"claude_second_check": "off"})
+        return make_vision_client(quiet, budget, fake=True)
+    # Checks the key before any work.
+    return make_live_client(settings, budget, second_check=any_check_enabled(settings))
 
 
 def refuse_unsafe_live(

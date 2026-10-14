@@ -24,7 +24,12 @@ import dataclasses
 
 from a11y_stem.config import Settings
 from a11y_stem.core.types import Fix, Verification
-from a11y_stem.models.verifier import MEANING_CHANGING, VerifierVerdict, verifier_of
+from a11y_stem.models.verifier import (
+    MEANING_CHANGING,
+    VerifierVerdict,
+    equation_check_on,
+    verifier_of,
+)
 
 
 def record(
@@ -37,7 +42,7 @@ def record(
     the final answer is reused for it instead of asking (and paying) twice.
     """
     verifier = verifier_of(client)
-    if verifier is None or not settings.decisions_equation_shadow:
+    if verifier is None or not equation_check_on(settings):
         return fix
     final_latex = fix.equation.latex if fix.equation is not None else None
     final = verifier.equation_match(png, latex=final_latex) if final_latex else None

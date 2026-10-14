@@ -141,9 +141,9 @@ class AnthropicVisionClient:
     inject an `anthropic.Anthropic`; without it the SDK client is created on first use from
     `settings.require_anthropic_key()` (so constructing this object never needs a key), with
     the workspace header when `settings.anthropic_workspace_id` is set. `http_client` is
-    passed to that SDK client (tests give it a scripted transport). `verifier` exists for
-    parity with `OpenAIVisionClient` and is None: the second automated check is OpenAI's
-    Decisions API and is not used with this provider (`models.verifier`).
+    passed to that SDK client (tests give it a scripted transport). `verifier` is the job's
+    second automated check, if any (`models.claude_verifier`, T2-20); `count_calls=False`
+    makes the client reserve dollars only, which is how the check's own client is built.
     """
 
     def __init__(
@@ -154,8 +154,12 @@ class AnthropicVisionClient:
         client: anthropic.Anthropic | None = None,
         http_client: httpx2.Client | None = None,
         verifier: Any = None,
+        count_calls: bool = True,
     ) -> None:
         self.verifier = verifier
+        # False: every send holds dollars only, not one of the job's model calls (the
+        # second check's client, `models.claude_verifier`).
+        self._count_calls = count_calls
         self._settings = settings
         self._budget = budget
         self._given_client = client
@@ -184,7 +188,9 @@ class AnthropicVisionClient:
             images=request.images,
         )
         started = time.perf_counter()
-        reservation = self._budget.reserve(estimate)  # BudgetExceeded: nothing was sent
+        reservation = self._budget.reserve(
+            estimate, count_call=self._count_calls
+        )  # BudgetExceeded: nothing was sent
         replies: list[_Reply] = []
         charged = 0.0
         while True:
@@ -194,7 +200,7 @@ class AnthropicVisionClient:
             if not reply.retryable or len(replies) > self._settings.model_max_retries:
                 break
             try:
-                reservation = self._budget.reserve(estimate)
+                reservation = self._budget.reserve(estimate, count_call=self._count_calls)
             except BudgetExceeded as exc:
                 log_fields(
                     log,
