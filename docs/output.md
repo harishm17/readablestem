@@ -418,9 +418,18 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
    `menclose`) and layout attributes (`mathvariant`, `stretchy`, `columnalign`, ...).
    `href`, event handlers, `style`, `class`, `id` and colours are dropped. Attribute values
    must match `[A-Za-z0-9 .%+-]{0,64}`. All text is escaped.
-3. `semantics` and `maction` are replaced by their first child, which is what a browser
+3. **Bold letters.** MathML Core (Chromium) draws only `mathvariant="normal"`, so a bold or
+   bold-italic token is written as Unicode mathematical bold letters instead
+   (`core.mathchars.bake_bold_variants`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`
+   U+1D6DA, the way `\mathbf{d}` was already U+1D41D, and the attribute (also inherited from
+   an `mstyle`) is removed from the tokens that could be written so. The converter does it
+   when it makes the MathML (`validate.safe_latex_to_mathml`) and the sanitiser does it
+   again for MathML stored before, so every screen reader says "bold omega" and every
+   browser draws it bold (`tests/test_math_bold_greek.py`, Chromium). Other variants are
+   left as they were.
+4. `semantics` and `maction` are replaced by their first child, which is what a browser
    shows anyway; annotations and alternatives are dropped.
-4. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
+5. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
    rejects the whole equation, which then falls back to the original image with
    `data-reason="mathml_rejected"`. Dropping just the unknown element would show maths
    with a silent hole in it, and a wrong equation read aloud is worse than an honest "not

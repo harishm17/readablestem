@@ -459,7 +459,9 @@ def test_mathml_attributes_outside_the_allowlist_are_dropped():
         'onclick="alert(1)" style="color:red" mathvariant="bold">v</mi></math>'
     )
     html = render_table(TableGrid(rows=1, cols=1, cells=[c(0, 0, mathml=mathml)]), id_prefix="t")
-    assert '<mi mathvariant="bold">v</mi>' in html
+    # The one allowed attribute, mathvariant, is written as the bold code point (Chromium
+    # does not draw the attribute); every other attribute is dropped.
+    assert "<mi>\U0001d42f</mi>" in html and "mathvariant" not in html
     for bad in ("href", "onclick", "style", "javascript"):
         assert bad not in html
 
