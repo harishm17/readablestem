@@ -188,6 +188,16 @@ Element conventions:
   public demo's doubled box titles (14 pt over 12 pt) are kept.
 - A bare chapter number (`4`, `Chapter 4`) in a large font directly above the title is
   merged into it (`4 Energy and Work`).
+- **Lines of one heading share a typeface and a size** (T2-8, 2026-10-14). Two bold lines
+  are lines of one block only when their font family (`_Row.family`: the name without
+  subset tag, weight, style and design size, so bold and regular of one family agree and
+  Sans and Serif do not) and size (to half a point) are the same; heading-sized lines
+  already had to agree in size. A bold sans "Practice Makes Perfect" over the bold serif
+  title of the section it introduces is two headings, not one that reads "Practice Makes
+  Perfect Solve a System of Equations by Substitution" (two such merges on the dev-v2
+  set); the second line starts a block of its own.
+- **The PDF's own tags** (T2-18, "Tagged PDFs" below) can make a line a heading, and give
+  its level.
 
 **Levels** (`heading_levels`): the sizes of size-based headings are clustered (within 5 %),
 largest = level 1. Bold body-size and standalone numbered headings sit one level below the
@@ -218,15 +228,58 @@ written as a heading; the tier only says whether a person must decide:
 | Heading | Status | `Fix.review` |
 |---|---|---|
 | certain | ACCEPTED | `none` (`optional` when the outline repair moved it) |
-| uncertain, its label used once | ACCEPTED | `optional`: its failed checks are the notes |
+| uncertain | ACCEPTED | `optional`: its failed checks are the notes |
 | uncertain, the same label and style two or more times | NEEDS_REVIEW | `required`, one decision for the group (`group_key`, `group_size`) |
+| weak evidence and a sentence (see below) | NEEDS_REVIEW | `required`, check `heading.sentence_like` (T2-7) |
 
 Same label: NFKC, case-folded, letters and digits only ("Teacher Support:" = "teacher
 support"). Same style: font size to the half point, bold or not, larger-font evidence or
-not, and the same proposed level. Certain copies of the label are never in a group. On
-the three gold pages this gives 9 decisions in 43 PDF pages (one per repeated label:
-"Teacher Support", "Solution", "Discussion", "Procedure", "Distance vs. Displacement")
-instead of 61 headings to review.
+not, and the same proposed level. Certain copies of the label are never in a group, and
+nor are sentence-like lines, which are decisions of their own.
+
+*A sentence* (T2-7, 2026-10-14, `heading_step.sentence_like`): a heading with weak
+evidence (bold at body size: no larger font, no section number, no tag) whose text ends in
+a full stop, a question mark or a colon (closing quotes and brackets aside) and has at
+least three words ("Given a binomial, write it in expanded form.", "Can factorials always
+be found using a calculator?", "Remember the order of operations:"). It is still written as
+a heading; a person decides whether it is one. Shorter lines ("Answer:", "Definition.") are
+labels. The backlog's evidence (A5): every wrong heading of the held-out run was in the
+optional bucket, so no wrong guess ever reached a person.
+
+*Repeated labels, the T2-7 measurement* (2026-10-14, development sets only; the held-out
+set was not used). The backlog proposed making repeated-label groups optional notes. The two
+development sets disagree about them, so four ways of handling a group were run on both
+(`eval pipeline --task headings --fake`, no model; the sentence rule is on in all four):
+
+| Variant | Set | Required decisions | Flag precision | Flag recall | Wrong headings not asked about |
+|---|---|---|---|---|---|
+| (a) groups are optional notes | original dev (3 sections, 43 PDF pages) | 0 | n/a | 0.000 (0 of 18) | 18 |
+| | dev-v2 (28 documents, 338 pages) | 26 | 0.577 (15 of 26) | 0.122 (15 of 123) | 108 |
+| (b) one required decision per group (kept) | original dev | 9 | 0.556 (5 of 9) | 0.778 (14 of 18) | 4 |
+| | dev-v2 | 59 | 0.305 (18 of 59) | 0.236 (29 of 123) | 94 |
+| (b2) only the first copy of a group is required, the others optional notes | original dev | 9 | 0.556 (5 of 9) | 0.278 (5 of 18) | 13 |
+| | dev-v2 | 59 | 0.305 (18 of 59) | 0.146 (18 of 123) | 105 |
+| (c) every copy is a decision of its own | original dev | 41 | 0.341 (14 of 41) | 0.778 (14 of 18) | 4 |
+| | dev-v2 | 159 | 0.182 (29 of 159) | 0.236 (29 of 123) | 94 |
+
+Heading F1 is the same in every variant (0.9344 original dev, 0.9168 dev-v2). Before T2-7
+(no sentence rule) the group behaviour was (b) minus the 26 sentence decisions: 9 decisions
+on the original dev set and 34 on dev-v2 (flag precision 0.118, flag recall 0.114). (b) is
+the old "one decision per group, not per copy"; (b2) is the variant that asks for the group's
+first copy only.
+
+*Why (b).* The criterion was: keep one decision per group if it holds most of the original
+dev set's flag recall and adds few decisions on dev-v2. (b) keeps all of it (14 of its 18
+wrong headings, 0.778, against none in (a)) and costs 33 more decisions on dev-v2 (26 to 59,
+0.077 to 0.175 per PDF page: one more every ten pages). Those 33 are mostly wasted there: 30
+of the 33 groups hold only right headings ("Answer:", "Definition." under every example), so
+dev-v2 flag precision falls from 0.577 to 0.305; but they also double its flag recall
+(0.122 to 0.236, 14 more wrong headings), and a group is answered with one action for all its
+copies (keep all, set a level, make all bold text). (a) loses the original set's recall
+entirely. (b2) keeps the decisions and loses most of the recall (it checks one copy and the
+rest go unasked). (c) has (b)'s recall at four times the decisions on both sets. The weakness
+of (b) is precision on dev-v2; the next lever would be a rule that tells "Answer:"-type
+labels from "Teacher Support"-type boxes, which no development set separates yet.
 
 **Run-in labels.** OpenStax's outline does not count the bold labels inside a worked
 example or lab box ("Solution", "Discussion", "Procedure") as headings, but does count
@@ -272,6 +325,22 @@ bold omega gives nothing.
   text layer, one box per term in print. A ruled box found as a table is turned into
   items the same way (`_term_items`). A paragraph with no wide gap, or a long piece, stays
   a paragraph; a term that wraps onto a second line becomes two items (not told apart).
+- **Glossary entries** (T2-16). Under a heading that ends in "Key Terms", "Glossary",
+  "Vocabulary" or "Terms and Definitions" (`GLOSSARY_HEADING`; the section lasts until a
+  heading in a larger font or with a section number), a term and its definition become one
+  paragraph with `Element.term_end` (the term is `text[:term_end]`), and the assembler
+  writes consecutive entries as one `<dl>` with a `<dt>` and a `<dd>` each
+  (`_glossary_entries`). Four shapes: a term at the margin with the definition on the
+  indented lines below it in one paragraph (OpenStax's "Key Terms" pages; the term takes
+  one or two lines); the same as two blocks, a term line over an indented paragraph; a bold
+  term of at most six words that layout took for a heading, directly over its definition
+  paragraph (those terms stop being headings: the authored glossary page goes from 22
+  predicted headings to 7); and a bold term that runs into its definition on a line, one entry per
+  line that starts with one after a sentence end (LaTeX description lists). A paragraph
+  that only looks like one (an indented first line) and text outside such a section are
+  left alone. Not read: a glossary set as an unruled two-column table (the Word fixture
+  in the dev set), an entry split across a page break, and terms and definitions that
+  share a line without a bold term.
 - **Teacher tags.** OpenStax's level tags at the start of a paragraph or item, `[BL]`,
   `[OL]`, `[AL]`, `[All]` and runs of them (`[BL][OL] Describe a scenario ...`), are dropped
   (`_strip_teacher_tags`); a screen reader would spell them out. Only those four, in
@@ -695,18 +764,66 @@ default (`Untitled document`, `Microsoft Word - ...`); otherwise the first level
 `lang` is the catalog `/Lang` when it looks like a language tag, else `en`. The text pass
 decides the document's language from there (it detects one when the PDF has none).
 
-### Code blocks and footnotes (notices)
+### Code blocks, footnotes and contents pages (T2-16, T2-17)
 
-`Layout.notices` carries two layout facts the job page lists under "Not handled in this
-file" (review "none": no decision; `_layout_notices`):
+**Code blocks.** Consecutive lines of upright text that are monospaced throughout
+(`CODE_MONO_SHARE` 80 % of each line's glyphs: MuPDF's flag, or a name such as Courier,
+cmtt, Consolas), in one column, one line pitch apart (up to `CODE_MAX_PITCH` 3.4 x the font
+size, so a blank line stays inside) and of one size, with at least 12 glyphs in all (or 6
+in two lines or more), are one block (`_code_groups`): `Element.preformatted` with
+`text` holding the lines and their indentation (`_code_text`). A monospaced font moves
+the same distance for every character, so a line's indent is its distance from the left
+edge of the block over that advance; spaces are the text layer's own, except that a
+space narrower than half an advance is one the layer made up for a gap and is not kept,
+and a gap of 1.8 advances or more between two characters with nothing between them is
+spaces. Blank lines are kept. The block is never joined with a paragraph above or below
+and its inline maths is not looked for. The assembler writes `<pre><code>` with the text
+escaped and the CSS added only when a document has code; a block with a line over 36
+characters is a tab stop named "Program code" (axe `scrollable-region-focusable`, as
+equations are). A box drawn round one line of code is its frame, not a figure
+(`_absorb_labels`). The notice `code_block` (review "none") is still given, now saying the
+code keeps its line breaks and indentation but not its highlighting.
 
-- `code_block`: a paragraph or list item with at least 12 glyphs, 80 % of them in a
-  monospaced font (MuPDF's flag, or a name such as Courier, cmtt, Consolas). Its text is
-  kept, but not its line breaks and indentation, which decide what belongs to a Python
-  loop's body.
-- `footnote`: a paragraph or list item in the bottom 40 % of the page, in a smaller font
-  than the body, that starts with a digit, `*`, a dagger or `§` printed raised in the
-  text above it on the same page. It is kept where it falls, not linked to its mark.
+**Footnotes.** A footnote (the notice `footnote`) is still found as before; since T2-16
+its mark in the text above it also links to it: the mark is found again in the element's
+text by the ten characters printed before it, and a mark that cannot be found exactly once
+gets no link (`_footnote_links`; an internal `Link` made by layout, which the text pass
+keeps and which wins over a PDF link on the same text).
+
+**Contents pages.** A page with at least two lines that end in dot leaders (five dots, or
+an ellipsis counting for three) is a contents page (`_contents_rows`). Each such line is a
+list item of its own with its title only: the leaders go, and so does the page number (at
+the end of the line, or a line of its own at the right edge on the same baseline); a line
+with no leaders whose number stands at that right edge is an entry too (a chapter line in
+bold). Items nest by indent (`list_level`). The page numbers are the printed book's, which
+nothing in the converted file has. An entry links to the one heading later in the document
+whose title is the same once section numbers are left out (`_contents_links`); when the
+PDF's own links already say where it goes, the text pass keeps those. Before, the
+chapter lines became headings with their numbers as stray paragraphs, and the section
+lines paragraphs full of dots (`tests/fixtures/layout/latex/tables.pdf`).
+
+### Tagged PDFs (T2-18, `pipeline/tagged.py`)
+
+A PDF exported from Word or PowerPoint with tags carries a structure tree. Read once after
+layout (`read`, MuPDF's structured text for the headings, the structure elements for the
+figures), used as proposals (`apply`):
+
+- a tagged `H1` to `H6` over a line whose text is the same (letters and digits, case
+  aside) makes it a heading even in body-size regular type (a paragraph becomes a
+  heading), with the reason `tagged heading h2`; the tag's level is the raw level
+  (`heading_levels`) and the evidence is strong (confidence 0.90, no weak-evidence note).
+  A tag over text that layout split or joined differently changes nothing;
+- a `Figure`'s `Alt`, matched to the figure by its `BBox` (or alone on the page), goes to
+  `Element.source_alt` when `check_alt` finds no error and it is not Word's own
+  "Description automatically generated". The figure step sends it to the model as context
+  ("Alt text in the PDF's own tags (may be wrong): ..."); when the model gives no usable
+  description (failed, abstained, or a description that fails an error check) the tag's
+  text is the proposal, NEEDS_REVIEW and required, with the warning `figure.source_alt` /
+  `source_alt_unchecked`. It is never written into the output unchecked.
+
+Fixture: `tests/fixtures/tagged/` (HTML exported by LibreOffice as a tagged PDF, two
+edits to look like Word's export; `make_tagged_pdf.py`). The eval documents are printed
+untagged on purpose (`eval/render.py`), so the dev-v2 numbers do not move with this.
 
 ## Hidden text and page types (`pipeline/page_type.py`, pipeline 0.4.0)
 

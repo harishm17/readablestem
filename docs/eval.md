@@ -1618,8 +1618,9 @@ the eval reads, `toolchain` and `variant`; their equations carry the LaTeX they 
 and its MathML (`latex_to_mathml`), the pictured ones the PNG as well.
 Only what has a scorer today is scored: equations (every class), headings and tables. The
 gold for prose sub- and superscripts (T2-4, T2-5) and for words hyphenated at a line end
-(T1-9) waits for the changes that need it; code blocks and glossary entries have no backlog
-item yet. Nothing here scores them.
+(T1-9) waits for the changes that need it. Code blocks and glossary entries are scored by a
+small local check, `eval/structure_check.py` ("Structure check", below), until the scorers
+of `feat/t2-scorers` replace it.
 
 **Two parts.**
 
@@ -1781,6 +1782,58 @@ letter's case flipped, the text layer left alone) they find 457 of 481 swaps and
   books.
 - Gold for the prose sub- and superscripts is the page's own markup. An OpenStax paragraph
   that writes a unit with a plain digit (`cm3`) is not in it.
+
+**Structure check** (T2-16, 2026-10-14). `uv run python -m a11y_stem.eval.structure_check
+[--out REPORT.json]` converts the four dev documents that have code or glossary gold
+(`html-code-glossary`, `latex-structure`, `word-lecture` and the OpenStax Chemistry key-terms
+page) with the offline fake client and reads the output HTML. It reads the dev part and the
+dev pages `eval pipeline --set dev-v2` printed into `.cache/eval/pages`; it never opens the
+sealed check part. Code: a gold block is *exact* when some `<pre>` holds its lines with
+their indentation (trailing spaces aside), *flat* when it does when each line's indentation
+is ignored. Glossary: *term found* when a `<dt>` holds the term, *entry right* when the
+`<dd>` after it also starts with the first 25 letters and digits of the definition (ASCII
+letters and digits only, so the maths in a term, a placeholder here, does not decide it).
+
+| Dev part, 126 glossary entries, 40 code blocks | Before (6c8bbda) | After T2-16 |
+|---|---|---|
+| code blocks written as `<pre>` | 0 | 40 |
+| code exact / flat | 0 of 40 / 0 of 40 | 40 of 40 / 40 of 40 |
+| glossary `<dl>` entries in the output | 0 | 116 |
+| glossary term found / entry right | 0 of 126 / 0 of 126 | 112 of 126 (0.889) / 109 of 126 (0.865) |
+
+Before, code was one or two flowing paragraphs per block ("def bisect(f, lo, hi, tol=1e-9):
+# f(lo) and f(hi) must have opposite signs while hi - lo > tol:") and glossary entries
+were paragraphs or, with a bold term, headings. The 14 entries not found: the ten of the
+Word fixture's unruled two-column table (a glossary set as a table the table step does not
+claim) and four OpenStax entries: "half-life (t1/2)" and "positron (...)", whose gold
+terms have their maths written out as text while the output has it as an equation, and
+"nuclide" and "radioisotope", whose term is the last line of a page and definition the first
+of the next. The 3 "entry right" misses that remain among the found terms are gold
+definitions that begin with a parenthesis of maths the fake client cannot convert. The
+code is tuned on this set, which is all authored (the dev part has no OpenStax code), so
+it shows the shapes handled, not a rate on other documents.
+
+Headings, the same set (`eval pipeline --task headings --set dev-v2 --fake`, no model
+call):
+
+| | Before | After T2-7 (sentence rule), T2-8 and the glossary entries |
+|---|---|---|
+| precision / recall / F1 | 0.892 / 0.917 / 0.904 | 0.914 / 0.919 / 0.917 |
+| predicted headings (gold 683) | 702 | 687 |
+| required decisions (per PDF page) | 34 (0.101) | 59 (0.175) |
+| optional notes | 163 | 124 |
+| flag precision (required decisions with a wrong heading in them) | 0.118 (4 of 34) | 0.305 (18 of 59) |
+| flag recall (wrong headings that were in a required decision) | 0.114 (16 of 140) | 0.236 (29 of 123) |
+| wrong headings not asked about | 124 | 94 |
+
+T2-8 accounts for two matches (two pages of OpenStax Elementary Algebra: "Practice Makes
+Perfect" no longer joins the title below it); the glossary entries for the drop from 22
+to 7 predicted headings on `html-code-glossary` (the terms are no longer headings) and
+2 on the Word lecture; the sentence rule for 26 of the 59 decisions. On the original
+development set (`data/gold`, 3 sections of Physics) F1 is unchanged, 0.9344 (precision
+0.877, recall 1.000, level accuracy 0.992) and the 9 group decisions are unchanged. Whether
+repeated-label groups should stay decisions was measured in four variants on both sets:
+docs/layout.md "Review tiers" has the table and the choice (one decision per group).
 
 ## What the numbers do not show
 

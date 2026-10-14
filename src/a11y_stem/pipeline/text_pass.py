@@ -825,7 +825,8 @@ def annotate(
     for element in elements:
         if element.kind not in LINK_KINDS or not element.text:
             continue
-        own = _tidy_links(element.text, found.links.get(element.id, []))
+        # Links layout made (a footnote's mark to the footnote) come first and win overlaps.
+        own = _tidy_links(element.text, [*element.links, *found.links.get(element.id, [])])
         if element.kind in RUNNING_KINDS:
             own = widen_internal(element.text, own)
         for link in own:

@@ -473,6 +473,17 @@ class Element(BaseModel):
     regular_letters: str | None = None
     # Tables: the grid layout built from the PDF's own words and lines (source "local").
     table: TableGrid | None = None
+    # Paragraphs: program code. `text` keeps its line breaks and the indentation it was
+    # printed with, and is written as a code block (`<pre><code>`).
+    preformatted: bool = Field(default=False, exclude_if=lambda v: not v)
+    # Paragraphs: a glossary entry, a term and its definition in one paragraph. The term
+    # is `text[:term_end]`, the definition the rest; consecutive entries are written as one
+    # definition list. None for every other element.
+    term_end: int | None = Field(default=None, exclude_if=lambda v: v is None)
+    # Figures: the alt text the PDF's own tags give this picture (a tagged Word or
+    # PowerPoint export), cleaned. A proposal only: the figure step shows it to the model
+    # as context, and offers it to a reviewer when the model has no usable description.
+    source_alt: str | None = Field(default=None, exclude_if=lambda v: v is None)
     # Links and coloured runs in `text` (offsets into `text` as stored, markers included).
     links: list[Link] = Field(default_factory=list)
     colour_runs: list[ColourRun] = Field(default_factory=list)

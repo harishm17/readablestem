@@ -184,6 +184,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "image, so its values may be off; it is added only if you choose to after checking them.",
     ("figure.long_description", "long_description_unsure"): "Part of the figure was hard "
     "to read, so the longer description may be wrong in places; worth a look.",
+    ("figure.source_alt", "source_alt_unchecked"): "No description from the model was usable, "
+    "so this is the alt text the PDF's own tags give the picture: check it against the "
+    "image.",
     # Headings (pipeline.heading_step)
     ("heading.text", "heading.empty_text"): "This heading has no text, so it cannot be used "
     "as a heading.",
@@ -196,6 +199,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "label or running header rather than a section heading.",
     ("heading.length", "heading.very_short"): "The text is very short, which is often a label "
     '(like "Ex.") rather than a section heading.',
+    ("heading.sentence", "heading.sentence_like"): "It reads like a sentence or a lead-in "
+    "(it ends in a full stop, a question mark or a colon), not a title: decide whether it is "
+    "a heading or just bold text.",
     ("heading.list_like", "heading.list_like"): 'It starts like a numbered list item ("1.", '
     '"A)"), so it may be part of a list rather than a heading.',
     # Whole-document checks of the output HTML (pipeline.html_checks)
@@ -322,8 +328,10 @@ NOTICE_MESSAGES: dict[str, str] = {
     "hidden_text_ignored": "Some text in the PDF ({count} characters) cannot be seen when "
     "the page is shown or printed, so it was left out: if students need it, add it to your "
     "source file and upload that again.",
-    "code_block": "Program code is kept as plain text, without its layout or highlighting.",
-    "footnote": "A footnote is kept where it falls in the text, not linked to its mark.",
+    "code_block": "Program code is kept as a code block with its line breaks and "
+    "indentation, without highlighting.",
+    "footnote": "A footnote is kept where it falls in the text; its mark in the text links "
+    "to it where the mark could be found.",
     "colour_reference": "The text refers to a colour (for example, shown in red), so add "
     "a cue that does not depend on seeing the colour.",
     "colour_only": "A figure tells things apart by colour alone, so add labels or patterns "

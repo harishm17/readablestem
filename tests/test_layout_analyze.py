@@ -349,7 +349,7 @@ def test_code_option_dashes_and_markup_are_not_maths():
 
     elements = analyze(one_page(fill)).elements
     assert {e.kind for e in elements} == {Kind.PARAGRAPH}  # no equation of any kind
-    assert texts(elements)[0] == "x = 5 y = x + 1"  # the code rows stay text
+    assert texts(elements)[0] == "x = 5\ny = x + 1"  # the code rows stay text, one per line
     prose = " ".join(texts(elements)[1:])
     assert "Run the tool with \u2212v for verbose output and \u2212q to stop." in prose
     assert "The element <a><b/></a> nests b inside a for this example." in prose
