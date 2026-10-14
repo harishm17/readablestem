@@ -25,7 +25,19 @@ from a11y_stem.proof.systems_stage import A11Y, Scored
 from a11y_stem.proof.systems_tables import FAMILY_A, METRICS
 
 TITLE = "Comparison with the chatbot recipe"
-PRIMARY_ARM = "chatbot-sol-purdue"
+PRIMARY_ARM = "chatbot-sol-purdue"  # the OpenAI recording's; `primary_arm` finds the recording's
+
+
+def primary_arm(arms) -> str | None:
+    """The primary chatbot arm among `arms` (ids), whichever provider it ran on."""
+    return next((a for a in chatbot.PRIMARY_IDS if a in arms), None)
+
+
+def arms_in(scored: Scored) -> list[chatbot.ChatArm]:
+    """The chatbot arms the bundle holds, in the order of spending."""
+    every = (*chatbot.ARMS, *chatbot.CLAUDE_ARMS)
+    return [a for a in every if a.id in scored.arms]
+
 
 EQUATION_KEYS = ["e2e", "e2e_clean", "unflagged", "matched_exact", "recall", "precision"]
 HEADING_KEYS = ["h_f1", "h_precision", "h_recall", "h_level"]
@@ -165,8 +177,8 @@ def arm_block(
             cols,
             n_boot,
             note="Over the figures with an OpenStax alt text. Agreement with a model judge "
-            "(gpt-6.1-sol) that sees the image, the candidate, the OpenStax alt and the "
-            "caption, never which system wrote the candidate; not accuracy, and not "
+            f"({ctx.settings.main_model}) that sees the image, the candidate, the OpenStax alt "
+            "and the caption, never which system wrote the candidate; not accuracy, and not "
             "calibrated against human labels in this run. A figure with no description is a "
             "fail. Judge cost is reported apart.",
         ),
@@ -198,6 +210,76 @@ def arm_block(
     return blocks
 
 
+_WORDS = {1: "one", 2: "two", 3: "three"}
+
+
+def _count(n: int) -> str:
+    return _WORDS.get(n, str(n))
+
+
+def family(scored: Scored) -> tuple[chatbot.ChatArm, ...]:
+    """The arms that belong with the arms the recording holds: Claude's when it holds any
+    of those, else the OpenAI ones."""
+    claude = any(a.id in scored.arms for a in chatbot.CLAUDE_ARMS)
+    return chatbot.CLAUDE_ARMS if claude else chatbot.ARMS
+
+
+def send_text(scored: Scored) -> str:
+    """How the arms send the PDF (the same for both providers up to the API's own words)."""
+    if family(scored) is chatbot.CLAUDE_ARMS:
+        return (
+            "Each arm sends the PDF as a document block and a 150 dpi image of every page, "
+            "then the prompt; no system prompt, no tools, the model's default reasoning "
+            "effort, at most 64,000 output tokens, streamed (`proof.chatbot`)."
+        )
+    return (
+        "Each arm sends the PDF as a file and a 150 dpi image of every page, then the "
+        "prompt; no system instructions, no tools, `store=False`, default reasoning "
+        "effort, at most 64,000 output tokens (`proof.chatbot`)."
+    )
+
+
+def arms_text(ctx: StageContext, scored: Scored) -> str:
+    if family(scored) is chatbot.CLAUDE_ARMS:
+        made = {a.id: scored.arms[a.id].expected_runs for a in arms_in(scored)}
+        parts = []
+        for arm in arms_in(scored):
+            runs = made[arm.id]
+            what = (
+                "the primary arm"
+                if arm.role == "primary"
+                else "the same Purdue prompt on the cheaper model"
+            )
+            parts.append(
+                f"`{arm.id}` is {what} ({arm.model}, {_count(runs)} run{'s' if runs > 1 else ''})"
+            )
+        return (
+            "Arms: "
+            + "; ".join(parts)
+            + ". The cheaper arm is descriptive. The registration's expert-prompt arm is not "
+            "run on Claude (Addendum 6)."
+        )
+    return (
+        "Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); "
+        "`chatbot-sol-expert` is a longer, more careful prompt written for this project "
+        "(one run; the text is `src/a11y_stem/proof/chat_prompts.json`) "
+        "so that the comparison is not only against the weakest prompt an instructor "
+        "might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper "
+        "gpt-6-luna (two runs). The last two are descriptive."
+    )
+
+
+def pooled_note(ctx: StageContext, scored: Scored, primary: str) -> str:
+    runs = scored.arms[primary].expected_runs
+    own = ctx.pset.repeats.get("document", 1)
+    chat = f"The chatbot's {_count(runs)} run{'s are' if runs > 1 else ' is'} pooled; "
+    if runs == own:
+        doc = f"a11y-stem's document task also has {_count(own)} run{'s' if own > 1 else ''}"
+    else:
+        doc = f"a11y-stem's document task has {_count(own)} run{'s' if own > 1 else ''}"
+    return chat + doc + ", and its headings task one. "
+
+
 class ChatbotStage:
     name = "chatbot_comparison"
     title = TITLE
@@ -210,7 +292,8 @@ class ChatbotStage:
 
     def run(self, ctx: StageContext) -> StageResult:
         scored = systems_stage.get_scored(ctx)
-        names = [a.id for a in chatbot.ARMS if a.id in scored.arms]
+        names = [a.id for a in arms_in(scored)]
+        primary = primary_arm(scored.arms)
         if not names:
             return StageResult(
                 "not_wired",
@@ -229,22 +312,15 @@ class ChatbotStage:
             "last modified 2026-07-28, read 2026-10-09), verbatim, and quoted as the input "
             "it is, not as a claim this project makes:",
             "<!-- quote -->\n> " + chatbot.PROMPTS["purdue"] + "\n<!-- /quote -->",
-            "Each arm sends the PDF as a file and a 150 dpi image of every page, then the "
-            "prompt; no system instructions, no tools, `store=False`, default reasoning "
-            "effort, at most 64,000 output tokens (`proof.chatbot`). The HTML in the reply is "
+            send_text(scored) + " The HTML in the reply is "
             "scored as it comes: a reply that was cut off or empty is a failure of the "
             "section, not asked again. Equations are read from the reply's MathJax TeX or "
             "MathML, converted the way a11y-stem converts its own model's LaTeX, and aligned "
             "to the gold equations by the document task's code, so the same scorer reads "
             "both systems.",
-            "Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); "
-            "`chatbot-sol-expert` is a longer, more careful prompt written for this project "
-            "(one run; the text is `src/a11y_stem/proof/chat_prompts.json`) "
-            "so that the comparison is not only against the weakest prompt an instructor "
-            "might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper "
-            "gpt-6-luna (two runs). The last two are descriptive.",
+            arms_text(ctx, scored),
         ]
-        missing = [a.id for a in chatbot.ARMS if a.id not in scored.arms]
+        missing = [a.id for a in family(scored) if a.id not in scored.arms]
         if missing:
             intro.append(
                 "**Not run in this recording:** "
@@ -252,16 +328,16 @@ class ChatbotStage:
                 + " (see the status table)."
             )
         blocks += intro
-        if PRIMARY_ARM in scored.arms:
+        if primary is not None:
             k = len(FAMILY_A)
             comparisons = [
                 systems_tables.compare(
                     key,
                     label,
                     scored.a11y_vectors,
-                    scored.vectors[PRIMARY_ARM],
+                    scored.vectors[primary],
                     a_name=A11Y,
-                    other=PRIMARY_ARM,
+                    other=primary,
                     k=k,
                     n_boot=n_boot,
                 )
@@ -269,7 +345,8 @@ class ChatbotStage:
             ]
             blocks.append(
                 systems_tables.claims_table(
-                    "Family A: a11y-stem against the Purdue-prompt chatbot on gpt-6.1-sol",
+                    "Family A: a11y-stem against the Purdue-prompt chatbot on "
+                    + chatbot.ARM_BY_ID[primary].model,
                     comparisons,
                     a_name=A11Y,
                     k=k,
@@ -278,8 +355,8 @@ class ChatbotStage:
                     "when the 99% interval (Bonferroni, k = 5) of the difference excludes 0; "
                     'otherwise "no difference this set can detect". With 15 sections '
                     "a percentile bootstrap is approximate and tends to be a little narrow. "
-                    "The chatbot's two runs are pooled; a11y-stem's document task also has "
-                    "two runs, and its headings task one. Every number here is a rate over "
+                    + pooled_note(ctx, scored, primary)
+                    + "Every number here is a rate over "
                     "all items, and a section that failed counts as a failure.",
                 )
             )

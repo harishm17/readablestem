@@ -102,9 +102,9 @@ The recording stores the provider and the models in its code identity (`model_pr
 the effort settings, `main_model`, `cheap_model`) and in each report (`client`, `models`); a
 replay of it needs no flag and takes the provider and models from the recording, whatever
 `MODEL_PROVIDER` says. A recording made before the provider existed names none and is an
-OpenAI recording. The second automated check is not part of a Claude run. The chatbot arms
-and the figure judge of the registered comparison stay on OpenAI (`--add-systems chatbot`
-needs `OPENAI_API_KEY` whatever the provider).
+OpenAI recording. The second automated check is not part of a Claude run. The chatbot arms follow
+the provider too (`--add-systems chatbot --provider anthropic`, "Recording the other systems"
+below); without `--provider` they are the OpenAI arms and need `OPENAI_API_KEY`.
 
 The default set (`smoke-physics-2`, three sections) recorded $0.28. A cap below that stops
 the run before it finishes and writes nothing, so use `MAX_USD=0.50` or more; there is no
@@ -234,7 +234,13 @@ a11y-stem proof --set heldout-2026-10 --add-systems chatbot --max-usd 10
 a11y-stem proof --set heldout-2026-10 --add-systems parsers
 ```
 
-`--arms` limits them. The chatbot recipe repeats `niche/chatbot-runs` of the research
+`--arms` limits them, and `--chat-runs N` makes N runs of each arm instead of the arm's own
+number (the recorded run says how many were made, and the report reads that). The arms can be
+added in steps, each with its own cap (an arm already in the recorded run is never run again):
+`--provider anthropic` records the Purdue prompt on `claude-opus-5-5` (`chatbot-opus-purdue`,
+the primary arm) and on `claude-haiku-5-5` (`chatbot-haiku-purdue`), and judges the figure
+descriptions with `claude-opus-5-5` (no refusal fallback), through the Messages API with the
+same PDF, page images and prompt (`proof/chatbot.py`). The chatbot recipe repeats `niche/chatbot-runs` of the research
 (`proof/chatbot.py`: the PDF as a file and a 150 dpi image of every page, one prompt, no
 system instructions, `store=False`, at most 64,000 output tokens). A reply that was cut off
 or empty is a failure of the section and is not asked again. The parsers run in

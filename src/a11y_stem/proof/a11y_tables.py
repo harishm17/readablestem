@@ -454,7 +454,7 @@ FIGURE_SPECS = [
 ]
 
 
-def figures_section(arm: ArmResults, n_boot: int) -> Section:
+def figures_section(arm: ArmResults, n_boot: int, judge_model: str = "gpt-6.1-sol") -> Section:
     got = collect(arm.runs("figures"), figure_counts, lambda i: section_of_item_id(i["id"]))
     metrics = pe.figure_metrics(arm.items("figures"))
     table = metric_table(
@@ -462,7 +462,7 @@ def figures_section(arm: ArmResults, n_boot: int) -> Section:
         FIGURE_SPECS,
         got,
         n_boot=n_boot,
-        note="The judge is a model (gpt-6.1-sol) that sees the image, the candidate, the "
+        note=f"The judge is a model ({judge_model}) that sees the image, the candidate, the "
         "OpenStax alt text and the caption, never which system wrote the candidate. Its "
         "pass rate is agreement with that judge, not accuracy; it is not yet calibrated "
         "against human labels. A figure with no proposal counts as a fail. Judge cost is "

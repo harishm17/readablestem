@@ -609,3 +609,79 @@ def test_a_primary_chatbot_arm_the_cap_cannot_hold_adds_nothing(recorded, tmp_pa
             chat_client=object(),
         )
     assert not (bundle_dir / "systems").exists()
+
+
+def test_claude_arms_are_added_one_after_the_other_with_the_runs_that_were_made(
+    recorded, tmp_path, monkeypatch
+):
+    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from a11y_stem.eval import render
+    from a11y_stem.proof import chatbot
+
+    asked = []
+
+    def record(pdfs, out, *, arms, max_usd, client, runs=None, say=print, **_kw):
+        asked.append(([a.id for a in arms], runs))
+        return _fake_chat_records([a.id for a in arms])(
+            pdfs, out, arms=arms, max_usd=max_usd, client=client
+        )
+
+    monkeypatch.setattr(chatbot, "record_arms", record)
+    monkeypatch.setattr(chatbot, "make_client", lambda provider="openai": object())
+    monkeypatch.setattr(render.ImageCache, "png", lambda self, url: b"not a picture")
+    bundle_dir = copy_bundle(recorded, tmp_path)
+    budget = JobBudget(InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=100)
+    settings = runner.proof_settings("anthropic")
+    common = {
+        "bundle_dir": bundle_dir,
+        "work_dir": tmp_path / "w",
+        "provider": "anthropic",
+        "probe": lambda: None,
+        "date": DATE,
+    }
+    first = engine.add_systems(
+        options(recorded, max_usd=3.0, chat_runs=1, **common),
+        "chatbot",
+        say=lambda _m: None,
+        arms=["chatbot-opus-purdue"],
+        judge_client=fake_client(settings, budget),
+    )
+    assert asked == [(["chatbot-opus-purdue"], 1)]
+    assert first["systems_runs"] == {"chatbot-opus-purdue": 1}
+    assert first["systems_judge"] == {"provider": "anthropic", "model": "claude-opus-5-5"}
+    second = engine.add_systems(
+        options(recorded, max_usd=2.0, **common),
+        "chatbot",
+        say=lambda _m: None,
+        arms=["chatbot-haiku-purdue"],
+        judge_client=fake_client(settings, budget),
+    )
+    assert "systems_runs" not in second
+    bundle = Bundle.open(bundle_dir)
+    assert bundle.verify() == []
+    assert sorted(p.name for p in bundle.systems_dir.iterdir()) == [
+        "chatbot-haiku-purdue",
+        "chatbot-opus-purdue",
+    ]
+    assert bundle.manifest["systems_runs"] == {"chatbot-opus-purdue": 1}
+    assert bundle.manifest["systems_spend"]["cap_usd"] == 5.0  # both caps, added
+    with pytest.raises(ProofError, match="already holds the chatbot arms"):
+        engine.add_systems(
+            options(recorded, max_usd=1.0, **common),
+            "chatbot",
+            say=lambda _m: None,
+            arms=["chatbot-opus-purdue"],
+        )
+
+
+def test_claude_arms_are_not_run_for_the_openai_provider(recorded, tmp_path):
+    bundle_dir = copy_bundle(recorded, tmp_path)
+    with pytest.raises(ProofError, match="run on anthropic, not on openai: pass --provider"):
+        engine.add_systems(
+            options(recorded, bundle_dir=bundle_dir, work_dir=tmp_path / "w", max_usd=3.0),
+            "chatbot",
+            say=lambda _m: None,
+            arms=["chatbot-opus-purdue"],
+            chat_client=object(),
+        )
+    assert not (bundle_dir / "systems").exists()

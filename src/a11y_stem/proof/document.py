@@ -111,7 +111,11 @@ def _status(info: DocumentInfo) -> Section:
         [
             "Models",
             f"main {models.get('main_model', NA)}, cheap {models.get('cheap_model', NA)}, "
-            f"second check {models.get('decisions_model', NA)}",
+            + (
+                "no second check"
+                if models.get("model_provider", "openai") != "openai"
+                else f"second check {models.get('decisions_model', NA)}"
+            ),
         ],
         ["Prompt versions", ", ".join(f"{k} {v}" for k, v in sorted(prompts.items())) or NA],
         ["Recorded spend", usd(b.manifest.get("spend", {}).get("total_usd"), 4)],

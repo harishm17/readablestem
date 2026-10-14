@@ -100,6 +100,23 @@ def register(stage: Stage) -> None:
 # ------------------------------------------------------------------------ a11y-stem
 
 
+def _settings_text(settings: Settings) -> str:
+    """The settings of the run in words: OpenAI's defaults, or the Claude pair."""
+    if settings.model_provider == "anthropic":
+        fallback = "on" if settings.anthropic_refusal_fallback else "off"
+        return (
+            f"Production settings with the Anthropic provider (main model {settings.main_model} "
+            f"at effort {settings.anthropic_effort_main}, cheap model {settings.cheap_model} "
+            f"at effort {settings.anthropic_effort_cheap}, the main model's server-side "
+            f"refusal fallback {fallback}, every content flag off, no second automated check: "
+            "it is OpenAI's)."
+        )
+    return (
+        "Production settings (`Settings()` defaults: main model gpt-6.1-sol, cheap "
+        "model gpt-6-luna, every content flag off, the second automated check on)."
+    )
+
+
 class A11yStage:
     name = "a11y_stem"
     title = "a11y-stem, production defaults"
@@ -122,14 +139,13 @@ class A11yStage:
         if arm.runs("headings"):
             blocks.append(a11y_tables.headings_section(arm, n_boot))
         if arm.runs("figures"):
-            blocks.append(a11y_tables.figures_section(arm, n_boot))
+            blocks.append(a11y_tables.figures_section(arm, n_boot, ctx.settings.main_model))
         blocks.append(a11y_tables.cost_section(arm, ctx.bundle.runs, ctx.settings))
         blocks.append(a11y_tables.failures_section(arm))
         intro = Section(
             "Results: a11y-stem",
             [
-                "Production settings (`Settings()` defaults: main model gpt-6.1-sol, cheap "
-                "model gpt-6-luna, every content flag off, the second automated check on). "
+                _settings_text(ctx.settings) + " "
                 "Tables are off in production, so a detected data table is kept as an image "
                 "with a required decision. Intervals: cluster bootstrap by section "
                 f"(B = {ctx.n_boot:,}, seed 0), which is approximate with this few sections "

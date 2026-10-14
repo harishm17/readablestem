@@ -98,7 +98,8 @@ class InventedStage:
             "Figure descriptions: judged as stating something the image contradicts",
             ["System", "Judge: factual error / descriptions judged", "Rate [cluster 95%]"],
             figure_rows,
-            note="Agreement with a model judge reading the image (gpt-6.1-sol), not accuracy; "
+            note="Agreement with a model judge reading the image "
+            f"({ctx.settings.main_model}), not accuracy; "
             "the judge is not calibrated against human labels in this run. A figure with no "
             "description is not judged here (it is a fail in the figure tables).",
         )

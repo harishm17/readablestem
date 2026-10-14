@@ -13,6 +13,9 @@
                                          PROOF.md, the OpenAI recording's report, as it is
     a11y-stem proof --add-systems chatbot --max-usd N [--bundle DIR]
                                          record the chatbot arms into a recorded run
+                                         (--provider anthropic: the Claude arms, with the
+                                         figure judge on claude-opus-5-5; --arms and
+                                         --chat-runs choose what is run)
     a11y-stem proof --add-systems parsers [--bundle DIR]
                                          record the open parsers (hours; resumable)
     a11y-stem proof --check              check the pins and the bundle's hashes, run nothing
@@ -106,6 +109,7 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             provider=args.provider,
             main_model=args.main_model,
             cheap_model=args.cheap_model,
+            chat_runs=args.chat_runs,
         )
         if args.add_systems:
             engine.add_systems(opts, args.add_systems, _say, arms=args.arms or None)
@@ -192,6 +196,13 @@ def register(sub: argparse._SubParsersAction) -> None:
         "or the open parsers into an existing recorded run (--bundle), then stop",
     )
     live.add_argument("--arms", nargs="*", help="with --add-systems: only these arms")
+    live.add_argument(
+        "--chat-runs",
+        type=_positive_int,
+        metavar="N",
+        help="with --add-systems chatbot: make N runs of each arm, not the arm's own number "
+        "(the recorded run says how many were made)",
+    )
     live.add_argument(
         "--resume",
         action="store_true",

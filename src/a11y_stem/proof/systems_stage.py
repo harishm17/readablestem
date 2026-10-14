@@ -51,7 +51,10 @@ class Scored:
     entries: dict[str, list[dict[str, Any]]]
 
 
-def _expected_runs(arm: str) -> int:
+def _expected_runs(arm: str, made: dict[str, int] | None = None) -> int:
+    """Runs of an arm: the number the recording says it made, else the arm's own."""
+    if made and arm in made:
+        return int(made[arm])
     return chatbot.ARM_BY_ID[arm].runs if arm in chatbot.ARM_BY_ID else 1
 
 
@@ -109,7 +112,7 @@ def get_scored(ctx: StageContext) -> Scored:
         report = ArmReport(
             name=arm_id,
             kind="chatbot" if arm_id.startswith("chatbot-") else "parser",
-            expected_runs=_expected_runs(arm_id),
+            expected_runs=_expected_runs(arm_id, ctx.bundle.manifest.get("systems_runs")),
         )
         arm_entries: list[dict[str, Any]] = []
         for section in order:

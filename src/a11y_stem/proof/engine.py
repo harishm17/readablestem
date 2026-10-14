@@ -72,6 +72,9 @@ class ProofOptions:
     provider: Provider = "openai"
     main_model: str | None = None
     cheap_model: str | None = None
+    # With `--add-systems chatbot`: make this many runs of each arm instead of the arm's
+    # own number (None: the arm's own). The bundle records the number that was made.
+    chat_runs: int | None = None
 
 
 @dataclass
@@ -450,26 +453,39 @@ def add_systems(
     if kind == "chatbot":
         if opts.max_usd is None:
             raise ProofError("--max-usd is required to record the chatbot arms")
-        if bundle.path("systems").is_dir() and any(
-            a.startswith("chatbot-") for a in (p.name for p in bundle.path("systems").iterdir())
-        ):
+        selected = (
+            [chatbot.ARM_BY_ID[a] for a in arms] if arms else list(chatbot.arms_for(opts.provider))
+        )
+        held = (
+            {p.name for p in bundle.path("systems").iterdir()}
+            if bundle.path("systems").is_dir()
+            else set()
+        )
+        if any(a.id in held for a in selected):
             raise ProofError("this recorded run already holds the chatbot arms")
+        chat_provider = {a.provider for a in selected}
+        if chat_provider != {opts.provider}:
+            raise ProofError(
+                f"these arms run on {', '.join(sorted(chat_provider))}, not on {opts.provider}: "
+                "pass --provider"
+            )
         if chat_client is None:
             say("checking the model API with one small request")
-            runner.probe_api(runner.proof_settings(), send=opts.probe)
+            runner.probe_api(runner.proof_settings(opts.provider), send=opts.probe)
         gold_dir = resolve_gold(pset, opts, bundle.gold_dir, work, say)
-        selected = [chatbot.ARM_BY_ID[a] for a in arms] if arms else list(chatbot.ARMS)
         summary = chatbot.record_arms(
             pdfs,
             out,
             arms=selected,
             max_usd=opts.max_usd,
-            client=chat_client or chatbot.make_client(),
+            client=chat_client or chatbot.make_client(opts.provider),
+            runs=opts.chat_runs,
             say=say,
         )
         refused = summary["refused_by_cap"]
         not_run = sorted({r.split("/")[0] for r in refused})
-        if chatbot.ARMS[0].id in not_run:
+        primary = next((a.id for a in selected if a.role == "primary"), None)
+        if primary in not_run:
             raise ProofError(
                 f"the cap ${opts.max_usd:.2f} did not hold the primary arm "
                 f"({len(refused)} jobs refused, first: {refused[0]}); nothing was added to the "
@@ -480,30 +496,55 @@ def add_systems(
             say(f"not run, the cap did not hold them: {', '.join(not_run)}")
         # Only arms that finished whole go into the bundle; a half-run arm is never scored.
         ready = work / "systems-out" / "chatbot-ready"
-        for arm_dir in sorted(p for p in out.iterdir() if p.is_dir() and p.name not in not_run):
-            shutil.copytree(arm_dir, ready / arm_dir.name, dirs_exist_ok=True)
+        shutil.rmtree(ready, ignore_errors=True)  # an earlier step's arms are in the bundle
+        for arm_id in sorted(a.id for a in selected if a.id not in not_run):
+            if (out / arm_id).is_dir():
+                shutil.copytree(out / arm_id, ready / arm_id, dirs_exist_ok=True)
         out = ready
-        remaining = max(0.0, opts.max_usd - summary["spent_usd"])
-        settings = runner.proof_settings()
+        spent = chatbot.recorded_cost(out, [a.id for a in selected if a.id not in not_run])
+        remaining = max(0.0, opts.max_usd - spent)
         records = goldinfo.load_records(gold_dir)
         golds = systems.section_golds(records, [s.id for s in pset.sections])
         from a11y_stem.eval import render
-        from a11y_stem.models.openai_client import OpenAIVisionClient
 
         images = render.ImageCache(work / "eval-cache" / "images")
         budget = JobBudget(InMemorySpendGuard(cap_usd=remaining), max_usd=remaining, max_calls=2000)
-        client = judge_client or OpenAIVisionClient(settings, budget)
+        if opts.provider == "openai":
+            from a11y_stem.models.openai_client import OpenAIVisionClient
+
+            settings = runner.proof_settings()
+            client = judge_client or OpenAIVisionClient(settings, budget)
+            judge_info = {"provider": "openai", "model": settings.main_model}
+        else:
+            # The figure judge is claude-opus-5-5 with no refusal fallback, whichever model
+            # the arms ran on (`eval.judge.make_judge`).
+            from a11y_stem.eval import judge as judge_mod
+
+            base = runner.proof_settings(opts.provider)
+            if judge_client is None:
+                made = judge_mod.make_judge(base, budget, run_client=None, provider="anthropic")
+                client, settings, judge_info = made.client, made.settings, made.describe()
+            else:  # a test's stand-in
+                settings = judge_mod.judge_settings(base, "anthropic")
+                client = judge_client
+                judge_info = {"provider": "anthropic", "model": settings.main_model}
         loaded = systems.load_arms_dir(out)
         judge_cost = judging.judge_arms(
             loaded, golds, client=client, settings=settings, image_for=images.png, say=say
         )
         extra = {
             "systems_spend": {
-                "chatbot_usd": summary["spent_usd"],
+                "chatbot_usd": spent,
                 "judge_usd": round(judge_cost, 6),
                 "cap_usd": opts.max_usd,
             }
         }
+        if opts.provider != "openai":
+            extra["systems_judge"] = judge_info
+        if opts.chat_runs:
+            extra["systems_runs"] = {
+                a.id: min(opts.chat_runs, a.runs) for a in selected if a.id not in not_run
+            }
         if not_run:
             extra["systems_not_run"] = {arm: "the spend cap did not hold it" for arm in not_run}
     else:
@@ -521,6 +562,22 @@ def add_systems(
         if done.returncode != 0:
             raise ProofError(f"proof/parsers failed (make exit code {done.returncode})")
         extra = {"systems_parsers": "recorded"}
-    new = bundle.extend(out, "systems", extra={**extra})
+    new = bundle.extend(out, "systems", extra=_merged_extra(bundle.manifest, extra))
     say(f"added {kind} to {new.root.name}/ ({len(new.files)} files)")
     return extra
+
+
+def _merged_extra(manifest: dict[str, Any], extra: dict[str, Any]) -> dict[str, Any]:
+    """`extra` for the manifest when systems are added in more than one step (the Claude
+    arms are recorded one after the other): spends add up, per-arm notes are joined."""
+    merged = dict(extra)
+    spend, before = extra.get("systems_spend"), manifest.get("systems_spend")
+    if spend and before:
+        merged["systems_spend"] = {
+            key: round(float(spend.get(key, 0.0)) + float(before.get(key, 0.0)), 6)
+            for key in sorted({*spend, *before})
+        }
+    for key in ("systems_runs", "systems_not_run"):
+        if extra.get(key) and manifest.get(key):
+            merged[key] = {**manifest[key], **extra[key]}
+    return merged
