@@ -570,8 +570,10 @@ repaired outline would write two or more `<h1>` the assembler writes the documen
 as the only `<h1>` (the title students hear, see "One self-contained file": the one the
 instructor typed on the job page, else the PDF's title without its section number) and
 moves every heading one level down, so the slide titles are `<h2>` (capped at `<h6>`). A
-file with at most one `<h1>` is written as before. The move comes after the repair above,
-so the review screen's levels (`would_write`) are the levels before it. The "About this
+file with at most one `<h1>` is written as before. `assemble.title_shift` decides it from the
+repaired outline, for the renderer and for tests. The move comes after the repair above,
+so the review screen's levels (`would_write`, "In the document: level N") are the levels
+before it: in a slide deck its numbers are one less than the file's. The "About this
 version" title is a labelled paragraph, not a heading: the `<footer>` is named by it
 (`aria-labelledby`), so a screen reader user reaches it as a landmark, and it is not a
 section of the document's outline.

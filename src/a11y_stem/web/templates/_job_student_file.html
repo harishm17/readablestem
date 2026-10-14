@@ -13,7 +13,8 @@
         names the downloaded file. {% if job.title_override %}You chose this title. Clear
         the box to use the one from your PDF.{% else %}It comes from your PDF; change it if
         it is not what students call this document.{% endif %} If the file has no top
-        heading, the title is written as one.</p>
+        heading, or one for every slide, the title is written as the top heading and the
+        slide titles go under it.</p>
       {% if title_error %}
       <p class="error-message" id="title-error"><span class="visually-hidden">Error: </span>{{ title_error.message }}</p>
       {% endif %}

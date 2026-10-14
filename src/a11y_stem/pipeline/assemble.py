@@ -587,6 +587,24 @@ def outline_before(elements: list[Element], fixes: list[Fix], element_id: str) -
     return outline
 
 
+def title_shift(elements: list[Element], fixes: list[Fix]) -> int:
+    """How many levels `render_html` moves every heading down (T3-13): 1 when the
+    repaired outline has two or more top-level headings (a slide deck has one per slide),
+    so the document's title can be the one `<h1>` and the slide titles are `<h2>`; else 0.
+    Read from the same headings, in the same order, as the renderer writes them."""
+    first: dict[str, Fix] = {}
+    for fix in fixes:
+        first.setdefault(fix.element_id, fix)
+    outline = Outline()
+    tops = 0
+    for element in sorted(elements, key=lambda e: e.order):
+        if element.kind is Kind.HEADING:
+            level, _ = heading_parts(element, first.get(element.id))
+            if level is not None:
+                tops += outline.write(level) == 1
+    return 1 if tops >= 2 else 0
+
+
 # --------------------------------------------------------------------------- renderer
 
 
@@ -1165,9 +1183,6 @@ _FIXED_ALT_IMG = re.compile(
 _DATA_TABLE_CAPTION = re.compile(r'(<caption id="[^"<>]*-data-caption")')
 
 
-_H1 = re.compile(r"<h1[\s>]")
-
-
 def _authored_in_english(part: str, lang: str) -> str:
     """`part` with `lang="en"` on the tool's own elements when the document is not in
     English; unchanged (byte for byte) when it is."""
@@ -1218,24 +1233,16 @@ def render_html(
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
 
-    def render_body(demote: int) -> tuple[_Renderer, list[str]]:
-        made = _Renderer(
-            fixes=first_fix,
-            crops=crops,
-            equations=equations,
-            math_alttext=math_alttext,
-            demote=demote,
-        )
-        made.placed = _placed_equations(ordered, made, set(equations))
-        return made, made.render_all(ordered)
-
-    renderer, body = render_body(0)
-    # Several top-level headings (a slide deck: one per slide) are not an outline: the
-    # document's title becomes the one h1 and every heading moves one level down, so the
-    # slide titles are h2 (T3-13). Rendered again so ids and styles are claimed afresh.
-    several_tops = sum(len(_H1.findall(part)) for part in body) >= 2
-    if several_tops:
-        renderer, body = render_body(1)
+    shift = title_shift(ordered, fixes)
+    renderer = _Renderer(
+        fixes=first_fix,
+        crops=crops,
+        equations=equations,
+        math_alttext=math_alttext,
+        demote=shift,
+    )
+    renderer.placed = _placed_equations(ordered, renderer, set(equations))
+    body = renderer.render_all(ordered)
     kept_pages = [
         e.page
         for e in ordered
@@ -1259,7 +1266,7 @@ def render_html(
         if level is not None
     ]
     page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
-    if (title_set or several_tops) and not any("<h1" in part for part in body):
+    if (title_set or shift) and not any("<h1" in part for part in body):
         body = [f"<h1>{_escape(page_title)}</h1>", *body]
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))

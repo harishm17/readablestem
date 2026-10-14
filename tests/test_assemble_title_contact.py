@@ -133,6 +133,29 @@ def test_levels_stay_inside_h6_when_a_slide_deck_is_moved_down():
     assert max(levels) == 6 and levels[0] == 1
 
 
+def test_no_outline_of_up_to_four_headings_ends_with_two_h1s():
+    """T3-13, exhaustively: a file has at most one top-level heading, and the move down
+    (`title_shift`) is made exactly when the repaired outline would have had two."""
+    import itertools
+
+    from a11y_stem.core.types import Status
+
+    for n in range(1, 5):
+        for spec in itertools.product((None, 1, 2, 3), repeat=n):
+            pairs = [_heading(f"p1-e{i}", i, f"H{i}", level or 2) for i, level in enumerate(spec)]
+            fixes = [
+                f.model_copy(update={"status": Status.REJECTED}) if level is None else f
+                for (_, f), level in zip(pairs, spec, strict=True)
+            ]
+            elements = [e for e, _ in pairs]
+            html = assemble.render_html(
+                title="T", lang="en", elements=elements, fixes=fixes, crops={}
+            )
+            assert html.count("<h1") <= 1, spec
+            moved = assemble.title_shift(elements, fixes)
+            assert (html.count("<h1") == 1 and moved == 1) or moved == 0, spec
+
+
 def test_a_chosen_title_is_escaped():
     html = render('Forces <script>x</script> & "more"', title_set=True)
     assert "<script>x" not in html
