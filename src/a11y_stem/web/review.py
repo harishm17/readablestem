@@ -1403,7 +1403,12 @@ def undo_last(
 
 
 def rerender_html(
-    result: DocumentResult, crops: dict[str, bytes], *, checked_on: date | None = None
+    result: DocumentResult,
+    crops: dict[str, bytes],
+    *,
+    checked_on: date | None = None,
+    title_override: str | None = None,
+    contact: str | None = None,
 ) -> str:
     """The output HTML after a review decision, from the same assembler the pipeline uses.
 
@@ -1416,7 +1421,9 @@ def rerender_html(
     from a11y_stem.pipeline import assemble, html_checks
 
     html = assemble.render_html(
-        title=result.title,
+        title=title_override or result.title,
+        title_set=bool(title_override),
+        contact=contact,
         lang=result.lang,
         elements=result.elements,
         fixes=result.fixes,
@@ -1426,3 +1433,17 @@ def rerender_html(
     )
     result.html_checks = html_checks.static_checks(html)
     return html
+
+
+def rerender_job_html(
+    job: Job, result: DocumentResult, crops: dict[str, bytes], *, checked_on: date | None = None
+) -> str:
+    """`rerender_html` with the job's own choices for the student file: the title the
+    instructor set and the contact line (T1-7, T1-17)."""
+    return rerender_html(
+        result,
+        crops,
+        checked_on=checked_on,
+        title_override=job.title_override,
+        contact=job.contact_line,
+    )

@@ -699,3 +699,15 @@ input[type="text"].input-short { width: 8rem; }
     color: var(--muted);
   }
 }
+
+/* ===================================================================== tier 1 web
+   The job page's one-line settings and the student-file fields (T1-7, T1-11, T1-17).
+   No new colours. */
+.doc-file { color: var(--muted); margin: -0.5rem 0 1rem; overflow-wrap: anywhere; }
+.setting-line { display: flex; flex-wrap: wrap; gap: 0.25rem 1rem; align-items: baseline; }
+.setting-line p { margin: 0; }
+.setting-line details[open] { flex-basis: 100%; }
+.inline-details > summary { display: inline-block; padding: 0.15rem 0; cursor: pointer; text-decoration: underline; color: var(--link, inherit); }
+.inline-details > form { margin-top: 0.75rem; }
+.student-setting { margin: 0 0 1.25rem; max-width: 40rem; }
+.student-setting input[type="text"] { width: 100%; max-width: 40rem; }

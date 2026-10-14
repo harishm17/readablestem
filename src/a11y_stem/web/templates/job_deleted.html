@@ -7,11 +7,12 @@
 {% block content %}
 <h1>This document has been deleted</h1>
 {% if kept %}
-<p>It was deleted automatically {{ kept }} after upload, as promised when you uploaded it.</p>
+<p>It was kept for {{ kept }} from upload and then deleted automatically, as promised when
+  you uploaded it.</p>
 {% else %}
-<p>Documents are deleted automatically {{ retention_hours }} hours after upload
-  ({{ opt_in_days }} days if you chose to keep them longer), or earlier if you delete them
-  yourself.</p>
+<p>Documents are deleted automatically {{ retention_hours }} hours after you last worked on
+  them (7 days if you chose to keep them, {{ opt_in_days }} if you also let the developer
+  look), or earlier if you delete them yourself.</p>
 {% endif %}
 <p>Files you downloaded are not affected. To start again, upload the PDF again.</p>
 <ul class="actions">

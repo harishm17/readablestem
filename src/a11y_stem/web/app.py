@@ -48,7 +48,17 @@ from a11y_stem.web.deps import (
 )
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.return_to import decision_link, remember_return, signed_out_page
-from a11y_stem.web.routes import admin, courses, cron, feedback, jobs, pages, review, split
+from a11y_stem.web.routes import (
+    admin,
+    courses,
+    cron,
+    feedback,
+    job_settings,
+    jobs,
+    pages,
+    review,
+    split,
+)
 from a11y_stem.web.security import (
     RequestSizeLimitMiddleware,
     SafeErrorMiddleware,
@@ -337,7 +347,7 @@ def create_app(
     app.add_exception_handler(RequestValidationError, _on_validation_error)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
-    for module in (pages, jobs, split, review, feedback, admin, cron, courses):
+    for module in (pages, jobs, job_settings, split, review, feedback, admin, cron, courses):
         app.include_router(module.router)
     app.include_router(auth_router)
     return app

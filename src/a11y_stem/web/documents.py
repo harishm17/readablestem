@@ -33,6 +33,7 @@ from sqlalchemy.orm import Session
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import Fix
+from a11y_stem.web import titles
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Job, JobStatus
 from a11y_stem.web.outcome import job_outcome
@@ -135,11 +136,10 @@ class DocumentList:
         return f"My documents ({total - self.unfinished} of {total} finished)"
 
 
-def display_title(title: object, filename: str) -> str:
-    """The stored result's title, else the file name."""
-    if isinstance(title, str) and title.strip() and title.strip() != FALLBACK_TITLE:
-        return " ".join(title.split())
-    return filename
+def display_title(title: object, filename: str, override: str | None = None) -> str:
+    """The title the instructor chose, else the stored result's title without its section
+    number (T1-7), else the file name."""
+    return titles.effective_title(override, title, filename)
 
 
 def _fixes(fixes: object) -> list[Fix]:
@@ -196,12 +196,17 @@ def documents(
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
     done = [job.id for job in jobs if job.status == JobStatus.DONE]
-    stored: dict[str, tuple[Any, Any]] = {}
+    stored: dict[str, tuple[Any, ...]] = {}
     if done:
         query = select(
-            Job.id, Job.result_json["title"].as_string(), Job.result_json["fixes"]
+            Job.id,
+            Job.result_json["title"].as_string(),
+            Job.result_json["fixes"],
+            Job.title_override,
         ).where(Job.id.in_(done))
-        stored = {job_id: (title, fixes) for job_id, title, fixes in session.execute(query)}
+        stored = {
+            job_id: (title, fixes, own) for job_id, title, fixes, own in session.execute(query)
+        }
     groups = [
         Group("decide", "Needs your decisions"),
         Group("ready", "Ready to download"),
@@ -209,10 +214,10 @@ def documents(
     ]
     by_key = {g.key: g for g in groups}
     for job in jobs:
-        title, fixes = stored.get(job.id, (None, None))
+        title, fixes, own = stored.get(job.id, (None, None, None))
         row = DocumentRow(
             id=job.id,
-            title=display_title(title, job.filename),
+            title=display_title(title, job.filename, own),
             filename=job.filename,
             pages=job.page_count,
             pages_done=job.pages_done,

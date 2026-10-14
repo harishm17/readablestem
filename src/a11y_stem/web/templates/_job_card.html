@@ -25,7 +25,7 @@
         <tr>
           <th scope="row">… {{ row.question }}?</th>
           <td data-label="In your PDF">{{ row.pdf }}</td>
-          <td data-label="In the HTML">{{ row.html }}</td>
+          <td data-label="In the HTML">{{ row.html }}{% if row.href %} <a href="{{ row.href }}">{{ row.href_text }}</a>{% endif %}</td>
         </tr>
         {% endfor %}
       </tbody>

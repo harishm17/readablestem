@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
-from a11y_stem.web import job_page
+from a11y_stem.web import job_page, titles
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User
 from a11y_stem.web.messages import Explained, explain_check, severity_label
@@ -156,6 +156,13 @@ class JobView:
     progress: dict[str, Any] | None = None
     # The job page's data from the result (`job_page.PageData`), when asked for.
     page: job_page.PageData | None = None
+    # What the instructor chose for the student file (T1-7, T1-17) and how long the job is
+    # kept (T1-8). `title` is what this page calls the document: the instructor's title,
+    # else the PDF's without its section number, else the file name.
+    title: str = ""
+    title_override: str | None = None
+    contact_line: str | None = None
+    retention_mode: str = "day"
 
     @property
     def finished(self) -> bool:
@@ -403,4 +410,12 @@ def job_view(
         wait_s=wait_s,
         progress=job.progress_json if job.status == JobStatus.RUNNING else None,
         page=page,
+        title=titles.effective_title(
+            job.title_override,
+            (job.result_json or {}).get("title") if job.status == JobStatus.DONE else None,
+            job.filename,
+        ),
+        title_override=job.title_override,
+        contact_line=job.contact_line,
+        retention_mode=job.retention_mode,
     )

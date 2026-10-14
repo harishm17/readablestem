@@ -57,18 +57,26 @@
              aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
     </div>
     {% include "_course_choice.html" %}
-    <div class="field checkbox-field">
-      <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint">
-      <label for="keep">Keep my document and results for {{ opt_in_days }} days to help improve the tool</label>
-      {# TODO(Harish): UX review MF10 part 1 asks for two separate choices ("keep my work
-         7 days, only you can see it" and "also let the developer look, 30 days"), with
-         the default yours to decide; the privacy notice changes with it. #}
-      <p class="hint" id="keep-hint">Off unless you tick it. If you tick it, your document
-        and results are kept for {{ opt_in_days }} days and Harish, who runs this beta, may
-        look at the results to find and fix mistakes in the tool. If you leave it unticked,
-        your document, results and decisions are deleted {{ retention_hours }} hours after
-        upload. Either way, uploads are never used to train AI models.</p>
-    </div>
+    {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
+       `retention_hours` after the last activity. TODO(Harish): the default and the final
+       wording; the privacy page (privacy.html) says the same. #}
+    <fieldset class="field retention-choices">
+      <legend>How long to keep my document</legend>
+      <p class="hint" id="keep-hint">If you tick neither box, your document, results and
+        decisions are deleted {{ retention_hours }} hours after you last worked on them.
+        Uploads are never used to train AI models.</p>
+      <div class="field checkbox-field">
+        <input type="checkbox" id="keep" name="keep" value="on" aria-describedby="keep-hint">
+        <label for="keep">Keep for 7 days, only I can see it</label>
+      </div>
+      <div class="field checkbox-field">
+        <input type="checkbox" id="share" name="share" value="on" aria-describedby="share-hint">
+        <label for="share">Also let the developer look ({{ opt_in_days }} days)</label>
+        <p class="hint" id="share-hint">Harish, who runs this beta, may look at the results
+          to find and fix mistakes in the tool. Your document and results are then kept
+          {{ opt_in_days }} days.</p>
+      </div>
+    </fieldset>
     <p id="upload-status" class="upload-status" role="status"></p>
     <button type="submit" class="button">Upload and convert</button>
   </form>

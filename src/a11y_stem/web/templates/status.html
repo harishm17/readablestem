@@ -11,7 +11,7 @@
   {% endif %}
 </dl>
 <p class="hint">This page shows the state right now. Whatever it says, uploaded documents
-  are deleted {{ retention_hours }} hours after upload ({{ opt_in_days }} days if the
-  uploader chose to keep them longer). What the tool cannot do yet is on the
+  are deleted {{ retention_hours }} hours after they were last worked on (7 days if the
+  uploader chose to keep them, {{ opt_in_days }} if they also let the developer look). What the tool cannot do yet is on the
   <a href="/limits">known limits</a> page.</p>
 {% endblock %}

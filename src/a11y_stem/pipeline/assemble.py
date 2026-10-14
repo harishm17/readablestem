@@ -37,6 +37,7 @@ from __future__ import annotations
 
 import base64
 import re
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
@@ -241,6 +242,37 @@ def _clean_title(title: str | None) -> str:
     text = INLINE_MARKER_RE.sub("[equation]", title or "")
     text = " ".join(text.split())
     return text or DEFAULT_TITLE
+
+
+# A section number in front of a title ("1 Derivatives", "2.1 Speed", "Chapter 3: Forces").
+# One or two digits per part, so a year ("2024 Annual report") stays. T1-7.
+_SECTION_NUMBER = re.compile(
+    r"^(?:(?:chapter|section|unit|lecture|part|week)\s+)?\d{1,2}(?:\.\d{1,2}){0,3}[.):]?\s+(?=\S)",
+    re.IGNORECASE,
+)
+# Titles that name a part of a document, not the document.
+GENERIC_TITLES = frozenset(
+    {"contents", "table of contents", "outline", "index", "overview", "agenda", "notes"}
+)
+
+
+def strip_section_number(text: str) -> str:
+    """ "1 Derivatives" -> "Derivatives"; the text as it is when it has no section number
+    or stripping would leave nothing."""
+    stripped = _SECTION_NUMBER.sub("", text.strip(), count=1).strip()
+    return stripped or text.strip()
+
+
+def suggested_title(raw: str | None, headings: Sequence[str] = ()) -> str:
+    """The title students hear when the instructor has not chosen one: the PDF's title (or
+    the first top-level heading, as layout reads it) without its section number; when that
+    is missing or only names a part ("Contents"), the first heading that does not.
+    `DEFAULT_TITLE` when there is none."""
+    for candidate in (raw or "", *headings):
+        text = strip_section_number(_clean_title(candidate)) if candidate.strip() else ""
+        if text and text != DEFAULT_TITLE and text.casefold().rstrip(".:") not in GENERIC_TITLES:
+            return text
+    return DEFAULT_TITLE
 
 
 def _is_png(data: bytes | None) -> bool:
@@ -856,6 +888,7 @@ def _about_section(
     source_note: str | None,
     checked_on: date | None = None,
     kept_pages: list[int] | None = None,
+    contact: str | None = None,
 ) -> str:
     """The note for students at the end of the file (MF7 of the UX review): what this
     is, whether the instructor has checked it, which pages are only pictures, who to tell
@@ -873,8 +906,26 @@ def _about_section(
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
         f'<h2 id="{ABOUT_TITLE_ID}">{ABOUT_TITLE}</h2>\n'
         f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
-        f"<p>{CONTACT}</p>\n{source}</footer>"
+        f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
     )
+
+
+def _contact_sentence(contact: str | None) -> str:
+    """The "tell your instructor" sentence, with the instructor's own contact line (T1-17)
+    when there is one: an email address (a mailto link) or a web address (a link), both
+    shown as typed. `web.titles.clean_contact` has checked it; anything else is left out
+    here too."""
+    line = (contact or "").strip()
+    if not line or len(line) > 320 or re.search(r"[\s<>\"']", line):
+        return CONTACT
+    if re.fullmatch(r"[^@/:]+@[^@/:]+\.[^@/:.]+", line):
+        href = "mailto:" + line
+    elif re.fullmatch(r"https?://[^/\s]+\.[^/\s]+\S*", line):
+        href = line
+    else:
+        return CONTACT
+    link = f'<a href="{_escape(href)}">{_escape(line)}</a>'
+    return f"{CONTACT.removesuffix('.')}: {link}."
 
 
 STYLE = """\
@@ -975,6 +1026,8 @@ def render_html(
     source_note: str | None = None,
     notice: str | None = None,
     checked_on: date | None = None,
+    title_set: bool = False,
+    contact: str | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -988,6 +1041,10 @@ def render_html(
     answers are placeholders). `checked_on` is the day the instructor made the last
     review decision: the student note gives it once no decision is open (the review
     screen passes it when it re-renders the file; the pipeline never does).
+    `title_set`: `title` is the one the instructor chose (T1-7): used as typed, and written
+    as the top-level heading too when the body has none. Otherwise the title is
+    `suggested_title` of the PDF's. `contact`: the instructor's contact line for the note
+    after `<main>` (T1-17).
     """
     ordered = sorted(elements, key=lambda e: e.order)
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
@@ -1005,8 +1062,23 @@ def render_html(
         and fix.status in NOT_CONVERTED
     ]
     about = _about_section(
-        list(first_fix.values()), len(renderer.flagged), source_note, checked_on, kept_pages
+        list(first_fix.values()),
+        len(renderer.flagged),
+        source_note,
+        checked_on,
+        kept_pages,
+        contact,
     )
+    heading_texts = [
+        text
+        for e in ordered
+        if e.kind is Kind.HEADING
+        for level, text in [heading_parts(e, first_fix.get(e.id))]
+        if level is not None
+    ]
+    page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
+    if title_set and not any("<h1" in part for part in body):
+        body = [f"<h1>{_escape(page_title)}</h1>", *body]
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))
     return "\n".join(
@@ -1017,7 +1089,7 @@ def render_html(
             '<meta charset="utf-8">',
             '<meta name="viewport" content="width=device-width, initial-scale=1">',
             f'<meta name="generator" content="a11y-stem {_escape(__version__)}">',
-            f"<title>{_escape(_clean_title(title))}</title>",
+            f"<title>{_escape(page_title)}</title>",
             f"<style>\n{style}</style>",
             "</head>",
             "<body>",
