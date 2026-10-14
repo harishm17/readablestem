@@ -226,7 +226,7 @@ def test_no_sideways_scrolling_at_320_css_px(site, browser, job):
 
     # The long file name really does need the wrapping: without it, the page scrolls.
     page.goto(f"{site.base}/jobs/{job}")
-    page.add_style_tag(content="h1, .lede { overflow-wrap: normal !important; }")
+    page.add_style_tag(content="h1, .lede, .doc-file { overflow-wrap: normal !important; }")
     assert sideways_overflow(page) > 300
     # The wide equation scrolls inside its own box instead of widening the page. (It was
     # accepted above, so it is folded away: unfold it.)

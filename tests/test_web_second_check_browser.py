@@ -181,7 +181,7 @@ def test_the_job_page_counts_the_note_as_optional(site, browser, job, axe_source
     _screenshot(page, "second-check-job.png")
     context.close()
     assert "1 need your decision" in text or "1 needs your decision" in text
-    # One breakdown (MF6): the note is counted inside "Accepted for you".
-    assert "with a note, 1 worth a look)" in text
+    # The note is said once, with how many are worth a look (T1-11: decisions are the count).
+    assert "with a note (1 worth a look)" in text
     assert "nothing to do" not in text
     assert not violations, describe(violations)

@@ -63,7 +63,7 @@ def test_the_job_page_passes_axe_also_with_the_language_control_open(
     page.goto(f"{site.base}/jobs/{job}")
     clean(page, axe_source, "job page")
     shoot(page, "job-page", viewport)
-    page.get_by_text("Change", exact=False).first.click()
+    page.locator("details.inline-details > summary").click()
     expect(page.get_by_label("Language of this document")).to_be_visible()
     clean(page, axe_source, "job page, language open")
     page.locator("#checks-ran summary").click()
