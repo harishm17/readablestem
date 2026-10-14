@@ -72,6 +72,17 @@ load_config() {
   # so the alert means something; a Cloud Billing budget does not include OpenAI.
   BUDGET_USD=${BUDGET_USD:-90}
   CRON_SCHEDULE=${CRON_SCHEDULE:-0 * * * *}
+  # Cloud Run sizing, from the measurements in docs/deploy.md ("Sizing"): a 30-page dense
+  # document takes about 20 CPU-seconds and 0.5 GB at its peak, one job at a time.
+  CPU=${CPU:-1}
+  MEMORY=${MEMORY:-1Gi}
+  MIN_INSTANCES=${MIN_INSTANCES:-1}
+  MAX_INSTANCES=${MAX_INSTANCES:-2}
+  CONCURRENCY=${CONCURRENCY:-20}
+  REQUEST_TIMEOUT=${REQUEST_TIMEOUT:-300}
+  [[ "$MIN_INSTANCES" =~ ^[1-9][0-9]*$ ]] ||
+    die "MIN_INSTANCES must be at least 1 (the worker thread lives in the instance)"
+  [[ "$MAX_INSTANCES" =~ ^[1-9][0-9]*$ ]] || die "MAX_INSTANCES must be a whole number"
   case "$DB_MODE" in
     cloudsql | external) ;;
     *) die "DB_MODE must be cloudsql or external" ;;
@@ -99,6 +110,16 @@ load_config() {
   SECRETS="$SECRETS,SESSION_SECRET=session-secret:latest"
   SECRETS="$SECRETS,GOOGLE_CLIENT_SECRET=google-client-secret:latest,CRON_TOKEN=cron-token:latest"
   SECRETS="$SECRETS,DATABASE_URL=database-url:latest"
+  # The content features are true/false; anything else the app would refuse at start.
+  local flag
+  for flag in FEATURE_TABLES FEATURE_LONG_DESCRIPTIONS FEATURE_COLOUR FEATURE_NOTATION_MEMORY \
+    DECISIONS_FIGURE_VERIFY DECISIONS_EQUATION_SHADOW DECISIONS_CANARY EVENTS_ENABLED \
+    FEEDBACK_QUESTIONS_ENABLED; do
+    case "${!flag:-}" in
+      "" | true | false) ;;
+      *) die "$flag must be true or false" ;;
+    esac
+  done
   TRACING_ENABLED=${TRACING_ENABLED:-false}
   if [ "$TRACING_ENABLED" = true ]; then
     require LANGFUSE_PUBLIC_KEY
@@ -116,6 +137,24 @@ load_config() {
     done
     SECRETS="$SECRETS,MS_CLIENT_SECRET=ms-client-secret:latest"
   fi
+}
+
+# The spend limits against the provider's worst-case reservation (ops/limits.py): the same
+# check the app makes at start-up, run first so a bad number fails here and not as a service
+# that never becomes ready. Skipped (with a note) where uv or the checkout is unavailable.
+preflight_limits() {
+  local out status=0
+  command -v uv >/dev/null || { note "uv not found: spend limits not checked here"; return 0; }
+  out=$(MODEL_PROVIDER="$MODEL_PROVIDER" uv run --quiet --no-sync python -m a11y_stem.ops.limits 2>&1) ||
+    status=$?
+  case "$status" in
+    0) [ -z "$out" ] || printf '%s\n' "$out" | sed 's/^/    /' ;;
+    3)
+      printf '%s\n' "$out" | sed 's/^/    /' >&2
+      die "the spend limits do not fit MODEL_PROVIDER=$MODEL_PROVIDER (docs/deploy.md, 'Spend limits')"
+      ;;
+    *) note "spend limits not checked (run 'uv sync' first): $status" ;;
+  esac
 }
 
 sql_connection_name() {
@@ -343,9 +382,33 @@ write_env_file() {
       yaml_line MS_CLIENT_ID "$MS_CLIENT_ID"
       yaml_line MS_ALLOWED_TENANTS "$MS_ALLOWED_TENANTS"
     fi
-    for name in MAX_USD_PER_JOB MAX_MODEL_CALLS_PER_JOB MAX_PAGES_PER_JOB MAX_UPLOAD_MB \
-      RETENTION_HOURS OPT_IN_RETENTION_DAYS SOURCE_URL LOG_LEVEL LANGFUSE_PUBLIC_KEY \
-      LANGFUSE_HOST; do
+    # Content features (docs/deploy.md, "Content features"): the beta defaults are set in
+    # deploy.env.example, and an unset name here leaves the app's own default (off).
+    for name in FEATURE_TABLES FEATURE_LONG_DESCRIPTIONS FEATURE_COLOUR \
+      FEATURE_NOTATION_MEMORY FEEDBACK_URL FEEDBACK_QUESTIONS_ENABLED EVENTS_ENABLED; do
+      if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
+    done
+    # The second check is OpenAI's: written out as off with Claude so it is plain in the
+    # service's settings (the app ignores it for that provider either way).
+    if [ "$MODEL_PROVIDER" = anthropic ]; then
+      yaml_line DECISIONS_FIGURE_VERIFY false
+      yaml_line DECISIONS_EQUATION_SHADOW false
+      yaml_line DECISIONS_CANARY false
+    else
+      for name in DECISIONS_MODEL DECISIONS_TIMEOUT_S DECISIONS_FIGURE_VERIFY \
+        DECISIONS_FIGURE_FLAG_BELOW DECISIONS_EQUATION_SHADOW DECISIONS_EQUATION_FLAG_AT \
+        DECISIONS_CANARY; do
+        if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
+      done
+    fi
+    for name in ANTHROPIC_EFFORT_MAIN ANTHROPIC_EFFORT_CHEAP ANTHROPIC_REFUSAL_FALLBACK \
+      MODEL_TIMEOUT_S MODEL_MAX_RETRIES; do
+      if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
+    done
+    for name in MAX_USD_PER_JOB MAX_USD_PER_PAGE MAX_MODEL_CALLS_PER_JOB \
+      MAX_MODEL_CALLS_PER_PAGE MAX_PAGES_PER_JOB MAX_UPLOAD_MB MAX_CONCURRENT_UPLOADS \
+      RETENTION_HOURS OPT_IN_RETENTION_DAYS WORKER_POLL_S SOURCE_URL LOG_LEVEL \
+      LANGFUSE_PUBLIC_KEY LANGFUSE_HOST; do
       if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
     done
   } >"$file"
@@ -362,8 +425,9 @@ step_service() {
   # shellcheck disable=SC2086  # $sql is empty or one flag
   gc run deploy "$SERVICE" --image="$IMAGE" --region="$REGION" \
     --service-account="$RUN_SA" --allow-unauthenticated --port=8080 \
-    --cpu=1 --memory=1Gi --min-instances=1 --max-instances=2 --no-cpu-throttling \
-    --concurrency=20 --timeout=900 \
+    --cpu="$CPU" --memory="$MEMORY" --min-instances="$MIN_INSTANCES" \
+    --max-instances="$MAX_INSTANCES" --no-cpu-throttling \
+    --concurrency="$CONCURRENCY" --timeout="$REQUEST_TIMEOUT" \
     --startup-probe=httpGet.path=/healthz,httpGet.port=8080,periodSeconds=5,timeoutSeconds=3,failureThreshold=24 \
     --env-vars-file="$env_file" --set-secrets="$SECRETS" $sql
   note "URL: $(service_url)"
@@ -533,8 +597,8 @@ EOF
 }
 
 uptime_alert() {
-  local channel=$1 check host name="$SERVICE healthz" policy_file
-  step "Uptime check on /healthz with an email alert to $ALERT_EMAIL"
+  local channel=$1 check host name="$SERVICE readyz" policy_file
+  step "Uptime check on /readyz (database, worker, model provider) with an email alert to $ALERT_EMAIL"
   host=${UPTIME_HOST:-$(service_url)}
   host=${host#https://}
   host=${host%%/*}
@@ -543,8 +607,8 @@ uptime_alert() {
   if [ -z "$check" ]; then
     check=$(gc monitoring uptime create "$name" --resource-type=uptime-url \
       --resource-labels="host=$host,project_id=$PROJECT_ID" --protocol=https \
-      --path=/healthz --period=5 --timeout=10 --status-codes=200 --format='value(name)')
-    note "uptime check created for https://$host/healthz"
+      --path=/readyz --period=5 --timeout=10 --status-codes=200 --format='value(name)')
+    note "uptime check created for https://$host/readyz"
   else
     note "uptime check exists ($check)"
   fi
@@ -614,6 +678,7 @@ main() {
   steps=${*:-apis iam registry build database secrets migrate service cron monitoring budget}
   cd "$(dirname "$0")/.." # Cloud Build uploads the repository root
   load_config
+  preflight_limits
   case " $steps " in
     *" budget "*)
       if [ -z "${BILLING_ACCOUNT_ID:-}" ] && [ "${SKIP_BUDGET:-false}" != true ]; then

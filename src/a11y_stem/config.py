@@ -25,6 +25,16 @@ CHEAP_MODEL = "gpt-6-luna"
 ANTHROPIC_MAIN_MODEL = "claude-opus-5-5"
 ANTHROPIC_CHEAP_MODEL = "claude-haiku-5-5"
 Provider = Literal["openai", "anthropic"]
+# The job spend caps differ by provider, because a call's worst-case reservation does: about
+# $0.03 on gpt-6.1-sol, about $0.14 on claude-opus-5-5 ($0.22 with long descriptions; a
+# 2,048-token thinking allowance and the crop's size). Four calls are held at once, so a
+# one-page job needs about $0.57 on Claude ($0.88 with long descriptions). Used for a cap
+# the environment does not set (`Settings._provider_limits`); the measurements and the
+# reasoning are in docs/deploy.md, "Spend limits".
+PROVIDER_LIMIT_DEFAULTS: dict[str, dict[str, float]] = {
+    "openai": {"max_usd_per_job": 2.0, "max_usd_per_page": 0.30},
+    "anthropic": {"max_usd_per_job": 3.0, "max_usd_per_page": 1.0},
+}
 Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
@@ -108,6 +118,9 @@ class Settings(BaseSettings):
     decisions_canary: bool = True
 
     # --- cost and abuse limits (no defaults for the money ones on purpose)
+    # MAX_USD_PER_JOB and MAX_USD_PER_PAGE: the values below are OpenAI's; with
+    # MODEL_PROVIDER=anthropic, a value the environment does not set becomes the Claude
+    # one (`PROVIDER_LIMIT_DEFAULTS`).
     daily_spend_cap_usd: float | None = Field(default=None, gt=0)
     per_user_daily_page_quota: int | None = Field(default=None, gt=0)
     max_usd_per_job: float = Field(default=2.0, gt=0)
@@ -228,6 +241,16 @@ class Settings(BaseSettings):
         self.cheap_model = self.anthropic_cheap_model
         return self
 
+    @model_validator(mode="after")
+    def _provider_limits(self) -> Settings:
+        """A job cap the environment did not set takes the provider's default. Written to
+        `__dict__` so it does not count as set: `with_provider` then lets a switch back to
+        the other provider bring that provider's default."""
+        for name, value in PROVIDER_LIMIT_DEFAULTS[self.model_provider].items():
+            if name not in self.model_fields_set:
+                self.__dict__[name] = value
+        return self
+
     @field_validator("feedback_url")
     @classmethod
     def _web_url(cls, value: str | None) -> str | None:
@@ -327,6 +350,11 @@ class Settings(BaseSettings):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):
             raise ConfigError("BASE_URL must be https in production")
+        from a11y_stem.ops.limits import spend_findings
+
+        errors = [f.text for f in spend_findings(self) if f.severity == "error"]
+        if errors:
+            raise ConfigError("production start refused; spend limits: " + "; ".join(errors))
 
     def provider_key(self) -> SecretStr | None:
         return self.anthropic_api_key if self.model_provider == "anthropic" else self.openai_api_key
@@ -380,7 +408,9 @@ def with_provider(
     if provider is None and main_model is None and cheap_model is None:
         return base
     chosen = provider or base.model_provider
-    values = base.model_dump(exclude={"main_model", "cheap_model"})
+    # A cap that was only a provider default is left out, so the new provider's applies.
+    unset = {n for n in PROVIDER_LIMIT_DEFAULTS["openai"] if n not in base.model_fields_set}
+    values = base.model_dump(exclude={"main_model", "cheap_model"} | unset)
     values["model_provider"] = chosen
     if chosen == "anthropic":
         if main_model:

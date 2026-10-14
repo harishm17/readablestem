@@ -120,7 +120,7 @@ def test_service_flags_and_environment(env):
         "--no-cpu-throttling",
         "--concurrency=20",
         "--memory=1Gi",
-        "--timeout=900",
+        "--timeout=300",
         "--port=8080",
         "--set-cloudsql-instances=proj:us-central1:a11y-stem-db",
     ):
@@ -262,7 +262,7 @@ def test_the_hourly_purge_has_alerts_of_its_own(env):
 
     found = policies(env)
     assert set(found) == {
-        "a11y-stem healthz failing",
+        "a11y-stem readyz failing",
         "a11y-stem cron not running",
         "a11y-stem cron or purge problem",
     }
@@ -326,3 +326,76 @@ def test_an_unknown_model_provider_is_refused(env):
     env["MODEL_PROVIDER"] = "gemini"
     result = run(env)
     assert result.returncode != 0 and "MODEL_PROVIDER must be openai or anthropic" in result.stderr
+
+
+def test_content_features_reach_the_service_and_a_redeploy_keeps_them(env):
+    env.update(
+        FEATURE_LONG_DESCRIPTIONS="true",
+        FEATURE_NOTATION_MEMORY="true",
+        FEATURE_TABLES="false",
+        FEATURE_COLOUR="false",
+        FEEDBACK_URL="https://forms.example.org/a11y",
+        MAX_USD_PER_PAGE="0.9",
+        DECISIONS_CANARY="false",
+    )
+    assert run(env, "service").returncode == 0
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    text = deploy["env_file"]
+    for line in (
+        "FEATURE_LONG_DESCRIPTIONS: 'true'",
+        "FEATURE_NOTATION_MEMORY: 'true'",
+        "FEATURE_TABLES: 'false'",
+        "FEATURE_COLOUR: 'false'",
+        "FEEDBACK_URL: 'https://forms.example.org/a11y'",
+        "MAX_USD_PER_PAGE: '0.9'",
+        "DECISIONS_CANARY: 'false'",
+    ):
+        assert line in text, line
+
+
+def test_unset_features_are_left_to_the_apps_defaults(env):
+    assert run(env, "service").returncode == 0
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    assert "FEATURE_" not in deploy["env_file"] and "DECISIONS_" not in deploy["env_file"]
+
+
+def test_a_feature_that_is_not_true_or_false_is_refused(env):
+    env["FEATURE_TABLES"] = "yes"
+    result = run(env, "service")
+    assert result.returncode != 0 and "FEATURE_TABLES must be true or false" in result.stderr
+
+
+def test_with_claude_the_openai_second_check_is_written_out_as_off(env):
+    env.update(MODEL_PROVIDER="anthropic", ANTHROPIC_API_KEY="sk-ant-never-printed")
+    env.pop("OPENAI_API_KEY")
+    assert run(env, "service").returncode == 0
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    for name in ("DECISIONS_FIGURE_VERIFY", "DECISIONS_EQUATION_SHADOW", "DECISIONS_CANARY"):
+        assert f"{name}: 'false'" in deploy["env_file"]
+
+
+def test_cloud_run_sizing_comes_from_settings_with_measured_defaults(env):
+    env.update(CPU="2", MEMORY="2Gi", MAX_INSTANCES="3", CONCURRENCY="10", REQUEST_TIMEOUT="120")
+    assert run(env, "service").returncode == 0
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    for flag in (
+        "--cpu=2",
+        "--memory=2Gi",
+        "--min-instances=1",
+        "--max-instances=3",
+        "--concurrency=10",
+        "--timeout=120",
+    ):
+        assert flag in deploy["argv"]
+    env["MIN_INSTANCES"] = "0"
+    assert "MIN_INSTANCES must be at least 1" in run(env, "service").stderr
+
+
+def test_a_claude_page_cap_that_cannot_hold_a_call_stops_the_deploy_before_anything(env):
+    env.update(MODEL_PROVIDER="anthropic", ANTHROPIC_API_KEY="sk-ant-x", MAX_USD_PER_PAGE="0.05")
+    result = run(env, "apis")
+    assert result.returncode != 0 and "spend limits do not fit" in result.stderr
+    assert "MAX_USD_PER_PAGE $0.05" in result.stderr
+    assert not (Path(env["FAKE_GCLOUD_DIR"]) / "calls.jsonl").exists()  # nothing was called
+    env["MAX_USD_PER_PAGE"] = "1.0"
+    assert run(env, "apis").returncode == 0

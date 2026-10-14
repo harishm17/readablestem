@@ -436,7 +436,7 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
 # --------------------------------------------------------------------------- HTTP
 
 _METHODS = frozenset({"GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"})
-_QUIET_ROUTES = frozenset({"/healthz"})
+_QUIET_ROUTES = frozenset({"/healthz", "/readyz"})
 
 
 def route_template(scope: Mapping[str, Any]) -> str:

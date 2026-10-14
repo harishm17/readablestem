@@ -93,6 +93,18 @@ NOTATION_PROMPT_VERSION = load_prompt(NOTATION_PROMPT_NAME).version
 
 SHORT_INLINE_CHARS = 25  # inline candidates up to this many text-layer chars start cheap
 MAX_OUTPUT_TOKENS = 2048  # LaTeX up to 2000 chars plus reasoning tokens
+# A model that thinks within its own allowance (claude: `pricing.Price.thinking_tokens`)
+# needs the answer's room only: 2000 characters of LaTeX are about 700 tokens.
+ANSWER_ONLY_MAX_OUTPUT_TOKENS = 1024
+
+
+def output_limit(model: str) -> int:
+    """The `max_output_tokens` to ask `model` for."""
+    from a11y_stem.models.pricing import price_for
+
+    return ANSWER_ONLY_MAX_OUTPUT_TOKENS if price_for(model).thinking_tokens else MAX_OUTPUT_TOKENS
+
+
 # Text-layer cross-check: only with enough symbols to compare, and a "strong mismatch"
 # is a Dice similarity of the two symbol bags below this.
 TEXT_LAYER_MIN_SYMBOLS = 3
@@ -736,7 +748,7 @@ def transcribe(
             instructions=prompt.text,
             images=[png],
             context_text=context_text,
-            max_output_tokens=MAX_OUTPUT_TOKENS,
+            max_output_tokens=output_limit(model),
             image_detail="high",
         )
         if escalation:

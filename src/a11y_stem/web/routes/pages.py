@@ -13,6 +13,7 @@ from a11y_stem.web.database import ping
 from a11y_stem.web.db import Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import get_ctx, render
 from a11y_stem.web.events import EVENT_RETENTION_DAYS
+from a11y_stem.web.health import readiness
 from a11y_stem.web.quota import next_day_start
 from a11y_stem.web.security import VIEW_CSP
 
@@ -117,3 +118,15 @@ def status(request: Request) -> Response:
 def healthz(request: Request) -> Response:
     ok = ping(get_ctx(request).engine)
     return JSONResponse({"status": "ok" if ok else "error"}, status_code=200 if ok else 503)
+
+
+@router.get("/readyz")
+def readyz(request: Request) -> Response:
+    """Can the service do its job: database, worker thread, model provider (web.health).
+    One word per check, never a setting's value. 503 while any check fails or the process
+    is shutting down."""
+    ready, checks = readiness(get_ctx(request))
+    return JSONResponse(
+        {"status": "ready" if ready else "not_ready", "checks": checks},
+        status_code=200 if ready else 503,
+    )

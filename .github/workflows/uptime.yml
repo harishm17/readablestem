@@ -15,7 +15,7 @@ permissions:
 
 jobs:
   check:
-    name: GET /healthz and /demo
+    name: GET /readyz and /demo
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -28,7 +28,7 @@ jobs:
             exit 0
           fi
           base="${LIVE_URL%/}"
-          for path in /healthz /demo; do
+          for path in /readyz /demo; do
             curl -fsS --max-time 30 --retry 2 --retry-delay 10 -o /dev/null \
               -w "$path %{http_code} in %{time_total}s\n" "$base$path"
           done

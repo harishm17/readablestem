@@ -181,6 +181,7 @@ class AnthropicVisionClient:
             n_images=len(request.images),
             text_chars=len(context or ""),
             max_output_tokens=request.max_output_tokens,
+            images=request.images,
         )
         started = time.perf_counter()
         reservation = self._budget.reserve(estimate)  # BudgetExceeded: nothing was sent
