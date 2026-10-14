@@ -71,6 +71,7 @@ from typing import Any
 
 import pymupdf
 
+from a11y_stem.core.childenv import child_env
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.core.types import BBox, Element, Kind, Notice, TableGrid, inline_marker
@@ -718,7 +719,12 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
     ]
     try:
         result = subprocess.run(
-            command, input=pdf_bytes, capture_output=True, timeout=PROBE_TIMEOUT_S, check=False
+            command,
+            input=pdf_bytes,
+            capture_output=True,
+            timeout=PROBE_TIMEOUT_S,
+            check=False,
+            env=child_env(),  # no keys or secrets for the process that reads the PDF
         )
     except subprocess.TimeoutExpired:
         raise LayoutError("unreadable", "the PDF took too long to render") from None

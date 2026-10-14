@@ -23,7 +23,7 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, Form, Query, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.responses import RedirectResponse, Response
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from a11y_stem.core.types import DocumentResult
@@ -139,6 +139,12 @@ def upload_error_message(
         "(LaTeX, Word or PowerPoint), upload that instead.",
         "no_content": f"Every page of {filename or 'this file'} is blank. Check that you "
         "chose the right file.",
+        "too_many_active": f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or "
+        f"still being converted. Wait for one to finish, then upload {name} again. Nothing was "
+        "uploaded.",
+        "too_many_stored": f"You are keeping {MAX_LIVE_JOBS_PER_USER} documents, the most "
+        f"allowed. Delete one you no longer need, then upload {name} again. Nothing was "
+        "uploaded.",
     }.get(code, f"{name} cannot be converted.")
 
 
@@ -164,6 +170,21 @@ def _quota_message(name: str, pages: int | None, left: int | None, quota: int | 
         f"to {left} {'page' if left == 1 else 'pages'} now, or the whole file after the "
         "count starts again at midnight UTC. Nothing was uploaded."
     )
+
+
+# Per person, on top of the daily page count: documents waiting or being converted, and
+# documents kept (finished or not, until their deletion time). A person with a full queue
+# would hold everyone else back; a person with hundreds of kept files would fill the database.
+MAX_ACTIVE_JOBS_PER_USER = 3
+MAX_LIVE_JOBS_PER_USER = 25
+
+
+class TooManyJobs(Exception):
+    """The person already has as many documents as they may (`_store_upload`)."""
+
+    def __init__(self, code: str) -> None:
+        super().__init__(code)
+        self.code = code
 
 
 class QuotaRefused(Exception):
@@ -389,6 +410,19 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         job_id = await run_in_threadpool(
             _store_upload, ctx, user, form.filename, form.data, pages, keep, course_id
         )
+    except TooManyJobs as exc:
+        return await run_in_threadpool(
+            partial(
+                _upload_error_page,
+                request,
+                user,
+                exc.code,
+                429,
+                form.filename,
+                headers={"Retry-After": "60"},
+                course=chosen,
+            )
+        )
     except QuotaRefused as exc:
         return await run_in_threadpool(
             partial(
@@ -460,6 +494,24 @@ def _store_upload(
         timedelta(days=s.opt_in_retention_days) if keep else timedelta(hours=s.retention_hours)
     )
     with session_scope(ctx.factory) as session:
+        # Checked before the pages are counted: a refusal costs nothing.
+        active = session.scalar(
+            select(func.count())
+            .select_from(Job)
+            .where(
+                Job.user_id == user.id,
+                Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
+            )
+        )
+        if (active or 0) >= MAX_ACTIVE_JOBS_PER_USER:
+            raise TooManyJobs("too_many_active")
+        live = session.scalar(
+            select(func.count())
+            .select_from(Job)
+            .where(Job.user_id == user.id, Job.retain_until > now)
+        )
+        if (live or 0) >= MAX_LIVE_JOBS_PER_USER:
+            raise TooManyJobs("too_many_stored")
         if not try_consume_pages(
             session, user.id, pages, quota=s.per_user_daily_page_quota, day=utc_today(now)
         ):

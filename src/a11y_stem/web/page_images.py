@@ -33,6 +33,7 @@ import threading
 from collections.abc import Generator, Iterable
 from contextlib import AbstractContextManager, contextmanager
 
+from a11y_stem.core.childenv import child_env
 from a11y_stem.web.pdf_probe import PNG_MAGIC
 
 BBox = tuple[float, float, float, float]
@@ -123,6 +124,7 @@ def _child(args: list[str], data: bytes, timeout_s: float) -> bytes:
             capture_output=True,
             timeout=timeout_s,
             check=False,
+            env=child_env(),  # no keys or secrets for the process that reads the PDF
         )
     except (subprocess.TimeoutExpired, OSError):
         raise RenderFailed() from None
