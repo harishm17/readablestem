@@ -268,3 +268,36 @@ def test_the_review_screen_shows_hostile_alt_text_and_latex_as_text(tmp_path):
         document = client.get(f"/jobs/{job}/view").text
         assert_inert(document)
         assert "javascript:" not in document
+
+
+HOSTILE_LATEX = [
+    r"\href{javascript:alert(1)}{x}",
+    r"\url{javascript:alert(1)}",
+    r"\text{<script>alert(1)</script>}",
+    r"\text{\"><img src=x onerror=alert(1)>}",
+    r"\input{/etc/passwd}",
+    r"\include{secret}",
+    r"\write18{id}",
+    r"\immediate\write18{id}",
+    r"\includegraphics{http://evil/x.png}",
+    r"\mathrm{<svg onload=alert(1)>}",
+    r"x^{" * 200 + "1" + "}" * 200,
+    r"\frac" * 500,
+    "x" * 100000,
+    "%\\text{comment}\n x",
+    r"\begin{array}{c} \\ \end{array}" * 100,
+]
+
+
+@pytest.mark.parametrize("latex", HOSTILE_LATEX)
+def test_hostile_latex_is_refused_or_becomes_inert_mathml(latex):
+    from a11y_stem.pipeline import validate
+
+    validate.check_latex(latex)  # must not raise on any input
+    try:
+        mathml = validate.safe_latex_to_mathml(latex, "block")
+    except Exception:  # refusing (content-free message) is a fine answer
+        return
+    html = f"<main>{mathml}</main>"
+    assert_inert(html, latex[:30])
+    assert "javascript" not in html and "evil" not in html and "passwd" not in html
