@@ -2295,11 +2295,11 @@ def _unbalanced(text: str, *, closing: bool) -> bool:
 _ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
 # Operators that cannot end an expression: a run ending in one was cut by prose
 # ("b - proj b" broken at a word the run does not take in). Not "|": it closes |x|.
-_TRAILING_OPERATORS = frozenset("+-*/=<>^_~\u2212\u00b1\u2213\u00d7\u00f7\u22c5\u00b7\u2219")
+_TRAILING_OPERATORS = frozenset("+-*/=<>^_~\u2212\u00b1\u2213\u00d7\u00f7\u22c5")
 # Operators that cannot start an expression: a run starting with one is the tail of an
 # expression cut by a line break or by prose ("(50 km)/(60 km/h)] = 40" -> "/h)] = 40").
 # Not "|" (it opens |x|, see `_trim_run`) and not "~" ("~5 m" is about five metres).
-_INFIX_ONLY = frozenset("/*^_=<>\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5\u00b7\u2219")
+_INFIX_ONLY = frozenset("/*^_=<>\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5")
 
 
 def _broken_brackets(text: str) -> bool:

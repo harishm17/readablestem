@@ -745,7 +745,7 @@ LATEX_CASES = [
     ),
     (
         "calculus_notes",
-        "dxdxn = nxn−1",
+        "d dxxn = nxn−1",
         r"\frac{d}{dx} x^n = n x^{n-1}",
         r"\frac{d}{dx} x^n = n x^{n+1}",
     ),
@@ -779,7 +779,7 @@ LATEX_CASES = [
     ("problem_set", "g = 9.8 m/s2", r"g = 9.8\ \mathrm{m/s^2}", r"g = -9.8\ \mathrm{m/s^2}"),
     (
         "problem_set",
-        "v2 = v20 + 2ad = 0 + 2 3.0 m/s2) (12 m) ( = 72 m2/s2.",
+        "v2 = v20 + 2ad = 0 + 2 (3.0 m/s2) (12 m) = 72 m2/s2.",
         r"\begin{array}{rcl} v^2 & = & v_0^2 + 2 a d \\ & = & 0 + 2 \left(3.0\ \mathrm{m/s^2}"
         r"\right)\left(12\ \mathrm{m}\right) \\ & = & 72\ \mathrm{m^2/s^2}. \end{array}",
         r"\begin{array}{rcl} v^2 & = & v_0^2 + 2 a d \\ & = & 0 - 2 \left(3.0\ \mathrm{m/s^2}"
