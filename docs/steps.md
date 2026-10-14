@@ -607,6 +607,8 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Unknown symbols | their Unicode name, lower-cased |
 
 Sentence punctuation at the very end of the equation is not read. Unreadable input
+| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
+| Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
 raises `SpeechError` with a content-free message. In the equation step a speech failure
 is a warning (`speech.generated`, code `speech_failed`), not an error, and only an optional
 note: the output keeps MathML only, so a missing reading aid changes nothing a student gets.
