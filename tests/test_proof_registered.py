@@ -130,10 +130,10 @@ def test_the_addenda_and_the_interim_headings_cite_the_version_1_registration():
         assert V1_REGISTRATION in (PROOF / rel).read_text(encoding="utf-8"), rel
 
 
-def test_the_hash_file_lists_the_registration_and_the_four_first_addenda():
+def test_the_hash_file_lists_the_registration_and_the_addenda_except_the_fifth():
     listed = {rel for _, rel in _lines("PREREG-v2.sha256")}
     expected = {"PREREGISTRATION.md", "PARSERS-PLAN.md"} | {
-        f"PREREGISTRATION-ADDENDUM-{n}.md" for n in (1, 2, 3, 4)
+        f"PREREGISTRATION-ADDENDUM-{n}.md" for n in (1, 2, 3, 4, 6, 7)
     }
     assert expected <= listed
     assert {"selection/draw.py", "selection/features.py", "selection/rules-before-draw.sha256"} <= (
