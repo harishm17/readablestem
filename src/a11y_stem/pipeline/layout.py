@@ -258,7 +258,10 @@ _STRONG_MATH = frozenset(
     "\u2208\u2209\u2282\u2286\u2283\u2287\u222a\u2229\u2200\u2203"  # sets and quantifiers
     "\u2032\u2033\u2220\u22a5\u2225\u27e8\u27e9"  # primes angle perp parallel brackets
 )
-_OPERATORS = frozenset("+-*/=<>^_|~")
+# "+-*/=<>^_|~", and the middle dot a body font draws for a product (Chromium prints
+# "7 · 6 · 5" with U+00B7 in the text font, TeX writes it U+22C5 in a maths font): an
+# operator, so a run of maths goes on through it instead of being cut there.
+_OPERATORS = frozenset("+-*/=<>^_|~\u00b7\u2219")
 _SIGNS = frozenset("\u2212\u00b1\u2213")  # minus, plus-minus, minus-plus
 _BRACKETS = frozenset("()[]{}")
 _OPENING = frozenset("([{")
@@ -2198,6 +2201,8 @@ def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
             )
             inside = between_digits or (c == "," and depth > 0)
             accent = c in _ACCENTS and i + 1 < n and info.mathy(i + 1)  # the hat of x-hat
+            if chars[i].blank and _between_formulas(chars, i):
+                break
             if info.mathy(i) or chars[i].blank or inside or accent:
                 i += 1
                 continue
@@ -2208,6 +2213,26 @@ def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
             if reasons:
                 runs.append((start, end, reasons))
     return runs
+
+
+def _between_formulas(chars: list[_Char], i: int) -> bool:
+    """Is the blank at `i` the space the page's text puts between two formulas?
+
+    Chromium prints each MathML formula in a maths font, with the spaces inside it in
+    that font too; the space between "B = 0," and "C = 1," (two formulas of one sentence)
+    is a character of the text font. A blank in a text font with maths-font glyphs on both
+    sides ends the run: they are two equations, as the source has them, not one.
+    """
+    if _font_traits(chars[i].font)[2]:
+        return False
+    before = next((c for c in reversed(chars[:i]) if not c.blank), None)
+    after = next((c for c in chars[i + 1 :] if not c.blank), None)
+    return (
+        before is not None
+        and after is not None
+        and _font_traits(before.font)[2]
+        and _font_traits(after.font)[2]
+    )
 
 
 def _trim_run(chars: list[_Char], info: _CharInfo, start: int, end: int) -> tuple[int, int]:
@@ -2270,11 +2295,11 @@ def _unbalanced(text: str, *, closing: bool) -> bool:
 _ACCENTS = frozenset("\u02c6\u02dc\u00af\u02d9\u00a8\u02c7\u02d8")
 # Operators that cannot end an expression: a run ending in one was cut by prose
 # ("b - proj b" broken at a word the run does not take in). Not "|": it closes |x|.
-_TRAILING_OPERATORS = frozenset("+-*/=<>^_~\u2212\u00b1\u2213\u00d7\u00f7\u22c5")
+_TRAILING_OPERATORS = frozenset("+-*/=<>^_~\u2212\u00b1\u2213\u00d7\u00f7\u22c5\u00b7\u2219")
 # Operators that cannot start an expression: a run starting with one is the tail of an
 # expression cut by a line break or by prose ("(50 km)/(60 km/h)] = 40" -> "/h)] = 40").
 # Not "|" (it opens |x|, see `_trim_run`) and not "~" ("~5 m" is about five metres).
-_INFIX_ONLY = frozenset("/*^_=<>\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5")
+_INFIX_ONLY = frozenset("/*^_=<>\u2264\u2265\u2260\u2248\u2261\u00d7\u00f7\u22c5\u00b7\u2219")
 
 
 def _broken_brackets(text: str) -> bool:

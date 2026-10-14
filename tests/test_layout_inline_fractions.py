@@ -246,3 +246,47 @@ def test_a_bracket_followed_by_plain_text_is_not_maths():
         )
 
     assert equations(prose_page(fill)) == []
+
+
+# ------------------------------------------------------ T2-6: dots and neighbours
+
+
+def test_a_middle_dot_in_the_text_font_does_not_cut_a_product():
+    # Chromium prints the product dot of "a . b . c" with U+00B7 in the text font.
+    def fill(page):
+        page.insert_text((72, 140), "so the product is", fontsize=BODY)
+        for x, text, font in [
+            (180, "a", "tiit"),
+            (190, "·", "tiro"),
+            (198, "b", "tiit"),
+            (206, "·", "tiro"),
+            (214, "c", "tiit"),
+        ]:
+            page.insert_text((x, 140), text, fontsize=BODY, fontname=font)
+        page.insert_text((230, 140), "and it grows with the count.", fontsize=BODY)
+
+    found = equations(prose_page(fill))
+    assert [spaceless(e.text) for e in found] == ["a·b·c"]
+
+
+def test_a_text_font_space_between_two_maths_font_formulas_makes_two_equations():
+    # "B = 0, C = 1": two formulas of one sentence, the space between them in the text
+    # font; the spaces inside a formula are in the maths font.
+    def fill(page):
+        page.insert_text((72, 140), "The solution is", fontsize=BODY)
+        page.insert_text((170, 140), "B = 0,", fontsize=BODY, fontname="symb")
+        page.insert_text((206, 140), " ", fontsize=BODY, fontname="helv")
+        page.insert_text((210, 140), "C = 1,", fontsize=BODY, fontname="symb")
+        page.insert_text((250, 140), "and nothing else.", fontsize=BODY)
+
+    found = equations(prose_page(fill))
+    assert [spaceless(e.text) for e in found] == ["B=0", "C=1"]
+
+
+def test_spaces_inside_one_formula_in_the_maths_font_keep_it_whole():
+    def fill(page):
+        page.insert_text((72, 140), "The solution is", fontsize=BODY)
+        page.insert_text((170, 140), "B = 0 + C = 1", fontsize=BODY, fontname="symb")
+        page.insert_text((250, 140), "and nothing else.", fontsize=BODY)
+
+    assert [spaceless(e.text) for e in equations(prose_page(fill))] == ["B=0+C=1"]
