@@ -78,6 +78,7 @@ class PurgeStats:
     unaggregated_deleted: int  # finished jobs deleted without their counts
     events_deleted: int = 0  # usage events past EVENT_RETENTION_DAYS
     pending_deleted: int = 0  # large files waiting for their pages to be chosen (T3-3)
+    results_deleted: int = 0  # answers to uploads of several files, past their hour (T3-4)
 
 
 def purge_expired(
@@ -104,7 +105,7 @@ def purge_expired(
     with session_scope(factory) as session:
         stats.events_deleted = purge_old_events(session, now)
         stats.pending_deleted = purge_pending(session, now)
-        purge_upload_results(session, now)
+        stats.results_deleted = purge_upload_results(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -113,6 +114,7 @@ def purge_expired(
         unaggregated_deleted=stats.unaggregated_deleted,
         events_deleted=stats.events_deleted,
         pending_deleted=stats.pending_deleted,
+        results_deleted=stats.results_deleted,
     )
     return stats
 

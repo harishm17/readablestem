@@ -366,17 +366,19 @@ def test_a_conversion_during_an_outage_is_not_a_dead_end(site):
 def test_trying_again_asks_only_for_the_items_the_service_missed(site):
     """Three of the four items fail at first: the one that was converted is kept."""
     clean, clean_requests, _ = baseline(site)
-    # Find the pictures of the items: take them from the clean job's crops.
-    from a11y_stem.web.db import Blob
+    # Find the pictures of the items as the model is sent them: the crop a conversion cuts
+    # first (an unconverted equation's stored crop is another, sharper one: T3-15).
+    from a11y_stem.pipeline import layout
 
-    with session_scope(site.ctx.factory) as session:
-        clean_id = session.scalars(select(Job.id)).first()
+    pdf = PDF.read_bytes()
+    by_id = {e.id: e for e in clean.elements}
+    try:
         crops = {
-            b.element_id: image_key(b.content)
-            for b in session.scalars(
-                select(Blob).where(Blob.job_id == clean_id, Blob.kind == "crop")
-            )
+            f.element_id: image_key(layout.crop(pdf, by_id[f.element_id]))
+            for f in model_fixes(clean)
         }
+    finally:
+        layout.release(pdf)
     ids = sorted(f.element_id for f in model_fixes(clean))
     missed = ids[1:]
     site.state["down_for"] = {crops[i] for i in missed if i in crops}

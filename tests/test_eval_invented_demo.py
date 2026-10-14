@@ -37,9 +37,11 @@ def test_nothing_the_tool_copied_from_the_pdf_is_unsupported(demo_score):
 def test_the_only_unsupported_text_is_the_about_section_the_tool_writes(demo_score):
     flagged = [v for v in demo_score.verdicts if v.unsupported]
     assert flagged and all(v.authored for v in flagged)
-    assert {v.kind for v in flagged} == {"sentence", "heading"}
-    assert demo_score.counts["sentence"].unsupported == 4  # the about section's four sentences
-    assert demo_score.counts["heading"].unsupported == 1
+    # The about section's sentences. Its title is a labelled region and no longer a heading
+    # (T3-13), so no heading is flagged now.
+    assert {v.kind for v in flagged} == {"sentence"}
+    assert demo_score.counts["sentence"].unsupported == 4
+    assert demo_score.counts["heading"].unsupported == 0
 
 
 def test_equations_align_to_gold_and_add_no_symbol(demo_score):

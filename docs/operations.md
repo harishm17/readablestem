@@ -71,6 +71,14 @@ made, the same hourly purge deletes it (`ops.retention.purge_pending`, logged as
 `erase_user`. Past its time it answers 404 before the purge runs. The sample document
 (`web/sample.py`) is an ordinary finished job with `is_sample` set, deleted by the same clock.
 
+### Answers to uploads of several files
+
+The page that says what became of the files of one upload (`web/upload_result.py`, docs/web.md
+"Several files in one upload") is a row of `upload_results`: file names and numbers, no document
+content. It is document-derived all the same, so `retain_until` is an hour after it was made, the
+hourly purge deletes it (`ops.retention.purge_upload_results`, logged as `results_deleted` in
+`purge_done`), `erase_user` deletes the person's, and past its time it answers 404.
+
 ### Usage events
 
 `events` (`web/events.py`, docs/web.md "Usage events") holds content-free, pseudonymous
