@@ -40,7 +40,7 @@ clear it when done.
 
 | ID | Where | Decision | Recommended default |
 |---|---|---|---|
-| P1 | `SECURITY.md` and `pyproject.toml` | The security contact is `harish_manoharan@outlook.com` in one and `harishmanoharan17@gmail.com` in the other. | Use one address you read daily, a dedicated alias if you have one; make both files agree. |
+| P1 | `SECURITY.md` and `pyproject.toml` | The security contact is `harish_manoharan@outlook.com` in one and `harishmanoharan17@gmail.com` in the other. | Use one address you read daily, a dedicated alias if you have one; make both files agree. Chosen: `SECURITY.md` now says `harishmanoharan17@gmail.com`; the `pyproject.toml` authors stay as they are. |
 | P2 | GitHub settings | Private vulnerability reporting, secret scanning and push protection, branch protection on `main`. | Turn all on the day the repository is public. |
 | P3 | `privacy.html` ("Changes to this notice", new) | How people are told of changes. | Use the sentence in the template comment. (launch-check) |
 | P4 | `terms.html` (governing law, new) | Jurisdiction. | Say nothing beyond "governed by the law of {state}" for a free beta; ask a lawyer or a university counsel before adding a venue or a liability cap. (launch-check) |

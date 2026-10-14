@@ -14,7 +14,7 @@ Please report privately, not in a public issue or pull request.
 
 1. Preferred: use GitHub's private vulnerability reporting (the repository's Security tab,
    "Report a vulnerability").
-2. Otherwise email harish_manoharan@outlook.com with "a11y-stem security" in the subject.
+2. Otherwise email harishmanoharan17@gmail.com with "a11y-stem security" in the subject.
 
 Include the commit you tested, the steps to reproduce, and what an attacker gains. Please
 do not attach real student records or anyone else's documents; a small synthetic PDF is
