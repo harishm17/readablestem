@@ -304,7 +304,11 @@ comes before the upload form.
 
 Only the title and the fixes are read from each stored result, through JSON paths, and
 only for finished jobs. While a document is waiting or converting, htmx polls
-`/app/documents` every 5 s; `list_version` (from the jobs' own columns) answers 204 when
+`/app/documents` every 5 s; the list reads no stored result: the title and the number
+of open decisions of a finished job are columns of the job (`jobs.result_title`,
+`jobs.open_decisions`), set whenever `result_json` is assigned (a SQLAlchemy set event in
+`web/db.py`), and a finished job from before them is filled in the first time the list
+sees it. `list_version` (from the jobs' own columns) answers 204 when
 nothing changed, otherwise the whole list is swapped. Every link in it has a stable id,
 so htmx puts focus back on the same link after a swap; the list is not a live region,
 but the tab title follows it ("My documents (4 of 6 finished)"). Without JavaScript a

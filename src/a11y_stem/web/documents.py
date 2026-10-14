@@ -13,11 +13,15 @@ A document is shown by its title (the PDF's title or its first heading, as in th
 title, by its file name. Titles and file names are document-derived: shown to their
 owner only, never logged.
 
-Only what the list needs is read from the stored results, through JSON paths (the title
-and the fixes, not the elements or the HTML), and only for finished jobs. While anything
-is waiting or converting, htmx polls `GET /app/documents`; `list_version` says whether
-anything changed from the jobs' own columns alone, so an unchanged list costs one small
-query and a 204.
+The list reads no stored result. The two facts it needs from one, the title and how many
+decisions are open, are columns of the job (`jobs.result_title`, `jobs.open_decisions`),
+set whenever a result is stored (`list_facts`, called from the `Job.result_json` set
+event in `web.db`): while anything is waiting or converting, htmx polls
+`GET /app/documents` and every change of a page count rebuilds the list, which used to
+load and validate the fixes of every finished document each time. `list_version` says
+whether anything changed from the jobs' own columns alone, so an unchanged list costs one
+small query and a 204. A finished job from before the columns existed (both NULL) is read
+once from its result and the two facts are stored.
 """
 
 from __future__ import annotations
@@ -157,6 +161,14 @@ def open_decisions(fixes: object) -> int:
     return triage.open_decisions(_fixes(fixes))
 
 
+def list_facts(result: object) -> tuple[int, str]:
+    """(decisions still open, title) of a stored result, the two facts the list shows."""
+    if not isinstance(result, dict):
+        return 0, ""
+    title = result.get("title")
+    return open_decisions(result.get("fixes")), title if isinstance(title, str) else ""
+
+
 def decided_by_you(fixes: object) -> int:
     """Decisions a reviewer made in a stored result's fixes (a heading group is one)."""
     return len(triage.units(f for f in _fixes(fixes) if f.decided_by_reviewer))
@@ -174,7 +186,12 @@ def list_version(session: Session, user_id: str, *, now: datetime, budget_closed
         .where(*_live(user_id, now))
         .order_by(Job.id)
     ).all()
-    raw = repr([tuple(row) for row in rows] + [budget_closed])
+    return _version([tuple(row) for row in rows], budget_closed)
+
+
+def _version(rows: list[tuple[Any, ...]], budget_closed: bool) -> str:
+    """The digest of (id, status, pages_done, result_version, error_code) per job, by id."""
+    raw = repr([*rows, budget_closed])
     return hashlib.sha256(raw.encode()).hexdigest()[:16]
 
 
@@ -191,22 +208,12 @@ def documents(
             Job.error_code,
             Job.created_at,
             Job.retain_until,
+            Job.result_version,
         )
         .where(*_live(user_id, now))
         .order_by(Job.created_at.desc(), Job.id)
     ).all()
-    done = [job.id for job in jobs if job.status == JobStatus.DONE]
-    stored: dict[str, tuple[Any, ...]] = {}
-    if done:
-        query = select(
-            Job.id,
-            Job.result_json["title"].as_string(),
-            Job.result_json["fixes"],
-            Job.title_override,
-        ).where(Job.id.in_(done))
-        stored = {
-            job_id: (title, fixes, own) for job_id, title, fixes, own in session.execute(query)
-        }
+    stored = _stored_facts(session, [job.id for job in jobs if job.status == JobStatus.DONE])
     groups = [
         Group("decide", "Needs your decisions"),
         Group("ready", "Ready to download"),
@@ -214,7 +221,7 @@ def documents(
     ]
     by_key = {g.key: g for g in groups}
     for job in jobs:
-        title, fixes, own = stored.get(job.id, (None, None, None))
+        title, open_count, own = stored.get(job.id, (None, 0, None))
         row = DocumentRow(
             id=job.id,
             title=display_title(title, job.filename, own),
@@ -224,13 +231,39 @@ def documents(
             status=str(job.status),
             created_at=as_utc(job.created_at),
             retain_until=as_utc(job.retain_until),
-            open_decisions=open_decisions(fixes),
+            open_decisions=open_count,
         )
         _label(row, job.error_code, budget_closed)
         by_key[row.group].rows.append(row)
     by_key["decide"].rows.reverse()  # oldest first (module docstring)
-    version = list_version(session, user_id, now=now, budget_closed=budget_closed)
-    return DocumentList(groups=groups, version=version)
+    # The same digest `list_version` makes, from the rows already read: no second query.
+    keys = sorted((j.id, j.status, j.pages_done, j.result_version, j.error_code) for j in jobs)
+    return DocumentList(groups=groups, version=_version(keys, budget_closed))
+
+
+def _stored_facts(session: Session, done: list[str]) -> dict[str, tuple[str, int, str | None]]:
+    """job id -> (result title, open decisions, title override) of the finished jobs. The
+    columns are read for all of them; a job from before they existed has its result read
+    (just its title and fixes) and the facts stored, once."""
+    if not done:
+        return {}
+    rows = session.execute(
+        select(Job.id, Job.result_title, Job.open_decisions, Job.title_override).where(
+            Job.id.in_(done)
+        )
+    ).all()
+    stored: dict[str, tuple[str, int, str | None]] = {}
+    missing: list[str] = []
+    for job_id, title, count, own in rows:
+        if count is None or title is None:
+            missing.append(job_id)
+        else:
+            stored[job_id] = (title, int(count), own)
+    if missing:
+        for job in session.scalars(select(Job).where(Job.id.in_(missing))):
+            job.result_json = job.result_json  # the set event stores the two facts
+            stored[job.id] = (job.result_title or "", job.open_decisions or 0, job.title_override)
+    return stored
 
 
 def _label(row: DocumentRow, error_code: str | None, budget_closed: bool) -> None:

@@ -369,6 +369,43 @@ def test_the_content_migration_round_trips_on_postgres(pg_url):
         engine.dispose()
 
 
+def test_the_list_facts_migration_round_trips_on_postgres(pg_url):
+    """Down to the exam revision (the columns gone, jobs kept), up again (schema matches
+    the models), and an older release's job insert still gets a valid row."""
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from a11y_stem.web.database import alembic_config
+    from test_web_migrations import EXAM_REVISION, FACTS_COLUMNS, INSERT_JOB, INSERT_USER
+
+    config = alembic_config(pg_url)
+    config.attributes["configure_logger"] = False
+    command.upgrade(config, "head")
+    command.downgrade(config, EXAM_REVISION)
+    engine = create_engine(pg_url)
+    try:
+        assert not {c["name"] for c in inspect(engine).get_columns("jobs")} & FACTS_COLUMNS
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+    finally:
+        engine.dispose()
+    command.upgrade(config, "head")
+    engine = create_engine(pg_url)
+    try:
+        with engine.begin() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+            conn.execute(text(INSERT_JOB), {"id": "j2"})
+            found = conn.execute(
+                text("SELECT id, open_decisions, result_title FROM jobs ORDER BY id")
+            ).all()
+        assert [tuple(row) for row in found] == [("j1", None, None), ("j2", None, None)]
+    finally:
+        engine.dispose()
+
+
 def test_erasure_and_course_deletion_on_postgres(factory):
     """Real ON DELETE behaviour: a deleted course leaves its job (course_id NULL) and
     takes its notation; erasing a user leaves nothing of theirs and keeps the other

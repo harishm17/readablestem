@@ -229,6 +229,8 @@ def test_jobs_survive_the_content_migration_and_old_inserts_still_work(tmp_path)
 TIER1_REVISION = "7c1d9a4e2b60"
 TIER1_JOB_COLUMNS = {"retention_mode", "title_override", "contact_line"}
 EXAM_REVISION = "3b8e5f1a9d27"
+FACTS_REVISION = "9d2f6a41c7e3"
+FACTS_COLUMNS = {"open_decisions", "result_title"}
 
 
 def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
@@ -237,7 +239,9 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert revision is not None and revision.down_revision == CONTENT_REVISION
     exam = script.get_revision(EXAM_REVISION)
     assert exam is not None and exam.down_revision == TIER1_REVISION
-    assert migration_heads() == {EXAM_REVISION}  # one head, the newest
+    facts = script.get_revision(FACTS_REVISION)
+    assert facts is not None and facts.down_revision == EXAM_REVISION
+    assert migration_heads() == {FACTS_REVISION}  # one head, the newest
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
@@ -333,5 +337,55 @@ def test_the_exam_migration_downgrades_and_upgrades_again(tmp_path):
     engine = create_engine(url)
     try:
         assert "exam_mode" in {c["name"] for c in inspect(engine).get_columns("jobs")}
+    finally:
+        engine.dispose()
+
+
+# --------------------------------------------------------------------------- list facts
+
+
+def test_the_list_facts_migration_keeps_jobs_and_old_inserts_still_work(tmp_path):
+    """Jobs made before it have no facts (the list fills them in) and a current file; an
+    older release inserting a job without the new columns still gets a valid row."""
+    url = f"sqlite:///{tmp_path}/facts.db"
+    migrate(url, EXAM_REVISION)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_JOB), {"id": "j2"})  # a release from before the columns
+            found = conn.execute(
+                text("SELECT id, open_decisions, result_title FROM jobs ORDER BY id")
+            ).all()
+        assert [tuple(row) for row in found] == [("j1", None, None), ("j2", None, None)]
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_list_facts_migration_downgrades_and_upgrades_again(tmp_path):
+    url = f"sqlite:///{tmp_path}/facts-down.db"
+    upgrade(url)
+    migrate(url, EXAM_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        columns = {c["name"] for c in inspect(engine).get_columns("jobs")}
+        assert not columns & FACTS_COLUMNS and "exam_mode" in columns
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        assert {c["name"] for c in inspect(engine).get_columns("jobs")} >= FACTS_COLUMNS
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:
         engine.dispose()
