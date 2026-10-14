@@ -879,6 +879,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `LayoutError.code` (e.g. `encrypted`, `unreadable`) | The layout step refused the PDF |
   | `budget_daily`, `budget_job_usd`, `budget_job_calls` | `BudgetExceeded` escaped the pipeline |
   | `handwritten`, `handwritten_no_text`, `scanned`, `scanned_ocr` | Every analysed page was handwritten or scanned (`page_type.refusal_code` on the stored page types; the upload probe normally refuses these first). A result stored before page types: `scanned` when every page was only a picture of a page |
+  | `too_complex` | A page needs more time or memory to read than a conversion has: the layout step's child process (open and render the pages, `layout._probe_pages`) passed its time limit (`PROBE_TIMEOUT_S` + `PROBE_PER_PAGE_S` per page after the first) or its 768 MB address-space cap (`PROBE_MEMORY_BYTES`) |
   | `no_content` | The result had no elements at all |
   | `model_not_configured` | The model client is misconfigured (no OpenAI key): every job would fail the same way |
   | `access_removed` | The owner was removed from the allowlist |

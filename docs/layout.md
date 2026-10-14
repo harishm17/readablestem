@@ -1062,6 +1062,32 @@ The decisions in the rules, with the measured values next to each threshold in t
   drawing fills the page, which keeps the page image (the safety net below). So writing
   under a long typed header that does not fill the page becomes a figure the model
   describes, once the budget has run out.
+- **Page cap** (`page_type.PAGE_MAX_PATHS` = 50,000 drawings, `PAGE_MAX_ITEMS` = 500,000
+  path items): the budget above is checked only after the work that costs most, and one
+  dense page costs seconds and tens of megabytes of Python objects whatever the budget (a
+  page of 86,000 strokes: 5 to 9 s in layout; 30 of them 4 minutes and 1.5 GB, before the
+  cap). A page over either number is not read for drawings at all: `ink_stats` returns at
+  once with `analysed` False and `over_cap` True, the page says `ink_not_analysed` and
+  `drawings_over_cap`, `layout._read_page` builds no paths for it, and `kept_reason` keeps
+  it as its page image with a decision (`unread_page`), whatever the typed text on it: a
+  page with visible text keeps that text (as `text_kept` above), and a page with none
+  has nothing but the image. Over the cap a page was before either read in full (a typed
+  page with a huge vector figure: the figure went to the figure model; now the page image
+  keeps it) or analysed as ink (handwritten pages: the kept reason was
+  `handwritten_page`, now `unread_page`; an upload of such a file is accepted, not refused,
+  as for every page whose ink was not analysed). The largest real page found has under
+  30,000 paths; the dense synthetic pages in the research corpus have 30,000 to 86,000.
+  The stored page record carries the reason code, so `kept_reason` gives the same answer
+  from it.
+- **A page kept as its image beside its text** (`text_kept`) is not given to the table
+  detector (docs/tables.md): its drawings are not read, so no rule can judge a grid, and
+  the detector is the slowest step on the pen-stroke pages these are (a lecture PDF with
+  pen annotation: 12 pages, 4 minutes, nearly all of it there).
+- **Clustering** (`layout._cluster`, the groups of drawings that make a figure) sweeps
+  the drawings from left to right and looks only at earlier boxes still in reach and in
+  the horizontal bands the box touches, instead of every earlier box in its column. The
+  groups are the same ones (`_cluster_scan` is the plain version it is tested against);
+  on a page of 40,000 strokes it took 38 s and now takes under a second.
 
 **The safety net** (C1.1, independent of the page types): after layout, a page keeps its
 page image, with a decision (`unread_page`), when something painted on it was read into

@@ -56,6 +56,13 @@ documents are the repository's own layout fixtures. `uv run python scripts/bench
 machine (these are from a 16-core machine with a load average over 20, so only the ratios
 mean anything).
 
+`scripts/bench_layout.py` times `layout.analyze` alone on synthetic pages of tens of
+thousands of tiny paths (and on any `--pdf` files you name, read only), each in its own
+process with its peak memory. `scripts/layout_identity.py snapshot DIR` and `compare A B`
+check that a change to layout leaves the output of every fixture, development-set page and
+table set exactly as it was (full elements, kept pages, page types, notices); take a
+snapshot before the change (from an old `src/` as above) and one after.
+
 | Command | Measures | Before | After |
 |---|---|---|---|
 | `convert --pages 12 --latency 1.5 --concurrency 4 8` | one conversion, 82 calls | 35.3 s at 4, layout 6.2 s CPU | 19.3 s at 8, layout 3.6 s CPU |

@@ -52,6 +52,7 @@ import re
 import statistics
 import sys
 import threading
+import time
 import unicodedata
 from collections import Counter
 from collections.abc import Callable, Generator, Iterable, Sequence
@@ -118,6 +119,39 @@ STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table m
 # lines with such a gap at one x position (the arbitration's MIN_GRID_LINES).
 PREFILTER_GAP = 0.5
 PREFILTER_LINES = 3
+# The detector (PyMuPDF Layout's model and `find_tables`) costs more the more there is drawn
+# on a page: a lecture slide with 35,000 path items of pen strokes took 47 s on one core
+# (the model's text extraction with vector collection 14 s of it, `get_drawings` four times
+# after), a page with a table and a few hundred items under a second, a typed page with
+# 5,000 items of pen strokes 0.4 s. A page with more items than this has no table
+# proposed: its lines are read as text, as on a page the detector found nothing on. The
+# largest page with a table in the repository's fixtures, the development set, the table
+# sets and the research corpora has 26,500.
+MAX_DETECTOR_ITEMS = 30_000
+# A document's time budget for slow detections. Pages differ too much in cost to tell by
+# what is drawn on them (a lecture slide with 200 pen-stroke paths of curves: 15 s, a page
+# with 800 stroked paths of lines: 9 s, a page of 30,000 items of lines: 0.5 s), so the
+# time is counted: each detection longer than DETECTOR_FREE_S (a page with a table takes
+# under a second; 3 s leaves room for a slow core) draws the part beyond it from
+# DETECTOR_EXCESS_S, and once that is used up the rest of the document's pages get no
+# proposals. A document that stays within it reads exactly as without the budget.
+DETECTOR_FREE_S = 3.0
+DETECTOR_EXCESS_S = 60.0
+
+
+class DetectorBudget:
+    """What is left of a document's slow-detection time (`DETECTOR_EXCESS_S`)."""
+
+    def __init__(self, excess_s: float = DETECTOR_EXCESS_S, free_s: float = DETECTOR_FREE_S):
+        self.left = excess_s
+        self.free = free_s
+
+    def open(self) -> bool:
+        return self.left > 0
+
+    def spend(self, seconds: float) -> None:
+        self.left -= max(0.0, seconds - self.free)
+
 
 # Reasons on a TABLE element (`Element.reasons`), content-free like layout's.
 REASON_RULED = "ruled grid"
@@ -537,11 +571,20 @@ def _positions(values: Iterable[float]) -> int:
     return count
 
 
-def propose(page: pymupdf.Page) -> list[Proposal]:
+def propose(page: pymupdf.Page, budget: DetectorBudget | None = None) -> list[Proposal]:
     """Candidate tables on a page that passed layout's probe (never run it on one that did
     not: the layout model renders the page, where the known MuPDF aborts are)."""
+    if budget is not None and not budget.open():
+        _warn_once("detector_budget", "table detection stopped: this document took too long")
+        return []
     if not load_detector():
         return []
+    with _pdf_lock():
+        items = sum(len(d["items"]) for d in page.get_cdrawings())
+    if items > MAX_DETECTOR_ITEMS:
+        _warn_once("detector_items", "table detection skipped on a page with too many drawn items")
+        return []
+    started = time.perf_counter()
     with _pdf_lock(), _quiet_stdout() as captured:
         try:
             finder = page.find_tables(union=True, refine=True)
@@ -550,6 +593,8 @@ def propose(page: pymupdf.Page) -> list[Proposal]:
             return []
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()
+            if budget is not None:
+                budget.spend(time.perf_counter() - started)
         if captured:
             log.info("table detection: %d PyMuPDF messages dropped", len(captured))
         if finder is None:
@@ -1827,6 +1872,7 @@ def find(
     paths: Sequence[PathLike],
     *,
     clean: Callable[[str], str] = lambda s: " ".join(s.split()),
+    budget: DetectorBudget | None = None,
 ) -> list[PageTable]:
     """The data tables of a page that passed layout's probe, in top-to-bottom order.
 
@@ -1836,7 +1882,7 @@ def find(
     warning), so a job is never lost to table detection.
     """
     try:
-        tables, _ = find_with_judgements(page, lines, paths, clean=clean)
+        tables, _ = find_with_judgements(page, lines, paths, clean=clean, budget=budget)
     except Exception as exc:
         log.warning("table detection failed on a page: %s", type(exc).__name__)
         return []
@@ -1849,9 +1895,10 @@ def find_with_judgements(
     paths: Sequence[PathLike],
     *,
     clean: Callable[[str], str] = lambda s: " ".join(s.split()),
+    budget: DetectorBudget | None = None,
 ) -> tuple[list[PageTable], list[tuple[Proposal, Judgement]]]:
     """`find`, plus every proposal with its judgement (for the evaluation)."""
-    proposals = propose(page)
+    proposals = propose(page, budget)
     if not proposals:
         return [], []
     view = _PageView.of(page, lines, paths)
