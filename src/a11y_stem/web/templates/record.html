@@ -38,6 +38,8 @@
     <li>{{ c.decided }} decided by a person ({{ record.decisions|length }} {{ "step" if record.decisions|length == 1 else "steps" }} listed below).</li>
     <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
     <li>{{ c.as_image }} {{ "part" if c.as_image == 1 else "parts" }} shown as pictures of the original.</li>
+    {% for name, n in record.by_hand.items() %}<li>{{ name }}: {{ n }}.</li>{% endfor %}
+    {% if record.left_out_pages %}<li>{{ "Page" if record.left_out_pages|length == 1 else "Pages" }} left out of the student file: {{ record.left_out_pages|join(", ") }}.</li>{% endif %}
   </ul>
 </section>
 

@@ -41,6 +41,8 @@ from a11y_stem.web.deps import (
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.page_edits import StructureChange
 from a11y_stem.web.review import (
+    BULK_KEY,
+    MODEL_READ_KEY,
     FieldError,
     ReviewChange,
     ReviewInvalid,
@@ -532,6 +534,14 @@ def write_review(
     return changes, result
 
 
+def _marked_bulk(result: DocumentResult) -> list[ReviewChange]:
+    """The clean tables accepted, each marked in the record as one of an action (T3-6)."""
+    changes = accept_clean_tables_rule(result)
+    for change in changes:
+        change.after[BULK_KEY] = True
+    return changes
+
+
 @router.post("/jobs/{job_id}/tables/accept-clean", dependencies=[Depends(require_csrf)])
 def accept_clean_tables(
     request: Request,
@@ -547,9 +557,7 @@ def accept_clean_tables(
 
     view = LIST_VIEW if view == LIST_VIEW else "split"
     try:
-        changes, result = write_review(
-            request, job_id, user, version, accept_clean_tables_rule, kind="group"
-        )
+        changes, result = write_review(request, job_id, user, version, _marked_bulk, kind="group")
     except ReviewStale:
         return _stale_page(request, job_id, user, view, "tables")
     except ReviewInvalid as exc:
@@ -640,7 +648,7 @@ def read_cell(
             job_id,
             user,
             version,
-            lambda stored: [apply_review(stored, element_id, "edit", form)],
+            lambda stored: [_marked_model_read(apply_review(stored, element_id, "edit", form))],
             kind="single",
         )
     except ReviewStale:
@@ -662,3 +670,9 @@ def read_cell(
 
 
 NOT_READ = "The tool could not read this cell as maths. Type the LaTeX yourself."
+
+
+def _marked_model_read(change: ReviewChange) -> ReviewChange:
+    """A cell the model read, marked as such in the record (T3-6)."""
+    change.after[MODEL_READ_KEY] = True
+    return change

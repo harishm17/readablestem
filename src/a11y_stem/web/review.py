@@ -413,6 +413,10 @@ LATER_SNAPSHOT_FIELDS = frozenset({"described"})
 # ANYWAY_KEY for an edit used although it differs from the PDF (`apply_review`).
 WRITE_KEY = "write"
 ANYWAY_KEY = "anyway"
+# Also `True` in `after`, for the record (T3-6): a decision made as one of many clean tables
+# accepted in one action (T3-11), and a table cell the model read at the person's request.
+BULK_KEY = "bulk"
+MODEL_READ_KEY = "model_read"
 # A `before` that holds a structural snapshot instead of a fix's (`web.page_edits.capture`).
 STRUCTURE_KEY = "structure"
 

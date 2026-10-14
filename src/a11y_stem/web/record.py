@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -40,7 +41,7 @@ from a11y_stem.core.types import (
 from a11y_stem.web import job_page
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.messages import explain_check, explain_reason, severity_label
-from a11y_stem.web.review import UNDO_ACTION, item_labels
+from a11y_stem.web.review import BULK_KEY, MODEL_READ_KEY, UNDO_ACTION, item_labels
 from a11y_stem.web.views import KIND_LABELS
 
 STATEMENT = (
@@ -59,7 +60,36 @@ ACTION_WORDS = {
     "edit": "Edited",
     "reject": "Rejected, original kept",
     "add_data_table": "Added a data table",
+    # Edits no decision on a proposal covers (T3-5, T3-16).
+    "describe": "Described the image in words",
+    "edit_text": "Changed the words of the text",
+    "make_heading": "Made a heading of a paragraph",
+    "add_figure": "Added a picture the tool missed, with the person's own alt text",
+    "add_equation": "Marked an equation the tool missed; the tool read it and a person checked",
+    "omit_page": "Left the page out of the student file and of the review",
+    "restore_page": "Put the page back into the student file and the review",
+    "carried": "Carried over from the earlier version of the document",
     UNDO_ACTION: "Undid the decision before",
+}
+# A decision with a mark in its `after` (web.review.BULK_KEY, MODEL_READ_KEY) says more.
+BULK_WORDS = "Accepted, together with the other clean tables, in one action"
+MODEL_READ_WORDS = "Table cell read by the AI service at the person's request, then saved"
+# What a carried edit was (web.carry_edits.CARRIED_KEY).
+CARRIED_EDIT_WORDS = {
+    "text": "change to the words of the text",
+    "heading": "paragraph made a heading",
+    "picture": "picture added by hand",
+    "equation": "equation marked by hand",
+    "page_left_out": "page left out",
+}
+# What the tool had, for an edit on something that is not a proposal of the tool.
+STRUCTURE_TOOL_HAD = {
+    "edit_text": "Text as read from the PDF",
+    "make_heading": "A paragraph",
+    "add_figure": "Not found by the tool",
+    "add_equation": "Not found by the tool",
+    "omit_page": "A page of the file",
+    "restore_page": "A page left out",
 }
 TOOL_STATUS_WORDS = {
     "needs_review": "Asked for a decision",
@@ -128,6 +158,9 @@ class Record:
     failed_checks: list[CheckRow] = field(default_factory=list)
     open_items: list[str] = field(default_factory=list)
     not_checked: list[str] = field(default_factory=list)
+    # What the instructor did by hand that the tool did not propose, as it stands now.
+    by_hand: dict[str, int] = field(default_factory=dict)
+    left_out_pages: list[int] = field(default_factory=list)  # 1-based
 
 
 def long_when(value: datetime | None) -> str:
@@ -146,8 +179,23 @@ def _page_of(elements: dict[str, Element], element_id: str) -> int | None:
     return element.page + 1 if element is not None else None
 
 
-def _decision_words(action: str) -> str:
+def _decision_words(edit: Any) -> str:
+    """What the decision was, in words, from the stored action and the marks its `after` keeps."""
+    action = str(edit.action)
+    after = edit.after if isinstance(edit.after, dict) else {}
+    if action == "accept" and after.get(BULK_KEY):
+        return BULK_WORDS
+    if action == "edit" and after.get(MODEL_READ_KEY):
+        return MODEL_READ_WORDS
+    if action == "carried" and after.get("carried_edit") in CARRIED_EDIT_WORDS:
+        return f"Carried over from the earlier version: {CARRIED_EDIT_WORDS[after['carried_edit']]}"
     return ACTION_WORDS.get(action, "Changed")
+
+
+def _page_number(element_id: str) -> int | None:
+    """1-based page of a page-level edit recorded under "page-3"."""
+    head, _, tail = element_id.partition("-")
+    return int(tail) if head == "page" and tail.isdecimal() else None
 
 
 def not_checked_list(result: DocumentResult, counts: job_page.Breakdown) -> list[str]:
@@ -177,7 +225,50 @@ def not_checked_list(result: DocumentResult, counts: job_page.Breakdown) -> list
             f"{counts.as_image} parts are shown as pictures of the original. Screen "
             "readers cannot read them."
         )
+    for line in by_hand_not_checked(result):
+        out.append(line)
     return out
+
+
+ADDED_ID = re.compile(r"p\d+-x\d+")
+
+
+def by_hand_counts(result: DocumentResult) -> dict[str, int]:
+    """What the instructor added or described by hand, from the stored result: pictures and
+    equations added (their ids have an "x"), images described in words."""
+    elements = [*result.elements, *(e for held in result.omitted for e in held.elements)]
+    fixes = [*result.fixes, *(f for held in result.omitted for f in held.fixes)]
+    added = [e for e in elements if ADDED_ID.fullmatch(e.id)]
+    counts = {
+        "Pictures added by hand": sum(1 for e in added if e.kind is Kind.FIGURE),
+        "Equations marked by hand": sum(1 for e in added if e.kind is Kind.EQUATION),
+        "Images described in words": sum(1 for f in fixes if f.described),
+    }
+    return {name: n for name, n in counts.items() if n}
+
+
+def by_hand_not_checked(result: DocumentResult) -> list[str]:
+    lines = []
+    counts = by_hand_counts(result)
+    if counts.get("Images described in words"):
+        lines.append(
+            f"{counts['Images described in words']} images are described in words by the "
+            "person. The tool checked the description's form (its length, no web address, not "
+            "a file name), not whether it says what the image shows."
+        )
+    added = counts.get("Pictures added by hand", 0)
+    if added:
+        lines.append(
+            f"{added} pictures were added by hand, with the person's own alt text, which the "
+            "tool did not check against the picture."
+        )
+    if result.omitted:
+        pages = ", ".join(str(n) for n in sorted(o.page + 1 for o in result.omitted))
+        lines.append(
+            f"Page {pages} {'was' if len(result.omitted) == 1 else 'were'} left out by the "
+            "person: not reviewed, and not in the student file."
+        )
+    return lines
 
 
 def build(
@@ -197,26 +288,34 @@ def build(
     """The record from a finished job's parts. `edits` are its `ReviewEdit` rows (any
     order); `who` maps a user id to the name shown for them."""
     elements = {e.id: e for e in result.elements}
-    labels = item_labels(result)
     fixes: dict[str, Fix] = {}
     for fix in result.fixes:
         fixes.setdefault(fix.element_id, fix)
+    # What the pages left out hold is still a part of the document: a decision made before
+    # the page was left out names an item that is there.
+    for held in result.omitted:
+        for e in held.elements:
+            elements.setdefault(e.id, e)
+        for f in held.fixes:
+            fixes.setdefault(f.element_id, f)
+    labels = item_labels(result)
     counts = job_page.breakdown(result.fixes)
     decisions = []
     for edit in sorted(edits, key=lambda e: (as_utc(e.created_at) or e.created_at, e.id)):
         fix = fixes.get(edit.element_id)
-        kind = fix.kind.value if fix is not None else ""
-        item = labels.get(edit.element_id) or (
-            KIND_LABELS.get(Kind(kind), kind.title()) if kind else "Item"
-        )
-        before = (edit.before or {}).get("status", "")
+        element = elements.get(edit.element_id)
+        kind = fix.kind.value if fix is not None else (element.kind.value if element else "")
+        page_edit = _page_number(edit.element_id)
+        words = KIND_LABELS.get(Kind(kind), kind.replace("_", " ").title()) if kind else "Item"
+        item = labels.get(edit.element_id) or (f"Page {page_edit}" if page_edit else words)
+        before = (edit.before or {}).get("status", "") or STRUCTURE_TOOL_HAD.get(edit.action, "")
         decisions.append(
             DecisionRow(
                 when=as_utc(edit.created_at) or edit.created_at,
                 item=item,
-                page=_page_of(elements, edit.element_id),
-                tool_had=TOOL_STATUS_WORDS.get(str(before), ""),
-                decision=_decision_words(edit.action),
+                page=page_edit if page_edit is not None else _page_of(elements, edit.element_id),
+                tool_had=TOOL_STATUS_WORDS.get(str(before), str(before)),
+                decision=_decision_words(edit),
                 by=who.get(edit.user_id, owner),
             )
         )
@@ -258,6 +357,8 @@ def build(
         failed_checks=failed,
         open_items=open_items,
         not_checked=not_checked_list(result, counts),
+        by_hand=by_hand_counts(result),
+        left_out_pages=sorted(o.page + 1 for o in result.omitted),
     )
 
 
@@ -313,6 +414,11 @@ def to_csv(record: Record) -> str:
     row("summary", "Decided by a person", detail=c.decided)
     row("summary", "Decisions still open", detail=c.decisions)
     row("summary", "Shown as pictures of the original", detail=c.as_image)
+    for name, n in record.by_hand.items():
+        row("summary", name, detail=n)
+    if record.left_out_pages:
+        pages = " ".join(str(n) for n in record.left_out_pages)
+        row("summary", "Pages left out of the student file", detail=pages)
     for d in record.decisions:
         row("decision", d.item, d.page or "", d.tool_had, d.decision, d.by, iso_when(d.when))
     for item in record.open_items:
