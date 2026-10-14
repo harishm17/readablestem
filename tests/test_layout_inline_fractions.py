@@ -13,6 +13,7 @@ from __future__ import annotations
 import pymupdf
 
 from a11y_stem.core.types import Element, Kind
+from a11y_stem.pipeline import layout
 from a11y_stem.pipeline.layout import analyze
 
 BODY = 11.0
@@ -170,3 +171,45 @@ def test_the_period_of_an_exercise_number_is_not_taken_into_a_binomial():
     elements = prose_page(fill)
     texts = [spaceless(e.text) for e in equations(elements)]
     assert all(not t.startswith("40") for t in texts)
+
+
+# ------------------------------------------------------ half a fraction (T2-11)
+
+
+def glyphs(text: str, x: float, y0: float, size: float = SMALL) -> layout._Row:
+    chars, at = [], x
+    for ch in text:
+        width = pymupdf.get_text_length(ch, fontname="tiit", fontsize=size)
+        chars.append(layout._Char(ch, at, y0, at + width, y0 + size, y0 + size - 1, size, "x", 0))
+        at += width
+    return layout._Row(chars)
+
+
+def inline_block(box, reasons=None) -> layout._Block:
+    piece = layout._Inline(box, "Q(x)", 1.0, reasons or ["math font or symbol"], 8.0)
+    return layout._Block(Kind.PARAGRAPH, box, pieces=["see ", piece])
+
+
+def test_an_equation_against_a_bar_with_glyphs_on_the_other_side_is_half_a_fraction():
+    bar = layout._Path((100.0, 120.0, 130.0, 120.4), "hrule", False, False)
+    above = glyphs("P(x)", 104, 112)  # the numerator, 0.5 pt over the bar
+    block = inline_block((104.0, 120.6, 126.0, 129.0))  # the denominator is all it holds
+    layout._flag_half_fractions([block], [bar], [above])
+    assert layout.REASON_HALF_FRACTION in block.pieces[1].reasons
+
+
+def test_a_bar_with_nothing_on_its_other_side_marks_nothing():
+    bar = layout._Path((100.0, 120.0, 130.0, 120.4), "hrule", False, False)
+    block = inline_block((104.0, 120.6, 126.0, 129.0))
+    layout._flag_half_fractions([block], [bar], [])
+    assert block.pieces[1].reasons == ["math font or symbol"]
+
+
+def test_an_equation_that_holds_its_own_bar_is_not_half_a_fraction():
+    bar = layout._Path((100.0, 120.0, 130.0, 120.4), "hrule", False, False)
+    above = glyphs("P(x)", 104, 112)
+    whole = layout._Block(
+        Kind.EQUATION, (100.0, 112.0, 130.0, 129.0), reasons=["fraction bar"], font_size=8.0
+    )
+    layout._flag_half_fractions([whole], [bar], [above])
+    assert whole.reasons == ["fraction bar"]

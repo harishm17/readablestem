@@ -5646,6 +5646,7 @@ def _page_blocks(
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
+    _flag_half_fractions(final, rules, text_rows)
     final = _key_term_lines(_term_items(final))
     origins = _column_origins(text_rows)
     for block in final:
@@ -6089,6 +6090,67 @@ def _merge_column_continuations(blocks: list[_Block]) -> list[_Block]:
             continue
         out.append(block)
     return out
+
+
+REASON_HALF_FRACTION = "half a fraction"
+
+
+def _flag_half_fractions(
+    blocks: Sequence[_Block], rules: Sequence[_Path], rows: Sequence[_Row]
+) -> None:
+    """Mark the equations that sit against a fraction bar from one side only.
+
+    An equation whose box ends at a thin bar, with the bar's other side holding glyphs of
+    something else, is half a fraction: the numerator without its denominator or the
+    denominator without its numerator ("Q(x)" of P(x)/Q(x)). Its crop shows half of what
+    the page shows, and whatever is read from it is a plausible but wrong answer, so the
+    equation step asks for a decision (`equation_step.HALF_FRACTION_CODE`). Bars that
+    layout used (the equation's own, inside its box or touching both sides of it) never
+    mark anything.
+    """
+    bars = [
+        p
+        for p in rules
+        if p.kind == "hrule" and p.bbox[3] - p.bbox[1] <= 1.5 and p.bbox[2] - p.bbox[0] >= 2.0
+    ]
+    if not bars:
+        return
+    items: list[tuple[BBox, list[str], float]] = []
+    for block in blocks:
+        if block.kind == Kind.EQUATION:
+            items.append((block.bbox, block.reasons, block.font_size or 10.0))
+        else:
+            for piece in block.pieces:
+                if isinstance(piece, _Inline):
+                    items.append((piece.bbox, piece.reasons, piece.font_size))
+    if not items:
+        return
+    chars = [c for r in rows if not r.vertical for c in r.ink]
+    for bar in bars:
+        bx0, by0, bx1, by1 = bar.bbox
+        middle = (by0 + by1) / 2
+        for box, reasons, size in items:
+            width = min(bx1, box[2]) - max(bx0, box[0])
+            if width < 0.5 * min(bx1 - bx0, box[2] - box[0]) or bx1 - bx0 > 10 * size:
+                continue
+            if abs(middle - box[1]) <= 0.3 * size:  # the bar is at the top: denominator
+                other = (-1, middle)  # glyphs above the bar
+            elif abs(middle - box[3]) <= 0.3 * size:  # the bar is at the bottom: numerator
+                other = (1, middle)
+            else:
+                continue
+            if REASON_HALF_FRACTION in reasons or "fraction bar" in reasons:
+                continue
+            side, edge = other
+            touching = any(
+                bx0 - 1 <= (c.x0 + c.x1) / 2 <= bx1 + 1
+                and (
+                    0 <= edge - c.y1 <= 0.35 * size if side < 0 else 0 <= c.y0 - edge <= 0.35 * size
+                )
+                for c in chars
+            )
+            if touching:
+                reasons.append(REASON_HALF_FRACTION)
 
 
 def _add_rules(block: _Block, rules: list[_Path]) -> None:

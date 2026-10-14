@@ -94,6 +94,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
+    ("equation.region", "half_fraction"): "The part of the page this equation was read "
+    "from ends at a fraction bar and may hold only the top or the bottom of a fraction, so "
+    "compare it with the page and write the whole fraction if part is missing.",
     ("equation.single_reading", "single_reading"): "The model read this equation once, "
     "and its answer passed every check, so no second reading was made and it was accepted "
     "as it stands.",

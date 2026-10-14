@@ -41,7 +41,11 @@ def use_fallback_router(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def equation_element(
-    *, display: str | None = "block", text: str | None = None, element_id: str = "p1-e3"
+    *,
+    display: str | None = "block",
+    text: str | None = None,
+    element_id: str = "p1-e3",
+    reasons: list[str] | None = None,
 ) -> Element:
     return Element(
         id=element_id,
@@ -51,6 +55,7 @@ def equation_element(
         order=3,
         text=text,
         display=display,  # type: ignore[arg-type]
+        reasons=reasons or [],
     )
 
 

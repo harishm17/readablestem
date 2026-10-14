@@ -71,7 +71,7 @@ from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCa
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import notation_memory
+from a11y_stem.pipeline import layout, notation_memory
 from a11y_stem.pipeline.signs import compare_signs
 from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
 from a11y_stem.pipeline.validate import (
@@ -258,6 +258,11 @@ SPEECH_CODES = frozenset({"speech_failed", "speech_empty"})
 # The cheap answer was not read a second time (see `SKIP_ESCALATION_FROM`): a note only.
 SINGLE_READING_CODE = "single_reading"
 NOTE_CODES = frozenset({"style_cosmetic", SINGLE_READING_CODE, *SPEECH_CODES})
+# Layout found a fraction bar against the equation's region with the bar's other side
+# holding glyphs of something else (`layout.REASON_HALF_FRACTION`): the crop shows half of
+# a fraction, so whatever is read from it cannot be trusted. Never accepted without a
+# decision, and its confidence is held under the auto-accept bar.
+HALF_FRACTION_CODE = "half_fraction"
 _MATHML_TOKENS = {"mi", "mn", "mo", "mtext", "ms"}
 # Children after the first are scripts (sub/superscripts, limits, a root's index).
 _SCRIPTED = {"msub", "msup", "msubsup", "munder", "mover", "munderover", "mmultiscripts", "mroot"}
@@ -845,6 +850,17 @@ def transcribe(
                 code=SINGLE_READING_CODE,
             )
         )
+    if layout.REASON_HALF_FRACTION in element.reasons:
+        candidate.checks.append(
+            Check(
+                name="equation.region",
+                passed=False,
+                severity="warning",
+                code=HALF_FRACTION_CODE,
+            )
+        )
+        if candidate.confidence is not None:
+            candidate.confidence = min(candidate.confidence, settings.auto_accept_confidence - 0.01)
     fix = _fix(element, candidate, calls, display, settings)
     outcome = _escalation_outcome(first, reread, skipped)
     if outcome is not None:
