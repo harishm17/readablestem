@@ -14,12 +14,13 @@ A render needs a slot (`render_slot`), taken *before* the route loads the upload
 burst of image requests cannot park threads each holding a copy of a 20 MB PDF:
 
 - each user has at most `MAX_RENDERS_PER_USER` renders in progress; one more is refused
-  at once (`RenderLimited`, the route answers 429). A review page asks for two images at
-  a time (the page and the item's region), so a person never meets this; a script
-  firing a hundred requests does;
+  at once (`RenderLimited`, the route answers 429). A review page asks for at most four
+  images at a time (the page, and the item's region or the three copies a group of
+  repeated headings shows: T1-18), so a person never meets this; a script firing a
+  hundred requests does;
 - at most `MAX_CONCURRENT_RENDERS` children run at once per instance; a request waits
   at most `SLOT_WAIT_S` for one (`RenderBusy`, 503). With the per-user cap, one user can
-  keep at most two threads waiting.
+  keep at most four threads waiting.
 
 The functions here are the seam the web tests replace with fakes.
 """
@@ -43,7 +44,7 @@ REGION_MAX_SIDE_PX = 1600
 RENDER_TIMEOUT_S = 20.0
 SIZES_TIMEOUT_S = 15.0
 MAX_CONCURRENT_RENDERS = 2
-MAX_RENDERS_PER_USER = 2
+MAX_RENDERS_PER_USER = 4
 SLOT_WAIT_S = 3.0
 
 
