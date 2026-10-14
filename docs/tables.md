@@ -545,3 +545,22 @@ tables evaluation in model mode is in [eval.md](eval.md) ("Tables").
 | `tests/test_assemble_tables.py` | the scroll box and tab stop, the width estimate, the caption kept, the HTML table rules, axe and 320 px reflow in Chromium (`browser`) |
 | `tests/test_table_html.py` | the serialiser (contracts work) |
 | `tests/test_tables_live.py` | the smoke test with the real models (`live_model`, opt-in; above) |
+
+
+## Review: clean tables, a grid that is not a table, a maths cell read (T3-11)
+
+Three rough edges of the table card, built in `web/review.py` and `routes/edits.py` (the card
+itself is described in docs/web.md "The table card" and "Rough edges"):
+
+- **Accept all clean tables.** A table that waits although nothing was found wrong with it
+  (a data table with a proposal, no failed check of any kind, no structural problem, no maths the
+  PDF gives flat; `review.is_clean_table`) is accepted with every other such table in one write.
+  A table with a finding, kept as an image or written as text is never swept in.
+- **This grid is not a table.** The reviewer's version of the table step's `written_as_text`: the
+  grid read from the PDF's own words (else the proposal's) is written as text, one cell after
+  another (`assemble_tables.text_html`). Refused for a grid with no text or flattened maths.
+- **A maths cell read by the model.** The equation step reads the cell's crop (its box, or the
+  box of the cell of the grid read from the PDF in its place) and the answer goes through the
+  cell's edit checks (`web.edit_check.check_cell_edit`, against the PDF's text in that cell). It
+  is a model call from the review, so it is spend capped like the conversion's (docs/web.md,
+  "What the model costs here").

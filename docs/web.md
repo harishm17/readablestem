@@ -100,14 +100,20 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
 | GET `/jobs/{id}/crops/{element_id}.png` | owner | Original image of one equation, figure or table |
-| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table |
+| GET `/jobs/{id}/review?item=&page=&accepted=1&cell=&note=&tools=1&change=` | owner | Review screen: one decision at a time beside its page (below); `cell` (`r1c2`) opens that cell's form on a table; `note` (`link_text_unclear:p3-e4`) opens the panel of a notice about text (T3-7); `tools=1` opens the page tools and `change=<element>` the text open in them (T3-5, T3-16); `add`, `left`, `top`, `right`, `bottom` describe a region to add |
 | GET `/jobs/{id}/review/list` | owner | "All items as a list": every fix, grouped by kind (no bulk accept) |
 | GET `/jobs/{id}/review/marks.css` | owner | Where each mark and its frame go on its page image, and the compare sizes (element ids and numbers only) |
 | GET `/jobs/{id}/pages/{n}.png` | owner | Page `n` (1-based) of the upload, rendered now at 144 dpi, never stored; 429 beyond four renders in progress for one person (a review page asks for the page and up to three crops of a repeated-heading group at once), 503 when the instance's two render slots stay busy |
 | GET `/jobs/{id}/regions/{element_id}.png` | owner | An item with the page around it: an equation with the words on each side (its differing symbol outlined), a heading with the whole lines around it (outlined), a figure, a table (outlined, its caption above it in whole); 429 and 503 as for pages |
-| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers` or `use_local`; `action=add_data_table` adds a chart's data table read from the image); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
+| POST `/jobs/{id}/review/{element_id}` | owner | Accept, save edit or reject one fix (a table's edit says what it changes: `change` is `cell`, `headers`, `use_local` or `not_a_table`; `action=add_data_table` adds a chart's data table read from the image; `action=describe` with `description` gives an item kept as an image its alt text, T3-16); a kind (`equations`, ...) in place of the id, the bulk accept removed on 2026-10-09, is a 404; with a heading group's key (`hg-p1-e7`), one decision for every heading of the group still waiting (with `scope=all`, for every heading of the group: a decided group decided again). A hidden `view` field (`split` or `list`) says which view to go back to, and `version` the review version the page was drawn at (a form from an out-of-date page is refused with a 409; "Stale tabs" below) |
 | POST `/jobs/{id}/review/{element_id}/check` | owner | The checks Save edit would run, on the LaTeX being typed (htmx, after a 0.6 s pause): an HTML fragment, nothing stored; 204 when signed out |
-| POST `/jobs/{id}/undo` | owner | Undo the job's last review write, from the page that write drew (its `version` must be the job's) |
+| POST `/jobs/{id}/undo` | owner | Undo the job's last review write, from the page that write drew (its `version` must be the job's); a structural edit below is put back too |
+| POST `/jobs/{id}/edit/{element_id}` | owner | Change what the tool did not propose (T3-5): `action=text` changes the words of a paragraph, list item or heading (`text`), `action=heading` makes a paragraph a heading (`level`). Review `version` checked; 422 with the error beside the field |
+| GET `/jobs/{id}/pages/{n}/region.png?left=&top=&right=&bottom=` | owner | The region of page `n` the four edges (percent of the page) describe, cut as it would be added; rendered now in the render child, never stored; 404 for a region that is not one |
+| POST `/jobs/{id}/pages/{n}/add` | owner | Add a picture the tool did not find (`kind=picture`, `alt`) or mark a region as an equation (`kind=equation`: the equation step reads it, the answer is a required decision), the region as `left`, `top`, `right`, `bottom`. Rate limited (`edit_region`, and `reread` for an equation), one read at a time per person, under the job's and the day's spend caps |
+| POST `/jobs/{id}/pages/{n}/omit`, `/restore` | owner | Leave page `n` out of review and of the student file (T3-16), and put it back |
+| POST `/jobs/{id}/tables/accept-clean` | owner | Accept every table that waits with nothing wrong found in it (T3-11), one write |
+| POST `/jobs/{id}/tables/{element_id}/read-cell` | owner | Read a table's maths cell with the equation step and check it like a typed edit (T3-11); rate limited (`reread`), one read at a time, spend capped |
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
 | GET, POST `/jobs/{id}/feedback` | owner | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
@@ -327,7 +333,7 @@ upload, review, download and mean to post it?) without cookies or scripts:
 `signed_in`, `uploaded` (value: pages; code: a fingerprint), `reuploaded` (the same
 file as an earlier upload of the same person; value: hours since), `finished` (code:
 `done`, `failed:<error code>`; value: seconds since upload), `review_opened` (once per
-visit of 30 minutes), `decision_made` (code: `single` or `group`, `bulk` in older rows; value: fixes
+visit of 30 minutes), `decision_made` (code: `single`, `group` or `structure` for an edit to the words, a heading, an added region or a page left out, `bulk` in older rows; value: fixes
 changed), `review_completed` (the first time no decision is left open; value: seconds
 since it finished), `html_viewed` (once per visit), `downloaded` (code `open` or `done`:
 whether decisions were still open), and the two answers after a download, `will_post`
@@ -736,6 +742,14 @@ forced colours, an image retried; `browser` marker), and for the list view `test
 `tests/test_web_review_messages.py` (every code has a sentence),
 `tests/test_web_review_triage.py` (decisions, optional checks, heading groups),
 `tests/test_web_review_browser.py` and `tests/test_web_review_triage_browser.py`.
+The review edits (T3-5, T3-7, T3-11, T3-16, below): `tests/test_web_edit_page.py` (the
+words, a heading made, a picture or an equation added, the model's read under its caps),
+`tests/test_web_edit_describe.py` (a description in words, pages left out),
+`tests/test_web_notice_places.py` (notices that name their place),
+`tests/test_web_edit_tables.py` (clean tables, not a table, a maths cell read),
+`tests/test_web_edit_postgres.py` (the same writes on Postgres, `postgres` marker) and
+`tests/test_web_edit_browser.py` (axe at 1280 and 375 px in every new state, the keyboard,
+no JavaScript; `browser` marker).
 
 Real documents need only one to three decisions under the review policy
 (docs/design/beta-architecture.md "Review tiers": OpenStax 2.1 three heading groups, the
@@ -1167,6 +1181,23 @@ for it too. A grid of numbers the model called not a table is not written as tex
 values would lose their columns, so the grid read from the PDF is proposed as a table,
 a decision (`numbers_not_a_table`).
 
+**Rough edges** (T3-11). *Accept all N clean tables*: with two or more tables that wait although
+nothing was found wrong with them (`web.review.is_clean_table`: a data table with a proposal, no
+failed check of any kind, no structural problem, no maths the PDF gives flat), one button on a
+waiting table's card and above the list view's tables (`POST /jobs/{id}/tables/accept-clean`)
+accepts them all in one write, one `ReviewEdit` each, one Undo for all; a table with a finding
+or kept as an image is never in it. *This grid is not a table* (`change=not_a_table`): the
+table is written as text, one cell after another (a description list for a term and its text,
+a list for short terms, else a paragraph a cell), from the grid read from the PDF's own words
+when there is one (`table_step.text_grid`), else the proposal's; refused for a grid with no
+text or flattened maths (keep the image); it settles the decision (`edited`), and "Use this
+grid instead" makes it a table again. *Read this cell with the model*: in a maths cell's form,
+when the cell has a place on the page (its own box, or the box of the cell of the grid read from
+the PDF in its place), the equation step reads that crop (`POST
+/jobs/{id}/tables/{element}/read-cell`, the controls of "What the model costs here" above) and
+what it read goes through the cell's edit checks as if typed: saved when it passes, else shown
+in the cell's box with what differs from the PDF (and "Use my edit anyway").
+
 With keyboard shortcuts on, A accepts a proposed table and E opens "Change the table" at
 the cell list. In the list view a table card shows its crop, the proposal (or the grid
 read from the PDF) and Accept, Keep as image, Use the grid read from the PDF;
@@ -1197,6 +1228,96 @@ keeps a draft of what is typed in this tab (above), and offers keyboard shortcut
 decision, P previous, A accept, E go to the edit field. They are off until turned on
 ("Keyboard shortcuts", stored in `localStorage`; WCAG 2.1.4), ignore keys with Ctrl, Alt
 or Meta, and never act while focus is in a field.
+
+**Describe it in words** (T3-16; `web.review.describe_in_words`, `templates/_describe.html`).
+An item shown as an image (an equation or table kept as the original, a page or handwriting
+kept as an image; `web.review.can_describe`) has a folded "Describe it in words" box, in both
+views. The text becomes the image's alt text in the student file instead of the PDF's own
+text (marked not checked) or the fixed words ("Equation not converted"). It is cleaned and
+checked exactly like a figure's alt text (invisible format characters out, whitespace
+collapsed, `validate.check_alt`: length, no "image of", no file name, no address or markup, not a
+placeholder) and escaped where it is written; a refusal comes back on the same item with the
+text kept. Describing an item that waits for a decision keeps it as an image (it is the
+decision); an empty box takes the description away; accepting or editing the item converts it
+and drops the description. The page is still marked "Not converted" (it is an image, not
+text), and a described image is no longer counted as one "that screen readers cannot read"
+(`job_page.shown_as_image`). The description is `Fix.described`, in the snapshot Undo puts
+back. For a group of kept pages each page has its own box.
+
+**Notices that name their place** (T3-7; `web/notice_places.py`). A notice stays a code, a page
+and an element id; what it is about is worked out again from the result when a page is shown,
+for the owner only: the text of each link in the paragraph that says nothing on its own
+("click here": `text_pass.unclear_link_text`, the rule that made the notice), a figure or table
+by its name in the review ("Figure 1"), a paragraph by its first words. The job page's
+"Not handled" and "Worth checking" lines say it ("The link text: “here”.") and link to **See it
+on the page**. On the review screen the notices are listed with the optional checks (after the
+fixes with notes; the count includes them), each line a link to its place: a figure's or
+table's own panel, or the **panel of a notice about text** (`?note=<code>:<element id>`): the
+sentence, the link text, the words around it and **Change the words** (the page tools below).
+The paragraph is marked on the page image like an optional check (a dashed "Note" frame in
+`marks.css`, laid out apart from the fixes' marks and under them, so a paragraph never takes a
+click from an equation inside it). A notice that is a decision of its own (a table or a page kept
+as an image) stays in the queue, not in the optional checks, and a whole-document notice (the
+language) stays on the job page. The list view has the same lines under "Notes on links, text
+and figures".
+
+**The page tools** (T3-5, T3-16; `web/page_edits.py`, `routes/edits.py`,
+`templates/_page_tools.html`). Under the optional checks, a folded "Change page N" (open after
+an edit or an error, and when `tools=1`) with, in this order:
+
+- *Change the words, or make a line a heading.* Every paragraph, list item and heading of the
+  page by its first words, each a link that opens it. The box holds the words as they read, an
+  inline equation as "[equation 3]" (the review's own number for it): the mark the tool keeps in
+  the stored text cannot be typed, so it is named and put back when the text is saved. Every
+  equation must stay exactly once, and the tool's own marks ⟦ ⟧ are refused (an equation is
+  changed in its own decision). The text is cleaned like alt text (controls, NUL and invisible
+  format characters out, whitespace collapsed; program code keeps its lines and indentation),
+  at most 6,000 characters, and written escaped like all text. A link, a colour or a raised or
+  lowered run stays on the words that did not change (`page_edits.remap_spans`, a character
+  diff); one whose words changed is dropped and the notice says how many links were taken off; a
+  glossary term stays a term only while its words are unchanged. A heading's words change in its
+  fix (`HeadingFix.text`) and its element. *Make it a heading, at level N* (paragraphs only, not
+  program code or a glossary entry, one line of at most 300 characters): the levels that keep
+  their place in the outline are named (`heading_levels_that_fit`) and another is refused as for
+  any heading; the element becomes a heading with a fix the reviewer made (`edited`), so
+  "Make plain text" and Undo take it back, and later headings are repaired in the outline as
+  always (the notice says how many moved).
+- *Add something the tool missed.* Step 1 is a plain GET form: a picture or an equation on its
+  own line, and the region as four numbers from 0 to 100 (left and right across the page, top
+  and bottom down it). Step 2 shows the region cut out (`pages/{n}/region.png`, the same crop
+  the file will carry, at 200 dpi with 2 pt of page round it) with **Add the picture** (alt text,
+  checked like any alt text before anything is cut) or **Read it as an equation**. A picture is
+  a new figure element in the reading order (placed after the last element above it in its
+  column, `reading_order_slot`) with a fix the reviewer made and its crop stored. An equation is
+  read by the equation step (`reread.read_equation`: the crop, the text the PDF has under it
+  read in the render child, the neighbouring text as context, the course notation in force); the
+  answer is **always a required decision**, also when the model was confident, and a read that
+  failed waits too. Added elements have ids `p3-x1`; at most 30 per document. Only equations on
+  their own line can be marked (an equation inside a line of text would need the paragraph
+  rewritten).
+- *Leave this page out.* A blank page or a cover moves, with its elements, fixes and notices,
+  into `DocumentResult.omitted` (`OmittedPage`): nothing downstream sees them (the queue, the
+  counts, the student file), the file says "Page 1 of the original PDF was left out of this
+  file." in its note, links to elements on it are taken off at render, and the job page lists the
+  notice `page_omitted`. A page that was kept whole as an image comes off `image_only_pages` while it is out (a job whose only such pages were left out is no longer "Finished, with pages not converted"). The last page left cannot be left out. **Put page N back** moves it all
+  home; Undo does the same.
+
+Every one of these is a write like a decision: the job row is locked, the stored result changed,
+a `ReviewEdit` stored, `jobs.html_stale` set (the HTML is made again when asked for), the review
+version counted, and a form from an out-of-date tab refused. Undo puts a structural edit back
+exactly: its `ReviewEdit.before` holds a snapshot of the elements, fixes, reading order, omitted
+pages and notices it touched (`page_edits.capture`, `restore`), and an undone addition drops its
+crop. The list view has a "Change the text, add what was missed, leave a page out" section with
+one link to each page's tools.
+
+*What the model costs here.* Marking an equation and reading a table cell are the only
+review actions that call a model. Each reserves its worst-case cost first against the day's cap
+and against the job's own caps (the whole job, the conversion's spend included;
+`reread.ReadBudget`, one conditional UPDATE on the job's row), is limited to 20 a person in 10
+minutes (`abuse.RULES["reread"]`) and to one at a time for each person, and is made with no
+transaction open (it takes seconds). A refusal (a cap, the model not answering) is a sentence on
+the same page with the form kept ("type it yourself"), never an error page; the money of a read
+whose write was then refused as stale is spent.
 
 ### The list view (`/jobs/{id}/review/list`)
 
@@ -1347,7 +1468,10 @@ change what a student reads: each is now opened and decided on its own (repeated
 headings are already one decision). Optional notes are accepted already and need no
 bulk action. A POST with a kind (`equations`, `figures`, `tables`, `headings`) in place
 of the element id is a 404 and changes nothing; Undo still puts back a bulk write made
-before the change.
+before the change. The one exception, asked for in T3-11, is **Accept all clean tables**
+(`POST /jobs/{id}/tables/accept-clean`, "Rough edges" under the table card): only tables
+where nothing at all was found wrong, only when there are two or more, named in the
+button, and one Undo takes them all back.
 
 **Job page.** "Need your decision" counts the decisions still waiting (a heading group
 once; failed and not-converted items too, since each needs a decision) and is broken down
