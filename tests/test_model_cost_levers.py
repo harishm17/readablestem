@@ -100,12 +100,12 @@ def test_the_request_effort_wins_over_the_model_effort():
 # ------------------------------------------------------------- T3-23 notice, context
 
 
-def test_the_notice_moves_to_the_cached_system_block_when_asked():
-    before = sdk_body(claude(), request())
+def test_the_notice_is_in_the_cached_system_block_unless_turned_off():
+    before = sdk_body(claude(anthropic_notice_in_system=False), request())
     assert before["system"][0]["text"] == "Transcribe."
     assert before["messages"][0]["content"][-1]["text"].startswith(UNTRUSTED_NOTICE)
 
-    after = sdk_body(claude(anthropic_notice_in_system=True), request())
+    after = sdk_body(claude(), request())
     assert after["system"][0]["text"] == f"Transcribe.\n\n{UNTRUSTED_NOTICE}"
     assert after["system"][0]["cache_control"] == {"type": "ephemeral"}
     sent = after["messages"][0]["content"][-1]["text"]
@@ -114,7 +114,7 @@ def test_the_notice_moves_to_the_cached_system_block_when_asked():
 
 
 def test_the_system_block_is_the_same_with_and_without_document_text():
-    settings = claude(anthropic_notice_in_system=True)
+    settings = claude()
     with_text = sdk_body(settings, request())["system"]
     without = sdk_body(settings, request(context_text=None))["system"]
     assert with_text == without

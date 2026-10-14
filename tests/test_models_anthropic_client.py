@@ -176,9 +176,13 @@ def test_request_carries_images_instructions_schema_and_cache_breakpoint():
     body = wire.body()
     assert body["model"] == HAIKU
     assert body["max_tokens"] == 600 + THINKING_ALLOWANCE_TOKENS  # thinking counts toward it
-    # The stable instructions are the cached prefix.
+    # The stable instructions, and the untrusted-text notice after them, are the cached prefix.
     assert body["system"] == [
-        {"type": "text", "text": INSTRUCTIONS, "cache_control": {"type": "ephemeral"}}
+        {
+            "type": "text",
+            "text": f"{INSTRUCTIONS}\n\n{UNTRUSTED_NOTICE}",
+            "cache_control": {"type": "ephemeral"},
+        }
     ]
     (message,) = body["messages"]
     assert message["role"] == "user"
@@ -191,10 +195,10 @@ def test_request_carries_images_instructions_schema_and_cache_breakpoint():
             "data": base64.standard_b64encode(PNG).decode(),
         },
     }
-    # Untrusted document text is fenced after its fixed notice, as for the other provider.
+    # Untrusted document text is fenced; its fixed notice is in the cached system block.
     assert text["type"] == "text"
-    assert text["text"].startswith(UNTRUSTED_NOTICE)
-    assert "<document_text>\nnear the equation\n</document_text>" in text["text"]
+    assert text["text"] == "<document_text>\nnear the equation\n</document_text>"
+    assert body["system"][0]["text"].endswith(UNTRUSTED_NOTICE)
     # Structured output through output_config, with the effort set explicitly.
     config = body["output_config"]
     assert config["effort"] == "low"

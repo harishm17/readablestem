@@ -82,8 +82,9 @@ class Settings(BaseSettings):
     anthropic_effort_equation: Effort | None = None
     anthropic_effort_figure: Effort | None = None
     # The fixed untrusted-text notice rides in the cached system block instead of in every
-    # request's user message (T3-23). Claude only.
-    anthropic_notice_in_system: bool = False
+    # request's user message (T3-23). Claude only. On by default: the same answers on the
+    # development sets, 6-10% less per call once the cache is warm (docs/eval.md "Model cost").
+    anthropic_notice_in_system: bool = True
     # Equation context (the text around the equation) is sent only when the main model
     # re-reads a cheap model's answer, not with the cheap model's first reading (T3-23).
     equation_context_on_escalation: bool = False
