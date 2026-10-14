@@ -1,9 +1,11 @@
-"""CLI commands: a11y-stem ops aggregate|purge|cron|launch-check|report|export-opted-in|
-decisions-canary.
+"""CLI commands: a11y-stem ops aggregate|purge|cron|launch-check|backup-check|restore-drill|
+report|export-opted-in|decisions-canary.
 
 The same tasks the web app runs on Cloud Scheduler's hourly call, for running by hand or
 from a Cloud Run job. Output is counts only, as `key=value` pairs on one line; database
 errors are reported by type, because their messages can include connection details.
+`backup-check` and `restore-drill` (ops/backup.py) say whether a database copy can run the
+app and whether dump-and-restore works; they print table names and counts only.
 `decisions-canary` is the Decisions API drift canary the hourly cron runs once a day
 (ops/canary.py); by hand it needs no database, only a key and `--max-usd`.
 """
@@ -39,6 +41,18 @@ def register(
         "launch-check",
         help="list what is unfinished before real users: draft pages, demo, eval baseline",
     ).set_defaults(func=_cmd_launch_check)
+    sub.add_parser(
+        "backup-check",
+        help="read DATABASE_URL (a restored copy) and say whether the app could run on it: "
+        "schema at head, tables present, an admin, how fresh the data is (exit 1 if not)",
+    ).set_defaults(func=_cmd_backup_check)
+    drill = sub.add_parser(
+        "restore-drill",
+        help="pg_dump DATABASE_URL, pg_restore into a scratch database on the same server, "
+        "check it and drop it (needs the Postgres client tools and CREATE DATABASE)",
+    )
+    drill.add_argument("--pg-bin", type=Path, help="directory with pg_dump and pg_restore")
+    drill.set_defaults(func=_cmd_restore_drill)
     report = sub.add_parser(
         "report", help="weekly error-analysis tables from the aggregates (no content)"
     )
@@ -153,6 +167,44 @@ def _cmd_launch_check(args: argparse.Namespace) -> int:
         print(f"- {item}")
     print(f"launch_blockers={len(items)}")
     return 1 if items else 0
+
+
+def _cmd_backup_check(args: argparse.Namespace) -> int:
+    """Exit 1 if the database could not run the app (ops.backup.DatabaseCheck.problems)."""
+    from a11y_stem.config import get_settings
+    from a11y_stem.ops.backup import check_database
+    from a11y_stem.web.db import make_engine
+
+    try:
+        check = check_database(make_engine(get_settings().database_url))
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    for line in check.lines():
+        print(line)
+    for problem in check.problems:
+        print(f"problem: {problem}")
+    print(f"backup_check={'ok' if check.ok else 'failed'}")
+    return 0 if check.ok else 1
+
+
+def _cmd_restore_drill(args: argparse.Namespace) -> int:
+    from a11y_stem.config import get_settings
+    from a11y_stem.ops.backup import DrillError, restore_drill
+
+    try:
+        result = restore_drill(get_settings().database_url, pg_bin=args.pg_bin)
+    except DrillError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
+    except SQLAlchemyError as exc:
+        return _db_error(exc)
+    for line in result.check.lines():
+        print(line)
+    print(f"dump_bytes={result.dump_bytes} seconds={result.seconds:.1f}")
+    for problem in result.problems:
+        print(f"problem: {problem}")
+    print(f"restore_drill={'ok' if result.ok else 'failed'}")
+    return 0 if result.ok else 1
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
