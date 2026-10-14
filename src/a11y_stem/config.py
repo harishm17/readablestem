@@ -195,6 +195,12 @@ class Settings(BaseSettings):
     # Per-course notation memory: hints for the equation step, spoken readings, bold
     # letters in running text as maths, "remember for this course" on the review screen.
     feature_notation_memory: bool = False
+    # Write each converted equation's stored speech text (`pipeline.speech`, the reading
+    # shown on the review screen) as the `alttext` attribute of its <math>. OFF until a
+    # person has checked it with NVDA + MathCAT (and ideally JAWS and VoiceOver): some
+    # screen readers read `alttext` in place of the maths structure, which would take
+    # away navigation inside the equation. Steps: docs/mathml-alttext.md.
+    mathml_alttext: bool = False
 
     # --- tracing (off by default; never on for private-inputs/ runs)
     tracing_enabled: bool = False

@@ -21,6 +21,7 @@ arrived at; read them by question, not front to back.
 | What are the parts and the rules every part follows? | [design/beta-architecture.md](design/beta-architecture.md) |
 | What do the optional content features promise? | [design/content-features.md](design/content-features.md) |
 | What is in the HTML file that comes out? | [output.md](output.md) |
+| Why do equations not have an `alttext` yet, and how is it tested? | [mathml-alttext.md](mathml-alttext.md) |
 | How does the web app work (routes, sign-in, review screen, retention)? | [web.md](web.md) |
 | How do I run, test and extend it? | [development.md](development.md) |
 | What is the threat model, what protects it, and how do I report a problem? | [security.md](security.md) |

@@ -1049,6 +1049,7 @@ def _convert(
                 crops=run.crops,
                 source_note=source_note,
                 notice=notice,
+                math_alttext=settings.mathml_alttext,
             )
             _send(stage_progress, "checks")
             checks = html_checks.static_checks(html)
