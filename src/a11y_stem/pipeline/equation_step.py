@@ -91,6 +91,16 @@ PROMPT_VERSION = load_prompt(PROMPT_NAME).version
 NOTATION_PROMPT_NAME = "equation_notation"
 NOTATION_PROMPT_VERSION = load_prompt(NOTATION_PROMPT_NAME).version
 
+# A cheap answer with passing checks and a confidence from here to the accept bar is not
+# asked again (`_needs_escalation`).
+SKIP_ESCALATION_FROM = 0.80
+# ... and is then accepted as it stands (review "optional", with the note `single_reading`)
+# instead of waiting for a decision. Without this the skip would turn every such answer into
+# a required decision, because the cheap model's 0.80 is below the accept bar: on the
+# development set (Claude, 2026-10-14) 8 of 8 second readings in the band gave the same
+# MathML, and a decision costs a person more than the call it replaces. Set False to keep the
+# status rules as they were (the answer then needs a decision).
+ACCEPT_SINGLE_READING = True
 SHORT_INLINE_CHARS = 25  # inline candidates up to this many text-layer chars start cheap
 MAX_OUTPUT_TOKENS = 2048  # LaTeX up to 2000 chars plus reasoning tokens
 # Text-layer cross-check: only with enough symbols to compare, and a "strong mismatch"
@@ -233,7 +243,9 @@ MEANING_MISMATCH_FACTOR = 0.6
 # A cosmetic style difference, and a reading aid for the review screen that could not
 # be made (the MathML in the output is unaffected).
 SPEECH_CODES = frozenset({"speech_failed", "speech_empty"})
-NOTE_CODES = frozenset({"style_cosmetic", *SPEECH_CODES})
+# The cheap answer was not read a second time (see `SKIP_ESCALATION_FROM`): a note only.
+SINGLE_READING_CODE = "single_reading"
+NOTE_CODES = frozenset({"style_cosmetic", SINGLE_READING_CODE, *SPEECH_CODES})
 _MATHML_TOKENS = {"mi", "mn", "mo", "mtext", "ms"}
 # Children after the first are scripts (sub/superscripts, limits, a root's index).
 _SCRIPTED = {"msub", "msup", "msubsup", "munder", "mover", "munderover", "mmultiscripts", "mroot"}
@@ -629,15 +641,67 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
     """Ask the main model again when the cheap answer is unsure, unusable, or disagrees
     with the text layer in any way, a cosmetic style difference included: the style rule
     is a heuristic, so a second reading is cheaper than a hidden vector-to-scalar error.
-    Only the speech notes do not escalate (they say nothing about the transcription)."""
+    Only the speech notes do not escalate (they say nothing about the transcription).
+
+    Not when the only reason is a confidence between SKIP_ESCALATION_FROM and the accept
+    bar and every check passed (`_band_only`): on the 2026-10 runs the main model's
+    second reading gave the same LaTeX for most escalated answers, and that band is where
+    the cheap answer is most often right. Such a fix keeps the cheap answer and the usual
+    status rules (below the accept bar it is a decision), and says so in `Fix.escalation`.
+    """
     if candidate.output is None or candidate.confidence is None:
         return False  # the router already tried the other model as the fallback
     if candidate.calls and candidate.calls[-1].model == settings.main_model:
         return False  # the fallback was the main model: nothing better to ask
+    if _band_only(candidate, settings):
+        return False
     disagrees = any(not c.passed and c.code not in SPEECH_CODES for c in candidate.checks)
     return (
         candidate.confidence < settings.auto_accept_confidence or not candidate.usable or disagrees
     )
+
+
+def _band_only(candidate: _Candidate, settings: Settings) -> bool:
+    """The cheap answer's only reason to be asked again is a confidence in
+    [SKIP_ESCALATION_FROM, auto_accept_confidence): it is usable and no check failed
+    (a failed speech note counts: with any failed check the old rule applies)."""
+    confidence = candidate.confidence
+    return (
+        confidence is not None
+        and SKIP_ESCALATION_FROM <= confidence < settings.auto_accept_confidence
+        and candidate.usable
+        and candidate.output is not None
+        and candidate.output.is_equation
+        and all(c.passed for c in candidate.checks)
+    )
+
+
+_SINGLE_BRACED = re.compile(r"([_^])\{(\\[A-Za-z]+|[A-Za-z0-9])\}")
+
+
+def _canonical(latex: str) -> str:
+    """LaTeX without whitespace and without braces around a single symbol after `_` or `^`
+    (`d_{0}` and `d_0` are one reading)."""
+    return _SINGLE_BRACED.sub(r"\1\2", "".join(latex.split()))
+
+
+def _same_reading(first: _Candidate, second: _Candidate) -> bool:
+    """Do two attempts transcribe the same thing? Their LaTeX, whitespace and the braces
+    around a single script aside."""
+    return _canonical(first.latex) == _canonical(second.latex)
+
+
+def _escalation_outcome(
+    first: _Candidate, escalated: _Candidate | None, skipped: bool
+) -> str | None:
+    """`Fix.escalation`: what the main model's second reading did (None: none was asked)."""
+    if escalated is None:
+        return "skipped" if skipped else None
+    if not escalated.usable or escalated.output is None or not escalated.output.is_equation:
+        return "failed"
+    if not first.usable or first.output is None or not first.output.is_equation:
+        return "changed"
+    return "same" if _same_reading(first, escalated) else "changed"
 
 
 def _prefer(main: _Candidate, cheap: _Candidate) -> _Candidate:
@@ -694,7 +758,9 @@ def _fix(
     if confidence < settings.abstain_confidence:
         return make(Status.ABSTAINED, "low_confidence")
     failed = [c for c in candidate.checks if not c.passed]
-    if confidence >= settings.auto_accept_confidence and all(c.code in NOTE_CODES for c in failed):
+    single = ACCEPT_SINGLE_READING and any(c.code == SINGLE_READING_CODE for c in failed)
+    bar = SKIP_ESCALATION_FROM if single else settings.auto_accept_confidence
+    if confidence >= bar and all(c.code in NOTE_CODES for c in failed):
         # Notes only (a cosmetic style difference, no speech text): accepted, listed as
         # optional checks on the review screen.
         return make(Status.ACCEPTED, proposal=True, review="optional" if failed else "none")
@@ -748,11 +814,29 @@ def transcribe(
     first_model = _first_model(element, settings)
     candidate = first = attempt(first_model)
     calls = list(candidate.calls)
-    if first_model != settings.main_model and _needs_escalation(candidate, settings):
-        escalated = attempt(settings.main_model, escalation=True)
-        calls += escalated.calls
-        candidate = _prefer(escalated, candidate)
+    cheap_start = first_model != settings.main_model
+    reread: _Candidate | None = None
+    if cheap_start and _needs_escalation(candidate, settings):
+        reread = attempt(settings.main_model, escalation=True)
+        calls += reread.calls
+        candidate = _prefer(reread, candidate)
+    answered_cheaply = not first.calls or first.calls[-1].model != settings.main_model
+    skipped = cheap_start and reread is None and answered_cheaply and _band_only(first, settings)
+    if skipped:
+        # The note rides on the answer that stands, so the review screen can say it was
+        # read once; with ACCEPT_SINGLE_READING it never makes the fix wait (`_fix`).
+        candidate.checks.append(
+            Check(
+                name="equation.single_reading",
+                passed=False,
+                severity="warning",
+                code=SINGLE_READING_CODE,
+            )
+        )
     fix = _fix(element, candidate, calls, display, settings)
+    outcome = _escalation_outcome(first, reread, skipped)
+    if outcome is not None:
+        fix = fix.model_copy(update={"escalation": outcome})
     # Second automated check, shadow mode (ADR 0005): records P(meaning_changing) for the
     # final proposal and the cheap answer before escalation; changes nothing else.
     from a11y_stem.pipeline import equation_shadow

@@ -514,6 +514,13 @@ class Fix(BaseModel):
     # The second automated check's answers about this fix (see `Verification`). Empty
     # when it did not run, and in results stored before it existed.
     verifications: list[Verification] = Field(default_factory=list)
+    # Equations that started on the cheap model: what asking the main model again did.
+    # "same" or "changed" (its LaTeX against the cheap answer's, whitespace aside),
+    # "failed" (it gave no usable answer; the cheap one stands) or "skipped" (the cheap
+    # answer's only reason to be asked again was a confidence just below the accept bar,
+    # `equation_step.SKIP_ESCALATION_FROM`). None when no second reading was due. Left out
+    # of the JSON when None, so a record without it is unchanged.
+    escalation: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="before")
     @classmethod

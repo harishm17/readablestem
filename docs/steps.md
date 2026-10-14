@@ -66,8 +66,34 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
+
+**The skipped second reading (equations).** A cheap answer whose only reason to be asked
+again is a confidence from 0.80 (`equation_step.SKIP_ESCALATION_FROM`) up to the accept
+bar, with every check passing (a failed speech note counts as a failed check), keeps the
+cheap answer and is not sent to the main model. It is ACCEPTED with review `optional` and
+the note `equation.single_reading` / `single_reading` (it was read once), so the skip does
+not turn into a decision: the cheap model's confidence comes in steps and 0.80 is its
+usual "fairly sure", so without the acceptance every such answer would wait for a person
+(`ACCEPT_SINGLE_READING = False` keeps the old status rules: NEEDS_REVIEW, required).
+Measured on the development set (3 OpenStax sections, 13-16 pages each, Claude, recorded
+2026-10-14 with the skip off and replayed with it on, same recorded answers): 8 of the 19
+second readings were band-only, and in all 8 the main model's answer was the same LaTeX
+(6) or the same maths in other braces (2); the document task made 81 model calls instead
+of 89 and cost $0.2028 instead of $0.2183 (-7.1 %); the equation scores did not move (end
+to end 0.7667, unflagged wrong 3.33 per 100, detection 1.0 / 0.5455); required decisions
+went from 8 to 7, optional notes per page from 0.60 to 0.79. Limits: the 30 gold equations
+are display equations, which start on the main model, so the scored equations never
+escalate; the inline answers are only seen through the document task's counts, and the 8
+cases are 8 inline variables at a confidence of exactly 0.80. With the status rules
+unchanged (`ACCEPT_SINGLE_READING = False`) the same replay gave 15 required decisions
+instead of 8.
+
+`Fix.escalation` records what a cheap start did: `same` / `changed` (the main model's
+LaTeX against the cheap one's, whitespace and the braces around a single script aside),
+`failed` (its answer was unusable, the cheap one stands), `skipped` (the rule above), or
+absent (no second reading was due, or the equation started on the main model).
 
 No escalation happens when the cheap call produced no output at all (the router already
 tried the main model as its fallback), or when the answer already came from the main
@@ -630,6 +656,7 @@ never reaches the instructions, and that the equation's text layer is never sent
 |---|---|
 | `tests/test_steps_validate.py` | every code of every validator; the allowlist-vs-converter tests (no allowed command converts with leftovers, every command whose argument is copied verbatim is treated as text mode); alignment rewriting; `\text{}` injection and a fuzz test showing `safe_latex_to_mathml` output is always allowlisted; defusedxml refusing DTDs and entity bombs; deep and oversize input; gold MathML and OpenStax alt text as real-data sanity checks |
 | `tests/test_steps_speech.py` | all 30 gold equations produce speech; targeted rules |
+| `tests/test_steps_equation_escalation.py` | the 0.80 band skipped and accepted with a note, the old rule below it, with a failed check, with an invalid or speech-failed answer; `ACCEPT_SINGLE_READING` off; `Fix.escalation` same / changed / failed / skipped, braces and spaces aside, the JSON round trip |
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
 | `tests/test_style_check.py` | the letter-style check: meaning-level and cosmetic cases, layout's bold and regular letters |
 | `tests/test_sign_check.py` | the sign and relation check: flips and drops that must flag, hyphens, ranges, product style, accents and long arrows that must not; tiers, escalation and the single confidence factor; the LaTeX fixtures' CMSY signs and the Chromium fixtures; a course page printed by Chromium (`browser`); a result stored by pipeline 0.2.0 still loads |
