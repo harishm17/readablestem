@@ -347,7 +347,7 @@ progress { width: 16rem; height: 1.1rem; }
 }
 .panel-decision { border-top: 5px solid var(--mark-required); }
 .panel-done { border-top: 5px solid var(--ok); }
-.panel-item { border-top: 5px solid var(--mark-optional); }
+.panel-item, .panel-notice { border-top: 5px solid var(--mark-optional); }
 .decision-notice {
   margin: 0 0 0.9rem; padding: 0.5rem 0.8rem; border-left: 5px solid var(--ok);
   background: #eef6f0; border-radius: 0 var(--radius) var(--radius) 0;
@@ -721,3 +721,29 @@ input[type="text"].input-short { width: 8rem; }
 .group-crops figure { margin: 0; }
 .group-crops img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); }
 .group-crops figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.25rem; }
+
+/* Notices about text (T3-7) and the page tools (T3-5, T3-16) */
+.notice-names { font-style: normal; }
+.notice-excerpt { margin: 0.6rem 0; }
+.notice-excerpt blockquote { margin: 0.25rem 0 0; padding: 0.4rem 0.8rem; border-left: 4px solid var(--rule); background: var(--panel); }
+.notice-excerpt blockquote p { margin: 0; }
+.notice-actions { margin: 0.6rem 0; display: flex; flex-wrap: wrap; gap: 0.5rem 1rem; }
+.page-tools > summary { cursor: pointer; padding: 0.65rem 0; font-weight: 700; font-size: 1.05rem; }
+.tool-section { padding: 0.5rem 0 0.75rem; border-top: 1px solid var(--rule); }
+.tool-section:first-of-type { border-top: 0; }
+.tool-section h3 { margin: 0 0 0.35rem; }
+.page-left-out { border-left: 5px solid var(--mark-optional); padding-left: 0.6rem; }
+.text-lines { list-style: none; margin: 0.4rem 0; padding: 0; max-height: 16rem; overflow-y: auto; }
+.text-lines li { padding: 0.2rem 0; border-top: 1px solid var(--rule); }
+.text-lines li:first-child { border-top: 0; }
+.text-lines a[aria-current="true"] { font-weight: 700; }
+.line-kind { color: var(--muted); }
+.tool-editor { margin: 0.6rem 0 0; padding: 0.6rem 0.8rem; border-left: 4px solid var(--mark-current); background: var(--panel); border-radius: 0 var(--radius) var(--radius) 0; }
+.tool-editor h4 { margin: 0 0 0.4rem; }
+.tool-editor .heading-make { margin-top: 0.8rem; }
+.region-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.4rem 1rem; max-width: 26rem; }
+.region-grid input[type="number"] { width: 100%; max-width: 9rem; }
+.region-preview { margin: 0.4rem 0 0.8rem; }
+.region-preview img { max-width: 100%; height: auto; border: 1px solid var(--rule); background: #fff; }
+.region-preview figcaption { color: var(--muted); font-size: 0.95rem; }
+.not-a-table, .accept-clean, .read-cell { margin-top: 0.75rem; }

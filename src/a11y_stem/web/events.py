@@ -11,7 +11,7 @@ records that on the server, with no cookies and no script in the browser:
 | `reuploaded` | ... a file this person uploaded before | | hours since then |
 | `finished` | the worker finishes a job | `done`, `failed:timeout`, ... | seconds since upload |
 | `review_opened` | the review screen or list opens | `split` or `list` | |
-| `decision_made` | a review decision is saved | `single`, `group` (`bulk`: old) | fixes changed |
+| `decision_made` | a review decision or edit is saved | `single`, `group`, `structure` | fixes |
 | `review_completed` | no decision is left open (once) | | seconds since finished |
 | `html_viewed` | the HTML opens in the browser | | |
 | `downloaded` | the HTML is downloaded | `open` (decisions open) or `done` | decisions open |

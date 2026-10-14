@@ -354,6 +354,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "so English is assumed: check it is right.",
     "long_description_missing": "A complex figure, such as a chart or a diagram, has no "
     "long description yet.",
+    "page_omitted": "You left this page out of the student file and of the review, and the "
+    "file says that it is not there.",
 }
 
 UNKNOWN_CHECK_MESSAGE = "A check did not pass, so compare the proposal with the original closely."

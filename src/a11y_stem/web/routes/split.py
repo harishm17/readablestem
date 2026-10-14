@@ -32,6 +32,7 @@ element ids and percentages only), because the CSP allows no inline styles.
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass, field
 from typing import Annotated, Any
 from urllib.parse import urlencode
@@ -45,7 +46,7 @@ from sqlalchemy import select
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import events, marks, notation, page_images, queue
+from a11y_stem.web import events, marks, notation, notice_places, page_edits, page_images, queue
 from a11y_stem.web.compare import (
     COMPARE_PX_PER_PT,
     CompareGeometry,
@@ -72,12 +73,22 @@ from a11y_stem.web.deps import (
 from a11y_stem.web.edit_check import EditCheck, check_equation_edit
 from a11y_stem.web.logsafe import log_event
 from a11y_stem.web.mathml import try_sanitize_mathml
-from a11y_stem.web.messages import explain_check, explain_reason
+from a11y_stem.web.messages import explain_check, explain_notice, explain_reason
+from a11y_stem.web.page_edits import (
+    HEADING_CODE,
+    HEADING_TOO_LONG,
+    MAX_HEADING_CHARS,
+    friendly_text,
+)
 from a11y_stem.web.review import (
     GROUP_KINDS,
     MAX_LATEX_CHARS,
+    NOT_CONVERTED,
     FieldError,
     ReviewInvalid,
+    clean_tables,
+    field_id,
+    heading_levels_that_fit,
     heading_places,
     is_kept_image,
     item_labels,
@@ -97,6 +108,7 @@ from a11y_stem.web.routes.review import (
     _load_versioned,
     page_group_view,
     stale_notice,
+    times_phrase,
     undo_offer,
 )
 from a11y_stem.web.speech_diff import SpokenDiff, spoken_diff
@@ -110,6 +122,13 @@ HEADING_REGION_ZOOM = 3.0  # pixels per point for a heading's band
 FIGURE_REGION_ZOOM = 2.0
 TABLE_REGION_ZOOM = 2.0
 TABLE_REGION_MARGIN = 6.0  # points of page round a table (its caption: snapped in whole)
+# A notice about text, as the `note` of an address: "link_text_unclear:p3-e4".
+NOTE_KEY = re.compile(r"^[a-z_]{1,40}:[A-Za-z0-9_-]{1,64}$")
+EXCERPT_CHARS = 400  # of a paragraph a notice is about, shown in its panel
+# Elements with words of their own that the page tools can change (T3-5).
+TEXT_KINDS = frozenset({Kind.PARAGRAPH, Kind.LIST_ITEM, Kind.HEADING})
+MAX_TEXT_LINES = 120  # lines of text the page tools list for one page
+LINE_CHARS = 80  # of a line, in that list
 MAX_STEPS = 12  # decisions shown as numbered steps; more become a progress bar
 # The kinds the review screen shows (marks, optional checks, items): its groups.
 REVIEW_KINDS = frozenset(GROUP_KINDS)
@@ -153,6 +172,7 @@ class PageLink:
     href: str
     to_decide: int
     current: bool
+    omitted: bool = False
 
 
 @dataclass
@@ -167,6 +187,7 @@ class PageView:
     prev_href: str | None
     next_href: str | None
     accepted_href: str  # toggles "Show accepted"
+    omitted: bool = False  # left out of the student file and of the review (T3-16)
 
     @property
     def placed(self) -> bool:
@@ -176,6 +197,70 @@ class PageView:
     def tiers(self) -> set[str]:
         """The kinds of mark on the page (the legend lists only these)."""
         return {b.tier for b in self.boxes}
+
+
+@dataclass
+class TextLine:
+    """One line of the page's text in the page tools: a paragraph, a list item or a
+    heading, by its first words (document content, for the owner's page only)."""
+
+    element_id: str
+    label: str  # "Paragraph", "List item", "Heading, level 2"
+    preview: str
+    href: str
+    current: bool = False
+
+
+@dataclass
+class TextEditor:
+    """The open text of the page tools: change its words, or make it a heading."""
+
+    element_id: str
+    label: str
+    text: str  # in the box: an inline equation as "[equation 3]"
+    code: bool = False  # program code: line breaks and indentation are kept
+    heading_level: int | None = None  # it is a heading now, at this level
+    can_make_heading: bool = False
+    why_not: str = ""  # why it cannot be made a heading
+    levels: int = 6  # levels 1 to this fit after the heading before it
+    level: str = "2"
+    item_href: str | None = None  # a heading's own panel (its level, bold text)
+    errors: dict[str, str] = field(default_factory=dict)  # "text", "level" -> message
+
+
+@dataclass
+class AddTool:
+    """ "Add something the tool missed" (T3-5): step 1 describes the region of the page, step
+    2 shows it cut out, with what the kind needs (alt text; or the note that a model reads
+    an equation) and the button that adds it."""
+
+    kind: str = ""  # "picture" or "equation" once chosen
+    values: dict[str, str] = field(default_factory=dict)  # left, top, right, bottom, alt
+    preview_url: str | None = None  # step 2: the region as it would be cut
+    errors: dict[str, str] = field(default_factory=dict)  # "region", "addalt", "add"
+    change_href: str | None = None  # back to step 1 with the same numbers
+    open: bool = False
+
+    @property
+    def confirming(self) -> bool:
+        return self.preview_url is not None
+
+
+@dataclass
+class PageTools:
+    """What can be changed on the page shown (T3-5, T3-16): the page tools under the
+    optional checks. Content-free except for what the owner's own page holds."""
+
+    number: int  # 1-based
+    omitted: bool  # the page is left out of the student file and of the review
+    blank: bool  # the page looks blank (a page type says so, or nothing was found on it)
+    only_page: bool  # the last page left: it cannot be left out
+    opens: bool = False  # the tools are shown open (something was just done or refused)
+    error: str = ""
+    lines: list[TextLine] = field(default_factory=list)
+    lines_cut: int = 0  # lines not listed (a very long page)
+    editor: TextEditor | None = None
+    add: AddTool = field(default_factory=AddTool)
 
 
 @dataclass
@@ -209,6 +294,21 @@ class ReadyView:
     finish: str  # "You made 3 decisions on 9 October." / "Nothing in this file needed ..."
     notes: int  # items accepted for you with a note (optional to look at)
     shareable: bool  # the file can go to students (not a job that stopped early)
+
+
+@dataclass
+class NoticeCard:
+    """A notice about text, shown in the decision's place (T3-7): which link or line it is
+    about and the words around it (document content, for the owner's page only)."""
+
+    sentence: str
+    lead: str  # "The link text"
+    names: tuple[str, ...]
+    excerpt: str  # the paragraph's own words ("" when there is none)
+    page: int  # 1-based
+    element_id: str
+    change_href: str | None  # the page tools, with this paragraph open to change
+    others: int = 0  # more notices on the same paragraph
 
 
 @dataclass
@@ -257,6 +357,10 @@ class Panel:
     # still open, to go on when done with it.
     continue_href: str | None = None
     continue_label: str = ""
+    notice: NoticeCard | None = None  # mode "notice": a notice about text
+    # Tables that wait with nothing wrong found in them, when there are several (T3-11):
+    # "Accept all N clean tables".
+    clean_tables: int = 0
 
 
 def review_url(
@@ -266,14 +370,23 @@ def review_url(
     page: int | None = None,
     accepted: bool = False,
     anchor: str | None = None,
+    tools: bool = False,
+    change: str | None = None,
+    note: str | None = None,
 ) -> str:
     query = {}
     if item:
         query["item"] = item
+    if note:
+        query["note"] = note
+    if change:  # the page tools, with this paragraph open to change (T3-5)
+        query["change"] = change
     if page:
         query["page"] = str(page)
     if accepted:
         query["accepted"] = "1"
+    if tools:  # the page tools open (T3-5, T3-16)
+        query["tools"] = "1"
     url = f"/jobs/{job_id}/review"
     if query:
         url += "?" + urlencode(query)
@@ -427,7 +540,17 @@ class SplitBuilder:
         self.queue = queue.decisions(self.result)
         self.sizes = resolve_page_sizes(request, job_id, user, self.result)
         self.page_count = _page_count(self.view, self.result)
+        self.omitted = set(self.result.omitted_pages)
         self.items: dict[str, ReviewItem] = {}
+        self.first_fix: dict[str, Fix] = {}
+        for fix in self.result.fixes:
+            self.first_fix.setdefault(fix.element_id, fix)
+        # Notices with their names and places (T3-7), those the optional checks list.
+        self.notes = [
+            p
+            for p in notice_places.places(self.result, self.labels)
+            if notice_places.shown_in_review(p, self.first_fix)
+        ]
 
     # ------------------------------------------------------------------ helpers
 
@@ -471,6 +594,64 @@ class SplitBuilder:
             if fix is not None and fix.kind in REVIEW_KINDS:
                 return None, fix
         return queue.first_open(self.queue), None
+
+    # ------------------------------------------------------------------ notices (T3-7)
+
+    def place_href(self, place: notice_places.Place) -> str:
+        return f"/jobs/{self.job_id}/review?{place.query}#{place.anchor}"
+
+    def note(self, key: str) -> notice_places.Place | None:
+        """The notice about text that `key` ("link_text_unclear:p3-e4") names, if it is
+        still one."""
+        if not key or not NOTE_KEY.match(key):
+            return None
+        return next((p for p in self.notes if p.key == key), None)
+
+    def notice_panel(self, place: notice_places.Place) -> Panel:
+        element = self.elements.get(place.notice.element_id or "")
+        text = notice_places.readable(element.text or "") if element is not None else ""
+        if len(text) > EXCERPT_CHARS:
+            text = text[:EXCERPT_CHARS].rsplit(" ", 1)[0] + "…"
+        page = (place.notice.page or 0) + 1
+        change = None
+        if element is not None and element.kind in TEXT_KINDS:
+            change = review_url(
+                self.job_id, page=page, anchor="page-tools", tools=True, change=element.id
+            )
+        card = NoticeCard(
+            sentence=explain_notice(place.notice).text,
+            lead=place.lead,
+            names=place.names,
+            excerpt=text,
+            page=page,
+            element_id=element.id if element is not None else "",
+            change_href=change,
+            others=sum(
+                1
+                for p in self.notes
+                if p is not place and p.notice.element_id == place.notice.element_id
+            ),
+        )
+        panel = Panel(
+            mode="notice",
+            title="Worth checking",
+            subtitle=f"Page {page}",
+            status="Optional check",
+            status_class="pill-optional",
+            notice=card,
+            why=card.sentence,
+        )
+        current = queue.first_open(self.queue)
+        if current is not None:
+            panel.back_href = self.decision_url(current)
+            panel.back_label = f"Back to decision {current.number}"
+        panel.show_on_page = self.url(page=page, anchor=f"box-{card.element_id}")
+        return panel
+
+    def notice_lines(self) -> list[OptionalLine]:
+        """The notices listed with the optional checks: which link or line, and where."""
+        rows = notice_places.rows(self.job_id, self.notes, self.url())
+        return [OptionalLine(r.label, r.sentence, r.href, r.what) for r in rows]
 
     # ------------------------------------------------------------------ panel
 
@@ -556,6 +737,9 @@ class SplitBuilder:
                 panel.back_href = self.decision_url(current)
                 panel.back_label = f"Back to decision {current.number}"
         self._fix_panel(panel, fix)
+        if fix.kind is Kind.TABLE and decision is not None and decision.open:
+            clean = len(clean_tables(self.result))
+            panel.clean_tables = clean if clean >= 2 else 0
         if fix.kind is Kind.TABLE and decision is not None and not decision.open:
             onward = queue.next_open(self.queue, decision)
             if onward is not None:
@@ -637,7 +821,7 @@ class SplitBuilder:
         panel.group = group
         lead = decision.lead
         page = self.page_of(lead)
-        panel.subtitle = f"Repeated heading, {len(decision.fixes)} times"
+        panel.subtitle = f"Repeated heading, {times_phrase(len(decision.fixes))}"
         panel.show_on_page = (
             self.url(item=decision.key, page=page, anchor=f"box-{lead.element_id}")
             if page
@@ -680,7 +864,13 @@ class SplitBuilder:
 
     # ------------------------------------------------------------------ page
 
-    def page_view(self, number: int, selected: set[str], current_key: str | None) -> PageView:
+    def page_view(
+        self,
+        number: int,
+        selected: set[str],
+        current_key: str | None,
+        current_note: str | None = None,
+    ) -> PageView:
         index = number - 1
         size = self.sizes.get(index)
         boxes: list[Box] = []
@@ -732,6 +922,20 @@ class SplitBuilder:
                 boxes.append(
                     Box(fix.element_id, href, "✓", f"{label}, {status}", "accepted", is_current)
                 )
+        placed = {b.element_id for b in boxes}
+        notes: list[Box] = []
+        for place in self.notes:
+            notice = place.notice
+            if not place.key or notice.page != index or notice.element_id in placed:
+                continue  # only a notice about text, once for its paragraph
+            placed.add(notice.element_id or "")
+            name = f"Page {number}, optional check: " + explain_notice(notice).text
+            if place.names:
+                name += " " + ", ".join(f"“{n}”" for n in place.names)
+            is_current = place.key == current_note
+            href = self.place_href(place)
+            notes.append(Box(notice.element_id or "", href, "Note", name, "optional", is_current))
+        boxes = notes + boxes  # under the fixes' marks, so a paragraph takes no click from them
         if size is None:
             boxes = []
         return PageView(
@@ -751,7 +955,146 @@ class SplitBuilder:
                 accepted=not self.show_accepted,
                 anchor="page-view",
             ),
+            omitted=index in self.omitted,
         )
+
+    def page_tools(
+        self,
+        number: int,
+        *,
+        opens: bool = False,
+        error: str = "",
+        change: str = "",
+        add: dict[str, str] | None = None,
+        invalid: tuple[str, ReviewInvalid] | None = None,
+    ) -> PageTools:
+        """The tools for page `number` (1-based): change its text, make a line a heading,
+        add what the tool missed, leave the page out, or put it back."""
+        index = number - 1
+        on_page = any(e.page == index for e in self.result.elements)
+        looks_blank = any(t.page == index and t.kind == "blank" for t in self.result.page_types)
+        left = self.page_count - len(self.omitted)
+        tools = PageTools(
+            number=number,
+            omitted=index in self.omitted,
+            blank=looks_blank or (not on_page and index not in self.omitted),
+            only_page=left <= 1 and index not in self.omitted,
+            opens=opens or index in self.omitted,
+            error=error,
+        )
+        if tools.omitted:
+            return tools
+        texts = sorted(
+            (e for e in self.result.elements if e.page == index and e.kind in TEXT_KINDS),
+            key=lambda e: e.order,
+        )
+        for element in texts[:MAX_TEXT_LINES]:
+            tools.lines.append(self.text_line(element, current=element.id == change))
+        tools.lines_cut = max(0, len(texts) - MAX_TEXT_LINES)
+        editing = next((e for e in self.result.elements if e.id == change), None)
+        if editing is not None and editing.kind in TEXT_KINDS and editing.page == index:
+            tools.editor = self.text_editor(editing)
+            tools.opens = True
+            if invalid is not None and invalid[0] == editing.id:
+                self._editor_error(tools.editor, invalid[1])
+            if editing.id not in {line.element_id for line in tools.lines}:
+                tools.lines.append(self.text_line(editing, current=True))
+        tools.add = self.add_tool(number, add or {}, invalid)
+        tools.opens = tools.opens or tools.add.open
+        return tools
+
+    def text_line(self, element: Element, *, current: bool = False) -> TextLine:
+        fix = self.first_fix.get(element.id)
+        text = friendly_text(self.result, element, fix)
+        shown = " ".join(text.split())
+        if len(shown) > LINE_CHARS:
+            shown = shown[:LINE_CHARS].rsplit(" ", 1)[0] + "…"
+        if element.kind is Kind.HEADING:
+            label = "Heading"
+            if fix is not None and fix.heading is not None and fix.status not in NOT_CONVERTED:
+                label = f"Heading, level {fix.heading.level}"
+        else:
+            label = "List item" if element.kind is Kind.LIST_ITEM else "Paragraph"
+        href = review_url(
+            self.job_id,
+            page=element.page + 1,
+            tools=True,
+            change=element.id,
+            anchor="page-tools-edit",
+        )
+        return TextLine(element.id, label, shown or "(no words)", href, current)
+
+    def text_editor(self, element: Element) -> TextEditor:
+        fix = self.first_fix.get(element.id)
+        line = self.text_line(element)
+        editor = TextEditor(
+            element_id=element.id,
+            label=line.label,
+            text=friendly_text(self.result, element, fix),
+            code=element.preformatted,
+        )
+        if element.kind is Kind.HEADING:
+            if fix is not None and fix.heading is not None:
+                editor.heading_level = fix.heading.level
+            editor.item_href = (
+                review_url(self.job_id, item=element.id, anchor="decision-title")
+                if fix is not None
+                else None
+            )
+            return editor
+        if element.kind is not Kind.PARAGRAPH:
+            return editor
+        if element.preformatted or element.term_end is not None:
+            editor.why_not = HEADING_CODE
+            return editor
+        if len(element.text or "") > MAX_HEADING_CHARS or "\n" in (element.text or ""):
+            editor.why_not = HEADING_TOO_LONG
+            return editor
+        fits = heading_levels_that_fit(self.result, element.id)
+        editor.can_make_heading = True
+        editor.levels = max(fits) if fits else 1
+        editor.level = str(min(2, editor.levels))
+        return editor
+
+    def _editor_error(self, editor: TextEditor, exc: ReviewInvalid) -> None:
+        editor.text = exc.values.get("text", editor.text)
+        editor.level = exc.values.get("level", editor.level)
+        for error in exc.errors:
+            editor.errors[error.field_id.split("-", 1)[0]] = error.message
+
+    def add_tool(
+        self, number: int, add: dict[str, str], invalid: tuple[str, ReviewInvalid] | None
+    ) -> AddTool:
+        """The "Add something the tool missed" tool. Step 2 (the region cut out, to confirm)
+        when the four edges make a region that fits the page; step 1 otherwise."""
+        kind = add.get("add", "")
+        tool = AddTool(kind=kind if kind in {"picture", "equation"} else "")
+        tool.values = {k: add.get(k, "") for k in ("left", "top", "right", "bottom", "alt")}
+        tool.open = bool(tool.kind)
+        if invalid is not None and invalid[0] == f"page-{number}":
+            tool.open = True
+            tool.values.update(invalid[1].values)
+            for error in invalid[1].errors:
+                tool.errors[error.field_id.split("-", 1)[0]] = error.message
+        edges = [tool.values[k] for k in ("left", "top", "right", "bottom")]
+        size = self.sizes.get(number - 1)
+        if tool.kind and any(edges) and size is not None and "region" not in tool.errors:
+            try:
+                page_edits.region_box(
+                    size, edges[0], edges[1], edges[2], edges[3], field_id("region", str(number))
+                )
+            except ReviewInvalid as exc:
+                tool.errors["region"] = exc.errors[0].message
+            else:
+                query = urlencode({k: tool.values[k] for k in ("left", "top", "right", "bottom")})
+                tool.preview_url = f"/jobs/{self.job_id}/pages/{number}/region.png?{query}"
+        if tool.preview_url is not None:
+            query = urlencode(
+                {"page": number, "tools": 1, "add": tool.kind}
+                | {k: tool.values[k] for k in ("left", "top", "right", "bottom")}
+            )
+            tool.change_href = f"/jobs/{self.job_id}/review?{query}#page-tools-add"
+        return tool
 
     def _page_href(self, number: int, current_key: str | None) -> str | None:
         if not 1 <= number <= self.page_count:
@@ -766,6 +1109,7 @@ class SplitBuilder:
                 self.url(item=current_key, page=n, anchor="page-view"),
                 counts.get(n - 1, 0),
                 n == shown,
+                n - 1 in self.omitted,
             )
             for n in range(1, self.page_count + 1)
         ]
@@ -799,7 +1143,7 @@ class SplitBuilder:
                 else None
             )
             out.append(self._line(fix, _first_note(fix, compare), href))
-        return out
+        return out + self.notice_lines()
 
     def _line(self, fix: Fix, note: str, href: str) -> OptionalLine:
         page = self.page_of(fix)
@@ -831,7 +1175,7 @@ class SplitBuilder:
                 bold = sum(f.status is Status.REJECTED for f in decision.fixes)
                 out.append(
                     OptionalLine(
-                        label=f"Repeated heading, {len(decision.fixes)} times",
+                        label=f"Repeated heading, {times_phrase(len(decision.fixes))}",
                         note=_group_state(kept, bold, len(decision.fixes)),
                         href=href,
                         what=text,
@@ -933,10 +1277,19 @@ def split_page(
     stale: bool = False,
     status_code: int = 200,
     cell: str = "",
+    tools: bool = False,
+    note: str = "",
+    change: str = "",
+    add: str = "",
+    left: str = "",
+    top: str = "",
+    right: str = "",
+    bottom: str = "",
 ) -> Response:
     builder = SplitBuilder(request, job_id, user, show_accepted=show_accepted)
-    decision, fix = builder.select(item)
-    panel = builder.panel(decision, fix)
+    place = builder.note(note)
+    decision, fix = (None, None) if place is not None else builder.select(item)
+    panel = builder.notice_panel(place) if place is not None else builder.panel(decision, fix)
     if cell and panel.item is not None and panel.item.table is not None:
         panel.item.table.pick(cell)  # "Change a cell": that cell's form is open
     errors: list[FieldError] = []
@@ -948,13 +1301,17 @@ def split_page(
     number = int(page) if page.isdigit() and 1 <= int(page) <= builder.page_count else 0
     if not number:
         number = (builder.page_of(shown_fix) if shown_fix is not None else None) or 1
+        if place is not None and place.notice.page is not None:
+            number = place.notice.page + 1
     selected = (
         {f.element_id for f in decision.fixes}
         if decision is not None
         else ({fix.element_id} if fix is not None else set())
     )
+    if place is not None and place.notice.element_id:
+        selected = {place.notice.element_id}
     current_key = decision.key if decision is not None else (fix.element_id if fix else None)
-    page_view = builder.page_view(number, selected, current_key)
+    page_view = builder.page_view(number, selected, current_key, place.key if place else None)
     open_count = sum(d.open for d in builder.queue)
     optional = builder.optional_lines()
     flashes = pop_flash(request)
@@ -991,6 +1348,13 @@ def split_page(
         if stale
         else None,
         "decided_lines": builder.decided_lines(),
+        "tools": builder.page_tools(
+            number,
+            opens=tools or bool(change),
+            change=change,
+            add={"add": add, "left": left, "top": top, "right": right, "bottom": bottom},
+            invalid=invalid,
+        ),
         # Undo, in the notice after a decision: only for the write this page shows.
         "undo": bool(notice)
         and flashes[-1].get("undo", True) is not False
@@ -1028,6 +1392,9 @@ def _apply_invalid(panel: Panel, invalid: tuple[str, ReviewInvalid]) -> None:
         panel.pages.error = " ".join(e.message for e in exc.errors)
         return
     item = panel.item
+    if item is None and panel.pages is not None:
+        # A description in words for one page of a group of kept images (T3-16).
+        item = next((m for m in panel.pages.describe if m.element_id == target), None)
     if item is not None and item.element_id == target:
         item.edited = any(item.values.get(k, "") != v for k, v in exc.values.items())
         item.values.update(exc.values)
@@ -1051,11 +1418,35 @@ def review_screen(
     page: str = "",
     accepted: str = "",
     cell: str = "",
+    tools: str = "",
+    note: str = "",
+    change: str = "",
+    add: str = "",
+    left: str = "",
+    top: str = "",
+    right: str = "",
+    bottom: str = "",
 ) -> Response:
-    """`cell` ("r1c2"): a table's "Change a cell" choice, whose form is then open."""
+    """`cell` ("r1c2"): a table's "Change a cell" choice, whose form is then open.
+    `tools` ("1"): the page tools are open; `change`: the text open in them; `add`, `left`,
+    `top`, `right`, `bottom`: the region being described for something to add."""
     shown = accepted == "1"
     response = split_page(
-        request, job_id, user, item=item, page=page, show_accepted=shown, cell=cell
+        request,
+        job_id,
+        user,
+        item=item,
+        page=page,
+        show_accepted=shown,
+        cell=cell,
+        tools=tools == "1",
+        note=note,
+        change=change,
+        add=add,
+        left=left,
+        top=top,
+        right=right,
+        bottom=bottom,
     )
     ctx = get_ctx(request)  # usage event (web/events.py)
     events.record_review_opened(ctx.factory, ctx.settings, user.id, job_id, "split")
@@ -1176,6 +1567,22 @@ def marks_css(request: Request, job_id: str, user: UserDep) -> Response:
         size = sizes.get(page)
         if size is not None:
             placed = marks.place(boxes, size, inline=inline, text=text.get(page))
+            rules.extend(_box_rules(m, size) for m in placed.values())
+    # Notices about text (T3-7) are marked on their paragraph. They are laid out apart from
+    # the fixes' marks and sit under them (they come first in the page), so a paragraph's
+    # mark never takes a click from an equation inside it.
+    first_fix: dict[str, Fix] = {}
+    for fix in result.fixes:
+        first_fix.setdefault(fix.element_id, fix)
+    noted: dict[int, dict[str, tuple[float, float, float, float]]] = {}
+    for place in notice_places.places(result, item_labels(result)):
+        element = elements.get(place.notice.element_id or "")
+        if place.key and element is not None and notice_places.shown_in_review(place, first_fix):
+            noted.setdefault(element.page, {})[element.id] = element.bbox
+    for page, boxes in sorted(noted.items()):
+        size = sizes.get(page)
+        if size is not None:
+            placed = marks.place(boxes, size, inline=frozenset(), text=text.get(page))
             rules.extend(_box_rules(m, size) for m in placed.values())
     for fix in result.fixes:
         element = elements.get(fix.element_id)

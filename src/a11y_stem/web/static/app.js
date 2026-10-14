@@ -520,7 +520,13 @@
 
   function start() {
     var saved = document.querySelector("[data-saved]");
-    if (saved) forget(saved.getAttribute("data-saved"));
+    if (saved) {
+      forget(saved.getAttribute("data-saved"));
+      // Other forms the same save settled (the page tools' text and region forms).
+      (saved.getAttribute("data-saved-also") || "").split(" ").forEach(function (action) {
+        if (action) forget(action);
+      });
+    }
     var forms = [];
     document.querySelectorAll("form [data-edit-field]").forEach(function (field) {
       var form = field.form;

@@ -75,6 +75,11 @@ class RenderContext(Protocol):
         """' id="..."' the first time an element id is used, else ""."""
         ...
 
+    def image_alt(self, element: Element, default: str) -> str:
+        """The alt text of an item shown as an image: the instructor's description in
+        words when there is one, else `default`."""
+        ...
+
     def original(self, element: Element, alt: str) -> str:
         """The element's crop as an <img alt> (or its text when there is no crop)."""
         ...
@@ -273,5 +278,6 @@ def render_table_element(element: Element, fix: Fix | None, ctx: RenderContext) 
         if element.caption and element.caption.strip()
         else ""
     )
-    body = f"<figure>{ctx.original(element, TABLE_NOT_CONVERTED_ALT)}{caption}</figure>"
+    alt = ctx.image_alt(element, TABLE_NOT_CONVERTED_ALT)
+    body = f"<figure>{ctx.original(element, alt)}{caption}</figure>"
     return ctx.flag_block(element, reason, body, TABLE_FLAG_LABEL, TABLE_NOTE)

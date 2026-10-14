@@ -1,0 +1,148 @@
+{# The page tools (T3-5, T3-16), under the optional checks on the review screen: change the
+   words of a paragraph or a heading, make a line a heading, add a picture or an equation
+   the tool missed, leave the page out of the student file (and put it back). Included by
+   review_split.html, which gives it `tools` (routes/split.py `PageTools`), `job`,
+   `csrf_field`, `csrf_token`, `result_version` and `alt_guideline`. Every control is a form
+   or a link, so it all works without JavaScript; each form carries the review version its
+   page was drawn at, so one from an out-of-date tab is refused, not applied. #}
+{% macro tool_fields() -%}
+<input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="version" value="{{ result_version }}">
+{%- endmacro %}
+{% macro tool_error(message, id) %}
+{% if message %}<p class="error-message" id="{{ id }}"><span class="visually-hidden">Error: </span>{{ message }}</p>{% endif %}
+{% endmacro %}
+<details class="optional-box page-tools" id="page-tools"{% if tools.opens %} open{% endif %}>
+  <summary id="page-tools-summary">Change page {{ tools.number }}</summary>
+  {% if tools.omitted %}
+  <p>Page {{ tools.number }} is left out of the student file and of this review. Nothing was deleted.</p>
+  <form method="post" action="/jobs/{{ job.id }}/pages/{{ tools.number }}/restore" class="inline-form">
+    {{ tool_fields() }}
+    <button type="submit" class="button-secondary" data-role="restore-page">Put page {{ tools.number }} back</button>
+  </form>
+  {% else %}
+
+  <section class="tool-section" id="page-tools-edit" aria-labelledby="edit-title">
+    <h3 id="edit-title" class="part-label">Change the words, or make a line a heading</h3>
+    {% if tools.lines %}
+    <p class="hint" id="edit-hint">Choose a paragraph, a list item or a heading on this page. The tool's own mistakes are changed here; an equation, a figure or a table is changed in its own decision.</p>
+    <ul class="text-lines" aria-describedby="edit-hint">
+      {% for line in tools.lines %}
+      <li><a href="{{ line.href }}"{% if line.current %} aria-current="true"{% endif %}><span class="line-kind">{{ line.label }}:</span> “{{ line.preview }}”<span class="visually-hidden"> (change)</span></a></li>
+      {% endfor %}
+    </ul>
+    {% if tools.lines_cut %}<p class="hint">{{ tools.lines_cut }} more {{ "line is" if tools.lines_cut == 1 else "lines are" }} not listed here.</p>{% endif %}
+    {% else %}
+    <p>Nothing was found on this page that has words to change.</p>
+    {% endif %}
+    {% if tools.editor %}
+    {% set ed = tools.editor %}
+    {% set eid = ed.element_id %}
+    <div class="tool-editor" role="group" aria-labelledby="editor-title-{{ eid }}">
+      <h4 id="editor-title-{{ eid }}">{{ ed.label }}</h4>
+      <form method="post" action="/jobs/{{ job.id }}/edit/{{ eid }}" class="decide-form">
+        {{ tool_fields() }}<input type="hidden" name="action" value="text">
+        <div class="field{% if ed.errors.get('text') %} field-error{% endif %}">
+          <label for="text-{{ eid }}">Words of this {{ "heading" if ed.heading_level else ed.label|lower }}</label>
+          <p class="hint" id="text-hint-{{ eid }}">Type it as it should read.{% if ed.code %} Line breaks and indentation are kept.{% endif %} Leave a mark like “[equation 3]” where that equation belongs: the equation itself is changed in its own decision. A link on words you change is taken off.</p>
+          {{ tool_error(ed.errors.get("text"), "text-error-" ~ eid) }}
+          <textarea id="text-{{ eid }}" name="text" rows="{{ 8 if ed.code else 4 }}" maxlength="12000" class="prose-input" data-edit-field{% if ed.code %} spellcheck="false"{% endif %}
+                    aria-describedby="text-hint-{{ eid }}{% if ed.errors.get('text') %} text-error-{{ eid }}{% endif %}"{% if ed.errors.get('text') %} aria-invalid="true"{% endif %}>{{ ed.text }}</textarea>
+        </div>
+        <button type="submit" class="button" data-role="save-text">Save the words<span class="visually-hidden"> of this {{ ed.label|lower }}</span></button>
+      </form>
+      {% if ed.can_make_heading %}
+      <form method="post" action="/jobs/{{ job.id }}/edit/{{ eid }}" class="decide-form heading-make">
+        {{ tool_fields() }}<input type="hidden" name="action" value="heading">
+        <div class="field field-inline{% if ed.errors.get('level') %} field-error{% endif %}">
+          <label for="level-{{ eid }}">Make this a heading, at level</label>
+          <p class="hint" id="level-hint-{{ eid }}">Level 1 is the top; after the heading before it, level 1{% if ed.levels > 1 %} to {{ ed.levels }}{% endif %} fits. The line stays where it is.</p>
+          {{ tool_error(ed.errors.get("level"), "level-error-" ~ eid) }}
+          <div class="inline-controls">
+            <select id="level-{{ eid }}" name="level" aria-describedby="level-hint-{{ eid }}{% if ed.errors.get('level') %} level-error-{{ eid }}{% endif %}"{% if ed.errors.get('level') %} aria-invalid="true"{% endif %}>
+              {% for n in range(1, 7) %}<option value="{{ n }}"{% if ed.level == n|string %} selected{% endif %}>Level {{ n }}</option>{% endfor %}
+            </select>
+            <button type="submit" class="button-secondary" data-role="make-heading">Make it a heading<span class="visually-hidden">: {{ ed.label|lower }}</span></button>
+          </div>
+        </div>
+      </form>
+      {% elif ed.why_not %}
+      <p class="hint">{{ ed.why_not }}</p>
+      {% elif ed.heading_level %}
+      <p class="hint">This is a heading, level {{ ed.heading_level }}.{% if ed.item_href %} To change its level, or to make it plain text, <a href="{{ ed.item_href }}">open it as an item</a>.{% endif %}</p>
+      {% endif %}
+    </div>
+    {% endif %}
+  </section>
+
+  <section class="tool-section" id="page-tools-add" aria-labelledby="add-title">
+    <h3 id="add-title" class="part-label">Add something the tool missed</h3>
+    {% set add = tools.add %}
+    {% if add.confirming %}
+    <figure class="region-preview">
+      <img class="region-image" src="{{ add.preview_url }}" alt="The part of page {{ tools.number }} you chose, cut out.">
+      <figcaption>The part of page {{ tools.number }} you chose.</figcaption>
+    </figure>
+    <form method="post" action="/jobs/{{ job.id }}/pages/{{ tools.number }}/add" class="decide-form">
+      {{ tool_fields() }}
+      <input type="hidden" name="kind" value="{{ add.kind }}">
+      {% for edge in ("left", "top", "right", "bottom") %}<input type="hidden" name="{{ edge }}" value="{{ add.values.get(edge, '') }}">{% endfor %}
+      {% if add.kind == "picture" %}
+      <div class="field{% if add.errors.get('addalt') %} field-error{% endif %}">
+        <label for="addalt-{{ tools.number }}">Alt text for this picture</label>
+        <p class="hint" id="addalt-hint-{{ tools.number }}">What it shows and why it matters here, in one or two sentences. Aim for {{ alt_guideline }} characters or fewer.</p>
+        {{ tool_error(add.errors.get("addalt"), "addalt-error-" ~ tools.number) }}
+        <textarea id="addalt-{{ tools.number }}" name="alt" rows="3" maxlength="1000" class="prose-input" data-edit-field
+                  aria-describedby="addalt-hint-{{ tools.number }}{% if add.errors.get('addalt') %} addalt-error-{{ tools.number }}{% endif %}"{% if add.errors.get('addalt') %} aria-invalid="true"{% endif %}>{{ add.values.get("alt", "") }}</textarea>
+      </div>
+      {% else %}
+      <p id="add-note-{{ tools.number }}">The tool will read this part as an equation. It takes a few seconds and uses part of this document's allowance for reading with the model. You then check what it read, as a decision.</p>
+      {% endif %}
+      {{ tool_error(add.errors.get("add"), "add-error-" ~ tools.number) }}
+      <div class="decide-row" id="add-{{ tools.number }}" tabindex="-1">
+        <button type="submit" class="button" data-role="add-region"{% if add.kind == "equation" %} aria-describedby="add-note-{{ tools.number }}"{% endif %}>{{ "Add the picture" if add.kind == "picture" else "Read it as an equation" }}</button>
+        <a href="{{ add.change_href }}">Change the region</a>
+      </div>
+    </form>
+    {% else %}
+    <form method="get" action="/jobs/{{ job.id }}/review" class="decide-form add-region-form">
+      <input type="hidden" name="page" value="{{ tools.number }}"><input type="hidden" name="tools" value="1">
+      <p class="hint" id="add-hint">For a picture the tool did not find (it needs alt text), or an equation it missed (the tool reads it, and you check the answer). Describe where it is on the page; you see it cut out before anything is added.</p>
+      <fieldset class="table-fieldset" aria-describedby="add-hint">
+        <legend>What is it?</legend>
+        <div class="checkbox-field"><input type="radio" id="add-picture" name="add" value="picture"{% if add.kind != "equation" %} checked{% endif %}><label for="add-picture">A picture or diagram</label></div>
+        <div class="checkbox-field"><input type="radio" id="add-equation" name="add" value="equation"{% if add.kind == "equation" %} checked{% endif %}><label for="add-equation">An equation on its own line</label></div>
+      </fieldset>
+      <fieldset class="table-fieldset region-fields{% if add.errors.get('region') %} field-error{% endif %}" aria-describedby="region-hint{% if add.errors.get('region') %} region-error-{{ tools.number }}{% endif %}">
+        <legend>Where is it on page {{ tools.number }}?</legend>
+        <p class="hint" id="region-hint">Each edge as a number from 0 to 100: how far across the page for the left and right edges (0 is the left side of the page), and how far down for the top and bottom edges (0 is the top).</p>
+        {{ tool_error(add.errors.get("region"), "region-error-" ~ tools.number) }}
+        <div class="region-grid">
+          <div class="field"><label for="region-{{ tools.number }}">Left edge</label><input type="number" id="region-{{ tools.number }}" name="left" min="0" max="100" step="any" inputmode="decimal" value="{{ add.values.get('left', '') }}" data-edit-field{% if add.errors.get('region') %} aria-invalid="true"{% endif %}></div>
+          <div class="field"><label for="region-top-{{ tools.number }}">Top edge</label><input type="number" id="region-top-{{ tools.number }}" name="top" min="0" max="100" step="any" inputmode="decimal" value="{{ add.values.get('top', '') }}" data-edit-field></div>
+          <div class="field"><label for="region-right-{{ tools.number }}">Right edge</label><input type="number" id="region-right-{{ tools.number }}" name="right" min="0" max="100" step="any" inputmode="decimal" value="{{ add.values.get('right', '') }}" data-edit-field></div>
+          <div class="field"><label for="region-bottom-{{ tools.number }}">Bottom edge</label><input type="number" id="region-bottom-{{ tools.number }}" name="bottom" min="0" max="100" step="any" inputmode="decimal" value="{{ add.values.get('bottom', '') }}" data-edit-field></div>
+        </div>
+      </fieldset>
+      {{ tool_error(add.errors.get("add"), "add-error-" ~ tools.number) }}
+      <div id="add-{{ tools.number }}" tabindex="-1">
+        <button type="submit" class="button-secondary" data-role="show-region">Show the part I described</button>
+      </div>
+    </form>
+    {% endif %}
+  </section>
+
+  <section class="tool-section" id="page-tools-omit" aria-labelledby="omit-title">
+    <h3 id="omit-title" class="part-label">Leave this page out</h3>
+    {% if tools.blank %}<p>This page looks blank.</p>{% endif %}
+    <p class="hint" id="omit-hint">For a blank page or a cover. The page is left out of the student file and of this review, and the file says that it is not there. You can put it back.</p>
+    {% if tools.only_page %}
+    <p>This is the only page left in the file, so it stays.</p>
+    {% else %}
+    <form method="post" action="/jobs/{{ job.id }}/pages/{{ tools.number }}/omit" class="inline-form">
+      {{ tool_fields() }}
+      <button type="submit" class="button-secondary" data-role="omit-page" aria-describedby="omit-hint">Leave page {{ tools.number }} out</button>
+    </form>
+    {% endif %}
+  </section>
+  {% endif %}
+</details>

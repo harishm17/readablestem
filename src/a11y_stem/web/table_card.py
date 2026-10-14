@@ -30,9 +30,11 @@ from a11y_stem.pipeline.table_html import render_table
 from a11y_stem.pipeline.table_step import NOTE_CODES, STRUCTURE_PROBLEMS
 from a11y_stem.web.review import (
     cell_label,
+    cell_region,
     find_cell,
     first_col_is_header,
     first_row_is_header,
+    grid_as_text,
     grid_problem_sentence,
     is_maths_cell,
     usable_local_grid,
@@ -53,6 +55,7 @@ class CellChoice:
     maths: bool  # edited as LaTeX
     value: str  # its text, or its LaTeX for a maths cell
     flat: str = ""  # the PDF's flattened text of a cell to be written as LaTeX
+    readable: bool = False  # a maths cell the equation step can read from the page (T3-11)
 
 
 @dataclass
@@ -70,6 +73,8 @@ class TableCard:
     # The only thing the checks found is that no cell is a header (T1-19): "Use the first
     # row as headers" is the main action, and one click settles the table.
     only_headers_missing: bool = False
+    # "This grid is not a table" (T3-11): its words can be written one after another.
+    can_text: bool = False
 
     def pick(self, ref: str) -> None:
         """Open the form of the cell `ref` ("r1c2"); an unknown ref opens nothing."""
@@ -89,8 +94,11 @@ def _preview(cell: TableCell) -> str:
     return shown
 
 
-def cell_choices(grid: TableGrid) -> list[CellChoice]:
-    """Every cell, in reading order (row, then column)."""
+def cell_choices(
+    grid: TableGrid, fix: Fix | None = None, element: Element | None = None
+) -> list[CellChoice]:
+    """Every cell, in reading order (row, then column). With the fix and its element, a
+    maths cell with a place on the page is marked readable by the equation step."""
     out = []
     flat = {id(c) for c in flattened_cells(grid)}
     for cell in sorted(grid.cells, key=lambda c: (c.row, c.col)):
@@ -108,6 +116,10 @@ def cell_choices(grid: TableGrid) -> list[CellChoice]:
                 maths=maths,
                 value=(cell.latex or "") if maths else cell.text,
                 flat=cell.text if id(cell) in flat else "",
+                readable=maths
+                and fix is not None
+                and element is not None
+                and not isinstance(cell_region(fix, element, str(cell.row), str(cell.col)), str),
             )
         )
     return out
@@ -155,11 +167,14 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
         header_col=grid is not None and first_col_is_header(grid),
     )
     if grid is not None:
-        card.cells = cell_choices(grid)
+        card.cells = cell_choices(grid, fix, element)
         card.problems = [
             grid_problem_sentence(p) for p in grid_problems(grid) if not _reported(p, fix)
         ]
         card.only_headers_missing = _only_headers_missing(fix, grid, card)
+    card.can_text = grid_as_text(fix, element) is not None and not (
+        card.in_document and not card.is_data
+    )
     return card
 
 

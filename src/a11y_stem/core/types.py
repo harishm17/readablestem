@@ -543,6 +543,11 @@ class Fix(BaseModel):
     # `equation_step.SKIP_ESCALATION_FROM`). None when no second reading was due. Left out
     # of the JSON when None, so a record without it is unchanged.
     escalation: str | None = Field(default=None, exclude_if=lambda v: v is None)
+    # The reviewer's description in words of an item kept as an image (an equation, a
+    # table, a page): written as the image's alt text instead of the PDF's own text or
+    # the fixed words (T3-16). Cleaned and checked like any alt text (`web.review`); None
+    # when there is none.
+    described: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="before")
     @classmethod
@@ -633,6 +638,8 @@ NOTICE_CODES = frozenset(
         "unread_page",  # drawings or images, nothing read from them: page kept as image
         "ocr_text_layer_ignored",  # a hidden tablet or OCR layer that was not used
         "hidden_text_ignored",  # invisible or covered words on a typed page, left out
+        # Review edits (T3-16): a page the reviewer left out of the student file.
+        "page_omitted",
     }
 )
 
@@ -727,6 +734,21 @@ class PageType(BaseModel):
         return self.invisible_chars + self.covered_chars
 
 
+class OmittedPage(BaseModel):
+    """A page the reviewer left out of review and of the student file (T3-16): a blank
+    page, a cover. Its elements, fixes and notices are moved here, out of the result's
+    own lists, so nothing downstream (the output, the decisions, the counts) sees them;
+    putting the page back moves them home again. Nothing is deleted."""
+
+    page: int = Field(ge=0)  # 0-based
+    elements: list[Element] = Field(default_factory=list)
+    fixes: list[Fix] = Field(default_factory=list)
+    notices: list[Notice] = Field(default_factory=list)
+    # The page was listed in `DocumentResult.image_only_pages` (kept whole as an image): it
+    # is taken off that list while it is out, and put back on it with the page.
+    image_only: bool = Field(default=False, exclude_if=lambda v: not v)
+
+
 # Where `DocumentResult.lang` came from: the PDF's /Lang, detection from the text, the
 # default ("en") when neither gave one, or the instructor's own choice on the job page.
 LangSource = Literal["pdf", "detected", "default", "user"]
@@ -768,6 +790,14 @@ class DocumentResult(BaseModel):
     # One record per analysed page (`PageType`), in page order. Empty in results stored
     # before page types existed.
     page_types: list[PageType] = Field(default_factory=list)
+    # Pages the reviewer left out (`OmittedPage`); empty for every result before the
+    # option existed, and left out of the JSON then.
+    omitted: list[OmittedPage] = Field(default_factory=list, exclude_if=lambda v: not v)
+
+    @property
+    def omitted_pages(self) -> list[int]:
+        """0-based pages left out, in order."""
+        return sorted(o.page for o in self.omitted)
 
     def fix_for(self, element_id: str) -> Fix | None:
         return next((f for f in self.fixes if f.element_id == element_id), None)

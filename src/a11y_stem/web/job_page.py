@@ -56,6 +56,7 @@ from a11y_stem.pipeline import language as languages
 from a11y_stem.pipeline import notices as notice_rules
 from a11y_stem.pipeline.source_facts import flattened_parts
 from a11y_stem.pipeline.speech import GREEK, SYMBOLS
+from a11y_stem.web import notice_places
 from a11y_stem.web.messages import explain_notice
 from a11y_stem.web.outcome import JobOutcome
 
@@ -255,7 +256,12 @@ def shown_as_image(fix: Fix) -> bool:
     """The original is kept as an image in the HTML file (T1-3). Not a heading: "Make bold
     text" rejects a heading too (`Status.REJECTED`), but what the student file gets is the
     heading's text as bold text, which a screen reader reads."""
-    return fix.kind is not Kind.HEADING and fix.status in KEPT_ORIGINAL_STATUSES
+    # An image the instructor described in words (T3-16) is read out: not a silent image.
+    return (
+        fix.kind is not Kind.HEADING
+        and fix.status in KEPT_ORIGINAL_STATUSES
+        and not (fix.described or "").strip()
+    )
 
 
 def breakdown(fixes: list[Fix]) -> Breakdown:
@@ -755,6 +761,14 @@ class NoticeLine:
     # A page kept as an image whose decision is its group's, listed with its first page:
     # that page's name ("page 2"), and no "Decide it" of its own.
     with_label: str = ""
+    # T3-7: the link, figure or table it is about (document content, for the owner's page
+    # only), a few words of the paragraph it is in, what that is ("The link text"), and
+    # the review screen address of its place (the query after `/jobs/{id}/review?`, "" for
+    # the whole document).
+    names: tuple[str, ...] = ()
+    snippet: str = ""
+    lead: str = ""
+    place: str = ""
 
 
 # Notices whose element's fix is the decision they describe (a table kept as an image, a
@@ -774,7 +788,12 @@ class NoticeLists:
         return len(self.not_handled) + len(self.worth_checking)
 
 
-def _line(notice: Notice, fixes: dict[str, Fix], labels: dict[str, str]) -> NoticeLine:
+def _line(
+    notice: Notice,
+    fixes: dict[str, Fix],
+    labels: dict[str, str],
+    elements: dict[str, Element] | None = None,
+) -> NoticeLine:
     fix = fixes.get(notice.element_id or "")
     decision: Literal["open", "made"] | None = None
     label = ""
@@ -785,7 +804,20 @@ def _line(notice: Notice, fixes: dict[str, Fix], labels: dict[str, str]) -> Noti
     text, count = explain_notice(notice).text, notice.count
     if "{count}" in text:  # the count is in the sentence (characters), not "N times"
         text, count = text.replace("{count}", f"{notice.count:,}"), 1
-    return NoticeLine(where, text, notice.code, count, notice.element_id, decision, label)
+    found = notice_places.place_of(notice, elements or {}, fixes, labels)
+    return NoticeLine(
+        where,
+        text,
+        notice.code,
+        count,
+        notice.element_id,
+        decision,
+        label,
+        names=found.names,
+        snippet=found.snippet,
+        lead=found.lead,
+        place=found.address,
+    )
 
 
 def notice_lists(result: DocumentResult) -> NoticeLists:
@@ -794,9 +826,10 @@ def notice_lists(result: DocumentResult) -> NoticeLists:
 
     fixes = _first_fixes(result)
     labels = item_labels(result)
+    elements = {e.id: e for e in result.elements}
     lists = NoticeLists()
     for notice in notice_rules.current(result):
-        line = _line(notice, fixes, labels)
+        line = _line(notice, fixes, labels, elements)
         if notice_rules.section(notice) == "worth_checking":
             lists.worth_checking.append(line)
         else:

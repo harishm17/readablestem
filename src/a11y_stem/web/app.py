@@ -55,6 +55,7 @@ from a11y_stem.web.routes import (
     admin,
     courses,
     cron,
+    edits,
     feedback,
     job_settings,
     jobs,
@@ -397,7 +398,7 @@ def create_app(
         app.add_exception_handler(unavailable, _on_database_unavailable)
 
     app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
-    for module in (pages, jobs, job_settings, split, review, feedback, admin, cron, courses):
+    for module in (pages, jobs, job_settings, split, review, edits, feedback, admin, cron, courses):
         app.include_router(module.router)
     app.include_router(auth_router)
     return app
