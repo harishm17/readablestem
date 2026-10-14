@@ -5,8 +5,8 @@ plain ω for a vector the PDF has bold, was saved without a word and the warning
 asked for the decision went away. Now an edit goes through what the equation step runs
 on a proposal (`pipeline.equation_step._evaluate`): the same cleaning, the LaTeX
 validators, the conversion, the MathML checks, the spoken version, and the cross-checks
-against the PDF's own text: letters, digits and Greek letters, letter styles (a vector's
-bold) and signs. What fails is said in plain words, as three kinds:
+against the PDF's own text: letters, digits and Greek letters, numbers and capitals,
+letter styles (a vector's bold) and signs. What fails is said in plain words, as three kinds:
 
 - *blocking*: the LaTeX cannot be used (an error-level check). Never saved.
 - *meaning*: it differs from the PDF's text where that changes what a student reads.
@@ -38,7 +38,14 @@ logger = logging.getLogger(__name__)
 # Failed checks that are about the meaning: the edit is not used without the reviewer's
 # explicit "Use my edit anyway". The same codes make a proposal a required decision.
 MEANING_CODES = frozenset(
-    {"symbol_mismatch", "text_layer_mismatch", "style_mismatch", "sign_mismatch"}
+    {
+        "symbol_mismatch",
+        "text_layer_mismatch",
+        "style_mismatch",
+        "sign_mismatch",
+        "number_mismatch",
+        "case_mismatch",
+    }
 )
 # What the compare sentences (`web.compare`) are about, for each meaning-level code.
 _SAID_FOR = {
@@ -46,6 +53,8 @@ _SAID_FOR = {
     "symbol_mismatch": ("symbol",),
     "text_layer_mismatch": ("symbol",),
     "sign_mismatch": ("sign",),
+    "number_mismatch": ("number",),
+    "case_mismatch": ("case",),
 }
 MAX_NAMED = 3  # unknown commands named in one message
 Display = Literal["block", "inline"]
@@ -198,6 +207,8 @@ def evaluate(
                 name="equation.text_layer", passed=symbols is None, severity="warning", code=symbols
             )
         )
+    if differ is False:
+        checks.extend(equation_step.text_layer_number_case_checks(text, mathml))
     style = equation_step.text_layer_style(
         text, mathml, regular_letters=regular, course_bold=course_bold
     )
