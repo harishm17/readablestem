@@ -200,7 +200,8 @@ def upload_error_message(
         "scanned_ocr": f"{name} is scanned, so this tool cannot convert it. Its text was "
         "guessed from the images by a text recognition (OCR) program, which is often wrong "
         f"in maths, so it is not used; running OCR again will not help. {NOTHING_TAKEN} If "
-        "you have the original file (LaTeX, Word or PowerPoint), export a PDF from it and upload that instead.",
+        "you have the original file (LaTeX, Word or PowerPoint), export a PDF from it and "
+        "upload that instead.",
         "handwritten": f"{name} is handwritten, so this tool cannot convert it. Its hidden "
         "text, guessed from the handwriting by a tablet or an OCR program, is often wrong in "
         f"maths, so it is not used. {NOTHING_TAKEN} If you have a typed version (LaTeX, Word "

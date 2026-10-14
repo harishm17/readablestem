@@ -262,7 +262,7 @@ def test_launch_check_still_catches_a_todo_or_a_draft_note(tmp_path, monkeypatch
 
     templates = tmp_path / "templates"
     templates.mkdir()
-    (templates / "limits.html").write_text("{# TODO(Harish): x #}<p class=\"draft-note\">Draft</p>")
+    (templates / "limits.html").write_text('{# TODO(Harish): x #}<p class="draft-note">Draft</p>')
     monkeypatch.setattr(launch, "TEMPLATES_DIR", templates)
     items = launch.launch_blockers()
     assert "web/templates/limits.html: still has a TODO(Harish) note" in items

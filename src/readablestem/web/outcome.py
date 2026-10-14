@@ -138,7 +138,8 @@ FAILED_MESSAGES = {
     "handwritten": "This PDF is handwritten, so this tool cannot convert it. It also holds "
     "hidden text that a tablet or a text recognition (OCR) program guessed from the "
     "handwriting. That text is often wrong, most of all in maths, so this tool does not "
-    "use it. If you have a typed version (LaTeX, Word or PowerPoint), export a PDF from it and upload that instead.",
+    "use it. If you have a typed version (LaTeX, Word or PowerPoint), export a PDF from it "
+    "and upload that instead.",
     "handwritten_no_text": "This PDF is handwritten, so this tool cannot convert it. "
     "It has no text this tool can use. If you have a typed version (LaTeX, Word or "
     "PowerPoint), export a PDF from it and upload that instead.",
