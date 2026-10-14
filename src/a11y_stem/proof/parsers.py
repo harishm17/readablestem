@@ -25,6 +25,21 @@ from a11y_stem.proof.systems_stage import A11Y, Scored
 
 TITLE = "Comparison with open PDF parsers"
 FAMILY_B = (("e2e", "end_to_end_exact_lenient"), ("h_f1", "heading F1"))
+# Addendum 1, D3: the held-out family is judged for four parser arms (Docling, Docling with
+# formula recognition, MinerU, PyMuPDF4LLM), so k = 8, although the arm with formula
+# recognition was not carried out (Addendum 4). A development set uses the arms it holds.
+REGISTERED_PARSER_ARMS = 4
+
+
+def family_b_k(parsers_that_ran: int, held_out: bool) -> int:
+    """Comparisons in family B: two per parser, and on a held-out set at least the registered
+    four parsers' worth."""
+    return len(FAMILY_B) * max(parsers_that_ran, REGISTERED_PARSER_ARMS if held_out else 0)
+
+
+def _registered_k_note(ran: int) -> str:
+    return f" ({ran} parsers ran; the registered four are counted, Addendum 1 D3)"
+
 
 PARSER_NOTES = {
     "docling": "default settings: a formula is not decoded, so no LaTeX is written (its Markdown "
@@ -109,7 +124,7 @@ class ParserStage:
             )
         n_boot = ctx.n_boot
         facts = ctx.facts
-        k = len(FAMILY_B) * len(names)
+        k = family_b_k(len(names), ctx.pset.held_out)
         comparisons = [
             systems_tables.compare(
                 key,
@@ -158,7 +173,8 @@ class ParserStage:
                 comparisons,
                 a_name=A11Y,
                 k=k,
-                note=f"Preregistration 8.3 as written: 2 comparisons per parser, k = {k}, the "
+                note=f"Preregistration 8.3 as written: 2 comparisons per parser, k = {k}"
+                f"{_registered_k_note(len(names)) if k > len(FAMILY_B) * len(names) else ''}, the "
                 f"{100 * (1 - 0.05 / k):.3f}% paired cluster-bootstrap interval of the "
                 "difference decides. For a parser that writes no LaTeX by design "
                 "(`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool "

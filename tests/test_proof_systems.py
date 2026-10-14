@@ -285,3 +285,12 @@ def test_the_claims_table_prints_the_sign_flip_p_and_says_what_it_is():
     table = systems_tables.claims_table("t", [done], a_name="a", k=8)
     text = table.markdown()
     assert "Sign-flip p" in text and "robustness check" in text and "fewer than 10 sections" in text
+
+
+def test_family_b_counts_the_registered_four_parsers_on_a_held_out_set():
+    from a11y_stem.proof import parsers
+
+    assert parsers.family_b_k(3, held_out=True) == 8  # Addendum 1, D3; three ran
+    assert parsers.family_b_k(4, held_out=True) == 8
+    assert parsers.family_b_k(5, held_out=True) == 10
+    assert parsers.family_b_k(1, held_out=False) == 2  # a development set: the arms it holds
