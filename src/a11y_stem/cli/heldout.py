@@ -144,18 +144,33 @@ def pdf_page_count(pdf: bytes) -> int:
 
 
 def add_set_arguments(parser: argparse.ArgumentParser) -> None:
-    """`--set heldout` and `--heldout-dir` for an `eval` subcommand (dest `gold_set`)."""
+    """`--set heldout|dev-v2`, `--heldout-dir` and `--part` for an `eval` subcommand (dest
+    `gold_set`)."""
     parser.add_argument(
         "--set",
         dest="gold_set",
-        choices=["heldout"],
-        help="the pre-registered held-out OpenStax set: gold from the held-out folder "
-        "(checked against the registered hashes first), caches and reports outside the "
-        "repository, no --fake",
+        choices=["heldout", "dev-v2"],
+        help="heldout: the pre-registered held-out OpenStax set: gold from the held-out "
+        "folder (checked against the registered hashes first), caches and reports outside "
+        "the repository, no --fake. dev-v2: the extended development set "
+        "(data/dev-v2, docs/eval.md); --part dev (default) is for building, --part check "
+        "is the small sealed part",
     )
     parser.add_argument(
         "--heldout-dir",
         type=Path,
         help="with --set heldout: the folder for its gold, caches and reports "
         f"(default: {default_root()})",
+    )
+    parser.add_argument(
+        "--devset-dir",
+        type=Path,
+        help="with --set dev-v2: the set's folder (default: <project>/data/dev-v2)",
+    )
+    parser.add_argument(
+        "--part",
+        choices=["dev", "check"],
+        default="dev",
+        help="with --set dev-v2: dev (default) or the sealed check part (totals only, "
+        "no --items, files kept outside the repository)",
     )

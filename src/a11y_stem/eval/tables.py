@@ -1189,7 +1189,7 @@ def table_documents(
     next to each other, so `--limit 3` is one page three ways), then the authored ones."""
     by_page: dict[tuple[str, str], list[dict]] = {}
     for record in pe.load_gold(gold_dir):
-        if record.get("kind") == "table":
+        if record.get("kind") == "table" and record.get("source", "openstax") == "openstax":
             by_page.setdefault((record["book_slug"], record["page_slug"]), []).append(record)
     docs = []
     for (book, slug), records in by_page.items():
@@ -1199,7 +1199,13 @@ def table_documents(
     if authored_dir is not None and (authored_dir / "index.json").is_file():
         index = json.loads((authored_dir / "index.json").read_text(encoding="utf-8"))
         for entry in index.get("documents", []):
-            records = load_jsonl(authored_dir / entry["gold"])
+            # A document's gold file may also hold other kinds (the extended development
+            # set's records of headings, equations, ...); only its tables are this task's.
+            records = [
+                r
+                for r in load_jsonl(authored_dir / entry["gold"])
+                if r.get("kind", "table") == "table"
+            ]
             docs.append(
                 TableDocument(
                     f"{AUTHORED}/{entry['id']}",
