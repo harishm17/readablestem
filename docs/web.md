@@ -1293,9 +1293,16 @@ the way model output is (LaTeX through `web.edit_check`, the equation step's own
 against the PDF included; alt text through `validate.clean_alt`, then `check_alt`), store
 a `ReviewEdit` (its `after` snapshot also records the review version the write made, so
 Undo can find the write's edits), set the fix status (`accepted`, `edited`, `rejected`)
-and `Fix.reviewed` in `result_json`, re-render the job's HTML with
-`pipeline.assemble.render_html`, re-run its static checks (`result_json.html_checks`,
-listed on the job page) and count the write (`jobs.result_version`). A failed check
+and `Fix.reviewed` in `result_json`, mark the HTML file out of date (`jobs.html_stale`)
+and count the write (`jobs.result_version`). The file is made again with
+`pipeline.assemble.render_html`, and its static checks re-run (`result_json.html_checks`,
+listed on the job page), when somebody asks for it: download, view, the Canvas version or
+the job page (`routes.jobs.current_html`, under the job's row lock, so a click that comes
+meanwhile waits and marks it again). A run of clicks therefore costs one render, not one
+each, and the figure images in it are kept per crop (`pipeline.figure_images`, 15 minutes,
+64 MB); measured on a 12-page document with 52 crops, a click went from 210 ms of CPU to
+58 ms (`scripts/bench_runtime.py review`). The student note's date is the day of the last
+decision, not of the render. A failed check
 re-shows the page (422) with the reviewer's input as typed and an error summary linked to
 the field; nothing is saved.
 

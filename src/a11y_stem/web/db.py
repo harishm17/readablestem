@@ -140,6 +140,11 @@ class Job(Base):
     # list fills in on first sight (`web.documents`). Document-derived: deleted with the job.
     open_decisions: Mapped[int | None] = mapped_column(Integer)
     result_title: Mapped[str | None] = mapped_column(Text)
+    # A review write changes `result_json` at once and the HTML file only when somebody
+    # asks for it (download, view, the job page), so a run of review clicks costs one
+    # render, not one each (`web.routes.jobs.current_html`). True: `html` and the checks in
+    # `result_json` are from before the last review write.
+    html_stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(

@@ -231,6 +231,7 @@ TIER1_JOB_COLUMNS = {"retention_mode", "title_override", "contact_line"}
 EXAM_REVISION = "3b8e5f1a9d27"
 FACTS_REVISION = "9d2f6a41c7e3"
 FACTS_COLUMNS = {"open_decisions", "result_title"}
+STALE_REVISION = "c4a7e9b05d18"
 
 
 def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
@@ -241,7 +242,9 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert exam is not None and exam.down_revision == TIER1_REVISION
     facts = script.get_revision(FACTS_REVISION)
     assert facts is not None and facts.down_revision == EXAM_REVISION
-    assert migration_heads() == {FACTS_REVISION}  # one head, the newest
+    stale = script.get_revision(STALE_REVISION)
+    assert stale is not None and stale.down_revision == FACTS_REVISION
+    assert migration_heads() == {STALE_REVISION}  # one head, the newest
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
@@ -374,7 +377,7 @@ def test_the_list_facts_migration_keeps_jobs_and_old_inserts_still_work(tmp_path
 def test_the_list_facts_migration_downgrades_and_upgrades_again(tmp_path):
     url = f"sqlite:///{tmp_path}/facts-down.db"
     upgrade(url)
-    migrate(url, EXAM_REVISION, down=True)
+    migrate(url, EXAM_REVISION, down=True)  # through the stale-HTML migration, too
     engine = create_engine(url)
     try:
         columns = {c["name"] for c in inspect(engine).get_columns("jobs")}
@@ -387,5 +390,75 @@ def test_the_list_facts_migration_downgrades_and_upgrades_again(tmp_path):
         assert {c["name"] for c in inspect(engine).get_columns("jobs")} >= FACTS_COLUMNS
         with engine.connect() as conn:
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+# --------------------------------------------------------------------------- stale HTML
+
+INSERT_DONE_JOB = (
+    "INSERT INTO jobs (id, user_id, status, filename, page_count, pages_done, "
+    "opt_in_retention, retain_until, created_at, attempts, cost_usd, model_calls, aggregated, "
+    "html, result_json) VALUES (:id, 'u1', 'done', 'f.pdf', 1, 1, false, "
+    "'2026-10-09 00:00:00', '2026-10-08 00:00:00', 1, 0, 0, false, :html, :result)"
+)
+
+
+def test_the_stale_html_migration_defaults_to_a_current_file_and_marks_a_missing_one(tmp_path):
+    url = f"sqlite:///{tmp_path}/stale.db"
+    migrate(url, FACTS_REVISION)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_DONE_JOB), {"id": "j1", "html": "<p>x</p>", "result": "{}"})
+            conn.execute(text(INSERT_DONE_JOB), {"id": "j2", "html": None, "result": "{}"})
+            conn.execute(
+                text(INSERT_JOB), {"id": "j3"}
+            )  # done, but no result: nothing to make from
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_JOB), {"id": "j4"})  # a release from before the column
+            found = conn.execute(text("SELECT id, html_stale FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [
+            ("j1", False), ("j2", True), ("j3", False), ("j4", False)
+        ]  # fmt: skip
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_stale_html_migration_downgrades_without_handing_out_an_old_file(tmp_path):
+    url = f"sqlite:///{tmp_path}/stale-down.db"
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_DONE_JOB), {"id": "j1", "html": "<p>old</p>", "result": "{}"})
+            conn.execute(text(INSERT_DONE_JOB), {"id": "j2", "html": "<p>old</p>", "result": "{}"})
+            conn.execute(text("UPDATE jobs SET html_stale = true WHERE id = 'j2'"))
+    finally:
+        engine.dispose()
+    migrate(url, FACTS_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        assert "html_stale" not in {c["name"] for c in inspect(engine).get_columns("jobs")}
+        with engine.connect() as conn:
+            found = conn.execute(text("SELECT id, html FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [("j1", "<p>old</p>"), ("j2", None)]
+    finally:
+        engine.dispose()
+    upgrade(url)  # and up again: the job with no file is marked to be made again
+    engine = create_engine(url)
+    try:
+        with engine.connect() as conn:
+            found = conn.execute(text("SELECT id, html_stale FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [("j1", False), ("j2", True)]
     finally:
         engine.dispose()

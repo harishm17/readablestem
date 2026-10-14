@@ -256,6 +256,102 @@ def test_large_images_are_scaled_down_never_up():
     assert size_of(figure_images.student_image(small, "photo")[1]) == (120, 80)
 
 
+@pytest.fixture
+def fresh_cache():
+    figure_images.clear_cache()
+    yield
+    figure_images.clear_cache()
+
+
+def test_an_image_is_made_once_per_crop_and_figure_type(fresh_cache, monkeypatch):
+    """A review write makes the file again; the images in it are the same, so each is encoded
+    once (T3-19), however many times the file is made."""
+    made: list[str | None] = []
+    real = figure_images._student_image
+    monkeypatch.setattr(
+        figure_images, "_student_image", lambda crop, kind: made.append(kind) or real(crop, kind)
+    )
+    crop = png(300, 200, noise=True)
+    first = figure_images.student_image(crop, "photo")
+    for _ in range(5):
+        assert figure_images.student_image(crop, "photo") == first
+    assert made == ["photo"]
+    figure_images.student_image(crop, "chart")  # another type decides differently: its own entry
+    figure_images.student_image(png(300, 201, noise=True), "photo")  # another crop
+    assert made == ["photo", "chart", "photo"]
+
+
+def test_a_file_made_again_is_the_same_file_and_costs_no_encoding(fresh_cache, monkeypatch):
+    crops = {"p1-e5": png(300, 200, noise=True)}
+    once = render(figure_fix(), crops=crops)
+    assert embedded(once)
+
+    def refuse(*args):
+        raise AssertionError("encoded again")
+
+    monkeypatch.setattr(figure_images, "_student_image", refuse)
+    assert render(figure_fix(), crops=crops) == once
+
+
+def test_the_cache_keeps_to_its_size_and_forgets_what_is_not_used(fresh_cache, monkeypatch):
+    monkeypatch.setattr(figure_images, "CACHE_BYTES", 3000)
+    crops = [png(60, 40 + i) for i in range(60)]  # flat line art: kept as the PNG it is
+    for crop in crops:
+        figure_images.student_image(crop, "diagram")
+    assert 0 < figure_images._cache_bytes <= 3000
+    assert len(figure_images._cache) < len(crops)
+    # a recent image is still there, an old one has gone
+    last, first = (figure_images.hashlib.sha256(c).hexdigest() for c in (crops[-1], crops[0]))
+    assert (last, "diagram") in figure_images._cache
+    assert (first, "diagram") not in figure_images._cache
+    # an image larger than the whole cache is made and not kept
+    monkeypatch.setattr(figure_images, "CACHE_BYTES", 10)
+    before = len(figure_images._cache)
+    figure_images.student_image(png(300, 200, noise=True), "photo")
+    assert len(figure_images._cache) == before
+
+
+def test_an_image_not_used_for_a_while_is_dropped(fresh_cache, monkeypatch):
+    now = [1000.0]
+    monkeypatch.setattr(figure_images.time, "monotonic", lambda: now[0])
+    crop = png(100, 60, noise=True)
+    figure_images.student_image(crop, "photo")
+    now[0] += figure_images.CACHE_TTL_S - 1
+    figure_images.student_image(crop, "photo")  # used again: the clock starts over
+    now[0] += figure_images.CACHE_TTL_S - 1
+    figure_images.student_image(png(100, 61, noise=True), "photo")
+    assert len(figure_images._cache) == 2
+    now[0] += figure_images.CACHE_TTL_S + 1
+    figure_images.student_image(png(100, 62, noise=True), "photo")
+    assert len(figure_images._cache) == 1  # the two before it expired
+    figure_images.clear_cache()
+    assert len(figure_images._cache) == 0 and figure_images._cache_bytes == 0
+
+
+def test_deleting_a_job_forgets_the_images_made_from_its_figures(fresh_cache):
+    from datetime import UTC, datetime
+
+    from a11y_stem.ops.retention import delete_jobs
+    from a11y_stem.web import db
+
+    figure_images.student_image(png(100, 60, noise=True), "photo")
+    assert figure_images._cache
+    engine = db.make_engine("sqlite://")
+    db.create_all(engine)
+    with db.session_scope(db.make_sessionmaker(engine)) as session:
+        user = db.User(email="x@example.org", is_allowed=True)
+        session.add(user)
+        session.flush()
+        job = db.Job(
+            user_id=user.id, filename="f.pdf", retain_until=datetime(2099, 1, 1, tzinfo=UTC)
+        )
+        session.add(job)
+        session.flush()
+        delete_jobs(session, [job.id])
+    assert not figure_images._cache
+    engine.dispose()
+
+
 def test_transparency_and_unreadable_images_are_kept_as_they_are():
     with_alpha = png(60, 40, noise=True, alpha=True)
     assert figure_images.student_image(with_alpha, "photo") == ("image/png", with_alpha)

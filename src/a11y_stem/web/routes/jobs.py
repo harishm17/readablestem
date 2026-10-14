@@ -245,13 +245,38 @@ def expired(job: Job, now: datetime | None = None) -> bool:
 
 
 def require_done(job: Job) -> None:
-    if job.status != JobStatus.DONE or job.html is None:
+    if job.status != JobStatus.DONE or (job.html is None and not job.html_stale):
         raise PageError(
             409,
             "Not ready yet",
             "This document has not finished converting, so there is nothing to show yet.",
             context={"job_id": job.id},
         )
+
+
+def current_html(ctx: AppContext, session: Session, job: Job) -> Job:
+    """`job` with its HTML file up to date.
+
+    A review write changes the stored result and only marks the file out of date
+    (`Job.html_stale`): a run of clicks costs one render, made here when somebody asks for
+    the file or for the checks of it (download, view, Canvas, the job page). The row is
+    locked for the rewrite, so a review write that comes meanwhile waits, then marks the
+    file out of date again. The student note's date is the day of the last decision, not
+    of the render."""
+    if job.status != JobStatus.DONE or not job.html_stale:
+        return job
+    from a11y_stem.web.review import rerender_job_html
+
+    session.refresh(job, with_for_update=True)
+    if job.html_stale:
+        result = DocumentResult.model_validate(job.result_json or {})
+        with notation.in_force(ctx.factory, ctx.settings, job.id):
+            job.html = rerender_job_html(
+                job, result, _crops(session, job.id), checked_on=last_decision(session, job)
+            )
+        job.result_json = result.model_dump(mode="json", exclude={"html"})
+        job.html_stale = False
+    return job
 
 
 # --------------------------------------------------------------------------- /app
@@ -558,7 +583,7 @@ def load_job_status(
     from one read."""
     ctx = get_ctx(request)
     with session_scope(ctx.factory) as session:
-        job = owned_job(session, job_id, user)
+        job = current_html(ctx, session, owned_job(session, job_id, user))
         view = job_view(session, job, with_page=True)
         status, error_code, result_json = str(job.status), job.error_code, job.result_json
     budget_closed = status == JobStatus.QUEUED and ctx.guard.cap_reached(ctx.min_headroom_usd)
@@ -686,6 +711,7 @@ def set_language(
 
         job.html = rerender_job_html(job, result, crops, checked_on=last_decision(session, job))
         job.result_json = result.model_dump(mode="json", exclude={"html"})
+        job.html_stale = False  # made from the stored result, review writes included
         bump_result_version(job)  # review forms open in other tabs are now stale
         retention.restart_clock(job, get_ctx(request).settings)
     log_event(logger, "language_set", job_id=job_id)
@@ -741,6 +767,7 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
+        job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename, job.title_override)
         html, name = job.html or "", download_filename(title, job.id)
@@ -782,6 +809,7 @@ def download_canvas(request: Request, job_id: str, user: UserDep, course: str = 
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
+        job = current_html(ctx, session, job)
         result = job.result_json or {}
         title = documents.display_title(result.get("title"), job.filename)
         html, job_ref = job.html or "", job.id
@@ -821,7 +849,7 @@ def view(request: Request, job_id: str, user: UserDep) -> Response:
     with session_scope(ctx.factory) as session:
         job = owned_job(session, job_id, user)
         require_done(job)
-        html = job.html or ""
+        html = current_html(ctx, session, job).html or ""
     events.record(
         ctx.factory, ctx.settings, user.id, events.HTML_VIEWED, job_ref=job_id, once_per_visit=True
     )

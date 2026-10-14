@@ -76,6 +76,7 @@ def _remake_html(session: Session, job: Job) -> DocumentResult:
     )
     # The static checks of the new file replace the stored ones (they ran in the render).
     job.result_json = result.model_dump(mode="json", exclude={"html"})
+    job.html_stale = False  # made from the stored result, review writes included
     return result
 
 

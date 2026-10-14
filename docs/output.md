@@ -632,8 +632,9 @@ a second.
 
 `convert_pdf` stores the static checks on `DocumentResult.html_checks` (and, for older
 callers, on `run.PipelineOutput.checks`). The CLI prints them and writes them to
-`--report`; the web app lists the failed ones on the job page and re-runs them after
-every review decision re-renders the file. `static_checks(result.html)` is deterministic
+`--report`; the web app lists the failed ones on the job page and re-runs them whenever
+it makes the file again after review decisions (once for a run of decisions: web.md,
+"Review screen"). `static_checks(result.html)` is deterministic
 and fast, so anyone holding only the HTML can recompute them.
 
 ## How `convert_pdf` fills it in

@@ -25,7 +25,15 @@ from a11y_stem.pipeline.html_checks import static_checks
 from a11y_stem.web.app import create_app
 from a11y_stem.web.db import Blob, ErrorAggregate, Job, ReviewEdit, session_scope
 from a11y_stem.web.review import rerender_html
-from fixtures.web.support import ALICE, csrf_from, job_id_from, login, make_settings, upload
+from fixtures.web.support import (
+    ALICE,
+    csrf_from,
+    job_id_from,
+    login,
+    make_settings,
+    upload,
+    with_file,
+)
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "worked_example.pdf"
 
@@ -118,7 +126,7 @@ def test_an_inline_equation_edited_in_review_stays_in_its_paragraph(site):
     assert review(site, "p1-e9", action="edit", latex="v = 2 t").status_code == 422
     response = review(site, "p1-e9", action="edit_anyway", latex="v = 2 t")
     assert response.status_code == 303, response.text[:300]
-    after = site.job(site.job_id).html or ""
+    after = with_file(site).html or ""  # made when the file is asked for
     edited = paragraph(after, "p1-e8")
     assert re.search(r'<math[^>]*\bdisplay="inline"[^>]*\bid="p1-e9"|<math[^>]*\bid="p1-e9"[^>]*'
                      r'\bdisplay="inline"', edited)  # fmt: skip
@@ -189,7 +197,7 @@ def test_the_student_note_gives_the_date_once_the_last_decision_is_made(site):
         assert response.status_code == 303, response.text[:300]
         result = DocumentResult.model_validate(site.job(site.job_id).result_json)
     assert not any(f.pending for f in result.fixes)
-    note = about(site.job(site.job_id).html or "")
+    note = about(with_file(site).html or "")
     assert f"{CHECKED} on {long_date(utcnow().date())}." in note
     assert NOT_CHECKED_YET not in note
 

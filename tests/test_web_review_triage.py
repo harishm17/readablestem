@@ -28,7 +28,17 @@ from a11y_stem.core.types import (
 )
 from a11y_stem.web import review
 from a11y_stem.web.db import ReviewEdit, session_scope
-from fixtures.web.support import ALICE, BOB, PNG, WebEnv, job_id_from, login, make_pdf, token
+from fixtures.web.support import (
+    ALICE,
+    BOB,
+    PNG,
+    WebEnv,
+    job_id_from,
+    login,
+    make_pdf,
+    token,
+    with_file,
+)
 from fixtures.web.support import upload as upload_pdf
 from test_web_review import cards, install_fake_pipeline
 
@@ -293,7 +303,7 @@ def test_apply_to_all_keeps_every_heading_of_the_group(tri):
     assert "Kept 3 headings as they are." in page
     assert '<h2 id="needs-decision-title">Needs your decision (1)</h2>' in page
     assert f"group-card-{GROUP}" not in page
-    assert tri.job(tri.job_id).html.count(":accepted") >= 5  # re-rendered once
+    assert with_file(tri).html.count(":accepted") >= 5  # re-rendered once
 
 
 def test_make_all_bold_text_rejects_every_heading_of_the_group(tri):

@@ -178,6 +178,11 @@ def delete_jobs(
     blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
     jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
+    # The student-file images made from the figures are kept in memory for a while
+    # (`pipeline.figure_images`); a deleted document's go with it.
+    from a11y_stem.pipeline import figure_images
+
+    figure_images.clear_cache()
     return PurgeStats(jobs_deleted=jobs, blobs_deleted=blobs, unaggregated_deleted=unaggregated)
 
 
