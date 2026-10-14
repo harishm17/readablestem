@@ -16,7 +16,7 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from sqlalchemy import func, select
 
-from a11y_stem.web import events
+from a11y_stem.web import events, linked_emails
 from a11y_stem.web.auth import normalise_email, set_allowed
 from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import ErrorAggregate, Job, JobStatus, User, session_scope
@@ -46,6 +46,7 @@ def admin_context(request: Request) -> dict[str, Any]:
                 "email": u.email,
                 "is_admin": u.is_admin,
                 "last_login_at": as_utc(u.last_login_at),
+                "linked": linked_emails.linked_to(session, u.id),
             }
             for u in session.scalars(
                 select(User).where(User.is_allowed.is_(True)).order_by(User.email)
@@ -80,6 +81,9 @@ def admin_context(request: Request) -> dict[str, Any]:
         "errors": [],
         "email_error": "",
         "email_value": "",
+        "link_error": "",
+        "link_owner_value": "",
+        "link_other_value": "",
     }
 
 
@@ -104,9 +108,17 @@ def allow(
             "email_value": email,
         }
         return render(request, "admin.html", context, status_code=422)
-    with session_scope(get_ctx(request).factory) as session:
-        # Unticked keeps the person's current role: re-adding an admin must not demote them.
-        set_allowed(session, normalised, allowed=True, admin=True if admin == "on" else None)
+    try:
+        with session_scope(get_ctx(request).factory) as session:
+            # Unticked keeps the person's current role: re-adding an admin must not demote them.
+            set_allowed(session, normalised, allowed=True, admin=True if admin == "on" else None)
+    except linked_emails.LinkRefused as refused:
+        context = admin_context(request) | {
+            "errors": [{"field_id": "allow-email", "message": refused.message}],
+            "email_error": refused.message,
+            "email_value": email,
+        }
+        return render(request, "admin.html", context, status_code=422)
     log_event(logger, "allowlist_add", by=user.id, admin=admin == "on")
     flash(request, "The allowlist was updated.")
     return RedirectResponse("/admin", status_code=303)
@@ -123,4 +135,46 @@ def remove(request: Request, user: AdminDep, email: Annotated[str, Form()] = "")
             set_allowed(session, normalised, allowed=False)
         log_event(logger, "allowlist_remove", by=user.id)
     flash(request, "The allowlist was updated.")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@router.post("/admin/linked-emails", dependencies=[Depends(require_csrf)])
+def link_email(
+    request: Request,
+    user: AdminDep,
+    email: Annotated[str, Form()] = "",
+    other: Annotated[str, Form()] = "",
+) -> Response:
+    """Let an allowed instructor also sign in with another Google address (T3-10)."""
+    owner, linked = normalise_email(email), normalise_email(other)
+    message = ""
+    if owner is None or linked is None:
+        message = "Enter both email addresses, like name@example.org."
+    else:
+        try:
+            with session_scope(get_ctx(request).factory) as session:
+                linked_emails.link(session, owner, linked)
+        except linked_emails.LinkRefused as refused:
+            message = refused.message
+    if message:
+        context = admin_context(request) | {
+            "errors": [{"field_id": "link-other", "message": message}],
+            "link_error": message,
+            "link_owner_value": email,
+            "link_other_value": other,
+        }
+        return render(request, "admin.html", context, status_code=422)
+    log_event(logger, "linked_email_add", by=user.id)
+    flash(request, "The other Google account was linked.")
+    return RedirectResponse("/admin", status_code=303)
+
+
+@router.post("/admin/linked-emails/remove", dependencies=[Depends(require_csrf)])
+def unlink_email(request: Request, user: AdminDep, other: Annotated[str, Form()] = "") -> Response:
+    linked = normalise_email(other)
+    if linked is not None:
+        with session_scope(get_ctx(request).factory) as session:
+            linked_emails.unlink(session, linked)
+        log_event(logger, "linked_email_remove", by=user.id)
+    flash(request, "The other Google account was removed. That instructor was signed out.")
     return RedirectResponse("/admin", status_code=303)

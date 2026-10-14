@@ -19,7 +19,9 @@ from test_audit_authz import CRON, ROUTES, fill, site  # noqa: F401  (site is a 
 STATE_CHANGING = [
     (method, path)
     for (method, path), who in ROUTES.items()
-    if method == "POST" and who != CRON and path not in {"/login", "/login/microsoft"}
+    if method == "POST"
+    and who != CRON
+    and path not in {"/login", "/login/microsoft", "/login/email"}
 ]
 
 

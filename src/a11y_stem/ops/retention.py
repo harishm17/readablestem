@@ -56,6 +56,8 @@ from a11y_stem.web.db import (
     CourseNotation,
     Event,
     Job,
+    LinkedEmail,
+    LoginLink,
     QuotaDay,
     ReviewEdit,
     User,
@@ -192,7 +194,8 @@ def erase_user(session: Session, user_id: str, now: datetime | None = None) -> P
     Their jobs go through `delete_jobs` (counted first, like any deletion); then, children
     before parents and without relying on ON DELETE CASCADE (see the module docstring):
     review edits they made on any job, their courses' notation entries, their courses,
-    their usage events, sign-in identities and daily page counts, and the user row.
+    their usage events, sign-in identities, linked Google addresses, email sign-in links and
+    daily page counts, and the user row.
     Returns the job deletion's stats.
     """
     job_ids = list(session.scalars(select(Job.id).where(Job.user_id == user_id)))
@@ -203,6 +206,8 @@ def erase_user(session: Session, user_id: str, now: datetime | None = None) -> P
     session.execute(delete(Course).where(Course.user_id == user_id))
     session.execute(delete(Event).where(Event.user_id == user_id))
     session.execute(delete(AuthIdentity).where(AuthIdentity.user_id == user_id))
+    session.execute(delete(LinkedEmail).where(LinkedEmail.user_id == user_id))
+    session.execute(delete(LoginLink).where(LoginLink.user_id == user_id))
     session.execute(delete(QuotaDay).where(QuotaDay.user_id == user_id))
     session.execute(delete(User).where(User.id == user_id))
     return stats

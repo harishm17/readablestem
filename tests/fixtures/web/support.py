@@ -40,6 +40,7 @@ from a11y_stem.models.fake import FakeVisionClient
 from a11y_stem.web.app import create_app
 from a11y_stem.web.auth import set_allowed
 from a11y_stem.web.db import Job, session_scope
+from a11y_stem.web.email_senders import LoginEmail, register_sender
 from a11y_stem.web.worker import Worker
 
 SECRETS = (
@@ -59,6 +60,26 @@ PNG = base64.b64decode(
     "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=="
 )
 _CSRF = re.compile(r'name="csrf_token" value="([^"]+)"')
+
+
+class OutboxSender:
+    """A sign-in email sender that keeps what it was asked to send (never a real provider)."""
+
+    sent: list[LoginEmail] = []  # noqa: RUF012  (shared on purpose: the app builds its own)
+    fails = False
+
+    def send(self, message: LoginEmail) -> None:
+        if OutboxSender.fails:
+            raise RuntimeError("SECRET-SMTP-DETAIL")
+        OutboxSender.sent.append(message)
+
+    @classmethod
+    def reset(cls) -> None:
+        cls.sent = []
+        cls.fails = False
+
+
+register_sender("outbox", lambda settings: OutboxSender(), production_ok=False)
 
 
 def make_settings(tmp_path: Path, **overrides: Any) -> Settings:

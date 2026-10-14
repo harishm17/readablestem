@@ -33,6 +33,12 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/login"): PUBLIC,
     ("POST", "/login"): PUBLIC,
     ("POST", "/login/microsoft"): PUBLIC,
+    (
+        "POST",
+        "/login/email",
+    ): PUBLIC,  # T3-10: 404 unless EMAIL_LOGIN_ENABLED; same page for every address
+    ("GET", "/login/email/confirm"): PUBLIC,  # shows a button; opening the link uses nothing up
+    ("POST", "/login/email/confirm"): PUBLIC,  # CSRF-checked; the token is single-use
     ("GET", "/auth/callback"): PUBLIC,
     ("GET", "/auth/microsoft/callback"): PUBLIC,
     ("GET", "/dev-login"): PUBLIC,  # 404 unless ENV is dev or test and DEV_LOGIN_ENABLED
@@ -42,6 +48,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/admin"): ADMIN_ONLY,
     ("POST", "/admin/allowlist"): ADMIN_ONLY,
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
+    ("POST", "/admin/linked-emails"): ADMIN_ONLY,  # T3-10: another Google account per instructor
+    ("POST", "/admin/linked-emails/remove"): ADMIN_ONLY,
     ("GET", "/app"): USER,
     ("GET", "/app/documents"): USER,
     ("POST", "/jobs"): USER,
@@ -94,7 +102,9 @@ def all_routes(routes):
 
 @pytest.fixture
 def site(tmp_path):
-    env = WebEnv(tmp_path, feature_notation_memory=True)
+    env = WebEnv(
+        tmp_path, feature_notation_memory=True, email_login_enabled=True, email_sender="outbox"
+    )
     with env.running() as alice:
         env.allow(ALICE)
         env.allow(BOB)
@@ -179,7 +189,12 @@ def test_signed_out_visitors_get_nothing_from_user_and_admin_routes(site):
 def test_non_admins_cannot_use_admin_routes_even_with_a_valid_token(site):
     token = csrf_from(site.bob.get("/app").text)
     assert site.bob.get("/admin").status_code == 403
-    for path in ("/admin/allowlist", "/admin/allowlist/remove"):
+    for path in (
+        "/admin/allowlist",
+        "/admin/allowlist/remove",
+        "/admin/linked-emails",
+        "/admin/linked-emails/remove",
+    ):
         data = {"csrf_token": token, "email": "mallory@example.org", "admin": "on"}
         assert site.bob.post(path, data=data).status_code == 403, path
     with session_scope(site.ctx.factory) as session:
