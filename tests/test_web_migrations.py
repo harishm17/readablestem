@@ -284,6 +284,6 @@ def test_the_job_page_migration_downgrades_and_upgrades_again(tmp_path):
     upgrade(url)
     engine = create_engine(url)
     try:
-        assert TIER1_JOB_COLUMNS <= {c["name"] for c in inspect(engine).get_columns("jobs")}
+        assert {c["name"] for c in inspect(engine).get_columns("jobs")} >= TIER1_JOB_COLUMNS
     finally:
         engine.dispose()

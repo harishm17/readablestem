@@ -9,8 +9,6 @@ The browser test (test_web_second_check_browser.py) covers axe and reflow.
 
 from __future__ import annotations
 
-import re
-
 import pytest
 
 from a11y_stem.core import triage
