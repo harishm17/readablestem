@@ -57,7 +57,7 @@ def test_a_short_claude_document_can_hold_four_calls_under_the_default_page_cap(
     usd, _ = job_caps(claude, 1)
     assert usd >= limits.in_flight_usd(claude)
     # ...which OpenAI's page cap would not allow for Claude's reservations:
-    assert 0.30 < limits.largest_reservation_usd(claude)
+    assert limits.largest_reservation_usd(claude) > 0.30
 
 
 @pytest.mark.parametrize("provider", ["openai", "anthropic"])

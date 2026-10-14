@@ -108,9 +108,7 @@ def spend_findings(settings: Settings) -> list[Finding]:
             f"can have elements left unconverted at a cost of a few cents"
         )
     if settings.max_usd_per_job < largest:
-        error(
-            f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below one call's reservation"
-        )
+        error(f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below one call's reservation")
     elif settings.max_usd_per_job < normal_job + in_flight:
         warning(
             f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below what a "
