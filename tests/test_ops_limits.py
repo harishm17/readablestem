@@ -142,3 +142,11 @@ def test_the_beta_feature_set_raises_no_finding_on_the_default_claude_caps():
     assert limits.spend_findings(s) == []
     usd, _ = job_caps(s, 1)
     assert usd >= limits.in_flight_usd(s)
+
+
+def test_a_small_page_limit_is_judged_by_the_job_cap_it_really_gives():
+    """With 5 pages allowed, a $2 job cap is really 5 x the page cap, not $2."""
+    s = settings(max_pages_per_job=5)
+    assert limits.spend_findings(s) == []
+    wide = settings(model_provider="anthropic", max_pages_per_job=30, max_usd_per_job=500)
+    assert any("runaway" in f.text for f in limits.spend_findings(wide))

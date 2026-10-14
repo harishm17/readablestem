@@ -39,7 +39,8 @@ def register(
     ).set_defaults(func=_cmd_cron)
     sub.add_parser(
         "launch-check",
-        help="list what is unfinished before real users: draft pages, demo, eval baseline",
+        help="list what is unfinished before real users: draft pages, demo, eval baseline, "
+        "production settings and spend limits",
     ).set_defaults(func=_cmd_launch_check)
     sub.add_parser(
         "backup-check",

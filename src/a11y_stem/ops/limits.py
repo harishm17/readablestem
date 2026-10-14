@@ -98,6 +98,11 @@ def spend_findings(settings: Settings) -> list[Finding]:
         out.append(Finding("warning", f"{text}; {who}"))
 
     normal_job = settings.max_pages_per_job * PLANNING_USD_PER_PAGE
+    # What a full-size job is really allowed (`web.worker.job_caps`): the job cap, lowered by
+    # the page cap times the page count.
+    full_job_cap = min(
+        settings.max_usd_per_job, settings.max_pages_per_job * settings.max_usd_per_page
+    )
     if settings.max_usd_per_page < largest:
         error(
             f"MAX_USD_PER_PAGE ${settings.max_usd_per_page:.2f} is below one call's "
@@ -111,13 +116,13 @@ def spend_findings(settings: Settings) -> list[Finding]:
         )
     if settings.max_usd_per_job < largest:
         error(f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below one call's reservation")
-    elif settings.max_usd_per_job < normal_job + in_flight:
+    elif full_job_cap < normal_job + in_flight:
         warning(
             f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is below what a "
             f"{settings.max_pages_per_job}-page dense document needs "
             f"(${normal_job:.2f} spent plus ${in_flight:.2f} held at once)"
         )
-    elif settings.max_usd_per_job > RUNAWAY_FACTOR * normal_job:
+    elif full_job_cap > RUNAWAY_FACTOR * normal_job:
         warning(
             f"MAX_USD_PER_JOB ${settings.max_usd_per_job:.2f} is more than {RUNAWAY_FACTOR}x "
             f"a {settings.max_pages_per_job}-page dense document (${normal_job:.2f}): a "
