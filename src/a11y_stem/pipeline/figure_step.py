@@ -331,10 +331,14 @@ def _conflicted(candidate: _Candidate) -> bool:
     return any(c.code == "decorative_conflict" for c in candidate.checks)
 
 
-def _accept_bar(output: FigureOutput, settings: Settings) -> float:
-    if output.decorative:
-        return max(settings.auto_accept_confidence, DECORATIVE_ACCEPT_CONFIDENCE)
-    return settings.auto_accept_confidence
+def _accept_bar(candidate: _Candidate, settings: Settings) -> float:
+    """The accept bar for this answer: the bar of the model that wrote it
+    (`Settings.accept_confidence_by_model`), raised for a decorative answer."""
+    model = candidate.calls[-1].model if candidate.calls else None
+    bar = settings.accept_confidence_for(model)
+    if candidate.output is not None and candidate.output.decorative:
+        return max(bar, DECORATIVE_ACCEPT_CONFIDENCE)
+    return bar
 
 
 def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
@@ -344,7 +348,7 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
     if candidate.calls and candidate.calls[-1].model == settings.main_model:
         return False
     return (
-        output.confidence < _accept_bar(output, settings)
+        output.confidence < _accept_bar(candidate, settings)
         or not candidate.usable
         or _conflicted(candidate)
     )
@@ -396,7 +400,7 @@ def _fix(
         return make(Status.FAILED, "invalid_alt")
     failed = [c for c in candidate.checks if not c.passed]
     notes_only = all(c.severity == "warning" and c.code in NOTE_CODES for c in failed)
-    if output.confidence >= _accept_bar(output, settings) and notes_only:
+    if output.confidence >= _accept_bar(candidate, settings) and notes_only:
         return make(Status.ACCEPTED, proposal=True, review="optional" if failed else "none")
     return make(Status.NEEDS_REVIEW, proposal=True)
 

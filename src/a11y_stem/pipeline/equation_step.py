@@ -651,6 +651,13 @@ def _evaluate(
     return candidate
 
 
+def _accept_at(candidate: _Candidate, settings: Settings) -> float:
+    """The confidence from which this candidate is accepted: the bar of the model that
+    wrote it (`Settings.accept_confidence_by_model`), else the common one."""
+    model = candidate.calls[-1].model if candidate.calls else None
+    return settings.accept_confidence_for(model)
+
+
 def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
     """Ask the main model again when the cheap answer is unsure, unusable, or disagrees
     with the text layer in any way, a cosmetic style difference included: the style rule
@@ -671,7 +678,7 @@ def _needs_escalation(candidate: _Candidate, settings: Settings) -> bool:
         return False
     disagrees = any(not c.passed and c.code not in SPEECH_CODES for c in candidate.checks)
     return (
-        candidate.confidence < settings.auto_accept_confidence or not candidate.usable or disagrees
+        candidate.confidence < _accept_at(candidate, settings) or not candidate.usable or disagrees
     )
 
 
@@ -682,7 +689,7 @@ def _band_only(candidate: _Candidate, settings: Settings) -> bool:
     confidence = candidate.confidence
     return (
         confidence is not None
-        and SKIP_ESCALATION_FROM <= confidence < settings.auto_accept_confidence
+        and SKIP_ESCALATION_FROM <= confidence < _accept_at(candidate, settings)
         and candidate.usable
         and candidate.output is not None
         and candidate.output.is_equation
@@ -773,7 +780,7 @@ def _fix(
         return make(Status.ABSTAINED, "low_confidence")
     failed = [c for c in candidate.checks if not c.passed]
     single = ACCEPT_SINGLE_READING and any(c.code == SINGLE_READING_CODE for c in failed)
-    bar = SKIP_ESCALATION_FROM if single else settings.auto_accept_confidence
+    bar = SKIP_ESCALATION_FROM if single else _accept_at(candidate, settings)
     if confidence >= bar and all(c.code in NOTE_CODES for c in failed):
         # Notes only (a cosmetic style difference, no speech text): accepted, listed as
         # optional checks on the review screen.

@@ -4,6 +4,7 @@ only what it names, and leaves the full-size picture to review and the second ch
 from __future__ import annotations
 
 import io
+import json
 from typing import Any
 
 import httpx2
@@ -11,6 +12,7 @@ import pytest
 from PIL import Image
 
 from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+from a11y_stem.core.types import Status
 from a11y_stem.models.anthropic_client import AnthropicVisionClient
 from a11y_stem.models.base import UNTRUSTED_NOTICE, VisionRequest
 from a11y_stem.models.fake import FakeVisionClient
@@ -201,3 +203,32 @@ def test_an_unsure_cheap_answer_to_a_display_equation_goes_to_the_main_model():
     )
     assert [r.model for r in client.requests] == [HAIKU, OPUS]
     assert fix.equation is not None and fix.equation.latex == "x^2"
+
+
+# ------------------------------------------------------------ T2-19 accept per model
+
+
+def test_the_accept_bar_is_per_model_and_defaults_to_the_common_one():
+    settings = claude(accept_confidence_by_model={SONNET: 0.92})
+    assert settings.accept_confidence_for(SONNET) == 0.92
+    assert settings.accept_confidence_for(OPUS) == settings.auto_accept_confidence == 0.85
+    assert settings.accept_confidence_for(None) == 0.85
+
+
+def test_a_sonnet_answer_below_its_own_bar_needs_review_while_opus_is_accepted():
+    for model, status in ((SONNET, Status.NEEDS_REVIEW), (OPUS, Status.ACCEPTED)):
+        settings = claude(anthropic_main_model=model, accept_confidence_by_model={SONNET: 0.92})
+        client = FakeVisionClient(defaults={"equation": eq("x", 0.90)})
+        fix = transcribe(
+            equation_element(display="block", text="x"), PNG, client=client, settings=settings
+        )
+        assert fix.status is status, model
+    for model, status in ((SONNET, Status.NEEDS_REVIEW), (OPUS, Status.ACCEPTED)):
+        settings = claude(anthropic_main_model=model, accept_confidence_by_model={SONNET: 0.97})
+        client = FakeVisionClient(defaults={"figure": fig(0.95)})
+        assert describe(figure_element(), PNG, client=client, settings=settings).status is status
+
+
+def test_the_request_body_is_valid_json_for_the_batch_api():
+    body = sdk_body(claude(), request())
+    json.dumps(body)

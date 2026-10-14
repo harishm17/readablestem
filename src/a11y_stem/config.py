@@ -93,6 +93,9 @@ class Settings(BaseSettings):
     # Display equations start on the cheap model like short inline ones; the main model
     # re-reads what it is unsure of (T3-29).
     equation_display_first_cheap: bool = False
+    # Accept bar per model (T2-19), model id -> confidence. A model not listed uses
+    # `auto_accept_confidence`. The bar is applied to the model that wrote the answer.
+    accept_confidence_by_model: dict[str, float] = Field(default_factory=dict)
     # Server-side refusal fallback on claude-opus-5-5 and claude-sonnet-5-5 (`fallbacks:
     # "default"`, beta header server-side-fallback-2026-07-01): a request a safety
     # classifier declines is re-run by Anthropic on the model it recommends. Turn off to
@@ -316,6 +319,12 @@ class Settings(BaseSettings):
         return (
             self.anthropic_effort_main if model == self.main_model else self.anthropic_effort_cheap
         )
+
+    def accept_confidence_for(self, model: str | None) -> float:
+        """The confidence from which an answer of `model` is accepted without review."""
+        if model is not None and model in self.accept_confidence_by_model:
+            return self.accept_confidence_by_model[model]
+        return self.auto_accept_confidence
 
     def require_anthropic_key(self) -> str:
         key = self.anthropic_api_key
