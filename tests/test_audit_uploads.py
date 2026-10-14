@@ -403,9 +403,6 @@ def test_one_person_cannot_store_without_limit(tmp_path):
     with env.running() as client:
         env.allow(ALICE)
         login(client, ALICE)
-        env.ctx.limiter.rules["upload_user"] = env.ctx.limiter.rules["upload"] = type(
-            env.ctx.limiter.rules["upload"]
-        )(10_000, 60)
         stored = 0
         for _ in range(MAX_LIVE_JOBS_PER_USER + 3):
             response = upload(client, make_pdf(1), keep=True)

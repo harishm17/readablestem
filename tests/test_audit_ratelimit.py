@@ -98,7 +98,7 @@ def test_ipv6_clients_share_a_limit_per_64_bit_prefix():
 
 @pytest.fixture
 def web(tmp_path):
-    env = WebEnv(tmp_path)
+    env = WebEnv(tmp_path, rate_limits_enabled=True)
     with env.running() as client:
         env.allow(ALICE)
         env.allow(BOB)
@@ -179,3 +179,24 @@ def test_the_cron_endpoint_limits_wrong_tokens(web):
         for _ in range(rule.limit + 2)
     ]
     assert codes[: rule.limit] == [403] * rule.limit and codes[-1] == 429
+
+
+def test_production_does_not_start_with_the_limits_off(tmp_path):
+    from a11y_stem.config import ConfigError
+    from a11y_stem.web.app import create_app
+    from fixtures.web.support import make_settings
+
+    settings = make_settings(
+        tmp_path,
+        env="prod",
+        dev_login_enabled=False,
+        database_url="postgresql+psycopg://u:p@127.0.0.1:1/never",
+        base_url="https://beta.example.org",
+        session_secret="s" * 40,
+        google_client_id="client-id",
+        google_client_secret="client-secret",
+        openai_api_key="sk-test",
+        rate_limits_enabled=False,
+    )
+    with pytest.raises(ConfigError, match="RATE_LIMITS_ENABLED"):
+        create_app(settings)

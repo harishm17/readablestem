@@ -152,6 +152,9 @@ class Settings(BaseSettings):
     # of X-Forwarded-For (web/abuse.py): 1 on Cloud Run, 2 behind an external load balancer
     # as well, 0 with none (the peer address is used and the header is ignored).
     trusted_proxy_hops: int = Field(default=1, ge=0, le=5)
+    # The per-address and per-person rate limits (web/abuse.py). On by default and required in
+    # production; only a local load test or a browser test server has a reason to turn it off.
+    rate_limits_enabled: bool = True
 
     # --- public pages
     source_url: str = "https://github.com/harishm17/a11y-stem"
@@ -327,6 +330,8 @@ class Settings(BaseSettings):
             raise ConfigError("DEV_LOGIN_ENABLED must be false in production")
         if self.fake_models:
             raise ConfigError("FAKE_MODELS must be false in production")
+        if not self.rate_limits_enabled:
+            raise ConfigError("RATE_LIMITS_ENABLED must be true in production")
         if self.database_url.startswith("sqlite"):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):

@@ -199,6 +199,8 @@ def enforce(request: Request, rule_name: str, key: str | None = None) -> None:
     """Count one attempt against `rule_name` (for this address, or `key`); 429 page when
     the allowance is used up. Logs the rule name only, never the address."""
     ctx = get_ctx(request)
+    if not ctx.settings.rate_limits_enabled:
+        return
     key = key or client_ip(request, ctx.settings.trusted_proxy_hops)
     wait = ctx.limiter.check(rule_name, key)
     if wait is None:

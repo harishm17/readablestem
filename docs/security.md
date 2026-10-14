@@ -112,7 +112,7 @@ no external resource, no event handler (below).
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
 | Cron route, per address | 10 per 5 minutes | `web/abuse.py` |
 
-The rate limit is in memory, per instance: with two instances the allowance is doubled, and a
+The rate limit is on by default and production refuses to start with `RATE_LIMITS_ENABLED=false`. It is in memory, per instance: with two instances the allowance is doubled, and a
 restart forgets it. It is a seatbelt for a few people, not a flood defence. The address is the
 entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 on Cloud Run, 2 behind
 an external load balancer); entries further left are written by the client and never
