@@ -1338,12 +1338,14 @@ def document_page_item(
         if any(pi == p for _, p, _ in pairs):
             continue
         reason = _unmatched_reason(element, pred_sigs[pi], pi in pieces)
+        fix = fixes.get(element.id)
         unmatched.append(
             {
                 "element_id": element.id,
                 "pred_display": element.display,
                 "reason": reason,
                 "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
+                "text_layer_supported": _text_layer_supported(element, fix, reason),
             }
         )
     split = _split_gold(gold, pairs, pieces)
@@ -1513,6 +1515,21 @@ _QUANTITY = re.compile(r"[-+\u00b1]?\d[\d.,]*(?:[^\W\d_]+\d*(?:[/\u00b7\u22c5][^
 _INDEXED_VARIABLE = re.compile(r"[^\W\d_]\d+")  # "d0", "x2": a variable and its index
 
 
+def _text_layer_supported(element: Element, fix: Fix | None, reason: str) -> bool:
+    """An extra prediction (no gold partner) that is real maths on the page, not a
+    fragment: it is not a piece of a gold equation or a broken run (`reason` is not
+    "fragment"), and the model's transcription uses the same letters, digits and Greek
+    letters as the PDF's own text for the region (`text_layer_symbols_differ` is False).
+    The gold has no MathML for it (the source wrote it as text), so it counts against
+    detection precision although nothing is wrong; that is the artefact this separates
+    out (backlog T2-13). A fragment agrees with its own text layer trivially, which is
+    why fragments never count as supported."""
+    proposal = fix.equation if fix is not None else None
+    if reason == "fragment" or proposal is None:
+        return False
+    return equation_step.text_layer_symbols_differ(element.text, proposal.mathml) is False
+
+
 def _formula_evidence(element: Element, text: str) -> bool:
     """Is an inline prediction a formula (maths the source wrote as text), not a bare
     quantity or a lone symbol? It must have a relation with operands on both sides
@@ -1599,6 +1616,9 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "detection_precision_excluding_prose_math": _safe_div(
             matched, pred - unmatched["prose_math"]
         ),
+        # The extras the PDF's own text supports (real maths the gold wrote as text),
+        # apart from fragments and the rest (T2-13). `_text_layer_supported`.
+        **_supported_extras(items, matched, pred),
         "split_gold_equations": sum(len(i.get("split_gold_ids", [])) for i in items),
         "secondary_stream_v2": stream_document_metrics(items, pairs, gold),
         "static_violations": sum(static_codes.values()),
@@ -1611,6 +1631,22 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "page_errors": _page_errors(items),
         "review_load": document_review_load(items),
         "second_check": vm.document_metrics(items),
+    }
+
+
+def _supported_extras(items: Sequence[dict], matched: int, pred: int) -> dict:
+    rows = [u for i in items for u in i.get("unmatched", [])]
+    supported = [u for u in rows if u.get("text_layer_supported")]
+    by_reason = Counter(u["reason"] for u in supported)
+    return {
+        "unmatched_text_layer_supported": len(supported),
+        "unmatched_text_layer_supported_by_reason": {
+            reason: by_reason.get(reason, 0) for reason in UNMATCHED_REASONS
+        },
+        "unmatched_not_supported": len(rows) - len(supported),
+        "detection_precision_excluding_text_layer_supported": _safe_div(
+            matched, pred - len(supported)
+        ),
     }
 
 
@@ -2087,6 +2123,16 @@ def format_markdown(report: dict) -> str:
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]
         lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())
+        if "unmatched_text_layer_supported" in metrics:
+            lines += [
+                "",
+                "Of these, supported by the PDF's own text (real maths the gold wrote as text, "
+                "not fragments): "
+                f"{metrics['unmatched_text_layer_supported']}; not supported: "
+                f"{metrics['unmatched_not_supported']}. Detection precision without the "
+                "supported ones: "
+                f"{_fmt(metrics['detection_precision_excluding_text_layer_supported'])}.",
+            ]
     if report["task"] == "equations":
         lines += ["", "### Selective prediction (keep proposals with confidence >= t)", ""]
         lines += _table(
