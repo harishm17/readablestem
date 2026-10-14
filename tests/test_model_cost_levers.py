@@ -14,6 +14,7 @@ from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
 from a11y_stem.models.anthropic_client import AnthropicVisionClient
 from a11y_stem.models.base import UNTRUSTED_NOTICE, VisionRequest
 from a11y_stem.models.fake import FakeVisionClient
+from a11y_stem.models.images import shrink_png
 from a11y_stem.models.openai_client import PNG_SIGNATURE
 from a11y_stem.pipeline.equation_step import EquationOutput, transcribe
 from a11y_stem.pipeline.figure_step import describe
@@ -142,3 +143,31 @@ def test_context_goes_only_with_the_escalation_when_asked():
         context_text="the sentence around it",
     )
     assert [r.context_text for r in plain.requests] == ["the sentence around it"] * 2
+
+
+# ------------------------------------------------------------------ T3-24 downscale
+
+
+def test_shrink_png_scales_the_long_side_and_never_up():
+    big = png_of(2000, 1000)
+    small = shrink_png(big, 800)
+    assert Image.open(io.BytesIO(small)).size == (800, 400)
+    assert shrink_png(big, None) is big
+    assert shrink_png(small, 800) is small
+    assert shrink_png(b"not a png", 800) == b"not a png"
+
+
+def test_the_model_gets_the_reduced_figure_and_the_second_check_the_full_one():
+    big = png_of(1600, 900)
+    client = FakeVisionClient(defaults={"figure": fig()})
+    describe(
+        figure_element(),
+        big,
+        client=client,
+        settings=claude(figure_model_max_edge_px=800),
+    )
+    sent = client.requests[0].images[0]
+    assert Image.open(io.BytesIO(sent)).size == (800, 450)
+    untouched = FakeVisionClient(defaults={"figure": fig()})
+    describe(figure_element(), big, client=untouched, settings=claude())
+    assert untouched.requests[0].images[0] == big

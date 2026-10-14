@@ -100,6 +100,7 @@ from a11y_stem.core.types import (
 )
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
+from a11y_stem.models.images import shrink_png
 from a11y_stem.models.prompts import load_prompt
 from a11y_stem.models.verifier import figure_score, verifier_of
 from a11y_stem.pipeline import figure_details
@@ -462,6 +463,9 @@ def describe(
     schema: type[FigureOutput] = FigureLongOutput if long else FigureOutput
     tiny = is_tiny(element)
     context = figure_context(element, context_text, labels=long)
+    # The model reads a reduced copy when `figure_model_max_edge_px` is set; `png` itself is
+    # what the second check and everything a person sees keep using.
+    sent = shrink_png(png, settings.figure_model_max_edge_px)
 
     def attempt(model: str, *, escalation: bool = False) -> _Candidate:
         request = VisionRequest(
@@ -469,7 +473,7 @@ def describe(
             model=model,
             prompt_version=prompt.version,
             instructions=prompt.text,
-            images=[png],
+            images=[sent],
             context_text=context,
             max_output_tokens=LONG_MAX_OUTPUT_TOKENS if long else MAX_OUTPUT_TOKENS,
             image_detail="low" if tiny else "high",
