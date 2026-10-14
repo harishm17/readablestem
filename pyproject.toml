@@ -64,7 +64,7 @@ line-length = 100
 target-version = "py312"
 src = ["src", "tests"]
 
-# Registered files are kept byte for byte (their SHA-256 is in proof/PREREG.sha256), so the
+# Registered files are kept byte for byte (their SHA-256 is in proof/PREREG-v2.sha256), so the
 # formatter and the linter leave them alone.
 extend-exclude = ["proof/selection", "proof/scorer-readiness/draw.py", "proof/scorer-readiness/make_pred.py"]
 

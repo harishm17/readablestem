@@ -1380,7 +1380,7 @@ development numbers. The held-out set is 15 OpenStax sections that no developmen
 saw, fixed in a pre-registration before any system ran on them: 3 sections each from
 College Physics, Chemistry, Precalculus, Introductory Statistics and Intermediate Algebra,
 242 Letter pages, 1,369 equations, 70 figures (69 with OpenStax alt text), 27 tables and
-509 headings. The pre-registration (SHA-256 `8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9`)
+509 headings. The pre-registration (version 2, SHA-256 `2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34`)
 holds the selection rule, the metrics, the statistics and what counts as a failure, and is
 published with the results. The gold manifest's SHA-256 is
 `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`.

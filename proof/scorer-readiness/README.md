@@ -7,4 +7,4 @@ known-correct LaTeX written by hand from the gold MathML, `report.json` is
 no prediction count as errors; the 40 predicted ones are the sample). Result: 28 of 40 exact under
 the lenient scorer. The author has not checked the 40 against the rendered gold yet.
 
-`draw.py` and `make_pred.py` are the registered files, byte for byte (SHA-256 in `../PREREG.sha256`). `draw.py` reads the answer key from a fixed path on the author's machine (line 7): change that line, or copy the file, to run it elsewhere.
+`draw.py` and `make_pred.py` are the registered files (SHA-256 in `../PREREG-v2.sha256`). `make_pred.py` is byte for byte as in version 1. `draw.py` differs from version 1 in line 7 only: it read the answer key from a fixed path on the author's machine, and now takes the folder as its second argument (default `~/.cache/a11y-stem/heldout`, where `make heldout-gold` puts it). It was run as `python3 draw.py sample.json <answer-key folder>` and writes the identical `sample.json`.

@@ -95,7 +95,7 @@ _BOOK_VERSIONS = {
 # and high maths-density strata). Page counts are section 4.4 of the pre-registration: 242.
 REGISTERED = Registration(
     date="2026-10-13",
-    preregistration_sha256="8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9",
+    preregistration_sha256="2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34",
     manifest_sha256="e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
     attribution_sha256="f65b0306d954a23d3c7cdf6f1afe223f8e4f3f65a52e70734c421b4c53b65df5",
     pins={book: BookPin(_ARCHIVE, version) for book, version in _BOOK_VERSIONS.items()},

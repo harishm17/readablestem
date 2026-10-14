@@ -1,7 +1,9 @@
 """The registered files in `proof/` can be checked from the repository alone.
 
 `proof/REGISTERED.md` says what can and cannot be checked. These tests do the checks that can
-be done offline: every registered file has the SHA-256 in `PREREG.sha256`, the seeded draw
+be done offline: every registered file has the SHA-256 in `PREREG-v2.sha256`, the five files
+that differ from version 1 differ in exactly the documented lines (reverting them gives back
+the version-1 hashes of `PREREG-v1.sha256` where the text can be rebuilt), the seeded draw
 reproduces the committed draw, and the sections that survived the page rules are the held-out
 set's sections.
 """
@@ -20,7 +22,57 @@ from a11y_stem.proof import registry
 
 ROOT = Path(__file__).resolve().parent.parent
 PROOF = ROOT / "proof"
-HASH_FILES = ("PREREG.sha256", "PREREG-after-review.sha256")
+HASH_FILES = ("PREREG-v2.sha256", "PREREG-after-review-v1.sha256")
+V1_REGISTRATION = "8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9"
+# Files whose text differs between version 1 and version 2 of the registration (wording only:
+# requester names, an authorship line, the author's local paths).
+CHANGED_IN_V2 = {
+    "PREREGISTRATION.md",
+    "PARSERS-PLAN.md",
+    "selection/features.py",
+    "selection/scan_used.py",
+    "scorer-readiness/draw.py",
+}
+# Version 1 of three scripts named the author's home directory. Version 2 replaced exactly
+# these lines; the old path is written in pieces so that it does not appear in the repository.
+OLD_HOME = "/" + "home" + "/" + "harish"
+V2_TO_V1_LINES = {
+    "selection/features.py": [
+        (
+            "REPO = Path(__file__).resolve().parents[2]\n",
+            f'REPO = Path("{OLD_HOME}/code/a11y-stem")\n',
+        )
+    ],
+    "selection/scan_used.py": [
+        (
+            '    Path(p) for p in os.environ.get("A11Y_SCAN_ROOTS", "").split(os.pathsep) if p\n'
+            '] or [Path(__file__).resolve().parents[2], Path("/tmp")]\n',
+            f'    Path("{OLD_HOME}/code/a11y-stem"),\n'
+            f'    Path("{OLD_HOME}/code/a11y-stem-int"),\n'
+            f'    Path("{OLD_HOME}/code/a11y-research"),\n'
+            f'    Path("{OLD_HOME}/.cache/a11y-fixer"),\n'
+            f'    Path("{OLD_HOME}/.cache/final-verify-pt"),\n'
+            '    Path("/tmp"),\n'
+            "]\n",
+        )
+    ],
+    "scorer-readiness/draw.py": [
+        (
+            "gold = Path(sys.argv[2]) if len(sys.argv) > 2 else "
+            'Path.home() / ".cache" / "a11y-stem" / "heldout"\n',
+            f'gold = Path("{OLD_HOME}/code/a11y-research/proof/heldout-gold")\n',
+        )
+    ],
+}
+
+
+def _as_in_v1(rel: str) -> str:
+    """The text of a script as it was in version 1, rebuilt from the committed version 2."""
+    text = (PROOF / rel).read_text(encoding="utf-8")
+    for new, old in V2_TO_V1_LINES[rel]:
+        assert text.count(new) == 1, f"{rel}: the documented version-2 lines are not there"
+        text = text.replace(new, old)
+    return text
 
 
 def _lines(name: str) -> list[tuple[str, str]]:
@@ -49,8 +101,33 @@ def test_every_registered_file_in_the_repository_has_the_registered_hash(name):
     assert checked >= 1
 
 
-def test_the_first_hash_file_lists_the_registration_and_the_four_first_addenda():
-    listed = {rel for _, rel in _lines("PREREG.sha256")}
+def test_version_1_hashes_differ_from_version_2_in_the_five_reworded_files_only():
+    v1, v2 = (
+        dict((r, d) for d, r in _lines("PREREG-v1.sha256")),
+        dict((r, d) for d, r in _lines("PREREG-v2.sha256")),
+    )
+    assert list(v1) == list(v2), "version 2 hashes the same files in the same order"
+    assert {rel for rel in v1 if v1[rel] != v2[rel]} == CHANGED_IN_V2
+    assert v1["PREREGISTRATION.md"] == V1_REGISTRATION
+    assert v2["PREREGISTRATION.md"] != V1_REGISTRATION
+
+
+@pytest.mark.parametrize("rel", sorted(V2_TO_V1_LINES))
+def test_reverting_the_documented_lines_gives_back_the_version_1_hash(rel):
+    v1 = dict((r, d) for d, r in _lines("PREREG-v1.sha256"))
+    assert hashlib.sha256(_as_in_v1(rel).encode("utf-8")).hexdigest() == v1[rel]
+
+
+def test_the_addenda_and_the_interim_headings_cite_the_version_1_registration():
+    for rel in (
+        "PREREGISTRATION-ADDENDUM-1.md",
+        "interim/heldout-2026-10/a11y-headings/headings.json",
+    ):
+        assert V1_REGISTRATION in (PROOF / rel).read_text(encoding="utf-8"), rel
+
+
+def test_the_hash_file_lists_the_registration_and_the_four_first_addenda():
+    listed = {rel for _, rel in _lines("PREREG-v2.sha256")}
     expected = {"PREREGISTRATION.md", "PARSERS-PLAN.md"} | {
         f"PREREGISTRATION-ADDENDUM-{n}.md" for n in (1, 2, 3, 4)
     }
@@ -61,7 +138,8 @@ def test_the_first_hash_file_lists_the_registration_and_the_four_first_addenda()
 
 
 def test_the_registration_hash_is_the_one_the_set_the_code_and_the_readme_cite():
-    registered = dict((rel, d) for d, rel in _lines("PREREG.sha256"))["PREREGISTRATION.md"]
+    registered = dict((rel, d) for d, rel in _lines("PREREG-v2.sha256"))["PREREGISTRATION.md"]
+    assert registered != V1_REGISTRATION
     pset = registry.resolve_set(ROOT, "heldout-2026-10")
     assert pset.prereg is not None and pset.prereg.sha256 == registered
     assert registered in (ROOT / "README.md").read_text(encoding="utf-8")
@@ -95,11 +173,14 @@ def test_the_sections_that_survived_the_page_rules_are_the_held_out_sections():
 
 def test_the_rules_were_hashed_before_the_draw_and_the_files_still_match_them():
     # rules-before-draw.sha256 lists the draw-time hashes of the scripts and of features.json;
-    # budget.py was edited after the draw (logged in the same file), the others were not.
+    # budget.py was edited after the draw (logged in the same file), the others were not;
+    # features.py is compared as it was in version 1 (only its path line was reworded).
     listed = {}
     for line in (PROOF / "selection" / "rules-before-draw.sha256").read_text().splitlines():
         digest, _, rel = line.partition("  ")
         if len(digest) == 64 and rel:
             listed.setdefault(rel, digest)
-    for rel in ("features.py", "draw.py", "features.json"):
+    features_v1 = hashlib.sha256(_as_in_v1("selection/features.py").encode("utf-8")).hexdigest()
+    assert features_v1 == listed["features.py"]
+    for rel in ("draw.py", "features.json"):
         assert _sha(PROOF / "selection" / rel) == listed[rel], rel

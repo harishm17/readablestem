@@ -1,5 +1,16 @@
 # Pre-registration: held-out OpenStax evaluation of a11y-stem
 
+**Version 2**, written 2026-10-13, before any model-dependent result on the held-out sections
+existed (the first live attempts were cut off by the account's credit limit and produced no
+results: see Addendum 3). It differs from version 1 only in wording: the names of the people who
+asked for this evidence, an authorship line and paths on the author's machine were removed or
+made generic. The sections, metrics, rules, thresholds and the set are unchanged. The
+measures already taken without any model (a11y-stem's heading detection and the open parsers;
+see Addendum 4, its corrections in Addendum 5, and `interim/`) ran under version 1. Version 1's
+hashes are kept in `PREREG-v1.sha256` (and `PREREG-after-review-v1.sha256`); this version's are in
+`PREREG-v2.sha256`. Where the text below says `PREREG.sha256`, read the hash file of the version
+in question.
+
 Written 2026-10-13, before any system under test (a11y-stem, the chatbot recipe, the open
 parsers) has processed any of the sections below. The author's sign-off items are in
 section 12.
@@ -26,7 +37,7 @@ as "compliant", "verified" or "accessible guaranteed".
 ## 2. What was used in development (none of it is held out)
 
 Found by `selection/scan_used.py` (run 2026-10-13 over `a11y-stem`, `a11y-stem-int`, every
-worktree under `a11y-stem/.claude/worktrees`, `a11y-research` including its tarballs,
+worktree among the agent worktrees of the repository, `a11y-research` including its tarballs,
 `~/.cache/a11y-fixer`, `~/.cache/final-verify-pt` and `/tmp`): cached OpenStax archive
 pages, section slugs in text files and file names, and the contents of the research
 tarballs; plus a grep for `openstax.org/books/...` URLs in `a11y-research`.

@@ -6,7 +6,7 @@ held-out sections are still unseen by every parser. No model calls were made ($0
 was committed, pushed or published. Not legal advice.
 
 This is the "parser plan" that `PREREGISTRATION.md` §6.3 asks for (file read at SHA-256
-`8127b143…`). The pre-registration wins wherever the two overlap: the held-out set, primary
+`8127b143…`, version 1; version 2 differs only in wording and has `2c16815a…`). The pre-registration wins wherever the two overlap: the held-out set, primary
 metrics, statistics, failure rules and the chatbot arms. This file adds what §6.3 leaves open:
 - which parsers run, at which versions and settings;
 - how each tool's output is mapped onto the shared intermediate form;
@@ -505,7 +505,7 @@ Model revisions seen today:
   - `landscape/readme_olmocr.md`.
 - `chatbot-baseline/report.txt`, `score_baseline.py`, `structure.py` and `extract.py`;
   `niche/chatbot-runs/usage.jsonl` and `scripts/run_chat.py`; `niche/VERDICT-2026-10-10.md`.
-- `proof/PREREGISTRATION.md` (SHA-256 `8127b143…`) and `proof/selection/`.
+- `proof/PREREGISTRATION.md` (SHA-256 `8127b143…` for version 1, `2c16815a…` for version 2) and `proof/selection/`.
 - a11y-stem `README.md`, `docs/eval.md`, `docs/design/beta-architecture.md` and `docs/steps.md`.
 - Licences fetched today (`~/.cache/a11y-proof/lic/`):
   - MinerU `LICENSE.md` and `README.md`;

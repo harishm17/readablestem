@@ -6,7 +6,7 @@
   "description": "Fifteen sections of five OpenStax books (242 Letter pages), chosen by rule and registered, with this set's answer key hashed, before any system ran on them. The books are retired first editions, which are CC BY 4.0 (the current editions are CC BY-NC-SA 4.0 and the live CC BY STEM books were used in development).",
   "preregistration": {
     "file": "proof/PREREGISTRATION.md",
-    "sha256": "8127b143cdbf278f9a14650e086c70b4af7063d789b16ffdfc266399e5d4c5d9",
+    "sha256": "2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34",
     "note": "Public copy of the registration. The run stops if the file here does not have this hash."
   },
   "gold": {
