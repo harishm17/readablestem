@@ -30,7 +30,7 @@ def running(tmp_path, **overrides):
 
 
 def test_readyz_is_ready_with_a_key_and_shows_no_secret(tmp_path):
-    env, client = running(tmp_path, openai_api_key=SECRET_KEY)
+    _env, client = running(tmp_path, openai_api_key=SECRET_KEY)
     with client as web:
         response = web.get("/readyz")
     assert response.status_code == 200
@@ -43,27 +43,27 @@ def test_readyz_is_ready_with_a_key_and_shows_no_secret(tmp_path):
 
 def test_readyz_follows_the_selected_provider(tmp_path):
     only_openai = {"model_provider": "anthropic", "openai_api_key": SECRET_KEY}
-    env, client = running(tmp_path, **only_openai)
+    _env, client = running(tmp_path, **only_openai)
     with client as web:
         response = web.get("/readyz")
     assert response.status_code == 503
     assert response.json()["checks"]["model_provider"] == "no_key"
-    env, client = running(tmp_path / "b", model_provider="anthropic", anthropic_api_key="sk-a")
+    _env, client = running(tmp_path / "b", model_provider="anthropic", anthropic_api_key="sk-a")
     with client as web:
         assert web.get("/readyz").status_code == 200
 
 
 def test_readyz_without_any_key_is_not_ready_unless_the_models_are_fake(tmp_path):
-    env, client = running(tmp_path)
+    _env, client = running(tmp_path)
     with client as web:
         assert web.get("/readyz").status_code == 503
-    env, client = running(tmp_path / "f", fake_models=True)
+    _env, client = running(tmp_path / "f", fake_models=True)
     with client as web:
         assert web.get("/readyz").json()["checks"]["model_provider"] == "fake"
 
 
 def test_readyz_names_the_database_when_it_does_not_answer(tmp_path, monkeypatch):
-    env, client = running(tmp_path, openai_api_key=SECRET_KEY)
+    _env, client = running(tmp_path, openai_api_key=SECRET_KEY)
     with client as web:
         monkeypatch.setattr(health, "ping", lambda engine: False)
         response = web.get("/readyz")
