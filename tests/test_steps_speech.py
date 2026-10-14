@@ -70,12 +70,14 @@ def test_openstax_and_latex_markup_read_the_same():
         (r"v_\text{f}", "v sub f"),
         (r"x_{i+1}", "x sub i plus 1 end sub"),
         (r"x_i^2", "x sub i squared"),
-        # ions: the charge needs no "end power"; a nuclide's numbers come before its symbol
+        # ions: the charge needs no "end power"; a nuclide is read as the element (the data
+        # of `speech_nuclides`), and one that is not known keeps its numbers before its symbol
         (r"\text{SO}_4^{2-}", "SO sub 4 to the power 2 minus"),
         (r"\text{Fe}^{3+}", "Fe to the power 3 plus"),
-        (r"{}^{14}_{6}\text{C}", "superscript 14 subscript 6 C"),
-        (r"{}^{235}\text{U}", "superscript 235 U"),
-        (r"{}^{0}_{-1}\text{e}", "superscript 0 subscript minus 1 e"),
+        (r"{}^{14}_{6}\text{C}", "carbon 14, atomic number 6"),
+        (r"{}^{235}\text{U}", "uranium 235"),
+        (r"{}^{0}_{-1}\text{e}", "electron, mass number 0, atomic number minus 1"),
+        (r"{}^{14}_{6}\text{Xx}", "superscript 14 subscript 6 Xx"),
         (r"y''", "y double prime"),
         (r"30^\circ", "30 degrees"),
         # roots

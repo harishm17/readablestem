@@ -297,7 +297,8 @@ def test_a_footnote_mark_links_to_its_footnote():
     assert (link.kind, link.target_id) == ("internal", note.id)
     assert (body.text or "")[link.start : link.end] == "1"
     html = html_of(footnote_pdf())
-    assert f'<a href="#{note.id}">1</a>' in html
+    # the mark is raised text too (T2-4): the link wraps the <sup>
+    assert f'<a href="#{note.id}"><sup>1</sup></a>' in html
     assert f'<p id="{note.id}">1 Pressure matters.</p>' in html
 
 

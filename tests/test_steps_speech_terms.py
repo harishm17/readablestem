@@ -98,8 +98,8 @@ def test_aligned_equations_and_brace_matrices_stay_plain_tables():
         (r"{}^{0}_{-1}e", "electron, mass number 0, atomic number minus 1"),
         (r"{}^{0}_{+1}e", "positron, mass number 0, atomic number plus 1"),
         (r"{}^{4}_{2}\alpha", "alpha particle, mass number 4, atomic number 2"),
-        # not an element or a particle: read as written
-        (r"{}^{a}_{b}X", "sub b to the power a capital X"),
+        # not an element or a particle: the scripts before the symbol, as written
+        (r"{}^{a}_{b}X", "superscript a subscript b capital X"),
     ],
 )
 def test_nuclide_notation_reads_as_the_element(latex, expected):
