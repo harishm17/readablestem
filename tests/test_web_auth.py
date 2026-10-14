@@ -291,6 +291,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/courses/{course_id}/entries/{entry_id}/delete",
         "/courses/{course_id}/remember",
         "/courses/{course_id}/rename",
+        "/courses/{course_id}/suggestions",
         "/dev-login",
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",

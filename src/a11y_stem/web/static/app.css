@@ -736,3 +736,5 @@ input[type="text"].input-short { width: 8rem; }
   .table-scroll { overflow: visible; }
   tr, section { break-inside: avoid; }
 }
+#suggestions p, #suggestions .button { overflow-wrap: anywhere; }
+#suggestions .button { max-width: 100%; white-space: normal; text-align: left; }

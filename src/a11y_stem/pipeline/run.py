@@ -687,6 +687,7 @@ class _Run:
             self.fixes[element.id] = _failed(element, self.stop.reason())
             self.step_done(element)
             return
+        self.raise_if_fatal()  # a step may have failed while this element was being cut
         work = partial(
             _run_step,
             _Task(element, png, self.contexts.get(element.id)),
