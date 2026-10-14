@@ -19,6 +19,7 @@ this table. This is a plain statement of scope, not legal advice.
 | `proof/PREREGISTRATION*.md`, `proof/PARSERS-PLAN.md`, `proof/DECISION-*.md`, `proof/PREREG*.sha256`, `proof/REGISTERED.md`, `proof/sets/` | MIT | |
 | `proof/selection/` (the selection code, its inputs and outputs, and the licence table; the section lists and counts are OpenStax metadata) | MIT for the code and logs; CC BY 4.0 (OpenStax) for what is read from OpenStax | `proof/REGISTERED.md` |
 | Vendored files under `src/a11y_stem/pipeline/vendor/` and `src/a11y_stem/web/static/vendor/` | Their own (table below) | The licence files beside them |
+| The English word list `src/a11y_stem/pipeline/data/words-en.txt.gz` (63,849 lower-case words) | SCOWL's permissive notice (Kevin Atkinson; the Moby parts are public domain) | `src/a11y_stem/pipeline/data/README.md` (source, filter, SHA-256 and the full notice) |
 
 All OpenStax material used in this repository is from books that OpenStax publishes under
 CC BY 4.0. The licence of each book was read from OpenStax's CMS and archive on the dates in

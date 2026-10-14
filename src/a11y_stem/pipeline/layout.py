@@ -74,8 +74,8 @@ import pymupdf
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.core.types import BBox, Element, Kind, Notice, TableGrid, inline_marker
+from a11y_stem.pipeline import hyphens, page_type, tables
 from a11y_stem.pipeline import options as run_options
-from a11y_stem.pipeline import page_type, tables
 from a11y_stem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
     EVIDENCE_COURSE,
@@ -4691,14 +4691,18 @@ def _line_break(before: str, after: str) -> tuple[str, str]:
     """(`before` with any hyphen removed, separator) for joining two lines of a paragraph.
 
     "veloc-" + "ity" -> "velocity": a letter, a hyphen at the line end and a lowercase
-    start make one word. "Newton-" + "Raphson" keeps its hyphen but gets no space. A soft
-    hyphen always disappears. Anything else is joined with a space. ("well-" + "known"
-    becomes "wellknown": without a dictionary that case cannot be told apart.)
+    start make one word. "Newton-" + "Raphson" keeps its hyphen but gets no space, and
+    so does "well-" + "known": a compound is told from a broken word by the word list
+    (`hyphens.keeps_hyphen`: kept when both pieces are words and the joined word is not,
+    or when the piece before the hyphen is a single letter, as in "x-" + "ray"). A soft
+    hyphen always disappears. Anything else is joined with a space.
     """
     if before.endswith("\u00ad"):
         return before[:-1], ""
-    if len(before) > 1 and before[-1] in "-\u2010" and before[-2].isalpha():
-        return (before[:-1], "") if after[:1].islower() else (before, "")
+    if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
+        if after[:1].islower() and not hyphens.keeps_hyphen(before, after):
+            return before[:-1], ""
+        return before, ""
     return before, " "
 
 

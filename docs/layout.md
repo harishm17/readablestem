@@ -140,7 +140,13 @@ Element conventions:
    paragraph and a fraction's denominator to the text under it.
 7. **Paragraph text.** Rows are joined with spaces. `veloc-` + `ity` becomes `velocity` (a
    letter, a hyphen at the line end and a lowercase start); `Newton-` + `Raphson` keeps the
-   hyphen without a space; soft hyphens disappear. Whitespace is collapsed and zero-width
+   hyphen without a space; so does a compound whose pieces are words when the joined word
+   is not (`well-` + `known`, `cross-` + `section`, `self-` + `consistent`), and a hyphen
+   after a single letter (`x-` + `ray`). The list is `pipeline/data/words-en.txt.gz`
+   (63,849 lower-case English words from SCOWL; source, licence and SHA-256 in
+   `pipeline/data/README.md`) and the rule is `pipeline/hyphens.py`: the joined word is a
+   word, or neither piece is one (`eigen-` + `vector`, a technical word the list lacks):
+   the hyphen goes. Soft hyphens disappear. Whitespace is collapsed and zero-width
    and control characters removed. A paragraph cut by a column break (first part does not
    end a sentence, second part starts lowercase at the top of the next column) is rejoined.
 
