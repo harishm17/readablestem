@@ -483,7 +483,8 @@ def figure_check_mode(settings: Settings) -> CheckMode:
     """What the figure step does with the job's check: "note" (a flag adds an optional
     note), "shadow" (the answer is recorded and changes nothing) or "off"."""
     if settings.model_provider == "anthropic":
-        return {"off": "off", "shadow": "shadow", "enforce": "note"}[settings.claude_second_check]
+        mode = settings.claude_second_check
+        return "note" if mode == "enforce" else mode
     return "note" if settings.decisions_figure_verify else "off"
 
 

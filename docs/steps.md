@@ -861,7 +861,7 @@ total live spend $0.74 of the $3 cap).**
 | `convert` of 9 pages of 4 authored dev documents (matrices, chemistry, equation pictures, slides), scope `all` | 136 equation + 18 equation-picture ("figure") checks | all 154 answered; of the 93 the first pass **accepted**, the check flagged 3 (**96.8% agree**); of the 61 it sent to review it flagged 16 (26%): the two passes doubt the same elements |
 | `eval pipeline --task equations` (48-item stride sample) | 47 answered | flagged 2 (4.3%); both equal the gold LaTeX (apparent false flags); 0 of the 18 the scorer calls wrong flagged, most of those are notation differences with the same meaning (`array` vs `aligned`, `\text` vs `\mathrm`); one probable real miss (a dropped "?") was not flagged |
 | `eval pipeline --task figures` (8-item stride sample) | judged by claude-opus-5-5 | the judge passed all 8; the check flagged 1: raw agreement 7/8 |
-| Cost per check | 154 + 47 + 8 checks | equations $0.0007-0.0009 (about 1,200 input tokens, the system prompt is cached), figures $0.0014-0.0026 |
+| Cost per check | 154 + 47 + 8 checks | equations $0.0007-0.0009 (about 1,200 input tokens), figures $0.0014-0.0026 |
 | Cost per page | 9 pages, scope `all` | $0.015 a page (27% of the $0.055 a page the conversion cost); default scope `accepted`: **$0.009 a page** (the 93 accepted checks cost $0.080) |
 | Latency | 154 checks | median 1.3 s, p90 2.1 s, slowest 11.8 s |
 
