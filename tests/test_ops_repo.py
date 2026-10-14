@@ -155,7 +155,13 @@ def test_dockerignore_keeps_private_and_local_files_out():
 
 @pytest.mark.parametrize(
     "path",
-    ["docs/deploy.md", "docs/operations.md", "deploy/deploy.sh", "Dockerfile"],
+    [
+        "docs/deploy.md",
+        "docs/deploy-railway.md",
+        "docs/operations.md",
+        "deploy/deploy.sh",
+        "Dockerfile",
+    ],
 )
 def test_ops_files_never_claim_compliance(path):
     text = (ROOT / path).read_text().lower()

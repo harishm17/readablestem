@@ -1,5 +1,17 @@
 # Changelog
 
+## Railway deploy and layout limits (2026-10-14)
+
+- Deploy on Railway: `railway.json` (Dockerfile build, `readablestem db upgrade` before each deploy,
+  `/healthz` deploy check), `deploy/railway.cron.json` (hourly `readablestem ops cron`) and
+  [docs/deploy-railway.md](docs/deploy-railway.md). The Cloud Run guide stays as the alternative.
+- Layout analysis no longer takes minutes and gigabytes on pages of tens of thousands of tiny
+  drawings: banded clustering (same groups), a drawing cap per page (`page_type.PAGE_MAX_PATHS`,
+  `PAGE_MAX_ITEMS`; such a page is kept as its image with its text, reason `unread_page`), a limit on
+  the table detector, and the error code `too_complex` for an upload whose pages need too much.
+  Output is unchanged on every repository fixture and development page
+  (`scripts/layout_identity.py`); details in docs/layout.md.
+
 ## Rename to ReadableSTEM (2026-10-14)
 
 The product is now called ReadableSTEM (readablestem.com). It was called a11y-stem. No

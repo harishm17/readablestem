@@ -1,5 +1,9 @@
 # Deploying ReadableSTEM to Google Cloud Run
 
+> **The current deploy is on Railway: see [deploy-railway.md](deploy-railway.md).** This guide is the
+> Google Cloud Run alternative (`deploy/deploy.sh`). It is still accurate for that path, and its
+> sections on spend limits, content features, sizing and the sign-in clients apply to either host.
+
 This walks through the first deploy, the parts that cannot be scripted (the model provider's
 spend limit, Google sign-in client, the optional Microsoft sign-in app, custom domain), and
 how to roll back. Day-to-day running is in [operations.md](operations.md). The beta runs on

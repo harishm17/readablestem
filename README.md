@@ -269,7 +269,8 @@ uv run readablestem serve   # http://127.0.0.1:8000, sign in at /dev-login
 ```
 
 Settings are listed in [`.env.example`](.env.example) and explained in
-[docs/web.md](docs/web.md). Deployment to Google Cloud Run is in
+[docs/web.md](docs/web.md). Deployment on Railway is in
+[docs/deploy-railway.md](docs/deploy-railway.md); the Google Cloud Run alternative is in
 [docs/deploy.md](docs/deploy.md).
 
 ## Reproduce the results

@@ -37,7 +37,8 @@ consequences.
 
 ## If you want to run it as a service
 
-[deploy.md](deploy.md) for the first deploy and rollback, [operations.md](operations.md)
+[deploy-railway.md](deploy-railway.md) for the current first deploy (Railway) and rollback,
+[deploy.md](deploy.md) for the Google Cloud Run alternative and the settings behind both, [operations.md](operations.md)
 for what runs on a schedule and what to do when something breaks. [../SECURITY.md](../SECURITY.md)
 says how to report a vulnerability.
 
