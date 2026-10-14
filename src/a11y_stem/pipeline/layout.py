@@ -864,6 +864,15 @@ def _letter_style(font: str) -> tuple[str, bool] | None:
 
 
 @lru_cache(maxsize=1024)
+def _font_family(font: str) -> str:
+    """The typeface of a font name, without subset tag, weight, style or design size:
+    "ABCDEF+LiberationSans-Bold" and "LiberationSans" are "liberationsans", "CMBX12" is
+    "cmbx". Bold and regular faces of one family compare equal; Sans and Serif do not."""
+    name = font.split("+", 1)[-1].lower()
+    return re.split(r"[-,]", name, maxsplit=1)[0].rstrip("0123456789")
+
+
+@lru_cache(maxsize=1024)
 def _font_traits(font: str) -> tuple[bool, bool, bool, bool]:
     """(bold, italic, maths, monospaced) from a font name like "ABCDEF+DejaVuSerif-Bold"."""
     name = font.split("+", 1)[-1]
@@ -1011,6 +1020,12 @@ class _Row:
     def bold(self) -> bool:
         letters = [c for c in self.ink if c.c.isalnum()]
         return bool(letters) and all(c.bold for c in letters)
+
+    @cached_property
+    def family(self) -> str:
+        """The typeface most letters are set in (maths fonts and symbols left out)."""
+        counts = Counter(_font_family(c.font) for c in self.ink if c.c.isalnum() and not c.math)
+        return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0] if counts else ""
 
     @property
     def x0(self) -> float:
@@ -4536,11 +4551,17 @@ def _continues(prev: _Row, row: _Row, run: _Run, ctx: _Context) -> bool:
 
 
 def _same_style(prev: _Row, row: _Row, ctx: _Context) -> bool:
+    """Two lines of one block: both heading-sized or neither; for heading-sized lines the
+    same size (to half a point); the same weight; and for bold lines, which are headings
+    or run-in labels, the same size and typeface too ("Practice Makes Perfect" in a bold
+    sans over the bold serif of the section it introduces is two headings; T2-8)."""
     if _heading_sized(prev, ctx) != _heading_sized(row, ctx):
         return False
     if _heading_sized(row, ctx) and abs(prev.size - row.size) > 0.5:
         return False
-    return prev.bold == row.bold
+    if prev.bold != row.bold:
+        return False
+    return not (row.bold and (abs(prev.size - row.size) > 0.5 or prev.family != row.family))
 
 
 def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
@@ -4563,7 +4584,10 @@ def _runs(rows: list[_Row], ctx: _Context) -> list[_Run]:
             run.block_end = not geometric
             ends_sentence = prev.clean[-1:] in ".:?!"
             short = row.x1 < run.box[2] - 3 * row.size
-            starts = not geometric or (ends_sentence and short)
+            # Two bold lines that differ in size or typeface are two headings (or labels),
+            # not a heading and the paragraph it leads: the second one starts a block.
+            restyled = geometric and prev.bold and row.bold
+            starts = not geometric or restyled or (ends_sentence and short)
             runs.append(_Run([row], row.kind, block_start=starts))
         else:
             runs.append(_Run([row], row.kind, block_start=True))

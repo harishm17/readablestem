@@ -329,3 +329,39 @@ def test_worked_example_fixture_outline():
     assert failed_codes(fixes[1]) == ["heading.level_repaired"]
     assert failed_codes(fixes[2]) == ["heading.level_repaired", "heading.weak_evidence"]
     assert [f.review for f in fixes] == ["none", "optional", "optional", "none"]
+
+
+# ----------------------------------------------------------------- T2-8: lines of one heading
+
+
+def _bold_lines(lines: list[tuple[str, str, float]]) -> list[Element]:
+    """A page with some body text and then bold lines (text, built-in font, size), one
+    below the other at a normal line pitch; returns the headings and paragraphs found."""
+    import pymupdf
+
+    doc = pymupdf.open()
+    page = doc.new_page(width=612, height=792)
+    y = 100.0
+    for i in range(6):
+        page.insert_text((72, y), "The cart keeps a constant speed along the whole ramp.", fontsize=11)
+        y += 15
+    y += 12
+    for text, font, size in lines:
+        page.insert_text((72, y), text, fontsize=size, fontname=font)
+        y += size * 1.3
+    return [e for e in analyze(doc.tobytes()).elements if e.kind != Kind.PARAGRAPH]
+
+
+def test_two_bold_lines_in_other_typefaces_are_two_headings():
+    found = _bold_lines([("Practice Makes Perfect", "hebo", 11.0), ("Solve a System", "tibo", 11.0)])
+    assert [e.text for e in found] == ["Practice Makes Perfect", "Solve a System"]
+
+
+def test_two_bold_lines_of_other_sizes_are_two_headings():
+    found = _bold_lines([("Practice Makes Perfect", "hebo", 11.0), ("Solve a System", "hebo", 11.9)])
+    assert [e.text for e in found] == ["Practice Makes Perfect", "Solve a System"]
+
+
+def test_a_long_bold_heading_wrapped_over_two_lines_is_still_one_heading():
+    found = _bold_lines([("Solve a System of Equations", "hebo", 12.0), ("by Substitution", "hebo", 12.0)])
+    assert [e.text for e in found] == ["Solve a System of Equations by Substitution"]
