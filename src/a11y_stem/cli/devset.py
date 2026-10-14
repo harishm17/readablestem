@@ -188,10 +188,14 @@ def _cmd_select(args: argparse.Namespace) -> int:
     config = _config(selection)
     fetcher = HttpFetcher(cache_dir=project_root() / ".cache" / "openstax")
     held = HttpFetcher(cache_dir=heldout_cli.locations(None).openstax)
-    plan = build.make_plan(config, fetcher, ds.heldout_grams(held))
+    printer = build.PagePrinter(config, fetcher, project_root() / ".cache" / "eval")
+    try:
+        plan = build.make_plan(config, fetcher, ds.heldout_grams(held), printer.count)
+    finally:
+        printer.close()
     print(f"candidates {plan.pool_size} (overlap below {ds.NEAR_DUP}); dev pool {plan.dev_pool}")
-    print(f"dev: {len(plan.dev)} sections, about {plan.pages('dev')} pages")
-    print(f"check: {len(plan.check)} sections (names are not printed)")
+    print(f"dev: {len(plan.dev)} sections, {plan.pages('dev')} Letter pages with key terms")
+    print(f"check: {len(plan.check)} sections, {plan.pages('check')} pages (names not printed)")
     committed = [(s["book"], s["slug"]) for s in selection.get("dev", [])]
     chosen = [(c.book, c.slug) for c in plan.dev]
     if committed and committed != chosen:
@@ -216,6 +220,7 @@ def _cmd_build(args: argparse.Namespace) -> int:
     cache = project_root() / ".cache" / "openstax"
     fetcher = HttpFetcher(cache_dir=cache)
     held = HttpFetcher(cache_dir=heldout_cli.locations(None).openstax)
+    printer = build.PagePrinter(config, fetcher, project_root() / ".cache" / "eval")
     try:
         build.build_set(
             base,
@@ -226,9 +231,12 @@ def _cmd_build(args: argparse.Namespace) -> int:
             authored_pool=args.authored_pool,
             date=args.date,
             overwrite=args.force,
+            page_counter=printer.count,
         )
     except (GoldError, ds.DevsetError) as exc:
         return _error(str(exc))
+    finally:
+        printer.close()
     problems = ds.verify(base)
     if problems:
         for problem in problems:

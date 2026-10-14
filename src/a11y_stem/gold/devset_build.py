@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -55,7 +55,7 @@ class Plan:
             "figures": c.figures,
             "tables": c.tables,
             "overlap_with_heldout": c.overlap,
-            "pages_estimate": c.pages_estimate,
+            "pdf_pages": c.pdf_pages,
             "items": dict(sorted(c.counts.items())),
         }
 
@@ -72,6 +72,7 @@ def _key_terms_candidates(
     reference: set[tuple[str, ...]],
     chosen: Sequence[ds.Candidate],
     target: int,
+    page_counter: Callable[[ds.Candidate], int] | None = None,
 ) -> list[ds.Candidate]:
     """Key-terms pages of the chapters the chosen sections belong to, fullest first,
     until `target` glossary entries are reached."""
@@ -97,15 +98,23 @@ def _key_terms_candidates(
             break
         out.append(cand)
         total += cand.counts.get("glossary_entry", 0)
+    if page_counter is not None:
+        for cand in out:
+            cand.pdf_pages = page_counter(cand)
     return out
 
 
 def make_plan(
-    config: ds.SelectionConfig, fetcher: ox.Fetcher, reference: set[tuple[str, ...]]
+    config: ds.SelectionConfig,
+    fetcher: ox.Fetcher,
+    reference: set[tuple[str, ...]],
+    page_counter: Callable[[ds.Candidate], int] | None = None,
 ) -> Plan:
-    """Scan the candidate books and choose the sections and key-terms pages of both parts."""
+    """Scan the candidate books and choose the sections and key-terms pages of both parts.
+    With a `page_counter` (`PagePrinter.count`) each section taken is printed first and
+    dropped when it runs over the pipeline's page limit."""
     pool = ds.candidate_pool(config, fetcher, reference)
-    sections = ds.choose_sections(config, pool)
+    sections = ds.choose_sections(config, pool, page_counter)
     terms = {
         part: _key_terms_candidates(
             config,
@@ -115,6 +124,7 @@ def make_plan(
             (config.dev_targets if part == "dev" else config.check_targets).get(
                 "glossary_entry", 0
             ),
+            page_counter,
         )
         for part in ds.PARTS
     }
@@ -124,6 +134,46 @@ def make_plan(
         pool_size=len(pool),
         dev_pool=len(ds.split_pool(config, pool)["dev"]),
     )
+
+
+class PagePrinter:
+    """Letter page counts of printed sections (Chromium, as `eval render` prints them),
+    cached with the other prints so the eval later reads the same files."""
+
+    def __init__(self, config: ds.SelectionConfig, fetcher: ox.Fetcher, cache_dir: Path) -> None:
+        from a11y_stem.eval import render
+
+        self._render = render
+        self.config = config
+        self.fetcher = fetcher
+        self.cache_dir = cache_dir
+        self.renderer = render.ChromiumRenderer()
+        self.images = render.ImageCache(cache_dir / "images")
+        self._books: dict[str, ox.Book] = {}
+
+    def close(self) -> None:
+        self.renderer.close()
+
+    def count(self, cand: ds.Candidate) -> int:
+        import pymupdf
+
+        book = self._books.get(cand.book)
+        if book is None:
+            pin = ox.BookPin(self.config.archive_version, self.config.books[cand.book])
+            book = self._books[cand.book] = ox.resolve_book(cand.book, self.fetcher, pin=pin)
+        (page,) = ox.select_pages(ox.iter_pages(book.tree), 1, slugs=[cand.slug])
+        xhtml = self.fetcher.get_json(book.content_url(page.uuid))["content"]
+        records = ds.build_page(book, page, xhtml, "2026-10-14")
+        pdf = self._render.render_page_pdf(
+            records,
+            fetcher=self.fetcher,
+            authors=book.authors,
+            images=self.images,
+            renderer=self.renderer,
+            cache_dir=self.cache_dir / "pages",
+        )
+        with pymupdf.open(stream=pdf, filetype="pdf") as doc:
+            return doc.page_count
 
 
 def fetch_picks(
@@ -162,13 +212,14 @@ def build_set(
     authored_pool: Path,
     date: str,
     overwrite: bool = False,
+    page_counter: Callable[[ds.Candidate], int] | None = None,
 ) -> dict:
     """Write the whole set under `root`: dev tree, manifest, attribution, summary, the
     sealed check archive and its seal. Returns the dev manifest."""
     dev_dir = root / "dev"
     if dev_dir.exists() and any(dev_dir.iterdir()) and not overwrite:
         raise ds.DevsetError(f"{dev_dir} already has files (use --force to write over them)")
-    plan = make_plan(config, fetcher, ds.heldout_grams(held_fetcher))
+    plan = make_plan(config, fetcher, ds.heldout_grams(held_fetcher), page_counter)
     committed = [(s["book"], s["slug"]) for s in selection.get("dev", [])]
     if committed and committed != [(c.book, c.slug) for c in plan.dev]:
         raise ds.DevsetError("the dev sections chosen now differ from selection.json")

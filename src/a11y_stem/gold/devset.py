@@ -39,7 +39,7 @@ import re
 import tarfile
 import xml.etree.ElementTree as ET
 from collections import Counter
-from collections.abc import Iterable, Mapping, Sequence
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -56,6 +56,8 @@ CHECK_ARCHIVE = "check.sealed.tar.gz"
 PARTS = ("dev", "check")
 NEAR_DUP = 0.05  # same threshold as proof/selection/features.py
 MIN_WORDS = 300
+# The pipeline refuses a PDF of more pages than this (config.Settings.max_pages_per_job).
+MAX_SECTION_PAGES = 30
 CHECK_SHARE = 0.15  # share of the candidate pool whose hash puts it in the check part
 LICENSE_AUTHORED = {
     "license_name": "MIT License",
@@ -248,6 +250,7 @@ class Candidate:
     overlap: float
     counts: dict[str, int]
     xhtml_grams: set[tuple[str, ...]] = field(default_factory=set, repr=False)
+    pdf_pages: int | None = None  # Letter pages of the printed section, once counted
 
     @property
     def key(self) -> str:
@@ -255,7 +258,11 @@ class Candidate:
 
     @property
     def pages_estimate(self) -> int:
-        """Letter pages when printed: a rough 320 words a page, equations and figures add."""
+        """Letter pages when printed: the count once it has been made, else a rough guess
+        (320 words a page, equations and figures add; display-heavy exercise pages run
+        longer, which is why the choice counts the real print of what it takes)."""
+        if self.pdf_pages is not None:
+            return self.pdf_pages
         return max(2, math.ceil(self.words / 320 + 0.05 * self.equations + 0.4 * self.figures))
 
 
@@ -290,13 +297,17 @@ def greedy_choose(
     max_sections: int,
     max_pages: int,
     max_pair_overlap: float = 0.2,
+    page_counter: Callable[[Candidate], int] | None = None,
+    max_section_pages: int = MAX_SECTION_PAGES,
 ) -> list[Candidate]:
     """Sections that reach the class targets in the fewest printed pages.
 
     Each round takes the candidate with the most still-needed items per estimated page
     (ties by key), skipping any whose text overlaps an already chosen section by more than
-    `max_pair_overlap` (sibling books repeat each other). Stops when every target is met,
-    or at the limits.
+    `max_pair_overlap` (sibling books repeat each other). With a `page_counter` the
+    winner is printed first and dropped when its print is longer than `max_section_pages`
+    (the pipeline refuses more pages than that). Stops when every target is met, or at the
+    limits.
     """
     chosen: list[Candidate] = []
     need = dict(targets)
@@ -314,6 +325,11 @@ def greedy_choose(
                 best, best_score = cand, score
         if best is None:
             break
+        if page_counter is not None and best.pdf_pages is None:
+            best.pdf_pages = page_counter(best)
+            if best.pdf_pages > max_section_pages or pages + best.pdf_pages > max_pages:
+                remaining = [c for c in remaining if c is not best]
+                continue
         chosen.append(best)
         pages += best.pages_estimate
         for c in need:
@@ -467,7 +483,9 @@ def split_pool(config: SelectionConfig, pool: Sequence[Candidate]) -> dict[str, 
 
 
 def choose_sections(
-    config: SelectionConfig, pool: Sequence[Candidate]
+    config: SelectionConfig,
+    pool: Sequence[Candidate],
+    page_counter: Callable[[Candidate], int] | None = None,
 ) -> dict[str, list[Candidate]]:
     """The dev and check sections: the greedy choice on each part's own candidates."""
     parts = split_pool(config, pool)
@@ -477,12 +495,14 @@ def choose_sections(
             config.dev_targets,
             max_sections=config.max_sections,
             max_pages=config.max_pages,
+            page_counter=page_counter,
         ),
         "check": greedy_choose(
             parts["check"],
             config.check_targets,
             max_sections=max(3, config.max_sections // 4),
             max_pages=config.max_pages // 4,
+            page_counter=page_counter,
         ),
     }
 
@@ -518,8 +538,10 @@ def openstax_files(
 
 def authored_files(pool_dir: Path, variant: str) -> dict[str, bytes]:
     """Part files for the authored documents of one variant ("dev" or "check") found in
-    `pool_dir` (the builder's output: one folder per document with gold.jsonl)."""
+    `pool_dir` (the builder's output: one folder per document with gold.jsonl), and the
+    index the tables task needs for the documents that have tables."""
     files: dict[str, bytes] = {}
+    with_tables: list[dict] = []
     for doc in sorted(p for p in pool_dir.iterdir() if p.is_dir()):
         gold = doc / "gold.jsonl"
         if not gold.is_file():
@@ -532,6 +554,20 @@ def authored_files(pool_dir: Path, variant: str) -> dict[str, bytes]:
             continue
         for path in sorted(p for p in doc.rglob("*") if p.is_file()):
             files[f"authored/{doc.name}/{path.relative_to(doc).as_posix()}"] = path.read_bytes()
+        if any(r["kind"] == "table" for r in records):
+            pdf = records[0]["pdf"].removeprefix("authored/")
+            with_tables.append(
+                {
+                    "id": doc.name,
+                    "pdf": pdf,
+                    "gold": f"{doc.name}/gold.jsonl",
+                    "toolchain": records[0]["toolchain"],
+                }
+            )
+    if with_tables:
+        # The tables task reads authored documents through an index (eval.tables).
+        index = {"schema_version": 1, "documents": with_tables}
+        files["authored/index.json"] = (json.dumps(index, indent=2) + "\n").encode("utf-8")
     return files
 
 
