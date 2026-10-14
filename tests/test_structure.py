@@ -170,9 +170,10 @@ def test_a_term_at_the_margin_over_its_indented_definition_is_a_definition_list(
     ]
     html = html_of(terms_page(entries))
     assert (
-        '<dl><dt id="p1-e1"><strong>alpha decay</strong></dt><dd>loss of an alpha particle during radioactive '
-        'decay</dd><dt id="p1-e2"><strong>half-life</strong></dt><dd>time for half of the atoms in a sample to '
-        "decay</dd></dl>"
+        '<dl><dt id="p1-e1"><strong>alpha decay</strong></dt>'
+        "<dd>loss of an alpha particle during radioactive decay</dd>"
+        '<dt id="p1-e2"><strong>half-life</strong></dt>'
+        "<dd>time for half of the atoms in a sample to decay</dd></dl>"
     ) in html
 
 
