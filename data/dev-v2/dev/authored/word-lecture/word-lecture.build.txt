@@ -1,0 +1,2 @@
+Made with python-docx (Word built-in styles, real superscript and subscript runs, automatic hyphenation on, en-US language), then exported to an untagged PDF by LibreOffice (writer_pdf_Export) with the hyph_en_US hyphenation dictionary.
+Authored for a11y-stem's development set (dev-v2). Licence: MIT. Author: a11y-stem contributors.

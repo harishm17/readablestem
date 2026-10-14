@@ -9,6 +9,8 @@ this table. This is a plain statement of scope, not legal advice.
 |---|---|---|
 | The code, tests, documentation, `deploy/`, `migrations/` and everything not listed below | MIT | `LICENSE` |
 | `data/authored/` (documents written for this project: LaTeX and Word sources, their PDFs, gold labels) | MIT | `data/authored/README.md` |
+| `data/dev-v2/dev/authored/` and `data/dev-v2/authored/` (the extended development set's documents written for this project: sources, PDFs, gold, the builder), the set's `selection.json`, `README.md`, `SEAL.json`, `summary.md` | MIT | `data/dev-v2/README.md` |
+| `data/dev-v2/dev/openstax/`, the OpenStax part of `data/dev-v2/check.sealed.tar.gz` (gold for OpenStax sections and key-terms pages: equations, headings, tables, figure captions and alt text, glossary entries, prose sub- and superscripts, with class labels added) | CC BY 4.0 (OpenStax); the books are live CC BY editions or retired first editions, which are CC BY 4.0 | `data/dev-v2/ATTRIBUTION.md` |
 | `data/eval/*.json` (the project's own eval reports: metrics, cost and dataset hashes) | MIT | The reports name OpenStax items by id only |
 | `data/openstax-licenses.csv` (a table of each OpenStax book's licence, read from OpenStax's public interfaces) | MIT | `docs/decisions/0001-scope.md` |
 | `data/gold/` (equations, figure alt text and captions, tables and headings extracted from OpenStax web books) | CC BY 4.0 (OpenStax) | `data/gold/ATTRIBUTION.md`, `data/gold/tables/ATTRIBUTION.md` |

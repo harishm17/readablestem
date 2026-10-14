@@ -1,0 +1,19 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Lynn Marecek",
+    "MaryAnne Anthony-Smith"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/elementary-algebra",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-14",
+  "slug": "elementary-algebra",
+  "state": "retired",
+  "title": "Elementary Algebra",
+  "uuid": "0889907c-f0ef-496a-bcb8-2a5bb121717f",
+  "version": "eb2e29d"
+}

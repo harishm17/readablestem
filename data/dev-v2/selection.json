@@ -60,7 +60,7 @@
       "glossary_entry": 10
     },
     "max_sections": 22,
-    "max_pages": 330
+    "max_pages": 300
   },
   "check_rule": {
     "share": 0.15,
@@ -76,7 +76,7 @@
       "figures": 0,
       "tables": 6,
       "overlap_with_heldout": 0.0275,
-      "pages_estimate": 9,
+      "pdf_pages": 20,
       "items": {
         "heading_multiline": 4,
         "heading_repeated_label": 11,
@@ -84,8 +84,7 @@
         "inline_fraction": 81,
         "numbered_exercise_eq": 44,
         "table_layout": 6
-      },
-      "pdf_pages": 20
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -96,7 +95,7 @@
       "figures": 3,
       "tables": 1,
       "overlap_with_heldout": 0.007,
-      "pages_estimate": 7,
+      "pdf_pages": 7,
       "items": {
         "chem_charge": 41,
         "chem_equation": 46,
@@ -105,8 +104,7 @@
         "prose_chem_script": 3,
         "prose_script_other": 2,
         "table_data": 1
-      },
-      "pdf_pages": 7
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -117,7 +115,7 @@
       "figures": 1,
       "tables": 0,
       "overlap_with_heldout": 0.0072,
-      "pages_estimate": 5,
+      "pdf_pages": 4,
       "items": {
         "chem_equation": 6,
         "chem_formula": 11,
@@ -125,8 +123,7 @@
         "nuclide": 26,
         "prose_nuclide": 4,
         "prose_script_other": 1
-      },
-      "pdf_pages": 4
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -137,7 +134,7 @@
       "figures": 1,
       "tables": 5,
       "overlap_with_heldout": 0.0029,
-      "pages_estimate": 11,
+      "pdf_pages": 10,
       "items": {
         "chem_charge": 3,
         "chem_equation": 5,
@@ -150,8 +147,7 @@
         "prose_script_other": 25,
         "prose_unit_power": 14,
         "table_data": 5
-      },
-      "pdf_pages": 10
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -162,7 +158,7 @@
       "figures": 0,
       "tables": 2,
       "overlap_with_heldout": 0.0044,
-      "pages_estimate": 6,
+      "pdf_pages": 6,
       "items": {
         "chem_equation": 5,
         "chem_formula": 7,
@@ -174,8 +170,7 @@
         "prose_script_other": 18,
         "prose_unit_power": 4,
         "table_data": 2
-      },
-      "pdf_pages": 6
+      }
     },
     {
       "book": "algebra-and-trigonometry",
@@ -186,7 +181,7 @@
       "figures": 2,
       "tables": 1,
       "overlap_with_heldout": 0.0108,
-      "pages_estimate": 18,
+      "pdf_pages": 27,
       "items": {
         "determinant": 39,
         "heading_multiline": 3,
@@ -197,8 +192,7 @@
         "multirow_equations": 36,
         "numbered_exercise_eq": 44,
         "table_data": 1
-      },
-      "pdf_pages": 27
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -209,7 +203,7 @@
       "figures": 0,
       "tables": 0,
       "overlap_with_heldout": 0.0039,
-      "pages_estimate": 7,
+      "pdf_pages": 5,
       "items": {
         "chem_charge": 13,
         "chem_equation": 10,
@@ -220,8 +214,7 @@
         "nuclide": 1,
         "prose_chem_script": 33,
         "prose_script_other": 12
-      },
-      "pdf_pages": 5
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -232,7 +225,7 @@
       "figures": 5,
       "tables": 3,
       "overlap_with_heldout": 0.0023,
-      "pages_estimate": 14,
+      "pdf_pages": 11,
       "items": {
         "chem_formula": 9,
         "heading_repeated_label": 13,
@@ -243,8 +236,7 @@
         "prose_nuclide": 20,
         "prose_script_other": 11,
         "table_data": 3
-      },
-      "pdf_pages": 11
+      }
     },
     {
       "book": "elementary-algebra",
@@ -255,7 +247,7 @@
       "figures": 0,
       "tables": 11,
       "overlap_with_heldout": 0.031,
-      "pages_estimate": 16,
+      "pdf_pages": 29,
       "items": {
         "heading_multiline": 1,
         "heading_repeated_label": 14,
@@ -266,8 +258,7 @@
         "prose_script_other": 2,
         "system_braced": 65,
         "table_layout": 11
-      },
-      "pdf_pages": 29
+      }
     },
     {
       "book": "college-algebra",
@@ -278,7 +269,7 @@
       "figures": 2,
       "tables": 0,
       "overlap_with_heldout": 0.0085,
-      "pages_estimate": 14,
+      "pdf_pages": 11,
       "items": {
         "heading_repeated_label": 7,
         "heading_sentence": 2,
@@ -287,8 +278,7 @@
         "multirow_equations": 2,
         "numbered_exercise_eq": 25,
         "prose_script_other": 1
-      },
-      "pdf_pages": 11
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -299,81 +289,33 @@
       "figures": 3,
       "tables": 3,
       "overlap_with_heldout": 0.0024,
-      "pages_estimate": 11,
+      "pdf_pages": 9,
       "items": {
         "heading_repeated_label": 8,
         "heading_sentence": 2,
         "prose_script_other": 33,
         "prose_unit_power": 22,
         "table_data": 3
-      },
-      "pdf_pages": 9
-    },
-    {
-      "book": "college-algebra",
-      "slug": "6-6-exponential-and-logarithmic-equations",
-      "title": "6.6 Exponential and Logarithmic Equations",
-      "words": 2842,
-      "equations": 231,
-      "figures": 3,
-      "tables": 1,
-      "overlap_with_heldout": 0.0081,
-      "pages_estimate": 22,
-      "items": {
-        "chem_formula": 1,
-        "heading_multiline": 12,
-        "heading_repeated_label": 31,
-        "heading_sentence": 18,
-        "inline_fraction": 10,
-        "multirow_equations": 18,
-        "numbered_exercise_eq": 69,
-        "table_data": 1
-      },
-      "pdf_pages": 32
+      }
     },
     {
       "book": "algebra-and-trigonometry",
-      "slug": "3-2-domain-and-range",
-      "title": "3.2 Domain and Range",
-      "words": 4321,
-      "equations": 201,
-      "figures": 26,
-      "tables": 1,
-      "overlap_with_heldout": 0.0052,
-      "pages_estimate": 34,
+      "slug": "11-4-partial-fractions",
+      "title": "11.4 Partial Fractions",
+      "words": 2190,
+      "equations": 215,
+      "figures": 0,
+      "tables": 0,
+      "overlap_with_heldout": 0.0117,
+      "pdf_pages": 25,
       "items": {
-        "heading_repeated_label": 29,
-        "heading_sentence": 7,
-        "inline_fraction": 20,
-        "multirow_equations": 2,
-        "numbered_exercise_eq": 37,
-        "piecewise_words": 22,
-        "table_layout": 1
-      },
-      "pdf_pages": 43
-    },
-    {
-      "book": "algebra-and-trigonometry",
-      "slug": "13-1-sequences-and-their-notations",
-      "title": "13.1 Sequences and Their Notations",
-      "words": 3606,
-      "equations": 236,
-      "figures": 7,
-      "tables": 3,
-      "overlap_with_heldout": 0.0021,
-      "pages_estimate": 26,
-      "items": {
-        "heading_multiline": 7,
-        "heading_repeated_label": 26,
-        "heading_sentence": 9,
-        "inline_fraction": 44,
-        "multirow_equations": 16,
-        "numbered_exercise_eq": 46,
-        "piecewise_words": 8,
-        "prose_script_other": 2,
-        "table_layout": 3
-      },
-      "pdf_pages": 21
+        "heading_multiline": 11,
+        "heading_repeated_label": 8,
+        "heading_sentence": 11,
+        "inline_fraction": 72,
+        "multirow_equations": 25,
+        "numbered_exercise_eq": 54
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -384,7 +326,7 @@
       "figures": 1,
       "tables": 0,
       "overlap_with_heldout": 0.0054,
-      "pages_estimate": 6,
+      "pdf_pages": 7,
       "items": {
         "chem_charge": 10,
         "chem_equation": 6,
@@ -395,8 +337,29 @@
         "inline_fraction": 1,
         "prose_chem_script": 2,
         "prose_script_other": 8
-      },
-      "pdf_pages": 7
+      }
+    },
+    {
+      "book": "algebra-and-trigonometry",
+      "slug": "13-1-sequences-and-their-notations",
+      "title": "13.1 Sequences and Their Notations",
+      "words": 3606,
+      "equations": 236,
+      "figures": 7,
+      "tables": 3,
+      "overlap_with_heldout": 0.0021,
+      "pdf_pages": 21,
+      "items": {
+        "heading_multiline": 7,
+        "heading_repeated_label": 26,
+        "heading_sentence": 9,
+        "inline_fraction": 44,
+        "multirow_equations": 16,
+        "numbered_exercise_eq": 46,
+        "piecewise_words": 8,
+        "prose_script_other": 2,
+        "table_layout": 3
+      }
     },
     {
       "book": "chemistry-atoms-first",
@@ -407,7 +370,7 @@
       "figures": 0,
       "tables": 0,
       "overlap_with_heldout": 0.0076,
-      "pages_estimate": 3,
+      "pdf_pages": 2,
       "items": {
         "chem_equation": 1,
         "chem_formula": 2,
@@ -415,8 +378,27 @@
         "heading_sentence": 1,
         "inline_fraction": 1,
         "prose_chem_script": 10
-      },
-      "pdf_pages": 2
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "18-2-occurrence-and-preparation-of-the-representative-metals",
+      "title": "18.2 Occurrence and Preparation of the Representative Metals",
+      "words": 1373,
+      "equations": 12,
+      "figures": 2,
+      "tables": 0,
+      "overlap_with_heldout": 0.0044,
+      "pdf_pages": 4,
+      "items": {
+        "chem_charge": 2,
+        "chem_equation": 12,
+        "chem_formula": 12,
+        "heading_multiline": 1,
+        "heading_repeated_label": 2,
+        "heading_sentence": 1,
+        "prose_chem_script": 11
+      }
     },
     {
       "book": "algebra-and-trigonometry",
@@ -427,7 +409,7 @@
       "figures": 1,
       "tables": 0,
       "overlap_with_heldout": 0.0096,
-      "pages_estimate": 19,
+      "pdf_pages": 30,
       "items": {
         "determinant": 42,
         "heading_multiline": 3,
@@ -437,8 +419,7 @@
         "matrix": 9,
         "multirow_equations": 56,
         "numbered_exercise_eq": 46
-      },
-      "pdf_pages": 30
+      }
     }
   ],
   "dev_key_terms": [
@@ -451,14 +432,13 @@
       "figures": 0,
       "tables": 0,
       "overlap_with_heldout": 0.0,
-      "pages_estimate": 5,
+      "pdf_pages": 5,
       "items": {
         "chem_formula": 1,
         "glossary_entry": 67,
         "nuclide": 9,
         "prose_script_other": 4
-      },
-      "pdf_pages": 5
+      }
     }
   ]
 }

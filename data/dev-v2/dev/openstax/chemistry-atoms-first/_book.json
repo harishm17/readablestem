@@ -1,0 +1,22 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Edward J. Neth",
+    "Paul Flowers",
+    "William R. Robinson, PhD",
+    "Klaus Theopold",
+    "Richard Langley"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/chemistry-atoms-first",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-14",
+  "slug": "chemistry-atoms-first",
+  "state": "retired",
+  "title": "Chemistry: Atoms First",
+  "uuid": "4539ae23-1ccc-421e-9b25-843acbb6c4b0",
+  "version": "741a7af"
+}

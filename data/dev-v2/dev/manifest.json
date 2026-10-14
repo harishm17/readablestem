@@ -1,0 +1,873 @@
+{
+  "schema_version": 1,
+  "set": "dev-v2",
+  "part": "dev",
+  "generated_by": "a11y-stem gold build --set dev-v2",
+  "date": "2026-10-14",
+  "files": [
+    {
+      "path": "authored/html-code-glossary/gold.jsonl",
+      "sha256": "3cfdec8e84db390268835d58a35c4b8037e16ea80a986607d82efdec9e75b3ad",
+      "bytes": 27937,
+      "records": 34,
+      "counts": {
+        "code": 12,
+        "glossary": 15,
+        "heading": 5,
+        "table": 2
+      }
+    },
+    {
+      "path": "authored/html-code-glossary/html-code-glossary.html",
+      "sha256": "fd75abedc3939bab6c071f9f03d851ef3ab9658581f2e51a53e28ed83ebddf39",
+      "bytes": 6438
+    },
+    {
+      "path": "authored/html-code-glossary/html-code-glossary.pdf",
+      "sha256": "cae8a2efb9f6fc160a3bc035b80628182cec3aed15518c2e31a399efe2f69352",
+      "bytes": 53720
+    },
+    {
+      "path": "authored/html-slides/gold.jsonl",
+      "sha256": "132fe7163a292d365f9164a15298389acb50458e9401b84fe6933328e410004f",
+      "bytes": 52214,
+      "records": 53,
+      "counts": {
+        "equation": 30,
+        "heading": 23
+      }
+    },
+    {
+      "path": "authored/html-slides/html-slides.html",
+      "sha256": "4becdca70b9f5965441f73c3b6093f462b27c2e6b033e67e9b26843f1825ae43",
+      "bytes": 15393
+    },
+    {
+      "path": "authored/html-slides/html-slides.pdf",
+      "sha256": "2bfbe9a41cc05dad27b4df2bfcd58cd265391d16ad38526109eb5ef3aea22197",
+      "bytes": 61872
+    },
+    {
+      "path": "authored/index.json",
+      "sha256": "653c1b29e8dca366da2061002ccb78b28f6f5fe430e3f48dda8b193004a81937",
+      "bytes": 729
+    },
+    {
+      "path": "authored/latex-chemistry/gold.jsonl",
+      "sha256": "ec8dbc36482d55d86ccd599b63476dadccb3a3e003683cb9af3c581442ddbed7",
+      "bytes": 242007,
+      "records": 145,
+      "counts": {
+        "equation": 108,
+        "heading": 6,
+        "script": 31
+      }
+    },
+    {
+      "path": "authored/latex-chemistry/latex-chemistry.pdf",
+      "sha256": "a32769d0aba5a76e0de8eac24f5868a98d2ed6bb01a5fb1a72fe8f6b14a3a468",
+      "bytes": 44304
+    },
+    {
+      "path": "authored/latex-chemistry/latex-chemistry.tex",
+      "sha256": "909b40eaddbcba3d39ad2a1c85be0a12d3397aa1808c41ec48a2e8e0554606d7",
+      "bytes": 27970
+    },
+    {
+      "path": "authored/latex-exercises/gold.jsonl",
+      "sha256": "332b2259e7122a5f77418fdf0bf3b53f5173a2946aef7e1709ad9ed0d9b0e8f0",
+      "bytes": 125006,
+      "records": 104,
+      "counts": {
+        "equation": 100,
+        "heading": 4
+      }
+    },
+    {
+      "path": "authored/latex-exercises/latex-exercises.pdf",
+      "sha256": "c46e59fbd477c5ea23f47ce3dba07a46db59f10f9422d2ad8c5e84f4b3b85496",
+      "bytes": 38460
+    },
+    {
+      "path": "authored/latex-exercises/latex-exercises.tex",
+      "sha256": "77a5b235780323473b5806835b89ad600797dee39d0f4fbb8462be8f77710562",
+      "bytes": 12268
+    },
+    {
+      "path": "authored/latex-hyphenation/gold.jsonl",
+      "sha256": "41212ac34cbf33fa991af5d40b9be769922733485b1bed95fb2cd3310f9bebd3",
+      "bytes": 139482,
+      "records": 182,
+      "counts": {
+        "heading": 6,
+        "hyphen_break": 176
+      }
+    },
+    {
+      "path": "authored/latex-hyphenation/latex-hyphenation.pdf",
+      "sha256": "bcb62dfd3d46d851e79bd17c96973812fc7001dbcd5e36b538e1f744d8a297d3",
+      "bytes": 24802
+    },
+    {
+      "path": "authored/latex-hyphenation/latex-hyphenation.tex",
+      "sha256": "e0247ecfb7bc18a605cfe9ffbf638c65c24c2da775f5c1ebdfcd029b459ede99",
+      "bytes": 21619
+    },
+    {
+      "path": "authored/latex-matrices/gold.jsonl",
+      "sha256": "10d7376e1446407f0aa02e66439dd018b122dd4f0b6f9d20b058dc2a04b8a689",
+      "bytes": 77341,
+      "records": 51,
+      "counts": {
+        "equation": 47,
+        "heading": 4
+      }
+    },
+    {
+      "path": "authored/latex-matrices/latex-matrices.pdf",
+      "sha256": "4045a25f46beaf0fdd9fac58e14ecd3e2d3424fcafad119c0ddfe99170a4cafc",
+      "bytes": 31674
+    },
+    {
+      "path": "authored/latex-matrices/latex-matrices.tex",
+      "sha256": "8a7cf14c6eaba18af9ac17cacbe455c0fe947e6dc24f0465409d5c3b205d06e1",
+      "bytes": 9389
+    },
+    {
+      "path": "authored/latex-slides/gold.jsonl",
+      "sha256": "e8604b27b2dc3d50a258b8c8a7714facaab7a44b022e1b2a7294323757336515",
+      "bytes": 62223,
+      "records": 61,
+      "counts": {
+        "equation": 32,
+        "heading": 29
+      }
+    },
+    {
+      "path": "authored/latex-slides/latex-slides.pdf",
+      "sha256": "a391fe4809dfc4cec15eabebde3a84995075ef831092ce63b52dd2f9d554486a",
+      "bytes": 49289
+    },
+    {
+      "path": "authored/latex-slides/latex-slides.tex",
+      "sha256": "86a0b490bfcedde4cb7028929a5600927ce19ce804215c5cc90d007ecb2ca88b",
+      "bytes": 6299
+    },
+    {
+      "path": "authored/latex-structure/gold.jsonl",
+      "sha256": "9c63d38fb3e170be72c241cd377767b03748e392c987760703688b6ee2c1e33a",
+      "bytes": 114010,
+      "records": 140,
+      "counts": {
+        "code": 28,
+        "glossary": 34,
+        "heading": 65,
+        "script": 5,
+        "table": 8
+      }
+    },
+    {
+      "path": "authored/latex-structure/latex-structure.pdf",
+      "sha256": "f5ab536c58a9c777c26850b959293e6190d34f8d46f9205a9c665c2ee48af4f8",
+      "bytes": 56804
+    },
+    {
+      "path": "authored/latex-structure/latex-structure.tex",
+      "sha256": "189db6b88b928fabce077b55503f8ee35564f8da7ba746a9ec1652759c12004a",
+      "bytes": 23451
+    },
+    {
+      "path": "authored/word-eq-images/eq-000.png",
+      "sha256": "4b44c0871bd05f57c11da8d76fa1781ac2a67cd65d835220b38cebf667c952c3",
+      "bytes": 530
+    },
+    {
+      "path": "authored/word-eq-images/eq-001.png",
+      "sha256": "af973d8eb5c8d3f06afe10d12f348661dadb98b684401d2a6e11b226ffc7d0e4",
+      "bytes": 727
+    },
+    {
+      "path": "authored/word-eq-images/eq-002.png",
+      "sha256": "1d1b699d5ac99c8c5ebdad89d6e7ec29677bc768d0dfb82b14f28cb648a6a541",
+      "bytes": 325
+    },
+    {
+      "path": "authored/word-eq-images/eq-003.png",
+      "sha256": "0d146c017ca3a5ff07f29e5f325959adc4684172a8cf187e89f4df3e04985a8d",
+      "bytes": 317
+    },
+    {
+      "path": "authored/word-eq-images/eq-004.png",
+      "sha256": "41ab513840a7e7afc1288eb5cd6a7c19b6cbd344528c62f2e4225a9d58349d0b",
+      "bytes": 379
+    },
+    {
+      "path": "authored/word-eq-images/eq-005.png",
+      "sha256": "f5ed1b97edc45e131baee4937d1a940280c991ce806106a9a5a3b5ae9ae4cd25",
+      "bytes": 306
+    },
+    {
+      "path": "authored/word-eq-images/eq-006.png",
+      "sha256": "43fc7fa1cb177a80fcb5be4c9cec53120ec7622c2b77ada98ec65a78ceb6e8b7",
+      "bytes": 338
+    },
+    {
+      "path": "authored/word-eq-images/eq-007.png",
+      "sha256": "a16928dd87ff060d9f2ab72887c03d0132fad52995355dbb55b8d45e9e646e01",
+      "bytes": 1191
+    },
+    {
+      "path": "authored/word-eq-images/eq-008.png",
+      "sha256": "52c73651d810108f23f196f603f28eda1c9eb92e02994429d6a5c4910f43522f",
+      "bytes": 645
+    },
+    {
+      "path": "authored/word-eq-images/eq-009.png",
+      "sha256": "12dc8a1a4cc0a57a9ffe234438d6cea29bd72ae4456fc79b853c8cc827216da9",
+      "bytes": 2536
+    },
+    {
+      "path": "authored/word-eq-images/eq-010.png",
+      "sha256": "877cc7d987ace72e1a461f312be972aeb7d89800b9c76cec5b21a189e8c61f77",
+      "bytes": 4150
+    },
+    {
+      "path": "authored/word-eq-images/eq-011.png",
+      "sha256": "73e366351d601198b05ab1f1c10277eabd297e17999148f03854b0f430dc576c",
+      "bytes": 2550
+    },
+    {
+      "path": "authored/word-eq-images/eq-012.png",
+      "sha256": "dc90d9c271698cfec65bd1dfb572ea869099cb03a0a886310b3d8e800e9447af",
+      "bytes": 2014
+    },
+    {
+      "path": "authored/word-eq-images/eq-013.png",
+      "sha256": "fe53ec14226a5aaf8662e0fba1e4a10738a4ef62a63a6d77bffad0a0ab488e3e",
+      "bytes": 4846
+    },
+    {
+      "path": "authored/word-eq-images/eq-014.png",
+      "sha256": "afdab614d5a7a8e5cb8b3017820c887d72a8afa7c64ffe5f0d1c6ccb66a1c417",
+      "bytes": 1847
+    },
+    {
+      "path": "authored/word-eq-images/eq-015.png",
+      "sha256": "656dac498dc12a677977a9deaeb5e7da9006e327f897e673b6bef9e6af67461b",
+      "bytes": 3888
+    },
+    {
+      "path": "authored/word-eq-images/eq-016.png",
+      "sha256": "b78f8406a1d2ab7223629a44a3f807ad301f48bf65a0ab655140eb3f9232b3ab",
+      "bytes": 3569
+    },
+    {
+      "path": "authored/word-eq-images/eq-017.png",
+      "sha256": "4ec80737b3c12f9471c7b3e7e43ea77f221f91d63a93b3704fbe6932aaff7e3f",
+      "bytes": 1911
+    },
+    {
+      "path": "authored/word-eq-images/eq-018.png",
+      "sha256": "3bf0da8992f15e443aecf2c05197f65dc59251c52d975d960f3ec978a83d2fea",
+      "bytes": 1782
+    },
+    {
+      "path": "authored/word-eq-images/eq-019.png",
+      "sha256": "3930fa2306d42f945ed56ae63b56cd321414a299ecc4b26c45c5571718b9951f",
+      "bytes": 2706
+    },
+    {
+      "path": "authored/word-eq-images/eq-020.png",
+      "sha256": "30ec10c0ad3bffb7ab48071cf7a239165ce351490adcedfa3444aecbb9a2207a",
+      "bytes": 3260
+    },
+    {
+      "path": "authored/word-eq-images/eq-021.png",
+      "sha256": "898f94b31ac4928c911985d7a82d6e268c3eafd2cf83b6acc6bb1a7a5dd6ee58",
+      "bytes": 3393
+    },
+    {
+      "path": "authored/word-eq-images/eq-022.png",
+      "sha256": "2dcef3ff10c610438ac64405047f8992b45db5296a3754c4adb03c98f4e640b3",
+      "bytes": 3387
+    },
+    {
+      "path": "authored/word-eq-images/eq-023.png",
+      "sha256": "b04f6872083e5b18b33e4c90abcf9b86c0a9332027b4ac29f4f1664830dc247e",
+      "bytes": 3234
+    },
+    {
+      "path": "authored/word-eq-images/eq-024.png",
+      "sha256": "adb1ba878621d72cc740fc4912790907538b3f409621274a1285b711f923cf8a",
+      "bytes": 4953
+    },
+    {
+      "path": "authored/word-eq-images/eq-025.png",
+      "sha256": "b4140541abb41ba0a858f8122cfc8bdb8cc35bf122b25656510b13a44761473b",
+      "bytes": 4227
+    },
+    {
+      "path": "authored/word-eq-images/eq-026.png",
+      "sha256": "c9fb577a5db6d1a1a8538897482cb6a8430b1023dd80ec352b34b70137177d83",
+      "bytes": 4401
+    },
+    {
+      "path": "authored/word-eq-images/eq-027.png",
+      "sha256": "10e05ce2a4601069ded9a5de84682a8a661fc06763053225442bfffd43b0f5b2",
+      "bytes": 7625
+    },
+    {
+      "path": "authored/word-eq-images/eq-028.png",
+      "sha256": "b2a35273f6c1377b9492b74278909199bfdf0b0acbf8b37258474169d50aab85",
+      "bytes": 7947
+    },
+    {
+      "path": "authored/word-eq-images/eq-029.png",
+      "sha256": "ed68d136dc942ad4489f27fc36afdfcba17becdefa5d6fb2b3bb614c0f633882",
+      "bytes": 2524
+    },
+    {
+      "path": "authored/word-eq-images/eq-030.png",
+      "sha256": "2203ad776181c67ff8039d97717687c268a7fc82fef4d5cf99350123507909e8",
+      "bytes": 5753
+    },
+    {
+      "path": "authored/word-eq-images/eq-031.png",
+      "sha256": "63bed517f230a6a4ffd2aa7618a596c8d514b7a12b6305ecaaf03eeeebb1d5bc",
+      "bytes": 4154
+    },
+    {
+      "path": "authored/word-eq-images/eq-032.png",
+      "sha256": "99fd98625ff8dbd2cb6d2f00bd191b0bc2d299658e772ebddee98279915f35a1",
+      "bytes": 2484
+    },
+    {
+      "path": "authored/word-eq-images/eq-033.png",
+      "sha256": "9d206107e8a7963d27296948fdcb1cb7b666cbe2b70731411db82db41499005b",
+      "bytes": 2748
+    },
+    {
+      "path": "authored/word-eq-images/eq-034.png",
+      "sha256": "ba4b1d1f96e84320153fc10b6ca7df1860075de84c4230a36fd9ecb1adea329d",
+      "bytes": 2497
+    },
+    {
+      "path": "authored/word-eq-images/eq-035.png",
+      "sha256": "80a23430af9f4d386b3b670f8ed1dffb2cfe2357a4eb8ce9b8851bc535593532",
+      "bytes": 2651
+    },
+    {
+      "path": "authored/word-eq-images/eq-036.png",
+      "sha256": "d4852a3070de7891de4a1e411e500537f91bce093f66f13b321ea8ffcd5b5c36",
+      "bytes": 1414
+    },
+    {
+      "path": "authored/word-eq-images/gold.jsonl",
+      "sha256": "d380f38b5efccf7105df0d477c0cca2b194c1ce97e1f3b05fe2e31c9cd81823f",
+      "bytes": 64268,
+      "records": 45,
+      "counts": {
+        "equation": 37,
+        "heading": 6,
+        "table": 2
+      }
+    },
+    {
+      "path": "authored/word-eq-images/word-eq-images.build.txt",
+      "sha256": "1895e929441d723feb0a26d1ad1d02afc1954bd7312a94be7adde2fd6972b0b2",
+      "bytes": 334
+    },
+    {
+      "path": "authored/word-eq-images/word-eq-images.docx",
+      "sha256": "8fcf7c3523e1b7685e48461995e1a77fb4be523050b3ceb43bda2ec6a19c7414",
+      "bytes": 146557
+    },
+    {
+      "path": "authored/word-eq-images/word-eq-images.pdf",
+      "sha256": "acec280f7bcaf9d7dd9894e9d34e6986fc46b61fcdeaf12ef62d1a6c1021c157",
+      "bytes": 195147
+    },
+    {
+      "path": "authored/word-lecture/gold.jsonl",
+      "sha256": "461ab34e2e3b1b8418c6f98625645b209f0296b1a8b6239564035fb295b40ee3",
+      "bytes": 125740,
+      "records": 134,
+      "counts": {
+        "exercise_text": 28,
+        "glossary": 10,
+        "heading": 40,
+        "hyphen_break": 22,
+        "script": 31,
+        "table": 3
+      }
+    },
+    {
+      "path": "authored/word-lecture/word-lecture.build.txt",
+      "sha256": "1895e929441d723feb0a26d1ad1d02afc1954bd7312a94be7adde2fd6972b0b2",
+      "bytes": 334
+    },
+    {
+      "path": "authored/word-lecture/word-lecture.docx",
+      "sha256": "8eb74c6c71a8574ce105c927e49f3de7300c225d3032ee14356fda8a014451ba",
+      "bytes": 42876
+    },
+    {
+      "path": "authored/word-lecture/word-lecture.pdf",
+      "sha256": "65284bc25f7f73cb4377c8090fab74bbc5d451db5f6f0accddcf915e25737141",
+      "bytes": 74218
+    },
+    {
+      "path": "openstax/algebra-and-trigonometry/11-4-partial-fractions.jsonl",
+      "sha256": "d5b94b47751ae119d0b61a967ae34c58578a32d55597e19b9e8d70f78977247c",
+      "bytes": 501701,
+      "records": 251,
+      "counts": {
+        "equation": 215,
+        "heading": 36
+      }
+    },
+    {
+      "path": "openstax/algebra-and-trigonometry/11-6-solving-systems-with-gaussian-elimination.jsonl",
+      "sha256": "b387e41afc968900cfb819aad9eae670e6227b49375d5a775783780cd02e1960",
+      "bytes": 592254,
+      "records": 222,
+      "counts": {
+        "equation": 165,
+        "figure": 1,
+        "heading": 56
+      }
+    },
+    {
+      "path": "openstax/algebra-and-trigonometry/11-8-solving-systems-with-cramers-rule.jsonl",
+      "sha256": "793800f3e3701282429e03f5e2654b169d6bd018d02d9b90eed099c372e6d14e",
+      "bytes": 448633,
+      "records": 191,
+      "counts": {
+        "equation": 144,
+        "figure": 2,
+        "heading": 44,
+        "table": 1
+      }
+    },
+    {
+      "path": "openstax/algebra-and-trigonometry/13-1-sequences-and-their-notations.jsonl",
+      "sha256": "3a6f317c23137847a7947cc8b93e5a1e64041931ae100d75a5768923aa07a8f0",
+      "bytes": 545846,
+      "records": 310,
+      "counts": {
+        "equation": 236,
+        "figure": 7,
+        "heading": 62,
+        "script": 2,
+        "table": 3
+      }
+    },
+    {
+      "path": "openstax/algebra-and-trigonometry/_book.json",
+      "sha256": "7803577a7bd5d997dd7f6e28de1016b54ebed8cb1ede08d97dbc2cc3354e5b14",
+      "bytes": 671
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/1-4-measurements.jsonl",
+      "sha256": "5088a829864fc128ab1cc1035b7a6787e6b88a4a0dc3a9ef8bf04397c966465b",
+      "bytes": 127865,
+      "records": 94,
+      "counts": {
+        "equation": 20,
+        "figure": 3,
+        "heading": 22,
+        "script": 46,
+        "table": 3
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/12-3-the-second-and-third-laws-of-thermodynamics.jsonl",
+      "sha256": "e0be66520b1287ca30d33fc57dbc863d833524a89e9810da97c069e4c9928406",
+      "bytes": 115575,
+      "records": 65,
+      "counts": {
+        "equation": 22,
+        "heading": 19,
+        "script": 22,
+        "table": 2
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/14-1-bronsted-lowry-acids-and-bases.jsonl",
+      "sha256": "e852fe84e87e170ce20d64d5afba8b605fff11a49f0e22c6d43d030459809ce0",
+      "bytes": 121312,
+      "records": 68,
+      "counts": {
+        "equation": 36,
+        "heading": 18,
+        "script": 14
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/16-3-standard-reduction-potentials.jsonl",
+      "sha256": "f06f539726ebe4a283d328bee8bb715ed8e29ee9ca71748a73da87f771b61f79",
+      "bytes": 217572,
+      "records": 72,
+      "counts": {
+        "equation": 57,
+        "figure": 3,
+        "heading": 7,
+        "script": 4,
+        "table": 1
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/16-4-the-nernst-equation.jsonl",
+      "sha256": "99387217d4aa4e2b7522527d8fcf99fea0c9d907de1e3757111797a0ab79bf08",
+      "bytes": 118428,
+      "records": 66,
+      "counts": {
+        "equation": 41,
+        "figure": 1,
+        "heading": 17,
+        "script": 7
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/17-3-rate-laws.jsonl",
+      "sha256": "15b12bd0afa08a64f521ce8639de75d66dbd428d26abc068d506932e363905f5",
+      "bytes": 238575,
+      "records": 142,
+      "counts": {
+        "equation": 66,
+        "figure": 1,
+        "heading": 20,
+        "script": 50,
+        "table": 5
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/18-12-occurrence-preparation-and-properties-of-the-noble-gases.jsonl",
+      "sha256": "ac5eee4a858b25b00245ef257a58dffd863b2198336cafe22bfc4137dcaa25bf",
+      "bytes": 16521,
+      "records": 10,
+      "counts": {
+        "equation": 3,
+        "heading": 2,
+        "script": 5
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/18-2-occurrence-and-preparation-of-the-representative-metals.jsonl",
+      "sha256": "cbe7483ac9a44f8295069c75476be0461d508c02dde86c445908c60496e35f0b",
+      "bytes": 57030,
+      "records": 27,
+      "counts": {
+        "equation": 12,
+        "figure": 2,
+        "heading": 10,
+        "script": 3
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/2-3-atomic-structure-and-symbolism.jsonl",
+      "sha256": "5cbedd115158ca44cd6dbc41cdb90f7260cd71bc816e6534cf3d6f15720fed28",
+      "bytes": 152876,
+      "records": 83,
+      "counts": {
+        "equation": 38,
+        "figure": 5,
+        "heading": 24,
+        "script": 13,
+        "table": 3
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/20-2-nuclear-equations.jsonl",
+      "sha256": "835fbd191b99250ab0d416302346a4f64c62a1572373547c7592589f78fb12af",
+      "bytes": 62817,
+      "records": 41,
+      "counts": {
+        "equation": 28,
+        "figure": 1,
+        "heading": 9,
+        "script": 3
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/20-key-terms.jsonl",
+      "sha256": "d68fb01ffe169ae67a5fe59e145c3812b461b40b9eb36abbcf5e03f46744084c",
+      "bytes": 95259,
+      "records": 84,
+      "counts": {
+        "equation": 12,
+        "glossary": 67,
+        "heading": 1,
+        "script": 4
+      }
+    },
+    {
+      "path": "openstax/chemistry-atoms-first/_book.json",
+      "sha256": "1018e90d4f872fac5b73d95e87bf3515240b42062f49f0b788f966b9a62aa5c4",
+      "bytes": 762
+    },
+    {
+      "path": "openstax/college-algebra/9-6-binomial-theorem.jsonl",
+      "sha256": "4170c14330cc2037f75bdd84c437dc83d49bf1106bbaa937122214f80e8bc3ea",
+      "bytes": 329030,
+      "records": 195,
+      "counts": {
+        "equation": 161,
+        "figure": 2,
+        "heading": 31,
+        "script": 1
+      }
+    },
+    {
+      "path": "openstax/college-algebra/_book.json",
+      "sha256": "f9003fca21514d11d1ecdec6588180ece972eacb3139c1300ee0863b62c34d71",
+      "bytes": 644
+    },
+    {
+      "path": "openstax/elementary-algebra/5-2-solve-systems-of-equations-by-substitution.jsonl",
+      "sha256": "b243276a68b922c9603770752116a64449978421defe0af1c4fc8a75c1e9702f",
+      "bytes": 396802,
+      "records": 177,
+      "counts": {
+        "equation": 101,
+        "heading": 64,
+        "script": 1,
+        "table": 11
+      }
+    },
+    {
+      "path": "openstax/elementary-algebra/8-5-simplify-complex-rational-expressions.jsonl",
+      "sha256": "c67e0371541d78215a11992714e296e0ad7037d9183390cc5232fd9a899c2cd6",
+      "bytes": 330589,
+      "records": 157,
+      "counts": {
+        "equation": 98,
+        "heading": 53,
+        "table": 6
+      }
+    },
+    {
+      "path": "openstax/elementary-algebra/_book.json",
+      "sha256": "06f7deccf5d1a68fc6e0d5b00e64fbccee214419cbfc5a26ed4e59a2d6a26aa4",
+      "bytes": 683
+    }
+  ],
+  "books": {
+    "algebra-and-trigonometry": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Jay Abramson"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/algebra-and-trigonometry",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-14",
+      "slug": "algebra-and-trigonometry",
+      "state": "retired",
+      "title": "Algebra and Trigonometry",
+      "uuid": "13ac107a-f15f-49d2-97e8-60ab2e3b519c",
+      "version": "ebc5beb"
+    },
+    "chemistry-atoms-first": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Edward J. Neth",
+        "Paul Flowers",
+        "William R. Robinson, PhD",
+        "Klaus Theopold",
+        "Richard Langley"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/chemistry-atoms-first",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-14",
+      "slug": "chemistry-atoms-first",
+      "state": "retired",
+      "title": "Chemistry: Atoms First",
+      "uuid": "4539ae23-1ccc-421e-9b25-843acbb6c4b0",
+      "version": "741a7af"
+    },
+    "college-algebra": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Jay Abramson"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/college-algebra",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-14",
+      "slug": "college-algebra",
+      "state": "retired",
+      "title": "College Algebra",
+      "uuid": "9b08c294-057f-4201-9f48-5d6ad992740d",
+      "version": "ebc5beb"
+    },
+    "elementary-algebra": {
+      "archive_path": "/apps/archive/20260604.144757",
+      "archive_version": "20260604.144757",
+      "authors": [
+        "Lynn Marecek",
+        "MaryAnne Anthony-Smith"
+      ],
+      "cms_license_name": "Creative Commons Attribution License",
+      "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+      "details_url": "https://openstax.org/details/books/elementary-algebra",
+      "license_name": "Creative Commons Attribution License",
+      "license_url": "http://creativecommons.org/licenses/by/4.0/",
+      "retrieved_at": "2026-10-14",
+      "slug": "elementary-algebra",
+      "state": "retired",
+      "title": "Elementary Algebra",
+      "uuid": "0889907c-f0ef-496a-bcb8-2a5bb121717f",
+      "version": "eb2e29d"
+    }
+  },
+  "authored_documents": [
+    {
+      "id": "html-code-glossary",
+      "title": "Programming and Mathematics Study Guide",
+      "toolchain": "chromium",
+      "variant": "dev",
+      "pdf": "authored/html-code-glossary/html-code-glossary.pdf"
+    },
+    {
+      "id": "html-slides",
+      "title": "Formulas at Presentation Size: A Short Slide Deck",
+      "toolchain": "chromium",
+      "variant": "dev",
+      "pdf": "authored/html-slides/html-slides.pdf"
+    },
+    {
+      "id": "latex-chemistry",
+      "title": "Atoms, Ions and Reactions: Notation for Chemistry and Nuclear Science",
+      "toolchain": "tectonic",
+      "variant": "dev",
+      "pdf": "authored/latex-chemistry/latex-chemistry.pdf"
+    },
+    {
+      "id": "latex-exercises",
+      "title": "Worksheet 4: Equations, Functions and Systems",
+      "toolchain": "tectonic",
+      "variant": "dev",
+      "pdf": "authored/latex-exercises/latex-exercises.pdf"
+    },
+    {
+      "id": "latex-hyphenation",
+      "title": "Notes on Measurement, Models and Uncertainty",
+      "toolchain": "tectonic",
+      "variant": "dev",
+      "pdf": "authored/latex-hyphenation/latex-hyphenation.pdf"
+    },
+    {
+      "id": "latex-matrices",
+      "title": "Determinants, Matrices and Systems: A Reference Sheet",
+      "toolchain": "tectonic",
+      "variant": "dev",
+      "pdf": "authored/latex-matrices/latex-matrices.pdf"
+    },
+    {
+      "id": "latex-slides",
+      "title": "Formulas on Slides: A Short Lecture Deck",
+      "toolchain": "tectonic",
+      "variant": "dev",
+      "pdf": "authored/latex-slides/latex-slides.pdf"
+    },
+    {
+      "id": "latex-structure",
+      "title": "Study Skills for Science: Notes, Examples and Key Terms",
+      "toolchain": "tectonic",
+      "variant": "dev",
+      "pdf": "authored/latex-structure/latex-structure.pdf"
+    },
+    {
+      "id": "word-eq-images",
+      "title": "Worked Problems with Equations Pasted as Pictures",
+      "toolchain": "libreoffice",
+      "variant": "dev",
+      "pdf": "authored/word-eq-images/word-eq-images.pdf"
+    },
+    {
+      "id": "word-lecture",
+      "title": "Lecture Notes: Measurement, Matter and Mathematics",
+      "toolchain": "libreoffice",
+      "variant": "dev",
+      "pdf": "authored/word-lecture/word-lecture.pdf"
+    }
+  ],
+  "totals": {
+    "code": 40,
+    "equation": 1809,
+    "exercise_text": 28,
+    "figure": 28,
+    "glossary": 126,
+    "heading": 683,
+    "hyphen_break": 198,
+    "script": 242,
+    "table": 50
+  },
+  "class_counts": {
+    "openstax": {
+      "inline_fraction": 264,
+      "system_braced": 65,
+      "multirow_equations": 149,
+      "determinant": 81,
+      "matrix": 50,
+      "piecewise_words": 9,
+      "numbered_exercise_eq": 295,
+      "display_large": 0,
+      "equation_image": 0,
+      "chem_formula": 133,
+      "chem_charge": 69,
+      "chem_equation": 91,
+      "nuclide": 59,
+      "prose_unit_power": 40,
+      "prose_chem_script": 113,
+      "prose_nuclide": 24,
+      "prose_script_other": 119,
+      "code_block": 0,
+      "glossary_entry": 67,
+      "table_data": 15,
+      "table_layout": 20,
+      "heading_sentence": 80,
+      "heading_repeated_label": 153,
+      "heading_multiline": 33,
+      "hyphen_break": 0
+    },
+    "authored": {
+      "inline_fraction": 79,
+      "system_braced": 28,
+      "multirow_equations": 13,
+      "determinant": 22,
+      "matrix": 23,
+      "piecewise_words": 16,
+      "numbered_exercise_eq": 54,
+      "display_large": 49,
+      "equation_image": 37,
+      "chem_formula": 78,
+      "chem_charge": 42,
+      "chem_equation": 57,
+      "nuclide": 39,
+      "prose_unit_power": 106,
+      "prose_chem_script": 150,
+      "prose_nuclide": 55,
+      "prose_script_other": 139,
+      "code_block": 40,
+      "glossary_entry": 59,
+      "table_data": 8,
+      "table_layout": 7,
+      "heading_sentence": 49,
+      "heading_repeated_label": 37,
+      "heading_multiline": 14,
+      "hyphen_break": 198
+    }
+  }
+}
