@@ -49,10 +49,45 @@ from a11y_stem.models.pricing import BATCH_DISCOUNT
 
 log = logging.getLogger(__name__)
 
+API_RETRIES = 6
+API_RETRY_FIRST_S = 2.0
+
 MAX_BATCH_BYTES = 200_000_000  # the API takes 256 MB per batch; stay clear of it
 MAX_BATCH_REQUESTS = 5_000
 POLL_S = 15.0
 FAILURES_BEFORE_GIVING_UP = 3
+
+
+def with_retries[R](
+    call: Callable[[], R],
+    *,
+    idempotent: bool = True,
+    sleep: Callable[[float], None] = time.sleep,
+) -> R:
+    """`call()` again after a dropped connection, a timeout, a rate limit or a server error,
+    up to `API_RETRIES` times with a doubling wait. A batch is billed whether or not anyone
+    is listening, so losing the connection while polling must not lose the results.
+    `idempotent` False (creating a batch): a connection that may have carried the request is
+    not tried again, because a second batch would be paid for twice; a rate limit or a
+    server error is (nothing was created)."""
+    import anthropic
+
+    from a11y_stem.models.anthropic_client import _may_have_reached_provider
+
+    delay = API_RETRY_FIRST_S
+    for attempt in range(API_RETRIES + 1):
+        try:
+            return call()
+        except anthropic.APIConnectionError as exc:
+            if attempt == API_RETRIES or not (idempotent or not _may_have_reached_provider(exc)):
+                raise
+        except anthropic.APIStatusError as exc:
+            if attempt == API_RETRIES or not (exc.status_code == 429 or exc.status_code >= 500):
+                raise
+        log.info("batch API call failed, trying again in %.0f s", delay)
+        sleep(delay)
+        delay = min(delay * 2, 60.0)
+    raise AssertionError("unreachable")
 
 
 @dataclass
@@ -199,12 +234,14 @@ class BatchRunner:
                 {"custom_id": cid, "params": item.builder.batch_params(item.request, item.schema)}
                 for cid, (item, _) in by_id.items()
             ]
-            batch_id = sdk.messages.batches.create(requests=requests).id
+            batch_id = with_retries(
+                lambda: sdk.messages.batches.create(requests=requests), idempotent=False
+            ).id
             result.batches += 1
             result.sent += len(requests)
             self._say(f"batch {batch_id}: {len(requests)} requests sent")
             self._wait(sdk, batch_id)
-            for entry in sdk.messages.batches.results(batch_id):
+            for entry in with_retries(lambda: list(sdk.messages.batches.results(batch_id))):
                 found = by_id.get(entry.custom_id)
                 if found is None or entry.custom_id in settled:
                     continue
@@ -219,7 +256,7 @@ class BatchRunner:
     def _wait(self, sdk: Any, batch_id: str) -> None:
         started = time.monotonic()
         while True:
-            batch = sdk.messages.batches.retrieve(batch_id)
+            batch = with_retries(lambda: sdk.messages.batches.retrieve(batch_id))
             if batch.processing_status == "ended":
                 counts = batch.request_counts
                 self._say(

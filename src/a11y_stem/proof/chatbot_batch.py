@@ -32,6 +32,7 @@ from typing import Any
 
 from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, Reservation
 from a11y_stem.models import pricing
+from a11y_stem.models.anthropic_batch import with_retries
 from a11y_stem.models.pricing import BATCH_DISCOUNT
 from a11y_stem.proof.chatbot import (
     MAX_OUTPUT_TOKENS,
@@ -128,7 +129,9 @@ def _round(
         nonlocal chunk, requests, size
         if not requests:
             return
-        batch = client.messages.batches.create(requests=requests)
+        batch = with_retries(
+            lambda: client.messages.batches.create(requests=requests), idempotent=False
+        )
         say(f"batch {batch.id}: {len(requests)} requests sent")
         submitted.append((batch.id, chunk, time.monotonic()))
         chunk, requests, size = {}, [], 0
@@ -166,7 +169,9 @@ def _round(
         seconds = time.monotonic() - started
         seen: set[str] = set()
         try:
-            for entry in client.messages.batches.results(batch_id):
+            for entry in with_retries(
+                lambda bid=batch_id: list(client.messages.batches.results(bid))
+            ):
                 found = sent.get(entry.custom_id)
                 if found is None or entry.custom_id in seen:
                     continue
@@ -187,7 +192,7 @@ def _wait(
 ) -> None:
     started = time.monotonic()
     while True:
-        batch = client.messages.batches.retrieve(batch_id)
+        batch = with_retries(lambda: client.messages.batches.retrieve(batch_id))
         if batch.processing_status == "ended":
             counts = batch.request_counts
             say(

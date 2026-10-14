@@ -183,3 +183,27 @@ def test_a_cap_that_cannot_hold_the_requests_stops_the_run_with_the_answers_kept
             lambda: cached.run(request(OPUS), EquationOutput), pool, runner, say=lambda _: None
         )
     assert wire.batches == []
+
+
+def test_a_dropped_connection_while_waiting_does_not_lose_the_batch(tmp_path: Path) -> None:
+    """A batch is paid for whether or not anyone listens: polling and reading the results
+    are tried again; creating one is not tried again after a connection that may have
+    carried it (a second batch would be paid for twice)."""
+    import anthropic
+
+    from a11y_stem.models.anthropic_batch import with_retries
+
+    calls = {"n": 0}
+    request = httpx2.Request("GET", "https://api.anthropic.com/x")
+
+    def flaky() -> str:
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise anthropic.APIConnectionError(request=request)
+        return "ok"
+
+    assert with_retries(flaky, sleep=lambda _s: None) == "ok" and calls["n"] == 3
+    calls["n"] = 0
+    with pytest.raises(anthropic.APIConnectionError):
+        with_retries(flaky, idempotent=False, sleep=lambda _s: None)
+    assert calls["n"] == 1
