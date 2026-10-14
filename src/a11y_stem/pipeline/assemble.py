@@ -37,7 +37,7 @@ from __future__ import annotations
 
 import base64
 import re
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import date
 from itertools import pairwise
@@ -61,6 +61,7 @@ from a11y_stem.core.types import (
 from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
 from a11y_stem.pipeline import (
     assemble_tables,
+    equation_scale,
     figure_details,
     figure_images,
     inline_text,
@@ -304,6 +305,10 @@ def _png_data_uri(png: bytes | None) -> str | None:
     if png is None or not _is_png(png):
         return None
     return "data:image/png;base64," + base64.b64encode(png).decode("ascii")
+
+
+def _unit_scale(_element: Element) -> float:
+    return 1.0
 
 
 def _size_attrs(element: Element) -> str:
@@ -587,6 +592,24 @@ def outline_before(elements: list[Element], fixes: list[Fix], element_id: str) -
     return outline
 
 
+def title_shift(elements: list[Element], fixes: list[Fix]) -> int:
+    """How many levels `render_html` moves every heading down (T3-13): 1 when the
+    repaired outline has two or more top-level headings (a slide deck has one per slide),
+    so the document's title can be the one `<h1>` and the slide titles are `<h2>`; else 0.
+    Read from the same headings, in the same order, as the renderer writes them."""
+    first: dict[str, Fix] = {}
+    for fix in fixes:
+        first.setdefault(fix.element_id, fix)
+    outline = Outline()
+    tops = 0
+    for element in sorted(elements, key=lambda e: e.order):
+        if element.kind is Kind.HEADING:
+            level, _ = heading_parts(element, first.get(element.id))
+            if level is not None:
+                tops += outline.write(level) == 1
+    return 1 if tops >= 2 else 0
+
+
 # --------------------------------------------------------------------------- renderer
 
 
@@ -603,6 +626,11 @@ class _Renderer:
     styles: dict[str, str] = field(default_factory=dict)
     # Write the stored speech as each <math>'s alttext (Settings.mathml_alttext).
     math_alttext: bool = False
+    # Levels added to every heading written (T3-13): 1 when the document has several
+    # top-level headings (slides), so its title can be the one h1 above them.
+    demote: int = 0
+    # The scale an unconverted equation's picture is shown at (T3-15).
+    scale_of: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
 
     def add_style(self, name: str, css: str) -> None:
         """Add CSS to this document's stylesheet, once per name. Features add their CSS
@@ -814,7 +842,7 @@ class _Renderer:
                 attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
-        level = self.outline.write(level)
+        level = min(6, self.outline.write(level) + self.demote)
         attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
         return f"<h{level}{attrs}>{self.rich(text, element)}</h{level}>"
 
@@ -850,6 +878,16 @@ class _Renderer:
         original = self.original(element, self.image_alt(element, equation_alt(element))) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
+    def picture_size(self, element: Element, png: bytes | None) -> str:
+        """The `width` and `height` of a crop's `<img>`: a figure or table at its printed
+        size, an equation at the size of the file's text (T3-15, `pipeline.equation_scale`)."""
+        if element.kind is not Kind.EQUATION or png is None:
+            return _size_attrs(element)
+        x0, y0, x1, y1 = element.bbox
+        printed = (round((x1 - x0) * _PT_TO_CSS_PX), round((y1 - y0) * _PT_TO_CSS_PX))
+        size = equation_scale.display_size(png, self.scale_of(element), printed)
+        return f' width="{size[0]}" height="{size[1]}"' if size else ""
+
     def inline_equation(self, element: Element) -> str:
         mathml, reason = self.converted_mathml(element, "inline", with_id=True)
         if mathml is not None:
@@ -864,7 +902,8 @@ class _Renderer:
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
             alt = _escape(self.image_alt(element, equation_alt(element)))
-            image = f'<img src="{src}" alt="{alt}"{_size_attrs(element)}>'
+            size = self.picture_size(element, self.crops.get(element.id))
+            image = f'<img src="{src}" alt="{alt}"{size}>'
             label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
         else:
             image = _escape(element.text or "")
@@ -946,7 +985,8 @@ class _Renderer:
         """The crop as an <img>, or the extracted text when there is no image."""
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
-            return f'<img src="{src}" alt="{_escape(alt)}"{_size_attrs(element)}>'
+            size = self.picture_size(element, self.crops.get(element.id))
+            return f'<img src="{src}" alt="{_escape(alt)}"{size}>'
         text = (element.text or "").strip()
         unavailable = f'<p class="{AUTHORED_CLASS}">The original image is not available.</p>'
         if text:
@@ -1063,7 +1103,7 @@ def _about_section(
     return (
         f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
         f'aria-labelledby="{ABOUT_TITLE_ID}">\n'
-        f'<h2 id="{ABOUT_TITLE_ID}">{ABOUT_TITLE}</h2>\n'
+        f'<p id="{ABOUT_TITLE_ID}" class="about-title">{ABOUT_TITLE}</p>\n'
         f"<p>{what}</p>\n{_review_line(fixes, checked_on)}{flagged_note}"
         f"<p>{_contact_sentence(contact)}</p>\n{source}</footer>"
     )
@@ -1095,6 +1135,9 @@ pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px sol
   border-radius: 4px; overflow-x: auto; }
 pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre; }
+@media screen and (prefers-color-scheme: dark) {
+  pre { background: #1f1f1f; border-color: #767676; }
+}
 """
 DEFINITIONS_CSS = """\
 dl { margin: 0 0 1em; }
@@ -1103,7 +1146,7 @@ dd { margin: 0.1em 0 0 1.5em; }
 """
 
 STYLE = """\
-:root { color-scheme: light; }
+:root { color-scheme: light dark; }
 body { margin: 0; background: #ffffff; color: #1b1b1b;
   font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
@@ -1142,8 +1185,16 @@ figcaption { margin-top: 0.5em; }
 .about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
   border-top: 2px solid #1b1b1b; }
 @media (min-width: 44rem) { .about { margin: 0 auto; } }
+.about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
+@media screen and (prefers-color-scheme: dark) {
+  body { background: #121212; color: #ececec; }
+  .flagged, .notice, .flagged-inline { border-color: #ffa066; }
+  .about { border-top-color: #ececec; }
+  :focus-visible { outline-color: #8ab4f8; }
+  img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
+}
 """
 
 
@@ -1252,8 +1303,15 @@ def render_html(
         first_fix.setdefault(fix.element_id, fix)
     if math_alttext is None:
         math_alttext = get_settings().mathml_alttext
+
+    shift = title_shift(ordered, fixes)
     renderer = _Renderer(
-        fixes=first_fix, crops=crops, equations=equations, math_alttext=math_alttext
+        fixes=first_fix,
+        crops=crops,
+        equations=equations,
+        math_alttext=math_alttext,
+        demote=shift,
+        scale_of=equation_scale.scaler(ordered),
     )
     renderer.placed = _placed_equations(ordered, renderer, set(equations))
     body = renderer.render_all(ordered)
@@ -1281,7 +1339,7 @@ def render_html(
         if level is not None
     ]
     page_title = _clean_title(title) if title_set else suggested_title(title, heading_texts)
-    if title_set and not any("<h1" in part for part in body):
+    if (title_set or shift) and not any("<h1" in part for part in body):
         body = [f"<h1>{_escape(page_title)}</h1>", *body]
     # Feature CSS (tables, ...) only in documents that use it, in a fixed order.
     style = STYLE + "".join(css for _, css in sorted(renderer.styles.items()))

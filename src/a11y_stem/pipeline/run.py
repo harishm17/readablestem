@@ -120,6 +120,7 @@ from a11y_stem.models.pricing import UnknownModelError
 from a11y_stem.observability.tracing import NoopTracer, Tracer
 from a11y_stem.pipeline import (
     assemble,
+    equation_scale,
     equation_step,
     figure_step,
     heading_step,
@@ -681,6 +682,10 @@ def _kind_counts(elements: Iterable[Element]) -> dict[str, int]:
     return dict(sorted(Counter(e.kind.value for e in elements).items()))
 
 
+def _unit_scale(_element: Element) -> float:
+    return 1.0
+
+
 @dataclass
 class _Run:
     """State of one conversion while its steps are in flight."""
@@ -707,10 +712,13 @@ class _Run:
     keys: dict[str, str] = field(default_factory=dict)
     # Told how each model request ended (`ModelCall`), for the status line about the AI service.
     observer: Callable[[ModelCall], None] | None = None
+    # The scale an equation's picture is shown at in the student file (T3-15).
+    eq_scale: Callable[[Element], float] = field(default_factory=lambda: _unit_scale)
 
     def start_stages(self, elements: list[Element]) -> None:
         """Each model stage's total, counting what was decided before any model work (a
         scanned page) as done."""
+        self.eq_scale = equation_scale.scaler(elements)
         for kind, stage in _STAGE_OF.items():
             members = [e.id for e in elements if e.kind is kind]
             self.stage_totals[kind] = len(members)
@@ -735,6 +743,22 @@ class _Run:
                 self.crop_and_submit(element)
         self.pages.submitted(page)
 
+    def sharp_equation(self, element: Element) -> bytes | None:
+        """An equation's crop for the student file, or None (not an equation, or the cut
+        failed: the ordinary crop is used then)."""
+        if element.kind is not Kind.EQUATION:
+            return None
+        try:
+            return layout.crop(
+                self.pdf_bytes,
+                element,
+                dpi=equation_scale.crop_dpi(self.eq_scale(element)),
+                tag_dpi=True,
+            )
+        except Exception as exc:
+            log.warning("sharp crop failed: %s", type(exc).__name__)
+            return None
+
     def crop_and_submit(self, element: Element) -> None:
         self.raise_if_fatal()
         try:
@@ -744,13 +768,17 @@ class _Run:
             self.fixes[element.id] = _failed(element, "crop_error")
             self.step_done(element)
             return
-        self.crops[element.id] = png
+        # The student file shows an unconverted equation at the size of its text, cut
+        # sharp for that size (T3-15); the model is sent the same crop as ever, and the
+        # review screen shows this one. Any other crop is as it was.
+        self.crops[element.id] = self.sharp_equation(element) or png
         if element.id in self.fixes:  # decided before any model work: a scanned page
             return
         if self.stop.scope is not None:  # still cropped: the output shows the original
             self.fixes[element.id] = _failed(element, self.stop.reason())
             self.step_done(element)
             return
+        self.raise_if_fatal()  # a step may have failed while this element was being cut
         if self.cache is not None:
             key = step_key(element, png, self.contexts.get(element.id), self.options, self.settings)
             if (kept := self.cache.lookup(element, key)) is not None:

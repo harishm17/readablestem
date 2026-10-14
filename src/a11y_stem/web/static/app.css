@@ -749,3 +749,19 @@ input[type="text"].input-short { width: 8rem; }
 .region-preview img { max-width: 100%; height: auto; border: 1px solid var(--rule); background: #fff; }
 .region-preview figcaption { color: var(--muted); font-size: 0.95rem; }
 .not-a-table, .accept-clean, .read-cell { margin-top: 0.75rem; }
+/* Notation found in a course's documents (T3-12): one ticked row per symbol, the guessed
+   meaning under it; no table, so nothing is wider than a phone screen. */
+.suggestion-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.suggestion { padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
+.suggestion .checkbox-field { margin: 0 0 0.4rem; }
+.suggestion .field { margin: 0 0 0.25rem 2rem; }
+.suggestion select { max-width: 100%; }
+
+/* The review record (T3-6): printed on its own, without the site's navigation. */
+@media print {
+  .site-header, .site-footer, .skip-link, .no-print { display: none; }
+  .table-scroll { overflow: visible; }
+  tr, section { break-inside: avoid; }
+}
+#suggestions p, #suggestions .button { overflow-wrap: anywhere; }
+#suggestions .button { max-width: 100%; white-space: normal; text-align: left; }

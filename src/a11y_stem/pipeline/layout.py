@@ -418,6 +418,7 @@ def crop(
     dpi: int = 200,
     pad: float = CROP_PAD,
     max_side_px: int = 2048,
+    tag_dpi: bool = False,
 ) -> bytes:
     """PNG of the element's region (padded), long side capped at `max_side_px`.
 
@@ -427,7 +428,9 @@ def crop(
     element of one PDF parses it once. A page is only rendered here after it rendered in a
     child process (`analyze` already did that for the pages it analysed). Safe to call from
     several threads, but calls are serialised by the module lock, so there is nothing to
-    gain from a thread pool here.
+    gain from a thread pool here. `tag_dpi`: write the resolution it was cut at into the PNG
+    header (pHYs), so whoever shows it can size it (`pipeline.equation_scale.png_dpi`); the
+    default leaves the header as MuPDF writes it, so other crops are byte for byte as before.
     """
     if dpi <= 0 or pad < 0 or max_side_px < 16:
         raise ValueError("crop needs dpi > 0, pad >= 0 and max_side_px >= 16")
@@ -449,6 +452,8 @@ def crop(
             if max(pixmap.width, pixmap.height) > max_side_px:  # defensive; rounding only
                 zoom *= (max_side_px - 1) / max(pixmap.width, pixmap.height)
                 pixmap = page.get_pixmap(matrix=pymupdf.Matrix(zoom, zoom), clip=clip, alpha=False)
+            if tag_dpi:
+                pixmap.set_dpi(round(zoom * 72), round(zoom * 72))
             return pixmap.tobytes("png")
         finally:
             pymupdf.TOOLS.reset_mupdf_warnings()

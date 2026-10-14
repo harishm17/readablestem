@@ -66,6 +66,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/courses/{course_id}/entries/{entry_id}"): USER,
     ("POST", "/courses/{course_id}/entries/{entry_id}/delete"): USER,
     ("POST", "/courses/{course_id}/remember"): USER,
+    ("POST", "/courses/{course_id}/suggestions"): USER,  # T3-12: CSRF, owner of course (and job)
     ("POST", "/courses/{course_id}/rename"): USER,
     ("GET", "/jobs/{job_id}"): USER,
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): USER,
@@ -95,6 +96,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/tables/accept-clean"): USER,
     ("POST", "/jobs/{job_id}/tables/{element_id}/read-cell"): USER,
     ("GET", "/jobs/{job_id}/progress"): USER,
+    ("GET", "/jobs/{job_id}/record"): USER,  # T3-6: owner only, changes nothing
+    ("GET", "/jobs/{job_id}/record.csv"): USER,  # T3-6
     ("GET", "/jobs/{job_id}/regions/{element_id}.png"): USER,
     ("GET", "/jobs/{job_id}/review"): USER,
     ("GET", "/jobs/{job_id}/review/list"): USER,

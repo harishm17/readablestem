@@ -118,8 +118,8 @@ What Canvas still removes, and why that is accepted:
   "Not converted." label, table captions and figure-description summaries shows in normal
   weight, and a very long unbroken string may not wrap. The label's text and the border
   still carry the meaning ("never by colour alone").
-- `:focus-visible`, `@media print` and the narrow-screen margin of the about section: Canvas
-  has its own focus rings, and its pages have their own layout.
+- `:focus-visible`, `@media print`, the dark-scheme block and the narrow-screen margin of
+  the about section: Canvas has its own focus rings, colours and layout.
 - `.visually-hidden` uses `clip: rect(0,0,0,0)` instead of `clip-path` (not allowed), plus
   Canvas's own `screenreader-only` class, so the hidden "Equation" labels stay hidden.
 - MathML is kept (all presentation elements the pipeline writes are on the list). Canvas
@@ -370,6 +370,32 @@ and label are unchanged. In a document in another language the alt text is marke
   where they are handled. So are fixes accepted with an optional note
   (`Fix.review == "optional"`, docs/design/beta-architecture.md "Review tiers").
 
+## Equations kept as pictures (T3-15)
+
+An equation that was not converted is shown as the crop of the PDF
+(`pipeline/equation_scale.py`). Two things are done for it:
+
+- **Text size.** The picture is shown at the size its text would have in the file, not at
+  the size it was printed: scaled by 18 CSS px (the file's text) over the PDF's text size
+  at 4/3 CSS px a point. The PDF's text size is that of the paragraph an inline equation
+  stands in, the equation's own size for a display equation when it is within 0.6 to 1.8
+  times the body size, else the document's body size (the size most paragraph and list
+  text is set in). A 10 pt handout's pictures are shown 1.35 times their printed size, a
+  12 pt one's 1.125 times, a slide deck's 24 pt text brings them down to 0.56 times. The
+  scale is kept between 0.5 and 2, and is 1 when the document has no text to measure by.
+  Width and height are set together from the crop's pixels, so the picture keeps its
+  shape (it was set from the equation's box before, which left out the 2 pt of margin
+  the crop has: small pictures were squeezed).
+- **Sharp.** The crop is cut at three image pixels for each CSS pixel it will take
+  (`crop_dpi`: 288 dpi times the scale), not at the 200 dpi of other crops, and says so in
+  its PNG header (pHYs), which is how the assembler knows to size it from its pixels. The
+  model is sent the same 200 dpi crop as before (a second cut, so what the model reads is
+  unchanged); the stored crop, which the review screen also shows, is the sharp one. A
+  result stored before this has untagged crops and gets the printed size times the scale.
+
+The cost is size: the 14 flagged equations of the problem-set fixture take 3 KB more each
+(60 KB to 102 KB for the file). Figures, tables and pages are not changed.
+
 ## Inline equations
 
 Layout writes a marker such as `⟦p1-e7⟧` (`core.types.inline_marker`) into the paragraph
@@ -499,8 +525,10 @@ The rule's colour reaches 4.5:1 on the white background (WCAG 1.4.3): a colour t
 already does is kept exactly; any other is made darker, keeping its hue, in OKLCH
 (`pipeline.contrast.with_contrast`: lightness lowered until the contrast is reached,
 chroma lowered only as far as sRGB needs). So pure red becomes `#ee0000`, light grey
-`#767676`, yellow a dark yellow. The output has no dark mode, so there is no second
-rule. Colour spans sit inside links and may wrap maths (which takes the colour); linked
+`#767676`, yellow a dark yellow. For a reader whose browser asks for dark colours (see
+"Dark colours") each class has a second rule in the dark-scheme `@media` block: the
+printed colour, lightened as far as 4.5:1 on `#121212` needs (no colour reaches 4.5:1 on
+both pages). Colour spans sit inside links and may wrap maths (which takes the colour); linked
 text itself keeps the link colour.
 
 Colour alone tells a screen reader nothing, so text that refers to colour near coloured
@@ -563,6 +591,21 @@ is `assemble.Outline`; the review screen asks it (`would_write`) before saving o
 accepting a heading level, refuses a level the output would show differently, and shows
 the level the output writes when a change to an earlier heading moved it.
 
+### One h1 (T3-13)
+
+A file should have one top-level heading. A slide deck has one per slide, so when the
+repaired outline would write two or more `<h1>` the assembler writes the document's title
+as the only `<h1>` (the title students hear, see "One self-contained file": the one the
+instructor typed on the job page, else the PDF's title without its section number) and
+moves every heading one level down, so the slide titles are `<h2>` (capped at `<h6>`). A
+file with at most one `<h1>` is written as before. `assemble.title_shift` decides it from the
+repaired outline, for the renderer and for tests. The move comes after the repair above,
+so the review screen's levels (`would_write`, "In the document: level N") are the levels
+before it: in a slide deck its numbers are one less than the file's. The "About this
+version" title is a labelled paragraph, not a heading: the `<footer>` is named by it
+(`aria-labelledby`), so a screen reader user reaches it as a landmark, and it is not a
+section of the document's outline.
+
 ## The note for students ("About this version")
 
 The file ends with a short note for the people who read it, in a `<footer>` after
@@ -604,8 +647,9 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 About 35 lines of inline CSS:
 
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
-  (about 17:1 contrast);
-- images at their printed size (PDF points x 96/72) and never wider than the column;
+  (about 17:1 contrast; for a dark scheme see "Dark colours");
+- images at their printed size (PDF points x 96/72) and never wider than the column; an
+  equation kept as a picture is the exception ("Equations kept as pictures" below);
 - display equations scroll sideways inside their `.equation` box when wider than the
   screen (see "Wide equations");
 - block maths keep the browser's own `display: block math` and centring (overriding
@@ -618,9 +662,25 @@ About 35 lines of inline CSS:
 - only in documents that have one: a figure's folded description (a bold summary with
   the browser's own marker, no new colours) and table rules.
 
-There is no dark mode yet. Documents with coloured text (FEATURE_COLOUR) get one rule
-per printed colour (see "Coloured text"); documents with rebuilt tables get the table
-rules.
+Documents with coloured text (FEATURE_COLOUR) get two rules per printed colour (see
+"Coloured text"); documents with rebuilt tables get the table rules.
+
+### Dark colours (T3-14)
+
+`:root { color-scheme: light dark; }` lets the browser choose its own scheme for what the
+file does not style (links, scrollbars), and a `@media screen and (prefers-color-scheme:
+dark)` block sets the file's colours for a reader whose browser asks for dark: `#121212`
+page, `#ececec` text (about 15:1), the dashed boxes of unconverted items and the notice
+in `#ffa066` and the focus ring in `#8ab4f8` (both above 3:1 on the page), a thin
+`#8c8c8c` edge on pictures (they are white-backed crops and would otherwise be a bare
+white block), and dark versions of the code block and table rules (borders `#767676` and
+`#a6a6a6`). MathML takes the text colour (nothing sets one on it), so equations follow the
+scheme. Pictures are not inverted: a figure's colours mean something. The block is
+`screen` only, so printing a file from a dark browser gives dark text on white paper.
+Features add their dark rules to their own CSS (code, tables), so a document pays for
+what it uses. The static check `html.text_contrast` reads both pages (a colour class
+must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), and
+`tests/test_assemble_dark.py` runs axe in both schemes in Chromium (browser suite).
 
 ## Checks
 

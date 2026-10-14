@@ -62,6 +62,7 @@ from a11y_stem.web.routes import (
     jobs,
     pages,
     parts,
+    record,
     review,
     sample,
     split,
@@ -415,6 +416,7 @@ def create_app(
         admin,
         cron,
         courses,
+        record,
     ):
         app.include_router(module.router)
     app.include_router(auth_router)

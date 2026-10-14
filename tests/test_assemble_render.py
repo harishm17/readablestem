@@ -291,7 +291,7 @@ def test_outline_moves_a_rejected_headings_subtree_up_together():
 
 
 def test_outline_without_rejections_is_unchanged():
-    levels = [1, 2, 3, 3, 2, 3, 1, 2]
+    levels = [1, 2, 3, 3, 2, 3, 2, 2]  # one h1: a second one would move the others down
     pairs = [
         heading(eid, o, lv) for o, (eid, lv) in enumerate(zip("abcdefgh", levels, strict=True))
     ]
@@ -583,7 +583,9 @@ def test_the_student_note_comes_after_main_and_speaks_to_students(sample_html):
     whether the instructor has checked it, who to tell. No counts and no review words."""
     note = about(sample_html)
     assert sample_html.index("</main>") < sample_html.index('<footer id="about-conversion"')
-    assert f'<h2 id="about-conversion-title">{ABOUT_TITLE}</h2>' in note
+    # Its title labels the footer region; it is not a heading in the outline (T3-13).
+    assert f'<p id="about-conversion-title" class="about-title">{ABOUT_TITLE}</p>' in note
+    assert 'aria-labelledby="about-conversion-title"' in note and "<h" not in note
     assert ABOUT_WORDING in note and MATHS_NOTE in note and CONTACT in note
     assert NOT_CHECKED_YET in note  # the sample has decisions still open
     assert FLAGGED_NOTE in note

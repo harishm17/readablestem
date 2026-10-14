@@ -17,6 +17,7 @@ from __future__ import annotations
 
 import threading
 import time
+import uuid
 from collections.abc import Iterator
 
 import pytest
@@ -212,3 +213,94 @@ def test_the_remember_offer_passes_axe(site, browser, axe_source):
     violations = strict_axe(page, axe_source)
     context.close()
     assert not violations, describe(violations)
+
+
+# --------------------------------------------------------------------------- suggestions (T3-12)
+
+
+def with_notation(output):
+    """The review document with notation in the equation that `v = d / t` was."""
+    for fix in output.result.fixes:
+        if fix.equation is not None and fix.equation.latex == "v = d / t":
+            fix.equation.latex = r"\mathbf{d} \in \mathbb{R}^3, \ \vec{v} = \hat{x}"
+    return output
+
+
+@pytest.fixture
+def suggesting(site, browser):
+    original = site.converter.output
+    site.converter.output = with_notation(review_output())
+    context, page = open_page(browser, site)
+    name = f"Suggestion course {uuid.uuid4().hex[:6]}"
+    add_course(page, site.base, name)
+    job_id = convert_for(page, site, name)
+    site.converter.output = original
+    yield context, page, job_id, name
+    context.close()
+
+
+@pytest.mark.parametrize("width", [1280, 375], ids=["wide", "phone"])
+def test_the_suggestion_lists_pass_axe_and_fit_the_screen(suggesting, site, width, axe_source):
+    _, page, job_id, course_name = suggesting
+    page.set_viewport_size({"width": width, "height": 800})
+    failures = []
+    for name, url in (("course page", None), ("job page", f"{site.base}/jobs/{job_id}")):
+        if url is None:
+            page.goto(f"{site.base}/courses")
+            page.get_by_role("link", name=course_name).click()
+            page.get_by_role("heading", name="Symbols found in your documents").wait_for()
+        else:
+            page.goto(url)
+            page.get_by_role("heading", name="Symbols found in this document").wait_for()
+        if violations := strict_axe(page, axe_source):
+            failures.append(f"{name}:\n{describe(violations)}")
+        scroll, client = page.evaluate(
+            "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+        )
+        if scroll > client:
+            failures.append(f"{name}: {scroll} px in {client} px")
+    assert not failures, "\n".join(failures)
+
+
+def test_ticking_a_suggestion_and_changing_its_meaning_works_without_javascript(site, browser):
+    original = site.converter.output
+    site.converter.output = with_notation(review_output())
+    context, page = open_page(browser, site, javascript=False)
+    add_course(page, site.base, "Plain suggestion course")
+    job_id = convert_for(page, site, "Plain suggestion course")
+    site.converter.output = original
+    page.goto(f"{site.base}/jobs/{job_id}")
+    page.get_by_label("What double-struck R means").select_option(label="A set")
+    page.get_by_label("double-struck R (1 equation, first on page 2)").check()
+    page.get_by_role("button", name="Add the ticked symbols to Plain suggestion course").click()
+    page.wait_for_url(f"{site.base}/jobs/{job_id}*")
+    assert "Added to Plain suggestion course" in page.locator("body").inner_text()
+    page.goto(f"{site.base}/jobs/{job_id}")
+    assert page.get_by_label("double-struck R (1 equation, first on page 2)").count() == 0
+    page.get_by_role("link", name="Plain suggestion course").first.click()
+    assert "From a document" in page.get_by_role("row", name="double-struck R").inner_text()
+    context.close()
+
+
+# --------------------------------------------------------------------------- the record (T3-6)
+
+
+@pytest.mark.parametrize("width", [1280, 375], ids=["wide", "phone"])
+def test_the_review_record_passes_axe_and_fits_the_screen(site, browser, course, width, axe_source):
+    context, page = open_page(browser, site, viewport={"width": width, "height": 800})
+    page.goto(f"{site.base}/jobs/{course['job']}/review")
+    button = page.get_by_role("button", name="Use bold ω in equation 1")
+    if button.count():  # the first run makes the decision the record lists
+        button.click()
+    page.goto(f"{site.base}/jobs/{course['job']}/record")
+    page.get_by_role("heading", name="Review record").wait_for()
+    assert page.get_by_role("heading", name="Decisions made by a person").is_visible()
+    violations = strict_axe(page, axe_source)
+    scroll, client = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+    )
+    printed = page.pdf() if width == 1280 else b""
+    context.close()
+    assert not violations, describe(violations)
+    assert scroll <= client, f"{scroll} px in {client} px"
+    assert width != 1280 or printed.startswith(b"%PDF")

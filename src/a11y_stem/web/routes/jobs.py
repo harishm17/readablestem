@@ -731,6 +731,28 @@ def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, s
         return {"id": course.id, "name": course.name} if course is not None else None
 
 
+def _job_suggestions(request: Request, job_id: str, user: CurrentUser) -> dict[str, Any]:
+    """The notation this finished document uses that its course does not have (T3-12),
+    for the job page's suggestion form; empty without a course, with the feature off or
+    when there is nothing to add."""
+    ctx = get_ctx(request)
+    if not notation.enabled(ctx.settings):
+        return {}
+    with session_scope(ctx.factory) as session:
+        job = owned_job(session, job_id, user)
+        course = notation.job_course(session, job)
+        if course is None:
+            return {}
+        rows = notation.course_suggestions(session, ctx.settings, course, job)
+        if not rows:
+            return {}
+        return {
+            "suggestions": rows,
+            "suggest_job": job.id,
+            "meanings": notation.MEANINGS,
+        }
+
+
 def _users_course(ctx: AppContext, user: CurrentUser, course_id: str) -> bool:
     if not JOB_ID.match(course_id):
         return False
@@ -821,6 +843,7 @@ def job_page(request: Request, job_id: str, user: UserDep, auto: str = "") -> Re
     job, outcome = load_job_status(request, job_id, user)
     context = status_context(job, outcome) | {"auto_reload": auto == "1"}
     context["course"] = _job_course(request, job_id, user)  # notation memory
+    context |= _job_suggestions(request, job_id, user)  # notation found in the document
     context["after_download"] = after_download_state(request, job_id, user)  # ux-a
     # No `active` nav item: this page is not "My documents" itself (aria-current="page"
     # would announce it as such).

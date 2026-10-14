@@ -11,7 +11,7 @@ of their boxes. The code is deterministic: the same PDF always gives the same el
 | Function | What it returns |
 |---|---|
 | `analyze(pdf_bytes, *, pages=None, max_pages=None) -> Layout` | elements of the requested 0-based pages (all by default), `page_count`, `pages`, `page_sizes`, `title`, `lang` |
-| `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped |
+| `crop(pdf_bytes, element, *, dpi=200, pad=2.0, max_side_px=2048, tag_dpi=False) -> bytes` | PNG of the element box grown by `pad` points, clipped to the page, long side capped; `tag_dpi` writes the resolution into the PNG header (equation crops for the student file, `pipeline/equation_scale.py`) |
 | `release(pdf_bytes=None)` | drops one cached document (or all); call it in a `finally` when a job finishes |
 | `heading_levels(elements) -> dict[id, level]` | raw outline level per heading (before repair) |
 | `page_glyphs(page) -> list[Glyph]` | every visible character of an open page with its box (display space) and span colour, for the text pass |

@@ -89,6 +89,73 @@ def test_the_title_is_not_a_second_top_heading_when_the_file_has_one():
     assert ">Limits</h1>" in html
 
 
+def headings_of(html: str) -> list[tuple[int, str]]:
+    return [(int(m.group(1)), m.group(2)) for m in re.finditer(r"<h([1-6])[^>]*>(.*?)</h", html)]
+
+
+SLIDES = (("Motion", 1), ("Position", 2), ("Constant acceleration", 1), ("Velocity graph", 1))
+
+
+def test_slide_titles_are_h2_under_the_one_h1_the_document_title():
+    """T3-13: a file with a top-level heading per slide has one h1, the title."""
+    html = render("Kinematics slides", headings=SLIDES)
+    assert headings_of(html) == [
+        (1, "Kinematics slides"),
+        (2, "Motion"),
+        (3, "Position"),
+        (2, "Constant acceleration"),
+        (2, "Velocity graph"),
+    ]
+    assert html.count("<h1") == 1 and title_of(html) == "Kinematics slides"
+    assert html_checks.static_checks(html)
+
+
+def test_the_slide_deck_h1_is_the_title_the_instructor_typed():
+    html = render("1 Kinematics", headings=SLIDES, title_set=True)
+    assert title_of(html) == "1 Kinematics"
+    assert headings_of(html)[0] == (1, "1 Kinematics")
+
+
+def test_a_file_with_one_top_level_heading_keeps_its_levels():
+    html = render("Calculus", headings=(("Limits", 1), ("Rules", 2), ("Proofs", 2)))
+    assert [level for level, _ in headings_of(html)] == [1, 2, 2]
+
+
+def test_the_about_title_is_not_a_heading():
+    html = render("Calculus", headings=SLIDES)
+    assert "About this version" not in [text for _, text in headings_of(html)]
+    assert 'aria-labelledby="about-conversion-title"' in footer(html)
+
+
+def test_levels_stay_inside_h6_when_a_slide_deck_is_moved_down():
+    deep = (("A", 1), ("B", 2), ("C", 3), ("D", 4), ("E", 5), ("F", 6), ("G", 1))
+    levels = [level for level, _ in headings_of(render("T", headings=deep))]
+    assert max(levels) == 6 and levels[0] == 1
+
+
+def test_no_outline_of_up_to_four_headings_ends_with_two_h1s():
+    """T3-13, exhaustively: a file has at most one top-level heading, and the move down
+    (`title_shift`) is made exactly when the repaired outline would have had two."""
+    import itertools
+
+    from a11y_stem.core.types import Status
+
+    for n in range(1, 5):
+        for spec in itertools.product((None, 1, 2, 3), repeat=n):
+            pairs = [_heading(f"p1-e{i}", i, f"H{i}", level or 2) for i, level in enumerate(spec)]
+            fixes = [
+                f.model_copy(update={"status": Status.REJECTED}) if level is None else f
+                for (_, f), level in zip(pairs, spec, strict=True)
+            ]
+            elements = [e for e, _ in pairs]
+            html = assemble.render_html(
+                title="T", lang="en", elements=elements, fixes=fixes, crops={}
+            )
+            assert html.count("<h1") <= 1, spec
+            moved = assemble.title_shift(elements, fixes)
+            assert (html.count("<h1") == 1 and moved == 1) or moved == 0, spec
+
+
 def test_a_chosen_title_is_escaped():
     html = render('Forces <script>x</script> & "more"', title_set=True)
     assert "<script>x" not in html

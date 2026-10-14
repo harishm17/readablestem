@@ -1,0 +1,12 @@
+{# A link to the review record (T3-6, routes/record.py): a page to print and a CSV for the
+   person's accessibility office. #}
+<section aria-labelledby="record-link-heading">
+  <h2 id="record-link-heading">Record for your accessibility office</h2>
+  <p>A list of what the tool did to this document, what you decided and when, which parts
+    were not converted, which checks ran and what was not checked. It is a record, not a
+    verdict. It goes when the document is deleted, so keep a copy.</p>
+  <ul class="actions">
+    <li><a href="/jobs/{{ job.id }}/record">Open the review record</a></li>
+    <li><a href="/jobs/{{ job.id }}/record.csv">Download it as a CSV file</a></li>
+  </ul>
+</section>

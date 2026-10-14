@@ -823,7 +823,8 @@ class NotationEntry(BaseModel):
     (a styled Unicode letter such as U+1D41D for bold d and U+211D for the reals, or a
     letter followed by a combining arrow or hat); one entry per key in a course. `note` is
     the instructor's own short wording, if any. `source`: "user" (typed on the course
-    page) or "review" (remembered from a review decision).
+    page), "review" (remembered from a review decision) or "document" (ticked from the
+    notation the course's documents use).
 
     User content: it belongs to the instructor's course, travels to a model only fenced
     as untrusted data (like document text), and is deleted with the course or the user.
@@ -833,7 +834,7 @@ class NotationEntry(BaseModel):
     canonical: str = Field(min_length=1, max_length=64)
     meaning: NotationMeaning
     note: str | None = Field(default=None, max_length=200)
-    source: Literal["user", "review"] = "user"
+    source: Literal["user", "review", "document"] = "user"
 
 
 # --------------------------------------------------------------------------- run options

@@ -159,7 +159,10 @@ def test_a_colour_run_gets_a_class_and_one_rule_per_colour():
         '<span class="tc-ff0000">Vectors</span> are red and '
         '<span class="tc-ff0000">so is this</span>.'
     )
-    assert styles.added == {"colour-tc-ff0000": ".tc-ff0000 { color: #ee0000; }\n"}
+    assert styles.added == {
+        "colour-tc-ff0000": ".tc-ff0000 { color: #ee0000; }\n"
+        "@media screen and (prefers-color-scheme: dark) { .tc-ff0000 { color: #ff0000; } }\n"
+    }
 
 
 def test_colour_spans_sit_inside_links_and_may_wrap_maths():
@@ -186,8 +189,14 @@ def test_without_add_style_colour_is_not_written():
 
 
 def test_colour_css_reaches_the_minimum_contrast():
-    assert colour_css((210, 210, 210)) == ".tc-d2d2d2 { color: #767676; }\n"
-    assert colour_css((0, 0, 255)) == ".tc-0000ff { color: #0000ff; }\n"
+    assert colour_css((210, 210, 210)) == (
+        ".tc-d2d2d2 { color: #767676; }\n"
+        "@media screen and (prefers-color-scheme: dark) { .tc-d2d2d2 { color: #d2d2d2; } }\n"
+    )
+    # Blue is readable on white as printed; on the dark page it is lightened.
+    light, dark = colour_css((0, 0, 255)).split("\n@media", 1)
+    assert light == ".tc-0000ff { color: #0000ff; }"
+    assert "prefers-color-scheme: dark) { .tc-0000ff { color: #" in dark and "#0000ff" not in dark
 
 
 # --------------------------------------------------------------------------- unchanged text

@@ -115,6 +115,7 @@ def test_the_only_styles_left_behind_are_known(made):
         ":focus-visible",
         "@media (min-width: 44rem)",
         "@media print",
+        "@media screen and (prefers-color-scheme: dark)",  # Canvas has its own colours
     }
 
 

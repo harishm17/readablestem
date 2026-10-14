@@ -56,6 +56,9 @@ caption { caption-side: top; text-align: left; font-weight: 700; padding: 0 0 0.
 th, td { border: 1px solid #5c5c5c; padding: 0.3em 0.6em; text-align: left;
   vertical-align: top; }
 thead th { border-bottom-width: 3px; }
+@media screen and (prefers-color-scheme: dark) {
+  th, td { border-color: #a6a6a6; }
+}
 """
 # A table estimated at least this wide (em of the body text) may not fit a 320 CSS px
 # screen: the column is then 288 px, 16 em of the 18 px body text. The estimate counts

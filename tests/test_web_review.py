@@ -861,10 +861,15 @@ def heading_doc(*spec: int | None) -> DocumentResult:
 
 
 def written_levels(data: DocumentResult) -> dict[str, int]:
-    """element_id -> N of the <hN> the real assembler writes for it."""
+    """element_id -> N of the <hN> the real assembler writes for it, without the move down
+    that gives a file with several top-level headings one title (T3-13, `title_shift`): the
+    review screen speaks of the outline repair's levels."""
+    from unittest.mock import patch
+
     from a11y_stem.pipeline.assemble import render_html
 
-    html = render_html(title="t", lang="en", elements=data.elements, fixes=data.fixes, crops={})
+    with patch("a11y_stem.pipeline.assemble.title_shift", return_value=0):
+        html = render_html(title="t", lang="en", elements=data.elements, fixes=data.fixes, crops={})
     return {eid: int(n) for n, eid in re.findall(r'<h([1-6]) id="(p1-e\d+)"', html)}
 
 
