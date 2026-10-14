@@ -20,13 +20,22 @@
   figures), the conversion result (proposed LaTeX, MathML, alt text and headings), the
   converted HTML, and your review decisions.</p>
 <ul>
-  <li>All of it is deleted automatically <strong>{{ retention_hours }} hours</strong> after
-    upload. From that moment it can no longer be opened or downloaded; an hourly clean-up
-    then removes it from the database, normally within the hour.</li>
-  <li>If you tick "Keep my document and results for {{ opt_in_days }} days to help improve
-    the tool", it is deleted after <strong>{{ opt_in_days }} days</strong> instead. During
-    that time Harish may look at the conversion results to find and fix mistakes in the
-    tool. The box is unticked unless you tick it.</li>
+  {# TODO(Harish): final wording of these three lines (T1-8). What the code does: the
+     24-hour and 7-day clocks restart on every review decision, language, title or contact
+     change, and download; "Keep 7 more days" on the job page makes a 24-hour document a
+     7-day one; the developer-look choice is 30 days from upload and does not restart. #}
+  <li>If you tick neither box on the upload form, all of it is deleted automatically
+    <strong>{{ retention_hours }} hours</strong> after you last worked on it: after your
+    last review decision or download, or the upload if there is none. From that moment it
+    can no longer be opened or downloaded; an hourly clean-up then removes it from the
+    database, normally within the hour.</li>
+  <li>If you tick "Keep for 7 days, only I can see it", it is deleted
+    <strong>7 days</strong> after you last worked on it instead. Nobody else looks at it.
+    "Keep 7 more days" on the document's page does the same later.</li>
+  <li>If you also tick "Also let the developer look ({{ opt_in_days }} days)", it is
+    deleted <strong>{{ opt_in_days }} days</strong> after upload. During that time Harish
+    may look at the conversion results to find and fix mistakes in the tool. Both boxes
+    are unticked unless you tick them.</li>
   <li>You can delete a document and everything made from it at any time with
     "Delete now". It is removed from the database straight away.</li>
   {# TODO(Harish): this matches the deploy default (SQL_RETAINED_BACKUPS=1). Decide the

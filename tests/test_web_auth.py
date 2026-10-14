@@ -294,11 +294,14 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/dev-login",
         "/internal/cron/aggregate-and-purge",  # token-authenticated, no session
         "/jobs",
+        "/jobs/{job_id}/contact",  # the student file's contact line (T1-17)
         "/jobs/{job_id}/delete",
         "/jobs/{job_id}/feedback",
+        "/jobs/{job_id}/keep",  # keep 7 more days (T1-8)
         "/jobs/{job_id}/language",
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
+        "/jobs/{job_id}/title",  # the title students hear (T1-7)
         "/jobs/{job_id}/undo",
         "/login",
         "/login/microsoft",

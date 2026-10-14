@@ -142,8 +142,9 @@ def test_privacy_and_terms_are_drafts_describing_real_behaviour(pages):
         assert "Draft, to be reviewed by Harish." in pages[path]
         assert "help@example.org" in pages[path]
     privacy = " ".join(pages["/privacy"].split())
-    assert "deleted automatically <strong>24 hours</strong> after upload" in privacy
-    assert "<strong>30 days</strong>" in privacy and "unticked unless you tick it" in privacy
+    assert "deleted automatically <strong>24 hours</strong> after you last worked on it" in privacy
+    assert "<strong>7 days</strong>" in privacy and "<strong>30 days</strong>" in privacy
+    assert "Both boxes are unticked unless you tick them" in privacy
     assert "never used to train AI models" in privacy
     assert "student records" in privacy
     assert "never contain document text" in privacy

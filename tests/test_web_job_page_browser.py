@@ -232,7 +232,7 @@ def test_the_steps_update_without_touching_the_live_region(site, browser, jobs):
     site.converter.output = card_output()  # 3 decisions open
     finish(site, job_id)
     page.locator("#job-status").get_by_role("link", name="Start the review").wait_for(timeout=15000)
-    assert page.title() == f"Converted: {LONG_NAME} | a11y-stem"
+    assert page.title() == "Converted: SECRET-HEADING Kinematics | a11y-stem"
     assert page.locator("#job-progress li").count() == 0
     context.close()
 
@@ -251,12 +251,13 @@ def test_the_draft_and_the_language_work_without_javascript(site, browser, jobs)
     page.get_by_role("link", name="Review 3 decisions first").click()
     assert "/review" in page.url
     page.goto(f"{site.base}/jobs/{job_id}")
+    page.locator("details.inline-details > summary").click()  # a details element: no script
     page.get_by_label("Language of this document").select_option("de")
     page.get_by_role("button", name="Confirm this language").click()
     assert "The language is now German." in page.locator(".notice").first.inner_text()
     # The confirmation is where focus is, in view (it was 1,365 px above the viewport).
     assert page.evaluate("document.activeElement.classList.contains('notice')")
-    assert "German (you chose it)" in page.locator("#language-heading + p").inner_text()
+    assert "German (you chose it)" in page.locator(".setting-line p").inner_text()
     context.close()
 
 

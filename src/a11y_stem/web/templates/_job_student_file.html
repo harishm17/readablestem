@@ -1,0 +1,42 @@
+{# What students see of this file that the instructor sets: the title they hear (T1-7, POST
+   /jobs/{id}/title) and a contact line in the footer (T1-17, POST /jobs/{id}/contact). Both
+   are CSRF-checked, owner only, and make the HTML file again. #}
+{% set title_error = field_errors.get("title") %}
+{% set contact_error = field_errors.get("contact") %}
+<section aria-labelledby="student-file-heading">
+  <h2 id="student-file-heading">For students</h2>
+  <form method="post" action="/jobs/{{ job.id }}/title" class="student-setting">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field{% if title_error %} field-error{% endif %}">
+      <label for="title">Title students hear</label>
+      <p class="hint" id="title-hint">Screen readers say it when the file opens, and it
+        names the downloaded file. {% if job.title_override %}You chose this title. Clear
+        the box to use the one from your PDF.{% else %}It comes from your PDF; change it if
+        it is not what students call this document.{% endif %} If the file has no top
+        heading, the title is written as one.</p>
+      {% if title_error %}
+      <p class="error-message" id="title-error"><span class="visually-hidden">Error: </span>{{ title_error.message }}</p>
+      {% endif %}
+      <input type="text" id="title" name="title" maxlength="200" autocomplete="off"
+             value="{{ typed.get('title') if 'title' in typed else (job.title_override or pg.title_suggested) }}"
+             aria-describedby="title-hint{% if title_error %} title-error{% endif %}"{% if title_error %} aria-invalid="true"{% endif %}>
+    </div>
+    <button type="submit" class="button-secondary">Save the title</button>
+  </form>
+  <form method="post" action="/jobs/{{ job.id }}/contact" class="student-setting">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <div class="field{% if contact_error %} field-error{% endif %}">
+      <label for="contact">Contact line for students (optional)</label>
+      <p class="hint" id="contact-hint">An email address or a web address. It is added to
+        the note at the end of the file, where students are told whom to ask about a part
+        they cannot read. Leave it empty for none.</p>
+      {% if contact_error %}
+      <p class="error-message" id="contact-error"><span class="visually-hidden">Error: </span>{{ contact_error.message }}</p>
+      {% endif %}
+      <input type="text" id="contact" name="contact" maxlength="254" autocomplete="off" spellcheck="false"
+             value="{{ typed.get('contact') if 'contact' in typed else (job.contact_line or '') }}"
+             aria-describedby="contact-hint{% if contact_error %} contact-error{% endif %}"{% if contact_error %} aria-invalid="true"{% endif %}>
+    </div>
+    <button type="submit" class="button-secondary">Save the contact line</button>
+  </form>
+</section>

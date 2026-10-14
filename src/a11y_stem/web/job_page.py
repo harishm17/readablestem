@@ -251,11 +251,18 @@ class Breakdown:
         return f"{kinds_phrase(self.as_image_kinds)} {verb} of the original."
 
 
+def shown_as_image(fix: Fix) -> bool:
+    """The original is kept as an image in the HTML file (T1-3). Not a heading: "Make bold
+    text" rejects a heading too (`Status.REJECTED`), but what the student file gets is the
+    heading's text as bold text, which a screen reader reads."""
+    return fix.kind is not Kind.HEADING and fix.status in KEPT_ORIGINAL_STATUSES
+
+
 def breakdown(fixes: list[Fix]) -> Breakdown:
     waiting = [f for f in fixes if f.pending]
     decided = [f for f in fixes if not f.pending and f.decided_by_reviewer]
     accepted = [f for f in fixes if not f.pending and not f.decided_by_reviewer]
-    images = [f for f in fixes if f.status in KEPT_ORIGINAL_STATUSES]
+    images = [f for f in fixes if shown_as_image(f)]
     grouped = [unit[0] for unit in triage.units(waiting) if len(unit) > 1]
     return Breakdown(
         items=len(fixes),
@@ -360,6 +367,10 @@ class Row:
     question: str  # completes "Can a screen-reader user ..."
     pdf: str
     html: str
+    # A link from the HTML cell to the notice that explains it (T1-15): the section it is
+    # listed in on the same page, and the words of the link.
+    href: str = ""
+    href_text: str = ""
 
 
 @dataclass(frozen=True)
@@ -647,13 +658,32 @@ def _table_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
     return Row("read a table cell by cell", pdf, html + ".")
 
 
+def link_counts(facts: SourceFacts, result: DocumentResult) -> tuple[int, int, int]:
+    """(links in the PDF, links kept in the HTML, links dropped because they were not web
+    or email addresses): what the link row of the card says (T1-15)."""
+    kept = sum(1 for e in result.elements for link in e.links if link.kind in ("uri", "internal"))
+    dropped = sum(n.count for n in result.notices if n.code == "link_scheme_dropped")
+    return facts.links, kept, dropped
+
+
 def _link_row(facts: SourceFacts, result: DocumentResult) -> Row | None:
     if not facts.links:
         return None
-    kept = sum(1 for e in result.elements for link in e.links if link.kind in ("uri", "internal"))
-    pdf = f"Yes: {plural(facts.links, 'link')}."
-    html = f"Yes: {plural(kept, 'link')}." if kept else "Not yet: links are plain text in the HTML."
-    return Row("follow the links", pdf, html)
+    total, kept, dropped = link_counts(facts, result)
+    pdf = f"Yes: {plural(total, 'link')}."
+    if kept >= total:
+        return Row("follow the links", pdf, f"Yes: {plural(kept, 'link')}.")
+    html = f"{kept} of {plural(total, 'link')} kept"
+    if not dropped:
+        return Row("follow the links", pdf, html + ".")
+    were = "was" if dropped == 1 else "were"
+    html += f"; {dropped} {were} not web addresses."
+    notice = next(
+        (n for n in notice_rules.current(result) if n.code == "link_scheme_dropped"), None
+    )
+    section = notice_rules.section(notice) if notice is not None else "not_handled"
+    href = "#worth-checking-heading" if section == "worth_checking" else "#not-handled-heading"
+    return Row("follow the links", pdf, html, href, "See the notice")
 
 
 def _title_row(facts: SourceFacts, result: DocumentResult) -> Row:
@@ -918,6 +948,24 @@ class PageData:
     first_open: str | None  # the review screen's first open decision (a key)
     finish: Finish
     draft: str  # what students get from a draft download
+    # The title the file has without the instructor's choice (T1-7): the field's start.
+    title_suggested: str = ""
+
+
+def suggested_title(result: DocumentResult) -> str:
+    """The title students hear when the instructor has not chosen one (T1-7): what the HTML
+    file's `<title>` is, so the field starts with what the file already says."""
+    from a11y_stem.pipeline import assemble
+
+    first = _first_fixes(result)
+    headings = [
+        text
+        for element in sorted(result.elements, key=lambda e: e.order)
+        if element.kind is Kind.HEADING
+        for level, text in [assemble.heading_parts(element, first.get(element.id))]
+        if level is not None
+    ]
+    return assemble.suggested_title(result.title, headings)
 
 
 def found_sentence(result: DocumentResult) -> str:
@@ -954,4 +1002,5 @@ def page_data(result: DocumentResult, last_decision: date | None) -> PageData:
             not_handled=len(notices.not_handled),
         ),
         draft=draft_sentence(result.fixes),
+        title_suggested=suggested_title(result),
     )

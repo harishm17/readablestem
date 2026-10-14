@@ -5,7 +5,9 @@
    everywhere on this page: title, status box and the sections below. `job.page` is the
    page's data from a finished job's result. #}
 {% set outcome = outcome|default(none) %}
-{% block title %}{{ headline.label }}: {{ job.filename }}{% endblock %}
+{% set field_errors = field_errors|default({}) %}
+{% set typed = typed|default({}) %}
+{% block title %}{% if errors|default([]) %}Error: {% endif %}{{ headline.label }}: {{ job.title }}{% endblock %}
 {% block head %}
 {% if auto_reload and not job.finished %}
 {# Without JavaScript, and only when the user asked for it (?auto=1), reload until the
@@ -16,7 +18,9 @@
 {% endif %}
 {% endblock %}
 {% block content %}
-<h1>{{ job.filename }}</h1>
+{% include "_error_summary.html" %}
+<h1>{{ job.title }}</h1>
+{% if job.title != job.filename %}<p class="doc-file">File: {{ job.filename }}</p>{% endif %}
 {% include "_job_course.html" %}
 {# A polite live region that changes per step, not per element: the counts are in the
    list below it, outside the region (_job_progress.html). #}
@@ -76,7 +80,9 @@
   </div>
   {% endif %}
   <p>{{ pg.found }}</p>
-  {# One breakdown (MF6): every item is waiting, accepted for you or decided by you. #}
+  {# Decisions are the one unit (MF6, T1-3, T1-11): the same count here, on the review
+     screen and in My documents. Items are not counted; a group of repeated headings is
+     one decision. #}
   <dl class="summary-list">
     <div><dt>Pages</dt><dd>{{ s.pages }}</dd></div>
     <div><dt>Equations</dt><dd>{{ s.by_kind.get("equation", 0) }}</dd></div>
@@ -87,18 +93,13 @@
     {% if s.by_kind.get("page") %}<div><dt>Pages kept as images</dt><dd>{{ s.by_kind["page"] }}</dd></div>{% endif %}
     {% if s.by_kind.get("handwriting") %}<div><dt>Handwriting kept as images</dt><dd>{{ s.by_kind["handwriting"] }}</dd></div>{% endif %}
     <div><dt>List items</dt><dd>{{ s.list_items }}</dd></div>
-    <div><dt>Need your decision</dt><dd>{{ c.decisions }}</dd></div>
-    <div><dt>Accepted for you</dt><dd>{{ c.accepted }}{% if c.notes %} <span class="meta">({{ c.notes }} with a note{% if s.second_check %}, {{ s.second_check }} worth a look{% endif %})</span>{% endif %}</dd></div>
-    <div><dt>Decided by you</dt><dd>{{ c.decided }}</dd></div>
-    {# Every attempt, including one interrupted before it could store a result. #}
-    <div><dt>Model cost</dt><dd>{{ job.cost_usd|usd }}</dd></div>
+    <div><dt>Decisions to make</dt><dd>{{ c.decisions }}</dd></div>
+    <div><dt>Decisions you made</dt><dd>{{ c.decided_units }}</dd></div>
   </dl>
-  <p id="items-count">Of the {{ c.items }} {{ "item" if c.items == 1 else "items" }} found,
-    {{ c.waiting }} {{ "waits" if c.waiting == 1 else "wait" }} for your decision,
-    {{ c.accepted }} {{ "was" if c.accepted == 1 else "were" }} accepted for you and
-    {{ c.decided }} {{ "was" if c.decided == 1 else "were" }} decided by you.
-    {%- if c.waiting != c.decisions and c.grouped_reason %} The {{ c.waiting }} waiting make {{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }}: {{ c.grouped_reason }}.{% endif %}
-    {%- if c.as_image %} {{ c.as_image_sentence }}{% endif %}</p>
+  {% if c.as_image %}<p id="items-count">{{ c.as_image_sentence }}</p>{% endif %}
+  {% if c.notes %}
+  <p id="notes-line">{{ c.notes }} {{ "part was" if c.notes == 1 else "parts were" }} accepted for you with a note{% if s.second_check %} ({{ s.second_check }} worth a look){% endif %}: <a href="/jobs/{{ job.id }}/review/list#optional-checks">see the notes</a>. None of them holds up the file.</p>
+  {% endif %}
   {% if c.decisions %}
   {# One link per kind, straight to its first decision on the review screen. A group of
      repeated headings is one decision, and so are the pages kept as images for one
@@ -118,8 +119,7 @@
   <p>{{ n }} of {{ s.checks_run }} checks did not pass{% if c.decisions %} (they run again after each review decision){% endif %}:</p>
   <ul class="check-list" aria-labelledby="checks-heading">
     {% for check in s.failed_checks %}
-    <li><strong>{{ check.severity }}:</strong> {{ check.text }}
-      <span class="code-line">Code: <code>{{ check.code }}</code></span></li>
+    <li><strong>{{ check.severity }}:</strong> {{ check.text }}</li>
     {% endfor %}
   </ul>
   {% else %}
@@ -127,24 +127,58 @@
     title, headings, lists, image alt attributes), not at whether its content is right.</p>
   {% endif %}
   {% endif %}
+  {# T1-11: say what ran and what did not, so a pass is not read as more than it is. #}
+  <details class="tech" id="checks-ran">
+    <summary>What was checked, and what was not</summary>
+    <p><strong>Ran on this file:</strong>{% if s.checks_run %} {{ s.checks_run }} checks of its
+      structure: the language, the title, the order of the headings, lists, links, tables
+      and the alt attribute of every image.{% else %} no structure checks are stored for this
+      file.{% endif %}</p>
+    <p><strong>Did not run on this file:</strong> the axe accessibility test (it runs on
+      our own test documents, not on yours) and testing with a screen reader. Nobody has
+      listened to this file with NVDA, JAWS or VoiceOver. Read the student version through
+      once before you share it.</p>
+  </details>
 </section>
 
 {% include "_job_language.html" %}
+{% include "_job_student_file.html" %}
 {% elif job.status == "failed" %}
 <section aria-labelledby="failed-heading">
   <h2 id="failed-heading">Why the conversion stopped</h2>
   <p>{{ outcome.message if outcome else job.status_detail }}</p>
-  <p class="hint">Error code: <code>{{ job.error_code or "unknown" }}</code></p>
+  <details class="tech">
+    <summary>Details for a bug report</summary>
+    <p>Error code: <code>{{ job.error_code or "unknown" }}</code></p>
+  </details>
 </section>
 {% endif %}
 
-{# A secondary action, last on the page (MF17): deleting is confirmed on its own page. #}
+{# A secondary action, last on the page (MF17): deleting is confirmed on its own page.
+   How long the document is kept is T1-8 (web/retention.py): the clock restarts on a
+   decision, a change or a download; "Keep 7 more days" makes it a 7-day document. #}
 <section aria-labelledby="delete-heading">
-  <h2 id="delete-heading">Deleting this document</h2>
+  <h2 id="delete-heading">Keeping and deleting this document</h2>
+  {% if job.retention_mode == "dev" %}
+  <p>You let the developer look at the results, so this document is kept for
+    {{ opt_in_days }} days from upload. It will be deleted automatically on
+    {{ job.retain_until|utc }}.</p>
+  {% elif job.retention_mode == "week" %}
+  <p>This document is kept for 7 days, and only you can see it. It will be deleted
+    automatically on {{ job.retain_until|utc }}. Working on it or downloading it starts the
+    7 days again.</p>
+  {% else %}
   <p>This document and everything made from it will be deleted automatically on
-    {{ job.retain_until|utc }}{% if job.opt_in %} (you chose to keep it for longer to help
-    improve the tool){% endif %}.</p>
-  <form method="post" action="/jobs/{{ job.id }}/delete">
+    {{ job.retain_until|utc }}, {{ retention_hours }} hours after you last worked on it.
+    Working on it or downloading it starts the {{ retention_hours }} hours again.</p>
+  {% endif %}
+  {% if job.retention_mode != "dev" %}
+  <form method="post" action="/jobs/{{ job.id }}/keep" class="inline-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    <button type="submit" class="button-secondary">Keep 7 more days</button>
+  </form>
+  {% endif %}
+  <form method="post" action="/jobs/{{ job.id }}/delete" class="inline-form">
     <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
     <button type="submit" class="button-secondary">Delete now</button>
   </form>

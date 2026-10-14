@@ -84,7 +84,7 @@ def stored(web, job_id: str) -> DocumentResult:
 def test_open_decisions_are_the_headline_and_the_review_is_one_click_away(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Converted: notes.pdf | a11y-stem"
+    assert title(html) == "Converted: SECRET-HEADING Kinematics | a11y-stem"
     status = page_text(section_of_status(html))
     assert "Converted 3 decisions need you before you share it." in status
     actions = html[
@@ -111,7 +111,7 @@ def test_nothing_to_decide_is_ready_to_share_with_the_download_first(web):
         fix.reviewed = False  # accepted by the pipeline: nothing needed a decision
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Ready to share: notes.pdf | a11y-stem"
+    assert title(html) == "Ready to share: SECRET-HEADING Kinematics | a11y-stem"
     ready = page_text(section(html, "ready-heading"))
     assert "Nothing in this file needed your decision." in ready
     assert f'<a class="button" href="/jobs/{job_id}/download">Download the HTML file</a>' in html
@@ -139,7 +139,7 @@ def test_after_the_last_decision_the_page_says_who_decided_and_when(web):
                                element_id="p1-e3", action="accept"))  # fmt: skip
     html = web.browser.get(f"/jobs/{job_id}").text
     # The abstained equation was kept as an image: ready, but said plainly.
-    assert title(html) == "Ready: notes.pdf | a11y-stem"
+    assert title(html) == "Ready: SECRET-HEADING Kinematics | a11y-stem"
     assert "1 equation is shown as an image that screen readers cannot read." in page_text(html)
     today = utcnow().date()
     ready = page_text(section(html, "ready-heading"))
@@ -158,7 +158,10 @@ def test_an_ai_outage_is_not_shown_as_finished(web):
             )
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
-    assert title(html) == "Stopped: the AI service did not answer: notes.pdf | a11y-stem"
+    assert (
+        title(html)
+        == "Stopped: the AI service did not answer: SECRET-HEADING Kinematics | a11y-stem"
+    )
     text = page_text(html)
     assert "did not answer for 4 of 4 equations and figures" in text
     assert "Nothing is wrong with your PDF" in text
@@ -181,12 +184,11 @@ def test_the_counts_add_up_and_match_the_review_screen(web):
     job_id = convert(web)
     html = web.browser.get(f"/jobs/{job_id}").text
     results = page_text(section(html, "results-heading"))
-    assert "Of the 5 items found, 3 wait for your decision, 2 were accepted for you and 0 " in (
-        results
-    )
+    # Decisions are the one unit (T1-11): no count of items waiting, accepted or decided.
+    assert "Of the 5 items" not in results and "were accepted for you" not in results
     assert "1 equation is shown as an image of the original." in results, results
     review = page_text(web.browser.get(f"/jobs/{job_id}/review").text)
-    assert "3" in review and "Need your decision 3" in results
+    assert "3" in review and "Decisions to make 3" in results
 
 
 def test_a_heading_group_counts_once_and_the_page_says_why(web):
@@ -202,8 +204,8 @@ def test_a_heading_group_counts_once_and_the_page_says_why(web):
         )  # fmt: skip
     job_id = convert(web)
     results = page_text(section(web.browser.get(f"/jobs/{job_id}").text, "results-heading"))
-    assert "Need your decision 4" in results
-    assert "The 6 waiting make 4 decisions: repeated headings are decided together." in results
+    assert "Decisions to make 4" in results
+    assert "waiting make" not in results  # items are not counted, only decisions
 
 
 # --------------------------------------------------------------------------- progress
@@ -362,7 +364,7 @@ def test_notices_are_listed_per_page_with_their_decisions(web):
         rf'[.)] <a href="/jobs/{job_id}/review\?item=p1-e9">Decide it<span', not_handled
     )
     # The table's decision is counted once, with the others, not again for its notice.
-    assert "Need your decision 4" in page_text(section(html, "results-heading"))
+    assert "Decisions to make 4" in page_text(section(html, "results-heading"))
 
 
 def test_a_colour_notice_does_not_link_to_a_decision_about_something_else(web):

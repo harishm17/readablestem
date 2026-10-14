@@ -119,6 +119,16 @@ class Job(Base):
     # Bumped by every review write, so a review screen open in an older tab can tell its
     # copy is stale. The server default keeps rows inserted by an older release valid.
     result_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # How long the job is kept (`web.retention`): "day" (the default hours), "week" (7
+    # days, only its owner sees it) or "dev" (30 days, the developer may look; always
+    # with `opt_in_retention`). The clock restarts on activity for "day" and "week".
+    retention_mode: Mapped[str] = mapped_column(String(8), default="day", server_default="day")
+    # The title the instructor chose for students (`web.titles`), used instead of the one
+    # read from the PDF. Document-derived, so deleted with the job.
+    title_override: Mapped[str | None] = mapped_column(String(300))
+    # A contact line (an email address or web address) the instructor chose for the
+    # student file's footer (`web.titles.clean_contact`). Document-derived.
+    contact_line: Mapped[str | None] = mapped_column(String(320))
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(

@@ -170,7 +170,7 @@ flowchart LR
 ```
 
 A FastAPI app wraps the pipeline with sign-in, an allowlist, spend caps and short retention
-(uploads are deleted after 24 hours unless the user opts in to 30 days). Every model request
+(uploads are deleted 24 hours after the last activity, or after 7 days or 30 days if the user chooses). Every model request
 reserves its worst-case cost before it is sent. Logs carry counts and category codes, never
 document content. The architecture, its module contracts and the rules every part follows
 are in [docs/design/beta-architecture.md](docs/design/beta-architecture.md); the reasons for

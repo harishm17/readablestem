@@ -53,7 +53,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import events, notation
+from a11y_stem.web import events, heading_groups, notation, retention
 from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
 from a11y_stem.web.deps import (
     ELEMENT_ID,
@@ -112,7 +112,7 @@ from a11y_stem.web.review import (
     kind_for_slug,
     needs_attention,
     next_to_review,
-    rerender_html,
+    rerender_job_html,
     restorable,
     review_anchor,
     undo_last,
@@ -441,6 +441,17 @@ class HeadingGroupView:
     error: str | None = None
     notices: list[str] = field(default_factory=list)
     members_open: bool = False  # one of them was just decided on its own
+    # The advice (`web.heading_groups`, T1-18): the answer to suggest ("bold" or "keep"),
+    # the fact that decides it, and up to three copies to look at.
+    suggest: str = "keep"
+    fact: str = ""
+    crops: list[heading_groups.Crop] = field(default_factory=list)
+
+    @property
+    def bold_first(self) -> bool:
+        """The suggested answer is the main button: bold text when that is the advice, or
+        the only direct choice (keeping them would move their level)."""
+        return self.suggest == "bold" or not self.keep
 
     @property
     def waiting(self) -> int:
@@ -838,6 +849,9 @@ def _heading_group(
         pages=[m.page for m in members if m.page],
         keep=keep,
         values={"level": str(level or 1)},
+        suggest=(advised := heading_groups.advice(result, unit)).suggest,
+        fact=advised.fact,
+        crops=heading_groups.crops(unit, elements),
     )
 
 
@@ -1198,9 +1212,10 @@ def review_action(
             _refuse_stale(job, version)
             result = DocumentResult.model_validate(job.result_json or {})
             change_made = apply_review(result, element_id, action, form, anyway=anyway)
-            job.html = rerender_html(result, _crops(session, job.id))
+            job.html = rerender_job_html(job, result, _crops(session, job.id))
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
+            retention.restart_clock(job, get_ctx(request).settings)
             session.add(_review_edit(job.id, user, change_made, written))
             _decision_events(request, session, user, job, result, "single", 1)
     except LookupError:
@@ -1272,9 +1287,10 @@ def _group_action(
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_group(result, group_key, action, {"level": level}, every=every)
             if outcome.changes:  # nothing left to decide: no write, no re-render
-                job.html = rerender_html(result, _crops(session, job.id))
+                job.html = rerender_job_html(job, result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
+                retention.restart_clock(job, get_ctx(request).settings)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
                 _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
@@ -1337,9 +1353,10 @@ def _page_group_action(
             result = DocumentResult.model_validate(job.result_json or {})
             outcome = apply_page_group(result, group_key)
             if outcome.changes:  # nothing left to decide: no write, no re-render
-                job.html = rerender_html(result, _crops(session, job.id))
+                job.html = rerender_job_html(job, result, _crops(session, job.id))
                 job.result_json = result.model_dump(mode="json", exclude={"html"})
                 written = bump_result_version(job)
+                retention.restart_clock(job, get_ctx(request).settings)
                 session.add_all(_review_edit(job.id, user, c, written) for c in outcome.changes)
                 _decision_events(request, session, user, job, result, "group", len(outcome.changes))
     except LookupError:
@@ -1526,9 +1543,10 @@ def undo(
                 raise LookupError("nothing to undo")
             result = DocumentResult.model_validate(job.result_json or {})
             changes = undo_last(result, [(e.element_id, e.before or {}) for e in edits])
-            job.html = rerender_html(result, _crops(session, job.id))
+            job.html = rerender_job_html(job, result, _crops(session, job.id))
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
+            retention.restart_clock(job, get_ctx(request).settings)
             session.add_all(_review_edit(job.id, user, c, written) for c in changes)
     except ReviewStale:
         log_event(logger, "review_stale", job_id=job_id)

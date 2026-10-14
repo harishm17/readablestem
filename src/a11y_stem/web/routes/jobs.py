@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.pipeline import export_canvas, text_pass
 from a11y_stem.pipeline import language as languages
-from a11y_stem.web import documents, events, notation
+from a11y_stem.web import documents, events, notation, retention
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web.database import as_utc, utc_today
@@ -405,10 +405,12 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 course=chosen,
             )
         )
-    keep = form.fields.get("keep") == "on"
+    mode = retention.mode_for_upload(
+        keep=form.fields.get("keep") == "on", share=form.fields.get("share") == "on"
+    )
     try:
         job_id = await run_in_threadpool(
-            _store_upload, ctx, user, form.filename, form.data, pages, keep, course_id
+            _store_upload, ctx, user, form.filename, form.data, pages, mode, course_id
         )
     except TooManyJobs as exc:
         return await run_in_threadpool(
@@ -438,7 +440,9 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 course=chosen,
             )
         )
-    log_event(logger, "job_created", job_id=job_id, pages=pages, opt_in=keep)
+    log_event(
+        logger, "job_created", job_id=job_id, pages=pages, opt_in=mode == "dev", retention=mode
+    )
     # Usage events (web/events.py): `uploaded`, and `reuploaded` for the same file again.
     data = form.data or b""
     await run_in_threadpool(
@@ -484,15 +488,12 @@ def _store_upload(
     filename: str,
     data: bytes,
     pages: int,
-    keep: bool,
+    mode: str,
     course_id: str | None = None,
 ) -> str:
     """Count the pages against today's quota and queue the job, in one transaction."""
     s = ctx.settings
     now = utcnow()
-    keep_for = (
-        timedelta(days=s.opt_in_retention_days) if keep else timedelta(hours=s.retention_hours)
-    )
     with session_scope(ctx.factory) as session:
         # Checked before the pages are counted: a refusal costs nothing.
         active = session.scalar(
@@ -525,8 +526,9 @@ def _store_upload(
             status=JobStatus.QUEUED,
             filename=filename,
             page_count=pages,
-            opt_in_retention=keep,
-            retain_until=now + keep_for,
+            opt_in_retention=mode == "dev",
+            retention_mode=mode,
+            retain_until=retention.retain_until_at_upload(s, mode, now),
             created_at=now,
             course_id=course_id,
         )
@@ -602,7 +604,7 @@ def job_status(request: Request, job_id: str, user: UserDep, v: str = "") -> Res
     if request.headers.get("HX-Request") == "true":
         # htmx sets document.title from a top-level <title> in the fragment.
         headline: page_rules.Headline = context["headline"]
-        context["page_title"] = f"{headline.label}: {job.filename}"
+        context["page_title"] = f"{headline.label}: {job.title}"
     return render(request, "_job_status.html", context)
 
 
@@ -670,11 +672,12 @@ def set_language(
         except ValueError:
             raise refused from None
         crops = _crops(session, job.id)
-        from a11y_stem.web.review import bump_result_version, rerender_html
+        from a11y_stem.web.review import bump_result_version, rerender_job_html
 
-        job.html = rerender_html(result, crops, checked_on=last_decision(session, job))
+        job.html = rerender_job_html(job, result, crops, checked_on=last_decision(session, job))
         job.result_json = result.model_dump(mode="json", exclude={"html"})
         bump_result_version(job)  # review forms open in other tabs are now stale
+        retention.restart_clock(job, get_ctx(request).settings)
     log_event(logger, "language_set", job_id=job_id)
     flash(
         request,
@@ -729,9 +732,10 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
         job = owned_job(session, job_id, user)
         require_done(job)
         result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename)
+        title = documents.display_title(result.get("title"), job.filename, job.title_override)
         html, name = job.html or "", download_filename(title, job.id)
         still_open = documents.open_decisions(result.get("fixes"))
+        retention.restart_clock(job, ctx.settings)  # a download is activity (T1-8)
     events.record_download(
         ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
     )
@@ -850,7 +854,7 @@ def _confirm_delete_page(
     with session_scope(get_ctx(request).factory) as session:
         job = owned_job(session, job_id, user)
         result = job.result_json or {}
-        title = documents.display_title(result.get("title"), job.filename)
+        title = documents.display_title(result.get("title"), job.filename, job.title_override)
         decided = documents.decided_by_you(result.get("fixes"))
         filename, uploaded = job.filename, as_utc(job.created_at)
     context = {

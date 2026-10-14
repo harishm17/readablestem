@@ -27,7 +27,7 @@ from a11y_stem.pipeline.assemble_tables import (
     text_html,
 )
 from a11y_stem.pipeline.table_html import render_table
-from a11y_stem.pipeline.table_step import STRUCTURE_PROBLEMS
+from a11y_stem.pipeline.table_step import NOTE_CODES, STRUCTURE_PROBLEMS
 from a11y_stem.web.review import (
     cell_label,
     find_cell,
@@ -67,6 +67,9 @@ class TableCard:
     problems: list[str] = field(default_factory=list)  # structural, in plain English
     editing: CellChoice | None = None  # the cell whose form is open ("Change a cell")
     local_flat: bool = False  # the grid read from the PDF gives maths flat: not the main action
+    # The only thing the checks found is that no cell is a header (T1-19): "Use the first
+    # row as headers" is the main action, and one click settles the table.
+    only_headers_missing: bool = False
 
     def pick(self, ref: str) -> None:
         """Open the form of the cell `ref` ("r1c2"); an unknown ref opens nothing."""
@@ -156,7 +159,25 @@ def table_card(fix: Fix, element: Element | None) -> TableCard:
         card.problems = [
             grid_problem_sentence(p) for p in grid_problems(grid) if not _reported(p, fix)
         ]
+        card.only_headers_missing = _only_headers_missing(fix, grid, card)
     return card
+
+
+def _only_headers_missing(fix: Fix, grid: TableGrid, card: TableCard) -> bool:
+    """A table still waiting whose one finding is "no cell is marked as a header" and whose
+    first row can be that header: a data table of at least two rows with nothing else wrong
+    (no other failed check, no structural problem)."""
+    failed = fix.failed_checks
+    return (
+        fix.pending
+        and grid.is_data
+        and card.in_document
+        and not card.header_row
+        and grid.rows >= 2
+        and not card.problems
+        and any(c.code == "no_headers" for c in failed)
+        and all(c.code in {"no_headers", *NOTE_CODES} for c in failed)
+    )
 
 
 def _reported(problem: str, fix: Fix) -> bool:

@@ -208,7 +208,7 @@ def test_after_the_purge_its_owner_still_learns_it_was_deleted(web):
     assert purge_expired(web.ctx.factory).jobs_deleted == 1
     flat = text(web.browser.get(f"/jobs/{job_id}").text)
     assert "This document has been deleted" in flat
-    assert "deleted automatically 24 hours after upload (30 days if" in flat
+    assert "deleted automatically 24 hours after you last worked on them (7 days if" in flat
     # Anyone else learns nothing, not even that the id existed.
     bob = web.client()
     login(bob, BOB)

@@ -75,18 +75,26 @@ def test_upload_queues_a_job_with_the_pdf_and_24_hour_retention(web):
         assert blob is not None and blob.kind == "upload" and blob.content == pdf
 
 
-def test_opt_in_keeps_the_job_for_30_days(web):
-    job = web.job(job_id_from(upload(web.browser, make_pdf(1), keep=True)))
-    assert job.opt_in_retention is True
+def test_sharing_with_the_developer_keeps_the_job_for_30_days(web):
+    job = web.job(job_id_from(upload(web.browser, make_pdf(1), share=True)))
+    assert job.opt_in_retention is True and job.retention_mode == "dev"
     assert as_utc(job.retain_until) - as_utc(job.created_at) == timedelta(days=30)
 
 
-def test_opt_in_checkbox_is_off_by_default(web):
+def test_keeping_alone_is_seven_days_and_nobody_else_looks(web):
+    job = web.job(job_id_from(upload(web.browser, make_pdf(1), keep=True)))
+    assert job.opt_in_retention is False and job.retention_mode == "week"
+    assert as_utc(job.retain_until) - as_utc(job.created_at) == timedelta(days=7)
+
+
+def test_the_keep_checkboxes_are_off_by_default(web):
     page = web.browser.get("/app").text
-    assert 'id="keep"' in page
-    checkbox = page[page.index('id="keep"') - 60 : page.index('id="keep"') + 120]
-    assert "checked" not in checkbox
-    assert "Keep my document and results for 30 days to help improve the tool" in page
+    for box in ("keep", "share"):
+        assert f'id="{box}"' in page
+        checkbox = page[page.index(f'id="{box}"') - 60 : page.index(f'id="{box}"') + 120]
+        assert "checked" not in checkbox
+    assert "Keep for 7 days, only I can see it" in page
+    assert "Also let the developer look (30 days)" in page
 
 
 @pytest.mark.parametrize(
@@ -360,7 +368,7 @@ def test_job_page_polls_with_htmx_and_reloads_without_javascript_only_on_request
     for path in (f"/jobs/{job_id}", f"/jobs/{job_id}?auto=1"):
         done = web.browser.get(path).text
         assert "http-equiv" not in done and "hx-get" not in done and "noscript" not in done
-        assert "Results" in done and "Need your decision" in done
+        assert "Results" in done and "Decisions to make" in done
 
 
 def test_status_fragment_is_204_until_something_changes(web):
@@ -385,7 +393,9 @@ def test_status_fragment_is_204_until_something_changes(web):
     assert "3 decisions need you before you share it." in finished.text
     assert "show the results" not in web.browser.get(f"/jobs/{job_id}").text
     # htmx takes the document title from the fragment, so the tab title follows it.
-    assert finished.text.startswith("<title>Converted: notes.pdf | a11y-stem</title>")
+    assert finished.text.startswith(
+        "<title>Converted: SECRET-HEADING Kinematics | a11y-stem</title>"
+    )
     assert "<title>" not in fragment.text  # not without htmx (it would be in <body>)
 
 

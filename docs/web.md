@@ -66,7 +66,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `MODEL_PROVIDER`, `OPENAI_API_KEY`, `MAIN_MODEL`, `CHEAP_MODEL` | Which provider answers (`openai`, the default) and its key and models |
 | `ANTHROPIC_API_KEY`, `ANTHROPIC_MAIN_MODEL`, `ANTHROPIC_CHEAP_MODEL`, `ANTHROPIC_WORKSPACE_ID`, `ANTHROPIC_EFFORT_MAIN`, `ANTHROPIC_EFFORT_CHEAP`, `ANTHROPIC_REFUSAL_FALLBACK` | With `MODEL_PROVIDER=anthropic`: the key (required in production instead of `OPENAI_API_KEY`), the models per role (`claude-opus-5-5`, `claude-haiku-5-5`), the workspace id an organisation-level key needs, how hard the models think, and the server-side refusal fallback. `MAIN_MODEL`/`CHEAP_MODEL` and the Decisions API check are then not used. docs/deploy.md, "Using Claude" |
 | `FAKE_MODELS` | Dev and test only: every model request is answered by the offline client (placeholder output), so the app runs end to end without an OpenAI key. Refused in production |
-| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted (24 h, or 30 days if the user opts in) |
+| `RETENTION_HOURS`, `OPT_IN_RETENTION_DAYS` | When a job is deleted: 24 h after the last activity, 7 days if the user keeps it, 30 days from upload if they also let the developer look (`web/retention.py`) |
 | `CRON_TOKEN` | Shared secret for `/internal/cron/aggregate-and-purge`. Required (non-empty) in production, or the purge would never run |
 | `RUN_WORKER`, `WORKER_POLL_S` | Run the worker thread in this process; queue poll interval |
 | `SOURCE_URL`, `CONTACT_EMAIL` | Footer source link (AGPL notice); contact on the 403, privacy and terms pages |
@@ -125,7 +125,7 @@ Every `/jobs/*` route answers 404 for a job that does not exist or belongs to so
 else, admins included, so job ids cannot be probed and admins never see documents. Its
 owner, though, is told what happened to a document that is gone (UX review MF10): a job
 past its `retain_until` (not purged yet) shows "This document has been deleted. It was
-deleted automatically 24 hours after upload, as promised" (or 30 days, as chosen), and
+deleted automatically 24 hours after upload, as promised" (the time the job was kept, whatever the choice), and
 once the purge has removed the row, the owner's own `uploaded` event still says the id
 was theirs, so the page says it was deleted and when documents are. Anyone else gets the
 plain "There is no document at this address" page, which no longer says "or it is not
@@ -263,11 +263,18 @@ With JavaScript, `app.js` checks the chosen file's size and type as soon as it i
 good one is sent it says "Uploading notes.pdf. Keep this tab open." and a second click
 does nothing. The server checks everything again.
 
-The opt-in box "Keep my document and results for 30 days to help improve the tool" is off
-by default; it sets `retain_until` to 30 days instead of 24 hours. Its hint says what
-ticking it allows: Harish may look at the results to fix mistakes in the tool (the
-privacy notice says the same). Splitting it into "keep my work, only me" and "also let
-the developer look" (UX review MF10 part 1) is Harish's decision.
+Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days, only
+I can see it" (`keep`) and "Also let the developer look (30 days)" (`share`; implies
+keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
+`jobs.opt_in_retention`, which `ops.export` reads, so only `dev` jobs can be looked at.
+`retain_until` is a full window from upload: `RETENTION_HOURS`, 7 days, or
+`OPT_IN_RETENTION_DAYS`. For `day` and `week` jobs the window restarts on activity (a
+review write, a language, title or contact change, a download), never earlier than it
+was; `dev` keeps its 30 days from upload. "Keep 7 more days" on the job page
+(`POST /jobs/{id}/keep`) makes a `day` job a `week` job and starts its seven days now. The
+purge knows only `retain_until` (`ops.retention.purge_expired`), so it honours all of
+this unchanged. The privacy page's three lines are marked `TODO(Harish)` for the final
+wording.
 
 When today's budget is spent, the upload form is replaced by a notice saying when
 uploads open again (the next midnight UTC, shown in the reader's time), instead of a form
@@ -643,15 +650,18 @@ From top to bottom:
    rendered for the owner only and never logged. On the committed demo PDF (13 pages,
    one real run) the card has 7 rows and its first example is Equation 2.4: "capital
    delta d capital delta t period" against "capital delta bold d over capital delta t".
-6. **Results**: what was found, and one breakdown everywhere (MF6): "Need your decision"
-   (decisions, as on the review screen: a group of repeated headings is one), "Accepted
-   for you" (with how many have a note, and how many of those the second automated
-   check calls worth a look) and "Decided by you" add up to the items, and a sentence
-   says so ("Of the 62 items found, 17 wait for your decision, 45 were accepted for you
-   and 0 were decided by you. The 17 waiting make 3 decisions: repeated headings are
-   decided together."). Then the links per kind to their first decision, and the
-   automatic checks of the file.
-7. **Language**: "Language: English (detected; your PDF did not say)" ("from your PDF",
+6. **Results**: what was found, and decisions as the one unit everywhere (MF6, T1-3,
+   T1-11): "Decisions to make" and "Decisions you made", counted as on the review
+   screen and in My documents (a group of repeated headings is one decision). A heading
+   made bold text is a decision, never "shown as an image" (`job_page.shown_as_image`),
+   so a job whose decisions are done is "Ready to share". Items are not counted, and
+   there is no model cost, internal code or confidence here (cost is on `/admin`). One
+   line says how many parts were accepted for you with a note, with a link to them. Then
+   the links per kind to their first decision, and the automatic checks of the file with
+   their plain sentences and a disclosure, "What was checked, and what was not": the
+   structure checks ran; the axe test and screen-reader testing did not.
+7. **Language**, one line with a "Change" control folded behind a details element:
+   "Language: English (detected; your PDF did not say)" ("from your PDF",
    "assumed; ...", "you chose it"; a result made before detection existed counts as
    "from your PDF" when the PDF has /Lang) and a select of the languages in
    `pipeline.language.LANGUAGE_NAMES` (35) with "Confirm this language" (when it was
@@ -662,6 +672,22 @@ From top to bottom:
    passage languages worked out again against the new language. Then it makes the HTML
    again (`review.rerender_html`, with the day of the last decision for the student
    note) and bumps `jobs.result_version`. The language tag is not logged.
+8. **For students** (`web/routes/job_settings.py`, `web/titles.py`): the title students
+   hear (T1-7) and a contact line (T1-17). The title field starts with the stored
+   `jobs.title_override`, else what the file's `<title>` already is
+   (`assemble.suggested_title`: the PDF's title or first top-level heading without its
+   section number, "1 Derivatives" to "Derivatives"; "Contents" and similar names of
+   parts are skipped for the first heading that is not one). Saving a different title
+   stores it and makes the HTML again (`assemble.render_html(title_set=True)`): `<title>`,
+   a top-level heading when the body has none, the job page heading and tab, My documents,
+   the delete page and the download name. Empty, or the suggestion, clears the choice. The
+   contact line is an email or an http(s) address (`titles.clean_contact`); it goes in the
+   student note's "tell your instructor" sentence as a `mailto:` or web link
+   (`assemble._contact_sentence`, which checks it again). Both are CSRF-checked, owner
+   only, finished jobs only; an unusable line shows the job page again, status 400, with
+   the error under the field and the typed text kept. Neither is logged.
+9. **Keeping and deleting**: when the document will be deleted and why, "Keep 7 more
+   days" (not for a `dev` job) and "Delete now".
 
 ## Review screen
 
@@ -1468,6 +1494,8 @@ a user id is added without it.
   deploy.md, "Roll back".
 - A local SQLite database made by start-up cannot then be upgraded with Alembic (its
   tables already exist). Delete `.local/a11y-stem.db` if you need to test migrations.
+- `7c1d9a4e2b60` adds `jobs.retention_mode` (server default `day`; old opt-in rows become
+  `dev`), `jobs.title_override` and `jobs.contact_line`; the downgrade drops them.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,

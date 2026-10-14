@@ -277,11 +277,14 @@ def upload(
     *,
     filename: str = "notes.pdf",
     keep: bool = False,
+    share: bool = False,
     csrf: str | None = None,
 ):
     fields = {"csrf_token": csrf if csrf is not None else token(client)}
     if keep:
         fields["keep"] = "on"
+    if share:
+        fields["share"] = "on"
     return client.post("/jobs", data=fields, files={"pdf": (filename, data, "application/pdf")})
 
 
