@@ -170,8 +170,7 @@ def migrate(url: str, revision: str, *, down: bool = False) -> None:
     (command.downgrade if down else command.upgrade)(config, revision)
 
 
-def test_the_content_migration_is_the_head():
-    assert migration_heads() == {CONTENT_REVISION}
+def test_the_content_migration_follows_the_session_version_one():
     script = ScriptDirectory.from_config(alembic_config())
     revision = script.get_revision(CONTENT_REVISION)
     assert revision is not None and revision.down_revision == BEFORE_CONTENT
@@ -180,7 +179,7 @@ def test_the_content_migration_is_the_head():
 def test_the_content_migration_downgrades_and_upgrades_again(tmp_path):
     url = f"sqlite:///{tmp_path}/content.db"
     upgrade(url)
-    migrate(url, BEFORE_CONTENT, down=True)
+    migrate(url, BEFORE_CONTENT, down=True)  # through the later revisions, too
     engine = create_engine(url)
     try:
         names = set(inspect(engine).get_table_names())
@@ -221,5 +220,71 @@ def test_jobs_survive_the_content_migration_and_old_inserts_still_work(tmp_path)
                 text("SELECT id, result_version, course_id, progress_json FROM jobs ORDER BY id")
             ).all()
         assert [tuple(row) for row in found] == [("j1", 0, None, None), ("j2", 0, None, None)]
+    finally:
+        engine.dispose()
+
+
+# --------------------------------------------------------------------------- job page choices
+
+TIER1_REVISION = "7c1d9a4e2b60"
+TIER1_JOB_COLUMNS = {"retention_mode", "title_override", "contact_line"}
+
+
+def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
+    script = ScriptDirectory.from_config(alembic_config())
+    revision = script.get_revision(TIER1_REVISION)
+    assert revision is not None and revision.down_revision == CONTENT_REVISION
+    assert migration_heads() == {TIER1_REVISION}
+
+
+def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
+    """Jobs made before it: the 30-day opt-in becomes mode "dev", the rest "day"; an older
+    release inserting a job without the new columns still gets a valid row."""
+    url = f"sqlite:///{tmp_path}/tier1.db"
+    migrate(url, CONTENT_REVISION)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+            conn.execute(text(INSERT_JOB.replace("1, 1, false", "1, 1, true")), {"id": "j2"})
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_JOB), {"id": "j3"})
+            found = conn.execute(
+                text(
+                    "SELECT id, retention_mode, title_override, contact_line FROM jobs "
+                    "ORDER BY id"
+                )
+            ).all()
+        assert [tuple(row) for row in found] == [
+            ("j1", "day", None, None),
+            ("j2", "dev", None, None),
+            ("j3", "day", None, None),
+        ]
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_job_page_migration_downgrades_and_upgrades_again(tmp_path):
+    url = f"sqlite:///{tmp_path}/tier1-down.db"
+    upgrade(url)
+    migrate(url, CONTENT_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        columns = {c["name"] for c in inspect(engine).get_columns("jobs")}
+        assert not columns & TIER1_JOB_COLUMNS and "result_version" in columns
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        assert TIER1_JOB_COLUMNS <= {c["name"] for c in inspect(engine).get_columns("jobs")}
     finally:
         engine.dispose()
