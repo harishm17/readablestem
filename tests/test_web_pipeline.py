@@ -138,11 +138,14 @@ def test_review_then_aggregate_then_delete(site):
     assert aggregate_finished(site.ctx.factory) == 1
     with session_scope(site.ctx.factory) as session:
         rows = {(r.step, r.category): r.count for r in session.scalars(select(ErrorAggregate))}
-    # Counted as the pipeline left it (accepted with an optional note: a single heading
-    # with weak evidence), not as the reviewer changed it.
+    # Counted as the pipeline left it (accepted with an optional note: the outline repair
+    # moved two headings), not as the reviewer changed it. "Worked example" is bold at body
+    # size, but this fixture is a tagged PDF (Chromium) and its tags call it a heading
+    # (T2-18), so it carries no weak-evidence note.
     assert rows[("heading", "status:accepted")] == 4
     assert rows[("heading", "tier:optional")] == 2
-    assert rows[("heading", "tier:optional:heading.weak_evidence")] == 1
+    assert rows[("heading", "tier:optional:heading.level_repaired")] == 2
+    assert ("heading", "tier:optional:heading.weak_evidence") not in rows
     assert ("heading", "status:rejected") not in rows
     assert rows[("equation", "status:abstained")] == 3
     assert rows[("job", "pages")] == 1 and rows[("job", "status:done")] == 1
