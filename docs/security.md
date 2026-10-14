@@ -91,7 +91,10 @@ The converted document (`/view`, `/download`, `/demo`) is served under `sandbox;
 default-src 'none'; img-src data:; style-src 'unsafe-inline'`: it cannot run scripts, submit
 forms or read the app's cookies even if its markup were hostile. The downloaded file is
 opened elsewhere without that header, so it is also built to be inert on its own: no script,
-no external resource, no event handler (below).
+no external resource, no event handler (below). `test_audit_browser.py` loads a document that
+does contain a script, an inline handler, a `javascript:` link and a form in Chromium and checks
+that none runs, the cookie is unreadable and the form does not submit; it also shows that a
+script injected into an app page is refused by the policy.
 
 ### Uploads and abuse limits
 
