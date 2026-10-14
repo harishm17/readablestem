@@ -23,7 +23,6 @@ from fastapi import FastAPI, Request
 from fastapi.concurrency import run_in_threadpool
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import RedirectResponse, Response
-from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
 from sqlalchemy.exc import InterfaceError, OperationalError
@@ -36,6 +35,7 @@ from a11y_stem.config import ConfigError, Settings, get_settings
 from a11y_stem.observability.logging import configure_logging, request_logging_middleware
 from a11y_stem.observability.tracing import NoopTracer, Tracer, make_tracer
 from a11y_stem.ops.launch import launch_blockers
+from a11y_stem.web.assets import CachedStaticFiles, static_url
 from a11y_stem.web.auth import make_oauth, seed_admins
 from a11y_stem.web.auth import router as auth_router
 from a11y_stem.web.database import as_utc, prepare_database
@@ -155,6 +155,8 @@ def make_templates() -> Jinja2Templates:
     env.filters["utc"] = _utc
     env.filters["utc_text"] = _utc_text
     env.filters["usd"] = _usd
+    # /static/app.<hash>.css, cached for a year (jinja2 types `globals` as its own defaults)
+    env.globals["static_url"] = static_url  # ty: ignore[invalid-assignment]
     return Jinja2Templates(env=env)
 
 
@@ -394,7 +396,7 @@ def create_app(
     for unavailable in (OperationalError, InterfaceError, SATimeoutError):
         app.add_exception_handler(unavailable, _on_database_unavailable)
 
-    app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+    app.mount("/static", CachedStaticFiles(directory=STATIC_DIR), name="static")
     for module in (pages, jobs, job_settings, split, review, feedback, admin, cron, courses):
         app.include_router(module.router)
     app.include_router(auth_router)

@@ -6,6 +6,7 @@ Served from our own origin so the Content-Security-Policy can stay `script-src '
 | File | Package | Version | Licence | Source |
 |---|---|---|---|---|
 | `htmx-2.0.11.min.js` | `htmx.org` (npm) | 2.0.11 | 0BSD (Zero-Clause BSD) | `https://registry.npmjs.org/htmx.org/-/htmx.org-2.0.11.tgz`, file `package/dist/htmx.min.js` |
+| `fonts/latinmodern-math-1.959.woff2` | Latin Modern Math, the same font repackaged as WOFF2 (see below) | 1.959 (2014-09-05) | GUST Font License (an instance of the LPPL 1.3c) | made from `fonts/latinmodern-math.otf` |
 | `fonts/latinmodern-math.otf` | Latin Modern Math (GUST e-foundry) | 1.959 (2014-09-05) | GUST Font License (an instance of the LPPL 1.3c) | `https://mirrors.ctan.org/fonts/lm-math.zip`, file `lm-math/opentype/latinmodern-math.otf` |
 
 Integrity (checked by `tests/test_web_pages.py`):
@@ -27,11 +28,30 @@ Latin Modern Math (checked by `tests/test_web_pages.py`):
 - Beside it, from the same archive (`lm-math/doc/`): `GUST-FONT-LICENSE.txt`,
   `MANIFEST-Latin-Modern-Math.txt`, `README-Latin-Modern-Math.txt`.
 
-It is served unmodified (no subsetting, no renaming): the GUST Font License requests that
+The font is not changed (no subsetting, no renaming): the GUST Font License requests that
 a derived font be renamed. The review screen draws the proposal of an equation in it
 (`app.css`, `.cmp-math`), so the same-size compare shows a LaTeX PDF's Computer Modern
-next to the same family; the browser only downloads it (733 KB, cached like any static
-file) when an equation is shown, and uses an installed copy if there is one.
+next to the same family; the browser only downloads it when an equation is shown, and uses
+an installed copy if there is one. What it downloads is the WOFF2 file (392 KB, against
+733 KB for the OpenType file, which stays here as the source and for the tests). WOFF2 is a
+lossless packaging of the same tables: every table of the two files is byte for byte the
+same except `head`, which has the packaging's flag (bit 11) and its own checksum. Made
+with fontTools and Brotli (not dependencies of this project) from the file above:
+
+```
+uv run --no-project --with fonttools --with brotli python -c "
+from fontTools.ttLib import TTFont
+f = TTFont('fonts/latinmodern-math.otf', recalcTimestamp=False)
+f.flavor = 'woff2'
+f.save('fonts/latinmodern-math-1.959.woff2')"
+```
+
+- SHA-256 of `fonts/latinmodern-math-1.959.woff2`:
+  `b11060f37967c090457580275129d0d7da1d5fbfc82b04e78c91aa31977f547c`
+
+Files under `vendor/` are served with `Cache-Control: public, max-age=31536000, immutable`
+(`web/assets.py`), so a changed file must get a new name, as the htmx and font files do
+(the version is in it).
 
 htmx 1.x was BSD-2-Clause; from 2.0 the package is published under 0BSD (its `LICENSE`
 file reads "Zero-Clause BSD"). 0BSD requires no attribution, but it is listed in

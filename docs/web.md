@@ -1395,6 +1395,8 @@ Cross-Origin-Resource-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 Cache-Control: no-store            (everything except /static/; page images and
                                     marks.css: private, no-store)
+                                   (/static/: public, max-age=31536000, immutable for
+                                    hashed names and vendor/ files, no-cache otherwise)
 Strict-Transport-Security: max-age=31536000; includeSubDomains   (production only)
 ```
 
@@ -1420,7 +1422,11 @@ forms or reading our cookies.
 The app pages have no inline scripts, styles or event handlers (a test scans the
 templates). htmx is vendored at `web/static/vendor/` (version, hashes and licence in its
 README) and configured to need no `eval`, inject no `<style>` and keep no history cache.
-Our own script, `web/static/app.js`, places error summary links (below), shows times in
+Static files are cached for a year under names that change with their content: pages ask
+for `/static/app.<12 hex>.css` and `.js` (`web/assets.py`, `static_url`; the hash is the
+file's SHA-256, read again only when the file changes), `vendor/` files carry their version
+in the name, and anything else is revalidated (`no-cache`, ETag). The math font is sent as
+WOFF2 (392 KB, against 733 KB for the OpenType file kept beside it). Our own script, `web/static/app.js`, places error summary links (below), shows times in
 the reader's time zone ("Times"), checks a chosen upload before it is sent ("Uploads and
 limits"), shows the questions after a download, and adds the review screen's
 enhancements (scrolling the page image to the selected mark, opt-in keyboard shortcuts,
