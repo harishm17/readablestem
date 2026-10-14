@@ -255,11 +255,12 @@ def test_text_around_a_script_is_escaped():
 def test_a_lowered_run_beside_a_raised_one_is_one_stacked_pair():
     styles = Styles()
     element = paragraph("SO42-", script_runs=[script(2, 3, "sub"), script(3, 5, "sup")])
+    # Text order (4, then 2-) is the reading order; the class says the lowered run is first.
     assert html(element, styles) == (
-        'SO<span class="script-stack"><sup>2-</sup><sub>4</sub></span>'
+        'SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></span>'
     )
     assert styles.added == {"script-stack": inline_text.STACK_CSS}
-    # The raised run is the upper line whichever comes first in the text.
+    # A nuclide: the mass number comes first, and is drawn on top.
     nuclide = paragraph("226Ra", script_runs=[script(0, 2, "sup"), script(2, 3, "sub")])
     assert html(nuclide).startswith('<span class="script-stack"><sup>22</sup><sub>6</sub>')
 

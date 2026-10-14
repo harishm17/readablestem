@@ -460,10 +460,12 @@ colour:
 
 A lowered and a raised run side by side (the count and the charge of SO4 2-, the two
 numbers before a nuclide's symbol) are one stacked pair, with a rule added to the document
-only when it has one:
+only when it has one. The two stay in the order of the text, which is the order a screen
+reader says them in (4, then 2-; the mass number, then the atomic number); the raised one is
+drawn on top whichever comes first (`flex-direction: column-reverse` when the lowered one does):
 
 ```html
-SO<span class="script-stack"><sup>2-</sup><sub>4</sub></span>
+SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></span>
 ```
 
 The text itself is unchanged (`H2O`), so search and copy read as before. A run is skipped

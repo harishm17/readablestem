@@ -58,11 +58,15 @@ AddStyle = Callable[[str, str], None]
 COLOUR_CLASS_PREFIX = "tc-"
 # A lowered and a raised run side by side, written one above the other as they are
 # printed (the count and the charge of SO4 2-, the mass number and the atomic number of
-# a nuclide). Added to the stylesheet only for a document that has one.
+# a nuclide). The two stay in the order of the text, which is the order a screen reader
+# says them in (4, then 2-; 14, then 6); the raised one is drawn on top either way, by the
+# direction of the column. Added to the stylesheet only for a document that has one.
 STACK_CLASS = "script-stack"
+STACK_LOW_FIRST = "script-stack-low-first"  # the lowered run comes first in the text
 STACK_CSS = (
     f".{STACK_CLASS} {{ display: inline-flex; flex-direction: column; vertical-align: -0.5em;"
     f" font-size: 0.75em; line-height: 1.1; text-align: left; }}\n"
+    f".{STACK_CLASS}.{STACK_LOW_FIRST} {{ flex-direction: column-reverse; }}\n"
     f".{STACK_CLASS} sup, .{STACK_CLASS} sub {{ font-size: inherit; vertical-align: baseline;"
     f" line-height: inherit; }}\n"
 )
@@ -223,9 +227,9 @@ def _inner(text: str, segments: Sequence[_Segment]) -> str:
             if following is not None and following.script and following.script != tag:
                 other = following.script
                 that = f"<{other}>{escape_text(text[following.start : following.end])}</{other}>"
-                # The raised run is the upper line whichever comes first in the text.
-                pair = this + that if tag == "sup" else that + this
-                out.append(f'<span class="{STACK_CLASS}">{pair}</span>')
+                # Text order for the reader; the raised run is drawn on top (`STACK_CSS`).
+                css = STACK_CLASS if tag == "sup" else f"{STACK_CLASS} {STACK_LOW_FIRST}"
+                out.append(f'<span class="{css}">{this}{that}</span>')
                 i += 1
             else:
                 out.append(this)
