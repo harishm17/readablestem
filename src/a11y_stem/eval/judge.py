@@ -299,12 +299,15 @@ def judge_settings(
     """The settings the judge runs with. `provider` None: the run's. Model None: the run's
     main model on OpenAI (unchanged), `claude-opus-5-5` on Anthropic (not the run's main
     model, which may be a Sonnet being compared). On Anthropic the refusal fallback is
-    off, so the judge never changes model inside a call. Raises pydantic's
+    off, so the judge never changes model inside a call, and so is the notice-in-system setting:
+    the judge is an instrument and sends the prompt it always has. Raises pydantic's
     `ValidationError` for a Claude model without a price."""
     chosen = provider or settings.model_provider
     if chosen == "anthropic":
         base = with_provider(settings, "anthropic", main_model=model or ANTHROPIC_MAIN_MODEL)
-        return base.model_copy(update={"anthropic_refusal_fallback": False})
+        return base.model_copy(
+            update={"anthropic_refusal_fallback": False, "anthropic_notice_in_system": False}
+        )
     if chosen == settings.model_provider and model is None:
         return settings
     return with_provider(settings, chosen, main_model=model)
