@@ -71,6 +71,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/language"): USER,
     ("GET", "/jobs/{job_id}/pages/{number}.png"): USER,
     ("GET", "/jobs/{job_id}/progress"): USER,
+    ("GET", "/jobs/{job_id}/record"): USER,  # T3-6: owner only, changes nothing
+    ("GET", "/jobs/{job_id}/record.csv"): USER,  # T3-6
     ("GET", "/jobs/{job_id}/regions/{element_id}.png"): USER,
     ("GET", "/jobs/{job_id}/review"): USER,
     ("GET", "/jobs/{job_id}/review/list"): USER,

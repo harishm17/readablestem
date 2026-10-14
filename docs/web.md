@@ -114,6 +114,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
+| GET `/jobs/{id}/record`, `/jobs/{id}/record.csv` | owner | The review record (T3-6, "The review record" below): a page to print and a CSV; owner only, finished jobs only (409 otherwise), changes nothing |
 | POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the ticked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
@@ -444,6 +445,39 @@ as ids and counts (`course_created`, `course_renamed`, `course_deleted`,
 model only as the fenced course notation block, and erased with the user
 (`ops.retention.erase_user`). Every form is a plain POST with the CSRF token, with an
 error summary linked to the field, so it all works without JavaScript.
+
+## The review record (`web/record.py`, `web/routes/record.py`, T3-6)
+
+For the person's accessibility office. `GET /jobs/{id}/record` is a page made to print
+(site navigation and the buttons are hidden by `@media print`); `GET /jobs/{id}/record.csv`
+has the same facts as one table. Both are made on request from what is stored, are owner
+only, and change nothing (no deletion-clock restart, unlike a download). The job page links to
+both under "Record for your accessibility office".
+
+It lists, in this order: the document (title, file name, pages, when and by whom it was
+converted, the tool and pipeline version, the language, when the record was made, a short
+reference); what the tool did (parts found by kind, accepted by the tool with no decision
+from a person, decided by a person, still open, shown as pictures); every review decision
+(`ReviewEdit` row: when in UTC, the part, its page, what the tool had, the decision, by whom
+- the document's owner, the only person who can review it); the decisions still open; the
+parts shown as pictures and why; the automatic checks (how many ran, which did not pass);
+**what was not checked**; what the instructor set (a chosen title, a contact line); and blank
+lines for the office to sign. "Not checked" is five fixed facts (no screen reader testing, the
+axe test not run on the document, meaning is not checked, not tried in a course site, the PDF
+itself is out of scope) plus counts from the result: the equations, figure descriptions,
+headings and tables the tool accepted without a person, the decisions still open, the parts
+that are pictures.
+
+It is a record and not a verdict: the page opens with a statement that it does not say the
+document meets any standard or law, and neither it nor the CSV uses the word "certification"
+or "compliance" (`tests/test_web_record.py` checks both). It goes when the document goes
+(`ReviewEdit` rows are deleted with the job), and the page says to print it or save the CSV
+first. CSV cells that start like a formula (`=`, `+`, `-`, `@`) get a quote in front; the file
+starts with a byte order mark so Excel reads non-English letters right. Its columns are
+`section, item, page, tool_had, decision, by, when_utc, detail`, with the sections `document`,
+`summary`, `decision`, `open`, `not_converted`, `check` and `not_checked`.
+`docs/vendor-information.md` is the matching one-page sheet for a procurement office: what the
+tool does, what happens to a document, and where it falls short.
 
 ## Spend cap (`web/spend.py`)
 
@@ -1569,6 +1603,7 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px, and every number in a six-column table on one line; "Add the data table" then "Remove the data table" without JavaScript) |
+| `uv run pytest tests/test_web_record.py` | The review record: the page and the CSV, decisions with who and when, what was not checked, no "certification", owner only, nothing changed by asking, formula-safe cells |
 | `uv run pytest tests/test_notation_suggest.py tests/test_web_course_suggestions.py` | Notation suggested from documents: what is found and guessed, the course and job pages, ticking and meanings, ownership, CSRF, skipped duplicates, logs without symbols |
 | `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |

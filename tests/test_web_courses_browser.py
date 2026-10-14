@@ -280,3 +280,27 @@ def test_ticking_a_suggestion_and_changing_its_meaning_works_without_javascript(
     page.get_by_role("link", name="Plain suggestion course").first.click()
     assert "From a document" in page.get_by_role("row", name="double-struck R").inner_text()
     context.close()
+
+
+# --------------------------------------------------------------------------- the record (T3-6)
+
+
+@pytest.mark.parametrize("width", [1280, 375], ids=["wide", "phone"])
+def test_the_review_record_passes_axe_and_fits_the_screen(site, browser, course, width, axe_source):
+    context, page = open_page(browser, site, viewport={"width": width, "height": 800})
+    page.goto(f"{site.base}/jobs/{course['job']}/review")
+    button = page.get_by_role("button", name="Use bold ω in equation 1")
+    if button.count():  # the first run makes the decision the record lists
+        button.click()
+    page.goto(f"{site.base}/jobs/{course['job']}/record")
+    page.get_by_role("heading", name="Review record").wait_for()
+    assert page.get_by_role("heading", name="Decisions made by a person").is_visible()
+    violations = strict_axe(page, axe_source)
+    scroll, client = page.evaluate(
+        "[document.documentElement.scrollWidth, document.documentElement.clientWidth]"
+    )
+    printed = page.pdf() if width == 1280 else b""
+    context.close()
+    assert not violations, describe(violations)
+    assert scroll <= client, f"{scroll} px in {client} px"
+    assert width != 1280 or printed.startswith(b"%PDF")

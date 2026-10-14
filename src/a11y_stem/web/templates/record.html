@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{# The review record of one finished document (routes/record.py, web/record.py): a page to
+   print, and the same facts as a CSV. It is a record of what was done, checked and decided,
+   not a verdict: the words never say the document meets a standard or a law. #}
+{% block title %}Review record: {{ record.title }}{% endblock %}
+{% block content %}
+<h1>Review record</h1>
+<p class="doc-file">{{ record.title }}</p>
+<p>{{ statement }}</p>
+<p class="no-print">{{ keep_note }}</p>
+<ul class="actions no-print">
+  <li><a class="button" href="/jobs/{{ job_id }}/record.csv">Download as a CSV file</a></li>
+  <li><a href="/jobs/{{ job_id }}">Back to the document</a></li>
+</ul>
+
+<section aria-labelledby="record-document">
+  <h2 id="record-document">The document</h2>
+  <dl class="summary-list">
+    <div><dt>Title</dt><dd>{{ record.title }}</dd></div>
+    <div><dt>File name</dt><dd>{{ record.filename }}</dd></div>
+    <div><dt>Pages</dt><dd>{{ record.pages }}</dd></div>
+    <div><dt>Converted on</dt><dd>{{ long_when(record.converted_at) or "Not recorded" }}</dd></div>
+    <div><dt>Converted by</dt><dd>{{ record.owner }}</dd></div>
+    <div><dt>Tool</dt><dd>{{ record.tool }}</dd></div>
+    <div><dt>Language</dt><dd>{{ record.language }}</dd></div>
+    <div><dt>Record made on</dt><dd>{{ long_when(record.made_at) }}</dd></div>
+    <div><dt>Reference</dt><dd>{{ record.job_ref }}</dd></div>
+  </dl>
+</section>
+
+<section aria-labelledby="record-done">
+  <h2 id="record-done">What the tool did</h2>
+  {% set c = record.counts %}
+  <ul>
+    <li>{{ c.items }} {{ "part" if c.items == 1 else "parts" }} found
+      {%- if record.by_kind %} ({% for kind, n in record.by_kind.items() %}{{ n }} {{ kind }}{{ ", " if not loop.last }}{% endfor %}){% endif %}.</li>
+    <li>{{ c.accepted }} accepted by the tool after its own automatic checks, with no decision from a person.</li>
+    <li>{{ c.decided }} decided by a person ({{ record.decisions|length }} {{ "step" if record.decisions|length == 1 else "steps" }} listed below).</li>
+    <li>{{ c.decisions }} {{ "decision" if c.decisions == 1 else "decisions" }} still open.</li>
+    <li>{{ c.as_image }} {{ "part" if c.as_image == 1 else "parts" }} shown as pictures of the original.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="record-decisions">
+  <h2 id="record-decisions">Decisions made by a person</h2>
+  {% if record.decisions %}
+  <div class="table-scroll" role="group" aria-label="Decisions table" tabindex="0">
+  <table>
+    <caption class="visually-hidden">Decisions, oldest first</caption>
+    <thead>
+      <tr><th scope="col">When</th><th scope="col">Part</th><th scope="col">Page</th><th scope="col">The tool had</th><th scope="col">Decision</th><th scope="col">By</th></tr>
+    </thead>
+    <tbody>
+      {% for d in record.decisions %}
+      <tr>
+        <td>{{ long_when(d.when) }}</td>
+        <td>{{ d.item }}</td>
+        <td>{{ d.page or "" }}</td>
+        <td>{{ d.tool_had }}</td>
+        <td>{{ d.decision }}</td>
+        <td>{{ d.by }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  </div>
+  {% else %}
+  <p>No decision was made by a person on this document.</p>
+  {% endif %}
+  {% if record.open_items %}
+  <h3 id="record-open">Waiting for a decision</h3>
+  <ul aria-labelledby="record-open">
+    {% for item in record.open_items %}<li>{{ item }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+</section>
+
+<section aria-labelledby="record-images">
+  <h2 id="record-images">Parts shown as pictures</h2>
+  {% if record.kept_as_images %}
+  <p>These parts could not be converted to text. Screen readers cannot read them.</p>
+  <ul>
+    {% for i in record.kept_as_images %}<li>{{ i.item }}{% if i.page %}, page {{ i.page }}{% endif %}{% if i.why %}: {{ i.why }}{% endif %}</li>{% endfor %}
+  </ul>
+  {% else %}
+  <p>Every part was converted.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="record-checks">
+  <h2 id="record-checks">Automatic checks</h2>
+  {% if record.checks_run %}
+  <p>{{ record.checks_run }} checks of the structure of the HTML file ran
+    (language, title, order of headings, lists, links, tables and the alt attribute of every image).
+    {% if record.failed_checks %}{{ record.failed_checks|length }} did not pass:{% else %}All passed.{% endif %}</p>
+  {% if record.failed_checks %}
+  <ul>
+    {% for ch in record.failed_checks %}<li><strong>{{ ch.severity }}:</strong> {{ ch.text }}</li>{% endfor %}
+  </ul>
+  {% endif %}
+  {% else %}
+  <p>No structure checks are stored for this file.</p>
+  {% endif %}
+</section>
+
+<section aria-labelledby="record-not-checked">
+  <h2 id="record-not-checked">What was not checked</h2>
+  <ul>
+    {% for line in record.not_checked %}<li>{{ line }}</li>{% endfor %}
+  </ul>
+</section>
+
+<section aria-labelledby="record-settings">
+  <h2 id="record-settings">What the instructor set</h2>
+  <ul>
+    <li>Title students hear: {{ "chosen by the instructor" if record.title_chosen else "taken from the PDF" }}.</li>
+    <li>Contact line for students in the file: {{ "set" if record.contact_set else "not set" }}.</li>
+  </ul>
+</section>
+
+<section aria-labelledby="record-office">
+  <h2 id="record-office">For the accessibility office</h2>
+  <p>Reviewed by: ______________________________ &nbsp; Date: ________________</p>
+  <p>Notes:</p>
+  <p>______________________________________________________________</p>
+</section>
+{% endblock %}
