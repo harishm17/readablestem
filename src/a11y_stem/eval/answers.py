@@ -81,6 +81,7 @@ class CachedClient:
         self.misses = 0
         self.live_cost_usd = 0.0
         self.replayed_cost_usd = 0.0
+        self._steps: dict[str, dict[str, float]] = {}
 
     def run(
         self, request: VisionRequest, schema: type[T], *, is_fallback: bool = False
@@ -109,6 +110,7 @@ class CachedClient:
         if row is not None:
             call = ModelCall.model_validate(row["call"])
             self.replayed_cost_usd += call.cost_usd
+            self._tally(call)
             payload = row["payload"]
             if payload is None:
                 return None, call
@@ -130,6 +132,7 @@ class CachedClient:
             self._local.staged = True
             return parsed, call
         self.live_cost_usd += call.cost_usd
+        self._tally(call)
         # An answer lost to an outage or a budget stop is not worth keeping: ask again later.
         if call.outcome in ("ok", "invalid_output", "refused"):
             self.record(key, request.step, parsed, call)
@@ -153,9 +156,42 @@ class CachedClient:
         """Zero the counters (a staged run counts its last pass only)."""
         self.hits = self.misses = 0
         self.live_cost_usd = self.replayed_cost_usd = 0.0
+        self._steps = {}
+
+    def _tally(self, call: ModelCall) -> None:
+        """Count a call's tokens and its cost twice: as billed, and as it would be billed
+        with the instructions always read from the prompt cache. Whether a call found the
+        cache warm depends on what ran before it, not on what it asked; the second figure
+        is the one to compare two runs by."""
+        from a11y_stem.models.pricing import cost_usd
+
+        steady = cost_usd(
+            call.model,
+            call.input_tokens,
+            call.cached_input_tokens + call.cache_creation_input_tokens,
+            call.output_tokens,
+        )
+        with self._lock:
+            row = self._steps.setdefault(
+                f"{call.step}/{call.model}",
+                dict.fromkeys(
+                    ("calls", "input", "cached", "written", "output", "usd", "steady_usd"), 0.0
+                ),
+            )
+            row["calls"] += 1
+            row["input"] += call.input_tokens
+            row["cached"] += call.cached_input_tokens
+            row["written"] += call.cache_creation_input_tokens
+            row["output"] += call.output_tokens
+            row["usd"] += call.cost_usd
+            row["steady_usd"] += steady
 
     def summary(self) -> Mapping[str, Any]:
         return {
+            "by_step": {
+                k: {n: round(v, 6) for n, v in row.items()} for k, row in self._steps.items()
+            },
+            "steady_cost_usd": round(sum(r["steady_usd"] for r in self._steps.values()), 6),
             "answers_file_hits": self.hits,
             "answers_file_misses": self.misses,
             "live_cost_usd": round(self.live_cost_usd, 6),
