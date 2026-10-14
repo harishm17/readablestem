@@ -721,3 +721,11 @@ input[type="text"].input-short { width: 8rem; }
 .group-crops figure { margin: 0; }
 .group-crops img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); }
 .group-crops figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.25rem; }
+
+/* Notation found in a course's documents (T3-12): one ticked row per symbol, the guessed
+   meaning under it; no table, so nothing is wider than a phone screen. */
+.suggestion-list { list-style: none; padding: 0; margin: 0 0 1rem; }
+.suggestion { padding: 0.6rem 0; border-bottom: 1px solid var(--rule); }
+.suggestion .checkbox-field { margin: 0 0 0.4rem; }
+.suggestion .field { margin: 0 0 0.25rem 2rem; }
+.suggestion select { max-width: 100%; }

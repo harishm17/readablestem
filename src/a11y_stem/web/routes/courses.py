@@ -129,6 +129,7 @@ def _course_page(
             "examples": notation.SYMBOL_EXAMPLES,
             "values": {"meaning": "vector"},
             "rename_value": course.name,
+            "suggestions": notation.course_suggestions(session, get_ctx(request).settings, course),
         }
     return render(request, "course.html", context | (extra or {}), status_code=status)
 
@@ -268,6 +269,61 @@ def remove_entry(request: Request, course_id: str, entry_id: str, user: UserDep)
     log_event(logger, "notation_removed", course_id=course_id)
     flash(request, f"Removed {words}. To keep it after all, add it again below.")
     return RedirectResponse(f"/courses/{course_id}", status_code=303)
+
+
+# --------------------------------------------------------------------------- suggestions
+
+
+@router.post("/courses/{course_id}/suggestions", dependencies=[Depends(require_csrf)])
+def add_suggestions(
+    request: Request,
+    course_id: str,
+    user: UserDep,
+    job: Field = "",
+    key: Annotated[list[str], Form()] = [],  # noqa: B006 (FastAPI copies the default)
+    meaning: Annotated[list[str], Form()] = [],  # noqa: B006
+    pick: Annotated[list[str], Form()] = [],  # noqa: B006
+) -> Response:
+    """Add the symbols the instructor ticked from the notation the course's documents use
+    (T3-12, source "document"). Each row of the form has a hidden key and a meaning; `pick`
+    holds the row numbers that were ticked. Only symbols the documents use now are taken
+    (the offer is worked out again here), and nothing is added when none is ticked."""
+    _require_feature(request)
+    ctx = get_ctx(request)
+    back = f"/courses/{course_id}"
+    chosen: dict[str, str] = {}
+    for number in pick:
+        if number.isascii() and number.isdigit() and int(number) < min(len(key), len(meaning)):
+            chosen[key[int(number)]] = meaning[int(number)]
+    with session_scope(ctx.factory) as session:
+        course = _course(session, course_id, user)
+        row = None
+        if job:
+            if not JOB_ID.match(job):
+                raise PageError(404, *NOT_FOUND)
+            row = owned_job(session, job, user)
+            if row.course_id != course.id:
+                raise PageError(404, *NOT_FOUND)
+            back = f"/jobs/{row.id}#suggestions"
+        if not chosen:
+            added, skipped = [], 0
+        else:
+            offered = notation.course_suggestions(session, ctx.settings, course, row)
+            added, skipped = notation.add_suggested(session, course, offered, chosen)
+    if not chosen:
+        flash(request, "Tick the symbols to add first. Nothing was added.", undo=False)
+    else:
+        log_event(logger, "notation_added", course_id=course_id, source="document", n=len(added))
+        if not added:
+            parts = ["Nothing was added."]
+        elif len(added) <= 6:
+            parts = [f"Added to {course.name}: {'; '.join(added)}."]
+        else:
+            parts = [f"Added {len(added)} symbols to {course.name}."]
+        if skipped:
+            parts.append(f"{skipped} could not be added: already in the course, or not found.")
+        flash(request, " ".join(parts), undo=False)
+    return RedirectResponse(back, status_code=303)
 
 
 # --------------------------------------------------------------------------- remember

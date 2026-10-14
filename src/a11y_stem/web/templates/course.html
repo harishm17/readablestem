@@ -32,7 +32,7 @@
         <th scope="row"><span aria-hidden="true">{{ entry.canonical }}</span> {{ entry.words }}{% if entry.symbol != entry.words %} <span class="meta">(you wrote “{{ entry.symbol }}”)</span>{% endif %}</th>
         <td>{{ entry.meaning_label }}</td>
         <td>{{ entry.note or "" }}</td>
-        <td>{{ "From a review" if entry.source == "review" else "By you" }}</td>
+        <td>{{ {"review": "From a review", "document": "From a document"}.get(entry.source, "By you") }}</td>
         <td><a href="/courses/{{ course.id }}/entries/{{ entry.id }}">Edit or remove<span class="visually-hidden"> {{ entry.words }}</span></a></td>
       </tr>
       {% endfor %}
@@ -41,9 +41,12 @@
   </div>
   {% else %}
   <p>No symbols yet. Add the ones your course writes in a special way, such as bold
-    vectors or a double-struck R for the real numbers.</p>
+    vectors or a double-struck R for the real numbers.{% if suggestions %} The symbols your
+    documents use are listed below to tick, so you do not have to type them.{% endif %}</p>
   {% endif %}
 </section>
+
+{% include "_notation_suggestions.html" %}
 
 <section aria-labelledby="add-heading">
   <h2 id="add-heading">Add a symbol</h2>

@@ -263,7 +263,7 @@ class CourseNotation(Base):
     canonical: Mapped[str] = mapped_column(String(64))
     meaning: Mapped[str] = mapped_column(String(16))  # NotationEntry.meaning
     note: Mapped[str | None] = mapped_column(String(200))
-    source: Mapped[str] = mapped_column(String(16))  # "user" | "review"
+    source: Mapped[str] = mapped_column(String(16))  # "user" | "review" | "document"
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
     course: Mapped[Course] = relationship(back_populates="notation")

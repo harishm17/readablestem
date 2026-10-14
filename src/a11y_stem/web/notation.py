@@ -13,6 +13,9 @@ logs or events (ids and counts only), and they are erased with the user
   does not understand is refused with examples of what works. One entry per symbol.
 - The worker loads the job's course notation into the run's `ConversionOptions`
   (`conversion_options`); the pipeline reads it (`pipeline.notation_memory`).
+- The course page and the job page suggest the notation the course's documents use
+  (`course_suggestions`, `pipeline.notation_suggest`, source "document"): the instructor
+  ticks what to keep and what each means; nothing is added without that (`add_suggested`).
 - The review screen shows the entries that concern the equation on screen
   (`card_notation`) and, after a decision that settled a styled letter, offers to
   remember it for the course (`remember_offer`, source "review").
@@ -40,13 +43,14 @@ from a11y_stem.core.types import (
     NotationEntry,
     Status,
 )
-from a11y_stem.pipeline import notation_memory
-from a11y_stem.web.db import Course, CourseNotation, Job, ReviewEdit
+from a11y_stem.pipeline import notation_memory, notation_suggest
+from a11y_stem.web.db import Course, CourseNotation, Job, JobStatus, ReviewEdit
 
 MAX_NAME_CHARS = 200  # courses.name
 MAX_NOTE_CHARS = 200  # notation_entries.note
 MAX_COURSES = 50  # per user
 MAX_ENTRIES = 200  # per course
+SUGGESTION_DOCUMENTS = 5  # the course's latest finished documents read for suggestions
 
 # The meanings an entry can have (`core.types.NotationMeaning`), as the form lists them.
 MEANINGS: dict[str, str] = {
@@ -107,7 +111,7 @@ class EntryView:
     meaning: str
     meaning_label: str
     note: str | None
-    source: str  # "user" or "review"
+    source: str  # "user", "review" or "document"
 
     @property
     def phrase(self) -> str:
@@ -302,6 +306,96 @@ def update_entry(session: Session, course: Course, row: CourseNotation, entry: E
 
 def _values(entry: EntryInput) -> dict[str, str]:
     return {"symbol": entry.symbol, "meaning": entry.meaning, "note": entry.note or ""}
+
+
+# --------------------------------------------------------------------------- suggestions
+
+
+@dataclass(frozen=True)
+class SuggestionView:
+    """One symbol a course's documents use, for the suggestion form."""
+
+    canonical: str
+    words: str  # "bold d"
+    latex: str | None
+    meaning: str  # the guess
+    where: str  # "2 equations, first on page 3"
+
+
+def _where(found: notation_suggest.Suggestion) -> str:
+    uses = "1 equation" if found.count == 1 else f"{found.count} equations"
+    return f"{uses}, first on page {found.page}"
+
+
+def _views(found: list[notation_suggest.Suggestion]) -> list[SuggestionView]:
+    return [SuggestionView(s.canonical, s.words, s.latex, s.meaning, _where(s)) for s in found]
+
+
+def _results(rows: Iterable[Job]) -> list[DocumentResult]:
+    out = []
+    for job in rows:
+        try:
+            out.append(DocumentResult.model_validate(job.result_json or {}))
+        except ValueError:  # a result that no longer validates: nothing to read from it
+            continue
+    return out
+
+
+def course_suggestions(
+    session: Session, settings: Settings, course: Course, job: Job | None = None
+) -> list[SuggestionView]:
+    """The notation the course's documents use that the course does not have yet: those of
+    `job` when given (one of the course's), else the course's latest finished documents.
+    Empty with the feature off or when the course has no room left."""
+    if not enabled(settings) or len(course.notation) >= MAX_ENTRIES:
+        return []
+    if job is not None:
+        if job.course_id != course.id or job.status != JobStatus.DONE or not job.result_json:
+            return []
+        jobs: list[Job] = [job]
+    else:
+        jobs = list(
+            session.scalars(
+                select(Job)
+                .where(Job.course_id == course.id, Job.status == JobStatus.DONE)
+                .where(Job.result_json.is_not(None))
+                .order_by(Job.created_at.desc())
+                .limit(SUGGESTION_DOCUMENTS)
+            )
+        )
+    known = {r.canonical for r in course.notation}
+    room = MAX_ENTRIES - len(course.notation)
+    found = notation_suggest.suggest(_results(jobs), known=known, limit=room)
+    return _views(found[: notation_suggest.MAX_SUGGESTIONS])
+
+
+def add_suggested(
+    session: Session,
+    course: Course,
+    offered: list[SuggestionView],
+    picks: dict[str, str],
+) -> tuple[list[str], int]:
+    """Add the ticked suggestions to the course (source "document"). `picks` maps a ticked
+    key to the meaning the instructor chose; a key that was not offered, or a meaning that
+    is not one of `MEANINGS`, is skipped. Returns (what was added, as phrases; how many
+    ticked ones were skipped)."""
+    offered_keys = {view.canonical for view in offered}
+    added: list[str] = []
+    skipped = 0
+    for key, meaning in picks.items():
+        if key not in offered_keys or meaning not in MEANINGS:
+            skipped += 1
+            continue
+        entry = EntryInput(
+            symbol=notation_memory.describe(key), canonical=key, meaning=meaning, note=None
+        )
+        try:
+            add_entry(session, course, entry, source="document")
+        except NotationInvalid:  # added meanwhile, or the course is full
+            skipped += 1
+            continue
+        added.append(notation_memory.phrase(key, meaning))
+    return added, skipped
 
 
 # --------------------------------------------------------------------------- conversion

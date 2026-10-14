@@ -114,6 +114,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
+| POST `/courses/{id}/suggestions` | owner of the course (and of the job, when sent) | Add the ticked symbols found in the course's documents; back to the course page or the job page |
 | POST `/courses/{id}/remember` | owner of the course and the job | "Remember for <course>" from the review screen; back to the review screen |
 | GET `/admin` | admins | Allowlist, today's spend against the cap, queue depth, aggregate counts, usage counts per day and per pseudonymous person |
 | POST `/admin/allowlist`, `/admin/allowlist/remove` | admins | Add or remove someone |
@@ -401,6 +402,25 @@ notation" and docs/layout.md "Bold letters in prose".
   otherwise the form comes back with an error and nothing is uploaded or counted. The job
   stores `course_id`, and the job page says "Course: <name>. This document is read with
   its notation."
+- **Suggestions (T3-12).** Typing `\mathbf{d}` is not needed: the course page ("Symbols
+  found in your documents", the course's five latest finished documents) and the finished
+  job page ("Symbols found in this document", for a job with a course) list the notation
+  the documents use that the course does not have yet, from `pipeline/notation_suggest.py`:
+  the style commands in the LaTeX of every equation that is used in the file
+  (`\mathbf`, `\boldsymbol`, `\bm`, `\mathbb`, `\mathcal`, `\mathfrak`, `\mathsf`, `\mathtt`),
+  `\vec`, `\hat`, `\overrightarrow`, `\nabla` and `\hbar`, and styled letters in the
+  PDF's text (a bold d the text layer gives as U+1D41D). Each row says how many
+  equations use it and the first page, with a checkbox and a meaning list that starts at
+  a guess (bold, an arrow or a hat: a vector; double-struck: a set, but E and P an
+  operator; the nabla an operator; the h-bar a constant; anything else "something
+  else"). Nothing is added until the instructor ticks symbols and presses "Add the
+  ticked symbols to <course>" (POST `/courses/{id}/suggestions`; owner of the course, and
+  of the job when one is sent; the offer is worked out again on the server, so only
+  symbols the documents use are taken; a symbol the course already has is skipped). They
+  are saved with source "document" ("From a document" on the course page) and used from
+  the next conversion. Up to 40 are shown. Recurring macros in the instructor's own
+  LaTeX source are not seen: the PDF holds the expanded symbols, so the commands above
+  are what can be found.
 - **Worker.** Before converting, `notation.conversion_options` loads the course's symbols
   into the run's `ConversionOptions` (the settings' flags plus `notation`). The list is
   read when the job runs, so a symbol added while it waits is used. A job without a
@@ -1549,6 +1569,7 @@ a user id is added without it.
 | `uv run pytest -m browser tests/test_web_auth_browser.py` | Chromium: the sign-in pages with Microsoft set up (axe, 320 px reflow) and the whole Microsoft round trip under the real CSP |
 | `uv run pytest -m browser tests/test_web_review_split_browser.py` | Chromium: the review screen (axe at 1440 and 390 px, reflow, target size, no-JS completion, focus, shortcuts, forced colours) |
 | `uv run pytest -m browser tests/test_web_review_figures_browser.py` | Chromium: the figure card with a long description and a data table (axe at 1440 and 390 px, as shown, after a refused edit and with the table added; no sideways scrolling at 320 px, and every number in a six-column table on one line; "Add the data table" then "Remove the data table" without JavaScript) |
+| `uv run pytest tests/test_notation_suggest.py tests/test_web_course_suggestions.py` | Notation suggested from documents: what is found and guessed, the course and job pages, ticking and meanings, ownership, CSRF, skipped duplicates, logs without symbols |
 | `uv run pytest tests/test_web_courses.py` | Courses and notation: the flag off, ownership (404), CSRF, every accepted symbol form and the errors, the upload's course, the worker's options, the review card and "remember", logs without course content, erasure |
 | `uv run pytest -m browser tests/test_web_courses_browser.py` | Chromium: axe on every courses page and error state, the upload choice, the job page and the remember offer; 320 px reflow with text spacing; the whole flow without JavaScript |
 | `uv run pytest -m browser tests/test_web_job_page_browser.py` | Chromium: the job page in each state (axe at 1280 and 320 px, reflow with text spacing, htmx steps outside the live region, draft and language without JavaScript, the one-click download) |

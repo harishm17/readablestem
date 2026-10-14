@@ -1,0 +1,39 @@
+{# Notation the course's documents use, offered as course entries (T3-12; routes/courses.py
+   `add_suggestions`). Needs `course` (id, name) and `suggestions` (web.notation.SuggestionView
+   rows); `suggest_job` is the job id when the list is for one document. Nothing is added
+   until the instructor ticks symbols and presses the button; the meaning is a guess they
+   can change. No JavaScript is needed. #}
+{% set suggest_job = suggest_job|default(none) %}
+{% if suggestions|default([]) %}
+<section aria-labelledby="suggest-heading" id="suggestions">
+  <h2 id="suggest-heading">Symbols found in {{ "this document" if suggest_job else "your documents" }}</h2>
+  <p>{{ "This document uses" if suggest_job else "The documents you converted for this course use" }}
+    {{ suggestions|length }} {{ "symbol" if suggestions|length == 1 else "symbols" }} that
+    {{ course.name }} does not have yet. Tick the ones to add. The meaning is a guess from
+    how the symbol is written, so change it where it is wrong. Nothing is added until you
+    press the button.</p>
+  <form method="post" action="/courses/{{ course.id }}/suggestions" class="suggestion-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+    {% if suggest_job %}<input type="hidden" name="job" value="{{ suggest_job }}">{% endif %}
+    <ul class="suggestion-list">
+      {% for row in suggestions %}
+      <li class="suggestion">
+        <input type="hidden" name="key" value="{{ row.canonical }}">
+        <div class="checkbox-field">
+          <input type="checkbox" id="pick-{{ loop.index0 }}" name="pick" value="{{ loop.index0 }}">
+          <label for="pick-{{ loop.index0 }}"><span aria-hidden="true">{{ row.canonical }}</span> {{ row.words }}
+            <span class="meta">({{ row.where }})</span></label>
+        </div>
+        <div class="field">
+          <label for="meaning-{{ loop.index0 }}">What {{ row.words }} means</label>
+          <select id="meaning-{{ loop.index0 }}" name="meaning">
+            {% for value, label in meanings.items() %}<option value="{{ value }}"{% if row.meaning == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+          </select>
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+    <button type="submit" class="button">Add the ticked symbols to {{ course.name }}</button>
+  </form>
+</section>
+{% endif %}

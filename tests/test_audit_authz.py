@@ -55,6 +55,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/courses/{course_id}/entries/{entry_id}"): USER,
     ("POST", "/courses/{course_id}/entries/{entry_id}/delete"): USER,
     ("POST", "/courses/{course_id}/remember"): USER,
+    ("POST", "/courses/{course_id}/suggestions"): USER,  # T3-12: CSRF, owner of course (and job)
     ("POST", "/courses/{course_id}/rename"): USER,
     ("GET", "/jobs/{job_id}"): USER,
     ("GET", "/jobs/{job_id}/crops/{element_id}.png"): USER,
