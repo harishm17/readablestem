@@ -43,7 +43,7 @@ from __future__ import annotations
 
 import logging
 from collections.abc import Callable, Mapping
-from typing import TYPE_CHECKING, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -186,6 +186,11 @@ class ClaudeVerifier:
     def __init__(self, client: VisionClient, model: str) -> None:
         self._client = client
         self.model = model
+
+    def wrap_client(self, wrap: Callable[[Any], VisionClient]) -> None:
+        """Replace the client by `wrap(client)` (an eval keeps the check's answers in the
+        answers file, as it does the pipeline's)."""
+        self._client = wrap(self._client)
 
     def figure_alt(self, png: bytes, *, alt: str, caption: str | None) -> VerifierVerdict:
         return self._ask(

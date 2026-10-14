@@ -87,3 +87,36 @@ def test_every_keeps_each_nth_unit_before_the_limit() -> None:
     ids = [u["id"] for u in select_units("equations", records, None, 3)]
     assert ids == ["e0", "e3", "e6", "e9"]
     assert [u["id"] for u in select_units("equations", records, 2, 3)] == ["e0", "e3"]
+
+
+def test_the_second_check_keeps_its_answers_in_the_file_too(tmp_path: Path) -> None:
+    """A replay of a Claude run must not pay for the Claude check again."""
+    import argparse
+
+    from a11y_stem.cli import eval_cli
+    from a11y_stem.models.claude_verifier import ClaudeVerifier
+
+    class Inner(FakeVisionClient):
+        settings = settings()  # what a real Claude client exposes
+
+    check_client = Inner(defaults={"figure": {"conveys_key_information": True}})
+    check_client.defaults = {}  # the answer below is not a valid audit: only the keys matter
+    verifier = ClaudeVerifier(check_client, "claude-sonnet-5-5")
+    main_client = FakeVisionClient(defaults={"equation": ANSWER})
+    main_client.verifier = verifier  # type: ignore[attr-defined]
+    path = tmp_path / "a.jsonl"
+    args = argparse.Namespace(answers=path, answers_offline=False, batch=False)
+    cached = eval_cli._cached(args, settings(), main_client)
+    assert cached.second_check is not None
+    verifier.figure_alt(PNG, alt="A graph of speed against time.", caption=None)
+    assert len(check_client.requests) == 1
+    assert cached.summary()["second_check"]["answers_file_misses"] == 1  # type: ignore[index]
+
+    offline = argparse.Namespace(answers=path, answers_offline=True, batch=False)
+    verifier2 = ClaudeVerifier(check_client, "claude-sonnet-5-5")
+    main2 = FakeVisionClient(defaults={"equation": ANSWER})
+    main2.verifier = verifier2  # type: ignore[attr-defined]
+    cached2 = eval_cli._cached(offline, settings(), main2)
+    verifier2.figure_alt(PNG, alt="A graph of speed against time.", caption=None)
+    assert len(check_client.requests) == 1  # nothing was sent
+    assert cached2.second_check is not None and cached2.second_check.hits == 1

@@ -186,7 +186,28 @@ def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
         cached = CachedClient(staging, path, settings)
         staging.owner = cached
         return cached
-    return CachedClient(None if args.answers_offline else client, path, settings)
+    cached = CachedClient(None if args.answers_offline else client, path, settings)
+    _keep_second_check_answers(args, client, cached)
+    return cached
+
+
+def _keep_second_check_answers(args: argparse.Namespace, client: Any, cached: Any) -> None:
+    """The Claude second check asks the model too: its answers go into the same file, so a
+    replay (and `--answers-offline`) spends nothing on it either. A staged `--batch` run
+    leaves it live (its few small requests are not staged)."""
+    from a11y_stem.eval.answers import CachedClient
+    from a11y_stem.models.claude_verifier import ClaudeVerifier
+
+    verifier = getattr(client, "verifier", None)
+    if not isinstance(verifier, ClaudeVerifier) or getattr(args, "batch", False):
+        return
+
+    def wrap(inner: Any) -> Any:
+        check = CachedClient(None if args.answers_offline else inner, args.answers, inner.settings)
+        cached.second_check = check
+        return check
+
+    verifier.wrap_client(wrap)
 
 
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
@@ -212,7 +233,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
         # Checks the key before any work, not on the first call. The OpenAI client carries
         # the second automated check on the same budget, as in the app
         # (DECISIONS_FIGURE_VERIFY, DECISIONS_EQUATION_SHADOW turn it off); the Claude
-        # client has none.
+        # client carries the Claude check (CLAUDE_SECOND_CHECK, shadow by default).
         client = make_live_client(settings, budget)
     except ConfigError as exc:
         return str(exc)

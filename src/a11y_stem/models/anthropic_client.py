@@ -245,6 +245,11 @@ class AnthropicVisionClient:
         _log_call(call, last, sends=len(replies))
         return cast("T | None", last.parsed), call
 
+    @property
+    def settings(self) -> Settings:
+        """The settings this client sends with."""
+        return self._settings
+
     def sdk_client(self) -> anthropic.Anthropic:
         """The SDK client this object sends with (built on first use)."""
         return self._client()

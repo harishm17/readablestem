@@ -592,6 +592,12 @@ thing, and an experiment pays only for requests that differ from the baseline's.
 `--answers-offline` turns a miss into a refusal instead of a call (a replay that cannot spend),
 and `--every N` takes every Nth equation or figure instead of the first few. `--answers` is
 refused for the held-out set and the sealed check part.
+The Claude second check (shadow by default) asks the model as well; from 2026-10-14 its
+answers are kept in the same file (the report's `answers_file.second_check`), so a replay and
+`--answers-offline` spend nothing on it. The baselines of "Baselines and the gate" were
+recorded before that, so their check answers are not in `.local/answers-baseline.jsonl`: the
+first replay with the check on pays for them once (about $0.13). A `--batch` run leaves the
+check live.
 
 ```
 uv run a11y-stem eval pipeline --task equations --provider anthropic --max-usd 2 --answers .local/answers.jsonl

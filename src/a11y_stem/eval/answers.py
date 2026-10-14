@@ -77,6 +77,8 @@ class CachedClient:
         self._answers = AnswerSet(load_rows(path))
         self._local = threading.local()  # per thread: did the last first attempt only stage?
         self.verifier = getattr(inner, "verifier", None)
+        # The second check's own `CachedClient`, when the run keeps its answers too.
+        self.second_check: CachedClient | None = None
         self.hits = 0
         self.misses = 0
         self.live_cost_usd = 0.0
@@ -187,6 +189,12 @@ class CachedClient:
             row["steady_usd"] += steady
 
     def summary(self) -> Mapping[str, Any]:
+        out = self._summary()
+        if self.second_check is not None:
+            out["second_check"] = dict(self.second_check._summary())
+        return out
+
+    def _summary(self) -> dict[str, Any]:
         return {
             "by_step": {
                 k: {n: round(v, 6) for n, v in row.items()} for k, row in self._steps.items()
