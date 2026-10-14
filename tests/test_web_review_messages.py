@@ -108,7 +108,18 @@ class _Module:
                 constants |= c
                 families |= f
         elif isinstance(expr, ast.Name) and (key := (id(scope), expr.id)) not in seen:
-            for value in self._assigned(expr.id, scope):
+            # A name assigned in the function; failing that, a module-level constant
+            # (`SINGLE_READING_CODE = "single_reading"`).
+            values = list(self._assigned(expr.id, scope))
+            if not values and scope is not self.tree:
+                values = [
+                    node.value
+                    for node in self.tree.body
+                    if isinstance(node, ast.Assign)
+                    and any(isinstance(t, ast.Name) and t.id == expr.id for t in node.targets)
+                ]
+                scope = self.tree
+            for value in values:
                 c, f = self.strings(value, scope, seen | {key})
                 constants |= c
                 families |= f

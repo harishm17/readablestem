@@ -402,8 +402,8 @@ def test_reject_is_named_for_what_it_does(ux):
     equation = panel(screen(ux))
     assert re.search(r'data-role="reject"[^>]*>Keep as image<span', equation)
     assert (
-        "Keep as image: Students see a picture of the original; screen readers say only "
-        "“Equation not converted”." in text_of(equation)
+        "Keep as image: Students see a picture of the original; screen readers hear the PDF "
+        "text of the equation, marked as not checked." in text_of(equation)
     )
     heading = panel(screen(ux, "?item=p1-e0"))  # a bold heading, accepted
     assert re.search(r'data-role="reject"[^>]*>Make bold text<span', heading)
@@ -411,8 +411,8 @@ def test_reject_is_named_for_what_it_does(ux):
     response = post(ux, "p1-e2", action="reject", version="0")
     page = ux.browser.get(response.headers["location"]).text
     assert (
-        "Equation 1: Kept as an image of the original. Screen readers will say “Equation not "
-        "converted”. 2 decisions left." in text_of(page)
+        "Equation 1: Kept as an image of the original. Screen readers will hear the PDF text "
+        "of the equation, marked as not checked. 2 decisions left." in text_of(page)
     )
     assert "Decided: Kept as an image by you" in panel(screen(ux, "?item=p1-e2"))
 

@@ -57,6 +57,15 @@
              aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
     </div>
     {% include "_course_choice.html" %}
+    {# T1-14: exam mode. Per job (Job.exam_mode); the figure step then describes what is
+       shown and never the result. #}
+    <div class="field checkbox-field exam-choice">
+      <input type="checkbox" id="exam" name="exam" value="on" aria-describedby="exam-hint">
+      <label for="exam">Exam or quiz: describe figures without giving answers</label>
+      <p class="hint" id="exam-hint">Figure descriptions then say what is shown, such as the
+        axes and labels, and leave out values, trends and results a student is asked to work
+        out.</p>
+    </div>
     {# T1-8: two separate choices (UX review MF10 part 1). Neither ticked: deleted
        `retention_hours` after the last activity. TODO(Harish): the default and the final
        wording; the privacy page (privacy.html) says the same. #}

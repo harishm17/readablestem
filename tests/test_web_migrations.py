@@ -228,13 +228,16 @@ def test_jobs_survive_the_content_migration_and_old_inserts_still_work(tmp_path)
 
 TIER1_REVISION = "7c1d9a4e2b60"
 TIER1_JOB_COLUMNS = {"retention_mode", "title_override", "contact_line"}
+EXAM_REVISION = "3b8e5f1a9d27"
 
 
 def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     script = ScriptDirectory.from_config(alembic_config())
     revision = script.get_revision(TIER1_REVISION)
     assert revision is not None and revision.down_revision == CONTENT_REVISION
-    assert migration_heads() == {TIER1_REVISION}
+    exam = script.get_revision(EXAM_REVISION)
+    assert exam is not None and exam.down_revision == TIER1_REVISION
+    assert migration_heads() == {EXAM_REVISION}  # one head, the newest
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
@@ -285,5 +288,50 @@ def test_the_job_page_migration_downgrades_and_upgrades_again(tmp_path):
     engine = create_engine(url)
     try:
         assert {c["name"] for c in inspect(engine).get_columns("jobs")} >= TIER1_JOB_COLUMNS
+    finally:
+        engine.dispose()
+
+
+# --------------------------------------------------------------------------- exam mode
+
+
+def test_the_exam_migration_defaults_old_and_older_release_rows_to_not_an_exam(tmp_path):
+    url = f"sqlite:///{tmp_path}/exam.db"
+    migrate(url, TIER1_REVISION)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(INSERT_USER))
+            conn.execute(text(INSERT_JOB), {"id": "j1"})
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        with engine.begin() as conn:
+            # A release from before the column inserts without it (after a traffic rollback).
+            conn.execute(text(INSERT_JOB), {"id": "j2"})
+            found = conn.execute(text("SELECT id, exam_mode FROM jobs ORDER BY id")).all()
+        assert [tuple(row) for row in found] == [("j1", False), ("j2", False)]
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_exam_migration_downgrades_and_upgrades_again(tmp_path):
+    url = f"sqlite:///{tmp_path}/exam-down.db"
+    upgrade(url)
+    migrate(url, TIER1_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        columns = {c["name"] for c in inspect(engine).get_columns("jobs")}
+        assert "exam_mode" not in columns and columns >= TIER1_JOB_COLUMNS
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        assert "exam_mode" in {c["name"] for c in inspect(engine).get_columns("jobs")}
     finally:
         engine.dispose()

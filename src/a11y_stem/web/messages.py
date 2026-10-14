@@ -94,6 +94,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
+    ("equation.single_reading", "single_reading"): "The model read this equation once, "
+    "and its answer passed every check, so no second reading was made and it was accepted "
+    "as it stands.",
     # Alt text (pipeline.validate.check_alt)
     ("alt.decorative", "decorative_with_text"): "A decorative figure must have empty alt "
     "text, so clear the text or untick Decorative.",

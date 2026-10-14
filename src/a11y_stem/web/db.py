@@ -35,6 +35,7 @@ from sqlalchemy import (
     UniqueConstraint,
     create_engine,
     event,
+    false,
 )
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import (
@@ -129,6 +130,9 @@ class Job(Base):
     # A contact line (an email address or web address) the instructor chose for the
     # student file's footer (`web.titles.clean_contact`). Document-derived.
     contact_line: Mapped[str | None] = mapped_column(String(320))
+    # The upload form's "Exam or quiz" box: the figure step describes what is shown and
+    # never the result (`ConversionOptions.exam_mode`, read by `web.notation.conversion_options`).
+    exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(

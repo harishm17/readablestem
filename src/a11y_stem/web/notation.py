@@ -328,23 +328,25 @@ def notation_entries(rows: Iterable[CourseNotation]) -> list[NotationEntry]:
 def conversion_options(
     factory: sessionmaker[Session], settings: Settings, job_id: str
 ) -> ConversionOptions | None:
-    """The job's run options with its course notation; None when the feature is off or
-    the job has no course with entries (the run then uses the settings' flags)."""
-    if not enabled(settings):
-        return None
+    """The job's run options: its course notation (when the feature is on and the course
+    has entries) and its exam choice (`Job.exam_mode`, the upload form's box). None when
+    it has neither (the run then uses the settings' flags)."""
     from a11y_stem.web.db import session_scope
 
     with session_scope(factory) as session:
         job = session.get(Job, job_id)
-        if job is None or job.course_id is None:
+        if job is None:
             return None
-        course = owned_course(session, job.course_id, job.user_id)
-        if course is None:
-            return None
-        found = notation_entries(course.notation)
-    if not found:
+        exam = bool(job.exam_mode)
+        found: list[NotationEntry] = []
+        if enabled(settings) and job.course_id is not None:
+            course = owned_course(session, job.course_id, job.user_id)
+            if course is not None:
+                found = notation_entries(course.notation)
+    if not found and not exam:
         return None
-    return ConversionOptions.from_settings(settings).model_copy(update={"notation": found})
+    options = ConversionOptions.from_settings(settings)
+    return options.model_copy(update={"notation": found, "exam_mode": exam})
 
 
 @contextmanager

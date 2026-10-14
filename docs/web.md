@@ -263,6 +263,12 @@ With JavaScript, `app.js` checks the chosen file's size and type as soon as it i
 good one is sent it says "Uploading notes.pdf. Keep this tab open." and a second click
 does nothing. The server checks everything again.
 
+A third box, off by default: "Exam or quiz: describe figures without giving answers"
+(`exam`). It is stored as `jobs.exam_mode` and the worker passes it to the conversion as
+`ConversionOptions.exam_mode` (`web/notation.conversion_options`, which also carries the
+course notation; with neither, the run uses the settings' flags as before). Figure
+descriptions then say what is shown and never the result (`pipeline/figure_step.py`).
+
 Two separate boxes, both off by default (T1-8, `web/retention.py`): "Keep for 7 days, only
 I can see it" (`keep`) and "Also let the developer look (30 days)" (`share`; implies
 keeping). They set `jobs.retention_mode`: `day` (neither), `week` or `dev`; `dev` is also
@@ -846,8 +852,9 @@ the results".
 description" for a figure, "Keep as image" for a table, "Make bold text" or "Make plain text" for a heading, "Keep the
 original" otherwise. A line under the buttons, tied to the button by
 `aria-describedby`, says what that means for students ("Keep as image: Students see a
-picture of the original; screen readers say only “Equation not converted”."), and the
-notice after it and the item's state say the same in other words ("Kept as an image by
+picture of the original; screen readers hear the PDF text of the equation, marked as not
+checked."; "Equation not converted" is what they hear only when the PDF has no text there),
+and the notice after it and the item's state say the same in other words ("Kept as an image by
 you"). The action posted is still `reject`; stored results, ops counts and the output
 are unchanged.
 
@@ -1496,6 +1503,8 @@ a user id is added without it.
   tables already exist). Delete `.local/a11y-stem.db` if you need to test migrations.
 - `7c1d9a4e2b60` adds `jobs.retention_mode` (server default `day`; old opt-in rows become
   `dev`), `jobs.title_override` and `jobs.contact_line`; the downgrade drops them.
+- `3b8e5f1a9d27` (after `7c1d9a4e2b60`) adds `jobs.exam_mode` (server default false); the
+  downgrade drops it.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
