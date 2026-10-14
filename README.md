@@ -145,8 +145,9 @@ Method, definitions and every table: [docs/eval.md](docs/eval.md).
 - **Equations** become MathML. A model reads the crop and proposes LaTeX; deterministic
   checks compare it with the PDF's own text layer (letters, digits, signs, bold and
   double-struck styles); anything that could change what a student reads goes to review.
-- **Headings** become real `<h1>` to `<h6>` in a repaired outline. A bold line that reads as
-  a sentence is a decision; other uncertain ones are notes. A tagged PDF's own headings count.
+- **Headings** become real `<h1>` to `<h6>` in a repaired outline. Uncertain ones
+  are grouped so a repeated label is one decision, not eleven; a bold line that reads as a
+  sentence is a decision of its own. A tagged PDF's own headings count.
 - **Lists** become real `<ul>` and `<ol>` with their nesting and numbering, with no model call.
 - **Figures** get short alt text, or an explicit "needs a description" flag. Long
   descriptions are built but off by default.

@@ -27,9 +27,9 @@ strong evidence and none of the first three penalties (confidence >= 0.85, the d
 `Settings.auto_accept_confidence`). Check codes are content-free categories
 ("heading.level_repaired", "heading.weak_evidence").
 
-Review tiers ("meaning-level only" policy, 2026-10-08; sentence rule and optional groups
-2026-10-14, T2-7). Every heading is written as a heading either way; the tier only says
-whether a person must decide:
+Review tiers ("meaning-level only" policy, 2026-10-08; sentence rule 2026-10-14, T2-7).
+Every heading is written as a heading either way; the tier only says whether a person
+must decide:
 
 - certain: ACCEPTED, review "none" ("optional" when the outline repair moved it);
 - uncertain and on its own: ACCEPTED, review "optional" (its checks are the notes): a
@@ -42,15 +42,18 @@ whether a person must decide:
   (backlog A5);
 - uncertain and repeated: when the same label (normalised text) with the same style
   (font size, weight, evidence, level) is uncertain two or more times ("Teacher Support"
-  as a small bold line in every box), each copy carries the optional note
-  "heading.repeated_label" (no decision). Asking once per label, "Answer:" or "Definition."
-  under every example, cost a decision for each label and caught few of the wrong ones;
-  the labels are short run-in words that mostly are real box headings in the gold.
+  as a small bold line in every box), the copies make one group: NEEDS_REVIEW, review
+  "required", sharing `group_key` ("hg-" + the first one's element id) and `group_size`.
+  The review screen asks once: keep them all as headings at that level, choose another
+  level, or make them all plain bold text. One wrong guess repeated eleven times is worth
+  a decision; a label used once is not. (T2-7 tried making groups optional notes; the
+  development sets disagreed and one decision per group was kept: docs/layout.md "Review
+  tiers" has the measurements.)
 
 Bold run-in labels ("Solution", "Discussion", "Procedure" in an OpenStax worked example)
 are not headings in OpenStax's gold outline, but no structural rule separated them from
 real box headings reliably (docs/layout.md, "Run-in labels"), so they are not guessed
-at: optional notes, with the repeated-label note when they repeat.
+at: on their own they are optional notes, repeated they form a group like any label.
 """
 
 from __future__ import annotations
@@ -79,7 +82,8 @@ from a11y_stem.pipeline.layout import (
 
 ACCEPT_AT = 0.85  # matches the default Settings.auto_accept_confidence
 MIN_LETTERS = 4  # fewer letters than this ("Ex.", "A") is too little to trust
-MIN_GROUP = 2  # uncertain copies of one label that make a repeated-label group
+MIN_GROUP = 2  # uncertain copies of one label that make a group decision
+GROUP_PREFIX = "hg-"
 MIN_SENTENCE_WORDS = 3  # a shorter line ("Answer:", "Definition.") is a label, not a sentence
 SENTENCE_ENDS = ".?:"
 _CLOSERS = "\"'\u2019\u201d)]"  # closing quotes and brackets after the final mark
@@ -174,8 +178,7 @@ def style_key(element: Element, level: int) -> tuple[float | None, bool, bool, i
 
 
 def group_repeated(headings: Sequence[Element], fixes: Sequence[Fix]) -> None:
-    """Note repeated uncertain labels (in place): each copy gets the optional check
-    "heading.repeated_label", and no decision is asked for (T2-7).
+    """Turn repeated uncertain labels into one required decision per label (in place).
 
     Uncertain = the optional single headings `_fix` made with a failed evidence or
     shape check (not the certain ones whose only note is the outline repair, and not the
@@ -190,8 +193,12 @@ def group_repeated(headings: Sequence[Element], fixes: Sequence[Fix]) -> None:
     for members in groups.values():
         if len(members) < MIN_GROUP:
             continue
+        group_key = GROUP_PREFIX + members[0].element_id
         for fix in members:
-            fix.checks.append(_check("heading.repeated", False, "heading.repeated_label"))
+            fix.status = Status.NEEDS_REVIEW
+            fix.review = "required"
+            fix.group_key = group_key
+            fix.group_size = len(members)
 
 
 def sentence_like(text: str) -> bool:

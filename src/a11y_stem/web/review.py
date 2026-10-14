@@ -921,7 +921,7 @@ def _edit_heading(
 
 # --------------------------------------------------------------------------- heading groups
 
-GROUP_PREFIX = "hg-"  # groups stored before T2-7, which made repeated labels optional notes
+GROUP_PREFIX = "hg-"  # pipeline.heading_step.GROUP_PREFIX (element ids start with "p")
 
 
 def is_group_key(target: str) -> bool:

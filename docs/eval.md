@@ -1702,26 +1702,24 @@ it shows the shapes handled, not a rate on other documents.
 Headings, the same set (`eval pipeline --task headings --set dev-v2 --fake`, no model
 call):
 
-| | Before | After T2-7, T2-8 and the glossary entries |
+| | Before | After T2-7 (sentence rule), T2-8 and the glossary entries |
 |---|---|---|
 | precision / recall / F1 | 0.892 / 0.917 / 0.904 | 0.914 / 0.919 / 0.917 |
 | predicted headings (gold 683) | 702 | 687 |
-| required decisions (per PDF page) | 34 (0.101) | 26 (0.077) |
-| optional notes | 163 | 257 |
-| flag precision (required decisions with a wrong heading in them) | 0.118 (4 of 34) | 0.577 (15 of 26) |
-| flag recall (wrong headings that were in a required decision) | 0.114 (16 of 140) | 0.122 (15 of 123) |
-| wrong headings not asked about | 124 | 108 |
+| required decisions (per PDF page) | 34 (0.101) | 59 (0.175) |
+| optional notes | 163 | 124 |
+| flag precision (required decisions with a wrong heading in them) | 0.118 (4 of 34) | 0.305 (18 of 59) |
+| flag recall (wrong headings that were in a required decision) | 0.114 (16 of 140) | 0.236 (29 of 123) |
+| wrong headings not asked about | 124 | 94 |
 
 T2-8 accounts for two matches (two pages of OpenStax Elementary Algebra: "Practice Makes
 Perfect" no longer joins the title below it); the glossary entries for the drop from 22
 to 7 predicted headings on `html-code-glossary` (the terms are no longer headings) and
-2 on the Word lecture; T2-7 for the decisions. On the original development set
-(`data/gold`, 3 sections of Physics) F1 is unchanged, 0.9344 (precision 0.877, recall
-1.000, level accuracy 0.992), but the required decisions fall from 9 to 0 and the flag recall
-from 0.78 (14 of 18 wrong headings) to 0: its repeated-label groups ("Teacher Support",
-"Solution", "Discussion", "Procedure") held most of its wrong headings, while the
-dev-v2 groups (135 headings, 97 % right) held almost none. The two sets disagree; the
-held-out set is where the rule is meant to be settled (backlog T2-7).
+2 on the Word lecture; the sentence rule for 26 of the 59 decisions. On the original
+development set (`data/gold`, 3 sections of Physics) F1 is unchanged, 0.9344 (precision
+0.877, recall 1.000, level accuracy 0.992) and the 9 group decisions are unchanged. Whether
+repeated-label groups should stay decisions was measured in four variants on both sets:
+docs/layout.md "Review tiers" has the table and the choice (one decision per group).
 
 ## What the numbers do not show
 

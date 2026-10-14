@@ -157,7 +157,7 @@ def test_every_heading_is_accepted_and_uncertain_ones_carry_notes():
             assert fix.confidence is not None and fix.confidence >= ACCEPT_AT
 
 
-def test_repeated_uncertain_labels_are_an_optional_note_not_a_decision():
+def test_repeated_uncertain_labels_make_one_group_decision():
     elements = [
         large(0, "Motion", 18.0),
         large(1, "Teacher Support", 14.0),
@@ -173,23 +173,23 @@ def test_repeated_uncertain_labels_are_an_optional_note_not_a_decision():
         heading(11, "Teacher Support", 11.0, REASON_BOLD_BODY),
     ]
     fixes = by_id(elements)
-    for element_id in ("p1-e3", "p1-e7", "p1-e11"):
+    members = ["p1-e3", "p1-e7", "p1-e11"]
+    for element_id in members:
         fix = fixes[element_id]
         assert (fix.status, fix.review, fix.group_key, fix.group_size) == (
-            Status.ACCEPTED,
-            "optional",
-            None,
-            None,
+            Status.NEEDS_REVIEW,
+            "required",
+            "hg-p1-e3",
+            3,
         ), element_id
-        assert failed_codes(fix) == ["heading.weak_evidence", "heading.repeated_label"]
         assert fix.heading is not None and fix.heading.level == 3
     # Certain copies of the same words are not part of it, nor is a label used once.
-    assert failed_codes(fixes["p1-e1"]) == []
+    assert fixes["p1-e1"].status is Status.ACCEPTED and fixes["p1-e1"].group_key is None
     for element_id in ("p1-e2", "p1-e9"):
         assert fixes[element_id].status is Status.ACCEPTED
         assert fixes[element_id].review == "optional"
-        assert failed_codes(fixes[element_id]) == ["heading.weak_evidence"]
-    assert not [f for f in fixes.values() if f.review == "required"]
+        assert fixes[element_id].group_key is None
+    assert re.fullmatch(r"hg-p\d+-e\d+", fixes["p1-e3"].group_key or "")
 
 
 @pytest.mark.parametrize(

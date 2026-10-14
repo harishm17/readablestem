@@ -229,8 +229,13 @@ written as a heading; the tier only says whether a person must decide:
 |---|---|---|
 | certain | ACCEPTED | `none` (`optional` when the outline repair moved it) |
 | uncertain | ACCEPTED | `optional`: its failed checks are the notes |
-| uncertain, the same label and style two or more times | ACCEPTED | `optional`, with one more note on each copy, `heading.repeated_label` (T2-7) |
+| uncertain, the same label and style two or more times | NEEDS_REVIEW | `required`, one decision for the group (`group_key`, `group_size`) |
 | weak evidence and a sentence (see below) | NEEDS_REVIEW | `required`, check `heading.sentence_like` (T2-7) |
+
+Same label: NFKC, case-folded, letters and digits only ("Teacher Support:" = "teacher
+support"). Same style: font size to the half point, bold or not, larger-font evidence or
+not, and the same proposed level. Certain copies of the label are never in a group, and
+nor are sentence-like lines, which are decisions of their own.
 
 *A sentence* (T2-7, 2026-10-14, `heading_step.sentence_like`): a heading with weak
 evidence (bold at body size: no larger font, no section number, no tag) whose text ends in
@@ -241,17 +246,40 @@ a heading; a person decides whether it is one. Shorter lines ("Answer:", "Defini
 labels. The backlog's evidence (A5): every wrong heading of the held-out run was in the
 optional bucket, so no wrong guess ever reached a person.
 
-*Repeated labels* are no longer a decision (they were one group decision per label until
-T2-7): the same label (NFKC, case-folded, letters and digits only; "Teacher Support:" =
-"teacher support") in the same style (font size to the half point, bold or not,
-larger-font evidence or not, and the same proposed level) two or more times is a note on
-each copy. On the dev-v2 set the 135 members of such groups were 97 % real headings of
-OpenStax's own outline ("Answer:" and "Definition." under every example), so the decisions
-were mostly noise there; on the original three-section development set the opposite held
-(its 9 group decisions held 14 of its 18 wrong headings: "Teacher Support", "Solution",
-"Discussion", "Procedure"). docs/eval.md "Structure check" has both. Certain copies of
-a label are never noted. Results stored before T2-7 may still carry `group_key`; the review
-screen reads them as before (`web/heading_groups.py`).
+*Repeated labels, the T2-7 measurement* (2026-10-14, development sets only; the held-out
+set was not used). The backlog proposed making repeated-label groups optional notes. The two
+development sets disagree about them, so four ways of handling a group were run on both
+(`eval pipeline --task headings --fake`, no model; the sentence rule is on in all four):
+
+| Variant | Set | Required decisions | Flag precision | Flag recall | Wrong headings not asked about |
+|---|---|---|---|---|---|
+| (a) groups are optional notes | original dev (3 sections, 43 PDF pages) | 0 | n/a | 0.000 (0 of 18) | 18 |
+| | dev-v2 (28 documents, 338 pages) | 26 | 0.577 (15 of 26) | 0.122 (15 of 123) | 108 |
+| (b) one required decision per group (kept) | original dev | 9 | 0.556 (5 of 9) | 0.778 (14 of 18) | 4 |
+| | dev-v2 | 59 | 0.305 (18 of 59) | 0.236 (29 of 123) | 94 |
+| (b2) only the first copy of a group is required, the others optional notes | original dev | 9 | 0.556 (5 of 9) | 0.278 (5 of 18) | 13 |
+| | dev-v2 | 59 | 0.305 (18 of 59) | 0.146 (18 of 123) | 105 |
+| (c) every copy is a decision of its own | original dev | 41 | 0.341 (14 of 41) | 0.778 (14 of 18) | 4 |
+| | dev-v2 | 159 | 0.182 (29 of 159) | 0.236 (29 of 123) | 94 |
+
+Heading F1 is the same in every variant (0.9344 original dev, 0.9168 dev-v2). Before T2-7
+(no sentence rule) the group behaviour was (b) minus the 26 sentence decisions: 9 decisions
+on the original dev set and 34 on dev-v2 (flag precision 0.118, flag recall 0.114). (b) is
+the old "one decision per group, not per copy"; (b2) is the variant that asks for the group's
+first copy only.
+
+*Why (b).* The criterion was: keep one decision per group if it holds most of the original
+dev set's flag recall and adds few decisions on dev-v2. (b) keeps all of it (14 of its 18
+wrong headings, 0.778, against none in (a)) and costs 33 more decisions on dev-v2 (26 to 59,
+0.077 to 0.175 per PDF page: one more every ten pages). Those 33 are mostly wasted there: 30
+of the 33 groups hold only right headings ("Answer:", "Definition." under every example), so
+dev-v2 flag precision falls from 0.577 to 0.305; but they also double its flag recall
+(0.122 to 0.236, 14 more wrong headings), and a group is answered with one action for all its
+copies (keep all, set a level, make all bold text). (a) loses the original set's recall
+entirely. (b2) keeps the decisions and loses most of the recall (it checks one copy and the
+rest go unasked). (c) has (b)'s recall at four times the decisions on both sets. The weakness
+of (b) is precision on dev-v2; the next lever would be a rule that tells "Answer:"-type
+labels from "Teacher Support"-type boxes, which no development set separates yet.
 
 **Run-in labels.** OpenStax's outline does not count the bold labels inside a worked
 example or lab box ("Solution", "Discussion", "Procedure") as headings, but does count
