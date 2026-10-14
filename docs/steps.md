@@ -581,6 +581,18 @@ OpenStax's own alt text in the gold set triggers only `too_long` and `redundant_
 | `figure.long_description` | `long_description_unsure` | warning (a note) | the model marked its long description unsure |
 | `figure.data_values` | `values_from_image` | warning (a note: the table is an optional extra, not in the file until a reviewer adds it) | some value of the data table is not printed in the PDF text inside the figure, or the model says it read one off the chart |
 
+## Equations as pictures
+
+An equation that layout found as a picture (`Element.reasons` has `equation image`, `text` is
+None: `pipeline/equation_images.py`, docs/layout.md "Equations pasted as pictures") is read
+by the same step with the same prompt. Nothing can confirm the reading, so a usable one
+gets the failed warning check `equation.no_text_layer` (code `no_text_layer`) added after
+the model's answers, not before: it is no reason to ask the main model again (an inline
+picture starts on the cheap model like any short inline equation), and rule 6 cannot accept
+it, so the status is NEEDS_REVIEW (review `required`) whatever the confidence. A picture the
+model says is not an equation is ABSTAINED `not_equation` (rule 2) as for any crop; the
+picture stays in the output, flagged ("Equation not converted").
+
 ## Speech (`mathml_to_speech`)
 
 Deterministic English for the review screen and report; the output HTML keeps MathML

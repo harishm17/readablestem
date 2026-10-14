@@ -94,6 +94,9 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer_style", "style_cosmetic"): "A letter's style differs from the PDF "
     "only where it does not change the meaning (a bold subscript or digit, or a style such "
     "as double-struck that the PDF's text cannot show), so this was accepted as it is.",
+    ("equation.no_text_layer", "no_text_layer"): "This equation is a picture, so the PDF holds "
+    "no text to check the transcription against: compare it with the picture symbol by "
+    "symbol.",
     ("equation.single_reading", "single_reading"): "The model read this equation once, "
     "and its answer passed every check, so no second reading was made and it was accepted "
     "as it stands.",
@@ -322,11 +325,11 @@ NOTICE_MESSAGES: dict[str, str] = {
     "a cue that does not depend on seeing the colour.",
     "colour_only": "A figure tells things apart by colour alone, so add labels or patterns "
     "that do not depend on seeing the colour.",
+    "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
+    "could not be kept and is written on the line, so check it reads right.",
     "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
     "email address.",
     "link_text_unclear": "A link's text does not say where it goes (for example, click "
-    "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
-    "could not be kept and is written on the line, so check it reads right.",
     "here), so reword it.",
     "lang_detected": "The language of the document was detected from its text, so check it "
     "is right.",
