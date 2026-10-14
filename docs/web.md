@@ -191,8 +191,9 @@ yours to see". It is a 404 either way. The
   `/admin`. It is checked on every request, so removing someone ends their access at
   once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
   created for them.
-- **Sessions.** Starlette `SessionMiddleware`: a signed cookie `a11y_stem_session`,
-  HttpOnly, SameSite=Lax, 7 days, Secure in production. The session is cleared and a new
+- **Sessions.** Starlette `SessionMiddleware`: a signed cookie `a11y_stem_session`
+  (`__Host-a11y_stem_session` in production), HttpOnly, SameSite=Lax, 7 days, Secure in
+  production. The session is cleared and a new
   CSRF token issued at sign-in. It holds the user id, the user's session version, the
   CSRF token, one-time notices (never document content) and Authlib's sign-in state (the
   state, the nonce and, for Microsoft, the PKCE verifier; each works once).
@@ -1333,6 +1334,7 @@ X-Content-Type-Options: nosniff
 Referrer-Policy: same-origin
 X-Frame-Options: DENY
 Cross-Origin-Opener-Policy: same-origin
+Cross-Origin-Resource-Policy: same-origin
 Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=()
 Cache-Control: no-store            (everything except /static/; page images and
                                     marks.css: private, no-store)
@@ -1347,6 +1349,11 @@ Request bodies are capped at 1 MiB while they stream in (`RequestSizeLimitMiddle
 before any form is parsed: Starlette's multipart parser has no limit on file parts, and
 CSRF can only be checked after parsing. The upload route is exempt because it enforces
 its own `MAX_UPLOAD_MB` limit the same way.
+
+Sign-in starts and callbacks, uploads and the cron route are rate limited per address (and
+uploads per person) in memory (`web/abuse.py`; the numbers are in [security.md](security.md)).
+The address is read from `X-Forwarded-For` counting `TRUSTED_PROXY_HOPS` entries from the
+right. A person may have 10 documents waiting or running and 40 kept at once.
 
 The converted document (`/view`, `/download`, `/demo`) gets its own policy instead:
 `sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'`. It may carry

@@ -55,6 +55,8 @@ BASE_HEADERS = {
     "Referrer-Policy": "same-origin",
     "X-Frame-Options": "DENY",
     "Cross-Origin-Opener-Policy": "same-origin",
+    # No other site may embed our pages, images or the converted document.
+    "Cross-Origin-Resource-Policy": "same-origin",
     "Permissions-Policy": "camera=(), microphone=(), geolocation=(), payment=()",
 }
 

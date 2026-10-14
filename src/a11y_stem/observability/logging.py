@@ -34,6 +34,7 @@ dictConfig); nothing is written by uvicorn's own plain-text handlers.
 from __future__ import annotations
 
 import logging
+import os
 import re
 import sys
 import time
@@ -94,6 +95,7 @@ MAX_FRAMES = 8
 _VERBOSE_ALLOWED = ("a11y_stem", "uvicorn.error", "alembic.runtime.migration")
 # Chatty libraries also get their level raised, so they skip formatting messages at all.
 _QUIET_LOGGERS = (
+    "anthropic",
     "openai",
     "httpx",
     "httpx2",
@@ -370,6 +372,11 @@ def uvicorn_log_options() -> dict[str, Any]:
     return {"log_config": None, "access_log": False}
 
 
+# The model SDKs read these at import and then log whole request bodies (document text, page
+# images) at DEBUG, through a handler of their own. This process never wants that.
+_SDK_LOG_VARIABLES = ("ANTHROPIC_LOG", "OPENAI_LOG")
+
+
 def configure_logging(settings: Settings | None = None) -> None:
     """JSON logs to stdout at `settings.log_level`. Safe to call more than once.
 
@@ -377,6 +384,8 @@ def configure_logging(settings: Settings | None = None) -> None:
     Langfuse warnings get the same severity mapping and privacy filter as our own lines.
     Uvicorn's records go through it even if uvicorn configures its own logging later.
     """
+    for variable in _SDK_LOG_VARIABLES:
+        os.environ.pop(variable, None)
     level_name = (settings.log_level if settings is not None else "INFO").upper()
     level = logging.getLevelNamesMapping().get(level_name, logging.INFO)
     shared = _shared_processors()
@@ -400,8 +409,12 @@ def configure_logging(settings: Settings | None = None) -> None:
     root.addHandler(handler)
     root.setLevel(level)
 
+    quiet = max(level, logging.WARNING)
     for name in _QUIET_LOGGERS:
-        logging.getLogger(name).setLevel(max(level, logging.WARNING))
+        logging.getLogger(name).setLevel(quiet)
+    for name in list(logging.root.manager.loggerDict):  # a child already set to DEBUG
+        if name.startswith(tuple(f"{quiet_name}." for quiet_name in _QUIET_LOGGERS)):
+            logging.getLogger(name).setLevel(quiet)
     # Uvicorn's own handlers would bypass the chain: remove them now, and route its records
     # through our handler with logger filters, which survive a later dictConfig.
     for name in _UVICORN_ROUTED:

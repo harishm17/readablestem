@@ -79,6 +79,11 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "session_secret": None,
     }
     values.update(overrides)
+    if values["env"] != "prod":
+        # Browser tests share one server and one address for many sign-ins and uploads; the
+        # rate limit tests (tests/test_audit_ratelimit.py) switch it back on. Production
+        # settings keep the default, which production requires.
+        values.setdefault("rate_limits_enabled", False)
     return Settings(_env_file=None, **values)  # type: ignore[call-arg]
 
 

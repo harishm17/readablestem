@@ -35,6 +35,7 @@ from starlette.datastructures import UploadFile
 from starlette.formparsers import MultiPartException, MultiPartParser
 from starlette.requests import Request
 
+from a11y_stem.core.childenv import child_env
 from a11y_stem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
 
 # Room for the multipart boundaries and the small text fields around the file itself.
@@ -217,6 +218,7 @@ def inspect_pdf_isolated(
             capture_output=True,  # MuPDF's own messages are discarded, never logged
             timeout=timeout_s,
             check=False,
+            env=child_env(),  # no keys or secrets for the process that reads the PDF
         )
         answer = json.loads(completed.stdout.decode("utf-8").strip().splitlines()[-1])
     except (subprocess.TimeoutExpired, ValueError, IndexError, OSError):

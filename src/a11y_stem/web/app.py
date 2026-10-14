@@ -74,6 +74,9 @@ TEMPLATES_DIR = WEB_DIR / "templates"
 STATIC_DIR = WEB_DIR / "static"
 
 SESSION_COOKIE = "a11y_stem_session"
+# In production the cookie is named with the __Host- prefix: browsers then refuse it unless it
+# is Secure, has Path=/ and no Domain, so a sibling subdomain cannot plant or replace it.
+HOST_PREFIX = "__Host-"
 SESSION_MAX_AGE_S = 7 * 24 * 60 * 60
 MIN_SESSION_SECRET_CHARS = 32
 
@@ -362,7 +365,7 @@ def create_app(
     app.add_middleware(
         SessionMiddleware,
         secret_key=_session_secret(settings),
-        session_cookie=SESSION_COOKIE,
+        session_cookie=(HOST_PREFIX if settings.env == "prod" else "") + SESSION_COOKIE,
         max_age=SESSION_MAX_AGE_S,
         same_site="lax",
         https_only=settings.env == "prod",

@@ -56,7 +56,9 @@
     nearby text, are sent to Anthropic's API (the Claude models).{% if notation_on %} For a document you upload
     for one of your courses, that course's notation (its symbols and what they mean) is
     sent with the equations.{% endif %} Anthropic states that it does not use API data to train its models by
-    default; see Anthropic's own API data policies for how long it keeps requests.</li>
+    default. Anthropic's published policy is to delete API inputs and outputs from its systems
+    within 30 days (longer for material its safety systems flag), so a document you delete here
+    can remain with Anthropic for up to that long; see Anthropic's own API data policies.</li>
   {% else %}
   <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
@@ -105,6 +107,27 @@
   cookies or scripts are used for this. These notes are deleted after {{ event_days }}
   days, or with your account.</p>
 {% endif %}
+
+<h2>How it is protected</h2>
+{# Every line below is a behaviour the tests exercise (docs/security.md, tests/test_audit_*.py);
+   keep it that way when editing. #}
+<ul>
+  <li>The site is served over HTTPS only.</li>
+  <li>Only you can open your documents. Other people on the beta, and the people who run
+    it, are told "not found" for an address that is yours.</li>
+  <li>The converted document is shown in a sandbox that stops it running scripts.</li>
+  <li>An uploaded PDF is first opened in a separate short-lived process with its own time
+    and memory limits, and is kept only in the database, never as a file on the server's disk.</li>
+  <li>Sign-in, uploads and daily page counts have limits that stop automated misuse.</li>
+</ul>
+{# TODO(Harish): "Where it is processed". Recommended text: "The app and its database run
+   in Google Cloud, region {REGION from deploy.env}. Images and nearby text of equations and
+   figures are sent to {OpenAI|Anthropic} in the United States for processing, as described
+   above. If you are outside the United States, your documents are therefore transferred
+   there." Check the region before publishing; a university's privacy office will ask. #}
+{# TODO(Harish): "Changes to this notice". Recommended text: "If this notice changes in a
+   way that affects what is stored or who receives it, we will say so on this page, with the
+   date, before the change takes effect, and email the people on the beta list." #}
 
 <h2>Requests, takedowns and rights</h2>
 <p>To have your data deleted, to report material that should not be here, or for any
