@@ -322,19 +322,32 @@ def test_inline_maths_becomes_child_equations_with_markers_in_the_paragraph():
         assert px0 <= x0 < x1 <= px1 and py0 <= y0 < y1 <= py1
 
 
-def test_superscripts_count_as_maths_but_italic_words_citations_and_ranges_do_not():
+def test_a_variables_superscript_is_maths_but_italic_words_citations_and_ranges_are_not():
     elements = analyze(
         html_page(
             "<p>This is <i>important</i>: see [3] and pages 10-12 of the 2019 edition, a "
-            "classic. The area is x<sup>2</sup> square metres.</p>"
+            "classic. The area is <i>x</i><sup>2</sup> square metres.</p>"
         )
     ).elements
     paragraph, square = elements
-    assert square.text == "x2" and square.reasons == ["letter with sub/superscript"]
+    assert square.text == "x2" and square.reasons == ["italic variable with operator"]
     assert paragraph.text == (
         "This is important: see [3] and pages 10-12 of the 2019 edition, a classic. "
         f"The area is {inline_marker(square.id)} square metres."
     )
+
+
+def test_a_superscript_of_upright_text_is_raised_text_not_maths():
+    # Upright x with a raised 2 (a unit, an ion, a power in a text font) is not a variable:
+    # it stays in the paragraph and is written <sup> (docs/layout.md "Raised and lowered text").
+    (paragraph,) = analyze(
+        html_page("<p>The area is x<sup>2</sup> square metres, in cm<sup>2</sup>.</p>")
+    ).elements
+    assert paragraph.text == "The area is x2 square metres, in cm2."
+    assert [(paragraph.text[r.start : r.end], r.kind) for r in paragraph.script_runs] == [
+        ("2", "sup"),
+        ("2", "sup"),
+    ]
 
 
 def test_code_option_dashes_and_markup_are_not_maths():

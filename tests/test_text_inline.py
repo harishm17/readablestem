@@ -10,7 +10,16 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.types import ColourRun, Element, Fix, Kind, Link, Status, inline_marker
+from a11y_stem.core.types import (
+    ColourRun,
+    Element,
+    Fix,
+    Kind,
+    Link,
+    ScriptRun,
+    Status,
+    inline_marker,
+)
 from a11y_stem.pipeline import inline_text
 from a11y_stem.pipeline.assemble import render_html
 from a11y_stem.pipeline.html_checks import static_checks
@@ -221,3 +230,72 @@ def test_the_assembled_document_carries_links_colour_and_language():
     assert ".tc-d2d2d2 { color: #767676; }" in out
     assert [c.code for c in static_checks(out) if not c.passed] == []
     assert inline_text.COLOUR_CLASS_PREFIX == "tc-"
+
+
+# ------------------------------------------------------------------ raised and lowered text
+
+
+def script(start: int, end: int, kind: str) -> ScriptRun:
+    return ScriptRun(start=start, end=end, kind=kind)  # type: ignore[arg-type]
+
+
+def test_script_runs_are_written_as_sup_and_sub():
+    text = "H2O and Na+ and g/cm3"
+    element = paragraph(
+        text, script_runs=[script(1, 2, "sub"), script(10, 11, "sup"), script(20, 21, "sup")]
+    )
+    assert html(element) == "H<sub>2</sub>O and Na<sup>+</sup> and g/cm<sup>3</sup>"
+
+
+def test_text_around_a_script_is_escaped():
+    element = paragraph("a<b & c2", script_runs=[script(7, 8, "sub")])
+    assert html(element) == "a&lt;b &amp; c<sub>2</sub>"
+
+
+def test_a_lowered_run_beside_a_raised_one_is_one_stacked_pair():
+    styles = Styles()
+    element = paragraph("SO42-", script_runs=[script(2, 3, "sub"), script(3, 5, "sup")])
+    # Text order (4, then 2-) is the reading order; the class says the lowered run is first.
+    assert html(element, styles) == (
+        'SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></span>'
+    )
+    assert styles.added == {"script-stack": inline_text.STACK_CSS}
+    # A nuclide: the mass number comes first, and is drawn on top.
+    nuclide = paragraph("226Ra", script_runs=[script(0, 2, "sup"), script(2, 3, "sub")])
+    assert html(nuclide).startswith('<span class="script-stack"><sup>22</sup><sub>6</sub>')
+
+
+def test_two_raised_runs_side_by_side_are_not_stacked():
+    element = paragraph("x23", script_runs=[script(1, 2, "sup"), script(2, 3, "sup")])
+    styles = Styles()
+    assert html(element, styles) == "x<sup>2</sup><sup>3</sup>"
+    assert styles.added == {}
+
+
+def test_a_script_run_that_starts_inside_a_marker_or_overlaps_is_skipped():
+    marker = inline_marker("p1-e1")
+    text = f"ab {marker} cd"
+    inside = script(4, 6, "sup")  # inside the marker
+    element = paragraph(text, script_runs=[inside, script(len(text) - 2, len(text), "sub")])
+    assert html(element) == f"ab {MATHS} <sub>cd</sub>"
+    overlap = paragraph("abcdef", script_runs=[script(1, 4, "sup"), script(3, 5, "sub")])
+    assert html(overlap) == "a<sup>bcd</sup>ef"
+
+
+def test_a_script_sits_inside_a_link_and_a_colour():
+    text = "See H2O now"
+    element = paragraph(
+        text,
+        links=[uri(0, 6)],
+        colour_runs=[ColourRun(start=4, end=7, rgb=RED)],
+        script_runs=[script(5, 6, "sub")],
+    )
+    out = html(element)
+    assert out.startswith(
+        '<a href="https://example.org/a">See <span class="tc-ff0000">H<sub>2</sub>'
+    )
+
+
+def test_text_with_no_script_runs_is_written_as_before():
+    element = paragraph("H2O is water")
+    assert html(element) == "H2O is water"

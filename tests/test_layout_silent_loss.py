@@ -663,7 +663,9 @@ def test_a_small_pixel_picture_drawn_large_is_a_figure(case):
     page.insert_image(rect, pixmap=pix)
     _paragraphs(page, top=240, n=1)
     out = layout.analyze(doc.tobytes())
-    assert _held(out, 0, rect) and out.kept_pages == {}
+    # A picture of maths is held as an equation (T2-3), a QR code as a figure: not dropped.
+    kinds = (Kind.FIGURE,) if case == "qr" else (Kind.FIGURE, Kind.EQUATION)
+    assert _held(out, 0, rect, kinds) and out.kept_pages == {}
 
 
 def test_a_spacer_or_a_one_colour_image_is_still_decoration():

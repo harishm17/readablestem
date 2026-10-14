@@ -298,9 +298,12 @@ def _is_simple(node: ET.Element) -> bool:
 
 
 def _is_signed_token(node: ET.Element) -> bool:
-    """A token, or a minus/plus sign plus a token (`10^{-3}`)."""
+    """A token, a minus/plus sign plus a token (`10^{-3}`), or a token plus a sign: the
+    charge of an ion (`SO_4^{2-}`, `Fe^{3+}`)."""
     if node.tag == "mrow" and len(node) == 2 and node[0].tag == "mo":
         return _text_of(node[0]) in {"−", "-", "+"} and node[1].tag in _TOKENS
+    if node.tag == "mrow" and len(node) == 2 and node[1].tag == "mo":
+        return _text_of(node[1]) in {"−", "-", "+"} and node[0].tag in {"mn", "mi"}
     return node.tag in _TOKENS
 
 
@@ -374,10 +377,24 @@ def _with_limits(
     return [*words, "of"]
 
 
+def _no_base(base: ET.Element) -> bool:
+    """A script with nothing to hang on: the scripts before a nuclide's symbol."""
+    return (base.tag == "mrow" and len(base) == 0) or (base.tag == "mi" and not _text_of(base))
+
+
+def _pre_script(word: str, script: ET.Element) -> list[str]:
+    """A script before its base, read as "superscript 14" ("... end superscript" when long)."""
+    if _is_simple(script) or _is_signed_token(script):
+        return [word, *_speak(script)]
+    return [word, *_speak(script), f"end {word}"]
+
+
 def _speak_msub(node: ET.Element) -> list[str]:
     if len(node) != 2:
         return _speak_children(node)
     base, sub = node[0], node[1]
+    if _no_base(base):
+        return _pre_script("subscript", sub)
     limits = _with_limits(base, sub, None)
     return limits if limits is not None else [*_speak(base), *_sub_words(sub)]
 
@@ -386,6 +403,8 @@ def _speak_msup(node: ET.Element) -> list[str]:
     if len(node) != 2:
         return _speak_children(node)
     base, sup = node[0], node[1]
+    if _no_base(base):
+        return _pre_script("superscript", sup)
     limits = _with_limits(base, None, sup)
     return limits if limits is not None else [*_speak(base), *_power_words(sup)]
 
@@ -394,6 +413,8 @@ def _speak_msubsup(node: ET.Element) -> list[str]:
     if len(node) != 3:
         return _speak_children(node)
     base, sub, sup = node[0], node[1], node[2]
+    if _no_base(base):  # a nuclide's mass number over its atomic number: {}^{14}_{6}C
+        return [*_pre_script("superscript", sup), *_pre_script("subscript", sub)]
     limits = _with_limits(base, sub, sup)
     if limits is not None:
         return limits

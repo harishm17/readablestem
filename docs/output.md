@@ -451,6 +451,31 @@ stores both, as after a review decision.
 Text the tool itself writes (the notes, "Equation" before an equation number, the about
 section) is English whatever the document's language.
 
+## Raised and lowered text
+
+Raised and lowered text of upright text (`Element.script_runs`: H2O, Na+, g/cm3, 226Ra) is
+written as `<sup>` and `<sub>` inside the paragraph, list item or heading, inside any link or
+colour:
+
+```html
+<p id="p1-e2">Water is H<sub>2</sub>O, table salt is Na<sup>+</sup> and gold is 19.3 g/cm<sup>3</sup>.</p>
+```
+
+A lowered and a raised run side by side (the count and the charge of SO4 2-, the two
+numbers before a nuclide's symbol) are one stacked pair, with a rule added to the document
+only when it has one. The two stay in the order of the text, which is the order a screen
+reader says them in (4, then 2-; the mass number, then the atomic number); the raised one is
+drawn on top whichever comes first (`flex-direction: column-reverse` when the lowered one does):
+
+```html
+SO<span class="script-stack script-stack-low-first"><sub>4</sub><sup>2-</sup></span>
+```
+
+The text itself is unchanged (`H2O`), so search and copy read as before. A run is skipped
+when it would start inside an inline equation's marker or overlap another. What cannot be
+carried (a figure caption, a table cell's lowered text, a script with nothing before it) is
+written flat, and the notice `scripts_flattened` ("Worth checking") says where.
+
 ## Coloured text (FEATURE_COLOUR)
 
 With the flag on, text printed in a colour other than the body's keeps a colour in the

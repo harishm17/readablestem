@@ -13,7 +13,10 @@ cross-references", "Language", "Coloured text"):
   holds, and a link inside the document only to a well-formed id. Links are outermost
   and never wrap an inline equation (a wide equation is a tab stop of its own, which
   cannot sit inside a link): a link across one is written in pieces around it. Colour
-  spans sit inside links and may wrap maths, which takes the colour too.
+  spans sit inside links and may wrap maths, which takes the colour too. Raised and
+  lowered runs (`Element.script_runs`: Na+, H2O, cm3) are written as `<sup>` and `<sub>`,
+  innermost; a lowered and a raised run side by side (SO4 2-, the two numbers before a
+  nuclide's symbol) are written as one stacked pair (`STACK_CSS`).
 - `passage_attrs`: ` lang="..."` on the element's own block (`<p>`, `<li>`, `<h2>`...)
   when `Element.lang` is set.
 
@@ -34,7 +37,14 @@ from collections.abc import Callable, Sequence
 from dataclasses import dataclass
 from itertools import pairwise
 
-from a11y_stem.core.types import INLINE_MARKER_RE, ColourRun, Element, Link, is_safe_href
+from a11y_stem.core.types import (
+    INLINE_MARKER_RE,
+    ColourRun,
+    Element,
+    Link,
+    ScriptRun,
+    is_safe_href,
+)
 from a11y_stem.pipeline import contrast
 from a11y_stem.pipeline.language import is_language_tag
 from a11y_stem.pipeline.safe_html import escape_text
@@ -46,6 +56,20 @@ EquationHtml = Callable[[str], str | None]
 AddStyle = Callable[[str, str], None]
 
 COLOUR_CLASS_PREFIX = "tc-"
+# A lowered and a raised run side by side, written one above the other as they are
+# printed (the count and the charge of SO4 2-, the mass number and the atomic number of
+# a nuclide). The two stay in the order of the text, which is the order a screen reader
+# says them in (4, then 2-; 14, then 6); the raised one is drawn on top either way, by the
+# direction of the column. Added to the stylesheet only for a document that has one.
+STACK_CLASS = "script-stack"
+STACK_LOW_FIRST = "script-stack-low-first"  # the lowered run comes first in the text
+STACK_CSS = (
+    f".{STACK_CLASS} {{ display: inline-flex; flex-direction: column; vertical-align: -0.5em;"
+    f" font-size: 0.75em; line-height: 1.1; text-align: left; }}\n"
+    f".{STACK_CLASS}.{STACK_LOW_FIRST} {{ flex-direction: column-reverse; }}\n"
+    f".{STACK_CLASS} sup, .{STACK_CLASS} sub {{ font-size: inherit; vertical-align: baseline;"
+    f" line-height: inherit; }}\n"
+)
 # An element id a link may point at ("p3-e12"), as the assembler writes ids.
 LINK_TARGET = re.compile(r"[A-Za-z0-9_.:\-]{1,64}")
 
@@ -69,7 +93,7 @@ def _href(link: Link) -> str | None:
     return None
 
 
-def _usable[S: (Link, ColourRun)](
+def _usable[S: (Link, ColourRun, ScriptRun)](
     spans: Sequence[S], text: str, markers: Sequence[tuple[int, int]]
 ) -> list[S]:
     """Spans inside the text, not starting or ending inside a marker, without overlaps
@@ -95,6 +119,7 @@ class _Segment:
     maths: str | None  # the equation's HTML when this segment is a placed marker
     link: int | None  # index into the usable links
     colour: tuple[int, int, int] | None
+    script: str | None = None  # "sup" or "sub" when this piece is a raised or lowered run
 
 
 def render_inline_text(
@@ -120,19 +145,23 @@ def render_inline_text(
             placed[match.start()] = (match.end(), maths)
     links: list[tuple[Link, str]] = []
     runs: list[ColourRun] = []
+    scripts: list[ScriptRun] = []
     if element is not None:
+        scripts = _usable(element.script_runs, text, markers)
         for link in _usable(element.links, text, markers):
             href = _href(link)
             if href is not None:
                 links.append((link, href))
         if add_style is not None:
             runs = _usable(element.colour_runs, text, markers)
-    if not links and not runs:
+    if not links and not runs and not scripts:
         return _plain(text, placed)
-    segments = _segments(text, placed, [k for k, _ in links], runs)
+    segments = _segments(text, placed, [k for k, _ in links], runs, scripts)
     for rgb in sorted({s.colour for s in segments if s.colour is not None}):
         if add_style is not None:
             add_style(f"colour-{colour_class(rgb)}", colour_css(rgb))
+    if add_style is not None and _stacked(segments):
+        add_style(STACK_CLASS, STACK_CSS)
     return _write(text, segments, [href for _, href in links])
 
 
@@ -149,13 +178,17 @@ def _plain(text: str, placed: dict[int, tuple[int, str]]) -> str:
 
 
 def _segments(
-    text: str, placed: dict[int, tuple[int, str]], links: list[Link], runs: list[ColourRun]
+    text: str,
+    placed: dict[int, tuple[int, str]],
+    links: list[Link],
+    runs: list[ColourRun],
+    scripts: Sequence[ScriptRun] = (),
 ) -> list[_Segment]:
     """The text cut at every marker, link and run edge, each piece with what covers it."""
     cuts = {0, len(text)}
     for start, (end, _) in placed.items():
         cuts |= {start, end}
-    for span in (*links, *runs):
+    for span in (*links, *runs, *scripts):
         cuts |= {span.start, span.end}
     edges = sorted(cuts)
     segments = []
@@ -166,8 +199,44 @@ def _segments(
             None,
         )
         colour = next((r.rgb for r in runs if r.start <= start and end <= r.end), None)
-        segments.append(_Segment(start, end, maths, link, colour))
+        script = next(
+            (r.kind for r in scripts if r.start <= start and end <= r.end and maths is None), None
+        )
+        segments.append(_Segment(start, end, maths, link, colour, script))
     return segments
+
+
+def _stacked(segments: Sequence[_Segment]) -> bool:
+    """Is there a lowered and a raised run side by side?"""
+    return any(a.script and b.script and a.script != b.script for a, b in pairwise(segments))
+
+
+def _inner(text: str, segments: Sequence[_Segment]) -> str:
+    """The pieces as HTML: maths as written, raised and lowered runs in `<sup>` and `<sub>`
+    (a pair side by side in one stacked span), the rest escaped."""
+    out: list[str] = []
+    i = 0
+    while i < len(segments):
+        seg = segments[i]
+        if seg.maths:
+            out.append(seg.maths)
+        elif seg.script:
+            tag = seg.script
+            following = segments[i + 1] if i + 1 < len(segments) else None
+            this = f"<{tag}>{escape_text(text[seg.start : seg.end])}</{tag}>"
+            if following is not None and following.script and following.script != tag:
+                other = following.script
+                that = f"<{other}>{escape_text(text[following.start : following.end])}</{other}>"
+                # Text order for the reader; the raised run is drawn on top (`STACK_CSS`).
+                css = STACK_CLASS if tag == "sup" else f"{STACK_CLASS} {STACK_LOW_FIRST}"
+                out.append(f'<span class="{css}">{this}{that}</span>')
+                i += 1
+            else:
+                out.append(this)
+        else:
+            out.append(escape_text(text[seg.start : seg.end]))
+        i += 1
+    return "".join(out)
 
 
 def _coloured(text: str, segments: Sequence[_Segment]) -> str:
@@ -177,7 +246,7 @@ def _coloured(text: str, segments: Sequence[_Segment]) -> str:
         j = i
         while j < len(segments) and segments[j].colour == segments[i].colour:
             j += 1
-        inner = "".join(s.maths or escape_text(text[s.start : s.end]) for s in segments[i:j])
+        inner = _inner(text, segments[i:j])
         rgb = segments[i].colour
         out.append(f'<span class="{colour_class(rgb)}">{inner}</span>' if rgb else inner)
         i = j

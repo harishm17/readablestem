@@ -63,7 +63,7 @@ import threading
 import time
 import unicodedata
 from collections import Counter, OrderedDict, deque
-from collections.abc import Collection, Iterable, Sequence
+from collections.abc import Callable, Collection, Iterable, Sequence
 from dataclasses import dataclass, field, replace
 from functools import cached_property, lru_cache
 from itertools import combinations, count, pairwise
@@ -75,7 +75,7 @@ from a11y_stem.core.childenv import child_env
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.core.types import BBox, Element, Kind, Link, Notice, TableGrid, inline_marker
-from a11y_stem.pipeline import hyphens, page_type, tables
+from a11y_stem.pipeline import equation_images, hyphens, page_type, script_marks, tables
 from a11y_stem.pipeline import options as run_options
 from a11y_stem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
@@ -152,6 +152,25 @@ LABEL_REACH = 8.0
 RULE_THICKNESS = 1.6  # a fraction bar or table rule is at most this thick
 CAPTION_MAX_GAP = 36.0  # furthest a "Figure N" caption may sit from its figure
 SCRIPT_RATIO = 0.85  # characters smaller than this x the row size are sub/superscripts
+# Raised and lowered text in a paragraph (`_script_kinds`): a glyph smaller than the row's
+# text is a script when it sits this far (x the row size) off the baseline; a full-size
+# glyph carrying MuPDF's superscript flag when it is raised this far. Word and LibreOffice
+# lower a subscript by 8 % of its size, TeX by 15 %, a raised mark by 33 % or more.
+SCRIPT_OFFSET = 0.04
+SCRIPT_MIN_RATIO = 0.62  # the smallest a script is, beside the text it belongs to
+SCRIPT_MAX_LIFT = 0.7  # the furthest off the baseline a script is (x the text size)
+ScriptKind = script_marks.Kind
+FLAGGED_RAISE = 0.2
+# A script belongs to the glyph before it (or, for a nuclide's mass number, after it) when
+# the gap is at most this x the row size.
+SCRIPT_BASE_GAP = 0.35
+EQUATION_IMAGE_REASON = equation_images.REASON
+# A picture of an equation sits in a line of text when prose is this close beside it (x the
+# prose row's size) and level with it; its place in the row is this character.
+PICTURE_REACH = 3.0
+PICTURE_CHAR = "\ufffc"
+SPACE_AFTER_SCRIPT = 0.3  # a gap this wide (x the glyph size) beside a script is a space
+LOWERED_CELL_REASON = "lowered text in cells"  # a table with a subscript, written flat
 WATERMARK_RATIO = 2.0  # diagonal text this many times the body size is a watermark
 DOCUMENT_CACHE_SIZE = 4
 DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
@@ -1011,9 +1030,42 @@ class _Row:
 
     @cached_property
     def size(self) -> float:
-        """Font size covering most characters."""
+        """Font size covering most characters. A row whose small glyphs are all scripts of
+        its larger ones (a nuclide's "92 U -> 234": five script glyphs, two full-size) is set
+        in the larger size: the small glyphs are at least `SCRIPT_MIN_RATIO` of it, sit off
+        its baseline by at least 4 % and at most `SCRIPT_MAX_LIFT` of it, and no more than
+        60 % of it from a larger glyph; and the larger glyphs hold a letter and no word of three
+        letters. The numbers of a fraction (beside an operator, or in a sentence) are not
+        scripts of anything."""
         counts = Counter(round(c.size * 2) / 2 for c in self.ink)
-        return max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        size = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
+        larger = [s for s in counts if SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
+        if not larger:
+            return size
+        big = max(larger, key=lambda s: (counts[s], s))
+        large = [c for c in self.ink if round(c.size * 2) / 2 == big]
+        if not any(c.c.isalpha() for c in large):
+            return size  # nothing to hang scripts on: an operator and the numbers of a fraction
+        letters = 0  # a word in the larger size: a sentence with small numbers in it (a fraction)
+        for c in sorted(large, key=lambda g: g.x0):
+            letters = letters + 1 if c.c.isalpha() else 0
+            if letters >= 3:
+                return size
+        base = statistics.median(c.baseline for c in large)
+        reach = 0.6 * big  # a script sits next to its base, with at most a space between
+        run: list[_Char] = []  # small glyphs side by side: one script, the end glyphs touch
+        for c in [*sorted(self.ink, key=lambda g: g.x0), None]:
+            if c is not None and round(c.size * 2) / 2 == size:
+                if not SCRIPT_OFFSET * big <= abs(c.baseline - base) <= SCRIPT_MAX_LIFT * big:
+                    return size
+                run.append(c)
+                continue
+            if run and not any(
+                max(g.x0 - b.x1, b.x0 - g.x1) <= reach for g in (run[0], run[-1]) for b in large
+            ):
+                return size
+            run = []
+        return big
 
     @cached_property
     def baseline(self) -> float:
@@ -1212,6 +1264,20 @@ def _merge_baselines(frags: list[_Row], gutter: tuple[float, float] | None) -> l
             crosses = (
                 gutter is not None and current.x1 <= gutter[0] + 1 and frag.x0 >= gutter[1] - 1
             )
+            lead, rest = (
+                _leading_script(frag, current.size) if gap < 0 and not crosses else (None, None)
+            )
+            if lead is not None and _stacked_tail(current, lead):
+                # The lowered half of a stacked pair (the 4 of SO4 2-) under the raised half
+                # that ends the row: it goes in beside it, not after the row's text.
+                after = rest.chars if rest is not None else ()
+                current = _Row(
+                    _insert_script(current.chars, lead.chars, after), column=current.column
+                )
+                if rest is None:
+                    continue
+                frag = rest
+                gap = frag.x0 - current.x1
             if -0.5 * current.size <= gap <= 4 * max(current.size, frag.size) and not crosses:
                 current = _join_rows(current, frag)
             else:
@@ -1311,16 +1377,97 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 
 
-def _insert_script(host: list[_Char], script: list[_Char]) -> list[_Char]:
+def _insert_script(
+    host: list[_Char], script: list[_Char], after: Sequence[_Char] = ()
+) -> list[_Char]:
     """`script`'s characters as one block, after the host glyphs that start before its
     right edge. A sub/superscript lands right after its base; the denominator of a small
-    fraction lands after its numerator instead of being interleaved with it by x."""
+    fraction lands after its numerator instead of being interleaved with it by x.
+
+    A lowered script under a raised one (the 4 under the 2- of SO4 2-) is read first: it
+    lands before the raised script it sits under, when that follows a base. Before a
+    nuclide's symbol the raised one comes first (the mass number over the atomic number)."""
     end = max(c.x1 for c in script)
     at = 0
     for i, c in enumerate(host):
         if not c.blank and c.x0 < end - 0.01:
             at = i + 1
+    at = _stack_position(host, at, script, after)
     return [*host[:at], *script, *host[at:]]
+
+
+def _stack_position(
+    host: list[_Char], at: int, script: list[_Char], after: Sequence[_Char] = ()
+) -> int:
+    """Where `script` goes among the glyphs of `host`, `at` being just after the glyphs
+    that start before its right edge. When it lies over or under small glyphs the host
+    already holds (a stacked pair), it goes before them or after them so that the pair
+    reads lowered first after a base (SO4 2-) and raised first before a symbol (the mass
+    number before the atomic number of a nuclide). Otherwise `at`."""
+    main = max((c.size for c in host), default=0.0)
+    first = at
+    while first > 0 and not host[first - 1].blank and host[first - 1].size <= SCRIPT_RATIO * main:
+        first -= 1
+    last = at
+    while last < len(host) and not host[last].blank and host[last].size <= SCRIPT_RATIO * main:
+        last += 1  # the rest of the small glyphs the script lies over
+    cluster = host[first:last]
+    left, right = min(c.x0 for c in script), max(c.x1 for c in script)
+    if not cluster or not any(c.x1 > left and c.x0 < right for c in cluster):
+        return at
+    level = statistics.mean(c.baseline for c in cluster)
+    mine = statistics.mean(c.baseline for c in script)
+    if abs(mine - level) < 0.05 * main:
+        return at
+    # After a base of upright text (SO4 2-) lowered first; before the capital letter of a
+    # symbol (a nuclide) raised first. Any other stack (a variable's v_0^2 in a maths font, a
+    # small fraction) keeps the order of the text layer, as before.
+    base = host[first - 1] if first else None
+    after_base = base is not None and (_text_char(base) or base.c in ")]}")
+    following = next((c for c in [*host[last:], *after] if not c.blank), None)
+    before_symbol = following is not None and following.c.isupper() and _text_char(following)
+    if after_base and before_symbol:  # either: the closer one
+        assert base is not None and following is not None
+        end = max(right, *(c.x1 for c in cluster))
+        prefix = following.x0 - end < min(c.x0 for c in cluster) - base.x1
+    elif after_base or before_symbol:
+        prefix = before_symbol and not after_base
+    else:
+        return at
+    script_lower = mine > level
+    return first if script_lower != prefix else last
+
+
+def _leading_script(frag: _Row, size: float) -> tuple[_Row | None, _Row | None]:
+    """(the glyphs that start `frag` and are small beside text of `size`, the rest of it or
+    None). MuPDF starts a line with the lowered half of a stacked pair when the line goes on
+    at a slightly different baseline. (None, None) when `frag` does not start with a few
+    small glyphs."""
+    if frag.vertical:
+        return None, None
+    limit = SCRIPT_RATIO * size
+    cut = 0
+    while cut < len(frag.chars) and frag.chars[cut].size <= limit and not frag.chars[cut].blank:
+        cut += 1
+    if cut == 0 or cut > 6:
+        return None, None
+    lead = _Row(frag.chars[:cut], column=frag.column)
+    rest = frag.chars[cut:]
+    return lead, (_Row(rest, column=frag.column) if any(not c.blank for c in rest) else None)
+
+
+def _stacked_tail(row: _Row, frag: _Row) -> bool:
+    """Is `frag` a small fragment lying under the small glyphs that end `row`: the lowered
+    half of a stacked pair whose raised half the line already holds?"""
+    if row.vertical or frag.vertical or len(frag.clean) > 12:
+        return False
+    glyph = max(c.size for c in frag.ink)
+    if not SCRIPT_MIN_RATIO * row.size <= glyph <= SCRIPT_RATIO * row.size:
+        return False  # not script-sized: the numbers of a fraction are half the size
+    tail = [c for c in row.ink[-4:] if c.size <= SCRIPT_RATIO * row.size]
+    return any(c.x1 > frag.x0 + 0.5 and c.x0 < frag.x1 for c in tail) and (
+        frag.x0 >= row.x1 - 4 * frag.size
+    )
 
 
 # ============================================================================ margins
@@ -1834,6 +1981,304 @@ class _CharInfo:
         return kind == "L" and (self.words[i] == 1 or self.script[i] or self.maths_words[i])
 
 
+def _text_char(c: _Char) -> bool:
+    """A letter or digit of upright text: not italic, not in a maths font, not a maths
+    alphanumeric. The base of H2O, Na+, cm3, 226Ra; a variable (an italic x, a letter in
+    CMMI) is not one, and keeps its scripts in an equation."""
+    if c.blank or c.italic or is_math_alphanumeric(c.c) or _font_traits(c.font)[2]:
+        return False
+    return c.c.isalnum()
+
+
+def _bracket_base(chars: list[_Char], info: _CharInfo, at: int) -> bool:
+    """Is the closing bracket at `at` the end of a group of upright text, "(SO4)" in
+    Al2(SO4)3, "(OH)", "[Zn2+]"? Its opening bracket is in the row and holds only
+    letters, digits, scripts and brackets of upright text."""
+    depth = 0
+    for j in range(at, -1, -1):
+        c = chars[j]
+        if c.c in ")]":
+            depth += 1
+        elif c.c in "([":
+            depth -= 1
+            if depth == 0:
+                inner = [x for x in chars[j + 1 : at] if not x.blank]
+                return bool(inner) and all(
+                    _text_char(x) or x.c in "()[]" or info.script[k]
+                    for k, x in enumerate(chars[j + 1 : at], start=j + 1)
+                    if not x.blank
+                )
+        elif not (c.blank or _text_char(c) or info.script[j] or c.c in "+-\u2212,."):
+            return False
+    return False
+
+
+def _script_kinds(row: _Row, info: _CharInfo | None = None) -> list[ScriptKind | None]:
+    """`_script_glyphs(row, info)[1]`."""
+    return _script_glyphs(row, info)[1]
+
+
+def _script_glyphs(
+    row: _Row, info: _CharInfo | None = None
+) -> tuple[list[ScriptKind | None], list[ScriptKind | None]]:
+    """(raised or lowered glyphs, those among them that are scripts of upright text), per
+    character of a prose row, each "sup", "sub" or None. The second marks what belongs to
+    upright text (H2O, SO4 2-, Na+, cm3, m s-1, a nuclide's 226Ra).
+
+    A glyph is raised or lowered when it is smaller than the row's text and off its
+    baseline by `SCRIPT_OFFSET` of the row size, or full size with MuPDF's superscript flag
+    and raised by `FLAGGED_RAISE`. A run of them belongs to the letter, digit or closing
+    bracket of upright text just before it (`SCRIPT_BASE_GAP`), or, when it is only digits
+    and a capital letter follows at once, to that letter ("226Ra": a mass number). A script
+    of an italic letter or a letter in a maths font is left for the equation step: it is
+    not given a kind.
+    """
+    info = info or _CharInfo.of(row)
+    chars = row.chars
+    size, base = row.size, row.baseline
+    raw: list[ScriptKind | None] = [None] * len(chars)
+    for i, c in enumerate(chars):
+        if c.blank or not info.script[i]:
+            continue
+        lift = base - c.baseline  # positive: raised
+        if c.size < SCRIPT_RATIO * size:
+            if abs(lift) >= SCRIPT_OFFSET * size:
+                raw[i] = "sup" if lift > 0 else "sub"
+        elif c.flags & _SUPERSCRIPT_FLAG and lift >= FLAGGED_RAISE * size:
+            raw[i] = "sup"
+    kinds: list[ScriptKind | None] = [None] * len(chars)
+    i = 0
+    n = len(chars)
+    while i < n:
+        if raw[i] is None:
+            i += 1
+            continue
+        j = i
+        # One group: scripts side by side, a lowered and a raised run (SO4 2-) included.
+        while j < n and raw[j] is not None:
+            j += 1
+        if _script_base(chars, info, i, j, size):
+            kinds[i:j] = raw[i:j]
+        i = j
+    return raw, kinds
+
+
+def _script_base(chars: list[_Char], info: _CharInfo, start: int, end: int, size: float) -> bool:
+    """Does the group of script glyphs `chars[start:end]` belong to upright text?"""
+    reach = SCRIPT_BASE_GAP * size
+    before = start - 1
+    while before >= 0 and chars[before].blank is False and info.script[before]:
+        before -= 1  # an earlier script of the same word
+    if before >= 0 and not chars[before].blank and chars[start].x0 - chars[before].x1 <= reach:
+        base = chars[before]
+        if _text_char(base):
+            return True
+        if base.c in ")]":
+            return _bracket_base(chars, info, before)
+        return False
+    after = end
+    if after < len(chars) and chars[after].blank and after + 1 < len(chars):
+        after += 1  # the text layer may put a space between the numbers and the symbol
+    if (
+        after < len(chars)
+        and not chars[after].blank
+        and chars[after].x0 - max(c.x1 for c in chars[start:end]) <= reach + 0.3 * size
+        and (before < 0 or chars[before].blank or chars[start].x0 - chars[before].x1 > reach)
+    ):
+        # A mass number: digits before the capital letter of an element symbol.
+        nxt = chars[after]
+        digits = all(chars[k].c.isdigit() for k in range(start, end))
+        return digits and nxt.c.isalpha() and nxt.c.isupper() and _text_char(nxt)
+    return False
+
+
+def _picture_host(
+    figure: _Figure, rows: Sequence[_Row], has_prose: Callable[[_Row], bool]
+) -> _Row | None:
+    """The prose row the picture stands in the middle of: it has text on both sides."""
+    x0, y0, x1, y1 = figure.bbox
+    for row in rows:
+        if row.kind != "text" or row.vertical or row.absorbed:
+            continue
+        overlap = min(row.y1, y1) - max(row.y0, y0)
+        if (
+            overlap >= 0.3 * min(row.height, y1 - y0)
+            and row.x0 < x0 - 1
+            and row.x1 > x1 + 1
+            and has_prose(row)
+        ):
+            return row
+    return None
+
+
+def _picture_neighbours(
+    figure: _Figure, rows: Sequence[_Row], has_prose: Callable[[_Row], bool]
+) -> tuple[_Row | None, _Row | None]:
+    """The prose rows level with a picture and just left and right of it (None: none)."""
+    x0, y0, x1, y1 = figure.bbox
+    left = right = None
+    for row in rows:
+        if row.vertical or row.absorbed or row.marker is not None:
+            continue
+        overlap = min(row.y1, y1) - max(row.y0, y0)
+        if overlap < 0.3 * min(row.height, y1 - y0):
+            continue
+        # Prose, or the punctuation that ends the sentence the picture stands in.
+        ends = 0 < len(row.clean) <= 2 and all(c in ",.;:!?)" for c in row.clean)
+        if not ends and (row.kind != "text" or not has_prose(row)):
+            continue
+        reach = PICTURE_REACH * row.size
+        if row.x1 <= x0 + 2 and x0 - row.x1 <= reach and (left is None or row.x1 > left.x1):
+            left = row
+        elif row.x0 >= x1 - 2 and row.x0 - x1 <= reach and (right is None or row.x0 < right.x0):
+            right = row
+    return left, right
+
+
+def _picture_row(figure: _Figure, anchor: _Row) -> _Row:
+    """A row of one character standing for the picture, on the baseline of `anchor`."""
+    x0, y0, x1, y1 = figure.bbox
+    char = _Char(PICTURE_CHAR, x0, y0, x1, y1, anchor.baseline, anchor.size, "image", 0)
+    return _Row([char], column=anchor.column)
+
+
+def _equation_pictures(
+    page: pymupdf.Page,
+    figures: list[_Figure],
+    rows: list[_Row],
+    ctx: _Context,
+    small: Sequence[_Figure] = (),
+) -> tuple[list[_Figure], list[_Row]]:
+    """Pictures of equations (module `equation_images`) leave the figures.
+
+    One in a line of text becomes a character of the line: the prose rows beside it and the
+    picture join into one row, so the sentence stays one paragraph and the picture an inline
+    equation with no text layer. One on a line of its own stays a figure-sized block but is
+    an equation (`_Figure.equation`), and the equation number printed to its right, if any,
+    is its label. A figure with labels or a caption ("Figure 2.1" close by) is never one.
+    `small` pictures (under MIN_IMAGE_PT on a side) count only in a line of text.
+    """
+    kept: list[_Figure] = []
+    rows = list(rows)
+    captions = [r for r in rows if CAPTION.match(r.clean)]
+    prose: dict[int, tuple[_Row, bool]] = {}  # the row is kept so its id stays its own
+
+    def has_prose(row: _Row) -> bool:
+        if id(row) not in prose:
+            prose[id(row)] = (row, _prose_words(row, _CharInfo.of(row)) >= 1)
+        return prose[id(row)][1]
+
+    for figure in [*figures, *small]:
+        is_small = figure in small
+        x0, y0, x1, y1 = figure.bbox
+        if (
+            figure.labels
+            or figure.caption
+            or not equation_images.size_fits(x1 - x0, y1 - y0, ctx.body)
+            or any(
+                min(c.x1, x1) - max(c.x0, x0) >= 0.3 * min(c.x1 - c.x0, x1 - x0)
+                and (0 <= c.y0 - y1 <= CAPTION_MAX_GAP or 0 <= y0 - c.y1 <= CAPTION_MAX_GAP)
+                for c in captions
+            )
+        ):
+            if not is_small:
+                kept.append(figure)
+            continue
+        profile = equation_images.profile_of(page, figure.bbox)
+        if profile is None or not equation_images.looks_like_equation(profile):
+            if not is_small:
+                kept.append(figure)
+            continue
+        host = _picture_host(figure, rows, has_prose)
+        if host is not None:  # in the middle of a line: between its characters
+            centre = (x0 + x1) / 2
+            at = sum(1 for c in host.chars if (c.x0 + c.x1) / 2 < centre)
+            chars = [*host.chars[:at], *_picture_row(figure, host).chars, *host.chars[at:]]
+            joined = _Row(chars, column=host.column)
+            joined.kind, joined.marker = "text", host.marker
+            joined.exercise_number = host.exercise_number
+            rows[rows.index(host)] = joined
+            continue
+        left, right = _picture_neighbours(figure, rows, has_prose)
+        if left is None and right is None:
+            if is_small:
+                continue  # alone, this small: decoration, as before
+            if profile.components < equation_images.MIN_DISPLAY_COMPONENTS:
+                kept.append(figure)  # a right triangle with two letters: a drawing
+                continue
+            figure.equation = True
+            number = next(
+                (
+                    r
+                    for r in rows
+                    if not r.absorbed
+                    and not r.vertical
+                    and r.x0 >= x1 - 2
+                    and _is_equation_number(r.clean)
+                    and y0 - 0.5 * r.height <= (r.y0 + r.y1) / 2 <= y1 + 0.5 * r.height
+                ),
+                None,
+            )
+            if number is not None:
+                number.absorbed = True
+                figure.number = number.clean
+            kept.append(figure)
+            continue
+        anchor = left or right
+        assert anchor is not None
+        joined = _picture_row(figure, anchor)
+        if left is not None:
+            joined = _join_rows(left, joined)
+        if right is not None:
+            joined = _join_rows(joined, right)
+        joined.kind = "text"
+        joined.region = None
+        for source in (left, right):
+            if source is not None:
+                rows.remove(source)
+        rows.append(joined)
+    return kept, rows
+
+
+def _loose_scripts(
+    row: _Row,
+    info: _CharInfo,
+    raw: list[ScriptKind | None],
+    kinds: list[ScriptKind | None],
+    runs: Sequence[tuple[int, int, list[str]]],
+) -> bool:
+    """Give `kinds` the raised and lowered glyphs that no equation took and that are not
+    scripts of upright text either, when anything sits before them to be their base (the 2
+    of "(a + b)2" beyond a line break, the "cell" of "E°cell", a footnote mark after a full
+    stop): written raised or lowered they read better than flat. True when some are left
+    that no base explains."""
+    covered = {i for a, b, _ in runs for i in range(a, b)}
+    chars = row.chars
+    left_flat = False
+    i = 0
+    while i < len(chars):
+        if raw[i] is None or kinds[i] is not None or i in covered:
+            i += 1
+            continue
+        j = i
+        while j < len(chars) and raw[j] is not None and kinds[j] is None and j not in covered:
+            j += 1
+        before = i - 1
+        while before >= 0 and not chars[before].blank and info.script[before]:
+            before -= 1
+        base = chars[before] if before >= 0 else None
+        if (
+            base is not None
+            and not base.blank
+            and chars[i].x0 - base.x1 <= SCRIPT_BASE_GAP * row.size
+        ):
+            kinds[i:j] = raw[i:j]
+        else:
+            left_flat = True
+        i = j
+    return left_flat
+
+
 def _prose_words(row: _Row, info: _CharInfo) -> int:
     """Words that read as English: 3+ plain letters (not sin/log/...) or "is", "if", ..."""
     count = 0
@@ -1904,16 +2349,22 @@ class _Inline:
     regular: str | None = None  # `Element.regular_letters`
 
 
-def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
+def _inline_runs(
+    row: _Row, info: _CharInfo | None = None, kinds: list[ScriptKind | None] | None = None
+) -> list[tuple[int, int, list[str]]]:
     """(start, end, reasons) of the maths runs inside a prose row, by character index.
 
     A run is a stretch of maths-capable characters (maths/Greek/symbols, digits,
     operators, brackets, single letters, sub/superscripts). It is kept only with real
     evidence: a maths character; an italic single letter next to an operator, script or
     Greek letter; or a relation with operands on both sides ("x = 5"). A lone italic word,
-    a citation "[3]" or a year range is not maths.
+    a citation "[3]" or a year range is not maths. A sub- or superscript of upright text
+    (`_script_kinds`: H2O, Na+, cm3, 226Ra) is no evidence: it is written as raised or
+    lowered text, so a run that only those scripts made is dropped; inside a run that is
+    maths for another reason they stay part of it.
     """
-    info = _CharInfo.of(row)
+    info = info or _CharInfo.of(row)
+    kinds = _script_kinds(row, info) if kinds is None else kinds
     chars = row.chars
     runs: list[tuple[int, int, list[str]]] = []
     i, n = 0, len(chars)
@@ -1942,7 +2393,7 @@ def _inline_runs(row: _Row) -> list[tuple[int, int, list[str]]]:
             break
         start, end = _trim_run(chars, info, start, i)
         if end > start:
-            reasons = _inline_evidence(chars, info, start, end)
+            reasons = _inline_evidence(chars, info, start, end, kinds)
             if reasons:
                 runs.append((start, end, reasons))
     return runs
@@ -2028,20 +2479,30 @@ def _broken_brackets(text: str) -> bool:
     return depth != 0
 
 
-def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) -> list[str]:
+def _inline_evidence(
+    chars: list[_Char],
+    info: _CharInfo,
+    start: int,
+    end: int,
+    kinds: Sequence[ScriptKind | None] | None = None,
+) -> list[str]:
     """Why a run inside a paragraph row is maths, or [] when it is not.
 
     Without a maths character, a run must also be a whole expression: brackets that open
     and close in order (not "h)] = 40", a piece of a plain-text formula cut by a line
     break), and an operator that is not just a leading sign ("-49 m" is a quantity with
-    an italic unit, not a formula).
+    an italic unit, not a formula). The sub- and superscripts of upright text (`kinds`,
+    from `_script_kinds`) give none of this evidence.
     """
-    idx = range(start, end)
+    own = kinds if kinds is not None else [None] * len(chars)
+    idx = [i for i in range(start, end) if own[i] is None]
     if any(info.classes[i] == "M" for i in idx):
         return ["math font or symbol"]
-    if _broken_brackets("".join(chars[i].c for i in idx)):
+    if _broken_brackets("".join(chars[i].c for i in range(start, end))):
         return []
-    first = next(i for i in idx if not chars[i].blank)
+    first = next((i for i in idx if not chars[i].blank), None)
+    if first is None:
+        return []
     operator = any(
         (info.classes[i] == "O" and not (i == first and chars[i].c in "+-\u2212\u00b1"))
         or info.script[i]
@@ -2054,13 +2515,22 @@ def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) 
     if italic_letter and operator:
         return ["italic variable with operator"]
     if any(
-        info.classes[i] == "L" and info.words[i] == 1 and not info.script[i] and info.script[i + 1]
+        info.classes[i] == "L"
+        and info.words[i] == 1
+        and not info.script[i]
+        and info.script[i + 1]
+        and own[i + 1] is None
         for i in range(start, end - 1)
+        if own[i] is None
     ):
         return ["letter with sub/superscript"]
-    if any(chars[i].c in _SIGNS and chars[i + 1].c.isdigit() for i in range(start, end - 1)):
+    if any(
+        chars[i].c in _SIGNS and chars[i + 1].c.isdigit()
+        for i in range(start, end - 1)
+        if own[i] is None and own[i + 1] is None
+    ):
         return ["signed number"]
-    text = "".join(chars[i].c for i in idx)
+    text = "".join(chars[i].c for i in range(start, end))
     if _MARKUP.search(text):
         return []  # "<a><b/></a>" in a paragraph about XML is not a comparison
     for relation in RELATIONS:
@@ -3724,6 +4194,9 @@ class _Figure:
     labels: list[_Row] = field(default_factory=list)
     caption: str | None = None
     xref: int = 0  # the image of a figure that is one raster image (0: inline, or several)
+    flat_scripts: bool = False  # its caption has raised or lowered text, written flat
+    equation: bool = False  # a picture of an equation (`_equation_pictures`)
+    number: str | None = None  # ... and the equation number printed beside it
 
     @property
     def reasons(self) -> list[str]:
@@ -3735,13 +4208,18 @@ class _Figure:
         return reasons
 
 
-def _raster_figures(page: pymupdf.Page, page_rect: pymupdf.Rect) -> list[_Figure]:
+def _raster_figures(
+    page: pymupdf.Page, page_rect: pymupdf.Rect, small: list[_Figure] | None = None
+) -> list[_Figure]:
     """Raster images as figures. Decoration is decided by the size drawn, not the pixels
     (a 21-pixel QR code drawn an inch wide is content): an image drawn under MIN_IMAGE_PT
     on a side is a bullet, a spacer or a rule; one with fewer than MIN_IMAGE_PX pixels on
     a side is decoration only when it is plain (`_plain_image`: a transparent spacer, a
     one-colour block). A picture covering the page is the page's own (a background, a
-    scan): never a figure; whether the page keeps its image is `_page_picture`'s."""
+    scan): never a figure; whether the page keeps its image is `_page_picture`'s. Those
+    drawn under MIN_IMAGE_PT but over equation_images.MIN_SIDE_PT on both sides are added
+    to `small` when it is given: an equation of a letter or a fraction pasted in a line is
+    that small, and only `_equation_pictures` may keep one (inside a line of prose)."""
     display = _Display.of(page)
     figures = []
     page_area = page_rect.width * page_rect.height
@@ -3752,6 +4230,8 @@ def _raster_figures(page: pymupdf.Page, page_rect: pymupdf.Rect) -> list[_Figure
         if rect.is_empty:
             continue
         if min(rect.width, rect.height) < MIN_IMAGE_PT:
+            if small is not None and min(rect.width, rect.height) >= equation_images.MIN_SIDE_PT:
+                small.append(_Figure((rect.x0, rect.y0, rect.x1, rect.y1), images=1, xref=xrefs[k]))
             continue  # bullets, spacers, rules drawn as images
         if rect.width * rect.height >= FULL_PAGE_FRACTION * page_area:
             continue  # the page's background or a scan of it: `_page_picture`
@@ -4758,6 +5238,10 @@ class _Block:
     code: bool = False  # paragraphs: program code, lines and indentation kept (`_code_text`)
     term_pieces: int | None = None  # glossary entries: how many of `pieces` are the term
     contents_level: int = 0  # list items: an entry of a table of contents, at this level
+    # Raised or lowered text this block's element cannot carry (`Element.script_runs`): it is
+    # written flat, and a notice says so (`scripts_flattened`).
+    flat_scripts: bool = False
+    marked: str | None = None  # headings: `text` with its raised and lowered runs marked
 
 
 def _dominant_size(rows: Sequence[_Row]) -> float:
@@ -5210,19 +5694,30 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     if heading is not None:
         if bold:
             heading.append("bold")
+        marked = _join_text(rows, marked=True)
         return _Block(
-            Kind.HEADING, box, rows, text=text, font_size=size, bold=bold, reasons=heading
+            Kind.HEADING,
+            box,
+            rows,
+            text=text,
+            font_size=size,
+            bold=bold,
+            reasons=heading,
+            marked=marked if script_marks.has_marks(marked) else None,
         )
     if rows[0].marker is not None:
         return _Block(Kind.LIST_ITEM, box, rows, font_size=size, bold=bold, marker=rows[0].marker)
     return _Block(Kind.PARAGRAPH, box, rows, font_size=size, bold=bold)
 
 
-def _join_text(rows: Sequence[_Row]) -> str:
-    """Rows joined with spaces, end-of-line hyphenation repaired (see `_line_break`)."""
+def _join_text(rows: Sequence[_Row], *, marked: bool = False) -> str:
+    """Rows joined with spaces, end-of-line hyphenation repaired (see `_line_break`). With
+    `marked`, raised and lowered text of upright text is between marks
+    (`pipeline.script_marks`)."""
     out = ""
     for row in rows:
-        text = " ".join(row.text.split())  # soft hyphens survive until the final _clean
+        source = _marked(row.chars, _script_kinds(row), 0, len(row.chars)) if marked else row.text
+        text = " ".join(source.split())  # soft hyphens survive until the final _clean
         if out:
             out, separator = _line_break(out, text)
             out += separator
@@ -5297,6 +5792,48 @@ def _merge_chapter_numbers(blocks: list[_Block]) -> list[_Block]:
     return out
 
 
+def _before_symbol(
+    chars: list[_Char], kinds: Sequence[ScriptKind | None], k: int, start: int, end: int
+) -> bool:
+    """Is the blank at `k` the one between a nuclide's numbers and its symbol: digits written
+    raised or lowered that start a word, a blank, a capital letter?"""
+    if k <= start or k + 1 >= end or kinds[k - 1] is None or kinds[k + 1] is not None:
+        return False
+    if not chars[k + 1].c.isupper():
+        return False
+    j = k
+    while j > start and kinds[j - 1] is not None:
+        j -= 1
+    group = chars[j:k]
+    prefix = j == start or chars[j - 1].blank
+    return prefix and all(c.c.isdigit() or c.c in "-\u2212+" for c in group)
+
+
+def _marked(chars: list[_Char], kinds: list[ScriptKind | None], start: int, end: int) -> str:
+    """The text of `chars[start:end]` with its raised and lowered runs between marks
+    (`pipeline.script_marks`). TeX sets no space glyph after a script ("Cl-" and "and" in
+    "Cl- and"), so a visible gap at either edge of a script gets one."""
+    text: list[str] = []
+    marks: list[ScriptKind | None] = []
+    for k in range(start, end):
+        c = chars[k]
+        if c.blank and _before_symbol(chars, kinds, k, start, end):
+            continue  # the text layer's space between 14 6 and the C of a nuclide
+        if k > start and kinds[k] != kinds[k - 1]:
+            before = chars[k - 1]
+            right = before.x1
+            j = k - 1
+            while j > start and kinds[j - 1] is not None and kinds[k - 1] is not None:
+                j -= 1  # a stacked pair ends where its wider half does
+                right = max(right, chars[j].x1)
+            if not before.blank and not c.blank and c.x0 - right >= SPACE_AFTER_SCRIPT * c.size:
+                text.append(" ")
+                marks.append(None)
+        text.append(c.c)
+        marks.append(kinds[k])
+    return script_marks.wrap(text, marks)
+
+
 def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     """Paragraph (or list item) text with inline equations cut out, hyphenation repaired
     between rows. A list item's text starts after its marker."""
@@ -5311,10 +5848,33 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
     for row in rows:
         row_pieces: list[str | _Inline] = []
         cursor = 0
-        for start, end, reasons in _bold_letter_runs(row, _inline_runs(row), letters):
-            row_pieces.append("".join(c.c for c in row.chars[cursor:start]))
+        info = _CharInfo.of(row)
+        raw, kinds = _script_glyphs(row, info)
+        found = _bold_letter_runs(row, _inline_runs(row, info, kinds), letters)
+        found = sorted(
+            [
+                *(
+                    run
+                    for run in found
+                    if not any(row.chars[i].c == PICTURE_CHAR for i in range(run[0], run[1]))
+                ),
+                *(
+                    (i, i + 1, [EQUATION_IMAGE_REASON])
+                    for i, c in enumerate(row.chars)
+                    if c.c == PICTURE_CHAR
+                ),
+            ]
+        )
+        if _loose_scripts(row, info, raw, kinds, found):
+            block.flat_scripts = True  # raised or lowered text that is written flat
+        for start, end, reasons in found:
+            row_pieces.append(_marked(row.chars, kinds, cursor, start))
             chars = row.chars[start:end]
-            text = _clean("".join(c.styled for c in chars))
+            text = (
+                ""
+                if reasons == [EQUATION_IMAGE_REASON]
+                else _clean("".join(c.styled for c in chars))
+            )
             ink = [c for c in chars if not c.blank]
             fonts = sorted({c.font for c in ink})
             score, _ = equation_score(text, fonts, any(c.flags & _SUPERSCRIPT_FLAG for c in ink))
@@ -5323,7 +5883,7 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
                 _Inline(box, text, score, reasons, _dominant_size([row]), _regular_letters(ink))
             )
             cursor = end
-        row_pieces.append("".join(c.c for c in row.chars[cursor:]))
+        row_pieces.append(_marked(row.chars, kinds, cursor, len(row.chars)))
         _append_row(pieces, row_pieces)
     return _strip_teacher_tags(_tidy(pieces))
 
@@ -5430,6 +5990,9 @@ def _attach_captions(blocks: list[_Block], figures: list[_Figure]) -> None:
         if c_index in used_captions or figures[f_index].caption is not None:
             continue
         figures[f_index].caption = blocks[c_index].text
+        figures[f_index].flat_scripts = any(
+            kind for row in blocks[c_index].rows for kind in _script_kinds(row)
+        )
         used_captions.add(c_index)
     for index, block in enumerate(blocks):
         if block.kind == "caption":
@@ -5461,6 +6024,12 @@ def _claim_tables(
         return found
     lines = set().union(*(t.lines for t in found))
     drawn = set().union(*(t.paths for t in found))
+    for table in found:
+        # A cell keeps a raised mark as a superscript character (`tables._marked`) but not a
+        # lowered one: it is written flat, and the notice `scripts_flattened` says so.
+        cells = _merge_baselines([frags[number][i] for i in sorted(table.lines)], None)
+        if any("sub" in _script_glyphs(row)[0] for row in cells if not row.vertical):
+            table.reasons.append(LOWERED_CELL_REASON)
     frags[number] = [f for i, f in enumerate(frags[number]) if i not in lines]
     paths[number] = [p for i, p in enumerate(paths[number]) if i not in drawn]
     if previous and tables.continues(previous[-1], found[0], page.rect.width):
@@ -5489,6 +6058,7 @@ def _table_blocks(page_tables: Sequence[tables.PageTable]) -> list[_Block]:
                 caption=found.caption,
                 reasons=list(found.reasons),
                 table=grid,
+                flat_scripts=LOWERED_CELL_REASON in found.reasons,
             )
         )
     return blocks
@@ -5650,7 +6220,8 @@ def _page_blocks(
         ink=ink_sources,
         hand=ink,
     )
-    figures = _merge_figures(_raster_figures(page, page_rect) + vector)
+    small_pictures: list[_Figure] = []
+    figures = _merge_figures(_raster_figures(page, page_rect, small_pictures) + vector)
     # A logo repeated in the header or footer band is decoration, like a running header.
     figures = [f for f in figures if not margins.drops_figure(f.bbox, page_rect.height)]
     # A chart's tick labels in the footer band, or its axis title repeated on every slide,
@@ -5661,6 +6232,7 @@ def _page_blocks(
     rows = [*rows, *restored]
     figures = [f for f in figures if _absorb_labels(f, rows, ctx, page.parent)]
     _take_labels(restored, figures, rows)
+    figures, rows = _equation_pictures(page, figures, rows, ctx, small_pictures)
     text_rows = [r for r in rows if not r.absorbed]
     _equation_regions(text_rows, used_rules)
     placed = [f.bbox for f in figures] + [t.bbox for t in page_tables]
@@ -5676,6 +6248,17 @@ def _page_blocks(
     _attach_captions(blocks, figures)
     blocks = [b for b in blocks if b.kind != "attached"]
     for figure in figures:
+        if figure.equation:  # a picture of an equation: the equation step reads it
+            blocks.append(
+                _Block(
+                    Kind.EQUATION,
+                    figure.bbox,
+                    text=None,
+                    reasons=[EQUATION_IMAGE_REASON, *figure.reasons],
+                    label=figure.number,
+                )
+            )
+            continue
         labels = " ".join(r.clean for r in sorted(figure.labels, key=lambda r: (r.y0, r.x0)))
         blocks.append(
             _Block(
@@ -5684,6 +6267,7 @@ def _page_blocks(
                 text=labels or None,
                 caption=figure.caption,
                 reasons=figure.reasons,
+                flat_scripts=figure.flat_scripts,
             )
         )
     blocks.extend(_table_blocks(page_tables))
@@ -6556,6 +7140,9 @@ def _layout_notices(
         raised: dict[str, _FootnoteMark] = {}  # marks printed raised above, on this page
         for block in page.blocks:
             element_id = block_ids.get(id(block))
+            if element_id is not None and block.flat_scripts:
+                notices.append(Notice(code="scripts_flattened", page=page.number,
+                                      element_id=element_id, review="optional"))  # fmt: skip
             if block.kind not in _TEXT_BLOCKS or element_id is None:
                 continue
             ink = [c for row in block.rows for c in row.chars if not c.blank]
@@ -6673,12 +7260,17 @@ def _to_elements(
                     else:
                         parts.append(piece)
                     if number == block.term_pieces:
-                        term_length = len("".join(parts))
+                        # offsets are into the text without the script marks
+                        term_length = len(script_marks.strip_marks("".join(parts)))
                 joined = "".join(parts)
-                text = joined.strip("\n") if block.code else joined.strip()
+                plain = script_marks.strip_marks(joined)
+                if block.code:  # indentation is kept; code carries no raised or lowered runs
+                    text, script_runs = plain.strip("\n"), []
+                else:
+                    text, script_runs = script_marks.split(joined)
                 term_end = None
                 if block.term_pieces is not None:
-                    term_end = max(0, term_length - (len(joined) - len(joined.lstrip())))
+                    term_end = max(0, term_length - (len(plain) - len(plain.lstrip())))
                 marker = block.marker
                 elements.append(
                     Element(
@@ -6697,6 +7289,7 @@ def _to_elements(
                         list_level=block.contents_level
                         or (levels.get(id(block)) if marker else None),
                         reasons=[CONTENTS_ENTRY] if block.contents_level else [],
+                        script_runs=script_runs,
                     )
                 )
                 for child_id, inline in children:
@@ -6707,7 +7300,7 @@ def _to_elements(
                             page=page.number,
                             bbox=_rounded(inline.bbox),
                             order=len(elements),
-                            text=inline.text,
+                            text=inline.text or None,  # None: a picture, no text layer
                             font_size=inline.font_size,
                             score=inline.score,
                             reasons=inline.reasons,
@@ -6718,6 +7311,9 @@ def _to_elements(
                     )
                 continue
             kind = Kind(block.kind)
+            heading_text, heading_runs = (
+                script_marks.split(block.marked) if block.marked else (None, [])
+            )
             elements.append(
                 Element(
                     id=element_id,
@@ -6725,6 +7321,7 @@ def _to_elements(
                     page=page.number,
                     bbox=_rounded(block.bbox),
                     order=len(elements),
+                    script_runs=heading_runs if heading_text == block.text else [],
                     text=block.text,
                     font_size=block.font_size,
                     bold=block.bold,

@@ -41,6 +41,12 @@ layer shows no bold at all, read as a plain variable is the meaning-level
 `style_mismatch`; speech reads such a letter by its meaning ("vector d"); and a bold
 letter layout found in running text gets its fix without a model call.
 
+A picture of an equation (`equation_images`, `Element.reasons`) has no text layer, so
+nothing can confirm the reading: it gets the failed check `equation.no_text_layer`, not
+a reason to ask the main model again, so a usable reading is NEEDS_REVIEW (review
+"required") however sure the model is. The model may still answer that the picture is not
+an equation (rule 2); the picture stays in the output, flagged.
+
 Status rules, in order:
 1. no parsed output from any attempt -> FAILED, reason "model_<outcome>";
 2. the model says it is not an equation -> ABSTAINED "not_equation";
@@ -74,7 +80,7 @@ from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCa
 from a11y_stem.models import router
 from a11y_stem.models.base import T, VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import notation_memory
+from a11y_stem.pipeline import equation_images, notation_memory
 from a11y_stem.pipeline.signs import compare_signs
 from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
 from a11y_stem.pipeline.text_layer_compare import compare_case, numbers_differ
@@ -185,11 +191,20 @@ _WRAPPERS = [
 _DISPLAYSTYLE = re.compile(r"\\(?:displaystyle|textstyle)(?![A-Za-z])")
 
 
+# A script with nothing before it: at the start, or after a sign or an opening bracket. LaTeX
+# hangs it on the previous symbol, so the numbers of a nuclide after a plus ("+ ^{4}_{2}He")
+# become the plus's own; an empty group gives it an empty base (the nuclide's prefix scripts).
+_BARE_SCRIPT = re.compile(r"(?:^|(?<=[+\-=(\[,<>]))(\s*)(?=[\^_])")
+
+
 def clean_latex(latex: str) -> str:
     r"""Remove wrappers the prompt forbids but models still add ($...$, \[...\],
-    equation environments, \displaystyle), and escape bare `%` signs. Never changes the
-    mathematics: a bare `%` in one transcribed equation is a percent sign, but the
-    converter would treat it as a comment and silently drop the rest of the line."""
+    equation environments, \displaystyle), escape bare `%` signs, and give a script that
+    has nothing before it an empty base (`^{14}_{6}C` -> `{}^{14}_{6}C`, `+ ^{4}_{2}He` ->
+    `+ {}^{4}_{2}He`). Never changes the mathematics: a bare `%` in one transcribed equation
+    is a percent sign, but the converter would treat it as a comment and silently drop the
+    rest of the line; a script with no base belongs to no symbol, and the converter would
+    give it to the sign before it."""
     text = latex.strip()
     for pattern in _WRAPPERS:
         match = pattern.match(text)
@@ -197,6 +212,7 @@ def clean_latex(latex: str) -> str:
             text = match.group(1).strip()
     text = _DISPLAYSTYLE.sub("", text)
     text = text.removesuffix("\\\\").strip()
+    text = _BARE_SCRIPT.sub(lambda m: m.group(1) + "{}", text)
     return escape_percent_signs(text)
 
 
@@ -262,6 +278,8 @@ SPEECH_CODES = frozenset({"speech_failed", "speech_empty"})
 # The cheap answer was not read a second time (see `SKIP_ESCALATION_FROM`): a note only.
 SINGLE_READING_CODE = "single_reading"
 NOTE_CODES = frozenset({"style_cosmetic", SINGLE_READING_CODE, *SPEECH_CODES})
+# A picture of an equation: no text layer to check the reading against, so a person decides.
+NO_TEXT_LAYER_CODE = "no_text_layer"
 _MATHML_TOKENS = {"mi", "mn", "mo", "mtext", "ms"}
 # Children after the first are scripts (sub/superscripts, limits, a root's index).
 _SCRIPTED = {"msub", "msup", "msubsup", "munder", "mover", "munderover", "mmultiscripts", "mroot"}
@@ -889,6 +907,20 @@ def transcribe(
                 passed=False,
                 severity="warning",
                 code=SINGLE_READING_CODE,
+            )
+        )
+    if (
+        equation_images.REASON in element.reasons
+        and not element.text
+        and candidate.output is not None
+        and candidate.output.is_equation
+    ):
+        candidate.checks.append(
+            Check(
+                name="equation.no_text_layer",
+                passed=False,
+                severity="warning",
+                code=NO_TEXT_LAYER_CODE,
             )
         )
     fix = _fix(element, candidate, calls, display, settings)
