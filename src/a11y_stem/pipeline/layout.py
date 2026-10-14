@@ -1364,7 +1364,8 @@ def _fraction_at(
     # (`_equation_regions`), and lifting it would cut those rows. Three plain letters on
     # the line of the bar are words.
     words = sum(c.c.isalpha() and not c.math for c in line)
-    if words < PROSE_LETTERS_ON_LINE:
+    if words < PROSE_LETTERS_ON_LINE or not beside:
+        # Words on the line but none near the bar: nothing to compare its glyphs with.
         return None
     # The text around the bar must be set bigger than the glyphs on it: that is what makes
     # it an inline fraction (a display fraction's own line has glyphs of the same size).

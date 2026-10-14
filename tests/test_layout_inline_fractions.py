@@ -290,3 +290,14 @@ def test_spaces_inside_one_formula_in_the_maths_font_keep_it_whole():
         page.insert_text((250, 140), "and nothing else.", fontsize=BODY)
 
     assert [spaceless(e.text) for e in equations(prose_page(fill))] == ["B=0+C=1"]
+
+
+def test_a_bar_with_words_on_its_line_but_none_near_it_is_left_alone():
+    # Seen on OpenStax pages: the words share the bar's line but sit far from it, so no
+    # text is near enough to compare the bar's glyphs with. That must not crash.
+    def fill(page):
+        page.insert_text((72, 140), "Words at the start", fontsize=BODY)
+        fraction(page, 480, 140, "1", "5")
+
+    elements = prose_page(fill)
+    assert any(e.text and "Words at the start" in e.text for e in elements)
