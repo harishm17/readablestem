@@ -65,6 +65,7 @@ from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
 from a11y_stem.eval import equations_v2 as v2
 from a11y_stem.eval import judge as judge_mod
+from a11y_stem.eval import prose_classes
 from a11y_stem.eval import verifier_metrics as vm
 from a11y_stem.eval.equations import (
     EquationScore,
@@ -1597,7 +1598,9 @@ def document_metrics(items: Sequence[dict]) -> dict:
         reason: sum(i.get("unmatched_by_reason", {}).get(reason, 0) for i in items)
         for reason in UNMATCHED_REASONS
     }
+    classes = prose_classes.summarize([i["prose_classes"] for i in items if "prose_classes" in i])
     return {
+        **({"prose_classes": classes} if classes else {}),
         "gold_equations": gold,
         "predicted_equations": pred,
         "matched": matched,
@@ -1738,7 +1741,10 @@ def _eval_document(
             return items, f"budget_{exc.scope}"
         except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
             item = document_page_item(_page_id(page), _of_kind(page, "equation"), [], {}, [], [])
-            items.append(item | _calls_summary([]) | {"error": exc.code, "pdf_pages": 0})
+            item |= _calls_summary([]) | {"error": exc.code, "pdf_pages": 0}
+            if classes := prose_classes.score_page("", page):  # nothing was found: all misses
+                item["prose_classes"] = classes
+            items.append(item)
             continue
         result = output.result
         stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
@@ -1769,6 +1775,10 @@ def _eval_document(
         # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
         # page is the figure to compare with production (`ops report`), not per item.
         item["pdf_pages"] = result.stats.pages
+        # The dev-v2 classes with gold but no equation/heading scorer (scripts, code,
+        # glossary, hyphenated words): scored on the output HTML; absent without such gold.
+        if classes := prose_classes.score_page(result.html, page):
+            item["prose_classes"] = classes
         items.append(item)
     return items, None
 
@@ -2072,6 +2082,33 @@ def _second_check_rows(task: str, metrics: dict) -> list[tuple[str, Any]]:
     return rows
 
 
+def _class_rows(metrics: dict) -> list[tuple[Any, ...]]:
+    """One row per class of `prose_classes.summarize`: n, the count that is right, its
+    rate, and the other results."""
+    block = metrics["prose_classes"]
+    rows: list[tuple[Any, ...]] = []
+
+    def other(part: dict, names: Sequence[str], right: set[str]) -> str:
+        return ", ".join(f"{n} {part[n]}" for n in names if n not in right and part.get(n))
+
+    for name, part in block.get("scripts", {}).get("by_class", {}).items():
+        rows.append((name, part["n"], part["scripted"], part["scripted_rate"],
+                     other(part, prose_classes.SCRIPT_RESULTS, set())))  # fmt: skip
+    if "code" in block:
+        part = block["code"]
+        rows.append(("code_block", part["n"], part["exact"], part["exact_rate"],
+                     other(part, prose_classes.CODE_RESULTS, {"exact"})))  # fmt: skip
+    if "glossary" in block:
+        part = block["glossary"]
+        rows.append(("glossary_entry", part["n"], part["definition_list"], part["structured_rate"],
+                     other(part, prose_classes.GLOSSARY_RESULTS, {"definition_list"})))  # fmt: skip
+    if "hyphen_breaks" in block:
+        part = block["hyphen_breaks"]
+        rows.append(("hyphen_break", part["n"], part["joined"], part["joined_rate"],
+                     other(part, prose_classes.HYPHEN_RESULTS, {"joined"})))  # fmt: skip
+    return rows
+
+
 def format_markdown(report: dict) -> str:
     """Human summary of a report (metrics only; no document text)."""
     metrics = report["metrics"]
@@ -2114,6 +2151,9 @@ def format_markdown(report: dict) -> str:
         lines += ["", "### Long descriptions (FEATURE_LONG_DESCRIPTIONS on)", ""]
         long = metrics["long_descriptions"]
         lines += _table(["metric", "value"], ((k, long[k]) for k in LONG_HEADLINE))
+    if metrics.get("prose_classes"):
+        lines += ["", "### Prose classes (dev-v2: scripts, code, glossary, hyphenated words)", ""]
+        lines += _table(["class", "n", "right", "rate", "other results"], _class_rows(metrics))
     if report["task"] in {"equations", "document"} and metrics.get("secondary_stream_v2"):
         lines += ["", "### Secondary scorer: stream v2 (the rows above are primary)", ""]
         lines += _table(

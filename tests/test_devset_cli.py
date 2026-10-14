@@ -153,3 +153,33 @@ def test_the_devset_media_prints_openstax_pages_and_reads_authored_pdfs(tmp_path
     assert media.equation_context(record) == "near"
     with pytest.raises(devset_media.RenderError, match="missing"):
         media.page_pdf([{**record, "pdf": "authored/none/none.pdf"}])
+
+
+def test_classes_self_check_scores_the_gold_against_itself(tmp_path, capsys) -> None:
+    root = tiny_set(tmp_path)
+    argv = ["eval", "classes", "--set", "dev-v2", "--devset-dir", str(root), "--self-check"]
+    assert main(argv) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["scripts"]["scripted_rate"] == 1.0
+    assert out["code"]["exact_rate"] == 1.0 and out["glossary"]["structured_rate"] == 1.0
+
+
+def test_classes_scores_saved_pages_and_a_missing_page_is_all_lost(tmp_path, capsys) -> None:
+    root = tiny_set(tmp_path)
+    argv = ["eval", "classes", "--set", "dev-v2", "--devset-dir", str(root)]
+    pages = tmp_path / "html"
+    pages.mkdir()
+    assert main([*argv, "--html-dir", str(pages)]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["scripts"]["scripted"] == 0 and out["code"]["missing"] == out["code"]["n"]
+    assert main([*argv, "--html-dir", str(tmp_path / "none")]) == 2
+    assert "html dir not found" in capsys.readouterr().err
+
+
+def test_classes_needs_the_dev_part_of_dev_v2(tmp_path, capsys) -> None:
+    root = tiny_set(tmp_path)
+    assert main(["eval", "classes", "--self-check"]) == 2
+    assert "--set dev-v2" in capsys.readouterr().err
+    argv = ["eval", "classes", "--set", "dev-v2", "--devset-dir", str(root), "--self-check"]
+    assert main([*argv, "--part", "check"]) == 2
+    assert "--part check" in capsys.readouterr().err
