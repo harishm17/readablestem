@@ -31,7 +31,7 @@ What the first deploy found, and how production is actually configured:
   |---|---|
   | `web` | Dockerfile; pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart on failure, 10 retries; domains readablestem.com and www.readablestem.com |
   | `cron` | Same image; start `readablestem ops cron`; schedule `7 * * * *`; restart never; every variable a reference to `web` (`${{web.NAME}}`) |
-  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), gzipped onto the private volume `/backups`; copies older than 6 days are deleted |
+  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), gzipped onto the private volume `/backups`, then restored into a scratch database to prove it works; copies older than 6 days are deleted |
 
   A redeploy reuses the old deployment's settings; after changing a setting, deploy afresh with
   `railway up --service <name>`.
@@ -39,7 +39,9 @@ What the first deploy found, and how production is actually configured:
   above does the daily copy inside the same project. The privacy page's "kept for about 6 days"
   matches it. To restore: `railway ssh --service backup`, then
   `gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"` into an empty database.
-  **Do not rely on it until one restore has been tested.**
+  Every run also restores the new dump into a scratch database `restore_check`, counts its
+  tables, reads `alembic_version`, drops it and logs `backup_ok file=... tables=... alembic=...`;
+  a dump that does not restore fails the run. First verified run: 2026-10-14, 17 tables.
 - **Google sign-in** is published (In production): any Google account can reach the sign-in;
   the app's own allowlist decides who gets in (`/admin`).
 - **Smoke test, 2026-10-14:** sign-in, the sample job, a 2-page LaTeX handout converted in 19 s
