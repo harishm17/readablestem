@@ -22,6 +22,7 @@ Measurements behind the numbers: docs/deploy.md, "Spend limits".
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -71,6 +72,22 @@ def largest_reservation_usd(settings: Settings, *, optional_steps: bool = True) 
                 largest = max(largest, cost)
         except UnknownModelError:  # refused at the first call anyway
             continue
+    # The Claude second check (T2-20) holds its own reservation, after the step's and never
+    # beside it, on a model of its own: it counts when it is the dearest.
+    if settings.model_provider == "anthropic" and settings.claude_second_check != "off":
+        from a11y_stem.models import claude_verifier
+
+        text_chars = claude_verifier.CAPTION_LIMIT + claude_verifier.ALT_LIMIT + 400
+        with contextlib.suppress(UnknownModelError):  # refused at the first call anyway
+            largest = max(
+                largest,
+                estimate_max_cost_usd(
+                    settings.claude_check_model,
+                    n_images=1,
+                    text_chars=text_chars,
+                    max_output_tokens=claude_verifier.MAX_OUTPUT_TOKENS,
+                ),
+            )
     return largest
 
 

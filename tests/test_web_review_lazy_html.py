@@ -139,3 +139,51 @@ def test_the_student_note_is_dated_by_the_last_decision_not_by_the_render(site):
             edit.created_at = edit.created_at.replace(year=2026, month=1, day=2)
     served = site.browser.get(f"/jobs/{site.job_id}/download").text
     assert f"{CHECKED} on 2 January 2026." in served, served[-600:]
+
+
+def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
+    """`MATHML_ALTTEXT` is in the settings the app runs with: a re-render (a click, the
+    contact line) writes the same <math> attributes as the conversion would, not the
+    process-wide default."""
+    from a11y_stem.core.types import EquationFix, Fix, Kind, Status
+
+    mathml = (
+        '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mn>2</mn></math>'
+    )
+    with session_scope(site.ctx.factory) as session:
+        job = session.get(Job, site.job_id)
+        assert job is not None
+        result = DocumentResult.model_validate(job.result_json)
+        target = next(e for e in result.elements if e.kind is Kind.EQUATION)
+        equation = EquationFix(latex="x = 2", mathml=mathml, speech="x equals 2", display="block")
+        result.fixes = [
+            Fix(
+                element_id=target.id,
+                kind=Kind.EQUATION,
+                status=Status.ACCEPTED,
+                confidence=0.99,
+                equation=equation,
+            ),
+            *[f for f in result.fixes if f.element_id != target.id],
+        ]
+        job.result_json = result.model_dump(mode="json", exclude={"html"})
+        job.html_stale = True
+    assert 'alttext="' not in site.browser.get(f"/jobs/{site.job_id}/download").text
+
+    site.ctx.settings.mathml_alttext = True
+    try:
+        with session_scope(site.ctx.factory) as session:
+            job = session.get(Job, site.job_id)
+            assert job is not None
+            job.html_stale = True
+        served = site.browser.get(f"/jobs/{site.job_id}/download").text
+        assert 'alttext="x equals 2"' in served
+        token = csrf_from(site.browser.get(f"/jobs/{site.job_id}/review").text)
+        contact = site.browser.post(
+            f"/jobs/{site.job_id}/contact",
+            data={"contact": "help@example.org", "csrf_token": token},
+        )
+        assert contact.status_code == 303
+        assert 'alttext="x equals 2"' in (site.job(site.job_id).html or "")
+    finally:
+        site.ctx.settings.mathml_alttext = False

@@ -184,3 +184,24 @@ def test_a_small_page_limit_is_judged_by_the_job_cap_it_really_gives():
     assert limits.spend_findings(s) == []
     wide = settings(model_provider="anthropic", max_pages_per_job=30, max_usd_per_job=500)
     assert any("runaway" in f.text for f in limits.spend_findings(wide))
+
+
+def test_the_claude_second_check_counts_when_it_is_the_dearest_reservation():
+    """The check holds its own reservation on its own model (T2-20); the concurrency the
+    worker computes from the largest reservation must cover it, whatever models read the page."""
+    cheap_pair = {
+        "model_provider": "anthropic",
+        "anthropic_main_model": "claude-haiku-5-5",
+        "anthropic_cheap_model": "claude-haiku-5-5",
+    }
+    on = settings(claude_second_check="shadow", **cheap_pair)
+    off = settings(claude_second_check="off", **cheap_pair)
+    assert limits.largest_reservation_usd(on) > limits.largest_reservation_usd(off)
+    # with the default models the first pass is dearer, so nothing changes
+    default_on = settings(model_provider="anthropic", claude_second_check="shadow")
+    default_off = settings(model_provider="anthropic", claude_second_check="off")
+    assert limits.largest_reservation_usd(default_on) == limits.largest_reservation_usd(default_off)
+    # OpenAI never runs the Claude check
+    assert limits.largest_reservation_usd(settings()) == limits.largest_reservation_usd(
+        settings(claude_second_check="off")
+    )
