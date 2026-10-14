@@ -2,7 +2,7 @@
 
 `make proof` (or `uv run readablestem proof`) turns the recorded run in `proof/bundles/` into
 `PROOF.md`: every table, with its intervals, its limits and the licence notices. It needs no
-API key, no network and no money, and it writes the same bytes on every machine that has
+API key, no network (after the one-time table-model download described below) and no money, and it writes the same bytes on every machine that has
 the dependency versions in `uv.lock`.
 
 `PROOF.md` states what a machine can measure about ReadableSTEM's output on a set of OpenStax
@@ -33,6 +33,30 @@ answer for), so the replay is pinned to the tag:
 git checkout proof-heldout-2026-10
 make proof            # writes PROOF.md; `git diff PROOF.md` shows nothing
 ```
+
+### The table-structure model is an input of the replay
+
+The recording was made with the SLANet-plus table-structure model (7.5 MB, Apache-2.0)
+present. The pipeline builds its model requests from the tables that model recognises. The
+file is not in the repository. Without it the pipeline falls back to PyMuPDF's own grid,
+asks for different model answers, and the replay stops with exit code 5
+(`document.run1: 64 request(s) have no recorded answer`). The command prints
+`table structure model not found` just before it fails. A machine that happens to hold the
+file in its user cache replays fine, which is why this is easy to miss.
+
+Fetch it once before replaying (the download is checked against the SHA-256 pinned in
+`pipeline/table_model.py`, and a different file is refused):
+
+```
+git checkout proof-heldout-2026-10
+make table-model      # into the user cache, or into $TABLE_MODEL_DIR when that is set
+make proof
+```
+
+The CI job `proof-replay` does the same at the tag, with `TABLE_MODEL_DIR` pointing at a
+cached copy keyed by that checksum. With the file present, a replay on a clean runner (empty
+home and cache, `uv sync --locked --no-dev`, Python 3.12, no browser, no print fonts) gives
+the committed `PROOF.md` byte for byte.
 
 On a later commit `make proof` may fail, and when it does it says so and names the tag; that
 is not a defect in the proof, and re-recording or editing the bundle is not the fix.
