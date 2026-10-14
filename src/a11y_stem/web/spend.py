@@ -73,6 +73,9 @@ class DbSpendGuard:
         # its hold from the right row.
         self._days: dict[str, date] = {}
         self._lock = threading.Lock()
+        # Days whose row this process has seen exist: the row is created by the first
+        # reservation of a day, not checked for by every reservation and settlement.
+        self._known_days: set[date] = set()
 
     def _today(self) -> date:
         return utc_today(self._clock())
@@ -81,23 +84,39 @@ class DbSpendGuard:
     def _ensure_day(session: Session, day: date) -> None:
         insert_ignore(session, SpendDay, {"day": day, "spent_usd": 0.0, "held_usd": 0.0})
 
+    def _row_known(self, day: date) -> bool:
+        with self._lock:
+            return day in self._known_days
+
+    def _remember(self, day: date) -> None:
+        with self._lock:
+            self._known_days = {day} | {d for d in self._known_days if d >= day}
+
     def reserve(self, amount_usd: float) -> Reservation:
+        """One conditional UPDATE. The day's row is made (once per day per process) only
+        when the UPDATE finds none: a refusal by the cap and a missing row look the same
+        to it, so after making the row it runs once more."""
         if amount_usd < 0:
             raise ValueError("reservation must be >= 0")
         day = self._today()
-        with session_scope(self.factory) as session:
-            self._ensure_day(session, day)
-            stmt = (
-                update(SpendDay)
-                .where(SpendDay.day == day)
-                .values(held_usd=SpendDay.held_usd + amount_usd)
-                .execution_options(synchronize_session=False)
+        stmt = (
+            update(SpendDay)
+            .where(SpendDay.day == day)
+            .values(held_usd=SpendDay.held_usd + amount_usd)
+            .execution_options(synchronize_session=False)
+        )
+        if self.cap_usd is not None:
+            stmt = stmt.where(
+                SpendDay.spent_usd + SpendDay.held_usd + amount_usd <= self.cap_usd + _EPSILON
             )
-            if self.cap_usd is not None:
-                stmt = stmt.where(
-                    SpendDay.spent_usd + SpendDay.held_usd + amount_usd <= self.cap_usd + _EPSILON
-                )
-            if rowcount(session.execute(stmt)) != 1:
+        with session_scope(self.factory) as session:
+            held = rowcount(session.execute(stmt)) == 1
+            if not held and not self._row_known(day):
+                self._ensure_day(session, day)
+                held = rowcount(session.execute(stmt)) == 1
+            if held:  # the row is committed with this reservation
+                self._remember(day)
+            else:
                 raise BudgetExceeded("daily", f"daily spend cap ${self.cap_usd:.2f} reached")
         reservation = Reservation(uuid.uuid4().hex, amount_usd)
         with self._lock:
@@ -112,17 +131,21 @@ class DbSpendGuard:
         else:
             release = reservation.amount_usd
         held_after = SpendDay.held_usd - release
-        with session_scope(self.factory) as session:
-            self._ensure_day(session, day)
-            session.execute(
-                update(SpendDay)
-                .where(SpendDay.day == day)
-                .values(
-                    held_usd=case((held_after < 0, 0.0), else_=held_after),
-                    spent_usd=SpendDay.spent_usd + max(0.0, actual_usd),
-                )
-                .execution_options(synchronize_session=False)
+        stmt = (
+            update(SpendDay)
+            .where(SpendDay.day == day)
+            .values(
+                held_usd=case((held_after < 0, 0.0), else_=held_after),
+                spent_usd=SpendDay.spent_usd + max(0.0, actual_usd),
             )
+            .execution_options(synchronize_session=False)
+        )
+        with session_scope(self.factory) as session:
+            # The row exists: this reservation made it. Only a settlement of a hold this
+            # process did not make (above) can find none, and then it is made first.
+            if rowcount(session.execute(stmt)) != 1:
+                self._ensure_day(session, day)
+                session.execute(stmt)
 
     def snapshot(self) -> SpendSnapshot:
         day = self._today()

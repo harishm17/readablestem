@@ -431,9 +431,13 @@ UPDATE spend_days SET held_usd = held_usd + :a
 WHERE day = :d AND spent_usd + held_usd + :a <= :cap
 ```
 
-No row updated means `BudgetExceeded("daily")`. The day row is created first with an
-insert-ignore (`ON CONFLICT DO NOTHING`, on SQLite and Postgres). Settling moves the hold
-to `spent_usd` on the day it was reserved. The Postgres test runs 20 threads against the
+No row updated means `BudgetExceeded("daily")`. When the UPDATE finds no row and this
+process has not seen the day's row yet, the row is created with an insert-ignore (`ON
+CONFLICT DO NOTHING`, on SQLite and Postgres) and the UPDATE runs once more; after that a
+reservation and a settlement are one UPDATE each, where each used to be an insert-ignore
+and an UPDATE (a model call now costs four UPDATEs on the two rows it touches, the day's and
+the job's, instead of four and two inserts). Settling moves the hold to `spent_usd` on the
+day it was reserved. The Postgres test runs 20 threads against the
 cap and checks it is never exceeded. If a process dies between reserve and settle, its
 hold stays until the day ends: the cap errs on the side of spending less.
 
@@ -448,6 +452,12 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   transaction. SQLite: a conditional UPDATE (`WHERE status = 'queued'`) whose rowcount
   says who won. Jobs of people no longer on the allowlist are not claimed; removing
   someone also fails their queued and running jobs with `access_removed`.
+- **Idle polls.** Every `WORKER_POLL_S` (2 s) the loop does one read: is a job queued
+  (the claimable kind) or has a running job's lease run out (`Worker.pending`). With
+  neither it goes back to sleep, with no write, no spend snapshot and no claim attempt
+  (it used to be two UPDATEs and two SELECTs in three transactions, about 130,000
+  transactions and 86,000 writes a day on an idle server). Only when a lease has run out are
+  the requeue UPDATEs run, and the daily budget is looked at only when a job waits.
 - **Daily budget spent.** While less than the largest single model call is left under
   the daily cap (the same threshold as the upload gate), the worker claims nothing and
   logs `claims_paused` once (`claims_resumed` when it starts again). Queued jobs wait,

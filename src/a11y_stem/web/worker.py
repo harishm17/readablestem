@@ -431,6 +431,24 @@ class Worker:
             log_event(logger, "leases_expired", logging.WARNING, requeued=requeued, failed=failed)
         return requeued, failed
 
+    def pending(self, now: datetime | None = None) -> tuple[bool, bool]:
+        """(a job a worker could claim is queued, a running job's lease has run out): one
+        read for both, which is all an idle poll costs. The queued test is the one `claim`
+        makes (the owner is still on the allowlist)."""
+        now = now or self.clock()
+        queued = (
+            select(Job.id)
+            .join(User, User.id == Job.user_id)
+            .where(Job.status == JobStatus.QUEUED, User.is_allowed.is_(True))
+            .limit(1)
+        )
+        expired = (
+            select(Job.id).where(Job.status == JobStatus.RUNNING, Job.lease_until < now).limit(1)
+        )
+        with session_scope(self.factory) as session:
+            row = session.execute(select(queued.exists(), expired.exists())).one()
+        return bool(row[0]), bool(row[1])
+
     def claim(self, now: datetime | None = None) -> Claim | None:
         """Take the next queued job (fewest attempts, then oldest), or None.
 
@@ -923,8 +941,14 @@ class Worker:
     def run_once(self) -> str | None:
         """Requeue expired leases, then claim and process one job. Returns its id.
 
-        Claims nothing while the daily budget is spent (`budget_closed`)."""
-        self.requeue_expired()
+        Claims nothing while the daily budget is spent (`budget_closed`). With nothing
+        queued and no lease run out it does one read and returns (`pending`)."""
+        now = self.clock()
+        queued, expired = self.pending(now)
+        if expired:
+            queued = self.requeue_expired(now)[0] > 0 or queued
+        if not queued:  # an idle poll is this one read: no write, no snapshot, no claim
+            return None
         if self.budget_closed():
             if not self._paused:
                 self._paused = True
