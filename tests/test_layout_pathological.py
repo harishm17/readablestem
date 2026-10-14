@@ -17,9 +17,9 @@ import time
 
 import pytest
 
-from a11y_stem.core.types import PageType
-from a11y_stem.pipeline import layout, page_type, tables
 from layout_synth import dots_page, ink_document, ink_page, slide_with_ink
+from readablestem.core.types import PageType
+from readablestem.pipeline import layout, page_type, tables
 
 BOUND_S = 60.0  # the slowest of these takes well under a tenth of it on one core
 

@@ -53,7 +53,7 @@ def _cases() -> dict[str, Callable[[], bytes]]:
 
 def child(path: str) -> None:
     """Analyse one PDF and print one JSON line: seconds, peak MB, what was found."""
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     data = Path(path).read_bytes()
     started = time.perf_counter()
@@ -92,7 +92,7 @@ def main() -> int:
         child(args.child)
         return 0
 
-    from a11y_stem.pipeline import page_type, tables
+    from readablestem.pipeline import page_type, tables
 
     results = []
     with tempfile.TemporaryDirectory(prefix="bench-layout-") as tmp:

@@ -13,8 +13,8 @@ first differing field, and exits 1 if there is any.
 
 PDFs covered without arguments: `tests/fixtures/**.pdf`, `data/**.pdf` (the development
 set `data/dev-v2/dev`, the authored table sets, the gold material) and the development
-pages printed into `~/.cache/a11y-stem/dev-v2/eval-cache/pages` when that exists. The
-sealed check part of the development set (`data/dev-v2/check*`, `~/.cache/a11y-stem/
+pages printed into `~/.cache/readablestem/dev-v2/eval-cache/pages` when that exists. The
+sealed check part of the development set (`data/dev-v2/check*`, `~/.cache/readablestem/
 dev-v2/check-*`) and `proof/` are never read. `--extra DIR` adds the PDFs under DIR
 (each is written under a name made from its path).
 
@@ -35,8 +35,10 @@ from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import Any
 
+from readablestem.core.paths import cache_dir
+
 ROOT = Path(__file__).resolve().parents[1]
-CACHE_PAGES = Path.home() / ".cache" / "a11y-stem" / "dev-v2" / "eval-cache" / "pages"
+CACHE_PAGES = cache_dir("dev-v2", "eval-cache", "pages")
 SKIP_PARTS = ("check", "proof", ".venv", "node_modules")
 
 
@@ -65,7 +67,7 @@ def label(path: Path) -> str:
 
 def describe(path: str) -> dict[str, Any]:
     """The analysis of one PDF as plain data."""
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     started = time.perf_counter()
     try:
