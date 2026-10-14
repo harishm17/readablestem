@@ -224,3 +224,25 @@ def test_a_bracket_that_is_a_row_of_its_own_joins_the_line_it_stands_in():
     assert [r.clean for r in rows] == ["(7x3 -15x2)"]
     apart = layout._attach_big_operators([host, glyphs("(", 300, 345, 11.0)])
     assert len(apart) == 2  # a bracket far from the line is left alone
+
+
+def test_a_bracket_with_its_subscript_is_an_inline_equation():
+    # "(x)_n": the closing bracket and the script after it are the evidence.
+    def fill(page):
+        page.insert_text((72, 140), "The rate follows (x", fontsize=BODY)
+        page.insert_text((186, 140), ")", fontsize=BODY)
+        page.insert_text((191, 144), "n", fontsize=SMALL, fontname="tiit")
+        page.insert_text((199, 140), "throughout the experiment.", fontsize=BODY)
+
+    found = equations(prose_page(fill))
+    assert [spaceless(e.text) for e in found] == ["(x)n"]
+    assert found[0].reasons == ["bracket with sub/superscript"]
+
+
+def test_a_bracket_followed_by_plain_text_is_not_maths():
+    def fill(page):
+        page.insert_text(
+            (72, 140), "The rate follows (see below) and then it stops here.", fontsize=BODY
+        )
+
+    assert equations(prose_page(fill)) == []

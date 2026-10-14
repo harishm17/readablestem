@@ -2322,6 +2322,12 @@ def _inline_evidence(chars: list[_Char], info: _CharInfo, start: int, end: int) 
         for i in range(start, end - 1)
     ):
         return ["letter with sub/superscript"]
+    for i in range(start, end - 1):
+        if chars[i].c not in ")]":
+            continue
+        after = next((k for k in range(i + 1, end) if not chars[k].blank), None)
+        if after is not None and info.script[after] and info.classes[after] in "LD":
+            return ["bracket with sub/superscript"]  # (x)_n, [A]^2: a script only maths has
     if any(chars[i].c in _SIGNS and chars[i + 1].c.isdigit() for i in range(start, end - 1)):
         return ["signed number"]
     text = "".join(chars[i].c for i in idx)
