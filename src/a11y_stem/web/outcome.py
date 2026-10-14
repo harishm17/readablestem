@@ -202,6 +202,8 @@ def job_outcome(
     if error_code in PAGES_NOT_CONVERTED:
         message = _pages_message(result_json)
         by_reason, handwriting, _ = _kept(result_json)
+        if not (by_reason or handwriting) and (result_json or {}).get("omitted"):
+            return None  # every such page was left out of the file (T3-16)
         what = "handwriting" if handwriting and not by_reason else "pages"
         return JobOutcome(error_code, f"Finished, with {what} not converted", message, partial=True)
     return None

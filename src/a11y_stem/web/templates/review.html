@@ -1,6 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{% if errors %}Error: {% endif %}All items as a list: {{ job.filename }}{% endblock %}
-{% from "_table_card.html" import table_list_proposal, table_list_actions with context %}
+{% from "_table_card.html" import table_list_proposal, table_list_actions, accept_clean with context %}
+{% from "_describe.html" import describe_box with context %}
 
 {% macro notice_box(notice) %}
 <div class="notice" role="status"{% if notice.element_id %} data-saved="/jobs/{{ job.id }}/review/{{ notice.element_id }}"{% endif %}>
@@ -188,6 +189,7 @@
   <p class="hint decide-note" id="reject-note-{{ eid }}">{{ item.reject.button }}: {{ item.reject.consequence }}</p>
 </form>
 {% endif %}
+{{ describe_box(item, "list") }}
 {% endif %}
 {% endmacro %}
 
@@ -214,6 +216,7 @@
     <p id="actions-{{ eid }}" tabindex="-1">{{ item.kept_state or item.status_label }}</p>
   </div>
 </div>
+{{ describe_box(item, "list") }}
 {% endmacro %}
 
 {# One card for repeated headings: one decision for all of the ones still waiting. #}
@@ -224,7 +227,7 @@
   {% for message in hg.notices %}<div class="notice" role="status"><p>{{ message }}</p></div>{% endfor %}
   <article class="fix-card heading-group status-card-needs_review" aria-labelledby="{{ hg.anchor }}-title">
     <h4 id="{{ hg.anchor }}-title">Repeated heading: “{{ hg.text }}” <span class="meta">{{ counted(n, "heading", "headings") }}, {{ hg.pages_text }}</span></h4>
-    <p class="group-question">“{{ hg.text }}” appears {{ hg.size }} times {{ hg.style }}{% if n != hg.size %} ({{ n }} still waiting){% endif %}.
+    <p class="group-question">“{{ hg.text }}” appears {{ hg.times }} {{ hg.style }}{% if n != hg.size %} ({{ n }} still waiting){% endif %}.
       Keep {{ "it" if n == 1 else "them" }} as {{ "a heading" if n == 1 else "headings" }}{% if hg.level %} at level {{ hg.level }}{% endif %}, or make {{ "it" if n == 1 else "them" }} bold text?</p>
     {% if hg.fact %}<p class="group-fact" id="group-fact-{{ key }}"><strong>Suggested: {{ "make them bold text" if hg.suggest == "bold" else "keep them as headings" }}.</strong> {{ hg.fact }}</p>{% endif %}
     {% if hg.crops %}
@@ -313,6 +316,7 @@
     </form>
     {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
     <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+    {% for member in pg.describe %}{{ describe_box(member, "list") }}{% endfor %}
     {% if pg.hidden %}
     <details class="done-group">
       <summary>Hidden text in the PDF</summary>
@@ -379,9 +383,10 @@
         <li><a href="#group-{{ g.slug }}">{{ g.title }}</a>: {{ group_counts(g) }}</li>
         {% endfor %}
       </ul>{% endif %}</li>
-    <li><a href="#optional-checks">Optional checks</a>: {{ optional|length }}</li>
+    <li><a href="#optional-checks">Optional checks</a>: {{ optional|length + note_rows|length }}</li>
     <li><a href="#decided">Your decisions</a>: {{ done|selectattr("by_you")|list|length }}</li>
     <li><a href="#accepted">Accepted automatically</a>: {{ done|rejectattr("by_you")|list|length }}</li>
+    <li><a href="#page-changes">Change the text, add what was missed, leave a page out</a></li>
   </ul>
 </nav>
 
@@ -395,6 +400,8 @@
     <div class="notice" role="status"><p>{{ message }}</p></div>
     {% endfor %}
 
+    {# T3-11: the tables that wait with nothing wrong found in them, accepted together. #}
+    {% if g.slug == "tables" and g.clean >= 2 %}{{ accept_clean(g.clean, "list") }}{% endif %}
     {% if g.units %}
     <ol class="fix-list">
       {% for unit in g.units %}
@@ -422,7 +429,7 @@
 </section>
 
 <section id="optional-checks" class="review-section" aria-labelledby="optional-checks-title" tabindex="-1">
-  <h2 id="optional-checks-title">Optional checks ({{ optional|length }})</h2>
+  <h2 id="optional-checks-title">Optional checks ({{ optional|length + note_rows|length }})</h2>
   {% if optional %}
   {% if second_checks %}
   {% set small = optional|length - second_checks %}
@@ -443,8 +450,18 @@
       {% for item in optional %}{{ folded_item(item, true) }}{% endfor %}
     </ol>
   </details>
-  {% else %}
+  {% elif not note_rows %}
   <p>There are no optional checks.</p>
+  {% endif %}
+  {# T3-7: notes about a link, a line or a figure, each with its place on the review screen. #}
+  {% if note_rows %}
+  <h3 id="notes-title">Notes on links, text and figures ({{ note_rows|length }})</h3>
+  <p class="hint">Nothing here holds up the document. Each one names what it is about and opens its place on the page.</p>
+  <ul class="check-list" aria-labelledby="notes-title">
+    {% for r in note_rows %}
+    <li><strong>{{ r.label }}:</strong> {{ r.sentence }}{% if r.what %} <span class="notice-names">“{{ r.what }}”.</span>{% endif %} <a href="{{ r.href }}">Show it on the page<span class="visually-hidden">: {{ r.label }}{% if r.what %}, {{ r.what }}{% endif %}</span></a></li>
+    {% endfor %}
+  </ul>
   {% endif %}
 </section>
 
@@ -477,6 +494,18 @@
   {% else %}
   <p>Nothing was accepted automatically.</p>
   {% endif %}
+</section>
+
+{# T3-5, T3-16: what the tool did not propose. The tools sit beside the page, on the review
+   screen; one link to each page's. #}
+<section id="page-changes" class="review-section" aria-labelledby="page-changes-title" tabindex="-1">
+  <h2 id="page-changes-title">Change the text, add what was missed, leave a page out</h2>
+  <p>For the words of a paragraph or a heading, a line that should be a heading, a picture or an equation the tool did not find, or a blank or cover page. They are on the review screen, beside the page.</p>
+  <ul class="check-list">
+    {% for number, out in tool_pages %}
+    <li><a href="/jobs/{{ job.id }}/review?page={{ number }}&amp;tools=1#page-tools">Page {{ number }}<span class="visually-hidden">: change its text, add something, or leave it out</span></a>{% if out %} (left out of the student file){% endif %}</li>
+    {% endfor %}
+  </ul>
 </section>
 {% endif %}
 {% endblock %}

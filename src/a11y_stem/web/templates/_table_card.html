@@ -5,11 +5,37 @@
    all works without JavaScript; the forms send the job's result_version (`version`), so
    one made before another tab changed the review is refused, not applied. #}
 
+{% from "_describe.html" import describe_box with context %}
 {% macro flat_hint() %}<p class="hint">Some cells hold maths that the PDF's text gives flat (a fraction, a vector arrow), so this grid cannot go into the document as it is: if you use it, write those cells as LaTeX.</p>{% endmacro %}
 
 {% macro table_fields(view) -%}
 <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ job.result_version }}">
 {%- endmacro %}
+
+{# "This grid is not a table" (T3-11): its words are written one after another. #}
+{% macro not_a_table(item, view) %}
+{% set t = item.table %}
+{% if t and t.can_text %}
+{% set eid = item.element_id %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form not-a-table">
+  {{ table_fields(view) }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="not_a_table">
+  <button type="submit" class="button-secondary" data-role="not-a-table" aria-describedby="not-a-table-note-{{ eid }}">This grid is not a table<span class="visually-hidden"> ({{ item.label|lower }})</span></button>
+  <p class="hint" id="not-a-table-note-{{ eid }}">Its words are written one after another, without rows and columns. You can make it a table again.</p>
+</form>
+{% endif %}
+{% endmacro %}
+
+{# "Accept all N clean tables" (T3-11): the tables that wait although nothing was found wrong
+   with them. One write; Undo takes them all back. #}
+{% macro accept_clean(count, view) %}
+{% if count %}
+<form method="post" action="/jobs/{{ job.id }}/tables/accept-clean" class="inline-form accept-clean">
+  {{ table_fields(view) }}
+  <button type="submit" class="button-secondary" data-role="accept-clean" aria-describedby="accept-clean-note">Accept all {{ count }} clean tables</button>
+  <p class="hint" id="accept-clean-note">The tables where the checks found nothing wrong. You can still change any of them afterwards.</p>
+</form>
+{% endif %}
+{% endmacro %}
 
 {% macro table_error(item, prefix) %}
 {% set err = item.errors.get(prefix) %}
@@ -90,6 +116,15 @@
       <a href="{{ here }}">Cancel</a>
     </div>
   </form>
+  {% if c.readable %}
+  {# T3-11: the equation step reads this cell's crop; what it reads goes through the same
+     checks as a typed edit. A form of its own, so the box above is not sent. #}
+  <form method="post" action="/jobs/{{ job.id }}/tables/{{ eid }}/read-cell" class="inline-form read-cell">
+    {{ table_fields("split") }}<input type="hidden" name="row" value="{{ c.row }}"><input type="hidden" name="col" value="{{ c.col }}">
+    <button type="submit" class="button-secondary" data-role="read-cell" aria-describedby="read-cell-note-{{ eid }}">Read this cell with the model<span class="visually-hidden">: {{ c.position|lower }}</span></button>
+    <p class="hint" id="read-cell-note-{{ eid }}">The model reads the cell from the page; it takes a few seconds and uses part of this document's allowance. What it reads is checked as if you had typed it.</p>
+  </form>
+  {% endif %}
   {% else %}
   {# Choosing a cell is a link-like GET: the page comes back with that cell's form open. #}
   <form method="get" action="/jobs/{{ job.id }}/review" class="table-pick">
@@ -176,6 +211,9 @@
   {% endif %}
 </div>
 <p class="hint decide-note" id="reject-note-{{ eid }}">{% if t.proposal %}{{ item.reject.button }}: {{ item.reject.consequence }}{% else %}The image stays in the document, marked “not converted”: screen readers cannot read its cells.{% endif %}</p>
+{{ not_a_table(item, "split") }}
+{{ accept_clean(p.clean_tables, "split") }}
+{{ describe_box(item, "split") }}
 {% if p.continue_href %}<p class="table-continue"><a href="{{ p.continue_href }}">{{ p.continue_label }}</a></p>{% endif %}
 {% endmacro %}
 
@@ -236,6 +274,7 @@
       <button type="submit" name="action" value="reject" class="{{ 'button-secondary' if t.proposal or (t.local and not t.local_flat) else 'button' }}">{{ item.reject.button }}<span class="visually-hidden"> ({{ name }})</span></button>
     </form>
   </div>
+  {{ not_a_table(item, "list") }}
   <p class="hint">{{ item.reject.button }}: {{ item.reject.consequence }}{% if t.proposal and t.is_data %} To change its headers or a cell, <a href="/jobs/{{ job.id }}/review?item={{ eid }}">open it on the review screen</a>.{% elif t.proposal and t.local %} Use the grid read from the PDF: students get it as a table, as read from the PDF; compare it with the image first.{% endif %}</p>
 </div>
 {% endmacro %}

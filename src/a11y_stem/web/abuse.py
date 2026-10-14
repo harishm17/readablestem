@@ -47,6 +47,11 @@ RULES: dict[str, Rule] = {
     "retry_user": Rule(10, 600),  # ... per signed-in person
     "cron": Rule(10, 300),  # the scheduler's endpoint, per address
     "sample": Rule(10, 600),  # opening the sample document, per address
+    # Review edits that cost something (T3-5, T3-11): a region cut from the PDF and a read
+    # by the model, per signed-in person. Generous for a person fixing a document, tight
+    # for a script; the job's spend caps are the other bound.
+    "edit_region": Rule(60, 600),
+    "reread": Rule(20, 600),
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound
 

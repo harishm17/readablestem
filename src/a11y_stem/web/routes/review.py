@@ -16,7 +16,9 @@ Layout (see `web.review` for the rules), in three sections:
    `Fix.group_key` are one card with one decision for all of them ("Apply to all 11",
    "Make all 11 bold text", or one level for all); their own cards are folded inside it.
    N counts decisions, so such a group counts once. There is no bulk accept: every
-   decision asked for is meaning-level, so each is opened (`web.review`).
+   decision asked for is meaning-level, so each is opened (`web.review`). The one
+   exception is "Accept all N clean tables" (T3-11, `routes/edits.py`): tables where
+   nothing at all was found wrong, two or more, named in the button.
 2. "Optional checks (M)": fixes accepted automatically with a note (a cosmetic style
    difference, a heading with weak evidence, a long alt text), folded away in a
    <details>, each note in plain English. Nothing there blocks "done"; each can still be
@@ -46,14 +48,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import RedirectResponse, Response
 from markupsafe import Markup
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import events, heading_groups, notation, retention
+from a11y_stem.web import events, heading_groups, notation, notice_places, page_edits, retention
 from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
 from a11y_stem.web.deps import (
     ELEMENT_ID,
@@ -77,8 +79,10 @@ from a11y_stem.web.messages import (
     explain_reason,
     severity_label,
 )
+from a11y_stem.web.page_edits import StructureChange
 from a11y_stem.web.review import (
     ADD_DATA_TABLE,
+    DESCRIBE,
     GROUP_SLUGS,
     NOT_CONVERTED,
     STATUS_FOR_ACTION,
@@ -98,8 +102,11 @@ from a11y_stem.web.review import (
     apply_review,
     bump_result_version,
     can_accept,
+    can_describe,
+    clean_tables,
     group_anchor,
     group_fixes,
+    group_members,
     heading_level_written,
     heading_places,
     is_group_key,
@@ -134,7 +141,10 @@ DONE_MESSAGES = {
     "edit": "Your edit passed the required checks and was saved.",
     "reject": "The original from the PDF is kept in the document.",
     ADD_DATA_TABLE: "The data table was added: students get it under the figure.",
+    DESCRIBE: "Your description is now the alt text of the image: students using a screen "
+    "reader hear it.",
 }
+DESCRIPTION_REMOVED = "The description was taken away."
 # A table edit: the decision stays open while a required check fails (web.review
 # `table_still_open`), and the grid read from the PDF is not checked against itself.
 TABLE_OPEN = (
@@ -236,6 +246,8 @@ def done_message(change: ReviewChange, element: Element | None) -> str:
     """What the notice after one decision says (content-free: it lives in the session)."""
     if change.action == "reject":
         return reject_words(change.fix.kind, element, change.fix).done
+    if change.action == DESCRIBE and not change.fix.described:
+        return DESCRIPTION_REMOVED
     if change.anyway:
         return ANYWAY_DONE
     message = DONE_MESSAGES.get(change.action, "Done.")
@@ -407,6 +419,9 @@ class ReviewItem:
     # what it is now and offers no figure form (its one decision is the page group's).
     kept_image: bool = False
     kept_state: str = ""  # what students get, once decided
+    # "Describe it in words" (T3-16): offered on an item kept as an image; what it replaces.
+    can_describe: bool = False
+    describe_hint: str = ""
 
     @property
     def open(self) -> bool:
@@ -422,6 +437,12 @@ class ReviewItem:
     def notes(self) -> str:
         """The optional notes as one line of plain English (for a folded summary)."""
         return " ".join(c.text for c in self.checks)
+
+
+def times_phrase(n: int) -> str:
+    """ "once", "twice", "3 times": how often a heading repeats. A group can be left with
+    one when the page of its others was left out (T3-16)."""
+    return "once" if n == 1 else "twice" if n == 2 else f"{n} times"
 
 
 @dataclass
@@ -447,6 +468,10 @@ class HeadingGroupView:
     suggest: str = "keep"
     fact: str = ""
     crops: list[heading_groups.Crop] = field(default_factory=list)
+
+    @property
+    def times(self) -> str:
+        return times_phrase(self.size)
 
     @property
     def bold_first(self) -> bool:
@@ -497,6 +522,8 @@ class PageGroupView:
     error: str | None = None
     notices: list[str] = field(default_factory=list)
     members_open: bool = False
+    # Every page or piece of handwriting of the group, to describe in words (T3-16).
+    describe: list[ReviewItem] = field(default_factory=list)
 
     @property
     def waiting(self) -> int:
@@ -640,6 +667,7 @@ def page_group_view(
         pages=pages,
         size=len(members),
         state=state,
+        describe=[items[f.element_id] for f in members if f.element_id in items],
     )
 
 
@@ -667,6 +695,7 @@ class GroupView:
     not_converted: int
     notices: list[str] = field(default_factory=list)
     error: str | None = None
+    clean: int = 0  # tables waiting with nothing wrong found in them (T3-11)
 
     @property
     def total(self) -> int:
@@ -698,6 +727,9 @@ def _item(
         values["decorative"] = "on" if fix.figure.decorative else ""
         if details.get("long_description") is not None:
             values["long_description"] = details["long_description"]
+    describable = can_describe(fix)
+    if describable:
+        values["description"] = fix.described or ""
     if fix.heading is not None:
         # The select offers the level the document shows, not one it would move.
         suggested = place.suggested if place is not None else None
@@ -745,7 +777,20 @@ def _item(
         else "",
         kept_image=is_kept_image(fix),
         kept_state=KEPT_IMAGE_STATE if is_kept_image(fix) and not fix.pending else "",
+        can_describe=describable,
+        describe_hint=DESCRIBE_HINTS.get(fix.kind.value, "") if describable else "",
     )
+
+
+# What a description in words replaces, by the kind of item kept as an image (T3-16).
+DESCRIBE_HINTS = {
+    "equation": "Students using a screen reader hear this instead of the PDF's own text of "
+    "the equation. Say the equation in words, for example “v equals d over t”.",
+    "table": "Students using a screen reader hear this instead of “table not converted”. "
+    "Say what the table holds and what it shows.",
+    "figure": "Students using a screen reader hear this instead of the note that it is not "
+    "converted. Say what is on it.",
+}
 
 
 def _figure_details(fix: Fix, element: Element | None) -> dict[str, Any]:
@@ -845,7 +890,7 @@ def _heading_group(
         level=level,
         level_max=place.highest if place is not None else 6,
         style=_style_words(elements.get(first.element_id)),
-        size=first.group_size or len(unit),
+        size=len(group_members(result, key)) or first.group_size or len(unit),
         members=members,
         pages=[m.page for m in members if m.page],
         keep=keep,
@@ -886,6 +931,7 @@ def _group(
         done=[items[f.element_id] for f in group.done],
         needs_review=sum(f.status is Status.NEEDS_REVIEW for f in group.pending),
         not_converted=sum(f.status in NOT_CONVERTED for f in group.pending),
+        clean=len(clean_tables(result)) if group.kind is Kind.TABLE else 0,
     )
 
 
@@ -1031,7 +1077,25 @@ def _page(
         _apply_invalid(invalid, items, groups, cards)
     optional = [item for g in groups.values() for item in g.optional]
     done = [item for g in groups.values() for item in g.done]
+    first_fix: dict[str, Fix] = {}
+    for fix in result.fixes:
+        first_fix.setdefault(fix.element_id, fix)
+    # T3-7: the notices about links, text and figures, each with where it is on the review
+    # screen, listed with the optional checks.
+    note_rows = notice_places.rows(
+        view.id,
+        [
+            p
+            for p in notice_places.places(result, labels)
+            if notice_places.shown_in_review(p, first_fix)
+        ],
+        f"/jobs/{view.id}/review",
+    )
+    count = page_edits.page_count(result, view.page_count)
     context: dict[str, Any] = {
+        "note_rows": note_rows,
+        # T3-5, T3-16: the page tools are on the review screen; one link to each page's.
+        "tool_pages": [(n, n - 1 in result.omitted_pages) for n in range(1, count + 1)],
         "job": view,
         "groups": list(groups.values()),
         "deciding": [g for g in groups.values() if g.units or g.error or g.notices],
@@ -1153,6 +1217,7 @@ def review_action(
     # Figures with long descriptions on (web.review `_edited_details`).
     long_description: Annotated[str | None, Form()] = None,
     remove_data_table: Annotated[str | None, Form()] = None,
+    description: Annotated[str | None, Form()] = None,
     version: Annotated[str, Form()] = "",
 ) -> Response:
     """One decision on one fix; when it is a heading group's key ("hg-p1-e7"), one
@@ -1196,6 +1261,7 @@ def review_action(
         "header_col": header_col,
         "long_description": long_description,
         "remove_data_table": remove_data_table,
+        "description": description,
     }
     form = {name: value for name, value in sent.items() if value is not None}
     # "Use my edit anyway": an edit the reviewer chose to use although it differs from
@@ -1225,7 +1291,7 @@ def review_action(
         return _stale_page(request, job_id, user, view, element_id, _typed(form))
     except ReviewInvalid as exc:
         # `action` is free text from the form: only known values reach the log.
-        known = action in STATUS_FOR_ACTION or action == ADD_DATA_TABLE
+        known = action in STATUS_FOR_ACTION or action in {ADD_DATA_TABLE, DESCRIBE}
         log_event(logger, "review_invalid", job_id=job_id, action=action if known else "unknown")
         return _invalid_page(request, job_id, user, view, element_id, exc)
     log_event(
@@ -1245,7 +1311,7 @@ def review_action(
     message += _moved_message(change_made.moved, item_numbers(result))
     flash(request, message, element_id=element_id)
     if view != LIST_VIEW:
-        if (table and action == "edit") or action == ADD_DATA_TABLE:
+        if (table and action == "edit") or action in {ADD_DATA_TABLE, DESCRIBE}:
             # A table is often changed more than once (a header, then a cell), and a
             # data table just added is worth a look: the reviewer stays on the item and
             # sees it as it is now.
@@ -1460,14 +1526,26 @@ def _moved_message(moved: list[str], numbers: dict[str, int]) -> str:
     return f" Headings {listed} are now shown at a different level."
 
 
-def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange, version: int) -> ReviewEdit:
+def drop_crops(session: Session, job_id: str, element_ids: list[str]) -> None:
+    """Delete the stored crops of these elements (an undone creation)."""
+    if element_ids:
+        session.execute(
+            delete(Blob).where(
+                Blob.job_id == job_id, Blob.kind == "crop", Blob.element_id.in_(element_ids)
+            )
+        )
+
+
+def _review_edit(
+    job_id: str, user: CurrentUser, change: ReviewChange | StructureChange, version: int
+) -> ReviewEdit:
     """One fix's change. Its `after` snapshot also records the review version the write
     made (`web.review.WRITE_KEY`): the edits of the last write are the ones Undo puts
     back."""
     return ReviewEdit(
         job_id=job_id,
         user_id=user.id,
-        element_id=change.fix.element_id,
+        element_id=change.element_id,
         action=change.action,
         before=change.before,
         after=change.after | {WRITE_KEY: version},
@@ -1477,7 +1555,7 @@ def _review_edit(job_id: str, user: CurrentUser, change: ReviewChange, version: 
 # Fields typed into a form, kept when it is refused as stale (a table's cell reopens with
 # them: `split._apply_invalid`).
 TYPED_FIELDS = frozenset(
-    {"latex", "alt", "decorative", "level", "row", "col", "cell", "long_description"}
+    {"latex", "alt", "decorative", "level", "row", "col", "cell", "long_description", "description"}
 )
 
 
@@ -1544,6 +1622,9 @@ def undo(
                 raise LookupError("nothing to undo")
             result = DocumentResult.model_validate(job.result_json or {})
             changes = undo_last(result, [(e.element_id, e.before or {}) for e in edits])
+            for change in changes:
+                if isinstance(change, StructureChange) and change.removed:
+                    drop_crops(session, job.id, change.removed)
             job.html_stale = True  # made again when somebody asks for it (`jobs.current_html`)
             job.result_json = result.model_dump(mode="json", exclude={"html"})
             written = bump_result_version(job)
@@ -1557,7 +1638,20 @@ def undo(
         flash(request, "There is nothing to undo here.")
         return _back(job_id, view)
     log_event(logger, "review_undo", job_id=job_id, changed=len(changes))
-    fixes = [c.fix for c in changes]
+    from a11y_stem.web.routes.split import review_url
+
+    structural = [c for c in changes if isinstance(c, StructureChange)]
+    if structural:
+        # An edit to the text, a page or something added: back on the page it was on.
+        flash(request, "Undone. The document is as it was before.", element_id=None)
+        page = structural[0].page
+        where = review_url(
+            job_id, page=page + 1 if page is not None else None, anchor="page-tools", tools=True
+        )
+        if view == LIST_VIEW:
+            where = list_url(job_id, "review-progress")
+        return RedirectResponse(where, status_code=303)
+    fixes = [c.fix for c in changes if isinstance(c, ReviewChange)]
     many = len(fixes) > 1
     words = {"it": "They are" if many else "It is", "was": "they were" if many else "it was"}
     message = (UNDO_PENDING if any(f.pending for f in fixes) else UNDO_BACK).format(**words)
@@ -1573,8 +1667,6 @@ def undo(
     flash(request, message, element_id=flashed)
     if view == LIST_VIEW:
         return RedirectResponse(list_url(job_id, _stale_anchor(result, target)), status_code=303)
-    from a11y_stem.web.routes.split import review_url
-
     item = target if target and kind_for_slug(target) is None else None
     return RedirectResponse(review_url(job_id, item=item), status_code=303)
 

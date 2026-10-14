@@ -847,7 +847,7 @@ class _Renderer:
             css = "equation equation-labelled" if label else "equation"
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
-        original = self.original(element, equation_alt(element)) + label
+        original = self.original(element, self.image_alt(element, equation_alt(element))) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
     def inline_equation(self, element: Element) -> str:
@@ -863,7 +863,7 @@ class _Renderer:
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
-            alt = _escape(equation_alt(element))
+            alt = _escape(self.image_alt(element, equation_alt(element)))
             image = f'<img src="{src}" alt="{alt}"{_size_attrs(element)}>'
             label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
         else:
@@ -898,7 +898,8 @@ class _Renderer:
         if fix is not None and fix.status in NOT_CONVERTED and fix.reason in KEPT_IMAGE_WORDS:
             # A page (or handwriting) kept as an image: what it is, never "a figure".
             alt, note = KEPT_IMAGE_WORDS[fix.reason]
-            figure = f"<figure>{picture(alt.format(page=element.page + 1))}</figure>"
+            alt = self.image_alt(element, alt.format(page=element.page + 1))
+            figure = f"<figure>{picture(alt)}</figure>"
             return self.flag_block(element, fix.reason, figure, KEPT_IMAGE_LABEL, note)
         if fix is None:
             reason = "no_fix"
@@ -932,6 +933,14 @@ class _Renderer:
             return html + details
         figure = f"<figure>{picture(FIGURE_NOT_DESCRIBED_ALT)}{caption}</figure>"
         return self.flag_block(element, reason, figure, "Needs a description.", FIGURE_NOTE)
+
+    def image_alt(self, element: Element, default: str) -> str:
+        """The alt text of an item shown as an image: the instructor's own description in
+        words when there is one (T3-16), else the tool's `default` (the PDF's text, marked
+        as not checked, or fixed words). Escaped by the caller, like every alt text."""
+        fix = self.fixes.get(element.id)
+        described = (fix.described or "").strip() if fix is not None else ""
+        return described or default
 
     def original(self, element: Element, alt: str) -> str:
         """The crop as an <img>, or the extracted text when there is no image."""
@@ -1016,6 +1025,19 @@ def kept_pages_note(kept_pages: list[int]) -> str:
     return f"Pages {listed} are shown only as pictures of the pages and were not converted."
 
 
+def omitted_pages_note(omitted_pages: list[int]) -> str:
+    """ "Page 1 of the original PDF was left out of this file." (1-based), or "" when no
+    page was left out. The instructor chose it (a blank page, a cover: T3-16), so the
+    note says the page is not here and does not say why. TODO(Harish): confirm this line."""
+    numbers = [str(p + 1) for p in sorted(set(omitted_pages))]
+    if not numbers:
+        return ""
+    if len(numbers) == 1:
+        return f"Page {numbers[0]} of the original PDF was left out of this file."
+    listed = ", ".join(numbers[:-1]) + " and " + numbers[-1]
+    return f"Pages {listed} of the original PDF were left out of this file."
+
+
 def _about_section(
     fixes: list[Fix],
     flagged: int,
@@ -1023,6 +1045,7 @@ def _about_section(
     checked_on: date | None = None,
     kept_pages: list[int] | None = None,
     contact: str | None = None,
+    omitted_pages: list[int] | None = None,
 ) -> str:
     """The note for students at the end of the file (MF7 of the UX review): what this
     is, whether the instructor has checked it, which pages are only pictures, who to tell
@@ -1034,6 +1057,8 @@ def _about_section(
     flagged_note = f"<p>{FLAGGED_NOTE}</p>\n" if flagged else ""
     if pages_line := kept_pages_note(kept_pages or []):
         flagged_note += f"<p>{pages_line}</p>\n"
+    if left_out := omitted_pages_note(omitted_pages or []):
+        flagged_note += f"<p>{left_out}</p>\n"
     source = f"<p>{_escape(source_note)}</p>\n" if source_note and source_note.strip() else ""
     return (
         f'<footer id="{ABOUT_ID}" class="about {AUTHORED_CLASS}" '
@@ -1171,6 +1196,20 @@ def _authored_in_english(part: str, lang: str) -> str:
     return part
 
 
+def _without_dead_links(ordered: list[Element]) -> list[Element]:
+    """The elements with every internal link and cross-reference whose target is not in
+    the document taken off (the target is on a page the instructor left out, T3-16): a
+    link to nowhere helps nobody. An element with none is returned as it is."""
+    known = {e.id for e in ordered}
+    out = []
+    for element in ordered:
+        if any(link.target_id and link.target_id not in known for link in element.links):
+            links = [k for k in element.links if not k.target_id or k.target_id in known]
+            element = element.model_copy(update={"links": links})
+        out.append(element)
+    return out
+
+
 def render_html(
     *,
     title: str | None,
@@ -1184,6 +1223,7 @@ def render_html(
     title_set: bool = False,
     contact: str | None = None,
     math_alttext: bool | None = None,
+    omitted_pages: list[int] | None = None,
 ) -> str:
     """One self-contained HTML5 document for the elements, in reading order.
 
@@ -1202,8 +1242,10 @@ def render_html(
     `suggested_title` of the PDF's. `contact`: the instructor's contact line for the note
     after `<main>` (T1-17). `math_alttext`: write each equation's stored speech as the
     `alttext` of its <math> (None: `Settings.mathml_alttext`, off by default).
+    `omitted_pages`: 0-based pages the instructor left out (T3-16); the elements are not
+    here, and the student note says so.
     """
-    ordered = sorted(elements, key=lambda e: e.order)
+    ordered = _without_dead_links(sorted(elements, key=lambda e: e.order))
     equations = {e.id: e for e in ordered if e.kind is Kind.EQUATION}
     first_fix: dict[str, Fix] = {}
     for fix in fixes:  # first wins, like DocumentResult.fix_for
@@ -1229,6 +1271,7 @@ def render_html(
         checked_on,
         kept_pages,
         contact,
+        omitted_pages,
     )
     heading_texts = [
         text

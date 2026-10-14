@@ -46,6 +46,9 @@ The review screen uses the same child, with the same memory cap, for two more th
   exits with status 2.
 - `python -m a11y_stem.web.pdf_probe sizes` prints {"ok": true, "sizes": [[W, H], ...]}:
   every page's size in points (for results stored before they recorded it).
+- `python -m a11y_stem.web.pdf_probe text PAGE X0,Y0,X1,Y1` prints {"ok": true, "text": "..."}:
+  the words whose middle is inside the region, line by line (for a region the reviewer
+  marked as an equation: its text layer is evidence for the checks, T3-5).
 
 Nothing is written to disk and nothing is kept: the PDF arrives on stdin and the child
 exits after one answer.
@@ -399,6 +402,35 @@ def extract(data: bytes, pages: list[int], *, shrink: bool = False) -> bytes:
         doc.close()
 
 
+REGION_TEXT_MAX_CHARS = 2000
+
+
+def region_text(data: bytes, *, page: int, clip: tuple[float, float, float, float]) -> str:
+    """The words of page `page` (0-based) whose middle lies inside `clip`, in reading order,
+    one space between words and between lines; at most `REGION_TEXT_MAX_CHARS` characters.
+    Raises ProbeRejected."""
+    import pymupdf
+
+    doc = _open(data)
+    try:
+        if not 0 <= page < doc.page_count:
+            raise ProbeRejected("no_such_page")
+        current = doc[page]
+        if max(current.rect.width, current.rect.height) > MAX_PAGE_SIDE_PT:
+            raise ProbeRejected("page_too_large")
+        area = pymupdf.Rect(clip) & current.rect
+        found = []
+        for x0, y0, x1, y1, word, block, line, number in current.get_text(
+            "words", flags=pymupdf.TEXT_MEDIABOX_CLIP
+        ):
+            if area.x0 <= (x0 + x1) / 2 <= area.x1 and area.y0 <= (y0 + y1) / 2 <= area.y1:
+                found.append((block, line, number, word))
+        found.sort(key=lambda w: w[:3])
+        return " ".join(w[3] for w in found)[:REGION_TEXT_MAX_CHARS]
+    finally:
+        doc.close()
+
+
 def _rect(value: str) -> tuple[float, float, float, float]:
     x0, y0, x1, y1 = (float(v) for v in value.split(","))
     return x0, y0, x1, y1
@@ -434,11 +466,15 @@ def main(argv: list[str] | None = None) -> int:
             return RENDER_FAILED
         sys.stdout.buffer.write(part)
         return 0
-    if args and args[0] in {"render", "sizes"}:
+    if args and args[0] in {"render", "sizes", "text"}:
         data = sys.stdin.buffer.read()
         try:
             if args[0] == "render":
                 return _render_main(args[1:], data)
+            if args[0] == "text":
+                said = region_text(data, page=int(args[1]), clip=_rect(args[2]))
+                sys.stdout.write(json.dumps({"ok": True, "text": said}) + "\n")
+                return 0
             sizes = page_sizes(data)
         except Exception:  # ProbeRejected, bad arguments, anything MuPDF raises
             return RENDER_FAILED

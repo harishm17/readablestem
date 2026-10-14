@@ -189,3 +189,17 @@ def page_sizes(pdf: bytes) -> dict[int, tuple[float, float]]:
         return {i: (float(w), float(h)) for i, (w, h) in enumerate(sizes)}
     except (ValueError, KeyError, IndexError, TypeError):
         raise RenderFailed() from None
+
+
+def region_text(pdf: bytes, page: int, clip: BBox) -> str:
+    """The words inside `clip` on page `page` (0-based): the text layer of a region the
+    reviewer marked. Raises RenderFailed."""
+    out = _child(["text", str(page), _numbers(clip)], pdf, SIZES_TIMEOUT_S)
+    try:
+        answer = json.loads(out.decode("utf-8").strip().splitlines()[-1])
+        text = answer["text"]
+    except (ValueError, KeyError, IndexError, TypeError):
+        raise RenderFailed() from None
+    if not isinstance(text, str):
+        raise RenderFailed()
+    return text

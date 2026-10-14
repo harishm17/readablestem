@@ -1,0 +1,27 @@
+{# "Describe it in words" (T3-16), on the review screen and in the list view. Import it
+   with context: it uses `job`, `csrf_field`, `csrf_token` and `result_version`. For an
+   item kept as an image (an equation, a table, a page): the text becomes the image's alt
+   text, after the same checks as any alt text. One form of its own, so it never sends the
+   fields of another form; it is a plain POST, so it works without JavaScript. #}
+{% macro describe_box(item, view) %}
+{% if item.can_describe %}
+{% set eid = item.element_id %}
+{% set name = item.label|lower %}
+{% set err = item.errors.get("description") %}
+{% set text = item.values.get("description", "") %}
+<details class="edit-box describe-box"{% if err or text %} open{% endif %} id="describe-{{ eid }}">
+  <summary>{% if text %}Change the description in words{% else %}Describe it in words{% endif %}<span class="visually-hidden"> ({{ name }})</span></summary>
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="decide-form">
+    <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}"><input type="hidden" name="view" value="{{ view }}"><input type="hidden" name="version" value="{{ result_version }}">
+    <div class="field{% if err %} field-error{% endif %}">
+      <label for="description-{{ eid }}">Description of {{ name }}</label>
+      <p class="hint" id="description-hint-{{ eid }}">{{ item.describe_hint }} One or two short sentences; aim for {{ alt_guideline }} characters or fewer{% if text %} (this has {{ text|length }}){% endif %}.{% if text %} Empty the box and save to take the description away.{% endif %}</p>
+      {% if err %}<p class="error-message" id="description-error-{{ eid }}"><span class="visually-hidden">Error: </span>{{ err }}</p>{% endif %}
+      <textarea id="description-{{ eid }}" name="description" rows="3" maxlength="1000" class="prose-input" data-edit-field
+                aria-describedby="description-hint-{{ eid }}{% if err %} description-error-{{ eid }}{% endif %}"{% if err %} aria-invalid="true"{% endif %}>{{ text }}</textarea>
+    </div>
+    <button type="submit" name="action" value="describe" class="button-secondary" data-role="describe">Save the description<span class="visually-hidden"> of {{ name }}</span></button>
+  </form>
+</details>
+{% endif %}
+{% endmacro %}

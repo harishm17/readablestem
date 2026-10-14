@@ -81,6 +81,29 @@ download restarts the deletion clock of the person's own document (`retention.re
 which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
 other change.
 
+The review edits (T3-5, T3-11, T3-16) are owner-only and CSRF-checked like the decisions, and
+each carries the review version its page was drawn at (a form from an out-of-date tab is
+refused, nothing applied): `POST /jobs/{id}/edit/{element}` (the words of a paragraph or a
+heading; a paragraph made a heading), `POST /jobs/{id}/pages/{n}/add` (a picture or an equation
+the tool missed), `GET /jobs/{id}/pages/{n}/region.png` (the region about to be added),
+`POST /jobs/{id}/pages/{n}/omit` and `/restore` (a page left out), `POST
+/jobs/{id}/tables/accept-clean` and `POST /jobs/{id}/tables/{element}/read-cell`. Like a
+decision, a text edit, an omission or accepting the clean tables is not rate limited (it
+changes the person's own document, the body limit applies, the document is capped). Two of them
+cost something and are limited: adding a region cuts a crop in the render child (60 in 10
+minutes per person, `abuse.RULES["edit_region"]`, plus the render slots every page image
+needs), and a model read (an equation marked on a page, a table cell read) is 20 in 10 minutes
+per person (`"reread"`), one at a time per person (`reread.ReadGate`), and reserves its
+worst-case cost against the day's cap and the job's own caps before anything is sent
+(`reread.ReadBudget`, the same conditional UPDATEs as the worker's); a refused reservation is a
+sentence on the page, not an error. Added pictures and equations are at most 30 a document.
+Text the person types reaches the student file exactly as other review edits do: cleaned
+(`validate.clean_alt` or the same without collapsing lines for code; NUL, controls and
+invisible format characters out), checked (`check_alt` for alt text and descriptions), kept in
+the stored result as data and written through `html.escape` by the assembler;
+`tests/test_web_edit_page.py` and `tests/test_web_edit_describe.py` put markup, quotes,
+control characters and the tool's own equation marks through every one of these fields.
+
 Every route that takes a job, course or entry id loads it through one owner check
 (`owned_job`, `notation.owned_course`). A stranger gets the **same** 404 as for an id that does
 not exist, so ids cannot be probed. Admins have no access to other people's documents.
@@ -128,6 +151,8 @@ script injected into an app page is refused by the policy.
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
 | Tries again of one document | 3 | `web/retry.py`; "Try again" never touches the page quota, the job's spend caps cover all tries |
 | "Try again" requests, per address / per person | 20 / 10 per 10 minutes | `web/abuse.py` |
+| Regions added to a document (T3-5), per person | 60 per 10 minutes; at most 30 added per document | `web/abuse.py` (`edit_region`), `web/page_edits.py` |
+| Model reads from the review (an equation marked on a page, a table cell), per person | 20 per 10 minutes, one at a time, under the job's and the day's spend caps | `web/abuse.py` (`reread`), `web/reread.py` |
 | Sign-in starts, per address | 10 per 5 minutes | `web/abuse.py` |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
@@ -203,6 +228,12 @@ a wrong alt text or equation, which the instructor reviews.
 | Google Cloud (Cloud Run, Cloud SQL) | The PDF, results and HTML while retained; sessions; logs without content | Until the retention time; backups roughly one more day |
 | The model provider (`MODEL_PROVIDER`) | Images cut from the page (equations, figures, and tables when enabled) with a short fenced piece of nearby text; a course's notation when that feature is on. No file name, no email, never the whole PDF | OpenAI: requests are sent with `store=False`. Anthropic: per its published policy, deleted from its systems within 30 days (longer for material its safety systems flag); zero retention only by agreement |
 | Langfuse (only if tracing is on) | Timings, model names, token counts, costs, error categories, random ids; payloads are masked | Set in the Langfuse project |
+
+Two review actions send the model provider the same kind of material after the conversion has
+finished (T3-5, T3-11): marking a region of a page as an equation sends its image with the
+short fenced piece of nearby text, and "Read this cell with the model" sends the cell's image.
+Nothing else leaves the server, they are the same "what is sent" as the table above, and they
+are under the same spend caps (docs/web.md, "What the model costs here").
 
 TODO(Harish): the wording on the privacy page for the model provider is a draft. What is
 known as of the audit is above; it must be re-read against the provider's policy page on the

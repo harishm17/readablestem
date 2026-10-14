@@ -71,6 +71,7 @@ from typing import TYPE_CHECKING, Any
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import (
+    KEPT_ORIGINAL_STATUSES,
     PENDING_STATUSES,
     Check,
     DocumentResult,
@@ -91,6 +92,7 @@ from a11y_stem.web.messages import explain_check
 
 if TYPE_CHECKING:
     from a11y_stem.web.db import Job
+    from a11y_stem.web.page_edits import StructureChange
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +102,9 @@ STATUS_FOR_ACTION = {"accept": Status.ACCEPTED, "edit": Status.EDITED, "reject":
 # (`figure_details.data_table_offered`): the reviewer adds it with this action, which
 # changes nothing else about the figure (`add_data_table`).
 ADD_DATA_TABLE = "add_data_table"
+# "Describe it in words" on an item kept as an image (T3-16): the text becomes the image's
+# alt text after the same checks as any alt text (`describe_in_words`).
+DESCRIBE = "describe"
 MAX_LATEX_CHARS = 5000
 MAX_ALT_CHARS = 1000
 
@@ -180,6 +185,10 @@ class ReviewChange:
     note: str = ""
     # An edit used although it differs from the PDF where it changes the meaning.
     anyway: bool = False
+
+    @property
+    def element_id(self) -> str:
+        return self.fix.element_id
 
 
 @dataclass
@@ -396,18 +405,23 @@ def can_accept(fix: Fix) -> bool:
 SNAPSHOT_FIELDS = frozenset(
     {"status", "equation", "figure", "heading", "table", "checks", "reviewed"}
 )
+# Fields added to snapshots later: a snapshot without one is still restorable, and puts
+# back that field's default (`described` was not there before T3-16: None).
+LATER_SNAPSHOT_FIELDS = frozenset({"described"})
 # Beside the fields, a ReviewEdit's `after` holds the review version its write made (a
 # number), so the edits of one write can be found again (`undo_last`), and `True` under
 # ANYWAY_KEY for an edit used although it differs from the PDF (`apply_review`).
 WRITE_KEY = "write"
 ANYWAY_KEY = "anyway"
+# A `before` that holds a structural snapshot instead of a fix's (`web.page_edits.capture`).
+STRUCTURE_KEY = "structure"
 
 
 def snapshot(fix: Fix) -> dict[str, Any]:
     """What a ReviewEdit stores as before/after (deleted with the job): everything a
     decision can change, so `undo_last` can put it back. Snapshots stored before the
     checks and `reviewed` were in them cannot be undone."""
-    return fix.model_dump(mode="json", include=set(SNAPSHOT_FIELDS))
+    return fix.model_dump(mode="json", include=set(SNAPSHOT_FIELDS | LATER_SNAPSHOT_FIELDS))
 
 
 def field_id(prefix: str, element_id: str) -> str:
@@ -437,6 +451,8 @@ def apply_review(
     fix = result.fix_for(element_id)
     if fix is None:
         raise LookupError(element_id)
+    if action == DESCRIBE:
+        return describe_in_words(result, fix, form)
     if is_kept_image(fix) and action != "reject":
         # A page (or handwriting) kept as an image has one decision, keep it: alt text or
         # "decorative" would take its "Not converted" mark, or the page, from students.
@@ -479,6 +495,8 @@ def apply_review(
         warnings = _edit(result, fix, element, form, anyway=anyway)
         overridden = anyway and any(c.code in MEANING_CODES for c in warnings)
     fix.status = status
+    if status in {Status.ACCEPTED, Status.EDITED}:
+        fix.described = None  # converted now: a description of the image is not used
     # A reviewer's Accept is not the pipeline's automatic one; an open table is undecided.
     fix.reviewed = status not in PENDING
     _recount(result)
@@ -698,6 +716,63 @@ def add_data_table(result: DocumentResult, fix: Fix) -> ReviewChange:
         fix.reviewed = True
     _recount(result)
     return ReviewChange(fix=fix, action=ADD_DATA_TABLE, before=before, after=snapshot(fix))
+
+
+# --------------------------------------------------------------------------- describe
+
+DESCRIBE_FIRST = (
+    "Keep it as an image first: a description in words is for an item shown as an image."
+)
+DESCRIBE_EMPTY = "Write a description of it in words, or leave it as it is."
+
+
+def can_describe(fix: Fix) -> bool:
+    """An item shown as an image that a description in words can stand for (T3-16): an
+    equation or a table whose original is kept (the reviewer's choice, or nothing usable
+    was made), or a page or handwriting kept as an image. A figure has alt text of its
+    own."""
+    if fix.kind in {Kind.EQUATION, Kind.TABLE}:
+        return fix.status in KEPT_ORIGINAL_STATUSES
+    return is_kept_image(fix)
+
+
+def describe_in_words(result: DocumentResult, fix: Fix, form: Mapping[str, str]) -> ReviewChange:
+    """ "Describe it in words": the text becomes the alt text of the image the item is kept
+    as. It is cleaned and checked exactly like a figure's alt text (invisible format
+    characters out, whitespace collapsed, `validate.check_alt`: length, no "image of", no
+    file name, no address or markup, not a placeholder), and written escaped like every
+    alt text. Describing an item that waits for a decision keeps it as an image (it is
+    the decision); an empty box takes a description away again. Raises ReviewInvalid."""
+    from a11y_stem.pipeline import validate
+
+    fid = field_id("description", fix.element_id)
+    text = validate.clean_alt(form.get("description", ""))
+    values = {"description": text}
+    if not can_describe(fix):
+        raise ReviewInvalid([FieldError(fid, DESCRIBE_FIRST)], values)
+    current = fix.described or ""
+    if text == current:
+        message = DESCRIBE_EMPTY if not text else "Nothing changed: this is the description it has."
+        raise ReviewInvalid([FieldError(fid, message)], values)
+    if len(text) > MAX_ALT_CHARS:
+        message = f"Keep the description under {MAX_ALT_CHARS} characters."
+        raise ReviewInvalid([FieldError(fid, message)], values)
+    warnings: list[Check] = []
+    if text:
+        checks = validate.check_alt(text, decorative=False)
+        if failed := _blocking(checks):
+            message = "Your description was not saved. " + plain_failed(failed)
+            raise ReviewInvalid([FieldError(fid, message)], values)
+        warnings = [c for c in checks if not c.passed]
+    before = snapshot(fix)
+    fix.described = text or None
+    if text and fix.status is not Status.REJECTED:
+        fix.status = Status.REJECTED  # described = kept as an image, by the reviewer
+        fix.reviewed = True
+    _recount(result)
+    return ReviewChange(
+        fix=fix, action=DESCRIBE, before=before, after=snapshot(fix), warnings=warnings
+    )
 
 
 # Long descriptions and chart data tables (FEATURE_LONG_DESCRIPTIONS, pipeline.figure_details).
@@ -1075,7 +1150,12 @@ def _already(fix: Fix, action: str, level: int | None) -> bool:
 # --------------------------------------------------------------------------- tables
 
 # The changes a table edit can make (the form's `change` field).
-TABLE_CHANGES = ("cell", "headers", "use_local")
+TABLE_CHANGES = ("cell", "headers", "use_local", "not_a_table")
+NOT_A_TABLE_NOTE = "It is now written as text, one cell after another, not as a table."
+NO_TEXT_GRID = (
+    "There is no text to write for this grid (it has none, or holds maths the PDF gives flat). "
+    "Keep the image instead."
+)
 USE_LOCAL_NOTE = "The table now uses the grid read from the PDF."
 MAX_CELL_CHARS = 1000
 NO_TABLE_TO_ACCEPT = (
@@ -1214,6 +1294,13 @@ def edit_table(
         fix.checks = table_checks(fix.table.grid, element)
         failed = [c for c in fix.checks if not c.passed]
         return failed, USE_LOCAL_NOTE
+    if change == "not_a_table":
+        grid = grid_as_text(fix, element)
+        if grid is None:
+            raise ReviewInvalid([FieldError(field_id("actions", eid), NO_TEXT_GRID)])
+        fix.table = TableFix(grid=grid)
+        fix.checks = []  # the reviewer's own answer: nothing left to check against
+        return [], NOT_A_TABLE_NOTE
     if fix.table is None:
         message = (
             "There is no rebuilt table to change. Use the grid read from the PDF, if there "
@@ -1231,6 +1318,59 @@ def edit_table(
     if change == "cell":
         return _edit_cell(fix, fix.table.grid, element, form, anyway=anyway)
     raise ReviewInvalid([FieldError(field_id("actions", eid), "Choose what to change.")])
+
+
+def grid_as_text(fix: Fix, element: Element | None) -> TableGrid | None:
+    """The grid to write as text when the reviewer says "this grid is not a table": what the
+    table step writes for a grid it judged not to be data (`table_step.text_grid`: the grid
+    read from the PDF's own words, `is_data` False), else the proposal's grid written the
+    same way. None when it has no text, holds maths the PDF gives flat (written out, that
+    would read as something else), or is already written as text."""
+    from a11y_stem.pipeline import table_step
+
+    if (
+        fix.table is not None
+        and not fix.table.grid.is_data
+        and fix.status not in KEPT_ORIGINAL_STATUSES
+    ):
+        return None
+    if element is not None:
+        local = table_step.text_grid(element)
+        if local is not None:
+            return local
+    if fix.table is None:
+        return None
+    grid = fix.table.grid.model_copy(update={"is_data": False})
+    from a11y_stem.pipeline.assemble_tables import flattened_cells
+
+    if flattened_cells(grid) or not any(c.text.strip() for c in grid.cells):
+        return None
+    return grid
+
+
+def cell_region(
+    fix: Fix, element: Element, row: str, col: str
+) -> tuple[TableGrid, TableCell, tuple[float, float, float, float]] | str:
+    """The (grid, cell, box on the page) to read, or a sentence saying why not. The cell
+    must be a maths cell of the proposal with a place on the page: its own box, else the
+    box of the cell of the grid read from the PDF that stands in its place."""
+    if fix.table is None or not fix.table.grid.is_data:
+        return "This table has no cells to read."
+    if not (row.isascii() and row.isdigit() and col.isascii() and col.isdigit()):
+        return "That cell is not in the table any more. Choose it again from the list."
+    grid = fix.table.grid
+    cell = find_cell(grid, int(row), int(col))
+    if cell is None:
+        return "That cell is not in the table any more. Choose it again from the list."
+    if not is_maths_cell(grid, cell):
+        return "Only a cell that holds maths is read as an equation."
+    box = cell.bbox
+    if box is None and element.table is not None:
+        counterpart = find_cell(element.table, cell.row, cell.col)
+        box = counterpart.bbox if counterpart is not None else None
+    if box is None:
+        return "This cell has no place on the page to read from. Type the LaTeX yourself."
+    return grid, cell, box
 
 
 def table_still_open(failed: list[Check]) -> bool:
@@ -1363,6 +1503,49 @@ def _edit_cell(
     return [c for c in fix.checks if not c.passed], f"{cell_label(cell)} changed."
 
 
+# --------------------------------------------------------------------------- clean tables
+
+NO_CLEAN_TABLES = "No table is waiting with nothing wrong found in it."
+
+
+def is_clean_table(fix: Fix, element: Element | None = None) -> bool:
+    """A table that waits for a decision although nothing was found wrong with it (the model
+    was not sure enough of it to accept it): a data table with a proposal, no failed check
+    of any kind, no structural problem and no maths the PDF gives flat. Accepting it is the
+    answer. A table with a finding, a table kept as an image and a table written as text
+    are each their own decision."""
+    from a11y_stem.pipeline.assemble_tables import flattened_cells
+
+    if fix.kind is not Kind.TABLE or fix.status is not Status.NEEDS_REVIEW:
+        return False
+    table = fix.table
+    return (
+        table is not None
+        and table.grid.is_data
+        and can_accept(fix)
+        and not fix.failed_checks
+        and not grid_problems(table.grid)
+        and not flattened_cells(table.grid)
+    )
+
+
+def clean_tables(result: DocumentResult) -> list[Fix]:
+    """The clean tables still waiting, in page and reading order."""
+    position = _positions(result)
+    elements = {e.id: e for e in result.elements}
+    found = [f for f in result.fixes if is_clean_table(f, elements.get(f.element_id))]
+    return sorted(found, key=lambda f: position.get(f.element_id, (1 << 30, 1 << 30, 1 << 30)))
+
+
+def accept_clean_tables(result: DocumentResult) -> list[ReviewChange]:
+    """Accept every clean table at once (T3-11): one ordinary "Accept" per table, so each is
+    recorded and can be undone together. Raises ReviewInvalid when there is none."""
+    waiting = clean_tables(result)
+    if not waiting:
+        raise ReviewInvalid([FieldError(field_id("tables", "accept"), NO_CLEAN_TABLES)])
+    return [apply_review(result, fix.element_id, "accept", {}) for fix in waiting]
+
+
 # --------------------------------------------------------------------------- undo
 
 UNDO_ACTION = "undo"  # ReviewEdit.action of an undo (a write of its own)
@@ -1370,26 +1553,43 @@ UNDO_ACTION = "undo"  # ReviewEdit.action of an undo (a write of its own)
 
 def restorable(before: object) -> bool:
     """A `before` snapshot `undo_last` can put back: it has every field a decision can
-    change (snapshots stored before the checks were in them do not)."""
-    return isinstance(before, Mapping) and before.keys() >= SNAPSHOT_FIELDS
+    change (snapshots stored before the checks were in them do not), or it is a structural
+    snapshot (`web.page_edits`)."""
+    return isinstance(before, Mapping) and (
+        before.keys() >= SNAPSHOT_FIELDS or isinstance(before.get(STRUCTURE_KEY), Mapping)
+    )
 
 
 def undo_last(
     result: DocumentResult, edits: list[tuple[str, Mapping[str, Any]]]
-) -> list[ReviewChange]:
+) -> list[ReviewChange | StructureChange]:
     """Put back, in place, what one write changed: `edits` are its ReviewEdits as
     (element id, before snapshot). One ReviewChange per fix (action "undo"). Raises
     LookupError when a fix is gone or a snapshot cannot be put back; nothing is changed
     then (the route's transaction is rolled back)."""
-    changes: list[ReviewChange] = []
+    changes: list[ReviewChange | StructureChange] = []
     for element_id, before in edits:
+        if not restorable(before):
+            raise LookupError(element_id)
+        if isinstance(before.get(STRUCTURE_KEY), Mapping):
+            from a11y_stem.web import page_edits
+
+            try:
+                changes.append(page_edits.undo(result, element_id, dict(before[STRUCTURE_KEY])))
+            except (ValueError, KeyError, TypeError):
+                raise LookupError(element_id) from None
+            continue
         fix = result.fix_for(element_id)
-        if fix is None or not restorable(before):
+        if fix is None:
             raise LookupError(element_id)
         current = snapshot(fix)
-        merged = fix.model_dump(mode="json") | {name: before[name] for name in SNAPSHOT_FIELDS}
+        merged = (
+            fix.model_dump(mode="json")
+            | {name: before[name] for name in SNAPSHOT_FIELDS}
+            | {name: before.get(name) for name in LATER_SNAPSHOT_FIELDS}
+        )
         restored = Fix.model_validate(merged)
-        for name in SNAPSHOT_FIELDS:
+        for name in SNAPSHOT_FIELDS | LATER_SNAPSHOT_FIELDS:
             setattr(fix, name, getattr(restored, name))
         changes.append(
             ReviewChange(fix=fix, action=UNDO_ACTION, before=current, after=snapshot(fix))
@@ -1440,6 +1640,7 @@ def rerender_html(
         source_note=None,
         checked_on=checked_on or datetime.now(UTC).date(),
         math_alttext=math_alttext,
+        **({"omitted_pages": result.omitted_pages} if result.omitted else {}),
     )
     result.html_checks = html_checks.static_checks(html)
     return html

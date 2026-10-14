@@ -7,6 +7,7 @@
 {% block main_class %}wrap wrap-review{% endblock %}
 {% block head %}<link rel="stylesheet" href="/jobs/{{ job.id }}/review/marks.css">{% endblock %}
 {% from "_table_card.html" import table_split_body with context %}
+{% from "_describe.html" import describe_box with context %}
 {# The second Tab stop: straight to the decision's heading, past the site menu, the steps
    and the links (UX review BW11). #}
 {% block skip_links %}<a class="skip-link" href="#decision-title">Skip to the decision</a>{% endblock %}
@@ -158,6 +159,7 @@
   </details>
   {{ decide_row(item, anyway) }}
 </form>
+{{ describe_box(item, "split") }}
 {% endmacro %}
 
 {% macro figure_body(p) %}
@@ -292,7 +294,7 @@
 {% set hg = p.group %}
 {% set key = hg.key %}
 {% set n = hg.waiting %}
-<p class="group-question">“{{ hg.text }}” appears {{ "twice" if hg.size == 2 else hg.size ~ " times" }} {{ hg.style }}{% if n and n != hg.size %} ({{ n }} still waiting){% endif %}.</p>
+<p class="group-question">“{{ hg.text }}” appears {{ hg.times }} {{ hg.style }}{% if n and n != hg.size %} ({{ n }} still waiting){% endif %}.</p>
 {% if n and hg.fact %}<p class="group-fact" id="group-fact-{{ key }}"><strong>Suggested: {{ "make them bold text" if hg.suggest == "bold" else "keep them as headings" }}.</strong> {{ hg.fact }}</p>{% endif %}
 {% if hg.crops %}{{ group_crops(hg) }}{% else %}{{ region(p) }}{% endif %}
 {% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
@@ -375,12 +377,32 @@
 </form>
 {% else %}<p class="group-state">{{ pg.state }}</p>{% endif %}
 <p class="hint" id="hint-{{ key }}">{{ pg.hint }}</p>
+{# T3-16: the text becomes the image's alt text, one box for each page or piece. #}
+{% for member in pg.describe %}{{ describe_box(member, "split") }}{% endfor %}
 {% if pg.hidden %}
 <details class="tech">
   <summary>Hidden text in the PDF</summary>
   <p>{{ pg.hidden }}</p>
 </details>
 {% endif %}
+{% endmacro %}
+
+{# A notice about text (T3-7): which link or line, the words around it, and the way to
+   change them. Document content, shown to the owner only. #}
+{% macro notice_body(p) %}
+{% set n = p.notice %}
+<p class="notice-names-line">{{ n.lead }}{% if n.names %}:{% for name in n.names %} “{{ name }}”{% if not loop.last %},{% endif %}{% endfor %}.{% else %} is on page {{ n.page }}.{% endif %}</p>
+{% if n.excerpt %}
+<figure class="notice-excerpt">
+  <figcaption class="part-label">The words around it</figcaption>
+  <blockquote><p>{{ n.excerpt }}</p></blockquote>
+</figure>
+{% endif %}
+{% if n.others %}<p class="hint">{{ n.others }} more {{ "note is" if n.others == 1 else "notes are" }} about this paragraph; {{ "it is" if n.others == 1 else "they are" }} in the optional checks below.</p>{% endif %}
+<p class="notice-actions">
+  {% if n.change_href %}<a class="button-secondary" href="{{ n.change_href }}" data-role="change-words">Change the words</a>{% endif %}
+</p>
+<p class="hint">Nothing here holds up the document. Change the words if you agree, or leave it as it is.</p>
 {% endmacro %}
 
 {% block content %}
@@ -422,7 +444,7 @@
     {# What the last decision did, with Undo for it (only from the page that decision
        made: the form carries its version). `data-saved` names the item it saved, so
        app.js can forget a draft of it kept in this browser. #}
-    <div class="decision-notice"{% if saved_target %} data-saved="/jobs/{{ job.id }}/review/{{ saved_target }}"{% endif %}>
+    <div class="decision-notice"{% if saved_target %} data-saved="/jobs/{{ job.id }}/review/{{ saved_target }}" data-saved-also="/jobs/{{ job.id }}/edit/{{ saved_target }} /jobs/{{ job.id }}/pages/{{ page.number }}/add"{% endif %}>
       <p id="decision-notice" role="status">{{ notice }}</p>
       {% if undo %}
       <form method="post" action="/jobs/{{ job.id }}/undo" class="undo-form">
@@ -457,7 +479,8 @@
     {% if panel.why %}<p class="why">{{ panel.why }}</p>{% endif %}
     {% if panel.mode == "item" and panel.status_class == "pill-optional" %}<p class="hint">It was accepted: nothing to do unless you disagree.</p>{% endif %}
     {% if panel.show_on_page %}<p class="on-page"><a href="{{ panel.show_on_page }}">Show on the page</a></p>{% endif %}
-    {% if panel.group %}{{ group_body(panel) }}
+    {% if panel.notice %}{{ notice_body(panel) }}
+    {% elif panel.group %}{{ group_body(panel) }}
     {% elif panel.pages %}{{ page_group_body(panel) }}
     {% elif panel.item.kind == "equation" %}{{ equation_body(panel) }}
     {% elif panel.item.kind == "figure" %}{{ figure_body(panel) }}
@@ -523,6 +546,9 @@
       </ul>
     </details>
     {% endif %}
+    {# T3-5, T3-16: change the text, make a line a heading, add what the tool missed, leave
+       the page out. #}
+    {% include "_page_tools.html" %}
   </section>
 
   <section class="page-area" id="page-view" aria-labelledby="page-title" tabindex="-1">
@@ -537,7 +563,7 @@
     <nav class="page-list" aria-label="Pages">
       <ol>
         {% for pl in pages %}
-        <li><a href="{{ pl.href }}" class="page-chip{% if pl.to_decide %} has-open{% endif %}"{% if pl.current %} aria-current="page"{% endif %}><span class="visually-hidden">Page </span><span class="chip-num">{{ pl.number }}</span>{% if pl.to_decide %}<span class="chip-count"><span class="visually-hidden">, </span>{{ pl.to_decide }} to decide</span>{% endif %}</a></li>
+        <li><a href="{{ pl.href }}" class="page-chip{% if pl.to_decide %} has-open{% endif %}"{% if pl.current %} aria-current="page"{% endif %}><span class="visually-hidden">Page </span><span class="chip-num">{{ pl.number }}</span>{% if pl.omitted %}<span class="chip-count"><span class="visually-hidden">, </span>left out</span>{% elif pl.to_decide %}<span class="chip-count"><span class="visually-hidden">, </span>{{ pl.to_decide }} to decide</span>{% endif %}</a></li>
         {% endfor %}
       </ol>
     </nav>
@@ -555,6 +581,7 @@
       {% endif %}
       <a class="toggle-accepted" href="{{ page.accepted_href }}">{% if show_accepted %}Hide accepted{% else %}Show accepted{% if page.hidden_accepted %} ({{ page.hidden_accepted }}){% endif %}{% endif %}</a>
     </div>
+    {% if page.omitted %}<p class="page-note page-left-out" id="page-left-out">This page is left out of the student file and of the review. <a href="#page-tools">Put it back</a></p>{% endif %}
     <div class="page-scroll" role="region" tabindex="0" aria-label="Page {{ page.number }} image{% if page.boxes %} with {{ page.boxes|length }} {{ 'mark' if page.boxes|length == 1 else 'marks' }}{% endif %}">
       <div class="page-frame">
         <img class="page-image" src="{{ page.image_url }}" alt="Page {{ page.number }} of the PDF." width="{{ (page.width or 612)|round|int }}" height="{{ (page.height or 792)|round|int }}">
