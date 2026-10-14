@@ -425,6 +425,7 @@ def _run_pipeline(
             client_label=label,
             gold_label=gold_label,
             concurrency=args.concurrency,
+            section_workers=getattr(args, "section_workers", 1),
             budget=budget,
             judge=judge,
             scorer_gaps=pe.scorer_gap_ids(pe.load_gold(gold_dir), _default(SCORER_CHECK))
@@ -1019,6 +1020,14 @@ def register(
     pipeline.add_argument("--paper", choices=["Letter", "A4"], default="Letter")
     pipeline.add_argument(
         "--concurrency", type=_positive_int, default=4, help="document task: worker threads"
+    )
+    pipeline.add_argument(
+        "--section-workers",
+        type=_positive_int,
+        default=1,
+        help="document task: sections converted at once (default 1, one after the other). "
+        "Shortens a live run, which waits on a hosted model; a section's latency in the "
+        "report then includes its wait for the others, so keep 1 for a run that is timed",
     )
     pipeline.add_argument(
         "--notation",

@@ -685,3 +685,51 @@ def test_claude_arms_are_not_run_for_the_openai_provider(recorded, tmp_path):
             chat_client=object(),
         )
     assert not (bundle_dir / "systems").exists()
+
+
+def test_sections_recorded_together_replay_to_the_same_report(recorded, tmp_path):
+    """A live run may convert several sections at once (`--section-workers`). Its answers
+    and reports are those of one after the other, a replay of it passes the comparison with
+    what was recorded, and it records no section times (they would include the waiting)."""
+    root = make_project(tmp_path / "project")
+    work = tmp_path / "work"
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr(html_checks, "axe_checks", lambda html: [Check(name="axe", passed=True)])
+        together = engine.run_proof(
+            engine.ProofOptions(
+                root=root,
+                live=True,
+                max_usd=5.0,
+                date=DATE,
+                work_dir=work,
+                client_factory=fake_client,
+                media_factory=PdfMedia,
+                out=root / "PROOF.md",
+                n_boot=N_BOOT,
+                section_workers=2,
+            ),
+            say=lambda _msg: None,
+        )
+    assert together.exit_code == 0
+    bundle = work / "bundles" / f"{SET_ID}-{DATE}"
+
+    def reports(directory: Path) -> dict[str, dict]:
+        return {
+            p.name: runner.comparable(json.loads(p.read_text()))
+            for p in sorted((directory / "reports").glob("*.json"))
+        }
+
+    assert reports(bundle) == reports(recorded.bundle)
+    runs = [json.loads(p.read_text()) for p in sorted((bundle / "runs").glob("document*.json"))]
+    assert runs and all(run["timing"] == [] for run in runs)
+    again = engine.run_proof(
+        engine.ProofOptions(
+            root=root,
+            work_dir=work,
+            bundle_dir=bundle,
+            out=root / "replay-together.md",
+            n_boot=N_BOOT,
+        ),
+        say=lambda _m: None,
+    )
+    assert again.exit_code == 0

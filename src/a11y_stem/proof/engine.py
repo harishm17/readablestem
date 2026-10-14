@@ -51,6 +51,8 @@ class ProofOptions:
     record_dir: Path | None = None
     max_usd: float | None = None
     max_calls: int = runner.DEFAULT_MAX_CALLS
+    # Live runs only: sections of the document task converted at once (`runner.record_arm`).
+    section_workers: int = 1
     fake: bool = False
     confirm_signoff: bool = False
     allow_dirty: bool = False
@@ -353,6 +355,7 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         client_factory=opts.client_factory,
         keep_finished=opts.keep_finished,
         resume=opts.resume,
+        section_workers=opts.section_workers,
     )
     pdfs = runner.pdf_entries(pset, recorder, writer)
     writer.write_jsonl("media/equations.jsonl", recorder.equation_rows())

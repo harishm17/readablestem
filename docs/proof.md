@@ -140,6 +140,15 @@ finished are kept instead (the one the cap stopped is dropped whole), the bundle
 incomplete, and `PROOF.md` opens with a banner saying how many planned runs are missing. `--fake` swaps in the offline fake client to
 check the plumbing; its report carries a banner and a held-out set refuses it.
 
+`--section-workers N` (default 1, how every registered run was made) converts N sections of
+the document task at once, which shortens a live run (it waits on a hosted model: 8 sections
+of 3 pages at 1 s a call took 79 s one after the other and 28 s four at a time, with the
+same items; `scripts/bench_runtime.py sections`). The answers and the scores are those of
+one after the other; the sections' wall-clock times are not recorded when N is above 1,
+because each would include its wait for the others (layout is one PyMuPDF call at a time).
+A replay always converts the sections one after the other, so it is the same whatever N the
+run was recorded with.
+
 A new live recording will not give the same numbers as the committed one. Model output
 varies between runs; this is why the held-out set repeats its tasks and shows each run.
 

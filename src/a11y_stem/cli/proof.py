@@ -95,6 +95,7 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             record_dir=args.record,
             max_usd=args.max_usd,
             max_calls=args.max_calls,
+            section_workers=args.section_workers,
             fake=args.fake,
             confirm_signoff=args.confirm_signoff,
             allow_dirty=args.allow_dirty,
@@ -172,6 +173,14 @@ def register(sub: argparse._SubParsersAction) -> None:
     live.add_argument("--live", action="store_true", help="re-call the models and record a bundle")
     live.add_argument("--max-usd", type=_positive_float, help="hard spend cap for the whole run")
     live.add_argument("--max-calls", type=_positive_int, default=5000)
+    live.add_argument(
+        "--section-workers",
+        type=_positive_int,
+        default=1,
+        help="document task: sections converted at once (default 1, as the registered runs "
+        "were made). More shortens a live run; the sections' wall-clock times are then not "
+        "recorded, because each would include its wait for the others",
+    )
     live.add_argument(
         "--provider",
         choices=("openai", "anthropic"),
