@@ -88,7 +88,15 @@ load_config() {
     fi
   fi
   IMAGE="$REGION-docker.pkg.dev/$PROJECT_ID/$AR_REPO/$SERVICE:$IMAGE_TAG"
-  SECRETS="OPENAI_API_KEY=openai-api-key:latest,SESSION_SECRET=session-secret:latest"
+  # Which company's models answer: openai (the default) or anthropic (docs/deploy.md,
+  # "Using Claude"). Only the selected provider's key is a secret of the service.
+  MODEL_PROVIDER=${MODEL_PROVIDER:-openai}
+  case "$MODEL_PROVIDER" in
+    openai) SECRETS="OPENAI_API_KEY=openai-api-key:latest" ;;
+    anthropic) SECRETS="ANTHROPIC_API_KEY=anthropic-api-key:latest" ;;
+    *) die "MODEL_PROVIDER must be openai or anthropic" ;;
+  esac
+  SECRETS="$SECRETS,SESSION_SECRET=session-secret:latest"
   SECRETS="$SECRETS,GOOGLE_CLIENT_SECRET=google-client-secret:latest,CRON_TOKEN=cron-token:latest"
   SECRETS="$SECRETS,DATABASE_URL=database-url:latest"
   TRACING_ENABLED=${TRACING_ENABLED:-false}
@@ -274,7 +282,11 @@ ensure_database_url() {
 
 step_secrets() {
   step "Secrets (Secret Manager)"
-  ensure_secret openai-api-key OPENAI_API_KEY ask
+  if [ "$MODEL_PROVIDER" = anthropic ]; then
+    ensure_secret anthropic-api-key ANTHROPIC_API_KEY ask
+  else
+    ensure_secret openai-api-key OPENAI_API_KEY ask
+  fi
   ensure_secret google-client-secret GOOGLE_CLIENT_SECRET ask
   ensure_secret session-secret SESSION_SECRET generate
   ensure_secret cron-token CRON_TOKEN generate
@@ -321,6 +333,12 @@ write_env_file() {
     yaml_line ADMIN_EMAILS "$ADMIN_EMAILS"
     yaml_line RUN_WORKER true
     yaml_line TRACING_ENABLED "$TRACING_ENABLED"
+    if [ "$MODEL_PROVIDER" = anthropic ]; then
+      yaml_line MODEL_PROVIDER anthropic
+      for name in ANTHROPIC_WORKSPACE_ID ANTHROPIC_MAIN_MODEL ANTHROPIC_CHEAP_MODEL; do
+        if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
+      done
+    fi
     if [ -n "$MS_CLIENT_ID" ]; then
       yaml_line MS_CLIENT_ID "$MS_CLIENT_ID"
       yaml_line MS_ALLOWED_TENANTS "$MS_ALLOWED_TENANTS"

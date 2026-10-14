@@ -491,13 +491,13 @@ def test_a_long_retry_after_goes_to_the_fallback_model_not_a_wait(no_backoff):
     wire = Wire(
         httpx2.Response(429, json=error_body("rate_limit_error"), headers={"retry-after": "600"})
     )
-    parsed, call = run(wire, settings=make_settings(model_max_retries=2))
+    _, call = run(wire, settings=make_settings(model_max_retries=2))
     assert call.outcome == "api_error" and len(wire.requests) == 1
 
 
 def test_a_connection_error_is_retried(no_backoff):
     wire = Wire(httpx2.ConnectError("refused"), message_body())
-    parsed, call = run(wire, settings=make_settings(model_max_retries=1))
+    parsed, _ = run(wire, settings=make_settings(model_max_retries=1))
     assert parsed is not None and len(wire.requests) == 2
 
 

@@ -450,9 +450,7 @@ def test_provider_anthropic_runs_with_claude_and_the_report_records_it(
     from a11y_stem.models import anthropic_client
 
     monkeypatch.setattr(anthropic_client, "AnthropicVisionClient", StubAnthropicVisionClient)
-    monkeypatch.setattr(
-        eval_cli, "_settings", lambda: settings(anthropic_api_key="sk-ant-test")
-    )
+    monkeypatch.setattr(eval_cli, "_settings", lambda: settings(anthropic_api_key="sk-ant-test"))
     args = pipeline_args(gold, tmp_path, "--provider", "anthropic", "--max-usd", "1.5")
     assert main(args) == 0
     ((used, budget),) = built
@@ -480,7 +478,9 @@ def test_models_can_be_chosen_per_run(gold, tmp_path, fake_inputs, capsys):
 
 
 def test_an_unpriced_model_is_an_error_not_a_traceback(gold, tmp_path, fake_inputs, capsys):
-    args = pipeline_args(gold, tmp_path, "--provider", "anthropic", "--main-model", "gpt-6", "--fake")
+    args = pipeline_args(
+        gold, tmp_path, "--provider", "anthropic", "--main-model", "gpt-6", "--fake"
+    )
     assert main(args) == 2
     err = capsys.readouterr().err
     assert "invalid model settings" in err and "no price for ANTHROPIC_MAIN_MODEL" in err

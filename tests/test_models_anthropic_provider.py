@@ -229,8 +229,7 @@ def request(model: str) -> VisionRequest:
     )
 
 
-class Answer:
-    latex = {"is_equation": True, "latex": "x", "confidence": 0.95}
+ANSWER = {"is_equation": True, "latex": "x", "confidence": 0.95}
 
 
 def test_fallback_stays_within_the_selected_provider():
@@ -242,9 +241,7 @@ def test_fallback_stays_within_the_selected_provider():
         confidence: float
 
     s = settings(model_provider="anthropic")
-    client = FakeVisionClient(
-        defaults={"equation": Answer.latex}, fail_models={HAIKU: "api_error"}
-    )
+    client = FakeVisionClient(defaults={"equation": ANSWER}, fail_models={HAIKU: "api_error"})
     parsed, calls = call_with_fallback(client, request(HAIKU), Out, settings=s)
     assert parsed is not None
     assert [(c.model, c.outcome, c.attempt) for c in calls] == [
@@ -289,9 +286,7 @@ def test_confident_cheap_answer_stays_on_the_cheap_model(monkeypatch):
     client = FakeVisionClient(
         defaults={"equation": {"is_equation": True, "latex": "x", "confidence": 0.97}}
     )
-    fix = transcribe(
-        equation_element(display="inline"), b"\x89PNG crop", client=client, settings=s
-    )
+    fix = transcribe(equation_element(display="inline"), b"\x89PNG crop", client=client, settings=s)
     assert fix.status == Status.ACCEPTED
     assert {r.model for r in client.requests} <= {SONNET, OPUS}
     assert all(m.startswith("claude-") for m in (r.model for r in client.requests))
@@ -305,3 +300,43 @@ def test_spend_admission_prices_the_claude_models():
     assert claude_largest > 0
     # Thinking headroom and the dearer main model make the largest hold bigger.
     assert claude_largest > openai_largest
+
+
+# --- privacy page and launch check ------------------------------------------------------
+
+
+def test_the_privacy_page_names_the_provider_that_receives_the_images(tmp_path):
+    from fixtures.web.support import WebEnv
+
+    with WebEnv(tmp_path / "openai").running() as client:
+        page = client.get("/privacy").text
+    assert "OpenAI." in page and "Anthropic" not in page
+
+    claude = WebEnv(tmp_path / "claude", model_provider="anthropic", fake_models=True)
+    with claude.running() as client:
+        page = client.get("/privacy").text
+    assert "<strong>Anthropic.</strong>" in page and "Anthropic's API" in page
+    assert "OpenAI" not in page
+    assert "TODO(Harish)" not in page  # the note for Harish is a template comment
+
+
+def test_launch_check_wants_anthropic_in_the_privacy_notice_once_it_is_the_provider(
+    tmp_path, monkeypatch
+):
+    from a11y_stem.ops import launch
+
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    privacy = templates / "privacy.html"
+    privacy.write_text("<p>Images go to OpenAI.</p>")
+    monkeypatch.setattr(launch, "TEMPLATES_DIR", templates)
+
+    def flagged(s: Settings) -> bool:
+        return any(
+            "MODEL_PROVIDER=anthropic" in item for item in launch.launch_blockers(settings=s)
+        )
+
+    assert flagged(settings(model_provider="anthropic"))
+    assert not flagged(settings())
+    privacy.write_text("<p>Images go to Anthropic.</p>")
+    assert not flagged(settings(model_provider="anthropic"))

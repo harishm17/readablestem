@@ -103,7 +103,8 @@ heldout-pdfs:  ## print the 15 sections and check the page counts (242)
 #   SET=<id>       another proof set (make proof-list)
 #   BUNDLE=<dir>   another recorded run
 #   MAX_USD=<n>    hard spend cap for proof-live (required there)
-#   ENV_FILE=<f>   env file holding OPENAI_API_KEY for proof-live (never printed)
+#   ENV_FILE=<f>   env file holding OPENAI_API_KEY (ANTHROPIC_API_KEY with --provider
+#                  anthropic, via PROOF_EXTRA) for proof-live (never printed)
 #   RECORD=<dir>   where proof-live writes the new recording (default: outside the repo)
 PROOF_ARGS = $(if $(SET),--set $(SET)) $(if $(BUNDLE),--bundle $(BUNDLE)) $(PROOF_EXTRA)
 

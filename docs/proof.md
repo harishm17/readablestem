@@ -88,6 +88,24 @@ uv sync --group browser && uv run playwright install --with-deps chromium
 sudo apt-get install -y fonts-noto-core fonts-liberation     # the fonts the print uses
 ```
 
+A live run can be made with Claude instead: `--provider anthropic` (with `ANTHROPIC_API_KEY`
+in place of `OPENAI_API_KEY`; `--main-model` and `--cheap-model` choose the models, default
+`claude-opus-5-5` and `claude-haiku-5-5`). `--out` is then required, so that `PROOF.md`, the
+report of the committed OpenAI recording, is not overwritten, and `--record` should name a
+folder of its own:
+
+```
+make proof-live MAX_USD=2 ENV_FILE=.env RECORD=.local/bundles/claude PROOF_EXTRA="--provider anthropic --out .local/PROOF-claude.md"
+```
+
+The recording stores the provider and the models in its code identity (`model_provider`,
+the effort settings, `main_model`, `cheap_model`) and in each report (`client`, `models`); a
+replay of it needs no flag and takes the provider and models from the recording, whatever
+`MODEL_PROVIDER` says. A recording made before the provider existed names none and is an
+OpenAI recording. The second automated check is not part of a Claude run. The chatbot arms
+and the figure judge of the registered comparison stay on OpenAI (`--add-systems chatbot`
+needs `OPENAI_API_KEY` whatever the provider).
+
 The default set (`smoke-physics-2`, three sections) recorded $0.28. A cap below that stops
 the run before it finishes and writes nothing, so use `MAX_USD=0.50` or more; there is no
 section filter: a live run always covers the whole set.
