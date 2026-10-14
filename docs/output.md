@@ -243,7 +243,7 @@ type, so a stored result re-renders to the same file. Equation images are not to
 | File | Before | After | Images |
 |---|---|---|---|
 | The public demo (OpenStax Physics 2.3, 7 figures; stored result re-rendered with its crops) | 2,210 KB (gzip 1,657 KB) | 666 KB (gzip 460 KB) | 3 JPEG (a photo, two raster charts), 4 PNG |
-| The committed demo page, rebuilt on 0.4.0 (2026-10-09; the 0.3.0 build before) | 2,211 KB (gzip 1,657 KB) | 668 KB (gzip 461 KB) | the same 3 JPEG and 4 PNG |
+| The committed demo page, rebuilt on 0.4.0 (2026-10-14, with Claude; 2026-10-09 with OpenAI and the 0.3.0 build before) | 2,211 KB (gzip 1,657 KB) | 668 KB (gzip 461 KB) | the same 3 JPEG and 4 PNG |
 | `tests/fixtures/layout/` PDFs converted offline (`lecture_notes`, `two_column`, `worked_example`; one small figure each) | 35, 14, 40 KB | the same | PNG kept: line art, smaller than JPEG |
 
 A page-sized crop (1700 x 2200 px) takes about 0.15-0.3 s to re-encode, so a document of
@@ -332,9 +332,21 @@ that overflows is a tab stop, that arrow keys scroll it, and axe.
 ## Flagged items
 
 Anything the pipeline could not convert keeps the original crop. Sighted readers lose
-nothing, and screen reader users hear a fixed, honest alt text ("Equation not converted",
-"Figure without a description") and a note, instead of a guess read aloud as if it were
-right.
+nothing, and screen reader users hear a fixed, honest alt text ("Figure without a
+description") and a note, instead of a guess read aloud as if it were right.
+
+An equation kept as an image (`assemble.equation_alt`) has the text the PDF holds for its
+region as alt text, with a marker that says where it comes from and that nobody has checked
+it: `6.0 m/s, read from the PDF text; not checked`, or `Equation (2.4): v = d / t, read from
+the PDF text; not checked` when it has a number. Where layout saw fractions, roots,
+exponents or several lines in the region, the marker adds that the text may run them
+together (`v2 = v20 + 2ad` for v squared = v0 squared + 2ad), because the flat text layer
+loses their order and size; an inline equation's exponents are not always known, so
+`g = 9.8 m/s2` can be one. Without usable text (none, no letter or digit, or more than 200
+characters) the alt text is `Equation (2.4), not converted` (the number as printed) or
+`Equation not converted`. Nothing is written that the PDF does not hold. The visible note
+and label are unchanged. In a document in another language the alt text is marked
+`lang="en"`, as the other fixed words are.
 
 - The flag is a dashed border **and** a text label, never colour alone (WCAG 1.4.1). The
   border survives forced-colours mode and printing.
@@ -480,9 +492,18 @@ MathML in the output is re-serialised by `safe_html.sanitize_mathml` (also impor
    `menclose`) and layout attributes (`mathvariant`, `stretchy`, `columnalign`, ...).
    `href`, event handlers, `style`, `class`, `id` and colours are dropped. Attribute values
    must match `[A-Za-z0-9 .%+-]{0,64}`. All text is escaped.
-3. `semantics` and `maction` are replaced by their first child, which is what a browser
+3. **Bold letters.** MathML Core (Chromium) draws only `mathvariant="normal"`, so a bold or
+   bold-italic token is written as Unicode mathematical bold letters instead
+   (`core.mathchars.bake_bold_variants`): `\boldsymbol{\omega}` is U+1D754, `\mathbf{\omega}`
+   U+1D6DA, the way `\mathbf{d}` was already U+1D41D, and the attribute (also inherited from
+   an `mstyle`) is removed from the tokens that could be written so. The converter does it
+   when it makes the MathML (`validate.safe_latex_to_mathml`) and the sanitiser does it
+   again for MathML stored before, so every screen reader says "bold omega" and every
+   browser draws it bold (`tests/test_math_bold_greek.py`, Chromium). Other variants are
+   left as they were.
+4. `semantics` and `maction` are replaced by their first child, which is what a browser
    shows anyway; annotations and alternatives are dropped.
-4. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
+5. Any other element (`script`, an HTML or SVG element, `mfenced`, a nested `<math>`)
    rejects the whole equation, which then falls back to the original image with
    `data-reason="mathml_rejected"`. Dropping just the unknown element would show maths
    with a silent hole in it, and a wrong equation read aloud is worse than an honest "not

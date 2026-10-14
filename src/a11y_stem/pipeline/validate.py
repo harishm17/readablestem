@@ -56,6 +56,7 @@ import defusedxml.ElementTree as DET
 from latex2mathml.converter import convert as _latex2mathml_convert
 from latex2mathml.tokenizer import PATTERN as _LATEX2MATHML_TOKEN
 
+from a11y_stem.core.mathchars import bake_bold_variants
 from a11y_stem.core.types import Check
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
@@ -508,6 +509,7 @@ def safe_latex_to_mathml(latex: str, display: str = "block") -> str:
         root = wrapper
     root.set("display", display)
     _unescape_text_specials(root)
+    bake_bold_variants(root)
     try:
         return serialize_mathml(root)
     except UnsafeMathMLError as exc:

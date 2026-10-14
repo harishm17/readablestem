@@ -482,7 +482,7 @@ def test_your_decisions_are_listed_apart_from_the_automatic_ones(ux):
     assert '<summary id="decided-summary">Your decisions (2)</summary>' in box
     lines = [text_of(li) for li in re.findall(r"<li>.*?</li>", box, re.S)]
     assert lines == [
-        "Equation 1, page 1 ω Edited by you.",  # bold by its mathvariant
+        "Equation 1, page 1 \U0001d74e Edited by you.",  # a bold-italic omega code point
         "Repeated heading, 3 times “Teacher Support” All 3 were made bold text.",
     ]
     assert f'href="/jobs/{ux.job_id}/review?item={GROUP}#decision-title"' in box

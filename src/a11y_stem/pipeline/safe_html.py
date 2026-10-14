@@ -24,6 +24,8 @@ from xml.etree.ElementTree import ParseError
 import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
+from a11y_stem.core.mathchars import bake_bold_variants
+
 Display = Literal["block", "inline"]
 
 MATHML_NS = "http://www.w3.org/1998/Math/MathML"
@@ -142,6 +144,7 @@ def sanitize_mathml(mathml: str, *, display: Display, element_id: str | None = N
     ns, name = split_tag(root.tag)
     if name != "math" or ns not in ("", MATHML_NS):
         return None
+    bake_bold_variants(root)
     writer = _MathWriter()
     try:
         inner = writer.children(root, depth=1)

@@ -11,6 +11,7 @@ the most common transcription error on the OpenStax gold set).
 from __future__ import annotations
 
 import unicodedata
+from typing import Any
 
 # MathML mathvariant -> the words Unicode uses after "MATHEMATICAL ".
 VARIANT_NAMES = {
@@ -114,3 +115,45 @@ def base_char(ch: str) -> str:
     if ch in _HOLE_VARIANT:
         return _HOLE_VARIANT[ch][1]
     return unicodedata.normalize("NFKC", ch) if char_variant(ch) else ch
+
+
+# Weights browsers ignore on a MathML token. MathML Core (Chromium, and so most readers'
+# browsers) draws only mathvariant="normal"; Firefox and Safari honour more. A bold
+# \boldsymbol{\omega} that stays `<mi mathvariant="bold-italic">` is drawn as a plain
+# italic omega there. Written as the Unicode bold code point, every maths font draws it
+# bold and every screen reader says "bold omega". Latin letters already come out that way
+# (\mathbf{d} is U+1D41D); Greek ones, which \mathbf and \boldsymbol turn into an
+# attribute, are the gap this closes.
+BOLD_VARIANTS = frozenset({"bold", "bold-italic"})
+_TOKENS = frozenset({"mi", "mn", "mo"})
+
+
+def _local_name(tag: object) -> str:
+    return tag.rpartition("}")[2] if isinstance(tag, str) else ""
+
+
+def bake_bold_variants(root: Any, inherited: str | None = None) -> None:
+    """Rewrite bold and bold-italic tokens of a parsed MathML tree in place as Unicode
+    mathematical bold letters, and take the `mathvariant` off when it has done its job.
+
+    The attribute is inherited, as MathML says (`<mstyle mathvariant="bold">` over
+    `<mi>`s): it is read from the containers and applied to the tokens below, and a
+    container's own bold attribute is removed. A token with its own attribute and no bold
+    code point to show it (an operator, a letter Unicode has no bold form of) keeps the
+    attribute, so a browser that honours it still draws it bold. Other variants are left
+    alone."""
+    own = root.attrib.get("mathvariant")
+    variant = own if own in BOLD_VARIANTS else inherited
+    if own is not None and own not in BOLD_VARIANTS and own != inherited:
+        variant = None  # another variant overrides what was inherited
+    if _local_name(root.tag) in _TOKENS:
+        if variant and root.text:
+            baked = "".join(styled_char(ch, variant) for ch in root.text)
+            if baked != root.text:
+                root.text = baked
+                root.attrib.pop("mathvariant", None)
+        return
+    if own in BOLD_VARIANTS:
+        del root.attrib["mathvariant"]
+    for child in root:
+        bake_bold_variants(child, variant)

@@ -49,8 +49,15 @@ import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
 from a11y_stem import __version__
+from a11y_stem.core.types import (
+    HEADING_REPEATS_ABOVE,
+    KEPT_ORIGINAL_STATUSES,
+    Element,
+    Fix,
+    Kind,
+    Status,
+)
 from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
-from a11y_stem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, Status
 from a11y_stem.pipeline import (
     assemble_tables,
     figure_details,
@@ -74,6 +81,20 @@ AUTHORED_CLASS = table_html.AUTHORED_CLASS
 
 DEFAULT_TITLE = "Converted document"
 EQUATION_NOT_CONVERTED_ALT = "Equation not converted"
+# The alt text of an equation kept as an image, when its region has text in the PDF: that
+# text, said to be what the PDF holds and not checked ("v = d / t, read from the PDF
+# text; not checked"). Never a guess: it is the text layer or nothing, and nothing falls
+# back to the equation's number ("Equation (2.4), not converted") or the fixed words.
+EQUATION_TEXT_ALT_SUFFIX = ", read from the PDF text; not checked"
+# ... and when the region has fractions, roots, exponents or several lines, whose order and
+# size the flat text layer loses ("v2 = v20 + 2ad" for v squared = v zero squared + 2ad):
+EQUATION_FLAT_ALT_SUFFIX = (
+    ", read from the PDF text, where fractions and exponents may run together; not checked"
+)
+EQUATION_TEXT_ALT_SUFFIXES = (EQUATION_TEXT_ALT_SUFFIX, EQUATION_FLAT_ALT_SUFFIX)
+# Layout's reasons that say the text layer of an equation is not in reading order.
+_FLATTENED_REASONS = ("superscript", "fraction bar", "radical sign", "lines merged")
+EQUATION_ALT_MAX_CHARS = 200  # a longer text layer is not alt text: the fixed words instead
 FIGURE_NOT_DESCRIBED_ALT = "Figure without a description"
 # The student note (`_about_section`). It speaks to students: what this file is and who
 # to tell about problems. TODO(Harish): confirm this wording, and whether to name the
@@ -291,6 +312,45 @@ def _size_attrs(element: Element) -> str:
     if 0 < width <= 4000 and 0 < height <= 4000:
         return f' width="{width}" height="{height}"'
     return ""
+
+
+_LABEL_PREFIX = re.compile(r"^(?:equation|eqn?)\.?\s*", re.IGNORECASE)
+_LABEL_BRACKETS = "()[] \u00a0"
+
+
+def equation_number(label: str | None) -> str | None:
+    """ "2.4" from "(2.4)", "[2.4]", "Eq. 2.4" or "2.4"; None when there is no number."""
+    if not label:
+        return None
+    number = _LABEL_PREFIX.sub("", " ".join(label.split())).strip(_LABEL_BRACKETS)
+    return number or None
+
+
+def equation_alt(element: Element) -> str:
+    """The alt text of an equation that is shown as an image (not converted).
+
+    Text the PDF holds for the equation's region (`Element.text`), marked as read from the
+    PDF and not checked, so a student hears what the PDF says and how much to trust it;
+    without usable text, "Equation (2.4), not converted" (the equation's number) or
+    "Equation not converted". The text is whitespace-normalised and nothing else: nothing
+    is written that the PDF does not hold. Text that is empty, has no letter or digit, or
+    is longer than EQUATION_ALT_MAX_CHARS is not used. When layout saw fractions, roots,
+    exponents or several lines in the region, the marker says the text may run them
+    together (EQUATION_FLAT_ALT_SUFFIX).
+    """
+    number = equation_number(element.equation_label)
+    named = f"Equation ({number})" if number else "Equation"
+    text = " ".join(_ALT_CONTROL.sub(" ", element.text or "").split())
+    if text and len(text) <= EQUATION_ALT_MAX_CHARS and any(c.isalnum() for c in text):
+        lead = f"{named}: " if number else ""
+        flat = any(key in reason for reason in element.reasons for key in _FLATTENED_REASONS)
+        return f"{lead}{text}{EQUATION_FLAT_ALT_SUFFIX if flat else EQUATION_TEXT_ALT_SUFFIX}"
+    return f"{named}, not converted" if number else EQUATION_NOT_CONVERTED_ALT
+
+
+# Control and invisible characters a text layer can carry (they would end up in an attribute
+# read by a screen reader): replaced by a space before the text is used.
+_ALT_CONTROL = re.compile(r"[\x00-\x1f\x7f-\x9f\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
 
 
 def _equation_label(label: str | None) -> str:
@@ -677,9 +737,15 @@ class _Renderer:
         level, text = self.heading_parts(element)
         if level is None:
             fix = self.fixes.get(element.id)
-            if element.bold and fix is not None and fix.status is Status.REJECTED and text.strip():
+            decided = fix is not None and (
+                (element.bold and fix.status is Status.REJECTED)
+                # The same text as the heading above: bold text, by the heading step's rule.
+                or (fix.status is Status.ACCEPTED and fix.reason == HEADING_REPEATS_ABOVE)
+            )
+            if decided and text.strip():
                 # A reviewer said this bold line is a label, not a heading ("Make them
-                # bold text"): it stays bold, as in the PDF.
+                # bold text"), or the heading step saw it repeat the heading above: it
+                # stays bold, as in the PDF.
                 attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)
@@ -713,7 +779,7 @@ class _Renderer:
             css = "equation equation-labelled" if label else "equation"
             attrs = self.id_attr(element.id) + _scroller_attrs(mathml, element.equation_label)
             return f'<div class="{css}"{attrs}>{mathml}{label}</div>'
-        original = self.original(element, EQUATION_NOT_CONVERTED_ALT) + label
+        original = self.original(element, equation_alt(element)) + label
         return self.flag_block(element, reason, original, "Not converted.", EQUATION_NOTE)
 
     def inline_equation(self, element: Element) -> str:
@@ -729,7 +795,8 @@ class _Renderer:
         attrs = self.id_attr(element.id) + _fix_attrs(self.fixes.get(element.id), reason)
         src = _png_data_uri(self.crops.get(element.id))
         if src is not None:
-            image = f'<img src="{src}" alt="{EQUATION_NOT_CONVERTED_ALT}"{_size_attrs(element)}>'
+            alt = _escape(equation_alt(element))
+            image = f'<img src="{src}" alt="{alt}"{_size_attrs(element)}>'
             label = f'<span class="flag-label {AUTHORED_CLASS}" aria-hidden="true">'
         else:
             image = _escape(element.text or "")
@@ -993,6 +1060,12 @@ _FIXED_ALT_IMG = re.compile(
                     assemble_tables.TABLE_NOT_CONVERTED_ALT,
                 ),
             ),
+            # An equation kept as an image: "Equation (2.4), not converted", or its PDF
+            # text with our words after it (`equation_alt`).
+            r"Equation \([^\"<>]{1,50}\), not converted",
+            r"[^\"<>]{1,500}(?:"
+            + "|".join(re.escape(_escape(suffix)) for suffix in EQUATION_TEXT_ALT_SUFFIXES)
+            + ")",
             # A kept page's alt names its page: any number in its place.
             *(
                 re.escape(alt).replace(re.escape("{page}"), r"\d+")

@@ -1,7 +1,7 @@
 {
   "demo": {
-    "date": "2026-10-09",
-    "client": "openai",
+    "date": "2026-10-14",
+    "client": "anthropic",
     "book_slug": "physics",
     "book_title": "Physics",
     "page_slug": "2-3-position-vs-time-graphs",
@@ -367,17 +367,17 @@
       },
       {
         "id": "p1-e11",
-        "kind": "paragraph",
+        "kind": "list_item",
         "page": 0,
         "bbox": [
           57.75,
           436.37,
-          290.8,
-          446.37
+          141.07,
+          446.34
         ],
         "order": 11,
-        "text": "dependent variable independent variable tangent",
-        "font_size": 11.0,
+        "text": "dependent variable",
+        "font_size": null,
         "bold": false,
         "score": null,
         "reasons": [],
@@ -396,6 +396,64 @@
       },
       {
         "id": "p1-e12",
+        "kind": "list_item",
+        "page": 0,
+        "bbox": [
+          153.82,
+          436.37,
+          245.69,
+          446.34
+        ],
+        "order": 12,
+        "text": "independent variable",
+        "font_size": null,
+        "bold": false,
+        "score": null,
+        "reasons": [],
+        "display": null,
+        "parent_id": null,
+        "equation_label": null,
+        "list_marker": null,
+        "list_ordered": null,
+        "list_level": null,
+        "caption": null,
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
+      },
+      {
+        "id": "p1-e13",
+        "kind": "list_item",
+        "page": 0,
+        "bbox": [
+          258.45,
+          437.81,
+          290.8,
+          446.37
+        ],
+        "order": 13,
+        "text": "tangent",
+        "font_size": null,
+        "bold": false,
+        "score": null,
+        "reasons": [],
+        "display": null,
+        "parent_id": null,
+        "equation_label": null,
+        "list_marker": null,
+        "list_ordered": null,
+        "list_level": null,
+        "caption": null,
+        "regular_letters": null,
+        "table": null,
+        "links": [],
+        "colour_runs": [],
+        "lang": null
+      },
+      {
+        "id": "p1-e14",
         "kind": "heading",
         "page": 0,
         "bbox": [
@@ -404,7 +462,7 @@
           169.88,
           492.65
         ],
-        "order": 12,
+        "order": 14,
         "text": "Teacher Support",
         "font_size": 14.0,
         "bold": true,
@@ -428,7 +486,7 @@
         "lang": null
       },
       {
-        "id": "p1-e13",
+        "id": "p1-e15",
         "kind": "heading",
         "page": 0,
         "bbox": [
@@ -437,7 +495,7 @@
           154.2,
           519.99
         ],
-        "order": 13,
+        "order": 15,
         "text": "Teacher Support",
         "font_size": 12.0,
         "bold": true,
@@ -460,7 +518,7 @@
         "lang": null
       },
       {
-        "id": "p1-e14",
+        "id": "p1-e16",
         "kind": "paragraph",
         "page": 0,
         "bbox": [
@@ -469,8 +527,8 @@
           548.72,
           600.87
         ],
-        "order": 14,
-        "text": "[BL][OL] Describe a scenario, for example, in which you launch a water rocket into the air. It goes up 150 ft, stops, and then falls back to the earth. Have the students assess the situation. Where would they put their zero? What is the positive direction, and what is the negative direction? Have a student draw a picture of the scenario on the board. Then draw a position vs. time graph describing the motion. Have students help you complete the graph. Is the line straight? Is it curved? Does it change direction? What can they tell by looking at the graph?",
+        "order": 16,
+        "text": "Describe a scenario, for example, in which you launch a water rocket into the air. It goes up 150 ft, stops, and then falls back to the earth. Have the students assess the situation. Where would they put their zero? What is the positive direction, and what is the negative direction? Have a student draw a picture of the scenario on the board. Then draw a position vs. time graph describing the motion. Have students help you complete the graph. Is the line straight? Is it curved? Does it change direction? What can they tell by looking at the graph?",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -489,7 +547,7 @@
         "lang": null
       },
       {
-        "id": "p1-e15",
+        "id": "p1-e17",
         "kind": "paragraph",
         "page": 0,
         "bbox": [
@@ -498,8 +556,8 @@
           537.21,
           637.62
         ],
-        "order": 15,
-        "text": "[AL] Once the students have looked at and analyzed the graph, see if they can describe different scenarios in which the lines would be straight instead of curved? Where the lines would be discontinuous?",
+        "order": 17,
+        "text": "Once the students have looked at and analyzed the graph, see if they can describe different scenarios in which the lines would be straight instead of curved? Where the lines would be discontinuous?",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -518,7 +576,7 @@
         "lang": null
       },
       {
-        "id": "p1-e16",
+        "id": "p1-e18",
         "kind": "heading",
         "page": 0,
         "bbox": [
@@ -527,7 +585,7 @@
           319.72,
           679.47
         ],
-        "order": 16,
+        "order": 18,
         "text": "Graphing Position as a Function of Time",
         "font_size": 14.0,
         "bold": true,
@@ -551,7 +609,7 @@
         "lang": null
       },
       {
-        "id": "p1-e17",
+        "id": "p1-e19",
         "kind": "paragraph",
         "page": 0,
         "bbox": [
@@ -560,7 +618,7 @@
           557.13,
           732.09
         ],
-        "order": 17,
+        "order": 19,
         "text": "A graph, like a picture, is worth a thousand words. Graphs not only contain numerical information, they also reveal relationships between physical quantities. In this section, we will investigate kinematics by analyzing graphs of position over time.",
         "font_size": 11.0,
         "bold": false,
@@ -589,7 +647,7 @@
           559.39,
           111.26
         ],
-        "order": 18,
+        "order": 20,
         "text": "Graphs in this text have perpendicular axes, one horizontal and the other vertical. When two physical quantities are plotted against each other, the horizontal axis is usually considered the independent variable, and the vertical axis is the dependent variable. In algebra, you would have referred to the horizontal axis as the x-axis and the vertical axis as the y-axis. As in Figure 2.10, a straight-line graph has the general form ⟦p2-e1⟧.",
         "font_size": 11.0,
         "bold": false,
@@ -626,7 +684,7 @@
           424.13,
           111.26
         ],
-        "order": 19,
+        "order": 21,
         "text": "𝑦= 𝑚𝑥+ 𝑏",
         "font_size": 11.0,
         "bold": false,
@@ -657,7 +715,7 @@
           558.05,
           162.87
         ],
-        "order": 20,
+        "order": 22,
         "text": "Here m is the slope, defined as the rise divided by the run (as seen in the figure) of the straight line. The letter b is the y-intercept which is the point at which the line crosses the vertical, y-axis. In terms of a physical situation in the real world, these quantities will take on a specific significance, as we will see below. (Figure 2.10.)",
         "font_size": 11.0,
         "bold": false,
@@ -694,7 +752,7 @@
           489.0,
           398.25
         ],
-        "order": 21,
+        "order": 23,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -725,7 +783,7 @@
           560.48,
           489.87
         ],
-        "order": 22,
+        "order": 24,
         "text": "In physics, time is usually the independent variable. Other quantities, such as displacement, are said to depend upon it. A graph of position versus time, therefore, would have position on the vertical axis (dependent variable) and time on the horizontal axis (independent variable). In this case, to what would the slope and y-intercept refer? Let’s look back at our original example when studying distance and displacement.",
         "font_size": 11.0,
         "bold": false,
@@ -754,7 +812,7 @@
           552.37,
           542.37
         ],
-        "order": 23,
+        "order": 25,
         "text": "The drive to school was 5 km from home. Let’s assume it took 10 minutes to make the drive and that your parent was driving at a constant velocity the whole time. The position versus time graph for this section of the trip would look like that shown in Figure 2.11.",
         "font_size": 11.0,
         "bold": false,
@@ -791,7 +849,7 @@
           486.75,
           306.0
         ],
-        "order": 24,
+        "order": 26,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -822,7 +880,7 @@
           553.43,
           414.87
         ],
-        "order": 25,
+        "order": 27,
         "text": "As we said before, ⟦p3-e2⟧ because we call home our O and start calculating from there. In Figure 2.11, the line starts at ⟦p3-e3⟧, as well. This is the b in our equation for a straight line. Our initial position in a position versus time graph is always the place where the graph crosses the x-axis at ⟦p3-e4⟧. What is the slope? The rise is the change in position, (i.e., displacement) and the run is the change in time. This relationship can also be written",
         "font_size": 11.0,
         "bold": false,
@@ -859,7 +917,7 @@
           163.44,
           366.78
         ],
-        "order": 26,
+        "order": 28,
         "text": "𝐝0 = 0",
         "font_size": 11.0,
         "bold": false,
@@ -890,7 +948,7 @@
           108.94,
           381.86
         ],
-        "order": 27,
+        "order": 29,
         "text": "𝐝 = 0",
         "font_size": 11.0,
         "bold": false,
@@ -921,7 +979,7 @@
           346.41,
           396.86
         ],
-        "order": 28,
+        "order": 30,
         "text": "t = 0",
         "font_size": 11.0,
         "bold": false,
@@ -952,7 +1010,7 @@
           296.57,
           441.13
         ],
-        "order": 29,
+        "order": 31,
         "text": "Δ𝐝 Δ𝑡.",
         "font_size": 11.0,
         "bold": false,
@@ -988,7 +1046,7 @@
           543.98,
           476.37
         ],
-        "order": 30,
+        "order": 32,
         "text": "This relationship was how we defined average velocity. Therefore, the slope in a d versus t graph, is the average velocity.",
         "font_size": 11.0,
         "bold": false,
@@ -1017,7 +1075,7 @@
           175.35,
           519.65
         ],
-        "order": 31,
+        "order": 33,
         "text": "Tips For Success",
         "font_size": 14.0,
         "bold": true,
@@ -1050,7 +1108,7 @@
           541.12,
           588.12
         ],
-        "order": 32,
+        "order": 34,
         "text": "Sometimes, as is the case where we graph both the trip to school and the return trip, the behavior of the graph looks different during different time intervals. If the graph looks like a series of straight lines, then you can calculate the average velocity for each time interval by looking at the slope. If you then want to calculate the average velocity for the entire trip, you can do a weighted average.",
         "font_size": 11.0,
         "bold": false,
@@ -1079,7 +1137,7 @@
           544.9,
           637.62
         ],
-        "order": 33,
+        "order": 35,
         "text": "Let’s look at another example. Figure 2.12 shows a graph of position versus time for a jet-powered car on a very flat dry lake bed in Nevada.",
         "font_size": 11.0,
         "bold": false,
@@ -1116,7 +1174,7 @@
           463.5,
           306.0
         ],
-        "order": 34,
+        "order": 36,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -1147,7 +1205,7 @@
           557.48,
           385.62
         ],
-        "order": 35,
+        "order": 37,
         "text": "Using the relationship between dependent and independent variables, we see that the slope in the graph in Figure 2.12 is average velocity, ⟦p4-e2⟧ and the intercept is displacement at time zero—that is, ⟦p4-e3⟧. Substituting these symbols into ⟦p4-e4⟧ gives",
         "font_size": 11.0,
         "bold": false,
@@ -1184,7 +1242,7 @@
           178.9,
           370.17
         ],
-        "order": 36,
+        "order": 38,
         "text": "𝐯avg",
         "font_size": 11.0,
         "bold": false,
@@ -1215,7 +1273,7 @@
           432.11,
           368.28
         ],
-        "order": 37,
+        "order": 39,
         "text": "𝐝0",
         "font_size": 11.0,
         "bold": false,
@@ -1246,7 +1304,7 @@
           117.45,
           385.62
         ],
-        "order": 38,
+        "order": 40,
         "text": "y = mx + b",
         "font_size": 11.0,
         "bold": false,
@@ -1277,7 +1335,7 @@
           311.24,
           405.83
         ],
-        "order": 39,
+        "order": 41,
         "text": "𝐝= 𝐯𝑡+ 𝐝0",
         "font_size": 11.0,
         "bold": false,
@@ -1313,7 +1371,7 @@
           60.16,
           426.11
         ],
-        "order": 40,
+        "order": 42,
         "text": "or",
         "font_size": 11.0,
         "bold": false,
@@ -1342,7 +1400,7 @@
           314.96,
           448.58
         ],
-        "order": 41,
+        "order": 43,
         "text": "𝐝= 𝐝0 + 𝐯𝑡.",
         "font_size": 11.0,
         "bold": false,
@@ -1378,7 +1436,7 @@
           560.38,
           501.87
         ],
-        "order": 42,
+        "order": 44,
         "text": "Thus a graph of position versus time gives a general relationship among displacement, velocity, and time, as well as giving detailed numerical information about a specific situation. From the figure we can see that the car has a position of 400 m at ⟦p4-e9⟧, 650 m at ⟦p4-e10⟧, and so on. And we can learn about the object’s velocity, as well.",
         "font_size": 11.0,
         "bold": false,
@@ -1407,7 +1465,7 @@
           167.58,
           499.61
         ],
-        "order": 43,
+        "order": 45,
         "text": "t = 0 s",
         "font_size": 11.0,
         "bold": false,
@@ -1438,7 +1496,7 @@
           249.81,
           499.66
         ],
-        "order": 44,
+        "order": 46,
         "text": "t = 1.0 s",
         "font_size": 11.0,
         "bold": false,
@@ -1469,7 +1527,7 @@
           169.88,
           84.65
         ],
-        "order": 45,
+        "order": 47,
         "text": "Teacher Support",
         "font_size": 14.0,
         "bold": true,
@@ -1502,7 +1560,7 @@
           154.2,
           111.99
         ],
-        "order": 46,
+        "order": 48,
         "text": "Teacher Support",
         "font_size": 12.0,
         "bold": true,
@@ -1534,7 +1592,7 @@
           223.73,
           153.14
         ],
-        "order": 47,
+        "order": 49,
         "text": "Teacher Demonstration",
         "font_size": 14.0,
         "bold": true,
@@ -1567,7 +1625,7 @@
           404.37,
           177.87
         ],
-        "order": 48,
+        "order": 50,
         "text": "Help students learn what different graphs of displacement vs. time look like.",
         "font_size": 11.0,
         "bold": false,
@@ -1596,7 +1654,7 @@
           196.03,
           199.59
         ],
-        "order": 49,
+        "order": 51,
         "text": "[Visual] Set up a meter stick.",
         "font_size": 11.0,
         "bold": false,
@@ -1625,7 +1683,7 @@
           541.84,
           241.62
         ],
-        "order": 50,
+        "order": 52,
         "text": "If you can find a remote control car, have one student record times as you send the car forward along the stick, then backwards, then forward again with a constant velocity.",
         "font_size": 11.0,
         "bold": false,
@@ -1654,7 +1712,7 @@
           422.8,
           256.62
         ],
-        "order": 51,
+        "order": 53,
         "text": "Take the recorded times and the change in position and put them together.",
         "font_size": 11.0,
         "bold": false,
@@ -1683,7 +1741,7 @@
           378.12,
           272.37
         ],
-        "order": 52,
+        "order": 54,
         "text": "Get the students to coach you to draw a position vs. time graph.",
         "font_size": 11.0,
         "bold": false,
@@ -1712,7 +1770,7 @@
           531.13,
           313.62
         ],
-        "order": 53,
+        "order": 55,
         "text": "Each leg of the journey should be a straight line with a different slope. The parts where the car was going forward should have a positive slope. The part where it is going backwards would have a negative slope.",
         "font_size": 11.0,
         "bold": false,
@@ -1741,8 +1799,8 @@
           335.57,
           335.37
         ],
-        "order": 54,
-        "text": "[OL] Ask if the place that they take as zero affects the graph.",
+        "order": 56,
+        "text": "Ask if the place that they take as zero affects the graph.",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -1770,8 +1828,8 @@
           538.09,
           372.12
         ],
-        "order": 55,
-        "text": "[AL] Is it realistic to draw any position graph that starts at rest without some curve in it? Why might we be able to neglect the curve in some scenarios?",
+        "order": 57,
+        "text": "Is it realistic to draw any position graph that starts at rest without some curve in it? Why might we be able to neglect the curve in some scenarios?",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -1799,8 +1857,8 @@
           539.5,
           439.59
         ],
-        "order": 56,
-        "text": "[All] Discuss what can be uncovered from this graph. Students should be able to read the net displacement, but they can also use the graph to determine the total distance traveled. Then ask how the speed or velocity is reflected in this graph. Direct students in seeing that the steepness of the line (slope) is a measure of the speed and that the direction of the slope is the direction of the motion.",
+        "order": 58,
+        "text": "Discuss what can be uncovered from this graph. Students should be able to read the net displacement, but they can also use the graph to determine the total distance traveled. Then ask how the speed or velocity is reflected in this graph. Direct students in seeing that the steepness of the line (slope) is a measure of the speed and that the direction of the slope is the direction of the motion.",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -1828,8 +1886,8 @@
           508.05,
           476.37
         ],
-        "order": 57,
-        "text": "[AL] Some students might recognize that a curve in the line represents a sort of slope of the slope, a preview of acceleration which they will learn about in the next chapter.",
+        "order": 59,
+        "text": "Some students might recognize that a curve in the line represents a sort of slope of the slope, a preview of acceleration which they will learn about in the next chapter.",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -1857,7 +1915,7 @@
           122.72,
           84.65
         ],
-        "order": 58,
+        "order": 60,
         "text": "Snap Lab",
         "font_size": 14.0,
         "bold": true,
@@ -1890,7 +1948,7 @@
           155.74,
           112.04
         ],
-        "order": 59,
+        "order": 61,
         "text": "Graphing Motion",
         "font_size": 12.0,
         "bold": true,
@@ -1922,7 +1980,7 @@
           474.79,
           132.12
         ],
-        "order": 60,
+        "order": 62,
         "text": "In this activity, you will release a ball down a ramp and graph the ball’s displacement vs. time.",
         "font_size": 11.0,
         "bold": false,
@@ -1951,7 +2009,7 @@
           533.9,
           173.37
         ],
-        "order": 61,
+        "order": 63,
         "text": "Choose an open location with lots of space to spread out so there is less chance for tripping or falling due to rolling balls.",
         "font_size": 11.0,
         "bold": false,
@@ -1980,7 +2038,7 @@
           114.47,
           197.36
         ],
-        "order": 62,
+        "order": 64,
         "text": "1 ball",
         "font_size": 11.0,
         "bold": false,
@@ -2009,7 +2067,7 @@
           123.02,
           213.11
         ],
-        "order": 63,
+        "order": 65,
         "text": "1 board",
         "font_size": 11.0,
         "bold": false,
@@ -2038,7 +2096,7 @@
           144.4,
           228.11
         ],
-        "order": 64,
+        "order": 66,
         "text": "2 or 3 books",
         "font_size": 11.0,
         "bold": false,
@@ -2067,7 +2125,7 @@
           142.56,
           246.09
         ],
-        "order": 65,
+        "order": 67,
         "text": "1 stopwatch",
         "font_size": 11.0,
         "bold": false,
@@ -2096,7 +2154,7 @@
           155.67,
           261.84
         ],
-        "order": 66,
+        "order": 68,
         "text": "1 tape measure",
         "font_size": 11.0,
         "bold": false,
@@ -2125,7 +2183,7 @@
           198.41,
           276.87
         ],
-        "order": 67,
+        "order": 69,
         "text": "6 pieces of masking tape",
         "font_size": 11.0,
         "bold": false,
@@ -2154,7 +2212,7 @@
           188.01,
           292.62
         ],
-        "order": 68,
+        "order": 70,
         "text": "1 piece of graph paper",
         "font_size": 11.0,
         "bold": false,
@@ -2183,7 +2241,7 @@
           124.85,
           307.59
         ],
-        "order": 69,
+        "order": 71,
         "text": "1 pencil",
         "font_size": 11.0,
         "bold": false,
@@ -2212,7 +2270,7 @@
           108.18,
           331.63
         ],
-        "order": 70,
+        "order": 72,
         "text": "Procedure",
         "font_size": 11.0,
         "bold": true,
@@ -2244,7 +2302,7 @@
           548.46,
           389.41
         ],
-        "order": 71,
+        "order": 73,
         "text": "Build a ramp by placing one end of the board on top of the stack of books. Adjust location, as necessary, until there is no obstacle along the straight line path from the bottom of the ramp until at least the next 3 m.",
         "font_size": 11.0,
         "bold": false,
@@ -2273,7 +2331,7 @@
           541.24,
           422.34
         ],
-        "order": 72,
+        "order": 74,
         "text": "Mark distances of 0.5 m, 1.0 m, 1.5 m, 2.0 m, 2.5 m, and 3.0 m from the bottom of the ramp. Write the distances on the tape.",
         "font_size": 11.0,
         "bold": false,
@@ -2302,7 +2360,7 @@
           543.62,
           468.12
         ],
-        "order": 73,
+        "order": 75,
         "text": "Have one person take the role of the experimenter. This person will release the ball from the top of the ramp. If the ball does not reach the 3.0 m mark, then increase the incline of the ramp by adding another book. Repeat this Step as necessary.",
         "font_size": 11.0,
         "bold": false,
@@ -2331,7 +2389,7 @@
           549.75,
           513.94
         ],
-        "order": 74,
+        "order": 76,
         "text": "Have the experimenter release the ball. Have a second person, the timer, begin timing the trial once the ball reaches the bottom of the ramp and stop the timing once the ball reaches 0.5 m. Have a third person, the recorder, record the time in a data table.",
         "font_size": 11.0,
         "bold": false,
@@ -2360,7 +2418,7 @@
           527.54,
           545.34
         ],
-        "order": 75,
+        "order": 77,
         "text": "Repeat Step 4, stopping the times at the distances of 1.0 m, 1.5 m, 2.0 m, 2.5 m, and 3.0 m from the bottom of the ramp.",
         "font_size": 11.0,
         "bold": false,
@@ -2389,7 +2447,7 @@
           528.71,
           573.91
         ],
-        "order": 76,
+        "order": 78,
         "text": "Use your measurements of time and the displacement to make a position vs. time graph of the ball’s motion.",
         "font_size": 11.0,
         "bold": false,
@@ -2418,7 +2476,7 @@
           545.31,
           622.62
         ],
-        "order": 77,
+        "order": 79,
         "text": "Repeat Steps 4 through 6, with different people taking on the roles of experimenter, timer, and recorder. Do you get the same measurement values regardless of who releases the ball, measures the time, or records the result? Discuss possible causes of discrepancies, if any.",
         "font_size": 11.0,
         "bold": false,
@@ -2447,7 +2505,7 @@
           476.59,
           653.37
         ],
-        "order": 78,
+        "order": 80,
         "text": "True or False: The average speed of the ball will be less than the average velocity of the ball.",
         "font_size": 11.0,
         "bold": false,
@@ -2476,7 +2534,7 @@
           118.85,
           677.41
         ],
-        "order": 79,
+        "order": 81,
         "text": "True",
         "font_size": 11.0,
         "bold": false,
@@ -2505,7 +2563,7 @@
           121.69,
           693.16
         ],
-        "order": 80,
+        "order": 82,
         "text": "False",
         "font_size": 11.0,
         "bold": false,
@@ -2534,7 +2592,7 @@
           169.88,
           84.65
         ],
-        "order": 81,
+        "order": 83,
         "text": "Teacher Support",
         "font_size": 14.0,
         "bold": true,
@@ -2567,7 +2625,7 @@
           154.2,
           111.99
         ],
-        "order": 82,
+        "order": 84,
         "text": "Teacher Support",
         "font_size": 12.0,
         "bold": true,
@@ -2599,8 +2657,8 @@
           548.21,
           144.91
         ],
-        "order": 83,
-        "text": "[BL][OL] Emphasize that the motion in this lab is the motion of the ball as it rolls along the floor. Ask students where there zero should be.",
+        "order": 85,
+        "text": "Emphasize that the motion in this lab is the motion of the ball as it rolls along the floor. Ask students where there zero should be.",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -2628,8 +2686,8 @@
           524.39,
           183.87
         ],
-        "order": 84,
-        "text": "[AL] Ask students what the graph would look like if they began timing at the top versus the bottom of the ramp. Why would the graph look different? What might account for the difference?",
+        "order": 86,
+        "text": "Ask students what the graph would look like if they began timing at the top versus the bottom of the ramp. Why would the graph look different? What might account for the difference?",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -2657,8 +2715,8 @@
           548.89,
           264.91
         ],
-        "order": 85,
-        "text": "[BL][OL] Have the students compare the graphs made with different individuals taking on different roles. Ask them to determine and compare average speeds for each interval. What were the absolute differences in speeds, and what were the percent differences? Do the differences appear to be random, or are there systematic differences? Why might there be systematic differences between the two sets of measurements with different individuals in each role?",
+        "order": 87,
+        "text": "Have the students compare the graphs made with different individuals taking on different roles. Ask them to determine and compare average speeds for each interval. What were the absolute differences in speeds, and what were the percent differences? Do the differences appear to be random, or are there systematic differences? Why might there be systematic differences between the two sets of measurements with different individuals in each role?",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -2686,8 +2744,8 @@
           548.89,
           347.41
         ],
-        "order": 86,
-        "text": "[BL][OL] Have the students compare the graphs made with different individuals taking on different roles. Ask them to determine and compare average speeds for each interval. What were the absolute differences in speeds, and what were the percent differences? Do the differences appear to be random, or are there systematic differences? Why might there be systematic differences between the two sets of measurements with different individuals in each role?",
+        "order": 88,
+        "text": "Have the students compare the graphs made with different individuals taking on different roles. Ask them to determine and compare average speeds for each interval. What were the absolute differences in speeds, and what were the percent differences? Do the differences appear to be random, or are there systematic differences? Why might there be systematic differences between the two sets of measurements with different individuals in each role?",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -2715,7 +2773,7 @@
           336.18,
           387.29
         ],
-        "order": 87,
+        "order": 89,
         "text": "Solving Problems Using Position vs. Time Graphs",
         "font_size": 12.0,
         "bold": true,
@@ -2747,7 +2805,7 @@
           385.91,
           406.62
         ],
-        "order": 88,
+        "order": 90,
         "text": "So how do we use graphs to solve for things we want to know like velocity?",
         "font_size": 11.0,
         "bold": false,
@@ -2776,7 +2834,7 @@
           172.24,
           84.65
         ],
-        "order": 89,
+        "order": 91,
         "text": "Worked Example",
         "font_size": 14.0,
         "bold": true,
@@ -2809,7 +2867,7 @@
           434.74,
           112.04
         ],
-        "order": 90,
+        "order": 92,
         "text": "Using Position–Time Graph to Calculate Average Velocity: Jet Car",
         "font_size": 12.0,
         "bold": true,
@@ -2841,7 +2899,7 @@
           417.6,
           153.12
         ],
-        "order": 91,
+        "order": 93,
         "text": "Find the average velocity of the car whose position is graphed in Figure 1.13.",
         "font_size": 11.0,
         "bold": false,
@@ -2870,7 +2928,7 @@
           141.96,
           197.22
         ],
-        "order": 92,
+        "order": 94,
         "text": "Strategy",
         "font_size": 14.0,
         "bold": true,
@@ -2903,7 +2961,7 @@
           447.91,
           219.12
         ],
-        "order": 93,
+        "order": 95,
         "text": "The slope of a graph of d vs. t is average velocity, since slope equals rise over run.",
         "font_size": 11.0,
         "bold": false,
@@ -2932,7 +2990,7 @@
           322.3,
           245.38
         ],
-        "order": 94,
+        "order": 96,
         "text": "slope =Δ𝐝 Δ𝑡= 𝐯",
         "font_size": 11.0,
         "bold": false,
@@ -2969,7 +3027,7 @@
           482.21,
           264.87
         ],
-        "order": 95,
+        "order": 97,
         "text": "Since the slope is constant here, any two points on the graph can be used to find the slope.",
         "font_size": 11.0,
         "bold": false,
@@ -2998,7 +3056,7 @@
           116.33,
           314.38
         ],
-        "order": 96,
+        "order": 98,
         "text": "Solution",
         "font_size": 11.0,
         "bold": true,
@@ -3030,7 +3088,7 @@
           515.69,
           358.62
         ],
-        "order": 97,
+        "order": 99,
         "text": "Choose two points on the line. In this case, we choose the points labeled on the graph: (6.4 s, 2000 m) and (0.50 s, 525 m). (Note, however, that you could choose any two points.)",
         "font_size": 11.0,
         "bold": false,
@@ -3059,7 +3117,7 @@
           515.1,
           389.37
         ],
-        "order": 98,
+        "order": 100,
         "text": "Substitute the d and t values of the chosen points into the equation. Remember in calculating change ⟦p8-e10⟧ we always use final value minus initial value.",
         "font_size": 11.0,
         "bold": false,
@@ -3088,7 +3146,7 @@
           155.49,
           389.34
         ],
-        "order": 99,
+        "order": 101,
         "text": "(Δ)",
         "font_size": 11.0,
         "bold": false,
@@ -3119,7 +3177,7 @@
           354.43,
           447.11
         ],
-        "order": 100,
+        "order": 102,
         "text": "Δ𝐝 𝐯= Δ𝑡 = 2000 m −525 m , 6.4 s −0.50 s = 250 m/s",
         "font_size": 8.0,
         "bold": false,
@@ -3156,7 +3214,7 @@
           126.71,
           489.13
         ],
-        "order": 101,
+        "order": 103,
         "text": "Discussion",
         "font_size": 11.0,
         "bold": true,
@@ -3188,7 +3246,7 @@
           534.26,
           541.66
         ],
-        "order": 102,
+        "order": 104,
         "text": "This is an impressively high land speed (900 km/h, or about 560 mi/h): much greater than the typical highway speed limit of 27 m/s or 96 km/h, but considerably shy of the record of 343 m/s or 1,234 km/h, set in 1997.",
         "font_size": 11.0,
         "bold": false,
@@ -3217,7 +3275,7 @@
           169.88,
           623.9
         ],
-        "order": 103,
+        "order": 105,
         "text": "Teacher Support",
         "font_size": 14.0,
         "bold": true,
@@ -3250,7 +3308,7 @@
           154.2,
           650.49
         ],
-        "order": 104,
+        "order": 106,
         "text": "Teacher Support",
         "font_size": 12.0,
         "bold": true,
@@ -3282,7 +3340,7 @@
           528.93,
           686.37
         ],
-        "order": 105,
+        "order": 107,
         "text": "If the graph of position is a straight line, then the only thing students need to know to calculate the average velocity is the slope of the line, rise/run. They can use whichever points on the line are most convenient.",
         "font_size": 11.0,
         "bold": false,
@@ -3311,7 +3369,7 @@
           558.78,
           126.12
         ],
-        "order": 106,
+        "order": 108,
         "text": "But what if the graph of the position is more complicated than a straight line? What if the object speeds up or turns around and goes backward? Can we figure out anything about its velocity from a graph of that kind of motion? Let’s take another look at the jet-powered car. The graph in Figure 2.13 shows its motion as it is getting up to speed after starting at rest. Time starts at zero for this motion (as if measured with a stopwatch), and the displacement and velocity are initially 200 m and 15 m/s, respectively.",
         "font_size": 11.0,
         "bold": false,
@@ -3348,7 +3406,7 @@
           471.0,
           393.0
         ],
-        "order": 107,
+        "order": 109,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -3379,7 +3437,7 @@
           476.25,
           708.0
         ],
-        "order": 108,
+        "order": 110,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -3410,7 +3468,7 @@
           554.64,
           126.12
         ],
-        "order": 109,
+        "order": 111,
         "text": "The graph of position versus time in Figure 2.13 is a curve rather than a straight line. The slope of the curve becomes steeper as time progresses, showing that the velocity is increasing over time. The slope at any point on a position-versus-time graph is the instantaneous velocity at that point. It is found by drawing a straight line tangent to the curve at the point of interest and taking the slope of this straight line. Tangent lines are shown for two points in Figure 2.13. The average velocity is the net displacement divided by the time traveled.",
         "font_size": 11.0,
         "bold": false,
@@ -3454,7 +3512,7 @@
           172.24,
           170.15
         ],
-        "order": 110,
+        "order": 112,
         "text": "Worked Example",
         "font_size": 14.0,
         "bold": true,
@@ -3487,7 +3545,7 @@
           493.65,
           196.79
         ],
-        "order": 111,
+        "order": 113,
         "text": "Using Position–Time Graph to Calculate Average Velocity: Jet Car, Take Two",
         "font_size": 12.0,
         "bold": true,
@@ -3519,7 +3577,7 @@
           520.45,
           253.62
         ],
-        "order": 112,
+        "order": 114,
         "text": "Calculate the instantaneous velocity of the jet car at a time of 25 s by finding the slope of the tangent line at point Q in Figure 2.13.",
         "font_size": 11.0,
         "bold": false,
@@ -3556,7 +3614,7 @@
           141.96,
           297.72
         ],
-        "order": 113,
+        "order": 115,
         "text": "Strategy",
         "font_size": 14.0,
         "bold": true,
@@ -3589,7 +3647,7 @@
           503.54,
           334.59
         ],
-        "order": 114,
+        "order": 116,
         "text": "The slope of a curve at a point is equal to the slope of a straight line tangent to the curve at that point.",
         "font_size": 11.0,
         "bold": false,
@@ -3618,7 +3676,7 @@
           116.33,
           384.13
         ],
-        "order": 115,
+        "order": 117,
         "text": "Solution",
         "font_size": 11.0,
         "bold": true,
@@ -3650,7 +3708,7 @@
           311.06,
           412.62
         ],
-        "order": 116,
+        "order": 118,
         "text": "Find the tangent line to the curve at ⟦p10-e8⟧.",
         "font_size": 11.0,
         "bold": false,
@@ -3679,7 +3737,7 @@
           305.56,
           410.38
         ],
-        "order": 117,
+        "order": 119,
         "text": "𝑡= 25 s",
         "font_size": 11.0,
         "bold": false,
@@ -3710,7 +3768,7 @@
           523.11,
           443.34
         ],
-        "order": 118,
+        "order": 120,
         "text": "Determine the endpoints of the tangent. These correspond to a position of 1,300 m at time 19 s and a position of 3120 m at time 32 s.",
         "font_size": 11.0,
         "bold": false,
@@ -3739,7 +3797,7 @@
           383.53,
           459.12
         ],
-        "order": 119,
+        "order": 121,
         "text": "Plug these endpoints into the equation to solve for the slope, v.",
         "font_size": 11.0,
         "bold": false,
@@ -3768,7 +3826,7 @@
           359.25,
           544.61
         ],
-        "order": 120,
+        "order": 122,
         "text": "slope = 𝑣𝑄=Δ𝑑𝑄Δ𝑡𝑄 (3120 −1300) m = (32 −19) s = 1820 m 13 s = 140 m/s",
         "font_size": 8.0,
         "bold": false,
@@ -3805,7 +3863,7 @@
           126.71,
           587.38
         ],
-        "order": 121,
+        "order": 123,
         "text": "Discussion",
         "font_size": 11.0,
         "bold": true,
@@ -3837,7 +3895,7 @@
           346.17,
           610.62
         ],
-        "order": 122,
+        "order": 124,
         "text": "The entire graph of v versus t can be obtained in this fashion.",
         "font_size": 11.0,
         "bold": false,
@@ -3866,7 +3924,7 @@
           169.88,
           84.65
         ],
-        "order": 123,
+        "order": 125,
         "text": "Teacher Support",
         "font_size": 14.0,
         "bold": true,
@@ -3899,7 +3957,7 @@
           154.2,
           111.99
         ],
-        "order": 124,
+        "order": 126,
         "text": "Teacher Support",
         "font_size": 12.0,
         "bold": true,
@@ -3931,7 +3989,7 @@
           549.79,
           193.62
         ],
-        "order": 125,
+        "order": 127,
         "text": "A curved line is a more complicated example. Define tangent as a line that touches a curve at only one point. Show that as a straight line changes its angle next to a curve, it actually hits the curve multiple times at the base, but only one line will never touch at all. This line forms a right angle to the radius of curvature, but at this level, they can just kind of eyeball it. The slope of this line gives the instantaneous velocity. The most useful part of this line is that students can tell when the velocity is increasing, decreasing, positive, negative, and zero.",
         "font_size": 11.0,
         "bold": false,
@@ -3960,8 +4018,8 @@
           542.66,
           230.37
         ],
-        "order": 126,
-        "text": "[AL] You could find the instantaneous velocity at each point along the graph and if you graphed each of those points, you would have a graph of the velocity.",
+        "order": 128,
+        "text": "You could find the instantaneous velocity at each point along the graph and if you graphed each of those points, you would have a graph of the velocity.",
         "font_size": 11.0,
         "bold": false,
         "score": null,
@@ -3989,7 +4047,7 @@
           173.1,
           269.39
         ],
-        "order": 127,
+        "order": 129,
         "text": "Practice Problems",
         "font_size": 14.0,
         "bold": true,
@@ -4022,7 +4080,7 @@
           504.66,
           328.62
         ],
-        "order": 128,
+        "order": 130,
         "text": "16. Calculate the average velocity of the object shown in the graph below over the whole time interval.",
         "font_size": 11.0,
         "bold": false,
@@ -4051,7 +4109,7 @@
           405.75,
           559.5
         ],
-        "order": 129,
+        "order": 131,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -4082,7 +4140,7 @@
           136.35,
           585.91
         ],
-        "order": 130,
+        "order": 132,
         "text": "0.25 m/s",
         "font_size": 11.0,
         "bold": false,
@@ -4111,7 +4169,7 @@
           136.35,
           600.91
         ],
-        "order": 131,
+        "order": 133,
         "text": "0.31 m/s",
         "font_size": 11.0,
         "bold": false,
@@ -4140,7 +4198,7 @@
           130.85,
           616.66
         ],
-        "order": 132,
+        "order": 134,
         "text": "3.2 m/s",
         "font_size": 11.0,
         "bold": false,
@@ -4169,7 +4227,7 @@
           136.35,
           632.41
         ],
-        "order": 133,
+        "order": 135,
         "text": "4.00 m/s",
         "font_size": 11.0,
         "bold": false,
@@ -4198,7 +4256,7 @@
           527.29,
           97.66
         ],
-        "order": 134,
+        "order": 136,
         "text": "17 . True or False: By taking the slope of the curve in the graph you can verify that the velocity of the jet car is ⟦p12-e1⟧ at ⟦p12-e2⟧.",
         "font_size": 11.0,
         "bold": false,
@@ -4227,7 +4285,7 @@
           98.24,
           97.61
         ],
-        "order": 135,
+        "order": 137,
         "text": "125m/s",
         "font_size": 11.0,
         "bold": false,
@@ -4258,7 +4316,7 @@
           143.12,
           97.63
         ],
-        "order": 136,
+        "order": 138,
         "text": "𝑡= 20s",
         "font_size": 11.0,
         "bold": false,
@@ -4289,7 +4347,7 @@
           397.5,
           389.25
         ],
-        "order": 137,
+        "order": 139,
         "text": null,
         "font_size": null,
         "bold": false,
@@ -4320,7 +4378,7 @@
           110.11,
           415.66
         ],
-        "order": 138,
+        "order": 140,
         "text": "True",
         "font_size": 11.0,
         "bold": false,
@@ -4349,7 +4407,7 @@
           112.95,
           431.41
         ],
-        "order": 139,
+        "order": 141,
         "text": "False",
         "font_size": 11.0,
         "bold": false,
@@ -4378,7 +4436,7 @@
           230.08,
           479.97
         ],
-        "order": 140,
+        "order": 142,
         "text": "Check Your Understanding",
         "font_size": 14.0,
         "bold": true,
@@ -4411,7 +4469,7 @@
           542.27,
           552.12
         ],
-        "order": 141,
+        "order": 143,
         "text": "18. Which of the following information about motion can be determined by looking at a position vs. time graph that is a straight line?",
         "font_size": 11.0,
         "bold": false,
@@ -4440,7 +4498,7 @@
           179.64,
           576.91
         ],
-        "order": 142,
+        "order": 144,
         "text": "frame of reference",
         "font_size": 11.0,
         "bold": false,
@@ -4469,7 +4527,7 @@
           188.49,
           594.12
         ],
-        "order": 143,
+        "order": 145,
         "text": "average acceleration",
         "font_size": 11.0,
         "bold": false,
@@ -4498,7 +4556,7 @@
           133.89,
           609.87
         ],
-        "order": 144,
+        "order": 146,
         "text": "velocity",
         "font_size": 11.0,
         "bold": false,
@@ -4527,7 +4585,7 @@
           209.88,
           624.84
         ],
-        "order": 145,
+        "order": 147,
         "text": "direction of force applied",
         "font_size": 11.0,
         "bold": false,
@@ -4556,7 +4614,7 @@
           456.32,
           84.87
         ],
-        "order": 146,
+        "order": 148,
         "text": "19 . True or False: The position vs time graph of an object that is speeding up is a straight line.",
         "font_size": 11.0,
         "bold": false,
@@ -4585,7 +4643,7 @@
           110.11,
           108.91
         ],
-        "order": 147,
+        "order": 149,
         "text": "True",
         "font_size": 11.0,
         "bold": false,
@@ -4614,7 +4672,7 @@
           112.95,
           124.66
         ],
-        "order": 148,
+        "order": 150,
         "text": "False",
         "font_size": 11.0,
         "bold": false,
@@ -4643,7 +4701,7 @@
           169.88,
           185.9
         ],
-        "order": 149,
+        "order": 151,
         "text": "Teacher Support",
         "font_size": 14.0,
         "bold": true,
@@ -4676,7 +4734,7 @@
           154.2,
           213.24
         ],
-        "order": 150,
+        "order": 152,
         "text": "Teacher Support",
         "font_size": 12.0,
         "bold": true,
@@ -4708,7 +4766,7 @@
           548.71,
           261.16
         ],
-        "order": 151,
+        "order": 153,
         "text": "Use the Check Your Understanding questions to assess students’ achievement of the section’s learning objectives. If students are struggling with a specific objective, the Check Your Understanding will help identify direct students to the relevant content.",
         "font_size": 11.0,
         "bold": false,
@@ -4737,7 +4795,7 @@
           389.99,
           311.69
         ],
-        "order": 152,
+        "order": 154,
         "text": "“2.3 Position vs. Time Graphs” from Physics by Paul Peter Urone, Roger Hinrichs, OpenStax.",
         "font_size": 9.0,
         "bold": false,
@@ -4766,7 +4824,7 @@
           460.7,
           330.44
         ],
-        "order": 153,
+        "order": 155,
         "text": "Licensed under Creative Commons Attribution License (CC BY 4.0). http://creativecommons.org/licenses/by/4.0/",
         "font_size": 9.0,
         "bold": false,
@@ -4803,7 +4861,7 @@
           356.06,
           349.19
         ],
-        "order": 154,
+        "order": 156,
         "text": "Original page: https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs",
         "font_size": 9.0,
         "bold": false,
@@ -4840,7 +4898,7 @@
           164.79,
           367.94
         ],
-        "order": 155,
+        "order": 157,
         "text": "Access for free at openstax.org.",
         "font_size": 9.0,
         "bold": false,
@@ -4869,7 +4927,7 @@
           488.57,
           385.94
         ],
-        "order": 156,
+        "order": 158,
         "text": "Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.",
         "font_size": 9.0,
         "bold": false,
@@ -4898,7 +4956,7 @@
           258.72,
           404.69
         ],
-        "order": 157,
+        "order": 159,
         "text": "a11y-stem is not affiliated with or endorsed by OpenStax.",
         "font_size": 9.0,
         "bold": false,
@@ -5078,53 +5136,19 @@
       {
         "element_id": "p1-e6",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -5180,7 +5204,7 @@
         "verifications": []
       },
       {
-        "element_id": "p1-e12",
+        "element_id": "p1-e14",
         "kind": "heading",
         "status": "accepted",
         "confidence": 0.9,
@@ -5232,59 +5256,25 @@
         "verifications": []
       },
       {
-        "element_id": "p1-e13",
+        "element_id": "p1-e15",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
-        "element_id": "p1-e16",
+        "element_id": "p1-e18",
         "kind": "heading",
         "status": "accepted",
         "confidence": 0.9,
@@ -5339,7 +5329,7 @@
         "element_id": "p2-e1",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.95,
         "equation": {
           "latex": "y = mx + b",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>y</mi><mo>=</mo><mi>m</mi><mi>x</mi><mo>+</mo><mi>b</mi></mrow></math>",
@@ -5504,14 +5494,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1296,
-            "cached_input_tokens": 0,
-            "output_tokens": 53,
-            "reasoning_tokens": 22,
-            "cost_usd": 0.0001561,
-            "latency_ms": 3101,
+            "input_tokens": 2096,
+            "cached_input_tokens": 1900,
+            "output_tokens": 33,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.5100000000000004e-05,
+            "latency_ms": 1004,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5522,39 +5512,22 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.99,
-              "cosmetic": 0.01,
-              "meaning_changing": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 308,
-            "cost_usd": 3.08e-05,
-            "latency_ms": 290
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p2-e3",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.9,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Graph of y versus x: the line rises with positive slope m, equal to rise divided by run, and crosses the y-axis at positive intercept b.",
+          "alt": "Graph of a rising straight line on x and y axes, crossing the y-axis at intercept b above the origin; slope m equals rise over run, delta y over delta x.",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -5568,9 +5541,9 @@
           },
           {
             "name": "alt.length",
-            "passed": true,
-            "severity": "error",
-            "code": null
+            "passed": false,
+            "severity": "warning",
+            "code": "too_long"
           },
           {
             "name": "alt.no_redundant_prefix",
@@ -5607,25 +5580,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": true,
-            "severity": "warning",
-            "code": null
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1810,
-            "cached_input_tokens": 0,
-            "output_tokens": 58,
+            "input_tokens": 2588,
+            "cached_input_tokens": 1415,
+            "output_tokens": 86,
             "reasoning_tokens": 0,
-            "cost_usd": 0.0042,
-            "latency_ms": 4316,
+            "cost_usd": 0.006695,
+            "latency_ms": 3232,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5633,41 +5600,25 @@
         ],
         "reason": null,
         "reviewed": false,
-        "review": "none",
+        "review": "optional",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.95,
-              "factual_error": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1251,
-            "cost_usd": 0.0001251,
-            "latency_ms": 216
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p3-e0",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.95,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (km) versus time (min): position rises steadily from 0 km at 0 minutes to 5 km at 10 minutes.",
+          "alt": "Line graph of position in km versus time in minutes: a straight line rises from 0 km at 0 min to 5 km at 10 min, a constant 0.5 km/min.",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -5720,25 +5671,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": true,
-            "severity": "warning",
-            "code": null
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1905,
-            "cached_input_tokens": 0,
-            "output_tokens": 59,
+            "input_tokens": 2685,
+            "cached_input_tokens": 1415,
+            "output_tokens": 88,
             "reasoning_tokens": 0,
-            "cost_usd": 0.0044,
-            "latency_ms": 3929,
+            "cost_usd": 0.007123,
+            "latency_ms": 2341,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5749,30 +5694,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.94,
-              "factual_error": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1334,
-            "cost_usd": 0.00013340000000000002,
-            "latency_ms": 198
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p3-e2",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.85,
         "equation": {
           "latex": "\\mathbf{d}_0 = 0",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub><mo>=</mo><mn>0</mn></mrow></math>",
@@ -5937,28 +5865,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1303,
-            "cached_input_tokens": 1157,
-            "output_tokens": 72,
-            "reasoning_tokens": 40,
-            "cost_usd": 6.217e-05,
-            "latency_ms": 3094,
-            "attempt": 1,
-            "is_fallback": false,
-            "outcome": "ok"
-          },
-          {
-            "step": "equation",
-            "model": "gpt-6.1-sol",
-            "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1303,
-            "cached_input_tokens": 0,
-            "output_tokens": 64,
-            "reasoning_tokens": 29,
-            "cost_usd": 0.003246,
-            "latency_ms": 2823,
+            "input_tokens": 2088,
+            "cached_input_tokens": 1900,
+            "output_tokens": 42,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.88e-05,
+            "latency_ms": 1691,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -5969,50 +5883,15 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "cheap",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.97,
-              "cosmetic": 0.02,
-              "meaning_changing": 0.01
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 305,
-            "cost_usd": 3.05e-05,
-            "latency_ms": 163
-          },
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.54,
-              "cosmetic": 0.06,
-              "meaning_changing": 0.4
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 308,
-            "cost_usd": 3.08e-05,
-            "latency_ms": 109
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p3-e3",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.87,
+        "confidence": 0.85,
         "equation": {
-          "latex": "\\mathbf{d}=0",
+          "latex": "\\mathbf{d} = 0",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>𝐝</mi><mo>=</mo><mn>0</mn></mrow></math>",
           "speech": "bold d equals 0",
           "display": "inline"
@@ -6175,14 +6054,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1330,
-            "cached_input_tokens": 1157,
-            "output_tokens": 239,
-            "reasoning_tokens": 207,
-            "cost_usd": 0.00014837000000000002,
-            "latency_ms": 3764,
+            "input_tokens": 2118,
+            "cached_input_tokens": 1900,
+            "output_tokens": 37,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.93e-05,
+            "latency_ms": 1390,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6193,33 +6072,15 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.69,
-              "cosmetic": 0.04,
-              "meaning_changing": 0.27
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 305,
-            "cost_usd": 3.05e-05,
-            "latency_ms": 195
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p3-e4",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.9,
         "equation": {
-          "latex": "t=0",
+          "latex": "t = 0",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>t</mi><mo>=</mo><mn>0</mn></mrow></math>",
           "speech": "t equals 0",
           "display": "inline"
@@ -6382,14 +6243,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1329,
-            "cached_input_tokens": 1157,
-            "output_tokens": 56,
-            "reasoning_tokens": 27,
-            "cost_usd": 5.6769999999999993e-05,
-            "latency_ms": 1607,
+            "input_tokens": 2122,
+            "cached_input_tokens": 1900,
+            "output_tokens": 31,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.67e-05,
+            "latency_ms": 772,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6400,31 +6261,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.98,
-              "cosmetic": 0.01,
-              "meaning_changing": 0.01
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 298,
-            "cost_usd": 2.98e-05,
-            "latency_ms": 156
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p3-e5",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.96,
+        "confidence": 0.85,
         "equation": {
           "latex": "\\frac{\\Delta \\mathbf{d}}{\\Delta t}.",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>.</mo></mrow></math>",
@@ -6583,14 +6426,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1320,
-            "cached_input_tokens": 1157,
-            "output_tokens": 123,
-            "reasoning_tokens": 82,
-            "cost_usd": 0.0016717000000000001,
-            "latency_ms": 4320,
+            "input_tokens": 2121,
+            "cached_input_tokens": 1900,
+            "output_tokens": 56,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.002384,
+            "latency_ms": 1728,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6601,25 +6444,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.7,
-              "cosmetic": 0.05,
-              "meaning_changing": 0.25
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 311,
-            "cost_usd": 3.1100000000000004e-05,
-            "latency_ms": 180
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p3-e7",
@@ -6677,15 +6502,16 @@
         "element_id": "p4-e0",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.88,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): position starts at 400 m and rises linearly; slope gives a constant velocity of 250 m/s.",
+          "alt": "Straight-line position versus time graph starting at 400 m; from 0.50 s to 6.40 s position rises from 525 m to 2000 m, slope is average velocity.",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -6738,25 +6564,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": false,
-            "severity": "warning",
-            "code": "second_check_mismatch"
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1749,
-            "cached_input_tokens": 0,
-            "output_tokens": 261,
-            "reasoning_tokens": 198,
-            "cost_usd": 0.006108,
-            "latency_ms": 7205,
+            "input_tokens": 2525,
+            "cached_input_tokens": 1415,
+            "output_tokens": 89,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.006503,
+            "latency_ms": 1993,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6764,36 +6584,19 @@
         ],
         "reason": null,
         "reviewed": false,
-        "review": "optional",
+        "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.47,
-              "factual_error": 0.03
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1238,
-            "cost_usd": 0.0001238,
-            "latency_ms": 312
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e2",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.94,
+        "confidence": 0.85,
         "equation": {
-          "latex": "\\mathbf{v}_{\\text{avg}}",
-          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐯</mi><mrow><mtext>avg</mtext></mrow></msub></mrow></math>",
+          "latex": "\\mathbf{v}_\\text{avg}",
+          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐯</mi><mtext>avg</mtext></msub></mrow></math>",
           "speech": "bold v sub avg",
           "display": "inline"
         },
@@ -6949,14 +6752,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1279,
-            "cached_input_tokens": 1157,
-            "output_tokens": 156,
-            "reasoning_tokens": 120,
-            "cost_usd": 0.00010177000000000001,
-            "latency_ms": 2736,
+            "input_tokens": 2071,
+            "cached_input_tokens": 1900,
+            "output_tokens": 44,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.81e-05,
+            "latency_ms": 901,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -6967,31 +6770,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.57,
-              "cosmetic": 0.22,
-              "meaning_changing": 0.21
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 306,
-            "cost_usd": 3.06e-05,
-            "latency_ms": 183
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e3",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.97,
+        "confidence": 0.85,
         "equation": {
           "latex": "\\mathbf{d}_0",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>",
@@ -7150,14 +6935,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1279,
-            "cached_input_tokens": 1157,
-            "output_tokens": 94,
-            "reasoning_tokens": 62,
-            "cost_usd": 7.077000000000002e-05,
-            "latency_ms": 1935,
+            "input_tokens": 2069,
+            "cached_input_tokens": 1900,
+            "output_tokens": 38,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.4900000000000006e-05,
+            "latency_ms": 854,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7168,31 +6953,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.82,
-              "cosmetic": 0.07,
-              "meaning_changing": 0.11
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 303,
-            "cost_usd": 3.03e-05,
-            "latency_ms": 152
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e4",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.95,
         "equation": {
           "latex": "y = mx + b",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>y</mi><mo>=</mo><mi>m</mi><mi>x</mi><mo>+</mo><mi>b</mi></mrow></math>",
@@ -7357,14 +7124,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1287,
-            "cached_input_tokens": 1157,
-            "output_tokens": 54,
-            "reasoning_tokens": 23,
-            "cost_usd": 5.157e-05,
-            "latency_ms": 1416,
+            "input_tokens": 2077,
+            "cached_input_tokens": 1900,
+            "output_tokens": 33,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.3200000000000006e-05,
+            "latency_ms": 1329,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7375,35 +7142,17 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.99,
-              "cosmetic": 0.01,
-              "meaning_changing": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 308,
-            "cost_usd": 3.08e-05,
-            "latency_ms": 177
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e5",
         "kind": "equation",
-        "status": "needs_review",
-        "confidence": 0.528,
+        "status": "accepted",
+        "confidence": 0.93,
         "equation": {
-          "latex": "\\mathbf{d} = vt + \\mathbf{d}_0",
-          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>𝐝</mi><mo>=</mo><mi>v</mi><mi>t</mi><mo>+</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>",
-          "speech": "bold d equals v t plus bold d sub 0",
+          "latex": "\\mathbf{d} = \\mathbf{v}t + \\mathbf{d}_0",
+          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mi>𝐝</mi><mo>=</mo><mi>𝐯</mi><mi>t</mi><mo>+</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math>",
+          "speech": "bold d equals bold v t plus bold d sub 0",
           "display": "block"
         },
         "figure": null,
@@ -7550,9 +7299,9 @@
           },
           {
             "name": "equation.text_layer_style",
-            "passed": false,
+            "passed": true,
             "severity": "warning",
-            "code": "style_mismatch"
+            "code": null
           },
           {
             "name": "equation.text_layer_signs",
@@ -7564,14 +7313,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1292,
-            "cached_input_tokens": 1157,
-            "output_tokens": 314,
-            "reasoning_tokens": 274,
-            "cost_usd": 0.0035256999999999997,
-            "latency_ms": 8468,
+            "input_tokens": 2084,
+            "cached_input_tokens": 1900,
+            "output_tokens": 57,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.002256,
+            "latency_ms": 1374,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7579,28 +7328,10 @@
         ],
         "reason": null,
         "reviewed": false,
-        "review": "required",
+        "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.48,
-              "cosmetic": 0.1,
-              "meaning_changing": 0.42
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 317,
-            "cost_usd": 3.1700000000000005e-05,
-            "latency_ms": 182
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e7",
@@ -7771,14 +7502,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1303,
-            "cached_input_tokens": 1157,
-            "output_tokens": 280,
-            "reasoning_tokens": 235,
-            "cost_usd": 0.0032077,
-            "latency_ms": 8122,
+            "input_tokens": 2091,
+            "cached_input_tokens": 1900,
+            "output_tokens": 59,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.002324,
+            "latency_ms": 1340,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7789,31 +7520,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.74,
-              "cosmetic": 0.08,
-              "meaning_changing": 0.18
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 324,
-            "cost_usd": 3.24e-05,
-            "latency_ms": 156
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e9",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.9,
         "equation": {
           "latex": "t = 0\\ \\text{s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>t</mi><mo>=</mo><mn>0</mn><mtext> </mtext><mtext>s</mtext></mrow></math>",
@@ -7978,14 +7691,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1301,
-            "cached_input_tokens": 1157,
-            "output_tokens": 72,
-            "reasoning_tokens": 37,
-            "cost_usd": 6.197e-05,
-            "latency_ms": 2000,
+            "input_tokens": 2091,
+            "cached_input_tokens": 1900,
+            "output_tokens": 40,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.81e-05,
+            "latency_ms": 1428,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -7996,31 +7709,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.9,
-              "cosmetic": 0.06,
-              "meaning_changing": 0.04
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 307,
-            "cost_usd": 3.07e-05,
-            "latency_ms": 165
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p4-e10",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.93,
         "equation": {
           "latex": "t = 1.0\\ \\text{s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>t</mi><mo>=</mo><mn>1.0</mn><mtext> </mtext><mtext>s</mtext></mrow></math>",
@@ -8185,14 +7880,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1303,
-            "cached_input_tokens": 1157,
-            "output_tokens": 78,
-            "reasoning_tokens": 41,
-            "cost_usd": 6.517e-05,
-            "latency_ms": 1994,
+            "input_tokens": 2093,
+            "cached_input_tokens": 1900,
+            "output_tokens": 42,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.93e-05,
+            "latency_ms": 876,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -8203,25 +7898,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.96,
-              "cosmetic": 0.02,
-              "meaning_changing": 0.02
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 311,
-            "cost_usd": 3.1100000000000004e-05,
-            "latency_ms": 107
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p5-e0",
@@ -8278,53 +7955,19 @@
       {
         "element_id": "p5-e1",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -8590,53 +8233,19 @@
       {
         "element_id": "p7-e1",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -8851,7 +8460,7 @@
         "element_id": "p8-e5",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.96,
+        "confidence": 0.88,
         "equation": {
           "latex": "\\text{slope} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\mathbf{v}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mtext>slope</mtext><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mi>𝐯</mi></mrow></math>",
@@ -9016,14 +8625,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1287,
-            "cached_input_tokens": 1157,
-            "output_tokens": 135,
-            "reasoning_tokens": 82,
-            "cost_usd": 0.0017257000000000002,
-            "latency_ms": 4849,
+            "input_tokens": 2068,
+            "cached_input_tokens": 1900,
+            "output_tokens": 71,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.002472,
+            "latency_ms": 1588,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9034,25 +8643,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.61,
-              "cosmetic": 0.15,
-              "meaning_changing": 0.24
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 338,
-            "cost_usd": 3.38e-05,
-            "latency_ms": 144
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p8-e7",
@@ -9110,7 +8701,7 @@
         "element_id": "p8-e10",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.88,
         "equation": {
           "latex": "(\\Delta)",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mo stretchy=\"false\">(</mo><mi>Δ</mi><mo stretchy=\"false\">)</mo></mrow></math>",
@@ -9269,14 +8860,28 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1253,
-            "cached_input_tokens": 1157,
-            "output_tokens": 88,
-            "reasoning_tokens": 58,
-            "cost_usd": 6.517e-05,
-            "latency_ms": 2210,
+            "input_tokens": 2030,
+            "cached_input_tokens": 1900,
+            "output_tokens": 34,
+            "reasoning_tokens": 0,
+            "cost_usd": 4.9e-05,
+            "latency_ms": 871,
+            "attempt": 1,
+            "is_fallback": false,
+            "outcome": "ok"
+          },
+          {
+            "step": "equation",
+            "model": "claude-opus-5-5",
+            "prompt_version": "equation-df0e12f1",
+            "input_tokens": 2030,
+            "cached_input_tokens": 1900,
+            "output_tokens": 32,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.00154,
+            "latency_ms": 1168,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9287,31 +8892,14 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.97,
-              "cosmetic": 0.02,
-              "meaning_changing": 0.01
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 299,
-            "cost_usd": 2.9900000000000002e-05,
-            "latency_ms": 147
-          }
-        ]
+        "verifications": [],
+        "escalation": "same"
       },
       {
         "element_id": "p8-e11",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.9,
+        "confidence": 0.88,
         "equation": {
           "latex": "\\begin{array}{rcl} \\mathbf{v} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ & = & \\frac{2000\\ \\text{m} - 525\\ \\text{m}}{6.4\\ \\text{s} - 0.50\\ \\text{s}}, \\\\ & = & 250\\ \\text{m/s} \\end{array}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mtable><mtr><mtd columnalign=\"right\"><mi>𝐯</mi></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mn>2000</mn><mtext> </mtext><mtext>m</mtext><mo>−</mo><mn>525</mn><mtext> </mtext><mtext>m</mtext></mrow><mrow><mn>6.4</mn><mtext> </mtext><mtext>s</mtext><mo>−</mo><mn>0.50</mn><mtext> </mtext><mtext>s</mtext></mrow></mfrac><mo>,</mo></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mn>250</mn><mtext> </mtext><mtext>m/s</mtext></mtd></mtr></mtable></mrow></math>",
@@ -9476,14 +9064,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1314,
-            "cached_input_tokens": 1157,
-            "output_tokens": 325,
-            "reasoning_tokens": 203,
-            "cost_usd": 0.0036796999999999997,
-            "latency_ms": 8464,
+            "input_tokens": 2091,
+            "cached_input_tokens": 1900,
+            "output_tokens": 170,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.004544,
+            "latency_ms": 2179,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9494,25 +9082,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.56,
-              "cosmetic": 0.24,
-              "meaning_changing": 0.2
-            },
-            "flagged": true,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 432,
-            "cost_usd": 4.32e-05,
-            "latency_ms": 109
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p8-e12",
@@ -9621,68 +9191,35 @@
       {
         "element_id": "p8-e15",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
         "element_id": "p9-e1",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.97,
+        "confidence": 0.85,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Position (m) versus time (s) graph: position curves upward to about 2,900 m at 30 s; the tangent at Q is steeper than at P.",
+          "alt": "Graph of position versus time, 0 to 30 s: curve rises from about 200 m to 2900 m, steepening; tangent at Q (25 s) is steeper than at P (10 s).",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -9735,25 +9272,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": true,
-            "severity": "warning",
-            "code": null
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1856,
-            "cached_input_tokens": 0,
-            "output_tokens": 217,
-            "reasoning_tokens": 151,
-            "cost_usd": 0.005882,
-            "latency_ms": 6578,
+            "input_tokens": 2690,
+            "cached_input_tokens": 1415,
+            "output_tokens": 95,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.007283,
+            "latency_ms": 2831,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9764,38 +9295,22 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.75,
-              "factual_error": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1300,
-            "cost_usd": 0.00013,
-            "latency_ms": 293
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p9-e2",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.97,
+        "confidence": 0.88,
         "equation": null,
         "figure": {
           "figure_type": "photo",
-          "alt": "A long, low jet-powered car points right on a paved track, trailing a thick plume of exhaust to the left.",
+          "alt": "A long, low jet-powered car races along a runway, trailing thick clouds of white exhaust smoke behind it, with grass and trees nearby.",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -9848,25 +9363,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": true,
-            "severity": "warning",
-            "code": null
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1848,
-            "cached_input_tokens": 0,
-            "output_tokens": 51,
+            "input_tokens": 2667,
+            "cached_input_tokens": 1415,
+            "output_tokens": 80,
             "reasoning_tokens": 0,
-            "cost_usd": 0.004206,
-            "latency_ms": 3518,
+            "cost_usd": 0.006891,
+            "latency_ms": 1919,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -9877,24 +9386,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.98,
-              "factual_error": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1274,
-            "cost_usd": 0.0001274,
-            "latency_ms": 301
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p10-e1",
@@ -10108,7 +9600,7 @@
         "element_id": "p10-e8",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.92,
         "equation": {
           "latex": "t = 25\\ \\text{s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>t</mi><mo>=</mo><mn>25</mn><mtext> </mtext><mtext>s</mtext></mrow></math>",
@@ -10273,14 +9765,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1238,
-            "cached_input_tokens": 1157,
-            "output_tokens": 72,
-            "reasoning_tokens": 37,
-            "cost_usd": 5.567e-05,
-            "latency_ms": 1534,
+            "input_tokens": 2009,
+            "cached_input_tokens": 1900,
+            "output_tokens": 40,
+            "reasoning_tokens": 0,
+            "cost_usd": 4.99e-05,
+            "latency_ms": 1341,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10291,34 +9783,16 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.94,
-              "cosmetic": 0.04,
-              "meaning_changing": 0.02
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 309,
-            "cost_usd": 3.09e-05,
-            "latency_ms": 151
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p10-e11",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.99,
+        "confidence": 0.9,
         "equation": {
-          "latex": "\\begin{array}{rcl}\\text{slope} & = & v_Q = \\frac{\\Delta d_Q}{\\Delta t_Q} \\\\ & = & \\frac{(3120 - 1300)\\ \\text{m}}{(32 - 19)\\ \\text{s}} \\\\ & = & \\frac{1820\\ \\text{m}}{13\\ \\text{s}} \\\\ & = & 140\\ \\text{m/s}\\end{array}",
-          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mtable><mtr><mtd columnalign=\"right\"><mtext>slope</mtext></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><msub><mi>v</mi><mi>Q</mi></msub><mo>=</mo><mfrac><mrow><mi>Δ</mi><msub><mi>d</mi><mi>Q</mi></msub></mrow><mrow><mi>Δ</mi><msub><mi>t</mi><mi>Q</mi></msub></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mo stretchy=\"false\">(</mo><mn>3120</mn><mo>−</mo><mn>1300</mn><mo stretchy=\"false\">)</mo><mtext> </mtext><mtext>m</mtext></mrow><mrow><mo stretchy=\"false\">(</mo><mn>32</mn><mo>−</mo><mn>19</mn><mo stretchy=\"false\">)</mo><mtext> </mtext><mtext>s</mtext></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mn>1820</mn><mtext> </mtext><mtext>m</mtext></mrow><mrow><mn>13</mn><mtext> </mtext><mtext>s</mtext></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mn>140</mn><mtext> </mtext><mtext>m/s</mtext></mtd></mtr></mtable></mrow></math>",
+          "latex": "\\begin{array}{rcl} \\text{slope} & = & v_{Q} = \\frac{\\Delta d_{Q}}{\\Delta t_{Q}} \\\\ & = & \\frac{(3120 - 1300)\\ \\text{m}}{(32 - 19)\\ \\text{s}} \\\\ & = & \\frac{1820\\ \\text{m}}{13\\ \\text{s}} \\\\ & = & 140\\ \\text{m/s} \\end{array}",
+          "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"block\"><mrow><mtable><mtr><mtd columnalign=\"right\"><mtext>slope</mtext></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><msub><mi>v</mi><mrow><mi>Q</mi></mrow></msub><mo>=</mo><mfrac><mrow><mi>Δ</mi><msub><mi>d</mi><mrow><mi>Q</mi></mrow></msub></mrow><mrow><mi>Δ</mi><msub><mi>t</mi><mrow><mi>Q</mi></mrow></msub></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mo stretchy=\"false\">(</mo><mn>3120</mn><mo>−</mo><mn>1300</mn><mo stretchy=\"false\">)</mo><mtext> </mtext><mtext>m</mtext></mrow><mrow><mo stretchy=\"false\">(</mo><mn>32</mn><mo>−</mo><mn>19</mn><mo stretchy=\"false\">)</mo><mtext> </mtext><mtext>s</mtext></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mfrac><mrow><mn>1820</mn><mtext> </mtext><mtext>m</mtext></mrow><mrow><mn>13</mn><mtext> </mtext><mtext>s</mtext></mrow></mfrac></mtd></mtr><mtr><mtd columnalign=\"right\"></mtd><mtd columnalign=\"center\"><mo>=</mo></mtd><mtd columnalign=\"left\"><mn>140</mn><mtext> </mtext><mtext>m/s</mtext></mtd></mtr></mtable></mrow></math>",
           "speech": "row 1: slope equals v sub capital Q equals the fraction capital delta d sub capital Q over capital delta t sub capital Q end fraction; row 2: equals the fraction open parenthesis 3120 minus 1300 close parenthesis m over open parenthesis 32 minus 19 close parenthesis s end fraction; row 3: equals 1820 m over 13 s; row 4: equals 140 m/s",
           "display": "block"
         },
@@ -10480,14 +9954,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1328,
-            "cached_input_tokens": 1157,
-            "output_tokens": 225,
-            "reasoning_tokens": 90,
-            "cost_usd": 0.0027077,
-            "latency_ms": 5274,
+            "input_tokens": 2111,
+            "cached_input_tokens": 1900,
+            "output_tokens": 198,
+            "reasoning_tokens": 0,
+            "cost_usd": 0.005184,
+            "latency_ms": 3095,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10498,25 +9972,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.87,
-              "cosmetic": 0.06,
-              "meaning_changing": 0.07
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 469,
-            "cost_usd": 4.690000000000001e-05,
-            "latency_ms": 324
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p10-e12",
@@ -10625,53 +10081,19 @@
       {
         "element_id": "p11-e1",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -10730,15 +10152,16 @@
         "element_id": "p11-e6",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.96,
+        "confidence": 0.88,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): position rises linearly from about 2.5 m at 0 s to 19 m at 70 s.",
+          "alt": "Line graph of position in meters versus time in seconds: position rises steadily from about 2.5 m at 0 s to about 19 m at 70 s.",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -10791,25 +10214,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": true,
-            "severity": "warning",
-            "code": null
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1604,
-            "cached_input_tokens": 0,
-            "output_tokens": 63,
+            "input_tokens": 2329,
+            "cached_input_tokens": 1415,
+            "output_tokens": 81,
             "reasoning_tokens": 0,
-            "cost_usd": 0.003838,
-            "latency_ms": 3506,
+            "cost_usd": 0.005559,
+            "latency_ms": 1467,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -10820,30 +10237,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.94,
-              "factual_error": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1173,
-            "cost_usd": 0.0001173,
-            "latency_ms": 186
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p12-e1",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.85,
         "equation": {
           "latex": "125\\ \\text{m/s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mn>125</mn><mtext> </mtext><mtext>m/s</mtext></mrow></math>",
@@ -11002,14 +10402,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1262,
-            "cached_input_tokens": 1157,
-            "output_tokens": 113,
-            "reasoning_tokens": 79,
-            "cost_usd": 7.856999999999999e-05,
-            "latency_ms": 1899,
+            "input_tokens": 2038,
+            "cached_input_tokens": 1900,
+            "output_tokens": 39,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.23e-05,
+            "latency_ms": 838,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -11020,31 +10420,13 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.97,
-              "cosmetic": 0.02,
-              "meaning_changing": 0.01
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 308,
-            "cost_usd": 3.08e-05,
-            "latency_ms": 111
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p12-e2",
         "kind": "equation",
         "status": "accepted",
-        "confidence": 0.97,
+        "confidence": 0.85,
         "equation": {
           "latex": "t = 20\\ \\text{s}",
           "mathml": "<math xmlns=\"http://www.w3.org/1998/Math/MathML\" display=\"inline\"><mrow><mi>t</mi><mo>=</mo><mn>20</mn><mtext> </mtext><mtext>s</mtext></mrow></math>",
@@ -11209,14 +10591,14 @@
         "calls": [
           {
             "step": "equation",
-            "model": "gpt-6-luna",
+            "model": "claude-haiku-5-5",
             "prompt_version": "equation-df0e12f1",
-            "input_tokens": 1262,
-            "cached_input_tokens": 1157,
-            "output_tokens": 117,
-            "reasoning_tokens": 82,
-            "cost_usd": 8.057e-05,
-            "latency_ms": 1959,
+            "input_tokens": 2036,
+            "cached_input_tokens": 1900,
+            "output_tokens": 40,
+            "reasoning_tokens": 0,
+            "cost_usd": 5.2600000000000005e-05,
+            "latency_ms": 1221,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -11227,39 +10609,22 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "equation_match",
-            "stage": "final",
-            "mode": "shadow",
-            "outcome": "ok",
-            "probabilities": {
-              "match": 0.93,
-              "cosmetic": 0.05,
-              "meaning_changing": 0.02
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "equation_match-45fc775c",
-            "input_tokens": 309,
-            "cost_usd": 3.09e-05,
-            "latency_ms": 155
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p12-e3",
         "kind": "figure",
         "status": "accepted",
-        "confidence": 0.98,
+        "confidence": 0.88,
         "equation": null,
         "figure": {
           "figure_type": "chart",
-          "alt": "Line graph of position (m) versus time (s): position rises from about 200 m at 0 s to 2900 m at 30 s, with increasing slope and velocity.",
+          "alt": "Line graph of position versus time: position curves upward from about 200 m at 0 s to about 2900 m at 30 s, rising faster as time goes on.",
           "decorative": false,
           "long_description": null,
           "data_table": null,
           "data_values_from_text": null,
+          "data_table_added": false,
           "colour_only": false
         },
         "heading": null,
@@ -11312,25 +10677,19 @@
             "passed": true,
             "severity": "error",
             "code": null
-          },
-          {
-            "name": "figure.second_check",
-            "passed": true,
-            "severity": "warning",
-            "code": null
           }
         ],
         "calls": [
           {
             "step": "figure",
-            "model": "gpt-6.1-sol",
+            "model": "claude-opus-5-5",
             "prompt_version": "figure-ac51f42d",
-            "input_tokens": 1796,
-            "cached_input_tokens": 0,
-            "output_tokens": 66,
+            "input_tokens": 2543,
+            "cached_input_tokens": 1415,
+            "output_tokens": 82,
             "reasoning_tokens": 0,
-            "cost_usd": 0.004252,
-            "latency_ms": 3012,
+            "cost_usd": 0.006435,
+            "latency_ms": 2397,
             "attempt": 1,
             "is_fallback": false,
             "outcome": "ok"
@@ -11341,24 +10700,7 @@
         "review": "none",
         "group_key": null,
         "group_size": null,
-        "verifications": [
-          {
-            "check": "figure_alt",
-            "stage": "final",
-            "mode": "note",
-            "outcome": "ok",
-            "probabilities": {
-              "ok": 0.92,
-              "factual_error": 0.0
-            },
-            "flagged": false,
-            "model": "gpt-6-luna",
-            "version": "figure_alt-16a00e69",
-            "input_tokens": 1326,
-            "cost_usd": 0.0001326,
-            "latency_ms": 259
-          }
-        ]
+        "verifications": []
       },
       {
         "element_id": "p12-e6",
@@ -11467,60 +10809,26 @@
       {
         "element_id": "p13-e4",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       }
     ],
     "stats": {
       "pages": 13,
-      "cost_usd": 0.05524194,
-      "latency_ms": 32113,
+      "cost_usd": 0.0679103,
+      "latency_ms": 16656,
       "model_calls": 27,
       "by_kind": {
         "heading": 36,
@@ -11528,19 +10836,19 @@
         "figure": 7
       },
       "by_status": {
-        "accepted": 50,
-        "needs_review": 12
+        "accepted": 58,
+        "needs_review": 4
       },
       "by_review": {
-        "none": 44,
-        "required": 12,
-        "optional": 6
+        "none": 52,
+        "optional": 6,
+        "required": 4
       },
-      "required_decisions": 4,
+      "required_decisions": 2,
       "per_page": [
         {
           "page": 0,
-          "elements": 18,
+          "elements": 20,
           "fixes": 8,
           "cost_usd": 0.0,
           "latency_ms": 0
@@ -11549,22 +10857,22 @@
           "page": 1,
           "elements": 6,
           "fixes": 2,
-          "cost_usd": 0.004512,
-          "latency_ms": 8414
+          "cost_usd": 0.0067501,
+          "latency_ms": 4943
         },
         {
           "page": 2,
           "elements": 10,
           "fixes": 6,
-          "cost_usd": 0.00987111,
-          "latency_ms": 20979
+          "cost_usd": 0.0096818,
+          "latency_ms": 8560
         },
         {
           "page": 3,
           "elements": 11,
           "fixes": 8,
-          "cost_usd": 0.01353405,
-          "latency_ms": 35320
+          "cost_usd": 0.0113666,
+          "latency_ms": 10106
         },
         {
           "page": 4,
@@ -11591,36 +10899,36 @@
           "page": 7,
           "elements": 17,
           "fixes": 10,
-          "cost_usd": 0.00557747,
-          "latency_ms": 15929
+          "cost_usd": 0.008605,
+          "latency_ms": 5812
         },
         {
           "page": 8,
           "elements": 3,
           "fixes": 2,
-          "cost_usd": 0.0103454,
-          "latency_ms": 10697
+          "cost_usd": 0.014174,
+          "latency_ms": 4755
         },
         {
           "page": 9,
           "elements": 14,
           "fixes": 7,
-          "cost_usd": 0.00284117,
-          "latency_ms": 7289
+          "cost_usd": 0.0052339,
+          "latency_ms": 4441
         },
         {
           "page": 10,
           "elements": 11,
           "fixes": 4,
-          "cost_usd": 0.0039553,
-          "latency_ms": 3693
+          "cost_usd": 0.005559,
+          "latency_ms": 1468
         },
         {
           "page": 11,
           "elements": 12,
           "fixes": 4,
-          "cost_usd": 0.00460544,
-          "latency_ms": 7399
+          "cost_usd": 0.0065399,
+          "latency_ms": 4458
         },
         {
           "page": 12,
@@ -11808,6 +11116,281 @@
       "links": 2,
       "tables": 0
     },
-    "lang_source": "detected"
+    "lang_source": "detected",
+    "page_types": [
+      {
+        "page": 0,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1574,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 1.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 1,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1380,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.167,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 2,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1114,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.195,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 3,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 668,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.164,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 4,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1287,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 5,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1562,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 1.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 6,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1232,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 7,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1077,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 8,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 784,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.35,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 9,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 1130,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 10,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 827,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.154,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 11,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 389,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.193,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      },
+      {
+        "page": 12,
+        "kind": "born_digital",
+        "trust": "all",
+        "route": "text_layer",
+        "reasons": [
+          "visible_text"
+        ],
+        "visible_chars": 843,
+        "invisible_chars": 0,
+        "covered_chars": 0,
+        "image_coverage": 0.0,
+        "ink_strokes": 0,
+        "ink_rows": 0,
+        "ink_repeat_share": 0.0,
+        "ink_pen_share": 0.0,
+        "ink_size_twins": 0.0,
+        "annot_strokes": 0,
+        "producer": "chromium",
+        "classifier_version": "page-type-v5.4"
+      }
+    ]
   }
 }

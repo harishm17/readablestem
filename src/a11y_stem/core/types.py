@@ -105,6 +105,12 @@ def default_review(status: Status | str | None) -> Review:
         return "none"
 
 
+# `Fix.reason` of a heading fix that is not a heading: its text is the same as the heading
+# directly above it (a box title repeated under the section's own heading), so it is
+# written as bold text (`heading_step`).
+HEADING_REPEATS_ABOVE = "repeats_heading_above"
+
+
 class Check(BaseModel):
     """Result of one deterministic validator. Content-free by design."""
 
@@ -508,6 +514,13 @@ class Fix(BaseModel):
     # The second automated check's answers about this fix (see `Verification`). Empty
     # when it did not run, and in results stored before it existed.
     verifications: list[Verification] = Field(default_factory=list)
+    # Equations that started on the cheap model: what asking the main model again did.
+    # "same" or "changed" (its LaTeX against the cheap answer's, whitespace aside),
+    # "failed" (it gave no usable answer; the cheap one stands) or "skipped" (the cheap
+    # answer's only reason to be asked again was a confidence just below the accept bar,
+    # `equation_step.SKIP_ESCALATION_FROM`). None when no second reading was due. Left out
+    # of the JSON when None, so a record without it is unchanged.
+    escalation: str | None = Field(default=None, exclude_if=lambda v: v is None)
 
     @model_validator(mode="before")
     @classmethod
@@ -788,6 +801,12 @@ class ConversionOptions(BaseModel):
     long_descriptions: bool = False
     colour: bool = False
     notation_memory: bool = False
+    # The document is an exam or graded assessment: figure alt text describes what is
+    # shown and never the result (prompt `figure_exam.md`), and the long description and
+    # data table, which give values and trends, are not asked for even when
+    # `long_descriptions` is on. A per-job choice (the upload form), not a deployment
+    # flag, so `from_settings` leaves it off.
+    exam_mode: bool = False
 
     @classmethod
     def from_settings(cls, settings: Settings) -> ConversionOptions:

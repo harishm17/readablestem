@@ -161,31 +161,103 @@ def test_repeated_uncertain_labels_make_one_group_decision():
     elements = [
         large(0, "Motion", 18.0),
         large(1, "Teacher Support", 14.0),
-        heading(2, "Teacher Support", 11.0, REASON_BOLD_BODY),
-        heading(3, "Solution", 11.0, REASON_BOLD_BODY),
-        large(4, "Teacher Support", 14.0),
-        heading(5, "teacher  support:", 11.0, REASON_BOLD_BODY),  # same label, normalised
-        heading(6, "Teacher Support", 10.0, REASON_BOLD_BODY),  # another style: not grouped
-        heading(7, "Teacher Support", 11.0, REASON_BOLD_BODY),
+        heading(2, "Solution", 11.0, REASON_BOLD_BODY),
+        heading(3, "Teacher Support", 11.0, REASON_BOLD_BODY),
+        large(4, "Procedure", 14.0),
+        large(5, "Teacher Support", 14.0),
+        large(6, "Discussion", 14.0),
+        heading(7, "teacher  support:", 11.0, REASON_BOLD_BODY),  # same label, normalised
+        large(8, "Review", 14.0),
+        heading(9, "Teacher Support", 10.0, REASON_BOLD_BODY),  # another style: not grouped
+        large(10, "Check", 14.0),
+        heading(11, "Teacher Support", 11.0, REASON_BOLD_BODY),
     ]
     fixes = by_id(elements)
-    members = ["p1-e2", "p1-e5", "p1-e7"]
+    members = ["p1-e3", "p1-e7", "p1-e11"]
     for element_id in members:
         fix = fixes[element_id]
         assert (fix.status, fix.review, fix.group_key, fix.group_size) == (
             Status.NEEDS_REVIEW,
             "required",
-            "hg-p1-e2",
+            "hg-p1-e3",
             3,
         ), element_id
         assert fix.heading is not None and fix.heading.level == 3
     # Certain copies of the same words are not part of it, nor is a label used once.
     assert fixes["p1-e1"].status is Status.ACCEPTED and fixes["p1-e1"].group_key is None
-    for element_id in ("p1-e3", "p1-e6"):
+    for element_id in ("p1-e2", "p1-e9"):
         assert fixes[element_id].status is Status.ACCEPTED
         assert fixes[element_id].review == "optional"
         assert fixes[element_id].group_key is None
-    assert re.fullmatch(r"hg-p\d+-e\d+", fixes["p1-e2"].group_key or "")
+    assert re.fullmatch(r"hg-p\d+-e\d+", fixes["p1-e3"].group_key or "")
+
+
+def test_a_heading_with_the_same_text_and_level_as_the_one_above_becomes_bold_text():
+    elements = [
+        large(0, "Motion", 18.0),
+        large(1, "Teacher Support", 14.0),
+        large(2, "Teacher Support", 14.0),  # the same box title again, at the same level
+        large(3, "Teacher Demonstration", 14.0),
+        large(4, "teacher  demonstration:", 14.0),  # same label, normalised
+        large(5, "Teacher Demonstration", 14.0),  # a third copy repeats the second
+        large(6, "Summary", 14.0),
+    ]
+    fixes = by_id(elements)
+    assert list(fixes) == [f"p1-e{i}" for i in range(7)]  # one fix per heading, in order
+    for element_id in ("p1-e2", "p1-e4", "p1-e5"):
+        fix = fixes[element_id]
+        assert (fix.status, fix.review, fix.reason, fix.heading) == (
+            Status.ACCEPTED,
+            "none",
+            "repeats_heading_above",
+            None,
+        ), element_id
+        assert fix.group_key is None and not fix.pending
+    # The first copy stays a heading, and the repeats take no part in the outline.
+    assert [fixes[f"p1-e{i}"].heading.level for i in (0, 1, 3, 6)] == [1, 2, 2, 2]
+
+
+def test_the_same_text_one_level_down_is_a_real_sub_heading():
+    """OpenStax sets "Teacher Support" as a box title and again, smaller, as its first
+    line: the book's own outline has both (h3 then h4), so both stay headings."""
+    elements = [
+        large(0, "Motion", 18.0),
+        large(1, "Teacher Support", 14.0),
+        large(2, "Teacher Support", 12.0),
+        heading(3, "Teacher Support", 11.0, REASON_BOLD_BODY),  # lower still
+    ]
+    fixes = by_id(elements)
+    assert all(f.reason is None and f.heading is not None for f in fixes.values())
+    assert [f.heading.level for f in fixes.values()] == [1, 2, 3, 4]
+
+
+def test_a_heading_with_other_text_between_two_copies_is_not_a_repeat():
+    elements = [
+        large(0, "Motion", 18.0),
+        large(1, "Summary", 14.0),
+        heading(2, "Summary", 11.0, REASON_BOLD_BODY, kind=Kind.PARAGRAPH),  # text between
+        large(3, "Summary", 14.0),
+    ]
+    fixes = heading_fixes(elements)  # the paragraph is in the list, between the copies
+    assert all(f.reason is None for f in fixes)
+    assert [f.heading.level for f in fixes if f.heading] == [1, 2, 2]
+
+
+def test_the_repeated_heading_is_written_as_bold_text_in_the_html():
+    from a11y_stem.pipeline.assemble import render_html
+
+    elements = [
+        large(0, "Motion", 18.0),
+        large(1, "Teacher Support", 14.0),
+        large(2, "Teacher Support", 14.0),
+        large(3, "Summary", 14.0),
+    ]
+    html = render_html(
+        title="T", lang="en", elements=elements, fixes=heading_fixes(elements), crops={}
+    )
+    main = html[html.index("<main>") : html.index("</main>")]
+    assert main.count("<h2") == 2 and "<h3" not in main  # Teacher Support once, Summary
+    assert '<p id="p1-e2"><strong>Teacher Support</strong></p>' in main
 
 
 def test_repeated_certain_headings_are_not_grouped():

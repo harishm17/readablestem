@@ -75,8 +75,8 @@ from a11y_stem.core.childenv import child_env
 from a11y_stem.core.mathchars import base_char, char_variant, styled_char
 from a11y_stem.core.notation import canonical_from_parts
 from a11y_stem.core.types import BBox, Element, Kind, Notice, TableGrid, inline_marker
+from a11y_stem.pipeline import hyphens, page_type, tables
 from a11y_stem.pipeline import options as run_options
-from a11y_stem.pipeline import page_type, tables
 from a11y_stem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
     EVIDENCE_COURSE,
@@ -967,6 +967,8 @@ class _Row:
     absorbed: bool = False  # belongs to a figure (labels, text inside a diagram)
     marker: _Marker | None = None  # the row starts a list item (see _list_markers)
     region: _Region | None = None  # the display equation it belongs to (_equation_regions)
+    # An exercise number ("18.", "4)") cut off the front of a maths row: text, never maths.
+    exercise_number: bool = False
 
     @cached_property
     def ink(self) -> list[_Char]:
@@ -1830,6 +1832,8 @@ def _classify_row(row: _Row) -> None:
     prose = _prose_words(row, info)
     if row.vertical or sum(k == "C" for k in info.classes) > 0.5 * len(ink):
         row.kind = "text"
+    elif row.exercise_number:
+        row.kind = "text"  # "18.": kept as text before the equation it numbers
     elif row.marker is not None:
         row.kind = "text"  # a list item ("b. - 40 m/s"): maths in it is inline
     elif not counted:
@@ -3183,6 +3187,54 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
             out.append(_Row(row.chars[start:], column=row.column))
         else:
             out.append(row)
+    return out
+
+
+_EXERCISE_NUMBER = re.compile(r"^\d{1,3}[.)]$")
+
+
+def _split_exercise_numbers(rows: list[_Row]) -> list[_Row]:
+    """Cut an exercise number ("18.", "4)") off the front of a maths row into a text row.
+
+    A numbered exercise that is only an equation ("18. 0 = 5 t - 4.9 t") reads as one maths
+    row because `_merge_baselines` joins the number and the equation when they sit on one
+    baseline. The number would then be sent to the model as part of the equation, and
+    would stand in its text layer. The first token is cut off when it is a one- to
+    three-digit number with a full stop or bracket, drawn in a text font (no maths font,
+    no maths character), with a gap before the rest, and the rest alone reads as a display
+    equation. A row that already starts a list item (`row.marker`) keeps its item, and a
+    row whose rest is prose or a lone fragment is not touched. The number stays in the
+    document as a text row of its own, in front of the equation (`_Row.exercise_number`).
+    """
+    out: list[_Row] = []
+    for row in rows:
+        tokens = _tokens(row)
+        if row.vertical or row.marker is not None or len(tokens) < 2:
+            out.append(row)
+            continue
+        first, rest = tokens[0], tokens[1:]
+        end = first[1]
+        token = "".join(c.c for c in row.chars[first[0] : end])
+        if token.isdigit() and "".join(c.c for c in row.chars[slice(*rest[0])]) in (".", ")"):
+            end = rest[0][1]  # "18 ." (the number and its full stop in separate spans)
+            rest = rest[1:]
+            token += row.chars[end - 1].c
+        number = row.chars[first[0] : end]
+        if (
+            not rest
+            or not _EXERCISE_NUMBER.match(token)
+            or any(c.math or c.mono for c in number)
+            or row.chars[rest[0][0]].x0 - number[-1].x1 < 0.3 * row.size
+        ):
+            out.append(row)
+            continue
+        remainder = _Row(row.chars[rest[0][0] :], column=row.column)
+        _classify_row(remainder)
+        if remainder.kind != "math":
+            out.append(row)
+            continue
+        out.append(_Row(number, column=row.column, exercise_number=True))
+        out.append(_Row(row.chars[rest[0][0] :], column=row.column))
     return out
 
 
@@ -4541,6 +4593,78 @@ def _title_like(text: str) -> bool:
     return False
 
 
+MATHS_HEADING_SHARE = 0.7  # a heading candidate with this share of maths characters is a formula
+_LONGEST_SYMBOL_WORD = 3  # letters: a longer plain word (outside _MATH_WORDS) is prose
+
+
+def _mostly_maths(rows: Sequence[_Row]) -> bool:
+    """Is a heading candidate a formula? ("KE = m v", a large "F = m a" on a slide.)
+
+    It needs a relation sign at full size, no plain word longer than three letters (a
+    function name from `_MATH_WORDS` is fine), and at least MATHS_HEADING_SHARE of its
+    characters (punctuation apart) are maths: digits, operators, brackets, maths symbols
+    and letters that read as variables, or the letters of words up to three letters
+    long, which beside a relation sign are products of variables ("mgh"). A heading that
+    only contains a number or a sign has no relation sign and stays a heading.
+    """
+    counted = mathy = 0
+    relation = False
+    for row in rows:
+        info = _CharInfo.of(row)
+        chars = row.chars
+        i = 0
+        while i < len(chars):
+            c = chars[i]
+            if c.blank or c.c in ",.;:":
+                i += 1
+                continue
+            if info.classes[i] == "L" and not info.script[i] and not info.maths_words[i]:
+                j = i
+                while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
+                    j += 1
+                word = "".join(x.c for x in chars[i:j]).lower()
+                if j - i > _LONGEST_SYMBOL_WORD and word not in _MATH_WORDS and info.words[i] > 1:
+                    return False
+                counted += j - i
+                mathy += j - i
+                i = j
+                continue
+            counted += 1
+            mathy += info.mathy(i)
+            relation = relation or (c.c in _ROW_RELATIONS and not row.is_script(c))
+            i += 1
+    return relation and counted > 0 and mathy / counted >= MATHS_HEADING_SHARE
+
+
+def _equation_block(
+    rows: list[_Row], box: BBox, size: float, ink: list[_Char], *, plain: bool = False
+) -> _Block:
+    """The equation block of maths rows (their region's equation number kept apart).
+
+    `plain`: the text layer keeps no letter styles. For a line set bold as a whole (a
+    heading's weight), where bold says nothing about vectors."""
+    text = _clean(" ".join((r.text if plain else r.styled_text) for r in rows))
+    script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
+    score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
+    if len(rows) > 1:
+        reasons.append(f"{len(rows)} lines merged")
+    region = rows[0].region
+    labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
+    if labels:
+        reasons.append("equation number")
+    return _Block(
+        Kind.EQUATION,
+        box,
+        rows,
+        text=text,
+        font_size=size,
+        score=max([score, *(r.score for r in rows)]),
+        reasons=reasons,
+        label=" ".join(r.clean for r in labels) or None,
+        regular=_regular_letters(ink),
+    )
+
+
 def _classify_run(run: _Run, ctx: _Context) -> _Block:
     rows = run.rows
     box = _union(r.bbox for r in rows)
@@ -4549,26 +4673,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     # A lone ">4" or "+8" (a table cell, a stray sign) is too little to call an equation.
     trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
     if run.kind == "math" and not trivial:
-        text = _clean(" ".join(r.styled_text for r in rows))
-        script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
-        score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
-        if len(rows) > 1:
-            reasons.append(f"{len(rows)} lines merged")
-        region = rows[0].region
-        labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
-        if labels:
-            reasons.append("equation number")
-        return _Block(
-            Kind.EQUATION,
-            box,
-            rows,
-            text=text,
-            font_size=size,
-            score=max([score, *(r.score for r in rows)]),
-            reasons=reasons,
-            label=" ".join(r.clean for r in labels) or None,
-            regular=_regular_letters(ink),
-        )
+        return _equation_block(rows, box, size, ink)
     text = _join_text(rows)
     letters = sum(c.isalpha() for c in text)
     bold = all(r.bold for r in rows)
@@ -4618,6 +4723,12 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
+    if heading is not None and _mostly_maths(rows):
+        # A formula set large or bold on a slide is not a title: it goes to the equation
+        # step like any display equation, and the page keeps its real headings.
+        block = _equation_block(rows, box, size, ink, plain=bold)
+        block.reasons.append("heading candidate that is mostly maths")
+        return block
     if heading is not None:
         if bold:
             heading.append("bold")
@@ -4645,14 +4756,18 @@ def _line_break(before: str, after: str) -> tuple[str, str]:
     """(`before` with any hyphen removed, separator) for joining two lines of a paragraph.
 
     "veloc-" + "ity" -> "velocity": a letter, a hyphen at the line end and a lowercase
-    start make one word. "Newton-" + "Raphson" keeps its hyphen but gets no space. A soft
-    hyphen always disappears. Anything else is joined with a space. ("well-" + "known"
-    becomes "wellknown": without a dictionary that case cannot be told apart.)
+    start make one word. "Newton-" + "Raphson" keeps its hyphen but gets no space, and
+    so does "well-" + "known": a compound is told from a broken word by the word list
+    (`hyphens.keeps_hyphen`: kept when both pieces are words and the joined word is not,
+    or when the piece before the hyphen is a single letter, as in "x-" + "ray"). A soft
+    hyphen always disappears. Anything else is joined with a space.
     """
     if before.endswith("\u00ad"):
         return before[:-1], ""
-    if len(before) > 1 and before[-1] in "-\u2010" and before[-2].isalpha():
-        return (before[:-1], "") if after[:1].islower() else (before, "")
+    if len(before) > 1 and before[-1] in hyphens.HYPHENS and before[-2].isalpha():
+        if after[:1].islower() and not hyphens.keeps_hyphen(before, after):
+            return before[:-1], ""
+        return before, ""
     return before, " "
 
 
@@ -4728,7 +4843,29 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             cursor = end
         row_pieces.append("".join(c.c for c in row.chars[cursor:]))
         _append_row(pieces, row_pieces)
-    return _tidy(pieces)
+    return _strip_teacher_tags(_tidy(pieces))
+
+
+# OpenStax's teacher-support tags at the start of a paragraph: the level of student a
+# prompt is for, "[BL][OL] Describe a scenario ...", "[AL] ...", "[All] ...". They are
+# notes to a teacher, not words of the lesson, and a screen reader would read them out
+# letter by letter. Only these four, in capitals as OpenStax prints them, and only before
+# other text; "[1]", "[Visual]" and a "[BL]" in the middle of a sentence stay.
+_TEACHER_TAGS = re.compile(r"^\s*(?:\[(?:BL|OL|AL|All)\]\s*)+")
+
+
+def _strip_teacher_tags(pieces: list[str | _Inline]) -> list[str | _Inline]:
+    """`pieces` without OpenStax level tags at the start (see `_TEACHER_TAGS`); unchanged
+    when nothing but the tags would be left."""
+    if not pieces or not isinstance(pieces[0], str):
+        return pieces
+    stripped = _TEACHER_TAGS.sub("", pieces[0], count=1)
+    if stripped == pieces[0]:
+        return pieces
+    if not stripped.strip() and len(pieces) == 1:
+        return pieces
+    rest = pieces[1:]
+    return [stripped, *rest] if stripped else rest
 
 
 def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
@@ -4893,6 +5030,67 @@ def _term_items(blocks: list[_Block]) -> list[_Block]:
     return out
 
 
+KEY_TERMS_HEADING = re.compile(r"\bkey\s+terms?\s*$", re.IGNORECASE)
+TERM_GAP = 0.7  # x font size: a gap this wide on a line of terms separates two terms
+MAX_TERM_WORDS = 6  # a term is a few words; more is a sentence, and stays a paragraph
+
+
+def _key_term_lines(blocks: list[_Block]) -> list[_Block]:
+    """A line of terms under a "Key Terms" heading becomes its terms as list items.
+
+    OpenStax sets the terms of an unruled "Key Terms" box side by side on one line, each
+    in a box of its own; the text layer reads "dependent variable independent variable
+    tangent". Right under a heading that ends in "Key Terms", a paragraph of plain text
+    whose lines break into pieces at gaps of at least TERM_GAP x the font size (a space
+    between words is a quarter of that) with at most MAX_TERM_WORDS words in each piece
+    is read as a list of terms: one item per piece, in reading order (`_term_items`
+    does the same for a ruled box found as a table). A paragraph with no such gap, or
+    with a long piece, is left as it is.
+    """
+    out: list[_Block] = []
+    for block in blocks:
+        previous = out[-1] if out else None
+        if (
+            block.kind == Kind.PARAGRAPH
+            and previous is not None
+            and previous.kind == Kind.HEADING
+            and KEY_TERMS_HEADING.search(previous.text or "")
+            and all(isinstance(piece, str) for piece in block.pieces)
+        ):
+            terms = _term_pieces(block.rows)
+            if terms:
+                out.extend(_Block(Kind.LIST_ITEM, box, text=t, pieces=[t]) for box, t in terms)
+                continue
+        out.append(block)
+    return out
+
+
+def _term_pieces(rows: Sequence[_Row]) -> list[tuple[BBox, str]]:
+    """(box, text) of each piece of the rows' lines, or [] unless they are a line of terms
+    (`_key_term_lines`)."""
+    found: list[tuple[BBox, str]] = []
+    spread = False
+    for row in rows:
+        if row.vertical:
+            return []
+        pieces: list[list[_Char]] = []
+        previous: _Char | None = None
+        for char in row.chars:
+            if char.blank:
+                continue
+            if previous is None or char.x0 - previous.x1 >= TERM_GAP * row.size:
+                pieces.append([])
+            pieces[-1].append(char)
+            previous = char
+        spread = spread or len(pieces) > 1
+        for chars in pieces:
+            text = _clean("".join(c.c for c in row.chars if chars[0].x0 <= c.x0 <= chars[-1].x0))
+            if not text or len(text.split()) > MAX_TERM_WORDS:
+                return []
+            found.append((_union((c.x0, c.y0, c.x1, c.y1) for c in chars), text))
+    return found if spread else []
+
+
 # ============================================================================ pages
 
 
@@ -4947,7 +5145,7 @@ def _page_blocks(
     covers: Sequence[tuple[float, float]] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
-    rows = _split_labels(rows)
+    rows = _split_exercise_numbers(_split_labels(rows))
     for row in rows:
         _classify_row(row)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
@@ -5039,7 +5237,7 @@ def _page_blocks(
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
-    final = _term_items(final)
+    final = _key_term_lines(_term_items(final))
     origins = _column_origins(text_rows)
     for block in final:
         if block.marker is not None:

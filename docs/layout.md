@@ -140,7 +140,13 @@ Element conventions:
    paragraph and a fraction's denominator to the text under it.
 7. **Paragraph text.** Rows are joined with spaces. `veloc-` + `ity` becomes `velocity` (a
    letter, a hyphen at the line end and a lowercase start); `Newton-` + `Raphson` keeps the
-   hyphen without a space; soft hyphens disappear. Whitespace is collapsed and zero-width
+   hyphen without a space; so does a compound whose pieces are words when the joined word
+   is not (`well-` + `known`, `cross-` + `section`, `self-` + `consistent`), and a hyphen
+   after a single letter (`x-` + `ray`). The list is `pipeline/data/words-en.txt.gz`
+   (63,849 lower-case English words from SCOWL; source, licence and SHA-256 in
+   `pipeline/data/README.md`) and the rule is `pipeline/hyphens.py`: the joined word is a
+   word, or neither piece is one (`eigen-` + `vector`, a technical word the list lacks):
+   the hyphen goes. Soft hyphens disappear. Whitespace is collapsed and zero-width
    and control characters removed. A paragraph cut by a column break (first part does not
    end a sentence, second part starts lowercase at the top of the next column) is rejoined.
 
@@ -165,6 +171,21 @@ Element conventions:
   In a larger font any section number counts (`3 Forces` is a chapter title); at body size
   only the section shape above does.
 - Rotated and diagonal text is never a heading.
+- **A heading that is mostly maths is an equation** (`_mostly_maths`): a large or bold run
+  with a relation sign at full size, no plain word of more than three letters and at least
+  70 % maths characters (`KE = m v` set large on a slide, a bold `PE = mgh`; a letter
+  group of up to three letters counts as variables beside a relation sign) goes to the
+  equation step, not to the outline. A line set bold as a whole keeps no bold in its text
+  layer, since the weight is the heading's, not a vector's. `2.3 Units`, `Summary of
+  results` and a title with a number but no relation sign stay headings.
+- **A heading with the same text and the same level as the heading directly above it**
+  (nothing between them, case, spacing and punctuation aside, level = layout's raw level
+  from font size and weight: `heading_step.repeated_above`) is not a second heading. Its
+  fix is ACCEPTED, review `none`, reason `repeats_heading_above`, with no `HeadingFix`,
+  and the assembler writes it as `<p><strong>`. It takes no part in levels, the outline
+  or the repeated-label groups. The same text one level down is a real sub-heading and
+  stays one: OpenStax's own outline has "Teacher Support" at h3 and again at h4, so the
+  public demo's doubled box titles (14 pt over 12 pt) are kept.
 - A bare chapter number (`4`, `Chapter 4`) in a large font directly above the title is
   merged into it (`4 Energy and Work`).
 
@@ -243,6 +264,20 @@ style and is not listed. On the two-column handout: `𝐯 ∈ Rn` gives `n` (R i
 bold omega gives nothing.
 
 ### Lists
+
+- **A line of key terms.** Right under a heading that ends in "Key Terms", a paragraph of
+  plain text whose lines break at gaps of at least 0.7 x the font size, with at most six
+  words between gaps, becomes one list item per piece (`_key_term_lines`): OpenStax's
+  unruled "Key Terms" box is `dependent variable independent variable tangent` in the
+  text layer, one box per term in print. A ruled box found as a table is turned into
+  items the same way (`_term_items`). A paragraph with no wide gap, or a long piece, stays
+  a paragraph; a term that wraps onto a second line becomes two items (not told apart).
+- **Teacher tags.** OpenStax's level tags at the start of a paragraph or item, `[BL]`,
+  `[OL]`, `[AL]`, `[All]` and runs of them (`[BL][OL] Describe a scenario ...`), are dropped
+  (`_strip_teacher_tags`); a screen reader would spell them out. Only those four, in
+  capitals, before other text. `[Visual]` and similar stay, and so do `[1]` and a tag in
+  the middle of a sentence. The tag tells a teacher which students a prompt is for, so a
+  document that uses them loses that information in the student file.
 
 A row starts a list item when it begins with a marker followed by the item's text
 within 3 x font size:
@@ -333,6 +368,16 @@ other. A minus sign alone is not maths evidence: groff prints command-line optio
   The box covers every row and the rules the equation uses (no rule of a neighbouring
   equation). A single row of at most two characters without a maths character (`>4`,
   `+8`) is not an equation.
+- **Exercise numbers.** A numbered exercise that is only an equation (`18. 0 = 5 t -
+  4.9 t`) is one row, because the number and the equation sit on one baseline. The first
+  token is cut off into a text row of its own (`_split_exercise_numbers`) when it is one
+  to three digits and a full stop or bracket (`18.`, `4)`; also `18 .` in two spans),
+  drawn in a text font (no maths font, no maths character), with a gap before the rest,
+  and the rest alone reads as a display equation. The number then stays a paragraph in
+  front of the equation and is in neither its crop nor its text layer, which the
+  text-layer checks compare the model's answer with. A row that already starts a list
+  item (siblings `17.`, `19.` confirmed it) is untouched, and so are `2.5` (a decimal) and
+  `A)` (a letter).
 - **Equation numbers.** A row that reads as an equation number and touches no rule goes
   to the line it sits beside (`_number_beside`, nearest vertical centre first), unless
   that line ends with a relation or operator (`x =   2.4`: the number is its right-hand

@@ -51,6 +51,7 @@ tell the model that text between `<document_text>` tags is data, not instruction
 | `equation_notation.md` | `EquationOutput`, as above | `equation.md` plus how to use the fenced course notation list; sent only when the run has course notation ("Course notation" below) |
 | `figure.md` | `FigureOutput {figure_type: FigureType, decorative: bool, alt: str, confidence: 0..1}` | Classify the figure; decorative only when it adds no information (charts, diagrams, tables and captioned figures never are); alt of at most 150 characters that gives a student the figure's information (charts: type, variables, main trend; diagrams: what it shows and the key relationship); no "Image of ..."; no file names, URLs, markup or LaTeX; do not repeat the caption; abstain (confidence below 0.3, empty alt) when unreadable. |
 | `figure_long.md` (long descriptions on) | `FigureLongOutput`: `FigureOutput` plus `long_description: str`, `long_description_unsure: bool`, `data_table: {header: [str], rows: [[str]]} \| null`, `values_printed: bool`, `colour_only: bool` | Everything in `figure.md` (the alt text must stand on its own), plus: for charts, diagrams and illustrations with several labelled parts, a long description of 100-1,200 characters in at most 8 short plain lines (what it shows; axes with quantity, unit and range, or the parts and how they connect; the trend; the key values), never inventing a value ("about" for one read off an axis); for charts whose values can be read, a data table with units in the headers, the horizontal axis first, at most 40 rows and 8 columns; `values_printed` only when every value is printed in the figure; `colour_only` when series or parts are told apart by colour alone. |
+| `figure_exam.md` (`ConversionOptions.exam_mode`) | `FigureOutput`, as `figure.md` | The same output fields, and alt text rules for an exam or graded assessment: describe what is shown, never the result. Charts: type, the quantity and unit on each axis, the scale range, what is drawn; no trend, extreme, slope, intercept, total, comparison or value read off the graph unless the figure prints it. Diagrams: parts, printed labels and values, arrangement; no resultant, sum, net quantity or consequence. Never calculate a number; never answer a question in the caption or the nearby text. Long descriptions and data tables are not asked for in exam mode, even with long descriptions on (a trend or a table of values is a result). The default `figure.md` is unchanged, so the recorded runs and every job without the flag are as before. |
 
 Why `array{rcl}`: latex2mathml 3.81.1 renders `aligned` as one flat row with literal `&`
 tokens, and OpenStax writes multi-line equations as a three-column `mtable`
@@ -65,8 +66,34 @@ hallucinations.
 
 | Step | First model | Escalates to `main_model` when |
 |---|---|---|
-| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence`, it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
+| Equation | `cheap_model` if `display == "inline"` and the text layer is at most 25 characters (or absent); otherwise `main_model` | the cheap answer's confidence (after the cross-check) is below `auto_accept_confidence` (but not when that is the only reason and it is 0.80 or more, see below), it fails an error-level check, or any text-layer check fails (`text_layer_mismatch`, `symbol_mismatch`, `style_mismatch`, `sign_mismatch`, and also the cosmetic `style_cosmetic`: the style rule is a heuristic, so the main model gets a second reading; only the speech notes never escalate) |
 | Figure | `cheap_model` with `image_detail="low"` if the figure is tiny (no side longer than 72 pt, one inch on the page); otherwise `main_model` with `image_detail="high"` | confidence is below the accept bar (higher for decorative, see below), the alt text fails an error-level check, or a decorative answer contradicts itself (`decorative_conflict`) |
+
+**The skipped second reading (equations).** A cheap answer whose only reason to be asked
+again is a confidence from 0.80 (`equation_step.SKIP_ESCALATION_FROM`) up to the accept
+bar, with every check passing (a failed speech note counts as a failed check), keeps the
+cheap answer and is not sent to the main model. It is ACCEPTED with review `optional` and
+the note `equation.single_reading` / `single_reading` (it was read once), so the skip does
+not turn into a decision: the cheap model's confidence comes in steps and 0.80 is its
+usual "fairly sure", so without the acceptance every such answer would wait for a person
+(`ACCEPT_SINGLE_READING = False` keeps the old status rules: NEEDS_REVIEW, required).
+Measured on the development set (3 OpenStax sections, 13-16 pages each, Claude, recorded
+2026-10-14 with the skip off and replayed with it on, same recorded answers): 8 of the 19
+second readings were band-only, and in all 8 the main model's answer was the same LaTeX
+(6) or the same maths in other braces (2); the document task made 81 model calls instead
+of 89 and cost $0.2028 instead of $0.2183 (-7.1 %); the equation scores did not move (end
+to end 0.7667, unflagged wrong 3.33 per 100, detection 1.0 / 0.5455); required decisions
+went from 8 to 7, optional notes per page from 0.60 to 0.79. Limits: the 30 gold equations
+are display equations, which start on the main model, so the scored equations never
+escalate; the inline answers are only seen through the document task's counts, and the 8
+cases are 8 inline variables at a confidence of exactly 0.80. With the status rules
+unchanged (`ACCEPT_SINGLE_READING = False`) the same replay gave 15 required decisions
+instead of 8.
+
+`Fix.escalation` records what a cheap start did: `same` / `changed` (the main model's
+LaTeX against the cheap one's, whitespace and the braces around a single script aside),
+`failed` (its answer was unusable, the cheap one stands), `skipped` (the rule above), or
+absent (no second reading was due, or the equation started on the main model).
 
 No escalation happens when the cheap call produced no output at all (the router already
 tried the main model as its fallback), or when the answer already came from the main
@@ -629,6 +656,7 @@ never reaches the instructions, and that the equation's text layer is never sent
 |---|---|
 | `tests/test_steps_validate.py` | every code of every validator; the allowlist-vs-converter tests (no allowed command converts with leftovers, every command whose argument is copied verbatim is treated as text mode); alignment rewriting; `\text{}` injection and a fuzz test showing `safe_latex_to_mathml` output is always allowlisted; defusedxml refusing DTDs and entity bombs; deep and oversize input; gold MathML and OpenStax alt text as real-data sanity checks |
 | `tests/test_steps_speech.py` | all 30 gold equations produce speech; targeted rules |
+| `tests/test_steps_equation_escalation.py` | the 0.80 band skipped and accepted with a note, the old rule below it, with a failed check, with an invalid or speech-failed answer; `ACCEPT_SINGLE_READING` off; `Fix.escalation` same / changed / failed / skipped, braces and spaces aside, the JSON round trip |
 | `tests/test_steps_equation.py` | every status path, routing, escalation, fallback, the cross-check, strict schema, budget propagation, prompt version and context hygiene |
 | `tests/test_style_check.py` | the letter-style check: meaning-level and cosmetic cases, layout's bold and regular letters |
 | `tests/test_sign_check.py` | the sign and relation check: flips and drops that must flag, hyphens, ranges, product style, accents and long arrows that must not; tiers, escalation and the single confidence factor; the LaTeX fixtures' CMSY signs and the Chromium fixtures; a course page printed by Chromium (`browser`); a result stored by pipeline 0.2.0 still loads |
@@ -637,6 +665,7 @@ never reaches the instructions, and that the equation's text layer is never sent
 | `tests/test_eval_notation_flags.py` | the false-flag count and `eval pipeline --notation` |
 | `tests/test_steps_figure.py` | the same for figures, plus decorative handling and tiny-figure routing |
 | `tests/test_steps_figure_long.py` | long descriptions on and off: the request off is what it was, the long prompt and fenced labels on, cleaning and dropping long descriptions, the unsure note, values from the text or the image, tables that are dropped, colour only, number normalisation and the data grid |
+| `tests/test_steps_figure_exam.py` | exam mode off: the default prompt and its version; on: the exam prompt and version on every call (a tiny figure's cheap and main calls too), exam wins over long descriptions, the prompt's rules, none of the default examples, the shared output fields and the unchanged recorded identity |
 | `tests/test_steps_live.py` | `live_model`: a gold equation rendered from MathML in Chromium and a generated bar chart, through the real API |
 | `tests/test_steps_support.py` | helpers, including `fallback_router`, a stand-in for WP1's router used until it merges |
 
