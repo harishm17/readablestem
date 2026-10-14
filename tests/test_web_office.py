@@ -132,7 +132,7 @@ def test_the_form_is_pdf_only_when_office_input_is_off(tmp_path):
         page = client.get("/app").text
         assert "data-office" not in page and ".docx" not in page
         refused = send(client, office.docx(), "notes.docx")
-        assert refused.status_code == 422 and "cannot read those yet" in refused.text
+        assert refused.status_code == 415 and "is not a PDF" in refused.text
         assert jobs(env) == []
         junk = send(client, b"hello", "notes.docx")
         assert junk.status_code == 415 and "is not a PDF" in junk.text

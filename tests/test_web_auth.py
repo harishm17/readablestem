@@ -283,6 +283,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
     assert posts == [
         "/admin/allowlist",
         "/admin/allowlist/remove",
+        "/admin/linked-emails",  # another Google account for an instructor (T3-10)
+        "/admin/linked-emails/remove",
         # Courses and their notation (FEATURE_NOTATION_MEMORY): CSRF before the flag.
         "/courses",
         "/courses/{course_id}/delete",
@@ -304,6 +306,8 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/title",  # the title students hear (T1-7)
         "/jobs/{job_id}/undo",
         "/login",
+        "/login/email",  # the emailed link (T3-10): CSRF before the flag
+        "/login/email/confirm",
         "/login/microsoft",
         "/logout",
     ]

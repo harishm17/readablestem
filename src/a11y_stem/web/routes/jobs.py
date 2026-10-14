@@ -474,7 +474,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     original = form.data
     source, office = original, False
     try:
-        if is_office_upload(original):
+        if is_office_upload(original) and office_convert.input_kinds(ctx.settings):
             office = True
             source = await run_in_threadpool(_office_to_pdf, ctx, original)
         pages = await run_in_threadpool(

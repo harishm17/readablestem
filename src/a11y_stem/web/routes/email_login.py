@@ -1,8 +1,9 @@
 """Routes of the email sign-in link (T3-10; `web.email_login` says how it works).
 
-All three answer 404 unless EMAIL_LOGIN_ENABLED is on (and a sender is configured, which
-the settings check enforces at start). They are public routes: CSRF-checked POSTs, the
-sign-in rate limits, no session needed.
+All three answer 404 unless EMAIL_LOGIN_ENABLED is on (a POST is CSRF-checked first, as the
+course routes are, so a forged form is a 403 whatever the setting). A sender must be
+configured, which the settings check enforces at start. They are public routes:
+CSRF-checked POSTs, the sign-in rate limits, no session needed.
 """
 
 from __future__ import annotations
@@ -34,7 +35,7 @@ def _require_enabled(request: Request) -> None:
 
 @router.post(
     "/login/email",
-    dependencies=[Depends(_require_enabled), limited("login"), Depends(require_csrf)],
+    dependencies=[limited("login"), Depends(require_csrf), Depends(_require_enabled)],
 )
 async def start(request: Request, email: Annotated[str, Form()] = "") -> Response:
     """Send a link to the address if it can sign in. The page is the same either way."""
@@ -85,7 +86,7 @@ async def confirm_page(request: Request, token: str = "") -> Response:
 
 @router.post(
     "/login/email/confirm",
-    dependencies=[Depends(_require_enabled), limited("callback"), Depends(require_csrf)],
+    dependencies=[limited("callback"), Depends(require_csrf), Depends(_require_enabled)],
 )
 async def confirm(request: Request, token: Annotated[str, Form()] = "") -> Response:
     ctx = get_ctx(request)
