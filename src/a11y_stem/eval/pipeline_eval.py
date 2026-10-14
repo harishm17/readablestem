@@ -63,6 +63,7 @@ from a11y_stem.config import Settings
 from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
+from a11y_stem.eval import equations_v2 as v2
 from a11y_stem.eval import judge as judge_mod
 from a11y_stem.eval import verifier_metrics as vm
 from a11y_stem.eval.equations import (
@@ -95,6 +96,8 @@ EQUATION_ALIGN_MIN = 0.5
 # in order, in the gold signature (and it is at least two symbols long).
 PIECE_CONTAINMENT = 0.8
 UNMATCHED_REASONS = ("prose_math", "fragment", "other")
+# A merged prediction is credited for at most this many consecutive gold equations.
+MERGE_MAX_SPAN = 4
 _EDGE_OPERATORS = frozenset("=+-*/^_<>,.;:\u00d7\u00f7\u22c5\u2264\u2265\u2260\u2248")
 ROUTES = ("cheap", "main", "escalated", "fallback", "none", "other")
 MINUS_SIGN = chr(0x2212)
@@ -577,6 +580,11 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         if proposal is not None
         else _missing_score(record["mathml"])
     )
+    stream = (
+        v2.score_stream(proposal.mathml, record["mathml"])
+        if proposal is not None
+        else v2.missing_stream(record["mathml"])
+    )
     return {
         "id": record["id"],
         "display": record.get("display"),
@@ -590,6 +598,9 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "exact_strict": score.exact_strict,
         "exact_lenient": score.exact_lenient,
         "teds": score.teds,
+        # The labelled secondary scorer (eval.equations_v2); `wrong` below stays primary.
+        "exact_stream_v2": stream.exact,
+        "stream_similarity": stream.similarity,
         "score_error": score.error if proposal is not None else None,
         "failed_checks": _failed_codes(fix.checks),
         "pred_latex": proposal.latex if proposal is not None else None,
@@ -665,6 +676,13 @@ def equation_metrics(items: Sequence[dict]) -> dict:
         "exact_lenient_ci95": wilson_interval(lenient, n),
         "mean_teds": mean(i["teds"] for i in items),
         "proposal_rate": rate(i["has_proposal"] for i in items),
+        "secondary_stream_v2": {
+            "label": v2.LABEL,
+            "exact": rate(i["exact_stream_v2"] for i in items if "exact_stream_v2" in i),
+            "mean_similarity": mean(
+                i["stream_similarity"] for i in items if "stream_similarity" in i
+            ),
+        },
         "by_status": _group_rates(items, "status", STATUS_ORDER),
         "by_route": _group_rates(items, "route", ROUTES),
         "by_display": _group_rates(items, "display", ["block", "inline"]),
@@ -1290,6 +1308,11 @@ def document_page_item(
             if proposal is not None
             else _missing_score(gold[gi]["mathml"])
         )
+        stream = (
+            v2.score_stream(proposal.mathml, gold[gi]["mathml"])
+            if proposal is not None
+            else v2.missing_stream(gold[gi]["mathml"])
+        )
         matched.append(
             {
                 "gold_id": gold[gi]["id"],
@@ -1300,6 +1323,8 @@ def document_page_item(
                 "status": fix.status.value if fix is not None else None,
                 "exact_lenient": result.exact_lenient,
                 "teds": result.teds,
+                "exact_stream_v2": stream.exact,
+                "stream_similarity": stream.similarity,
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
@@ -1322,6 +1347,7 @@ def document_page_item(
             }
         )
     split = _split_gold(gold, pairs, pieces)
+    credited = _stream_credits(gold, predicted, fixes, pairs, pieces, matched)
     return {
         "id": page_id,
         "n_gold": len(gold),
@@ -1335,10 +1361,65 @@ def document_page_item(
             reason: sum(u["reason"] == reason for u in unmatched) for reason in UNMATCHED_REASONS
         },
         "split_gold_ids": split,
+        "stream_credited": credited,
         "static_violations": _failed_codes(static),
         "axe_violations": _failed_codes(axe) if axe_status(axe) == "ran" else [],
         "axe_status": axe_status(axe),
     }
+
+
+def _stream(fix: Fix | None) -> list[str] | None:
+    """The stream (`eval.equations_v2`) of a fix's proposed MathML; None without one."""
+    proposal = fix.equation if fix is not None else None
+    if proposal is None:
+        return None
+    try:
+        return v2.stream_of(proposal.mathml)
+    except MathMLError:
+        return None
+
+
+def _stream_credits(
+    gold: Sequence[dict],
+    predicted: Sequence[Element],
+    fixes: dict[str, Fix],
+    pairs: Sequence[tuple[int, int, float]],
+    pieces: dict[int, int],
+    matched: Sequence[dict],
+) -> dict[str, list[str]]:
+    """Gold equations the stream scorer credits although no single aligned prediction is
+    exact for them: `split` (the matched prediction and its pieces, in reading order,
+    make the gold equation) and `merged` (one prediction is several consecutive gold
+    equations, the later ones not matched to anything). A split or a merge is still a
+    layout error; this only says the transcription was right."""
+    exact = {m["gold_id"] for m in matched if m["exact_stream_v2"]}
+    by_gold = {gi: pi for gi, pi, _ in pairs}
+    gold_streams = [v2.stream_of(g["mathml"]) for g in gold]
+    split: list[str] = []
+    for gi in sorted({*pieces.values()}):
+        indices = sorted(
+            [pi for pi, host in pieces.items() if host == gi]
+            + ([by_gold[gi]] if gi in by_gold else [])
+        )
+        streams = [_stream(fixes.get(predicted[pi].id)) for pi in indices]
+        if all(st is not None for st in streams) and v2.credit_split(
+            [st for st in streams if st is not None], gold_streams[gi]
+        ):
+            split.append(gold[gi]["id"])
+    merged: list[str] = []
+    for gi, pi, _ in pairs:
+        stream = _stream(fixes.get(predicted[pi].id))
+        if stream is None or gold[gi]["id"] in exact:
+            continue
+        # The alignment may have paired the prediction with any of the gold equations it
+        # covers, so try each start that still reaches the paired one.
+        for start in range(max(0, gi - MERGE_MAX_SPAN + 1), gi + 1):
+            count = v2.credit_merged(stream, gold_streams[start:])
+            covered = range(start, start + count)
+            if count and gi in covered and all(gj == gi or gj not in by_gold for gj in covered):
+                merged += [gold[gj]["id"] for gj in covered]
+                break
+    return {"split": split, "merged": merged}
 
 
 def _shadow_pair(fix: Fix | None) -> dict[str, Any]:
@@ -1519,6 +1600,7 @@ def document_metrics(items: Sequence[dict]) -> dict:
             matched, pred - unmatched["prose_math"]
         ),
         "split_gold_equations": sum(len(i.get("split_gold_ids", [])) for i in items),
+        "secondary_stream_v2": stream_document_metrics(items, pairs, gold),
         "static_violations": sum(static_codes.values()),
         "static_violation_codes": dict(sorted(static_codes.items())),
         "axe_violations": sum(axe_codes.values()),
@@ -1529,6 +1611,28 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "page_errors": _page_errors(items),
         "review_load": document_review_load(items),
         "second_check": vm.document_metrics(items),
+    }
+
+
+def stream_document_metrics(items: Sequence[dict], pairs: Sequence[dict], gold: int) -> dict:
+    """The labelled secondary scorer on the document task (`eval.equations_v2`): exactness
+    of aligned pairs under the stream comparison, and the same with split and merged gold
+    credited. The primary numbers (`matched_exact_lenient`, `end_to_end_exact_lenient`)
+    are unchanged."""
+    exact_ids = {p["gold_id"] for p in pairs if p.get("exact_stream_v2")}
+    split = {g for i in items for g in i.get("stream_credited", {}).get("split", [])}
+    merged = {g for i in items for g in i.get("stream_credited", {}).get("merged", [])}
+    credited = exact_ids | split | merged
+    return {
+        "label": v2.LABEL,
+        "matched_exact": rate(p["exact_stream_v2"] for p in pairs if "exact_stream_v2" in p),
+        "matched_mean_similarity": mean(
+            p["stream_similarity"] for p in pairs if "stream_similarity" in p
+        ),
+        "end_to_end_exact": _safe_div(len(exact_ids), gold),
+        "end_to_end_exact_with_credit": _safe_div(len(credited), gold),
+        "credited_split": len(split - exact_ids),
+        "credited_merged": len(merged - exact_ids),
     }
 
 
@@ -1974,6 +2078,12 @@ def format_markdown(report: dict) -> str:
         lines += ["", "### Long descriptions (FEATURE_LONG_DESCRIPTIONS on)", ""]
         long = metrics["long_descriptions"]
         lines += _table(["metric", "value"], ((k, long[k]) for k in LONG_HEADLINE))
+    if report["task"] in {"equations", "document"} and metrics.get("secondary_stream_v2"):
+        lines += ["", "### Secondary scorer: stream v2 (the rows above are primary)", ""]
+        lines += _table(
+            ["metric", "value"],
+            ((k, v) for k, v in metrics["secondary_stream_v2"].items() if k != "label"),
+        )
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]
         lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())

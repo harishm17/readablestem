@@ -99,6 +99,7 @@ def test_the_scorer_ceiling_is_the_documented_one():
     assert check.ok
     assert "exact_lenient 0.833 (25 of 30)" in check.detail
     assert "5 known normalisation gaps" in check.detail
+    assert "secondary stream scorer (T2-12) matches 30 of 30" in check.detail
 
 
 def test_compare_reports_flags_a_changed_headline_metric_only():

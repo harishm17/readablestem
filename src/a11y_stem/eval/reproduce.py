@@ -163,7 +163,8 @@ def check_scorer_ceiling(root: Path, predictions: Path | None = None) -> Check:
         f"exact_lenient {summary['exact_lenient']:.3f} ({matched} of {n}), "
         f"exact_strict {summary['exact_strict']:.3f}, mean TEDS {summary['mean_teds']:.3f}; "
         f"{n - matched} known normalisation gaps, so equation scores understate quality "
-        f"by up to {1 - matched / n:.0%}"
+        f"by up to {1 - matched / n:.0%}; the secondary stream scorer (T2-12) matches "
+        f"{summary['secondary_stream_v2']['exact'] * n:.0f} of {n}"
     )
     return Check(name, ok, detail)
 
