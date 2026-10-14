@@ -89,7 +89,16 @@ class FakePipeline:
         return "spoken form"
 
     def render_html(
-        self, *, title, lang, elements, fixes, crops, source_note=None, checked_on=None
+        self,
+        *,
+        title,
+        lang,
+        elements,
+        fixes,
+        crops,
+        source_note=None,
+        checked_on=None,
+        **_options,
     ) -> str:
         if self.render_raises is not None:
             raise self.render_raises
