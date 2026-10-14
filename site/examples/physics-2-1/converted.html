@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="a11y-stem 0.1.0">
-<title>2.1 Relative Motion, Distance, and Displacement</title>
+<title>Relative Motion, Distance, and Displacement</title>
 <style>
-:root { color-scheme: light; }
+:root { color-scheme: light dark; }
 body { margin: 0; background: #ffffff; color: #1b1b1b;
   font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
@@ -45,13 +45,21 @@ figcaption { margin-top: 0.5em; }
 .about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
   border-top: 2px solid #1b1b1b; }
 @media (min-width: 44rem) { .about { margin: 0 auto; } }
+.about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
+@media screen and (prefers-color-scheme: dark) {
+  body { background: #121212; color: #ececec; }
+  .flagged, .notice, .flagged-inline { border-color: #ffa066; }
+  .about { border-top-color: #ececec; }
+  :focus-visible { outline-color: #8ab4f8; }
+  img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
+}
 </style>
 </head>
 <body>
 <aside aria-label="About this demo" style="border:2px solid #1a4f8b;padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;overflow-wrap:anywhere;">
-<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print of “2.1 Relative Motion, Distance, and Displacement” from <cite>Physics</cite> by Paul Peter Urone, Roger Hinrichs (OpenStax), converted on 2026-10-14. Equations, headings and image descriptions below are the tool's proposals with confidence scores; the ones marked for review have not been checked by a person. a11y-stem assists with accessibility work; it does not replace review.</p>
+<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print of “2.1 Relative Motion, Distance, and Displacement” from <cite>Physics</cite> by Paul Peter Urone, Roger Hinrichs (OpenStax), converted on 2026-10-14. Equations, headings and image descriptions below are the tool's proposals; the ones marked for review have not been checked by a person. a11y-stem assists with accessibility work; it does not replace review.</p>
 <p>Read <a href="https://openstax.org/books/physics/pages/2-1-relative-motion-distance-and-displacement">the original page on openstax.org</a>. Licensed under <a href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution License</a> (CC BY 4.0). Access for free at openstax.org. a11y-stem is not affiliated with or endorsed by OpenStax.</p>
 <p><a href="/">Back to a11y-stem</a>. a11y-stem is free, open-source software; its complete <a href="https://github.com/harishm17/a11y-stem">source code is on GitHub</a> (it uses PyMuPDF under the GNU Affero General Public License v3).</p>
 </aside>
@@ -156,7 +164,7 @@ figcaption { margin-top: 0.5em; }
 <p id="p11-e4">[AL] Discuss how the concept of direction might be important for the study of motion.</p>
 <h3 id="p11-e5">Displacement Problems</h3>
 <p id="p11-e6">Hopefully you now understand the conceptual difference between distance and displacement. Understanding concepts is half the battle in physics. The other half is math. A stumbling block to new physics students is trying to wade through the math of physics while also trying to understand the associated concepts. This struggle may lead to misconceptions and answers that make no sense. Once the concept is mastered, the math is far less confusing.</p>
-<p id="p11-e7">So let’s review and see if we can make sense of displacement in terms of numbers and equations. You can calculate an object&#x27;s displacement by subtracting its original position, <math display="inline" id="p11-e8"><mrow><mrow><msub><mi mathvariant="bold">d</mi><mn mathvariant="bold">0</mn></msub></mrow></mrow></math>, from its final position <math display="inline" id="p11-e9"><mrow><msub><mi>𝐝</mi><mi>𝐟</mi></msub></mrow></math>. In math terms that means</p>
+<p id="p11-e7">So let’s review and see if we can make sense of displacement in terms of numbers and equations. You can calculate an object&#x27;s displacement by subtracting its original position, <math display="inline" id="p11-e8"><mrow><mrow><msub><mi>𝐝</mi><mn>𝟎</mn></msub></mrow></mrow></math>, from its final position <math display="inline" id="p11-e9"><mrow><msub><mi>𝐝</mi><mi>𝐟</mi></msub></mrow></math>. In math terms that means</p>
 <div class="equation" id="p11-e10"><math display="block"><mrow><mi>Δ</mi><mi>𝐝</mi><mo>=</mo><msub><mi>𝐝</mi><mtext>f</mtext></msub><mo>−</mo><msub><mi>𝐝</mi><mn>0</mn></msub><mo>.</mo></mrow></math></div>
 <p id="p11-e11">If the final position is the same as the initial position, then <math display="inline" id="p11-e12"><mrow><mi>Δ</mi><mi>𝐝</mi><mo>=</mo><mn>0</mn></mrow></math>.</p>
 <p id="p11-e13">To assign numbers and/or direction to these quantities, we need to define an axis with a positive and a negative direction. We also need to define an origin, or O. In <a href="#p7-e4">Figure 2.6</a>, the axis is in a straight line with home at zero and school in the positive direction. If we left home and drove the opposite way from school, motion would have been in the negative direction. We would have assigned it a negative value. In the round-trip drive, <math display="inline" id="p11-e14"><mrow><msub><mi>𝐝</mi><mtext>f</mtext></msub></mrow></math> and <math display="inline" id="p11-e15"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math> were both at zero kilometers. In the one way trip to school, <math display="inline" id="p11-e16"><mrow><msub><mi>𝐝</mi><mtext>f</mtext></msub></mrow></math> was at 5 kilometers and <math display="inline" id="p11-e17"><mrow><msub><mi>𝐝</mi><mn>0</mn></msub></mrow></math> was at zero km. So, <math display="inline" id="p11-e18"><mrow><mi>Δ</mi><mi>𝐝</mi></mrow></math> was 5 kilometers.</p>
@@ -213,7 +221,7 @@ figcaption { margin-top: 0.5em; }
 <p id="p16-e18">a11y-stem is not affiliated with or endorsed by OpenStax.</p>
 </main>
 <footer id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
-<h2 id="about-conversion-title">About this version</h2>
+<p id="about-conversion-title" class="about-title">About this version</p>
 <p>This is a web version of a PDF from your course, made with a11y-stem, a tool that assists with accessibility. Its equations are written so that screen readers can read them aloud.</p>
 <p>Some parts were made by the tool and have not been checked by your instructor yet.</p>
 <p>If something is hard to read or looks wrong, tell your instructor.</p>

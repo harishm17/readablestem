@@ -1035,6 +1035,68 @@ def build_demo(
     return report
 
 
+def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: bool = True) -> dict:
+    """Write today's output for a stored result: no page is fetched, no model is asked, and
+    nothing is paid. The pictures are cut from the PDF again as a conversion cuts them
+    (`pipeline.run.recrop`), the file is written by today's assembler from the stored result
+    (`web.review.rerender_html`), the demo note goes in again (`note`), and the report keeps
+    its result with the checks of the new file. What the models answered stays the stored
+    answers; so does the pipeline version the result says it was converted by."""
+    from a11y_stem.config import Settings
+    from a11y_stem.core.types import DocumentResult
+    from a11y_stem.eval import render
+    from a11y_stem.pipeline.run import recrop
+    from a11y_stem.web.review import rerender_html
+
+    raw = report_path.read_text(encoding="utf-8")
+    report = json.loads(raw)
+    meta = report["demo"]
+    result = DocumentResult.model_validate({**report["result"], "html": ""})
+    pdf = pdf_path.read_bytes()
+    html = rerender_html(result, recrop(pdf, result.elements))
+    if note:
+        page = render.PageSource(
+            book_slug=meta.get("book_slug") or "",
+            book_title=meta.get("book_title") or "",
+            page_slug=meta.get("page_slug") or "",
+            page_title=meta.get("page_title") or "",
+            page_url=meta.get("page_url") or "",
+            content_url="",
+            license_name=meta.get("license_name") or "",
+            license_url=meta.get("license_url") or "",
+            xhtml="",
+            authors=list(meta.get("authors") or []),
+        )
+        # The note links to the source code (a11y-stem is AGPL: every page says where it is).
+        source_url = Settings(_env_file=None).source_url  # type: ignore[call-arg]
+        html = render.wrap_demo_html(
+            html, page, date=meta["date"], source_url=source_url, placeholder=False
+        )
+    html_path.write_text(html, encoding="utf-8")
+    # The report keeps the stored result as it was written, down to its formatting; only the
+    # checks of the file (`html_checks`) are those of the file just written.
+    checks = [c.model_dump(mode="json") for c in result.html_checks]
+    if report["result"].get("html_checks") != checks:
+        report["result"]["html_checks"] = checks
+        indented = raw.startswith("{\n")
+        text = json.dumps(
+            report,
+            ensure_ascii=False,
+            indent=2 if indented else None,
+            separators=None if indented else (",", ":"),
+        )
+        report_path.write_text(text + ("\n" if raw.endswith("\n") else ""), encoding="utf-8")
+    return report
+
+
+def _cmd_demo_rerender(args: argparse.Namespace) -> int:
+    report = rerender_demo(args.report, args.pdf, args.out, note=not args.no_note)
+    stats = report["result"]["stats"]
+    print(f"{args.report.name}: {stats['pages']} PDF pages, 0 model calls, $0.0000")
+    print(f"wrote {_shown(args.out)} and {_shown(args.report)}")
+    return 0
+
+
 def _cmd_demo_build(args: argparse.Namespace) -> int:
     from a11y_stem.eval import render
     from a11y_stem.gold.openstax import GoldError, HttpFetcher
@@ -1323,3 +1385,12 @@ def register(
     build.add_argument("--date", type=_iso_date, default=today)
     build.add_argument("--paper", choices=["Letter", "A4"], default="Letter")
     build.set_defaults(func=_cmd_demo_build)
+    again = demo.add_parser(
+        "rerender",
+        help="write today's output for a stored demo or example result (no model, no cost)",
+    )
+    again.add_argument("report", type=Path, help="the stored result (report.json)")
+    again.add_argument("pdf", type=Path, help="the PDF it was converted from")
+    again.add_argument("out", type=Path, help="the HTML file to write")
+    again.add_argument("--no-note", action="store_true", help="leave out the demo note")
+    again.set_defaults(func=_cmd_demo_rerender)

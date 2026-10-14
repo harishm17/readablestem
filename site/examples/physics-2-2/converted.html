@@ -4,9 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="generator" content="a11y-stem 0.1.0">
-<title>2.2 Speed and Velocity</title>
+<title>Speed and Velocity</title>
 <style>
-:root { color-scheme: light; }
+:root { color-scheme: light dark; }
 body { margin: 0; background: #ffffff; color: #1b1b1b;
   font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
@@ -45,13 +45,21 @@ figcaption { margin-top: 0.5em; }
 .about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
   border-top: 2px solid #1b1b1b; }
 @media (min-width: 44rem) { .about { margin: 0 auto; } }
+.about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
+@media screen and (prefers-color-scheme: dark) {
+  body { background: #121212; color: #ececec; }
+  .flagged, .notice, .flagged-inline { border-color: #ffa066; }
+  .about { border-top-color: #ececec; }
+  :focus-visible { outline-color: #8ab4f8; }
+  img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
+}
 </style>
 </head>
 <body>
 <aside aria-label="About this demo" style="border:2px solid #1a4f8b;padding:0.75em 1em;margin:0 0 1.5em;background:#fff;color:#000;overflow-wrap:anywhere;">
-<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print of “2.2 Speed and Velocity” from <cite>Physics</cite> by Paul Peter Urone, Roger Hinrichs (OpenStax), converted on 2026-10-14. Equations, headings and image descriptions below are the tool's proposals with confidence scores; the ones marked for review have not been checked by a person. a11y-stem assists with accessibility work; it does not replace review.</p>
+<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print of “2.2 Speed and Velocity” from <cite>Physics</cite> by Paul Peter Urone, Roger Hinrichs (OpenStax), converted on 2026-10-14. Equations, headings and image descriptions below are the tool's proposals; the ones marked for review have not been checked by a person. a11y-stem assists with accessibility work; it does not replace review.</p>
 <p>Read <a href="https://openstax.org/books/physics/pages/2-2-speed-and-velocity">the original page on openstax.org</a>. Licensed under <a href="http://creativecommons.org/licenses/by/4.0/">Creative Commons Attribution License</a> (CC BY 4.0). Access for free at openstax.org. a11y-stem is not affiliated with or endorsed by OpenStax.</p>
 <p><a href="/">Back to a11y-stem</a>. a11y-stem is free, open-source software; its complete <a href="https://github.com/harishm17/a11y-stem">source code is on GitHub</a> (it uses PyMuPDF under the GNU Affero General Public License v3).</p>
 </aside>
@@ -109,7 +117,7 @@ figcaption { margin-top: 0.5em; }
 <ol type="a"><li id="p5-e1">146 s</li><li id="p5-e2">0.01 s</li><li id="p5-e3">2.50 min</li><li id="p5-e4">287 s</li></ol>
 <h3 id="p5-e5">Velocity</h3>
 <p id="p5-e6">The vector version of speed is velocity. Velocity describes the speed and direction of an object. As with speed, it is useful to describe either the average velocity over a time period or the velocity at a specific moment. Average velocity is displacement divided by the time over which the displacement occurs.</p>
-<div class="equation" id="p5-e7" tabindex="0" role="group" aria-label="Equation"><math display="block"><mrow><msub><mi>𝐯</mi><mrow><mrow><mi mathvariant="bold">a</mi><mi mathvariant="bold">v</mi><mi mathvariant="bold">g</mi></mrow></mrow></msub><mo>=</mo><mfrac><mrow><mtext>displacement</mtext></mrow><mrow><mtext>time</mtext></mrow></mfrac><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><msub><mi>𝐝</mi><mtext>f</mtext></msub><mo>−</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow><mrow><msub><mi>t</mi><mtext>f</mtext></msub><mo>−</mo><msub><mi>t</mi><mn>0</mn></msub></mrow></mfrac></mrow></math></div>
+<div class="equation" id="p5-e7" tabindex="0" role="group" aria-label="Equation"><math display="block"><mrow><msub><mi>𝐯</mi><mrow><mrow><mi>𝐚</mi><mi>𝐯</mi><mi>𝐠</mi></mrow></mrow></msub><mo>=</mo><mfrac><mrow><mtext>displacement</mtext></mrow><mrow><mtext>time</mtext></mrow></mfrac><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>𝐝</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac><mo>=</mo><mfrac><mrow><msub><mi>𝐝</mi><mtext>f</mtext></msub><mo>−</mo><msub><mi>𝐝</mi><mn>0</mn></msub></mrow><mrow><msub><mi>t</mi><mtext>f</mtext></msub><mo>−</mo><msub><mi>t</mi><mn>0</mn></msub></mrow></mfrac></mrow></math></div>
 <p id="p5-e8">Velocity, like speed, has SI units of meters per second (m/s), but because it is a vector, you must also include a direction. Furthermore, the variable v for velocity is bold because it is a vector, which is in contrast to the variable v for speed which is italicized because it is a scalar quantity.</p>
 <h2 id="p5-e9">Tips For Success</h2>
 <p id="p5-e10">It is important to keep in mind that the average speed is not the same thing as the average velocity without its direction. Like we saw with displacement and distance in the last section, changes in direction over a time interval have a bigger effect on speed and velocity.</p>
@@ -191,7 +199,7 @@ figcaption { margin-top: 0.5em; }
 <p id="p14-e13">a11y-stem is not affiliated with or endorsed by OpenStax.</p>
 </main>
 <footer id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
-<h2 id="about-conversion-title">About this version</h2>
+<p id="about-conversion-title" class="about-title">About this version</p>
 <p>This is a web version of a PDF from your course, made with a11y-stem, a tool that assists with accessibility. Its equations are written so that screen readers can read them aloud.</p>
 <p>Some parts were made by the tool and have not been checked by your instructor yet.</p>
 <p>If something is hard to read or looks wrong, tell your instructor.</p>

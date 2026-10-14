@@ -686,6 +686,33 @@ def _unit_scale(_element: Element) -> float:
     return 1.0
 
 
+def recrop(pdf: bytes, elements: list[Element]) -> dict[str, bytes]:
+    """The pictures a conversion of `pdf` cuts for these elements, without converting
+    anything: the crop of every equation, figure and table, an equation's cut sharp for the
+    size it is shown at (T3-15), exactly as `_Run.crop_and_submit` does. For showing a
+    stored result again (the sample document, the demo): no model is asked and nothing is
+    paid. An element whose crop fails has none."""
+    scale = equation_scale.scaler(elements)
+    crops: dict[str, bytes] = {}
+    try:
+        for element in elements:
+            if element.kind not in _MODEL_KINDS:
+                continue
+            try:
+                png = layout.crop(pdf, element)
+                if element.kind is Kind.EQUATION:
+                    png = layout.crop(
+                        pdf, element, dpi=equation_scale.crop_dpi(scale(element)), tag_dpi=True
+                    )
+            except Exception as exc:
+                log.warning("crop failed: %s", type(exc).__name__)
+                continue
+            crops[element.id] = png
+    finally:
+        layout.release(pdf)  # the cached copy of a PDF is not kept
+    return crops
+
+
 @dataclass
 class _Run:
     """State of one conversion while its steps are in flight."""

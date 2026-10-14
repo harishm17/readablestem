@@ -81,7 +81,7 @@ def test_the_sample_is_the_recorded_conversion_in_the_persons_list(web):
     assert job.cost_usd == 0 and job.model_calls == 0 and job.aggregated
     result = DocumentResult.model_validate(job.result_json)
     assert result.title == "2.3 Position vs. Time Graphs" and result.stats.pages == 13
-    assert job.open_decisions == 2  # three repeated headings are one decision, plus one more
+    assert job.open_decisions == 3  # the repeated headings: one decision per kind of repeat
     assert job.html and "<html" in job.html and "Position vs. Time Graphs" in job.html
     with session_scope(web.ctx.factory) as session:
         kinds = dict(
@@ -206,11 +206,11 @@ def test_the_job_page_says_what_it_is_where_it_comes_from_and_offers_the_review(
     assert "Creative Commons Attribution License" in text and "OpenStax" in text
     assert "Paul Peter Urone, Roger Hinrichs" in text
     assert "https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs" in page.text
-    assert "Review 2 decisions" in text
+    assert "Review 3 decisions" in text
     assert "Upload a revised version" not in text  # a sample is not revised
     # The review screen opens on the first decision, with the page image beside it.
     review = web.alice.get(f"/jobs/{job_id}/review")
-    assert review.status_code == 200 and "Decision 1 of 2" in text_of(review.text)
+    assert review.status_code == 200 and "Decision 1 of 3" in text_of(review.text)
     image = web.alice.get(f"/jobs/{job_id}/pages/1.png")
     assert image.status_code == 200 and image.content.startswith(b"\x89PNG")
 
@@ -218,7 +218,7 @@ def test_the_job_page_says_what_it_is_where_it_comes_from_and_offers_the_review(
 def test_it_can_be_decided_downloaded_and_deleted_like_any_document(web):
     job_id = open_sample(web.alice)
     listing = text_of(web.alice.get("/app").text)
-    assert "Sample" in listing and "2 decisions to make" in listing
+    assert "Sample" in listing and "3 decisions to make" in listing
     deleted = web.alice.post(
         f"/jobs/{job_id}/delete",
         data={"csrf_token": token(web.alice, "/app"), "confirm": "yes"},
@@ -299,4 +299,24 @@ def test_the_recorded_files_are_the_openly_licensed_demo(web):
     assert recorded.licence_url.startswith("http://creativecommons.org/licenses/by/4.0")
     assert recorded.source_url.startswith("https://openstax.org/")
     assert recorded.authors == ["Paul Peter Urone", "Roger Hinrichs"]
-    assert recorded.result.stats.cost_usd < 0.1  # the recorded run, not a new one
+    assert recorded.result.stats.cost_usd < 0.2  # the recorded run, not a new one
+
+
+def test_the_sample_is_written_by_todays_assembler_and_cut_as_a_conversion_cuts(web):
+    """Recorded once, shown as the current output: one h1, the dark colour scheme, the About
+    region, and an equation's picture cut sharp for the size of the text (its resolution is
+    in the PNG), as `pipeline.run.recrop` does for a conversion."""
+    from a11y_stem.core.types import Kind
+    from a11y_stem.pipeline import equation_scale
+
+    recorded = sample.load()
+    html = recorded.html
+    assert html.count("<h1") == 1
+    assert "@media screen and (prefers-color-scheme: dark)" in html
+    assert 'id="about-conversion-title" class="about-title"' in html  # a region, not a heading
+    equations = [e for e in recorded.result.elements if e.kind is Kind.EQUATION]
+    assert equations
+    for equation in equations:
+        assert equation_scale.png_dpi(recorded.crops[equation.id]) is not None
+    figure = next(e for e in recorded.result.elements if e.kind is Kind.FIGURE)
+    assert equation_scale.png_dpi(recorded.crops[figure.id]) is None  # other crops as before

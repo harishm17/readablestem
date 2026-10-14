@@ -3,8 +3,8 @@
 An instructor deciding whether to upload a course PDF wants to see the review screen first:
 what the tool proposes, what it asks, what a decision looks like. The sample is a real
 conversion made once, ahead of time (`static/demo/`: OpenStax *Physics* 2.3 "Position vs.
-Time Graphs", CC BY 4.0, its source PDF and its stored result, 13 pages, pipeline 0.4.0
-with the real models), put in the person's list as a finished document of their own.
+Time Graphs", CC BY 4.0, its source PDF and its stored result, 13 pages, converted with
+the real models), put in the person's list as a finished document of their own.
 
 What makes it safe and free:
 
@@ -37,7 +37,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session, sessionmaker
 
 from a11y_stem.config import Settings
-from a11y_stem.core.types import DocumentResult, Kind
+from a11y_stem.core.types import DocumentResult
 from a11y_stem.web import retention
 from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 
@@ -45,8 +45,6 @@ logger = logging.getLogger(__name__)
 
 DEMO_DIR = Path(__file__).resolve().parent / "static" / "demo"
 SAMPLE_FILENAME = "sample-openstax-physics-2-3.pdf"
-# The kinds the pipeline cuts a picture of (`pipeline.run._MODEL_KINDS`).
-CROPPED = (Kind.EQUATION, Kind.FIGURE, Kind.TABLE)
 
 
 @dataclass(frozen=True)
@@ -88,20 +86,17 @@ def forget() -> None:
 
 
 def _build() -> Sample:
-    from a11y_stem.pipeline import layout
+    from a11y_stem.pipeline.run import recrop
     from a11y_stem.web.review import rerender_html
 
     report = json.loads((DEMO_DIR / "report.json").read_text(encoding="utf-8"))
     meta = report["demo"]
     result = DocumentResult.model_validate({**report["result"], "html": ""})
     pdf = (DEMO_DIR / "source.pdf").read_bytes()
-    crops: dict[str, bytes] = {}
-    try:
-        for element in result.elements:
-            if element.kind in CROPPED:
-                crops[element.id] = layout.crop(pdf, element)
-    finally:
-        layout.release(pdf)  # the cached copy of a PDF is not kept
+    # The pictures are cut again exactly as a conversion cuts them (an unconverted equation
+    # sharp for the size of the file's text), and the file is written by today's assembler:
+    # the sample shows the current output, not the output of the day it was recorded.
+    crops = recrop(pdf, result.elements)
     html = rerender_html(result, crops)
     result.html = ""
     return Sample(
