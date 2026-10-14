@@ -299,6 +299,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/feedback",
         "/jobs/{job_id}/keep",  # keep 7 more days (T1-8)
         "/jobs/{job_id}/language",
+        "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/jobs/{job_id}/title",  # the title students hear (T1-7)
@@ -306,10 +307,14 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/login",
         "/login/microsoft",
         "/logout",
+        "/sample",  # opens the recorded sample document (T3-9)
+        "/uploads/{upload_id}",  # choose the pages of a large file (T3-3)
+        "/uploads/{upload_id}/delete",
     ]
     for path in posts:
         url = path.replace("{job_id}", JOB).replace("{element_id}", "p1-e1")
         url = url.replace("{course_id}", JOB).replace("{entry_id}", JOB)
+        url = url.replace("{upload_id}", JOB)
         if path == "/jobs":
             response = web.browser.post(
                 url, data={"csrf_token": "forged"}, files={"pdf": ("a.pdf", b"%PDF-1.4", "x")}

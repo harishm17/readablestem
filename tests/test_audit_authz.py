@@ -11,7 +11,15 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.web.db import Course, CourseNotation, Job, ReviewEdit, User, session_scope
+from a11y_stem.web.db import (
+    Course,
+    CourseNotation,
+    Job,
+    PendingUpload,
+    ReviewEdit,
+    User,
+    session_scope,
+)
 from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, csrf_from, job_id_from, login, upload
 from fixtures.web.support import make_pdf as pdf
 
@@ -44,11 +52,14 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/admin/allowlist/remove"): ADMIN_ONLY,
     ("GET", "/app"): USER,
     ("GET", "/app/documents"): USER,
+    ("GET", "/app/download"): USER,  # T3-4: a zip of the person's own ready documents
     ("POST", "/jobs"): USER,
+    ("POST", "/sample"): USER,  # T3-9: CSRF, rate limited; makes a recorded copy for its owner
     ("GET", "/courses"): USER,
     ("POST", "/courses"): USER,
     ("GET", "/courses/{course_id}"): USER,
     ("GET", "/courses/{course_id}/delete"): USER,
+    ("GET", "/courses/{course_id}/download"): USER,  # T3-4: a zip of one course's documents
     ("POST", "/courses/{course_id}/delete"): USER,
     ("POST", "/courses/{course_id}/entries"): USER,
     ("GET", "/courses/{course_id}/entries/{entry_id}"): USER,
@@ -77,9 +88,14 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/review/{element_id}"): USER,
     ("POST", "/jobs/{job_id}/review/{element_id}/check"): USER,
     ("GET", "/jobs/{job_id}/status"): USER,
+    ("POST", "/jobs/{job_id}/retry"): USER,  # T3-1: CSRF, owner only, rate limited, tries capped
     ("POST", "/jobs/{job_id}/title"): USER,  # T1-7: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/undo"): USER,
     ("GET", "/jobs/{job_id}/view"): USER,
+    # T3-3: a large file kept while its owner chooses the pages; owner only like a job
+    ("GET", "/uploads/{upload_id}"): USER,
+    ("POST", "/uploads/{upload_id}"): USER,  # CSRF, rate limited, quota and caps as an upload
+    ("POST", "/uploads/{upload_id}/delete"): USER,  # asks first (confirm=yes)
 }
 
 
@@ -94,7 +110,7 @@ def all_routes(routes):
 
 @pytest.fixture
 def site(tmp_path):
-    env = WebEnv(tmp_path, feature_notation_memory=True)
+    env = WebEnv(tmp_path, feature_notation_memory=True, max_large_upload_mb=5, max_source_pages=40)
     with env.running() as alice:
         env.allow(ALICE)
         env.allow(BOB)
@@ -123,7 +139,10 @@ def site(tmp_path):
         )
         with session_scope(env.ctx.factory) as session:
             entry_id = session.scalar(select(CourseNotation.id))
+        kept = upload(alice, pdf(12))  # over the page limit: kept for its owner to choose pages
+        upload_id = kept.headers["location"].rsplit("/", 1)[-1]
         env.ids = {
+            "upload_id": upload_id,
             "job_id": job_id,
             "course_id": course_id,
             "entry_id": entry_id,
@@ -145,7 +164,7 @@ def counts(env) -> dict[str, int]:
     with session_scope(env.ctx.factory) as session:
         return {
             model.__tablename__: int(session.scalar(select(func.count()).select_from(model)) or 0)
-            for model in (Job, Course, CourseNotation, ReviewEdit, User)
+            for model in (Job, Course, CourseNotation, ReviewEdit, PendingUpload, User)
         }
 
 

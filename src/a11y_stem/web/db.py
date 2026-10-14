@@ -133,6 +133,15 @@ class Job(Base):
     # The upload form's "Exam or quiz" box: the figure step describes what is shown and
     # never the result (`ConversionOptions.exam_mode`, read by `web.notation.conversion_options`).
     exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # One part of a larger file converted in parts (T3-3, `web.routes.parts`): the id of the
+    # waiting file it was cut from (the same for every part, not a foreign key: the waiting
+    # file is deleted when its last page has been sent) and the pages it holds ("31-59").
+    part_group: Mapped[str | None] = mapped_column(String(32), index=True)
+    part_label: Mapped[str | None] = mapped_column(String(64))
+    # The sample document (T3-9, `web.sample`): a recorded conversion put in a person's list so
+    # they can practise on the review screen before uploading a real file. Outside the quota,
+    # the spend and the caps on documents, and outside the usage numbers.
+    is_sample: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     # What the documents list needs from `result_json`, kept beside it so the list (polled
     # every few seconds while anything converts) never loads a result's fixes: the decisions
     # still open (a heading group is one) and the title. Both are set whenever `result_json`
@@ -145,6 +154,18 @@ class Job(Base):
     # render, not one each (`web.routes.jobs.current_html`). True: `html` and the checks in
     # `result_json` are from before the last review write.
     html_stale: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # A revised upload (T3-2): the id of the earlier version whose decisions were to be
+    # carried over (`web.carry`), not a foreign key (the earlier version may be deleted
+    # first), and what happened to them: element ids and counts, never text
+    # (`carry.CarryReport.to_json`, with "from_name", the earlier file's name, shown to the
+    # owner only). Both document-derived: deleted with the job.
+    revises_job_id: Mapped[str | None] = mapped_column(String(32))
+    carried_json: Mapped[dict | None] = mapped_column(JSON)
+    # "Try again" (T3-1, `web.retry`): how many times the person asked for a stopped or
+    # partly converted job to be converted again, and the value of `attempts` when the last
+    # one began (a job interrupted `MAX_ATTEMPTS` times since then is failed, as before).
+    retries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    attempts_at_retry: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -179,6 +200,23 @@ class Blob(Base):
     job: Mapped[Job] = relationship(back_populates="blobs")
 
     __table_args__ = (UniqueConstraint("job_id", "kind", "element_id", name="uq_blob_slot"),)
+
+
+class StepRecord(Base):
+    """A finished model step of a job, kept so "Try again" does not pay for it twice (T3-1,
+    `web.step_cache`). `input_key` is `pipeline.run.step_key`: what the answer depends on.
+    The answer is a `Fix` as JSON. Document-derived: deleted with the job."""
+
+    __tablename__ = "step_records"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    element_id: Mapped[str] = mapped_column(String(64))
+    input_key: Mapped[str] = mapped_column(String(64))
+    fix_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (UniqueConstraint("job_id", "element_id", name="uq_step_record_slot"),)
 
 
 class ReviewEdit(Base):
@@ -218,6 +256,32 @@ class QuotaDay(Base):
     )
     day: Mapped[date] = mapped_column(Date, primary_key=True)
     pages: Mapped[int] = mapped_column(Integer, default=0)
+
+
+class PendingUpload(Base):
+    """A large file kept while the person chooses which of its pages to convert (T3-3,
+    `web.pending`). Document content: deleted at `retain_until`, when its last page has been
+    sent, by the person, and with the person (`ops.retention`)."""
+
+    __tablename__ = "pending_uploads"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    filename: Mapped[str] = mapped_column(String(255))
+    pages: Mapped[int] = mapped_column(Integer)
+    size_bytes: Mapped[int] = mapped_column(Integer)
+    content: Mapped[bytes] = mapped_column(LargeBinary)
+    # The choices made with the upload, applied to every part: the course, exam mode, how
+    # long to keep the documents.
+    course_id: Mapped[str | None] = mapped_column(
+        ForeignKey("courses.id", ondelete="SET NULL", name="fk_pending_uploads_course_id_courses")
+    )
+    exam_mode: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    retention_mode: Mapped[str] = mapped_column(String(8), default="day", server_default="day")
+    # The 0-based pages already sent to be converted, so the rest can be chosen later.
+    done_pages: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    retain_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
 class ErrorAggregate(Base):

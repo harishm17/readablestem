@@ -66,9 +66,11 @@ cannot skip these checks unnoticed.
 | Class | Routes |
 |---|---|
 | Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
-| Signed-in user, owner only | `/app`, `/app/documents`, `POST /jobs`, everything under `/jobs/{id}/...`, everything under `/courses/...` |
+| Signed-in user, owner only | `/app`, `/app/documents`, `/app/download`, `POST /jobs`, `POST /sample`, everything under `/jobs/{id}/...`, everything under `/uploads/{id}` (a large file kept for choosing its pages), everything under `/courses/...` (including `/courses/{id}/download`) |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove` |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
+
+`POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
 
 The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, are owner-only
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
@@ -111,15 +113,21 @@ script injected into an app page is refused by the policy.
 | Limit | Value | Where |
 |---|---|---|
 | Request body, any route but the upload | 1 MiB, cut off while streaming | `RequestSizeLimitMiddleware` |
-| Upload size | `MAX_UPLOAD_MB`, checked while streaming, never spooled to disk | `web/uploads.py` |
-| Pages per upload | `MAX_PAGES_PER_JOB` | the probe, before quota or model |
+| Upload size | `MAX_UPLOAD_MB` a file converted at once, `MAX_LARGE_UPLOAD_MB` a file kept for choosing its pages and the whole request; checked while streaming, never spooled to disk | `web/uploads.py` |
+| Pages per upload | `MAX_PAGES_PER_JOB` converted at once, `MAX_SOURCE_PAGES` for a file kept for choosing its pages; the quota counts only the pages converted | the probe, before quota or model |
 | Page size | 5000 pt a side | probe |
 | Uploads in progress | 3 per instance, 1 per person | `UploadGate` |
+| Files in one upload | 10; the request, files together, at most `MAX_LARGE_UPLOAD_MB` (30); each file after the first counts as an upload for `upload_user`; the probes of one request share 120 s | `web/uploads.py`, `routes/jobs.py` |
+| Large files kept for choosing their pages | 2 per person, up to 30 MB and 300 pages, deleted after `RETENTION_HOURS`; their parts are held to the page quota and the caps below | `web/pending.py`, `web/intake.py` |
+| Zip of ready documents | 25 documents and 80 MB, in memory | `web/bundle.py` |
+| Sample document | one per person, outside the quota, the spend and the caps; `sample` rate rule 10 per 10 minutes per address | `web/sample.py` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` | `web/quota.py` |
-| Waiting or running documents per person | 10 | `routes/jobs.py` |
-| Kept documents per person | 40 | `routes/jobs.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
+| Waiting or running documents per person | 10 | `web/intake.py` (every route that makes a job: the upload and the parts of a large file) |
+| Kept documents per person | 40 (the sample document does not count) | `web/intake.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
+| Tries again of one document | 3 | `web/retry.py`; "Try again" never touches the page quota, the job's spend caps cover all tries |
+| "Try again" requests, per address / per person | 20 / 10 per 10 minutes | `web/abuse.py` |
 | Sign-in starts, per address | 10 per 5 minutes | `web/abuse.py` |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |

@@ -56,8 +56,10 @@ from a11y_stem.web.db import (
     CourseNotation,
     Event,
     Job,
+    PendingUpload,
     QuotaDay,
     ReviewEdit,
+    StepRecord,
     User,
     session_scope,
 )
@@ -72,6 +74,7 @@ class PurgeStats:
     blobs_deleted: int
     unaggregated_deleted: int  # finished jobs deleted without their counts
     events_deleted: int = 0  # usage events past EVENT_RETENTION_DAYS
+    pending_deleted: int = 0  # large files waiting for their pages to be chosen (T3-3)
 
 
 def purge_expired(
@@ -97,6 +100,7 @@ def purge_expired(
             break
     with session_scope(factory) as session:
         stats.events_deleted = purge_old_events(session, now)
+        stats.pending_deleted = purge_pending(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -104,8 +108,15 @@ def purge_expired(
         blobs_deleted=stats.blobs_deleted,
         unaggregated_deleted=stats.unaggregated_deleted,
         events_deleted=stats.events_deleted,
+        pending_deleted=stats.pending_deleted,
     )
     return stats
+
+
+def purge_pending(session: Session, now: datetime) -> int:
+    """Delete the large files kept for choosing their pages that are past their deletion
+    time (`web.pending`), in the caller's transaction. Returns how many."""
+    return _deleted(session.execute(delete(PendingUpload).where(PendingUpload.retain_until < now)))
 
 
 def purge_old_events(session: Session, now: datetime) -> int:
@@ -162,7 +173,7 @@ def delete_jobs(
     """
     now = _as_utc(now or datetime.now(UTC))
     rows = session.execute(
-        select(Job.id, Job.status, Job.aggregated, Job.finished_at, Job.created_at)
+        select(Job.id, Job.status, Job.aggregated, Job.finished_at, Job.created_at, Job.is_sample)
         .where(Job.id.in_(sorted(set(job_ids))))
         .order_by(Job.id)
         .with_for_update()
@@ -173,10 +184,14 @@ def delete_jobs(
     pending = [row.id for row in rows if row.status in FINISHED and not row.aggregated]
     unaggregated = 0 if _aggregate_before_delete(session, pending, now) else len(pending)
 
-    day_of = {row.id: utc_day(row.finished_at or row.created_at, now) for row in rows}
+    # The sample document (web.sample) is not part of the counts.
+    day_of = {
+        row.id: utc_day(row.finished_at or row.created_at, now) for row in rows if not row.is_sample
+    }
     _count_review_actions(session, day_of)
     blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
+    session.execute(delete(StepRecord).where(StepRecord.job_id.in_(ids)))
     jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
     # The student-file images made from the figures are kept in memory for a while
     # (`pipeline.figure_images`); a deleted document's go with it.
@@ -199,6 +214,7 @@ def erase_user(session: Session, user_id: str, now: datetime | None = None) -> P
     stats = delete_jobs(session, job_ids, now)
     courses = select(Course.id).where(Course.user_id == user_id).scalar_subquery()
     session.execute(delete(ReviewEdit).where(ReviewEdit.user_id == user_id))
+    session.execute(delete(PendingUpload).where(PendingUpload.user_id == user_id))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))
     session.execute(delete(Course).where(Course.user_id == user_id))
     session.execute(delete(Event).where(Event.user_id == user_id))

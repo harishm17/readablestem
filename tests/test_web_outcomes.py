@@ -168,7 +168,7 @@ def test_a_job_the_daily_cap_stops_part_way_is_not_shown_as_a_normal_success(env
     text = page_text(env.browser.get(f"/jobs/{job_id}").text)
     assert "Stopped early" in text
     assert f"{len(failed)} of {len(model_fixes)} equations and figures were not converted" in text
-    assert "after 00:00 UTC" in text
+    assert "After 00:00 UTC" in text and "Convert the missing parts" in text
     assert "The accessible HTML is ready" not in text
     assert "Stopped early" in page_text(env.browser.get("/app").text)
     # The partial result is still there to use.

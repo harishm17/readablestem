@@ -299,7 +299,8 @@ which stays idle until baseline reports are promoted (`docs/eval.md`, "How to re
 ## Limits
 
 - **PDF in, HTML out.** Word and PowerPoint files must be exported to PDF first. Uploads are
-  limited to 30 pages and 20 MB by default.
+  limited to 30 pages and 20 MB by default; a bigger file (up to 300 pages and 30 MB) is kept so
+  you can choose which pages to convert, in parts.
 - **A model is in the loop.** Document images and the text around them are sent to OpenAI's
   API (with `store=False`), or to Anthropic's Claude API when `MODEL_PROVIDER=anthropic` is
   set. Models are not deterministic, so two runs on the same file can differ.

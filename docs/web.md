@@ -60,6 +60,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | `DAILY_SPEND_CAP_USD` | Global model spend per UTC day (`spend_days`) |
 | `PER_USER_DAILY_PAGE_QUOTA` | Pages per user per UTC day (`quota_days`) |
 | `MAX_UPLOAD_MB`, `MAX_PAGES_PER_JOB`, `MAX_CONCURRENT_UPLOADS` | Upload limits (the last: uploads taken in at once per instance, one per user) |
+| `MAX_LARGE_UPLOAD_MB` (30), `MAX_SOURCE_PAGES` (300) | A file over the limits above, up to these, is kept so its pages can be chosen and converted in parts ("Large files in parts"); `MAX_LARGE_UPLOAD_MB` is also the most one upload request may carry, files together (Cloud Run takes at most 32 MiB). Equal to the limits above, they turn the feature off: such files are refused |
 | `MAX_USD_PER_JOB`, `MAX_MODEL_CALLS_PER_JOB` | Per-job budget given to the model client (all attempts together). The second automated check's requests count in dollars, not as model calls |
 | `MAX_USD_PER_PAGE`, `MAX_MODEL_CALLS_PER_PAGE` | Lower the per-job caps for short documents: a job may use at most this much per page of its upload (defaults $0.30 and 80), so one dense page cannot use a long document's allowance |
 | `DECISIONS_FIGURE_VERIFY`, `DECISIONS_EQUATION_SHADOW`, `DECISIONS_CANARY` (and thresholds) | The second automated check (ADR 0005): an optional note on accepted figures, a shadow on equations, a daily drift canary in the cron (docs/steps.md, docs/operations.md). All on by default |
@@ -80,7 +81,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/privacy`, `/terms` | anyone | Drafts describing the real behaviour (hourly purge, one daily backup, Langfuse only when tracing is on), marked "Draft, to be reviewed by Harish". `a11y-stem ops launch-check` lists what is still unfinished on the public pages |
 | GET `/limits` | anyone | Known limits: the facts that hold today and the measured accuracy, marked "Draft, to be reviewed by Harish" until he writes the copy |
 | GET `/help/posting` | anyone | "Posting the file in your course": upload it to Canvas Files and link it, never paste it into a page; make the HTML the main version and keep the PDF only as a labelled print copy (28 CFR 35.202, the DOJ fact sheet); check with your accessibility office; guidance, not legal advice |
-| GET `/status` | anyone | Service status: up, conversions open or paused for today, documents waiting and converting (numbers only; 503 when the database does not answer) |
+| GET `/status` | anyone | Service status: up, conversions open or paused for today, whether the AI service is answering (from this server's own last requests), documents waiting and converting (numbers only; 503 when the database does not answer) |
 | GET `/login` | anyone | Sign-in page |
 | POST `/login` | anyone | Redirects to Google (CSRF-checked form) |
 | GET `/auth/callback` | Google | Finishes sign-in; 403 page if not allowlisted or email not verified |
@@ -88,14 +89,20 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/auth/microsoft/callback` | Microsoft | Finishes sign-in; 403 page if the organisation is not set up for the beta or the person is not allowlisted, 400 for any token that fails a check. With `admin_consent` (an IT admin back from the approval link, deploy.md step 3b): a thank-you notice on `/login`, nothing else |
 | GET, POST `/dev-login` | dev/test only | Any email, no password; the allowlist still applies |
 | POST `/logout` | signed in | Clears the session |
-| GET `/app` | signed in | My documents as a to-do list (below), then the upload form |
-| GET `/app/documents?v=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged) |
-| POST `/jobs` | signed in | Upload: checks, quota, queue; 303 to `/jobs/{id}` |
+| GET `/app?revises=` | signed in | My documents as a to-do list (below), then the upload form; with `revises=<job id>` of the person's own finished document, the form for a revised version of it ("Revised versions" below) |
+| GET `/app/documents?v=&course=` | signed in | The documents list alone, polled by htmx while a document is waiting or converting (204 while unchanged); with `course=` only that course's documents (the course page polls it) |
+| POST `/jobs` | signed in | Upload of one file or up to 10: checks, quota, queue, one job each; 303 to `/jobs/{id}` for one file, to `/uploads/{id}` when it is kept for choosing its pages, a results page for several ("Uploads and limits") |
+| GET `/app/download` | signed in | One zip of the person's ready documents ("Several files, courses and download all") |
+| POST `/sample` | signed in | Opens the person's sample document, made from the recorded conversion; 303 to its job page ("The sample document") |
+| GET `/uploads/{id}` | owner | A large file kept for choosing its pages: the suggested parts, the box to change them, "Shrink large pictures first" ("Large files in parts") |
+| POST `/uploads/{id}` | owner | Convert the chosen parts: each is cut out, checked, counted against the quota and queued as a document of its own; rate limited like an upload. 400 for pages that cannot be used, 413 for a part over the size limit, 429 for the quota or the caps |
+| POST `/uploads/{id}/delete` | owner | "Discard this file": only a POST with `confirm=yes` deletes it, any other POST shows the confirmation page |
 | GET `/jobs/{id}` | owner | The job page: status, live progress, what is left to do, the before/after card, notices, results, language (below) |
 | GET `/jobs/{id}/status?v=` | owner | Status fragment for htmx polling (204 while unchanged); changes per step |
 | GET `/jobs/{id}/progress?v=` | owner | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
 | GET `/jobs/{id}/draft` | owner | Asked before a download while decisions are open: what students would get, "Review N decisions first" or "Download the draft anyway"; with none open, 303 to the finish line |
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
+| POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
@@ -111,6 +118,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET, POST `/jobs/{id}/delete` | owner | A "Delete <title>? This cannot be undone" confirmation page (the file, its upload time, the decisions made on it); only a POST with `confirm=yes` from that page deletes the job and everything made from it (WCAG 3.3.4, works without JavaScript). The list's Delete links open it with `?from=app`, so "No, keep it" goes back to the list |
 | GET, POST `/jobs/{id}/feedback` | owner | The two optional questions after a download, on a page of their own; POST stores them as usage events, once per document (404 when the questions are off) |
 | GET, POST `/courses` | signed in | Courses (with `FEATURE_NOTATION_MEMORY` only, else 404): the user's courses; add one ("Courses and notation" below) |
+| GET `/courses/{id}/download` | owner | One zip of the ready documents converted for the course ("Several files, courses and download all") |
 | GET `/courses/{id}`; POST `/courses/{id}/rename`, `/courses/{id}/entries` | owner | A course's notation; rename; add a symbol |
 | GET, POST `/courses/{id}/entries/{entry}`; POST `.../delete` | owner | Edit or remove one symbol |
 | GET, POST `/courses/{id}/delete` | owner | "Delete <course>?" confirmation; only a POST with `confirm=yes` deletes |
@@ -225,7 +233,9 @@ yours to see". It is a 404 either way. The
    the body is read;
 3. size: a declared `Content-Length` over the limit is refused before reading, and the
    body is counted while it streams in, so an endless upload is cut off just past
-   `MAX_UPLOAD_MB` (413). The file stays in memory; it never touches the server's disk;
+   `MAX_LARGE_UPLOAD_MB` (413), files together; a file over `MAX_UPLOAD_MB` is kept for
+   choosing its pages ("Large files in parts"). The files stay in memory; they never touch the
+   server's disk;
 4. the CSRF token;
 5. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
    child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
@@ -288,6 +298,109 @@ that would send the whole file to be refused (UX review MF20). The same goes for
 person's daily page limit once no page is left ("You have converted all 20 pages you can
 today. Uploads open again at ..."); before that, the hint under the file field says how
 many pages are left and when the count starts again.
+
+### Several files in one upload
+
+The upload field takes up to `MAX_FILES_PER_UPLOAD` (10) files (`<input type="file" multiple>`;
+`app.js` checks the number, each file and the total as soon as they are chosen). Each file
+becomes **a job of its own**, with the course, exam and keeping choices of the form
+(`routes.jobs._place_files`, `intake.store_job`), and each is held to every control an upload has:
+
+- the probe, in a child process with its own 30 s (all the probes of one request share
+  120 s, so ten files that hang cannot hold the person's upload slot for five minutes);
+- the daily pages (`quota_days`, one conditional UPDATE in the job's own transaction), the
+  10 documents waiting or converting and 40 kept (`intake`), checked per file: a file that
+  does not fit is refused and the others still go in;
+- the rate limits: the request counts once against the address (`upload`) and once per file
+  against the person (`upload_user`), so ten files cost ten of the fifteen uploads a person
+  may make in ten minutes;
+- the token, once, and the upload gate (one request in progress per person).
+
+One file is answered as before (303 to its job page, or the upload form again with the
+reason). Several files get a results page (`upload_results.html`, status 200; the status of
+the first reason when nothing came of it): the documents that are converting, the large
+files waiting for their pages, and the files that were not uploaded with the reason for each
+("It did not use any of your pages"). It is a page, not a redirect, because the reasons name
+the files and a file name never goes in the session cookie. A revised version
+(`revises`) replaces one document, so it takes one file.
+
+### Large files in parts (`web/pending.py`, `web/routes/parts.py`, `web/ranges.py`)
+
+A PDF over `MAX_PAGES_PER_JOB` pages or `MAX_UPLOAD_MB`, and within `MAX_SOURCE_PAGES` pages and
+`MAX_LARGE_UPLOAD_MB`, is not turned away. It is kept as a **pending upload**
+(`pending_uploads`: the bytes, the page count and the course, exam and keeping choices made
+with it), nothing is converted or counted, and the person is sent to `/uploads/{id}`:
+
+- **The page** says how many pages and MB the file is and what one conversion takes, and
+  suggests parts: as few as fit and of nearly equal size, one per line (59 pages: `1-30` and
+  `31-59`; `ranges.suggest_parts`). The person edits the box: one part per line (or after a
+  semicolon), ranges with a hyphen, ranges joined with commas in one part, pages numbered
+  from 1 as in a PDF viewer. What cannot be used is said in words naming the part and the
+  page ("Part 2: page 70 is not in this file, which has 59 pages", `ranges.parse_parts`).
+  Pages already sent are left out and cannot be sent twice.
+- **Cutting.** Each part is cut out in the probe's child process (`pdf_probe extract`,
+  same memory cap, 60 s), so MuPDF never touches the file in the web process, checked again
+  by the probe like any upload (a part of only scanned pages is refused as a scanned
+  upload is) and must be at most `MAX_UPLOAD_MB`. A part over it says so and offers the
+  shrink.
+- **Shrink large pictures first** (`shrink`, ticked by default for a file that is large
+  because of its pictures): pictures sharper than 200 dots per inch are saved at 150 as JPEG at
+  quality 80 (`Document.rewrite_images`); text and equations set as text are not touched,
+  unused objects of the pages left out are dropped. A figure in the converted file can look a
+  little less sharp.
+- **Quota and caps.** The parts are started in order, each through `intake.store_job`: its
+  pages are counted against the daily quota, the cap on documents waiting and kept holds. The
+  first part that does not fit stops the run, and **the file stays** (with the pages sent
+  recorded in `done_pages`) so the rest can be chosen when the count starts again. The
+  page names what was started and why it stopped.
+- **Each part is a document** named "chapter2 (pages 31-59).pdf", with `jobs.part_group` (the
+  pending upload's id) and `jobs.part_label`; its page says which pages it holds and links
+  its sibling parts in page order. Parts are separate documents, not merged into one HTML
+  file.
+- **Retention.** The pending upload is deleted `RETENTION_HOURS` after it was made, by the
+  hourly purge (`ops.retention.purge_pending`), "Discard this file" (asks first), when its last
+  page has been sent, and with the person (`erase_user`). Past its time it answers 404 at
+  once. At most 2 wait per person (`pending.MAX_PENDING_PER_USER`). It is not a job: not in
+  the queue, not in the 40 documents a person may keep. My documents lists the waiting files.
+
+### Several files, courses and download all
+
+With `FEATURE_NOTATION_MEMORY` on, the course page lists the documents converted for the
+course ("Documents in this course", the same list as My documents, polling
+`/app/documents?course=<id>` while any is converting) and offers "Download all N ready
+documents (zip)". My documents offers the same for everything the person has
+(`web/bundle.py`, `web/routes/bundle.py`):
+
+- Only a document that is **ready to share** goes in (finished, no decision open). One with
+  decisions open is a draft, and the single download asks first; the zip leaves such documents
+  out and says so in its `contents.txt`.
+- Names are the single download's (`slug-of-the-title-<id6>.html`), so two documents called
+  "Notes" never overwrite each other. `contents.txt` lists them in words.
+- It is built in memory, at most 25 documents and 80 MB of files (the rest are listed in
+  `contents.txt` as not included), and with fixed timestamps so the same documents give
+  the same bytes.
+- It is a plain GET for the owner, like the single download: the deletion clock of the
+  documents in it restarts, each counts as downloaded, a stranger gets a 404 for someone
+  else's course, and with courses switched off the course route is a 404.
+
+### The sample document (`web/sample.py`)
+
+My documents offers "Try a sample first" (before the upload form for someone with no
+document of their own, after it otherwise). `POST /sample` (token, rate limited) puts a
+finished **recorded conversion** in the person's list and sends them to its page; opening it
+again returns the same one. It is OpenStax *Physics* 2.3 (CC BY 4.0, 13 pages, the committed
+`static/demo/report.json` and `source.pdf`: a real run of pipeline 0.4.0), with the pictures
+cut from its pages by the layout code, which reads no model, once per process.
+
+- **No model call for anyone**, no pages (no `quota_days` row) and no spend (cost 0), and it
+  takes no place from the 10 waiting or 40 kept documents (`Job.is_sample`,
+  `intake.live_job_count`).
+- **Not in the numbers**: created already aggregated, no usage event is written for it
+  (`events.is_sample`; no questions after its download), and its review actions are left
+  out when it is deleted (`ops.retention`).
+- **Theirs to use**: reviewing, deciding, previewing and downloading work as for any document,
+  it is deleted by the same clock or by "Delete now", it cannot be named as the earlier version
+  of a revised upload, and its page says what it is, where it comes from and its licence.
 
 ## My documents (`web/documents.py`)
 
@@ -425,6 +538,48 @@ model only as the fenced course notation block, and erased with the user
 (`ops.retention.erase_user`). Every form is a plain POST with the CSRF token, with an
 error summary linked to the field, so it all works without JavaScript.
 
+## Revised versions (`web/carry.py`)
+
+An instructor who fixes a typo and uploads the PDF again should not decide the same
+equations twice. The job page's "If you change the PDF" links to `GET /app?revises=<job id>`,
+the ordinary upload form with a hidden `revises` field (and the earlier document's course and
+exam choice as its starting values); `POST /jobs` accepts the field only for a finished,
+still-kept document of the same person (else the form comes back with "was not found", status
+400, and nothing is queued). The new job stores `jobs.revises_job_id`. Nothing else about the
+upload changes: its pages count against the daily quota like any other conversion.
+
+When the new job has been converted, the worker (`Worker._carry_decisions`, in the same
+transaction that stores the result) reads the earlier version's result and crops, if it is
+still the owner's, finished and not past its deletion time, and carries the decisions over
+(`carry.carry_decisions`):
+
+- An item is **the same item** only if its kind and content fingerprint are equal: for an
+  equation, figure or table the SHA-256 of its crop, plus an equation's display mode and a
+  figure's caption (the alt text is written for it); for a heading its words (case and
+  spacing ignored), size and weight. One pixel of difference is a different item, and a
+  changed item never inherits a decision.
+- **Position** chooses among items with one fingerprint (a small figure repeated on every
+  page): the nearest pairs (page first, then place on the page) are matched first, one earlier
+  item to one new item. It also finds the items that **changed**: a decided earlier item with
+  no match, and a new item waiting for a decision at least half inside its box, are reported
+  as "changed, decide again".
+- A person's decision is carried, the tool's own acceptance is not. An *accept* is carried
+  only if the tool proposes the same thing again; an *edit* or a *rejection* belongs to the
+  picture and is carried either way. A heading level is carried only if the output would still
+  write that level there (`review.heading_level_written`). Whatever is not carried stays
+  waiting, and says why in the report: `suggestion_changed` (same picture, another proposal),
+  `changed`, `new` (waiting, nothing like it before) and `removed` (an earlier decision whose
+  item is gone).
+
+The HTML file is made again with the carried decisions; each carried decision is a
+`ReviewEdit` with action `carried` and no write number (so Undo never takes back a whole
+carry, and usage counts show `review:carried`). The report is `jobs.carried_json`: element
+ids and counts, and the earlier file's name for the owner's page; no text of the document.
+The job page's "Compared with the earlier version" card says how many decisions were carried
+over, how many items changed or are new, and links to the first that needs a decision; the
+review screen marks a decision it carried. If the earlier document was deleted before the new
+one finished, the card says so and every decision is new.
+
 ## Spend cap (`web/spend.py`)
 
 `DbSpendGuard(factory, cap_usd)` implements `core.budget.SpendGuard` on `spend_days`
@@ -531,7 +686,7 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   | `access_removed` | The owner was removed from the allowlist |
   | `timeout` | The conversion ran past its time limit |
   | `store_failed` | The result could not be written to the database |
-  | `lease_expired` | The job was interrupted 3 times |
+  | `lease_expired` | The job was interrupted 3 times (since it was last tried again) |
   | `upload_missing` | The upload blob was gone |
   | `internal_error` | Anything else |
 
@@ -557,8 +712,53 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   A finished job with no code whose equations, figures and tables mostly failed with
   `model_api_error` or `model_timeout` is shown as "Stopped: the AI service did not
   answer" (`outcome.MODEL_OUTAGE`, read from the stored result on the job page; nothing
-  is stored on the job, and it goes away once enough of them are filled in). Retrying
-  without a new upload is not built yet.
+  is stored on the job, and it goes away once enough of them are filled in). "Convert
+  the missing parts" on that page tries it again ("Trying a document again", below).
+
+### Trying a document again (`web/retry.py`, `web/step_cache.py`)
+
+A conversion can stop for reasons that are nobody's fault. The job page offers a button, not
+a dead end:
+
+| The document | The button | Why |
+|---|---|---|
+| Failed with `timeout`, `lease_expired`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` | "Try again" | Stopped by something that is not about the file. The other failure codes (a handwritten or scanned file, `no_content`, a removed account) are not offered a retry: it would stop the same way |
+| Finished with `budget_daily`, or converted while the AI service was down | "Convert the missing parts" | Only the parts that were not converted are sent again |
+
+`POST /jobs/{id}/retry` (owner only, CSRF, rate limits `retry` per address and `retry_user`
+per person) puts the **same job** back in the queue: `queued`, `jobs.retries` plus one,
+`jobs.attempts_at_retry` set to `attempts` (the limit of 3 interrupted attempts counts from
+there). What it does not do:
+
+- **Charge pages again.** Pages are counted when a file is uploaded (`quota_days`); this is
+  not an upload, and nothing in the route touches the quota. The route restarts the
+  deletion clock, as any activity does.
+- **Pay for finished steps again.** While a job converts, each model step whose answer is
+  worth keeping (`pipeline.run.reusable`: not `model_*`, `budget_*`, `internal_error` or
+  `crop_error` failures, which a new try could change) is stored in `step_records` under a
+  key made from the element, its picture, its nearby text, the conversion options and the
+  models in use (`pipeline.run.step_key`). A later conversion of the same job takes those
+  answers instead of calling the model, so a retry spends only on what was missing; the
+  cost and calls of the steps given back are taken off the new result's totals
+  (`DbStepCache.reused_usd`), so `jobs.cost_usd` counts every step once. A changed key (a
+  new course notation, exam mode, another model) asks again. When a job finishes with
+  nothing a retry could improve, its records are deleted at once; the rest go with the job.
+- **Lose decisions.** A partly converted result keeps what the person decided: the new
+  result inherits the job's own earlier decisions item by item (`web/carry.py`, the same
+  rules as for a revised upload), no `ReviewEdit` is added (they already are the job's) and
+  the HTML is made again.
+- **Skip a limit.** A retried job waits for the daily budget like any queued job; the job's
+  own spend caps cover all tries together (`jobs.cost_usd` is kept); a person with 10
+  documents waiting or converting is refused (429); a job has at most 3 tries (409, "No more
+  tries": upload the file again as a new document); a job that is not stopped is a 409.
+
+**Is the AI service answering?** The converter reports how every model request ended
+(`convert_pdf(call_observer=)`); `web/provider_health.py` keeps the last few minutes in
+memory. When the most recent 5 requests, all within 10 minutes, ended in `api_error` or
+`timeout`, the public `/status` page says "Not answering since ...", and a document that is
+waiting or converting says so on its page and in its status box; one answered request ends
+it. It is a hint from this server's own traffic (per process, forgotten on restart), never a
+gate: nothing is refused because of it.
 
 **Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
 web process, not in a child process like the upload probe. A conversion stuck in native
@@ -1532,6 +1732,11 @@ a user id is added without it.
   `dev`), `jobs.title_override` and `jobs.contact_line`; the downgrade drops them.
 - `3b8e5f1a9d27` (after `7c1d9a4e2b60`) adds `jobs.exam_mode` (server default false); the
   downgrade drops it.
+- The jobs work (docs/web.md sections above) adds, in this order: `e2b6d1f84a30` (`jobs.revises_job_id`,
+  `jobs.carried_json`), `f7a3c9d20b15` (`step_records`, `jobs.retries`, `jobs.attempts_at_retry`),
+  `a8c4e0b61d97` (`pending_uploads`, `jobs.part_group`, `jobs.part_label`) and `b1d5f7a29c46`
+  (`jobs.is_sample`; its downgrade deletes the sample documents first). `tests/test_web_jobs_migrations.py`
+  runs each one up and down on SQLite and `tests/test_web_postgres.py` on Postgres.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
@@ -1556,6 +1761,8 @@ a user id is added without it.
 | `uv run pytest tests/test_page_types_pipeline.py` | Hidden text and kept pages through layout, the pipeline and the app (synthetic fixtures, offline model client): handwritten and scanned PDFs refused before any quota, the job page's outcome, one card per group on both review screens, one click keeping every page, a refused action |
 | `uv run pytest -m browser tests/test_page_types_browser.py` | Chromium: a course PDF with typed, handwritten and scanned pages (axe at 1440 and 390 px before and after the pages are kept, 320 px reflow with text spacing, the group decision without JavaScript) |
 | `uv run pytest -m browser tests/test_web_review_ux_browser.py` | Chromium: the UX review fixes (axe at 1280 and 320 px in each new state, reflow, keyboard flow, the live check, stale tab, Undo and "Use my edit anyway" without JavaScript, drafts kept across a session ending) |
+| `uv run pytest tests/test_web_carry.py tests/test_web_retry.py tests/test_web_parts.py tests/test_web_ranges.py tests/test_web_multiupload.py tests/test_web_sample.py` | The jobs work: decisions carried to a revised upload, trying a document again (the real pipeline with a model that stops answering), large files in parts, several files, the course page and the zip, the sample document |
+| `uv run pytest -m browser tests/test_web_jobs_browser.py` | Chromium: the new pages in each state (axe at 1280 and 375 px, no sideways scrolling at 320 px, keyboard flows) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

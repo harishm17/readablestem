@@ -38,6 +38,12 @@
     are unticked unless you tick them.</li>
   <li>You can delete a document and everything made from it at any time with
     "Delete now". It is removed from the database straight away.</li>
+  <li>A PDF that is too large to convert at once is kept, as uploaded, while you choose which
+    pages to convert. It is deleted <strong>{{ retention_hours }} hours</strong> after you
+    uploaded it, when you discard it, or once every page has been sent to be converted.
+    Nothing is sent to an AI service until you choose the pages. The sample document is
+    a recorded conversion of a published textbook section, not your file: it is deleted on the
+    same schedule as your own documents.</li>
   {# TODO(Harish): this matches the deploy default (SQL_RETAINED_BACKUPS=1). Decide the
      backup window (docs/deploy.md, "Backups and deleted documents") and keep this
      sentence true: change the number, or remove it if backups are turned off. #}

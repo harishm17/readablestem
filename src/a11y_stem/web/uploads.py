@@ -41,6 +41,8 @@ from a11y_stem.web.pdf_probe import ProbeRejected, looks_like_pdf, probe
 # Room for the multipart boundaries and the small text fields around the file itself.
 FORM_OVERHEAD_BYTES = 64 * 1024
 INSPECT_TIMEOUT_S = 30.0
+# Files in one upload (each becomes a document of its own; `routes.jobs`).
+MAX_FILES_PER_UPLOAD = 10
 
 # Status code per rejection code.
 REJECTION_STATUS = {
@@ -49,6 +51,7 @@ REJECTION_STATUS = {
     "empty": 400,
     "not_pdf": 415,
     "too_large": 413,
+    "too_many_files": 400,
     "encrypted": 422,
     "unreadable": 422,
     "damaged": 422,
@@ -78,10 +81,25 @@ class UploadRejected(Exception):
 
 
 @dataclass
+class UploadedFile:
+    filename: str  # a display name (`safe_filename`)
+    data: bytes
+
+
+@dataclass
 class UploadForm:
     fields: dict[str, str]
-    filename: str
-    data: bytes | None  # None when no file was chosen
+    files: list[UploadedFile] = field(default_factory=list)  # empty when no file was chosen
+
+    @property
+    def filename(self) -> str:
+        """The first file's name ("" when none was chosen)."""
+        return self.files[0].filename if self.files else ""
+
+    @property
+    def data(self) -> bytes | None:
+        """The first file's bytes (None when no file was chosen)."""
+        return self.files[0].data if self.files else None
 
 
 def max_upload_bytes(max_upload_mb: int) -> int:
@@ -126,13 +144,23 @@ class _InMemoryParser(MultiPartParser):
     spool_max_size = 2**31
 
 
-async def read_upload_form(request: Request, *, max_bytes: int) -> UploadForm:
-    """Parse a multipart upload with one file, refusing more than `max_bytes` of file data.
+async def read_upload_form(
+    request: Request,
+    *,
+    max_bytes: int,
+    max_total_bytes: int | None = None,
+    max_files: int = 1,
+) -> UploadForm:
+    """Parse a multipart upload of up to `max_files` files, refusing a file of more than
+    `max_bytes` and a body of more than `max_total_bytes` (default `max_bytes`: with one
+    file, the same limit) of file data.
 
     Raises UploadRejected("too_large") as soon as the body exceeds the limit (plus a
-    little room for the form fields), and UploadRejected("bad_form") for malformed bodies.
+    little room for the form fields), UploadRejected("too_many_files") for more than
+    `max_files` files, and UploadRejected("bad_form") for malformed bodies.
     """
-    limit = max_bytes + FORM_OVERHEAD_BYTES
+    total = max_bytes if max_total_bytes is None else max(max_total_bytes, max_bytes)
+    limit = total + FORM_OVERHEAD_BYTES
     declared = request.headers.get("content-length")
     if declared is not None and declared.isdigit() and int(declared) > limit:
         raise UploadRejected("too_large")
@@ -149,7 +177,7 @@ async def read_upload_form(request: Request, *, max_bytes: int) -> UploadForm:
             yield chunk
 
     parser = _InMemoryParser(
-        request.headers, limited(), max_files=1, max_fields=20, max_part_size=64 * 1024
+        request.headers, limited(), max_files=max_files + 1, max_fields=20, max_part_size=64 * 1024
     )
     try:
         form = await parser.parse()
@@ -157,18 +185,21 @@ async def read_upload_form(request: Request, *, max_bytes: int) -> UploadForm:
         raise UploadRejected("bad_form") from None
     try:
         fields: dict[str, str] = {}
-        upload: UploadFile | None = None
+        uploads: list[UploadFile] = []
         for key, value in form.multi_items():
             if isinstance(value, str):
                 fields.setdefault(key, value)
-            elif key == "pdf" and upload is None:
-                upload = value
-        if upload is None or not upload.filename:
-            return UploadForm(fields=fields, filename="", data=None)
-        data = await upload.read()
-        if len(data) > max_bytes:
-            raise UploadRejected("too_large")
-        return UploadForm(fields=fields, filename=safe_filename(upload.filename), data=data)
+            elif key == "pdf" and value.filename:
+                uploads.append(value)
+        if len(uploads) > max_files:
+            raise UploadRejected("too_many_files")
+        files = []
+        for upload in uploads:
+            data = await upload.read()
+            if len(data) > max_bytes:
+                raise UploadRejected("too_large")
+            files.append(UploadedFile(safe_filename(upload.filename), data))
+        return UploadForm(fields=fields, files=files)
     finally:
         await form.close()
 
@@ -233,3 +264,41 @@ def inspect_pdf_isolated(
         code if code in REJECTION_STATUS else "unreadable",
         pages if isinstance(pages, int) and not isinstance(pages, bool) else None,
     )
+
+
+class ExtractFailed(Exception):
+    """Some pages could not be cut out of a PDF (it is damaged, or the child failed)."""
+
+
+EXTRACT_TIMEOUT_S = 60.0
+
+
+def extract_part_isolated(
+    data: bytes, pages: list[int], *, shrink: bool = False, timeout_s: float = EXTRACT_TIMEOUT_S
+) -> bytes:
+    """A new PDF of just the 0-based `pages` of `data` (in that order), cut out in a child
+    process like the probe, with the pictures sharper than `pdf_probe.SHRINK_ABOVE_DPI`
+    saved at `SHRINK_TO_DPI` when `shrink`. Raises `ExtractFailed`. Call it from a worker
+    thread, not the event loop."""
+    spec = ",".join(str(p) for p in pages)
+    try:
+        completed = subprocess.run(
+            [
+                sys.executable,
+                "-m",
+                "a11y_stem.web.pdf_probe",
+                "extract",
+                spec,
+                "1" if shrink else "0",
+            ],
+            input=data,
+            capture_output=True,
+            timeout=timeout_s,
+            check=False,
+            env=child_env(),
+        )
+    except (subprocess.TimeoutExpired, OSError):
+        raise ExtractFailed from None
+    if completed.returncode != 0 or not looks_like_pdf(completed.stdout):
+        raise ExtractFailed
+    return completed.stdout

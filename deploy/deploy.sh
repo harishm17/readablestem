@@ -406,7 +406,8 @@ write_env_file() {
       if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi
     done
     for name in MAX_USD_PER_JOB MAX_USD_PER_PAGE MAX_MODEL_CALLS_PER_JOB \
-      MAX_MODEL_CALLS_PER_PAGE MAX_PAGES_PER_JOB MAX_UPLOAD_MB MAX_CONCURRENT_UPLOADS \
+      MAX_MODEL_CALLS_PER_PAGE MAX_PAGES_PER_JOB MAX_UPLOAD_MB MAX_LARGE_UPLOAD_MB \
+      MAX_SOURCE_PAGES MAX_CONCURRENT_UPLOADS \
       RETENTION_HOURS OPT_IN_RETENTION_DAYS WORKER_POLL_S SOURCE_URL LOG_LEVEL \
       LANGFUSE_PUBLIC_KEY LANGFUSE_HOST; do
       if [ -n "${!name:-}" ]; then yaml_line "$name" "${!name}"; fi

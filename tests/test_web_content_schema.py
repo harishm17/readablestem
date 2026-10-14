@@ -44,7 +44,8 @@ def factory(tmp_path):
 
 def seed_user(factory, email: str) -> dict[str, str]:
     """A user with a finished job (upload, review edit), a course with notation, events,
-    a sign-in identity and a day's page count. Returns the ids."""
+    a sign-in identity, a day's page count and a large file waiting for its pages to be
+    chosen. Returns the ids."""
     now = db.utcnow()
     with db.session_scope(factory) as session:
         user = db.User(email=email, is_allowed=True)
@@ -83,6 +84,15 @@ def seed_user(factory, email: str) -> dict[str, str]:
                     user_id=user.id, provider="google", issuer=GOOGLE_ISSUER, subject=email
                 ),
                 db.QuotaDay(user_id=user.id, day=date(2026, 10, 9), pages=3),
+                db.PendingUpload(
+                    user_id=user.id,
+                    filename="chapter.pdf",
+                    pages=40,
+                    size_bytes=1,
+                    content=b"%",
+                    done_pages=[],
+                    retain_until=now + timedelta(hours=24),
+                ),
             ]
         )
         return {"user": user.id, "course": course.id, "job": job.id}
@@ -186,6 +196,7 @@ def test_every_table_that_holds_a_user_id_is_known():
         ("courses", "user_id"),
         ("events", "user_id"),
         ("jobs", "user_id"),
+        ("pending_uploads", "user_id"),
         ("quota_days", "user_id"),
         ("review_edits", "user_id"),
     ]

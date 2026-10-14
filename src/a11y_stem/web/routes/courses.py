@@ -23,8 +23,8 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.notation import canonical_symbol
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.pipeline.notation_memory import describe, phrase
-from a11y_stem.web import notation
-from a11y_stem.web.db import Course, CourseNotation, session_scope
+from a11y_stem.web import documents, notation
+from a11y_stem.web.db import Course, CourseNotation, session_scope, utcnow
 from a11y_stem.web.deps import (
     ELEMENT_ID,
     JOB_ID,
@@ -120,8 +120,17 @@ def _course_page(
     extra: dict[str, Any] | None = None,
     status: int = 200,
 ) -> Response:
-    with session_scope(get_ctx(request).factory) as session:
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
         course = _course(session, course_id, user)
+        # The documents converted for this course (T3-4), listed as My documents lists them.
+        listing = documents.documents(
+            session,
+            user.id,
+            now=utcnow(),
+            budget_closed=ctx.guard.cap_reached(ctx.min_headroom_usd),
+            course_id=course.id,
+        )
         context = {
             "course": notation.CourseView(course.id, course.name, len(course.notation)),
             "entries": notation.entries(course),
@@ -129,6 +138,11 @@ def _course_page(
             "examples": notation.SYMBOL_EXAMPLES,
             "values": {"meaning": "vector"},
             "rename_value": course.name,
+            "documents": listing,
+            "list_url": f"/app/documents?course={course.id}",
+            "ready_documents": sum(
+                1 for row in listing.rows if row.status == "done" and not row.open_decisions
+            ),
         }
     return render(request, "course.html", context | (extra or {}), status_code=status)
 

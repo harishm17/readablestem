@@ -6,6 +6,7 @@
   <div><dt>Service</dt><dd>{{ "Up" if database_ok else "Having problems: the database is not answering. Please try again later." }}</dd></div>
   {% if database_ok %}
   <div><dt>Conversions today</dt><dd>{% if conversions_open %}Open{% else %}Paused: today's budget is used up. They start again at {{ next_reset|utc }}.{% endif %}</dd></div>
+  <div><dt>AI service</dt><dd>{% if provider_down_since %}Not answering since {{ provider_down_since|utc }}. Documents converting now may stop early, with parts not converted. When it answers again, open the document and use “Try again” or “Convert the missing parts”: nothing is lost and no pages are used up.{% else %}No problems seen in the last 10 minutes.{% endif %}</dd></div>
   <div><dt>Documents waiting</dt><dd>{{ waiting }}</dd></div>
   <div><dt>Documents converting</dt><dd>{{ converting }}</dd></div>
   {% endif %}

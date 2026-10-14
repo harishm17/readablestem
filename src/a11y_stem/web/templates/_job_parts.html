@@ -1,0 +1,12 @@
+{# T3-3: this document is one part of a larger file that was converted in parts
+   (web/routes/parts.py). Says which pages it holds and links the other parts. #}
+<p id="job-parts">This is pages {{ job.part_label }} of a larger file, converted in parts. Each part is its own document.</p>
+{% if job.parts|length > 1 %}
+<nav aria-label="Parts of this file">
+  <ul class="parts-list">
+    {% for part in job.parts %}
+    <li>{% if part.current %}Pages {{ part.label }} (this document){% else %}<a href="/jobs/{{ part.id }}">Pages {{ part.label }}</a> ({{ {"queued": "waiting", "running": "converting", "done": "finished", "failed": "stopped"}.get(part.status, part.status) }}){% endif %}</li>
+    {% endfor %}
+  </ul>
+</nav>
+{% endif %}

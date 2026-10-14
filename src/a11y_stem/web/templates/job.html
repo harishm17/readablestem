@@ -22,6 +22,8 @@
 <h1>{{ job.title }}</h1>
 {% if job.title != job.filename %}<p class="doc-file">File: {{ job.filename }}</p>{% endif %}
 {% include "_job_course.html" %}
+{% if job.is_sample %}{% include "_job_sample.html" %}{% endif %}
+{% if job.part_label %}{% include "_job_parts.html" %}{% endif %}
 {# A polite live region that changes per step, not per element: the counts are in the
    list below it, outside the region (_job_progress.html). #}
 <div id="job-status-region" role="status">
@@ -62,6 +64,10 @@
 {% include "_job_ready.html" %}
 {% endif %}
 
+{% if job.carry %}
+{% include "_job_carry.html" %}
+{% endif %}
+
 {% if pg.notices.total %}
 {% include "_job_notices.html" %}
 {% endif %}
@@ -77,6 +83,7 @@
     <p><strong>{{ outcome.label }}:</strong> part of this document was not converted. The
       status above says why and what to do; the HTML keeps those parts as images of the
       original, marked “Not converted”.</p>
+    {% include "_job_retry.html" %}
   </div>
   {% endif %}
   <p>{{ pg.found }}</p>
@@ -147,10 +154,20 @@
 <section aria-labelledby="failed-heading">
   <h2 id="failed-heading">Why the conversion stopped</h2>
   <p>{{ outcome.message if outcome else job.status_detail }}</p>
+  {% include "_job_retry.html" %}
   <details class="tech">
     <summary>Details for a bug report</summary>
     <p>Error code: <code>{{ job.error_code or "unknown" }}</code></p>
   </details>
+</section>
+{% endif %}
+
+{% if job.status == "done" and not job.is_sample %}
+<section aria-labelledby="revise-heading">
+  <h2 id="revise-heading">If you change the PDF</h2>
+  <p>Fixed a typo or added a slide? Upload the new version and the decisions you made here
+    are copied to every item that did not change. This document stays as it is.</p>
+  <p><a href="/app?revises={{ job.id }}#upload-heading">Upload a revised version</a></p>
 </section>
 {% endif %}
 

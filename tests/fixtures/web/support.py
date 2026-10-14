@@ -74,6 +74,10 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "daily_spend_cap_usd": 5.0,
         "max_pages_per_job": 5,
         "max_upload_mb": 1,
+        # No keeping of larger files for choosing their pages (web/pending.py) unless a test
+        # asks for it: the limits above are then what a file is refused at.
+        "max_large_upload_mb": 1,
+        "max_source_pages": 5,
         "google_client_id": None,
         "google_client_secret": None,
         "session_secret": None,

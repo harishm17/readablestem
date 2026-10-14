@@ -152,11 +152,18 @@ def record(
     row = make(user_id, name, job_ref=job_ref, code=code, value=value)
     try:
         with session_scope(factory) as session:
+            if job_ref is not None and is_sample(session, job_ref):
+                return  # the sample document is not part of the beta's numbers (web.sample)
             if once_per_visit and _since(session, user_id, name, job_ref, row.created_at):
                 return
             session.add(row)
     except Exception as exc:
         log_exception(logger, "event_failed", exc, kind=name)
+
+
+def is_sample(session: Session, job_id: str) -> bool:
+    """The job is the sample document (T3-9): no usage event is written for it."""
+    return bool(session.scalar(select(Job.is_sample).where(Job.id == job_id)))
 
 
 def _since(session: Session, user_id: str, name: str, job_ref: str | None, now: datetime) -> bool:
@@ -292,7 +299,7 @@ def add_decision(
     something (`kind`: "single" or "group"; value: fixes changed), and
     `review_completed` the first time a write leaves no decision open (value: seconds
     since the job finished)."""
-    if not settings.events_enabled or changed <= 0:
+    if not settings.events_enabled or changed <= 0 or job.is_sample:
         return
     now = utcnow()
     session.add(make(user_id, DECISION_MADE, job_ref=job.id, code=kind, value=changed, at=now))

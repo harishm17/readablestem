@@ -669,6 +669,8 @@ mark.said-diff {
 /* Days and pseudonyms are short codes: never break them to make room. */
 .usage-table tbody th { overflow-wrap: normal; white-space: nowrap; }
 .status-decisions, .status-partial { border-color: var(--warn); color: var(--warn); }
+.status-sample { border-color: var(--muted); color: var(--muted); }
+.parts-list { padding-left: 1.25rem; }
 
 .upload-status { font-weight: 600; }
 .upload-status:empty { display: none; }

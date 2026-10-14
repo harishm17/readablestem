@@ -20,9 +20,11 @@ from sqlalchemy.orm import Session
 
 from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
+from a11y_stem.web import carry as carry_rules
 from a11y_stem.web import job_page, titles
+from a11y_stem.web import retry as retry_rules
 from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User
+from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User, utcnow
 from a11y_stem.web.messages import Explained, explain_check, severity_label
 from a11y_stem.web.outcome import FAILED_MESSAGES
 
@@ -62,7 +64,7 @@ KIND_LABELS = {
 
 JOB_ERROR_MESSAGES = {
     "budget_daily": "Today's conversion budget ran out while this document was being "
-    "converted. Please upload it again tomorrow.",
+    "converted. After 00:00 UTC, use “Try again”: what was already converted is kept.",
     "budget_job_usd": "This document needed more model work than one conversion is allowed. "
     "Try splitting it into smaller parts.",
     "budget_job_calls": "This document needed more model calls than one conversion is "
@@ -71,14 +73,16 @@ JOB_ERROR_MESSAGES = {
     "unreadable": "The PDF could not be read.",
     "too_many_pages": "The PDF has too many pages.",
     "no_pages": "The PDF has no pages.",
-    "lease_expired": "The conversion was interrupted several times and has been stopped.",
+    "lease_expired": "The conversion was interrupted several times and has been stopped. "
+    "Use “Try again”: what was already converted is kept.",
     "timeout": "The conversion took longer than a document of this size is allowed and was "
-    "stopped. Try splitting it into smaller parts.",
-    "store_failed": "The conversion finished but its results could not be saved. Please "
-    "upload the document again.",
+    "stopped. You can use “Try again”: what was already converted is kept. If it stops "
+    "again, try splitting the PDF into smaller parts.",
+    "store_failed": "The conversion finished but its results could not be saved. Use "
+    "“Try again”: what was already converted is kept.",
     "upload_missing": "The uploaded file was no longer available.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
-    "of your document's content.",
+    "of your document's content. You can use “Try again”: what was already converted is kept.",
     # Codes with a longer explanation of what to do next (scanned PDFs, no model key,
     # removed access, ...) share their wording with the status box.
     **FAILED_MESSAGES,
@@ -152,6 +156,10 @@ class JobView:
     # While queued: how many of the jobs ahead are this user's, and the estimated wait.
     ahead_yours: int = 0
     wait_s: float | None = None
+    # "Try again" (T3-1, `web.retry`): the offer for a stopped or partly converted job, how
+    # many tries it has had, and whether the AI service is not answering right now.
+    retry: retry_rules.Offer | None = None
+    retries: int = 0
     # While converting: the stored live progress (`jobs.progress_json`).
     progress: dict[str, Any] | None = None
     # The job page's data from the result (`job_page.PageData`), when asked for.
@@ -163,6 +171,18 @@ class JobView:
     title_override: str | None = None
     contact_line: str | None = None
     retention_mode: str = "day"
+    # What happened to the decisions of the earlier version this one revises (T3-2):
+    # `carry.CarrySummary` and the earlier file's name; None for a job that revises nothing.
+    carry: CarryView | None = None
+    # Elements whose decision was copied from the earlier version (the review screen says so).
+    carried_ids: frozenset[str] = frozenset()
+    # A part of a larger file converted in parts (T3-3): the pages this one holds and the
+    # parts of the same file still kept (this one included), in page order.
+    part_label: str = ""
+    parts: list[PartLink] = field(default_factory=list)
+    # The recorded sample document (T3-9, `web.sample`) and, for its page, where it comes from.
+    is_sample: bool = False
+    sample: SampleView | None = None
 
     @property
     def finished(self) -> bool:
@@ -206,6 +226,36 @@ class JobView:
         if self.status == JobStatus.DONE:
             return "The HTML file is ready."
         return job_error_message(self.error_code)
+
+
+@dataclass
+class SampleView:
+    """Where the sample document comes from, for the notice on its page."""
+
+    title: str
+    source_url: str
+    licence: str
+    licence_url: str
+    authors: str
+
+
+@dataclass
+class PartLink:
+    """One part of a larger file, for the list on each part's page."""
+
+    id: str
+    label: str
+    status: str
+    current: bool
+
+
+@dataclass
+class CarryView:
+    """The carry-over card of a revised document (`templates/_job_carry.html`)."""
+
+    from_name: str
+    summary: carry_rules.CarrySummary
+    first_waiting: str | None = None  # review link target: the first changed or new item
 
 
 DECISION_NOUNS = {
@@ -387,9 +437,11 @@ def job_view(
         queue_wait(session, job) if with_page and job.status == JobStatus.QUEUED else (0, None)
     )
     page = None
+    carried = None
     if with_page and job.status == JobStatus.DONE and job.result_json:
         result = DocumentResult.model_validate(job.result_json)
         page = job_page.page_data(result, last_decision(session, job))
+        carried = carry_view(job, result)
     return JobView(
         id=job.id,
         filename=job.filename,
@@ -404,6 +456,15 @@ def job_view(
         cost_usd=job.cost_usd,
         model_calls=job.model_calls,
         queue_ahead=ahead,
+        retry=retry_rules.offer(
+            status=str(job.status),
+            error_code=job.error_code,
+            result_json=job.result_json,
+            retries=job.retries or 0,
+        )
+        if with_page
+        else None,
+        retries=job.retries or 0,
         summary=summarise(job.result_json) if with_summary or with_page else None,
         result_version=job.result_version or 0,
         ahead_yours=yours,
@@ -418,4 +479,71 @@ def job_view(
         title_override=job.title_override,
         contact_line=job.contact_line,
         retention_mode=job.retention_mode,
+        carry=carried,
+        carried_ids=_carried_ids(job),
+        part_label=job.part_label or "",
+        is_sample=bool(job.is_sample),
+        sample=sample_view() if job.is_sample and with_page else None,
+        parts=part_links(session, job) if with_page and job.part_group else [],
+    )
+
+
+def carry_view(job: Job, result: DocumentResult) -> CarryView | None:
+    """The carry-over card's data for a revised document, or None (it revises nothing, or
+    nothing was recorded: the earlier version was gone when this one finished)."""
+    if not job.revises_job_id:
+        return None
+    data = job.carried_json
+    name = data.get("from_name") if isinstance(data, dict) else None
+    if not isinstance(data, dict) or not isinstance(name, str):
+        return CarryView("", carry_rules.summary(carry_rules.CarryReport(), result))
+    report = carry_rules.CarryReport.from_json(data)
+    summary = carry_rules.summary(report, result)
+    fixes = {f.element_id: f for f in result.fixes}
+    waiting = [
+        i for i in [*summary.changed_ids, *summary.new_ids] if i in fixes and fixes[i].pending
+    ]
+    return CarryView(name, summary, waiting[0] if waiting else None)
+
+
+def _carried_ids(job: Job) -> frozenset[str]:
+    data = job.carried_json
+    ids = data.get("carried") if isinstance(data, dict) else None
+    return frozenset(i for i in ids if isinstance(i, str)) if isinstance(ids, list) else frozenset()
+
+
+def part_links(session: Session, job: Job) -> list[PartLink]:
+    """The parts of the same larger file that the person still keeps, in page order (the
+    pages are the label's first number)."""
+    rows = session.execute(
+        select(Job.id, Job.part_label, Job.status, Job.created_at)
+        .where(
+            Job.part_group == job.part_group,
+            Job.user_id == job.user_id,
+            Job.retain_until > utcnow(),
+        )
+        .order_by(Job.created_at, Job.id)
+    ).all()
+
+    def first_page(label: str | None) -> int:
+        digits = "".join(ch if ch.isdigit() else " " for ch in (label or "")).split()
+        return int(digits[0]) if digits else 0
+
+    ordered = sorted(rows, key=lambda r: (first_page(r.part_label), r.created_at))
+    return [PartLink(r.id, r.part_label or "", str(r.status), r.id == job.id) for r in ordered]
+
+
+def sample_view() -> SampleView | None:
+    """The sample's attribution, or None when its files are not in this build."""
+    from a11y_stem.web import sample
+
+    if not sample.available():
+        return None
+    recorded = sample.load()
+    return SampleView(
+        title=recorded.title,
+        source_url=recorded.source_url,
+        licence=recorded.licence,
+        licence_url=recorded.licence_url,
+        authors=", ".join(recorded.authors),
     )

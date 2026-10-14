@@ -520,6 +520,8 @@ class SplitBuilder:
             else:
                 states = {self.item(f).status_label for f in decision.fixes}
                 panel.status = "Decided: " + ", ".join(sorted(states)).lower().capitalize()
+                if any(f.element_id in self.view.carried_ids for f in decision.fixes):
+                    panel.status += ", carried over from the earlier version"
                 panel.status_class = "pill-done"
             before = queue.previous(self.queue, decision)
             after = queue.following(self.queue, decision)

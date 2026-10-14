@@ -101,6 +101,11 @@ KEPT_IMAGE_REASONS = frozenset(
 OUTAGE_REASONS = frozenset({"model_api_error", "model_timeout"})
 
 
+def is_outage(result_json: dict[str, Any] | None) -> bool:
+    """A finished job converted while the AI service was down (`_outage`)."""
+    return _outage(result_json) is not None
+
+
 def _outage(result_json: dict[str, Any] | None) -> tuple[int, int, str] | None:
     """(fixes the service failed, model fixes, what they are) when more than half failed
     that way."""
@@ -168,8 +173,9 @@ def job_outcome(
         n, total, kinds = outage
         message = (
             f"The AI service did not answer for {n} of {total} {kinds}, so "
-            f"they were not converted. Nothing is wrong with your PDF. {KEPT} Upload the "
-            "document again later to convert them."
+            f"they were not converted. Nothing is wrong with your PDF. {KEPT} Use "
+            "“Convert the missing parts” below, now or later: only those parts are sent "
+            "again, and it does not use up your daily pages."
         )
         return JobOutcome(MODEL_OUTAGE, "Stopped: the AI service did not answer", message,
                           partial=True)  # fmt: skip
@@ -179,7 +185,8 @@ def job_outcome(
         counts = _not_converted(result_json, error_code)
         message = (
             _count_sentence(counts, "Today's conversion budget ran out part way through")
-            + f" {KEPT} Upload the document again after 00:00 UTC to convert them."
+            + f" {KEPT} After 00:00 UTC use “Convert the missing parts” below to convert "
+            "them: only those parts are sent again, and it does not use up your daily pages."
         )
         return JobOutcome(error_code, "Stopped early", message, partial=True)
     if error_code in {"budget_job_usd", "budget_job_calls"}:

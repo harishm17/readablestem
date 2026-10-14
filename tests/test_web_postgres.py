@@ -14,7 +14,7 @@ import uuid
 from datetime import timedelta
 
 import pytest
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 
 from a11y_stem.core.budget import BudgetExceeded
@@ -549,3 +549,74 @@ def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory)
     with db.session_scope(factory) as session:
         job = session.get(db.Job, job_id)
         assert job is not None and job.result_version == 1
+
+
+def test_the_jobs_migrations_round_trip_on_postgres(pg_url):
+    """Each migration of the jobs work (T3-1 ...): down one step (its columns and tables
+    gone, a job kept), up again (the schema matches the models), and an older release's job
+    insert still gets a valid row."""
+    from alembic import command
+    from alembic.autogenerate import compare_metadata
+    from alembic.runtime.migration import MigrationContext
+    from sqlalchemy import inspect
+
+    from a11y_stem.web.database import alembic_config
+    from test_web_jobs_migrations import CHAIN
+    from test_web_migrations import INSERT_JOB, INSERT_USER
+
+    config = alembic_config(pg_url)
+    config.attributes["configure_logger"] = False
+    for revision, before, added, tables in reversed(CHAIN):
+        command.upgrade(config, "head")
+        command.downgrade(config, before)
+        engine = create_engine(pg_url)
+        try:
+            names = set(inspect(engine).get_table_names())
+            assert not tables & names, revision
+            assert not {c["name"] for c in inspect(engine).get_columns("jobs")} & added, revision
+            with engine.begin() as conn:
+                conn.execute(text("DELETE FROM jobs"))
+                conn.execute(text("DELETE FROM users"))
+                conn.execute(text(INSERT_USER))
+                conn.execute(text(INSERT_JOB), {"id": "j1"})
+        finally:
+            engine.dispose()
+        command.upgrade(config, "head")
+        engine = create_engine(pg_url)
+        try:
+            with engine.begin() as conn:
+                assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+                conn.execute(text(INSERT_JOB), {"id": "j2"})
+                found = conn.execute(text("SELECT id FROM jobs ORDER BY id")).all()
+            assert [row[0] for row in found] == ["j1", "j2"]
+            assert tables <= set(inspect(engine).get_table_names())
+        finally:
+            engine.dispose()
+
+
+def test_the_step_cache_round_trips_on_postgres(factory):
+    """T3-1: a finished step is kept as JSON (NUL characters dropped, which Postgres
+    refuses), replaced for the same element, given back under its key only, and removed
+    with the job."""
+    from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
+    from a11y_stem.ops.retention import delete_jobs
+    from a11y_stem.web.step_cache import DbStepCache
+
+    [job_id] = queue_jobs(factory, 1)
+    element = Element(id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=1)
+    fix = Fix(
+        element_id="p1-e1",
+        kind=Kind.EQUATION,
+        status=Status.NEEDS_REVIEW,
+        equation=EquationFix(latex="x\x00y", mathml="<math/>", speech="x"),
+    )
+    DbStepCache(factory, job_id).store(element, "k" * 64, fix)
+    DbStepCache(factory, job_id).store(element, "j" * 64, fix)  # replaces the first
+    again = DbStepCache(factory, job_id)
+    assert again.lookup(element, "k" * 64) is None
+    kept = again.lookup(element, "j" * 64)
+    assert kept is not None and kept.equation is not None and kept.equation.latex == "xy"
+    with db.session_scope(factory) as session:
+        assert session.scalar(select(func.count()).select_from(db.StepRecord)) == 1
+        delete_jobs(session, [job_id])
+        assert session.scalar(select(func.count()).select_from(db.StepRecord)) == 0

@@ -61,6 +61,16 @@ backup and no point-in-time-recovery logs, so that is up to about a day after th
 ([deploy.md](deploy.md), "Backups and deleted documents"); the privacy page has to say so
 (or backups have to be off).
 
+### Large files waiting for their pages
+
+A PDF over the page or size limit is kept as a `pending_uploads` row (`web/pending.py`, docs/web.md
+"Large files in parts") while its owner chooses which pages to convert. It is a copy of the
+upload, so it follows the same promise: `retain_until` is `RETENTION_HOURS` after it was
+made, the same hourly purge deletes it (`ops.retention.purge_pending`, logged as
+`pending_deleted` in `purge_done`), "Discard this file" deletes it at once, and so does
+`erase_user`. Past its time it answers 404 before the purge runs. The sample document
+(`web/sample.py`) is an ordinary finished job with `is_sample` set, deleted by the same clock.
+
 ### Usage events
 
 `events` (`web/events.py`, docs/web.md "Usage events") holds content-free, pseudonymous

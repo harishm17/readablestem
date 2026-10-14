@@ -50,8 +50,8 @@ class AfterDownload:
 def after_download(
     session: Session, settings: Settings, user_id: str, job_id: str
 ) -> AfterDownload:
-    if not enabled(settings):
-        return AfterDownload()
+    if not enabled(settings) or events.is_sample(session, job_id):
+        return AfterDownload()  # no questions about the sample document either
     if events.answered(session, user_id, job_id):
         return AfterDownload(answered=True)
     return AfterDownload(ask=True, hidden=not events.downloaded(session, user_id, job_id))
@@ -98,6 +98,8 @@ def parse(will_post: str, minutes: str) -> tuple[Answers, list[FieldError]]:
 
 def record(session: Session, user_id: str, job_id: str, answers: Answers) -> None:
     """The answers given as events, in the caller's transaction."""
+    if events.is_sample(session, job_id):
+        return
     if answers.will_post is not None:
         session.add(events.make(user_id, events.WILL_POST, job_ref=job_id, code=answers.will_post))
     if answers.minutes is not None:
