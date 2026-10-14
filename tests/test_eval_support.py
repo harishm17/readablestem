@@ -54,7 +54,10 @@ def fake_png(key: str, width: int = 40, height: int = 20) -> bytes:
 
 
 def base_record(page_slug: str, kind: str, index: int, **fields) -> dict:
-    prefix = {"equation": "eq", "figure": "fig", "table": "tab", "heading": "hd"}[kind]
+    prefix = {
+        "equation": "eq", "figure": "fig", "table": "tab", "heading": "hd",
+        "script": "sc", "code": "cd", "glossary": "gl", "hyphen_break": "hy",
+    }[kind]  # fmt: skip
     page_uuid = f"uuid-{page_slug}"
     record = {
         "id": f"openstax/physics/{page_slug}/{prefix}-{index:03d}",

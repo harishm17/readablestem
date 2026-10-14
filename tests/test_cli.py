@@ -93,6 +93,8 @@ def test_eval_equations_with_latex_predictions(tmp_path: Path, capsys):
     )
     assert code == 0
     summary = json.loads(report.read_text())["summary"]
+    secondary = summary.pop("secondary_stream_v2")  # the labelled secondary scorer (T2-12)
+    assert (secondary["n"], secondary["exact"]) == (1, 1.0) and "secondary" in secondary["label"]
     assert summary == {
         "n": 1,
         "exact_strict": 1.0,

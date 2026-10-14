@@ -37,6 +37,7 @@ from a11y_stem.pipeline.equation_step import (
     _mathml_letters,
     _symbol_bag,
 )
+from a11y_stem.pipeline.text_layer_compare import compare_case, numbers_differ
 
 BBox = tuple[float, float, float, float]
 
@@ -59,7 +60,7 @@ class DiffRow:
     """One line of the "What differs" table. Text only: the table is the way to get this
     information without seeing the outline on the image."""
 
-    what: str  # "Style", "Symbol" or "Sign"
+    what: str  # "Style", "Symbol", "Sign", "Number" or "Case"
     symbol: str  # as the PDF shows it (or the proposal, when only it has it)
     pdf: str  # "bold", "2 times", "not there"
     proposal: str
@@ -79,7 +80,7 @@ class EquationCompare:
     proposal_marks: set[str] = field(default_factory=set)  # ... in the proposed MathML
     summary: str | None = None  # the one sentence that says what to look at
     # Every sentence, by what it is about: "style" (a style that changes the meaning),
-    # "symbol", "sign", "cosmetic" (a style that does not) and "unseen".
+    # "symbol", "sign", "number", "case", "cosmetic" (a style that does not) and "unseen".
     said: dict[str, list[str]] = field(default_factory=dict)
 
     @property
@@ -238,11 +239,77 @@ def compare_equation(
         sentences.append(
             (1, "sign", f"The PDF has {_signs_word(pdf_n, sign)}; {other} has {got_n or 'none'}.")
         )
+    if not missing and not extra:
+        # The letters and digits agree as multisets: the step then asks whether the
+        # numbers are the same numbers and the capitals the same capitals.
+        _numbers_and_case(out, sentences, text, fix.equation.mathml, other)
     if sentences:
         out.summary = min(sentences, key=lambda s: s[0])[2]
     for _, about, sentence in sorted(sentences, key=lambda s: s[0]):
         out.said.setdefault(about, []).append(sentence)
     return out
+
+
+def _numbers_and_case(
+    out: EquationCompare, sentences: list[tuple[int, str, str]], text: str, mathml: str, other: str
+) -> None:
+    """The rows and sentences for `number_mismatch` and `case_mismatch` (the step's
+    `text_layer_compare`): 36 for 63, W for w."""
+    numbers = numbers_differ(text, mathml)
+    if numbers is not None and numbers.differ:
+        for number in numbers.pdf:
+            out.rows.append(DiffRow("Number", number, "there", "not there", True))
+        for number in numbers.mathml:
+            out.rows.append(DiffRow("Number", number, "not there", "there", True))
+        out.pdf_marks.update(ch for n in numbers.pdf for ch in n if ch.isdigit())
+        out.proposal_marks.update(ch for n in numbers.mathml for ch in n if ch.isdigit())
+        if len(numbers.pdf) == 1 and len(numbers.mathml) == 1:
+            said = f"The PDF has the number {numbers.pdf[0]} where {other} has {numbers.mathml[0]}."
+        elif numbers.pdf and numbers.mathml:
+            said = (
+                f"The PDF has the numbers {_listed(list(numbers.pdf))}; {other} has "
+                f"{_listed(list(numbers.mathml))} (the same digits make other numbers)."
+            )
+        elif numbers.pdf:
+            said = f"The PDF has the number {_listed(list(numbers.pdf))}, which {other} does not."
+        else:
+            said = (
+                f"{_capital(other)} has the number {_listed(list(numbers.mathml))}, "
+                "which the PDF does not."
+            )
+        sentences.append((1, "number", said))
+    for row in compare_case(text, mathml):
+        pdf_case = _case_word(row.pdf_capital, row.pdf_small)
+        got_case = _case_word(row.mathml_capital, row.mathml_small)
+        out.rows.append(DiffRow("Case", row.letter, pdf_case, got_case, True))
+        out.pdf_marks.update({row.letter, row.letter.upper()})
+        out.proposal_marks.update({row.letter, row.letter.upper()})
+        sentences.append(
+            (
+                1,
+                "case",
+                f"The PDF has {_case_phrase(row.letter, row.pdf_capital, row.pdf_small)}; "
+                f"{other} has {_case_phrase(row.letter, row.mathml_capital, row.mathml_small)}.",
+            )
+        )
+
+
+def _case_word(capital: int, small: int) -> str:
+    parts = []
+    if capital:
+        parts.append(f"capital {_times(capital)}")
+    if small:
+        parts.append(f"small {_times(small)}")
+    return ", ".join(parts) or "not there"
+
+
+def _case_phrase(letter: str, capital: int, small: int) -> str:
+    parts = []
+    if capital:
+        parts.append(f"a capital {letter.upper()}")
+    if small:
+        parts.append(f"a small {letter}")
+    return " and ".join(parts) or f"no {letter}"
 
 
 def _unseen_style(pdf: _LetterStyles, got: _MathLetters) -> bool:

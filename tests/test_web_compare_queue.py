@@ -297,3 +297,27 @@ def test_results_stored_before_tiers_count_what_is_waiting():
         {"p1-e0": 0},
     )
     assert [d.key for d in queue.decisions(old)] == ["p1-e0"]
+
+
+def test_a_swapped_number_is_a_number_row_with_one_sentence():
+    c = compare_equation(*equation("v = 36 m/s", r"v = 63\ \text{m/s}"))
+    assert c.summary == "The PDF has the number 36 where the proposal has 63."
+    assert [(r.what, r.symbol, r.pdf, r.proposal, r.meaning) for r in c.rows] == [
+        ("Number", "36", "there", "not there", True),
+        ("Number", "63", "not there", "there", True),
+    ]
+    assert c.said["number"] == [c.summary]
+    assert c.pdf_marks == {"3", "6"} and c.proposal_marks == {"6", "3"}
+
+
+def test_a_changed_case_is_a_case_row_with_one_sentence():
+    c = compare_equation(*equation("\U0001d464/\U0001d454", r"W/g"))
+    assert c.summary == "The PDF has a small w; the proposal has a capital W."
+    assert [(r.what, r.symbol, r.pdf, r.proposal) for r in c.rows] == [
+        ("Case", "w", "small once", "capital once")
+    ]
+
+
+def test_numbers_and_case_are_not_compared_when_the_symbols_already_differ():
+    c = compare_equation(*equation("g = 9.80", r"g = 9.30"))
+    assert {r.what for r in c.rows} == {"Symbol"}

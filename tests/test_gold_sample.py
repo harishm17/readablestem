@@ -51,3 +51,12 @@ def test_correct_latex_matches_gold_leniently(pred):
     score = score_latex(pred["latex"], GOLD[pred["id"]]["mathml"])
     assert score.error is None
     assert score.exact_lenient, f"normalisation gap: {pred['latex']}"
+
+
+@pytest.mark.parametrize("pred", [pytest.param(p, id=p["id"].split("/", 3)[-1]) for p in PREDS])
+def test_correct_latex_matches_gold_under_the_secondary_stream_scorer(pred):
+    """The known gaps above are packing gaps; the labelled secondary scorer
+    (`eval.equations_v2`, backlog T2-12) closes all of them. The primary stays strict."""
+    from a11y_stem.eval.equations_v2 import score_stream_latex
+
+    assert score_stream_latex(pred["latex"], GOLD[pred["id"]]["mathml"]).exact

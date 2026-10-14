@@ -63,7 +63,9 @@ from a11y_stem.config import Settings
 from a11y_stem.core import triage
 from a11y_stem.core.budget import BudgetExceeded, JobBudget
 from a11y_stem.core.types import Check, ConversionOptions, Element, Fix, Kind, ModelCall, Status
+from a11y_stem.eval import equations_v2 as v2
 from a11y_stem.eval import judge as judge_mod
+from a11y_stem.eval import prose_classes
 from a11y_stem.eval import verifier_metrics as vm
 from a11y_stem.eval.equations import (
     EquationScore,
@@ -95,6 +97,8 @@ EQUATION_ALIGN_MIN = 0.5
 # in order, in the gold signature (and it is at least two symbols long).
 PIECE_CONTAINMENT = 0.8
 UNMATCHED_REASONS = ("prose_math", "fragment", "other")
+# A merged prediction is credited for at most this many consecutive gold equations.
+MERGE_MAX_SPAN = 4
 _EDGE_OPERATORS = frozenset("=+-*/^_<>,.;:\u00d7\u00f7\u22c5\u2264\u2265\u2260\u2248")
 ROUTES = ("cheap", "main", "escalated", "fallback", "none", "other")
 MINUS_SIGN = chr(0x2212)
@@ -577,6 +581,11 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         if proposal is not None
         else _missing_score(record["mathml"])
     )
+    stream = (
+        v2.score_stream(proposal.mathml, record["mathml"])
+        if proposal is not None
+        else v2.missing_stream(record["mathml"])
+    )
     return {
         "id": record["id"],
         "display": record.get("display"),
@@ -590,6 +599,9 @@ def equation_item(record: dict, fix: Fix, settings: Settings) -> dict:
         "exact_strict": score.exact_strict,
         "exact_lenient": score.exact_lenient,
         "teds": score.teds,
+        # The labelled secondary scorer (eval.equations_v2); `wrong` below stays primary.
+        "exact_stream_v2": stream.exact,
+        "stream_similarity": stream.similarity,
         "score_error": score.error if proposal is not None else None,
         "failed_checks": _failed_codes(fix.checks),
         "pred_latex": proposal.latex if proposal is not None else None,
@@ -665,6 +677,13 @@ def equation_metrics(items: Sequence[dict]) -> dict:
         "exact_lenient_ci95": wilson_interval(lenient, n),
         "mean_teds": mean(i["teds"] for i in items),
         "proposal_rate": rate(i["has_proposal"] for i in items),
+        "secondary_stream_v2": {
+            "label": v2.LABEL,
+            "exact": rate(i["exact_stream_v2"] for i in items if "exact_stream_v2" in i),
+            "mean_similarity": mean(
+                i["stream_similarity"] for i in items if "stream_similarity" in i
+            ),
+        },
         "by_status": _group_rates(items, "status", STATUS_ORDER),
         "by_route": _group_rates(items, "route", ROUTES),
         "by_display": _group_rates(items, "display", ["block", "inline"]),
@@ -1290,6 +1309,11 @@ def document_page_item(
             if proposal is not None
             else _missing_score(gold[gi]["mathml"])
         )
+        stream = (
+            v2.score_stream(proposal.mathml, gold[gi]["mathml"])
+            if proposal is not None
+            else v2.missing_stream(gold[gi]["mathml"])
+        )
         matched.append(
             {
                 "gold_id": gold[gi]["id"],
@@ -1300,6 +1324,8 @@ def document_page_item(
                 "status": fix.status.value if fix is not None else None,
                 "exact_lenient": result.exact_lenient,
                 "teds": result.teds,
+                "exact_stream_v2": stream.exact,
+                "stream_similarity": stream.similarity,
                 "review": fix.review if fix is not None else None,
                 "tier_reasons": triage.tier_reasons(fix) if fix is not None else [],
                 "pred_latex": proposal.latex if proposal is not None else None,
@@ -1313,15 +1339,18 @@ def document_page_item(
         if any(pi == p for _, p, _ in pairs):
             continue
         reason = _unmatched_reason(element, pred_sigs[pi], pi in pieces)
+        fix = fixes.get(element.id)
         unmatched.append(
             {
                 "element_id": element.id,
                 "pred_display": element.display,
                 "reason": reason,
                 "piece_of": gold[pieces[pi]]["id"] if pi in pieces else None,
+                "text_layer_supported": _text_layer_supported(element, fix, reason),
             }
         )
     split = _split_gold(gold, pairs, pieces)
+    credited = _stream_credits(gold, predicted, fixes, pairs, pieces, matched)
     return {
         "id": page_id,
         "n_gold": len(gold),
@@ -1335,10 +1364,65 @@ def document_page_item(
             reason: sum(u["reason"] == reason for u in unmatched) for reason in UNMATCHED_REASONS
         },
         "split_gold_ids": split,
+        "stream_credited": credited,
         "static_violations": _failed_codes(static),
         "axe_violations": _failed_codes(axe) if axe_status(axe) == "ran" else [],
         "axe_status": axe_status(axe),
     }
+
+
+def _stream(fix: Fix | None) -> list[str] | None:
+    """The stream (`eval.equations_v2`) of a fix's proposed MathML; None without one."""
+    proposal = fix.equation if fix is not None else None
+    if proposal is None:
+        return None
+    try:
+        return v2.stream_of(proposal.mathml)
+    except MathMLError:
+        return None
+
+
+def _stream_credits(
+    gold: Sequence[dict],
+    predicted: Sequence[Element],
+    fixes: dict[str, Fix],
+    pairs: Sequence[tuple[int, int, float]],
+    pieces: dict[int, int],
+    matched: Sequence[dict],
+) -> dict[str, list[str]]:
+    """Gold equations the stream scorer credits although no single aligned prediction is
+    exact for them: `split` (the matched prediction and its pieces, in reading order,
+    make the gold equation) and `merged` (one prediction is several consecutive gold
+    equations, the later ones not matched to anything). A split or a merge is still a
+    layout error; this only says the transcription was right."""
+    exact = {m["gold_id"] for m in matched if m["exact_stream_v2"]}
+    by_gold = {gi: pi for gi, pi, _ in pairs}
+    gold_streams = [v2.stream_of(g["mathml"]) for g in gold]
+    split: list[str] = []
+    for gi in sorted({*pieces.values()}):
+        indices = sorted(
+            [pi for pi, host in pieces.items() if host == gi]
+            + ([by_gold[gi]] if gi in by_gold else [])
+        )
+        streams = [_stream(fixes.get(predicted[pi].id)) for pi in indices]
+        if all(st is not None for st in streams) and v2.credit_split(
+            [st for st in streams if st is not None], gold_streams[gi]
+        ):
+            split.append(gold[gi]["id"])
+    merged: list[str] = []
+    for gi, pi, _ in pairs:
+        stream = _stream(fixes.get(predicted[pi].id))
+        if stream is None or gold[gi]["id"] in exact:
+            continue
+        # The alignment may have paired the prediction with any of the gold equations it
+        # covers, so try each start that still reaches the paired one.
+        for start in range(max(0, gi - MERGE_MAX_SPAN + 1), gi + 1):
+            count = v2.credit_merged(stream, gold_streams[start:])
+            covered = range(start, start + count)
+            if count and gi in covered and all(gj == gi or gj not in by_gold for gj in covered):
+                merged += [gold[gj]["id"] for gj in covered]
+                break
+    return {"split": split, "merged": merged}
 
 
 def _shadow_pair(fix: Fix | None) -> dict[str, Any]:
@@ -1432,6 +1516,21 @@ _QUANTITY = re.compile(r"[-+\u00b1]?\d[\d.,]*(?:[^\W\d_]+\d*(?:[/\u00b7\u22c5][^
 _INDEXED_VARIABLE = re.compile(r"[^\W\d_]\d+")  # "d0", "x2": a variable and its index
 
 
+def _text_layer_supported(element: Element, fix: Fix | None, reason: str) -> bool:
+    """An extra prediction (no gold partner) that is real maths on the page, not a
+    fragment: it is not a piece of a gold equation or a broken run (`reason` is not
+    "fragment"), and the model's transcription uses the same letters, digits and Greek
+    letters as the PDF's own text for the region (`text_layer_symbols_differ` is False).
+    The gold has no MathML for it (the source wrote it as text), so it counts against
+    detection precision although nothing is wrong; that is the artefact this separates
+    out (backlog T2-13). A fragment agrees with its own text layer trivially, which is
+    why fragments never count as supported."""
+    proposal = fix.equation if fix is not None else None
+    if reason == "fragment" or proposal is None:
+        return False
+    return equation_step.text_layer_symbols_differ(element.text, proposal.mathml) is False
+
+
 def _formula_evidence(element: Element, text: str) -> bool:
     """Is an inline prediction a formula (maths the source wrote as text), not a bare
     quantity or a lone symbol? It must have a relation with operands on both sides
@@ -1499,7 +1598,9 @@ def document_metrics(items: Sequence[dict]) -> dict:
         reason: sum(i.get("unmatched_by_reason", {}).get(reason, 0) for i in items)
         for reason in UNMATCHED_REASONS
     }
+    classes = prose_classes.summarize([i["prose_classes"] for i in items if "prose_classes" in i])
     return {
+        **({"prose_classes": classes} if classes else {}),
         "gold_equations": gold,
         "predicted_equations": pred,
         "matched": matched,
@@ -1518,7 +1619,11 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "detection_precision_excluding_prose_math": _safe_div(
             matched, pred - unmatched["prose_math"]
         ),
+        # The extras the PDF's own text supports (real maths the gold wrote as text),
+        # apart from fragments and the rest (T2-13). `_text_layer_supported`.
+        **_supported_extras(items, matched, pred),
         "split_gold_equations": sum(len(i.get("split_gold_ids", [])) for i in items),
+        "secondary_stream_v2": stream_document_metrics(items, pairs, gold),
         "static_violations": sum(static_codes.values()),
         "static_violation_codes": dict(sorted(static_codes.items())),
         "axe_violations": sum(axe_codes.values()),
@@ -1529,6 +1634,44 @@ def document_metrics(items: Sequence[dict]) -> dict:
         "page_errors": _page_errors(items),
         "review_load": document_review_load(items),
         "second_check": vm.document_metrics(items),
+    }
+
+
+def _supported_extras(items: Sequence[dict], matched: int, pred: int) -> dict:
+    rows = [u for i in items for u in i.get("unmatched", [])]
+    supported = [u for u in rows if u.get("text_layer_supported")]
+    by_reason = Counter(u["reason"] for u in supported)
+    return {
+        "unmatched_text_layer_supported": len(supported),
+        "unmatched_text_layer_supported_by_reason": {
+            reason: by_reason.get(reason, 0) for reason in UNMATCHED_REASONS
+        },
+        "unmatched_not_supported": len(rows) - len(supported),
+        "detection_precision_excluding_text_layer_supported": _safe_div(
+            matched, pred - len(supported)
+        ),
+    }
+
+
+def stream_document_metrics(items: Sequence[dict], pairs: Sequence[dict], gold: int) -> dict:
+    """The labelled secondary scorer on the document task (`eval.equations_v2`): exactness
+    of aligned pairs under the stream comparison, and the same with split and merged gold
+    credited. The primary numbers (`matched_exact_lenient`, `end_to_end_exact_lenient`)
+    are unchanged."""
+    exact_ids = {p["gold_id"] for p in pairs if p.get("exact_stream_v2")}
+    split = {g for i in items for g in i.get("stream_credited", {}).get("split", [])}
+    merged = {g for i in items for g in i.get("stream_credited", {}).get("merged", [])}
+    credited = exact_ids | split | merged
+    return {
+        "label": v2.LABEL,
+        "matched_exact": rate(p["exact_stream_v2"] for p in pairs if "exact_stream_v2" in p),
+        "matched_mean_similarity": mean(
+            p["stream_similarity"] for p in pairs if "stream_similarity" in p
+        ),
+        "end_to_end_exact": _safe_div(len(exact_ids), gold),
+        "end_to_end_exact_with_credit": _safe_div(len(credited), gold),
+        "credited_split": len(split - exact_ids),
+        "credited_merged": len(merged - exact_ids),
     }
 
 
@@ -1598,7 +1741,10 @@ def _eval_document(
             return items, f"budget_{exc.scope}"
         except layout.LayoutError as exc:  # the pipeline failed this page: nothing found
             item = document_page_item(_page_id(page), _of_kind(page, "equation"), [], {}, [], [])
-            items.append(item | _calls_summary([]) | {"error": exc.code, "pdf_pages": 0})
+            item |= _calls_summary([]) | {"error": exc.code, "pdf_pages": 0}
+            if classes := prose_classes.score_page("", page):  # nothing was found: all misses
+                item["prose_classes"] = classes
+            items.append(item)
             continue
         result = output.result
         stopped = next((r for f in result.fixes if (r := budget_reason(f))), None)
@@ -1629,6 +1775,10 @@ def _eval_document(
         # One item is one OpenStax section printed to a PDF of many pages: cost per PDF
         # page is the figure to compare with production (`ops report`), not per item.
         item["pdf_pages"] = result.stats.pages
+        # The dev-v2 classes with gold but no equation/heading scorer (scripts, code,
+        # glossary, hyphenated words): scored on the output HTML; absent without such gold.
+        if classes := prose_classes.score_page(result.html, page):
+            item["prose_classes"] = classes
         items.append(item)
     return items, None
 
@@ -1932,6 +2082,33 @@ def _second_check_rows(task: str, metrics: dict) -> list[tuple[str, Any]]:
     return rows
 
 
+def _class_rows(metrics: dict) -> list[tuple[Any, ...]]:
+    """One row per class of `prose_classes.summarize`: n, the count that is right, its
+    rate, and the other results."""
+    block = metrics["prose_classes"]
+    rows: list[tuple[Any, ...]] = []
+
+    def other(part: dict, names: Sequence[str], right: set[str]) -> str:
+        return ", ".join(f"{n} {part[n]}" for n in names if n not in right and part.get(n))
+
+    for name, part in block.get("scripts", {}).get("by_class", {}).items():
+        rows.append((name, part["n"], part["scripted"], part["scripted_rate"],
+                     other(part, prose_classes.SCRIPT_RESULTS, set())))  # fmt: skip
+    if "code" in block:
+        part = block["code"]
+        rows.append(("code_block", part["n"], part["exact"], part["exact_rate"],
+                     other(part, prose_classes.CODE_RESULTS, {"exact"})))  # fmt: skip
+    if "glossary" in block:
+        part = block["glossary"]
+        rows.append(("glossary_entry", part["n"], part["definition_list"], part["structured_rate"],
+                     other(part, prose_classes.GLOSSARY_RESULTS, {"definition_list"})))  # fmt: skip
+    if "hyphen_breaks" in block:
+        part = block["hyphen_breaks"]
+        rows.append(("hyphen_break", part["n"], part["joined"], part["joined_rate"],
+                     other(part, prose_classes.HYPHEN_RESULTS, {"joined"})))  # fmt: skip
+    return rows
+
+
 def format_markdown(report: dict) -> str:
     """Human summary of a report (metrics only; no document text)."""
     metrics = report["metrics"]
@@ -1974,9 +2151,28 @@ def format_markdown(report: dict) -> str:
         lines += ["", "### Long descriptions (FEATURE_LONG_DESCRIPTIONS on)", ""]
         long = metrics["long_descriptions"]
         lines += _table(["metric", "value"], ((k, long[k]) for k in LONG_HEADLINE))
+    if metrics.get("prose_classes"):
+        lines += ["", "### Prose classes (dev-v2: scripts, code, glossary, hyphenated words)", ""]
+        lines += _table(["class", "n", "right", "rate", "other results"], _class_rows(metrics))
+    if report["task"] in {"equations", "document"} and metrics.get("secondary_stream_v2"):
+        lines += ["", "### Secondary scorer: stream v2 (the rows above are primary)", ""]
+        lines += _table(
+            ["metric", "value"],
+            ((k, v) for k, v in metrics["secondary_stream_v2"].items() if k != "label"),
+        )
     if report["task"] == "document":
         lines += ["", "### Unmatched predicted equations", ""]
         lines += _table(["reason", "n"], metrics["unmatched_by_reason"].items())
+        if "unmatched_text_layer_supported" in metrics:
+            lines += [
+                "",
+                "Of these, supported by the PDF's own text (real maths the gold wrote as text, "
+                "not fragments): "
+                f"{metrics['unmatched_text_layer_supported']}; not supported: "
+                f"{metrics['unmatched_not_supported']}. Detection precision without the "
+                "supported ones: "
+                f"{_fmt(metrics['detection_precision_excluding_text_layer_supported'])}.",
+            ]
     if report["task"] == "equations":
         lines += ["", "### Selective prediction (keep proposals with confidence >= t)", ""]
         lines += _table(

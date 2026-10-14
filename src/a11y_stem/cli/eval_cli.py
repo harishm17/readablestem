@@ -524,6 +524,46 @@ def _run_tables(
     return 0
 
 
+# ======================================================================== classes
+
+
+def _cmd_classes(args: argparse.Namespace) -> int:
+    """`eval classes --set dev-v2`: the scorers for the dev-v2 classes that have gold but
+    no equation, heading or table scorer (prose scripts, code blocks, glossary entries,
+    hyphenated line ends; `eval.prose_classes`). `--self-check` scores HTML rendered from
+    the gold itself (every metric must be 1.0); `--html-dir` scores converted pages saved
+    as `<book>__<page>.html`. The document task reports the same under `prose_classes`."""
+    from a11y_stem.cli import devset as devset_cli
+    from a11y_stem.eval import prose_classes
+    from a11y_stem.eval.pipeline_eval import group_pages, load_gold
+
+    if args.gold_set != "dev-v2":
+        return _error("eval classes works on the extended development set: add --set dev-v2")
+    if args.part != "dev":
+        return _error("eval classes --part check is not available (item by item output)")
+    found = devset_cli.resolve_eval("dev", args.devset_dir, None, None)
+    if isinstance(found, str):
+        return _error(found)
+    records = [r for r in load_gold(found[0]) if r.get("kind") in prose_classes.KINDS]
+    if args.self_check:
+        summary = prose_classes.self_check(records)
+    else:
+        if not args.html_dir.is_dir():
+            return _error(f"html dir not found: {args.html_dir}")
+        items = []
+        for page in group_pages(records):
+            name = f"{page[0]['book_slug']}__{page[0]['page_slug']}.html"
+            path = args.html_dir / name
+            html = path.read_text(encoding="utf-8") if path.is_file() else ""
+            items.append(prose_classes.score_page(html, page))
+        summary = prose_classes.summarize(items)
+    if args.report:
+        args.report.parent.mkdir(parents=True, exist_ok=True)
+        args.report.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n")
+    print(json.dumps(summary, ensure_ascii=False, indent=2))
+    return 0
+
+
 # ============================================================================ gate
 
 
@@ -1027,6 +1067,26 @@ def register(
         help='equations task: a course notation in force, e.g. "bold d" "v=other"',
     )
     pipeline.set_defaults(func=_cmd_pipeline)
+
+    classes = group.add_parser(
+        "classes",
+        help="score the dev-v2 classes without an equation scorer: prose scripts, code "
+        "blocks, glossary entries, hyphenated line ends",
+    )
+    heldout_cli.add_set_arguments(classes)
+    what = classes.add_mutually_exclusive_group(required=True)
+    what.add_argument(
+        "--self-check",
+        action="store_true",
+        help="score HTML rendered from the gold itself: every metric must be 1.0",
+    )
+    what.add_argument(
+        "--html-dir",
+        type=Path,
+        help="converted pages saved as <book>__<page>.html (a missing page scores as all lost)",
+    )
+    classes.add_argument("--report", type=Path, help="also write the summary as JSON")
+    classes.set_defaults(func=_cmd_classes)
 
     gate = group.add_parser(
         "gate", help="fail when a tracked metric regressed vs a baseline, or is below a floor"

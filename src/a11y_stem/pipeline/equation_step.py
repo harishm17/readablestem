@@ -26,7 +26,10 @@ a font layout does not know) is cosmetic, an optional note only. Signs and relat
 compared as well (`signs.compare_signs`, check `equation.text_layer_signs`): a minus
 that was dropped or added, ± read as +, ≤ read as <, = read as ≈, a dot product read
 as a cross product. That is meaning-level too, and asked only when the
-letters and digits mostly agree with the text layer (so it can be trusted). Any failed
+letters and digits mostly agree with the text layer (so it can be trusted). When the
+letters and digits agree exactly, two more checks run (`text_layer_number_case_checks`):
+the digits must make the same numbers (36 is not 63, 9.81 is not 98.1) and the capitals
+must be the same capitals (W/g is not w/g); either is meaning-level too. Any failed
 text-layer check on a cheap-model answer, a cosmetic one included, escalates to the main
 model.
 
@@ -74,6 +77,7 @@ from a11y_stem.models.prompts import load_prompt
 from a11y_stem.pipeline import notation_memory
 from a11y_stem.pipeline.signs import compare_signs
 from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
+from a11y_stem.pipeline.text_layer_compare import compare_case, numbers_differ
 from a11y_stem.pipeline.validate import (
     LatexConversionError,
     check_latex,
@@ -513,6 +517,42 @@ def text_layer_symbols_differ(text_layer: str | None, mathml: str) -> bool | Non
     return expected != _mathml_symbols(mathml)
 
 
+def text_layer_number_case_checks(text_layer: str | None, mathml: str) -> list[Check]:
+    """The two checks the symbol bag cannot make, for a pair whose bags already agree (the
+    caller asks `text_layer_symbols_differ` first and passes only a `False`):
+
+    - `equation.text_layer_numbers` / `number_mismatch`: the digits are the same but not
+      the numbers (36 for 63, 9.81 for 98.1, 10^23 for 10^32). `text_layer_compare`.
+    - `equation.text_layer_case` / `case_mismatch`: the letters are the same but a capital
+      is small or the other way round (W/g for w/g, S for s).
+
+    Each is a failed warning with a meaning-level code, like `symbol_mismatch`. A check
+    that cannot be made (no number in the text layer, a search past its bound) is left
+    out, not passed."""
+    checks: list[Check] = []
+    numbers = numbers_differ(text_layer, mathml)
+    if numbers is not None:
+        checks.append(
+            Check(
+                name="equation.text_layer_numbers",
+                passed=not numbers.differ,
+                severity="warning",
+                code="number_mismatch" if numbers.differ else None,
+            )
+        )
+    if text_layer:
+        wrong_case = bool(compare_case(text_layer, mathml))
+        checks.append(
+            Check(
+                name="equation.text_layer_case",
+                passed=not wrong_case,
+                severity="warning",
+                code="case_mismatch" if wrong_case else None,
+            )
+        )
+    return checks
+
+
 @dataclass
 class _Candidate:
     """One model attempt (with its fallback) and what the validators made of it."""
@@ -605,6 +645,12 @@ def _evaluate(
         if mismatch and similarity is not None:
             # scale towards half confidence as the symbol overlap goes to zero
             candidate.confidence = output.confidence * (0.5 + 0.5 * similarity)
+    if differ is False:
+        # The letters and digits agree as multisets: are the numbers the same numbers,
+        # and the capitals the same capitals?
+        extra = text_layer_number_case_checks(element.text, candidate.mathml)
+        candidate.checks.extend(extra)
+        meaning = any(not c.passed for c in extra)
     style = text_layer_style(
         element.text,
         candidate.mathml,
@@ -625,7 +671,7 @@ def _evaluate(
                 code=style_code,
             )
         )
-        meaning = style == "meaning"
+        meaning = meaning or style == "meaning"
     # Signs and relations: only against a text layer whose letters and digits mostly
     # agree with the transcription (it has some, and no strong mismatch), so a garbled
     # layer or a different equation never adds a sign flag on top.

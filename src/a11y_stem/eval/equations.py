@@ -36,7 +36,10 @@ inside the last cell of a final `mtable`.
 Known gaps (not normalised; see tests/fixtures/sample_latex_predictions.jsonl):
 OpenStax sometimes packs operators into text (`<mtext>time =</mtext>`,
 `<mtext>m/s)(46 s)</mtext>`), which LaTeX writes as text plus `<mo>`. Whether lenient
-mode should split text on operators is an open scoring decision (ADR 0001, question 3).
+mode should split text on operators is an open scoring decision (ADR 0001, question 3);
+this scorer stays as it is, and `eval.equations_v2` (a stream comparison that splits
+packed text and unifies look-alike characters) reports the answer beside it as a labelled
+secondary.
 """
 
 from __future__ import annotations

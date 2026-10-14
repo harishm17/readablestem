@@ -85,6 +85,12 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     ("equation.text_layer", "symbol_mismatch"): "A letter, digit or Greek letter in this "
     "transcription differs from the text stored in the PDF (a wrong digit, a misread or "
     "missing symbol), so compare it with the image symbol by symbol.",
+    ("equation.text_layer_numbers", "number_mismatch"): "A number differs from the text stored "
+    "in the PDF: the digits are the same but make a different number (36 for 63, 9.81 for "
+    "98.1, a decimal point or an exponent moved), so compare the numbers with the image.",
+    ("equation.text_layer_case", "case_mismatch"): "A capital letter is small here, or a small "
+    "letter is a capital, compared with the text stored in the PDF (W for w, S for s), so "
+    "compare the letters with the image.",
     ("equation.text_layer_signs", "sign_mismatch"): "A sign, relation or arrow differs from "
     "the PDF (a minus missing or added, ± read as +, =, <, ≤ or ≈ mixed up, a vector arrow "
     "dropped), so check the minus signs, plus/minus, relations and arrows.",

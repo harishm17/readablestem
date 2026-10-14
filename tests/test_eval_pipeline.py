@@ -33,6 +33,7 @@ from test_eval_support import (
     EQ_X,
     FIXTURES,
     FakeMedia,
+    base_record,
     eq_fix,
     equation,
     fake_describe,
@@ -682,6 +683,38 @@ def test_document_eval_drops_a_half_converted_page(monkeypatch, tmp_path):
     monkeypatch.setattr(run, "convert_pdf", convert_pdf)
     report = pe.run_pipeline_eval(config(gold, "document", FakeVisionClient())).report
     assert (report["n"], report["n_planned"], report["stopped_reason"]) == (0, 2, "budget_job_usd")
+
+
+def test_document_eval_scores_the_dev_v2_classes_on_the_output_html(monkeypatch, tmp_path):
+    """Scripts, code, glossary and hyphenated words (eval.prose_classes) are scored on the
+    page's converted HTML, beside the equations; a page without such gold has no block."""
+    gold = write_gold(
+        tmp_path,
+        [
+            equation("p-1", 0, EQ_V, "block"),
+            base_record(
+                "p-1", "script", 0, text="the ion Zn^{2+} here", classes=["prose_chem_script"],
+                runs=[{"script": "sup", "value": "2+", "class": "prose_chem_script"}],
+            ),
+            base_record("p-1", "glossary", 0, term="Limit", definition="The value approached."),
+            base_record("p-1", "hyphen_break", 0, word="pattern", left="pat", right="tern",
+                        compound=False),
+            equation("p-2", 0, EQ_X, "inline"),
+        ],
+    )  # fmt: skip
+    html = "<html><body><p>the ion Zn<sup>2+</sup> here</p><p>a pat-tern</p></body></html>"
+    monkeypatch.setattr(run, "convert_pdf", lambda pdf, **_: converted(html))
+    monkeypatch.setattr(html_checks, "static_checks", lambda html: [])
+    monkeypatch.setattr(html_checks, "axe_checks", lambda html: [])
+    run_ = pe.run_pipeline_eval(config(gold, "document", FakeVisionClient()))
+    classes = run_.report["metrics"]["prose_classes"]
+    assert classes["scripts"]["scripted"] == 1 and classes["scripts"]["sub_sup"] == 1
+    assert classes["glossary"]["missing"] == 1
+    assert classes["hyphen_breaks"]["kept_hyphen"] == 1 and "code" not in classes
+    by_page = {i["id"]: i for i in run_.items}
+    assert "prose_classes" in by_page["physics/p-1"]
+    assert "prose_classes" not in by_page["physics/p-2"]
+    assert "### Prose classes" in pe.format_markdown(run_.report)
 
 
 def test_a_page_the_layout_cannot_read_scores_as_found_nothing(monkeypatch, tmp_path):

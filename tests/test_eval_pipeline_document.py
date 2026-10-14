@@ -145,3 +145,33 @@ def test_the_markdown_summary_lists_the_unmatched_reasons():
     text = pe.format_markdown(report)
     assert "### Unmatched predicted equations" in text
     assert "| prose_math | 1 |" in text and "| split_gold_equations | 0 |" in text
+
+
+def test_extras_the_text_layer_supports_are_counted_apart_from_fragments_and_the_rest():
+    """T2-13: prose maths the model read right (its symbols agree with the PDF's own text)
+    is not a detection error of the pipeline; a fragment agrees with its own text trivially
+    and an unread or misread extra is not supported."""
+    gold = [equation("p-1", 0, DISPLACEMENT, "block")]
+    predicted = [
+        element(0, "Δ\U0001d41d = \U0001d41df − \U0001d41d0 ."),  # matched
+        element(1, "\U0001d461= 0 s", "inline", parent="p1-e10"),  # prose maths, read right
+        element(2, "\U0001d465= 3 m", "inline", parent="p1-e10"),  # prose maths, misread
+        element(3, "/h)] = 40", "inline", parent="p1-e10"),  # a fragment, read right
+        element(4, "\U0001d466= 5 m", "inline", parent="p1-e10"),  # prose maths, not read
+    ]
+    fixes = {
+        "p1-e0": eq_fix("p1-e0", r"\Delta \mathbf{d} = \mathbf{d}_f - \mathbf{d}_0"),
+        "p1-e1": eq_fix("p1-e1", r"t = 0\ \text{s}"),
+        "p1-e2": eq_fix("p1-e2", r"x = 8\ \text{m}"),
+        "p1-e3": eq_fix("p1-e3", r"/h)] = 40"),
+    }
+    item = page(gold, predicted, fixes)
+    supported = {u["element_id"]: u["text_layer_supported"] for u in item["unmatched"]}
+    assert supported == {"p1-e1": True, "p1-e2": False, "p1-e3": False, "p1-e4": False}
+    metrics = pe.document_metrics([item])
+    assert metrics["unmatched_predicted"] == 4
+    assert metrics["unmatched_text_layer_supported"] == 1
+    assert metrics["unmatched_text_layer_supported_by_reason"]["prose_math"] == 1
+    assert metrics["unmatched_not_supported"] == 3
+    assert metrics["detection_precision"] == 1 / 5
+    assert metrics["detection_precision_excluding_text_layer_supported"] == 1 / 4

@@ -11,6 +11,7 @@ import json
 from collections.abc import Iterator
 from pathlib import Path
 
+from a11y_stem.eval import equations_v2 as v2
 from a11y_stem.eval.equations import EquationScore, score_latex, score_mathml, summarize
 
 UNKNOWN_IDS_SHOWN = 5
@@ -71,24 +72,43 @@ def load_predictions(path: Path) -> dict[str, dict]:
 
 
 def score_equations(gold: list[dict], preds: dict[str, dict] | None, display: str = "all") -> dict:
-    """Score predictions; preds=None scores gold against itself (pipeline sanity check)."""
+    """Score predictions; preds=None scores gold against itself (pipeline sanity check).
+
+    The summary is the primary scorer's. `secondary_stream_v2` beside it is the labelled
+    secondary (`eval.equations_v2`); the rows carry `exact_stream_v2` too."""
     rows = []
     scores: list[EquationScore] = []
+    secondary: list[v2.StreamScore] = []
     for record in gold:
         if display != "all" and record.get("display") != display:
             continue
         if preds is None:
             score = score_mathml(record["mathml"], record["mathml"])
+            stream = v2.score_stream(record["mathml"], record["mathml"])
         elif record["id"] not in preds:
             size = score_mathml(record["mathml"], record["mathml"]).gold_nodes
             score = EquationScore(False, False, size, 0.0, size, 0, "missing prediction")
+            stream = v2.missing_stream(record["mathml"])
         elif "mathml" in preds[record["id"]]:
             score = score_mathml(preds[record["id"]]["mathml"], record["mathml"])
+            stream = v2.score_stream(preds[record["id"]]["mathml"], record["mathml"])
         else:
             score = score_latex(preds[record["id"]]["latex"], record["mathml"])
+            stream = v2.score_stream_latex(preds[record["id"]]["latex"], record["mathml"])
         scores.append(score)
-        rows.append({"id": record["id"], "display": record.get("display"), **score.to_dict()})
+        secondary.append(stream)
+        rows.append(
+            {
+                "id": record["id"],
+                "display": record.get("display"),
+                **score.to_dict(),
+                "exact_stream_v2": stream.exact,
+                "stream_similarity": stream.similarity,
+            }
+        )
     summary = summarize(scores)
+    if scores:
+        summary["secondary_stream_v2"] = v2.summarize(secondary)
     if preds is not None:
         gold_ids = {record["id"] for record in gold}
         unknown = sorted(pid for pid in preds if pid not in gold_ids)
