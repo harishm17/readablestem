@@ -18,8 +18,8 @@ parser's Markdown the same way. What it hands over (`Output`):
   figure, an SVG's title and description, the label of a `role="img"` element. Each
   carries the image when the HTML holds it (a data URI) and the figure's caption.
 
-Text ReadableSTEM wrote itself (every element with the class `readablestem`, or `a11y-stem`
-in earlier outputs, see `assemble.AUTHORED_CLASS`: the about section, notes, labels) is
+Text ReadableSTEM wrote itself (every element with the class `readablestem`, see
+`assemble.AUTHORED_CLASS`: the about section, notes, labels) is
 read like any other text and marked `authored`. A fragment of it inside a block of the
 document's own text (the hidden word "Equation" before an equation number) is dropped from
 the block and counted.
@@ -47,8 +47,6 @@ from readablestem.eval.equations import MathMLError, parse_mathml
 from readablestem.eval.invented.text import MATH
 
 AUTHORED_CLASS = "readablestem"
-# The class before the rename (October 2026): outputs recorded earlier still carry it.
-AUTHORED_CLASSES = (AUTHORED_CLASS, "a11y-stem")
 # The note the demo build puts in front of a converted page; not a conversion output.
 DEMO_BANNER_LABELS = ("About this demo",)
 
@@ -518,7 +516,7 @@ class _HtmlReader(HTMLParser):
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         a = {key: value or "" for key, value in attrs}
         classes = a.get("class", "").split()
-        authored = any(c in classes for c in AUTHORED_CLASSES)
+        authored = AUTHORED_CLASS in classes
         if tag in _BLOCKS:
             self._flush()
         if self.after_figure is not None and tag != "details":
@@ -684,8 +682,7 @@ class _HtmlReader(HTMLParser):
                 "alt",
                 self.figure_stack[-1] if self.figure_stack else None,
                 image=_data_image(a.get("src")),
-                authored=bool(self.n["authored"])
-                or any(c in a.get("class", "").split() for c in AUTHORED_CLASSES),
+                authored=bool(self.n["authored"]) or AUTHORED_CLASS in a.get("class", "").split(),
             )
         )
 

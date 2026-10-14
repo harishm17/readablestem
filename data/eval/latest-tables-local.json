@@ -15,7 +15,7 @@
   "client": "none",
   "dataset": {
     "gold_dir": "data/gold/tables",
-    "manifest_sha256": "c994c016627d6f288520c1990cad1d8320dd1f6f29a1d595f7cbfe1a331e1b15",
+    "manifest_sha256": "218fa7cbfdedf88b6a8a5bebfefda41a011cb82a312f263d1dd6344dedb0f946",
     "authored_sha256": "6478c10e9dd09c06ee926ef02ba46908ef4b6a979da75e2bf78f5ee3b7db8989",
     "styles": [
       "grid",

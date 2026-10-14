@@ -280,7 +280,7 @@ def test_uvicorn_default_log_config_cannot_bypass_the_chain(capsys, ours_first):
 
     if ours_first:
         configure_logging()
-        uvicorn.Config(app)  # default log_config, as `a11y-stem serve` uses today
+        uvicorn.Config(app)  # default log_config, as `readablestem serve` uses today
     else:
         uvicorn.Config(app)
         configure_logging()

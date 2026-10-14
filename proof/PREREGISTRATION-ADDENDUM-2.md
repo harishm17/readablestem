@@ -1,6 +1,6 @@
 # Addendum 2: the first attempt was stopped, and the harness was given a resume
 
-Written 2026-10-13, after the first start of the a11y-stem live run and before any run of it
+Written 2026-10-13, after the first start of the ReadableSTEM live run and before any run of it
 finished. `PREREGISTRATION.md` and Addendum 1 stand unchanged.
 
 ## What happened
@@ -35,6 +35,6 @@ fingerprint of the invented-content code, parser plan, locks) hold as they were.
 
 ## Time
 
-Because of the pace above, the integrator expects the a11y-stem recording alone to take
+Because of the pace above, the integrator expects the ReadableSTEM recording alone to take
 hours. If it cannot finish every planned run, the report says so on top (the `--keep-finished`
 banner) and the missing runs are not replaced by anything.

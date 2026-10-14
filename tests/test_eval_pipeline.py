@@ -498,7 +498,7 @@ def test_figure_eval_describes_then_judges_blind(monkeypatch, tmp_path):
         # the alt text, not to the picture).
         assert request.model == "gpt-6.1-sol" and request.images in figure_images
         text = (request.instructions + (request.context_text or "")).lower()
-        for leak in ("gpt", "luna", "sol", "a11y-stem", "ReadableSTEM", "pipeline", "model output"):
+        for leak in ("gpt", "luna", "sol", "readablestem", "pipeline", "model output"):
             assert leak not in text
     assert "<caption>\nFigure 1.1 A ball rolls.\n</caption>" in judge_requests[0].context_text
 

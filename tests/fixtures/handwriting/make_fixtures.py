@@ -346,7 +346,9 @@ def typed_page(doc: pymupdf.Document) -> pymupdf.Page:
     return page
 
 
-def save(doc: pymupdf.Document, out: Path, name: str, producer: str = "a11y-stem fixtures") -> Path:
+def save(
+    doc: pymupdf.Document, out: Path, name: str, producer: str = "ReadableSTEM fixtures"
+) -> Path:
     doc.set_metadata(
         {
             "producer": producer,

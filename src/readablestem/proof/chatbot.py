@@ -85,7 +85,7 @@ ARMS: tuple[ChatArm, ...] = (
     ChatArm("chatbot-sol-expert", "gpt-6.1-sol", "expert", 1, "secondary"),
 )
 # The arms of a run on Claude (Addendum 6): the Purdue prompt on the main and on the cheap
-# model of the a11y-stem run. They replace the arms above; the expert prompt is not run.
+# model of the ReadableSTEM run. They replace the arms above; the expert prompt is not run.
 CLAUDE_ARMS: tuple[ChatArm, ...] = (
     ChatArm("chatbot-opus-purdue", "claude-opus-5-5", "purdue", 2, "primary", "anthropic"),
     ChatArm("chatbot-haiku-purdue", "claude-haiku-5-5", "purdue", 2, "descriptive", "anthropic"),

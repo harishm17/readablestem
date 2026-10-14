@@ -5,7 +5,9 @@ be done offline: every registered file has the SHA-256 in `PREREG-v2.sha256`, th
 that differ from version 1 differ in exactly the documented lines (reverting them gives back
 the version-1 hashes of `PREREG-v1.sha256` where the text can be rebuilt), the seeded draw
 reproduces the committed draw, and the sections that survived the page rules are the held-out
-set's sections.
+set's sections. On 2026-10-14 the product's name was replaced in these files (Addendum 8):
+the hash lists as they were at the tag are in `proof/original-hashes/`, the current lists hold
+the hashes of the renamed files, and `proof/verify-rename.py` rebuilds the change from the tag.
 """
 
 from __future__ import annotations
@@ -37,19 +39,20 @@ CHANGED_IN_V2 = {
 # Version 1 of three scripts named the author's home directory. Version 2 replaced exactly
 # these lines; the old path is written in pieces so that it does not appear in the repository.
 OLD_HOME = "/" + "home" + "/" + "harish"
+OLD_NAME = "a11y" + "-stem"  # the files at the tag still have it; so do the lines below
 V2_TO_V1_LINES = {
     "selection/features.py": [
         (
             "REPO = Path(__file__).resolve().parents[2]\n",
-            f'REPO = Path("{OLD_HOME}/code/a11y-stem")\n',
+            f'REPO = Path("{OLD_HOME}/code/{OLD_NAME}")\n',
         )
     ],
     "selection/scan_used.py": [
         (
             '    Path(p) for p in os.environ.get("A11Y_SCAN_ROOTS", "").split(os.pathsep) if p\n'
             '] or [Path(__file__).resolve().parents[2], Path("/tmp")]\n',
-            f'    Path("{OLD_HOME}/code/a11y-stem"),\n'
-            f'    Path("{OLD_HOME}/code/a11y-stem-int"),\n'
+            f'    Path("{OLD_HOME}/code/{OLD_NAME}"),\n'
+            f'    Path("{OLD_HOME}/code/{OLD_NAME}-int"),\n'
             f'    Path("{OLD_HOME}/code/a11y-research"),\n'
             f'    Path("{OLD_HOME}/.cache/a11y-fixer"),\n'
             f'    Path("{OLD_HOME}/.cache/final-verify-pt"),\n'
@@ -60,16 +63,30 @@ V2_TO_V1_LINES = {
     "scorer-readiness/draw.py": [
         (
             "gold = Path(sys.argv[2]) if len(sys.argv) > 2 else "
-            'Path.home() / ".cache" / "a11y-stem" / "heldout"\n',
+            f'Path.home() / ".cache" / "{OLD_NAME}" / "heldout"\n',
             f'gold = Path("{OLD_HOME}/code/a11y-research/proof/heldout-gold")\n',
         )
     ],
 }
 
 
+TAG = "proof-heldout-2026-10"
+
+
+def _at_tag(rel: str) -> str:
+    """A registered file as it is at the tag, or a skip if the clone has no tag."""
+    done = subprocess.run(
+        ["git", "show", f"{TAG}:proof/{rel}"], cwd=ROOT, capture_output=True, check=False
+    )
+    if done.returncode != 0:
+        pytest.skip(f"the tag {TAG} is not in this clone")
+    return done.stdout.decode("utf-8")
+
+
 def _as_in_v1(rel: str) -> str:
-    """The text of a script as it was in version 1, rebuilt from the committed version 2."""
-    text = (PROOF / rel).read_text(encoding="utf-8")
+    """The text of a script as it was in version 1, rebuilt from the file at the tag (the
+    renamed files cannot be taken back to the old name by a rule, so the tag is the source)."""
+    text = _at_tag(rel)
     for new, old in V2_TO_V1_LINES[rel]:
         assert text.count(new) == 1, f"{rel}: the documented version-2 lines are not there"
         text = text.replace(new, old)
@@ -104,8 +121,8 @@ def test_every_registered_file_in_the_repository_has_the_registered_hash(name):
 
 def test_version_1_hashes_differ_from_version_2_in_the_five_reworded_files_only():
     v1, v2 = (
-        dict((r, d) for d, r in _lines("PREREG-v1.sha256")),
-        dict((r, d) for d, r in _lines("PREREG-v2.sha256")),
+        dict((r, d) for d, r in _lines("original-hashes/PREREG-v1.sha256")),
+        dict((r, d) for d, r in _lines("original-hashes/PREREG-v2.sha256")),
     )
     # Addenda written after version 2 are appended to its hash list (Addendum 6, ...).
     assert list(v2)[: len(v1)] == list(v1), "version 2 hashes the same files in the same order"
@@ -118,7 +135,7 @@ def test_version_1_hashes_differ_from_version_2_in_the_five_reworded_files_only(
 
 @pytest.mark.parametrize("rel", sorted(V2_TO_V1_LINES))
 def test_reverting_the_documented_lines_gives_back_the_version_1_hash(rel):
-    v1 = dict((r, d) for d, r in _lines("PREREG-v1.sha256"))
+    v1 = dict((r, d) for d, r in _lines("original-hashes/PREREG-v1.sha256"))
     assert hashlib.sha256(_as_in_v1(rel).encode("utf-8")).hexdigest() == v1[rel]
 
 
@@ -132,9 +149,11 @@ def test_the_addenda_and_the_interim_headings_cite_the_version_1_registration():
 
 def test_the_hash_file_lists_the_registration_and_the_addenda_except_the_fifth():
     listed = {rel for _, rel in _lines("PREREG-v2.sha256")}
-    expected = {"PREREGISTRATION.md", "PARSERS-PLAN.md"} | {
-        f"PREREGISTRATION-ADDENDUM-{n}.md" for n in (1, 2, 3, 4, 6, 7)
-    }
+    expected = (
+        {"PREREGISTRATION.md", "PARSERS-PLAN.md"}
+        | {f"PREREGISTRATION-ADDENDUM-{n}.md" for n in (1, 2, 3, 4, 6, 7, 8)}
+        | {"verify-rename.py"}
+    )
     assert expected <= listed
     assert {"selection/draw.py", "selection/features.py", "selection/rules-before-draw.sha256"} <= (
         listed
@@ -180,11 +199,75 @@ def test_the_rules_were_hashed_before_the_draw_and_the_files_still_match_them():
     # budget.py was edited after the draw (logged in the same file), the others were not;
     # features.py is compared as it was in version 1 (only its path line was reworded).
     listed = {}
-    for line in (PROOF / "selection" / "rules-before-draw.sha256").read_text().splitlines():
+    for line in (PROOF / "original-hashes" / "rules-before-draw.sha256").read_text().splitlines():
         digest, _, rel = line.partition("  ")
         if len(digest) == 64 and rel:
             listed.setdefault(rel, digest)
     features_v1 = hashlib.sha256(_as_in_v1("selection/features.py").encode("utf-8")).hexdigest()
     assert features_v1 == listed["features.py"]
     for rel in ("draw.py", "features.json"):
-        assert _sha(PROOF / "selection" / rel) == listed[rel], rel
+        assert _sha(PROOF / "selection" / rel) == listed[rel], rel  # unchanged by the rename
+
+
+def test_the_original_hash_lists_are_the_ones_at_the_tag():
+    for name, rel in (
+        ("PREREG-v1.sha256", "PREREG-v1.sha256"),
+        ("PREREG-v2.sha256", "PREREG-v2.sha256"),
+        ("PREREG-after-review-v1.sha256", "PREREG-after-review-v1.sha256"),
+        ("rules-before-draw.sha256", "selection/rules-before-draw.sha256"),
+    ):
+        assert (PROOF / "original-hashes" / name).read_text(encoding="utf-8") == _at_tag(rel)
+
+
+def test_the_registered_files_differ_from_the_tag_only_by_the_new_name():
+    """Addendum 8: `proof/verify-rename.py` rebuilds every file from the tag and compares."""
+    _at_tag("PREREG-v2.sha256")  # skips when the clone has no tag
+    done = subprocess.run(
+        [sys.executable, "-I", str(PROOF / "verify-rename.py")],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    assert done.returncode == 0, done.stdout + done.stderr
+    assert done.stdout.startswith("OK:")
+
+
+def _verify_module():
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location("verify_rename", PROOF / "verify-rename.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_rename_rules_on_small_examples():
+    rename = _verify_module().rename_text
+    old = "a11y" + "-stem"
+    assert (
+        rename(f"{old} is not affiliated with OpenStax.")
+        == "ReadableSTEM is not affiliated with OpenStax."
+    )
+    assert rename(f"run `{old} gold fetch` first") == "run `readablestem gold fetch` first"
+    assert rename(f"~/.cache/{old}/heldout") == "~/.cache/readablestem/heldout"
+    assert rename(f"from {'a11y' + '_stem'}.eval import x") == "from readablestem.eval import x"
+    seed = f"{old} held-out OpenStax set, pre-registered 2026-10-13"
+    assert rename(f"seed: {seed}; by {old}") == f"seed: {seed}; by ReadableSTEM"
+    assert rename("no name here") == "no name here"
+
+
+def test_the_old_name_is_left_only_in_the_seeds_and_the_script_that_replaces_it():
+    old = "a11y" + "-stem"
+    protected = _verify_module().PROTECTED
+    for path in sorted(PROOF.rglob("*")):
+        if not path.is_file() or path.suffix in {".pdf", ".png", ".gz"}:
+            continue
+        try:
+            text = path.read_text(encoding="utf-8")
+        except UnicodeDecodeError:
+            continue
+        for seed in protected:
+            text = text.replace(seed, "")
+        assert old not in text, f"{path.relative_to(ROOT)} still names the old product"

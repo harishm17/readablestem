@@ -1,6 +1,6 @@
 # Authored documents of the extended development set
 
-Original documents written for a11y-stem (no third-party text), licence MIT like the code.
+Original documents written for ReadableSTEM (no third-party text), licence MIT like the code.
 `build_authored.py` writes them; the committed copies are under `../dev/authored/<id>/`
 (source, untagged PDF, `gold.jsonl`, images). Gold is known by construction: each equation
 is set from LaTeX and stored with its MathML (`latex_to_mathml`), each heading, term,

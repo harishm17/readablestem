@@ -1,16 +1,16 @@
-"""The part of the held-out run that needs no model: a11y-stem's headings and the parsers.
+"""The part of the held-out run that needs no model: ReadableSTEM's headings and the parsers.
 
     uv run python proof/interim/report.py --gold <held-out gold folder> [--data DIR] [--out FILE]
 
 Reads, from `--data` (default: `proof/interim/heldout-2026-10`):
 
     pdfs/<book>__<page>.pdf          the 15 section PDFs every system was given
-    a11y-headings/headings-items.jsonl   `a11y-stem eval pipeline --task headings --set heldout`
+    a11y-headings/headings-items.jsonl   `readablestem eval pipeline --task headings --set heldout`
     a11y-headings/headings.json          the same task's report (review load and flags)
     parsers/<arm>/<book>__<page>.{json,md}   `proof/parsers` (`parsers-bench proof`)
 
-and writes one Markdown report: a11y-stem's heading detection (the headings task makes no model
-call and runs once) next to each parser's, a11y-stem's review load and heading flags, and the
+and writes one Markdown report: ReadableSTEM's heading detection (the headings task makes no model
+call and runs once) next to each parser's, ReadableSTEM's review load and heading flags, and the
 parsers' equations, headings, invented content, coverage, time and memory against the held-out
 answer key. The answer key is fetched with `make heldout-gold` (network) and must be the
 registered one (its manifest SHA-256 is checked here).
@@ -19,8 +19,8 @@ The registered rows are computed as registered. The rows marked "descriptive" we
 after the results were known, to show how far a result depends on how it is read; none of them
 changes a registered row, and none was used to change any code that produced an output.
 
-This is NOT the registered comparison: a11y-stem's equation, figure and whole-document runs and
-the chatbot arms need paid model calls and do not exist. Nothing here compares a11y-stem's
+This is NOT the registered comparison: ReadableSTEM's equation, figure and whole-document runs and
+the chatbot arms need paid model calls and do not exist. Nothing here compares ReadableSTEM's
 equations with anything.
 """
 
@@ -44,15 +44,15 @@ sys.path.insert(0, str(HERE.parent / "parsers" / "src"))
 
 from parsers_bench import equations as parser_equations  # noqa: E402
 
-from a11y_stem.eval.invented import read as inv_read  # noqa: E402
-from a11y_stem.eval.invented import score as inv_score  # noqa: E402
-from a11y_stem.eval.invented import text as inv_text  # noqa: E402
-from a11y_stem.proof import a11y_tables, goldinfo, stats, systems, systems_tables  # noqa: E402
-from a11y_stem.proof.bundle import pdf_name  # noqa: E402
-from a11y_stem.proof.report import Section, Table, num, wording_problems  # noqa: E402
-from a11y_stem.proof.systems import SystemRun  # noqa: E402
+from readablestem.eval.invented import read as inv_read  # noqa: E402
+from readablestem.eval.invented import score as inv_score  # noqa: E402
+from readablestem.eval.invented import text as inv_text  # noqa: E402
+from readablestem.proof import a11y_tables, goldinfo, stats, systems, systems_tables  # noqa: E402
+from readablestem.proof.bundle import pdf_name  # noqa: E402
+from readablestem.proof.report import Section, Table, num, wording_problems  # noqa: E402
+from readablestem.proof.systems import SystemRun  # noqa: E402
 
-MANIFEST_SHA = "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb"
+MANIFEST_SHA = "9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3"
 N_BOOT = 10_000
 K = 8  # 2 comparisons x 4 parser arms (Addendum 1, D3)
 NEED_GOLD = (
@@ -128,7 +128,7 @@ def build(data: Path, gold_dir: Path) -> str:
     g1 = goldinfo.g1_ids(records)
     pdf_dir = data / "pdfs"
 
-    # a11y-stem: the headings task items
+    # ReadableSTEM: the headings task items
     builder = systems_tables.VectorBuilder()
     a11y_items: list[dict[str, Any]] = []
     for line in (data / "a11y-headings" / "headings-items.jsonl").read_text().splitlines():
@@ -220,11 +220,11 @@ def build(data: Path, gold_dir: Path) -> str:
         flagged_rows.append([arm, *[num(flagged[k]) for k in ("all", "negative", "math")]])
 
     parser_cols = list(vectors.items())
-    both = [("a11y-stem (headings task)", a11y_v), *parser_cols]
+    both = [("ReadableSTEM (headings task)", a11y_v), *parser_cols]
     heading_keys = ["h_f1", "h_precision", "h_recall", "h_level"]
     claims = [
         systems_tables.compare(
-            "h_f1", "heading F1", a11y_v, v, a_name="a11y-stem", other=arm, k=K, n_boot=N_BOOT
+            "h_f1", "heading F1", a11y_v, v, a_name="ReadableSTEM", other=arm, k=K, n_boot=N_BOOT
         )
         for arm, v in vectors.items()
     ]
@@ -232,20 +232,20 @@ def build(data: Path, gold_dir: Path) -> str:
     inv = ["inv_sentence", "inv_number", "inv_heading", "inv_eq_aligned", "inv_eq_unaligned"]
     intro: list[str] = [
         "**What this is.** The two parts of the held-out run that need no model call: "
-        "a11y-stem's heading detection (the headings task, run once) and the open parsers "
-        "(CPU, one process per section, 30-minute limit). a11y-stem's equation, "
+        "ReadableSTEM's heading detection (the headings task, run once) and the open parsers "
+        "(CPU, one process per section, 30-minute limit). ReadableSTEM's equation, "
         "figure and whole-document runs and the chatbot arms need paid model calls, which "
         "could not be made (the API account had no credit), so **they do not exist and "
-        "nothing about them is claimed here**. No number below compares a11y-stem's equation "
+        "nothing about them is claimed here**. No number below compares ReadableSTEM's equation "
         "transcription with anything. Held-out answer key: registered, manifest "
         f"`{MANIFEST_SHA}`; 15 sections, 242 Letter pages, 509 gold headings, 1,369 gold "
         "equations. Inputs are OpenStax retired first editions (CC BY 4.0), attribution in "
         "each PDF; figures inside them keep the credits and licences OpenStax gives them.",
         "**The PDFs are printed by this project's own stylesheet.** Every system was given "
         "the same PDF bytes, but they were not the publisher's PDFs: the sections were "
-        "printed from OpenStax's HTML by `a11y_stem.eval.render` (its `PRINT_CSS`, Liberation "
+        "printed from OpenStax's HTML by `readablestem.eval.render` (its `PRINT_CSS`, Liberation "
         "Sans, bordered boxes and bold labels for examples, solutions and notes). That "
-        "stylesheet was written for a11y-stem's own tests, and the headings rules were "
+        "stylesheet was written for ReadableSTEM's own tests, and the headings rules were "
         "developed on pages it printed. A result that depends on how a box is drawn may not "
         "carry over to a publisher's PDF; see the heading tables below.",
         "**Reading the numbers.** `value [cluster 95% interval by section]`: cluster "
@@ -277,16 +277,16 @@ def build(data: Path, gold_dir: Path) -> str:
 
     sections = [
         Section(
-            "Headings: a11y-stem against the parsers",
+            "Headings: ReadableSTEM against the parsers",
             [
                 systems_tables.metrics_table(
                     "Headings (preregistration 7.2)", heading_keys, both, N_BOOT
                 ),
                 systems_tables.counts_table("Counts", heading_keys, both),
                 systems_tables.claims_table(
-                    "Heading F1: a11y-stem against each parser",
+                    "Heading F1: ReadableSTEM against each parser",
                     claims,
-                    a_name="a11y-stem",
+                    a_name="ReadableSTEM",
                     k=K,
                     note="Paired cluster bootstrap by section. k = 8: the registration's rule "
                     "of 2 comparisons per parser arm with four arms (Addendum 1, D3), "
@@ -369,7 +369,7 @@ def build(data: Path, gold_dir: Path) -> str:
         Section(
             "What these numbers leave out",
             [
-                "- a11y-stem's equations, figures and whole documents, and the chatbot arms, "
+                "- ReadableSTEM's equations, figures and whole documents, and the chatbot arms, "
                 "were not run: there is no held-out comparison on equations.\n"
                 "- Docling with formula recognition was not run to the registered rule; "
                 "MinerU was run at the `basic` tier, not its documented default (`standard`). "
@@ -384,11 +384,11 @@ def build(data: Path, gold_dir: Path) -> str:
                 "Bonferroni threshold for MinerU and PyMuPDF4LLM, so those two are "
                 "differences in point estimate that the registered interval only just "
                 "separates from 0.\n"
-                "- On free-standing headings a11y-stem is not ahead (0.964 recall against 0.973 to "
+                "- On free-standing headings ReadableSTEM is not ahead (0.964 recall against 0.973 to "
                 "1.000 for the parsers); its lead is in headings inside boxes, and a part of "
                 "Docling's and PyMuPDF4LLM's deficit is bare exercise numbers that they write "
                 "as headings (tables above).\n"
-                "- a11y-stem's review screen asked about none of the 28 wrong headings "
+                "- ReadableSTEM's review screen asked about none of the 28 wrong headings "
                 "(table above).\n"
                 "- The invented-content rows are a text-layer mismatch from an unaudited "
                 "rule, and are not comparable between a Markdown parser and HTML.\n"
@@ -416,7 +416,7 @@ def build(data: Path, gold_dir: Path) -> str:
 def _heading_split_table(
     a11y_items: Sequence[dict[str, Any]], parser_items: dict[str, list[dict[str, Any]]]
 ) -> Table:
-    names = ["a11y-stem", *parser_items]
+    names = ["ReadableSTEM", *parser_items]
     splits = [heading_recall_split(a11y_items)] + [
         heading_recall_split(items) for items in parser_items.values()
     ]
@@ -439,7 +439,7 @@ def _heading_extras_table(
     a11y_items: Sequence[dict[str, Any]], parser_items: dict[str, list[dict[str, Any]]]
 ) -> Table:
     rows = []
-    for name, items in [("a11y-stem", list(a11y_items)), *parser_items.items()]:
+    for name, items in [("ReadableSTEM", list(a11y_items)), *parser_items.items()]:
         matched = sum(i["matched"] for i in items)
         predicted = sum(i["n_pred"] for i in items)
         gold = sum(i["n_gold"] for i in items)
@@ -477,7 +477,7 @@ def _review_section(report: dict[str, Any]) -> Section:
     where = Counter((w["status"], w["review"]) for w in wrong)
     only = ", ".join(f"{n} {s}, {r} note" for (s, r), n in sorted(where.items()))
     table = Table(
-        "a11y-stem's review screen on headings (headings task, registered metrics 7.4)",
+        "ReadableSTEM's review screen on headings (headings task, registered metrics 7.4)",
         ["Measure", "Value"],
         [
             ["PDF pages", num(load["pdf_pages"])],
@@ -514,7 +514,7 @@ def _review_section(report: dict[str, Any]) -> Section:
         "review were all right: the screen asks about repeated labels, which were not where "
         "the errors were.",
     )
-    return Section("Review load and heading flags (a11y-stem)", [table], level=3)
+    return Section("Review load and heading flags (ReadableSTEM)", [table], level=3)
 
 
 def main() -> None:

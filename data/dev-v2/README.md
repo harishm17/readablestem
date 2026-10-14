@@ -21,8 +21,8 @@ and how to run it: `docs/eval.md`, section "Extended development set".
   has one. Chosen sections are checked against the registered text: the share of a
   section's word 8-grams (visible text, MathML removed; the measure of
   `proof/selection/features.py`) found in the held-out text must be below 0.05.
-  `a11y-stem gold devset verify --overlap` recomputes the numbers (it needs the held-out
-  archive cache, `~/.cache/a11y-stem/heldout/openstax`).
+  `readablestem gold devset verify --overlap` recomputes the numbers (it needs the held-out
+  archive cache, `~/.cache/readablestem/heldout/openstax`).
 - Only CC BY 4.0 OpenStax books (retired first editions are allowed, see
   `proof/DECISION-retired-editions-2026-10-13.md`) and MIT material written for this
   project. Every record carries its licence; `ATTRIBUTION.md` lists the books.
@@ -39,9 +39,9 @@ the repository; its authored documents are fresh draws from the same generators.
 - `SEAL.json` records the archive's SHA-256, size, record count, the hash of its record
   ids and the totals per class, and no item name.
 - `eval pipeline --set dev-v2 --part check` checks the archive against the seal, extracts it
-  under `~/.cache/a11y-stem/dev-v2/`, keeps its caches and report outside the repository,
+  under `~/.cache/readablestem/dev-v2/`, keeps its caches and report outside the repository,
   refuses `--items`, and the report holds totals only.
-- `a11y-stem gold devset verify` fails if the archive is not the sealed one.
+- `readablestem gold devset verify` fails if the archive is not the sealed one.
 
 The protection is a hash and a discipline, not secrecy: anyone can unpack the archive, and
 the builder `authored/build_authored.py` can regenerate the four check documents
@@ -51,11 +51,11 @@ well. The rule is to run the check part, read the totals, and not open it.
 ## Commands
 
 ```
-uv run a11y-stem gold devset summary                 # items per class, dev and check
-uv run a11y-stem gold devset verify [--overlap]      # files vs manifest, archive vs seal
-uv run a11y-stem eval pipeline --task document --set dev-v2 --fake
-uv run a11y-stem eval pipeline --task headings --set dev-v2 --part check --max-usd 5
-uv run a11y-stem eval equations --set dev-v2 --self-check
+uv run readablestem gold devset summary                 # items per class, dev and check
+uv run readablestem gold devset verify [--overlap]      # files vs manifest, archive vs seal
+uv run readablestem eval pipeline --task document --set dev-v2 --fake
+uv run readablestem eval pipeline --task headings --set dev-v2 --part check --max-usd 5
+uv run readablestem eval equations --set dev-v2 --self-check
 uv run python data/dev-v2/authored/build_authored.py --out /tmp/pool     # authored documents
-uv run a11y-stem gold devset build --authored-pool /tmp/pool --date 2026-10-14 --force
+uv run readablestem gold devset build --authored-pool /tmp/pool --date 2026-10-14 --force
 ```

@@ -3994,7 +3994,7 @@
           385.94
         ],
         "order": 156,
-        "text": "Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.",
+        "text": "Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited.",
         "font_size": 9.0,
         "bold": false,
         "score": null,
@@ -4018,7 +4018,7 @@
           404.69
         ],
         "order": 157,
-        "text": "a11y-stem is not affiliated with or endorsed by OpenStax.",
+        "text": "ReadableSTEM is not affiliated with or endorsed by OpenStax.",
         "font_size": 9.0,
         "bold": false,
         "score": null,

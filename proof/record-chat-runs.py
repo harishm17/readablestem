@@ -1,5 +1,5 @@
 """Record the chatbot arms of a held-out run into the work folder, one arm and one number of
-runs at a time, before `a11y-stem proof --add-systems chatbot` adds them to the recorded run.
+runs at a time, before `readablestem proof --add-systems chatbot` adds them to the recorded run.
 
     uv run --env-file ENV_FILE python proof/record-chat-runs.py \
         BUNDLE WORK ARM RUNS CAP_USD [--provider anthropic]
@@ -18,13 +18,13 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from a11y_stem.proof import chatbot
-from a11y_stem.proof.bundle import Bundle
+from readablestem.proof import chatbot
+from readablestem.proof.bundle import Bundle
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
-    parser.add_argument("bundle", type=Path, help="the recorded run (a11y-stem's, finished)")
+    parser.add_argument("bundle", type=Path, help="the recorded run (ReadableSTEM's, finished)")
     parser.add_argument("work", type=Path, help="the work folder of the recording")
     parser.add_argument("arm", choices=sorted(chatbot.ARM_BY_ID))
     parser.add_argument("runs", type=int, help="runs of the arm to make (at most the arm's own)")

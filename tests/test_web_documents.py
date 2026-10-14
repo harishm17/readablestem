@@ -332,7 +332,7 @@ def test_the_landing_page_says_why_now_how_long_and_how_accurate(web):
     flat = text(web.client().get("/").text)
     assert "public universities" in flat
     assert "one or two per page" in flat and "pre-registered test" in flat
-    assert "about half of all equations" in flat and "It makes mistakes" in flat
+    assert "about as many equations as a general chatbot" in flat and "It makes mistakes" in flat
     assert "/blob/main/PROOF.md" in web.client().get("/").text
     assert "How to post it in your course" in flat
     assert "confidence score" not in flat

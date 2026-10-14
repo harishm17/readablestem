@@ -21,7 +21,7 @@ from parsers_bench.arms import ARMS, NOT_RUN, Arm
 from parsers_bench.equations import VARIANTS
 
 REPO_ROOT = arms_mod.HARNESS_DIR.parents[1]
-DEMO_PDF = REPO_ROOT / "src" / "a11y_stem" / "web" / "static" / "demo" / "source.pdf"
+DEMO_PDF = REPO_ROOT / "src" / "readablestem" / "web" / "static" / "demo" / "source.pdf"
 GOLD_DIR = REPO_ROOT / "data" / "gold"
 DEV_BOOK = "physics"
 DEV_PAGE = "2-3-position-vs-time-graphs"
@@ -144,7 +144,7 @@ def cmd_plumbing(args: argparse.Namespace) -> int:
 
     if not DEMO_PDF.is_file() or not GOLD_DIR.is_dir():
         print(
-            "run this from a checkout of a11y-stem (the demo PDF and data/gold are needed)",
+            "run this from a checkout of ReadableSTEM (the demo PDF and data/gold are needed)",
             file=sys.stderr,
         )
         return 2

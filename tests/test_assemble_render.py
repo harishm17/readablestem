@@ -592,7 +592,7 @@ def test_the_student_note_comes_after_main_and_speaks_to_students(sample_html):
     assert "<p>Test note.</p>" in note
     for word in ("needs review", "rejected", "accepted", "reviewer", "("):
         assert word not in note.lower(), word
-    text = re.sub(r"<[^>]+>", "", note).replace("a11y-stem", "")
+    text = re.sub(r"<[^>]+>", "", note).replace("readablestem", "")
     assert not re.search(r"\d", text)  # no counts
 
 

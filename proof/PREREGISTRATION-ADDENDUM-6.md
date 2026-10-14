@@ -2,7 +2,7 @@
 
 Written 2026-10-13 at about 23:30 local time, before any model has seen any of the 15 held-out
 sections. `PREREGISTRATION.md` (version 2, SHA-256
-`2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34`) and Addenda 1 to 5 stand,
+`d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec`) and Addenda 1 to 5 stand,
 except where this addendum says it replaces something. Every metric, the set, the statistics
 and the failure rules are unchanged (section 6).
 
@@ -11,13 +11,13 @@ and the failure rules are unchanged (section 6).
 The OpenAI account ran out of credit during the first live attempt (Addendum 3). The owner
 decided on 2026-10-13 that OpenAI stays paused and that every model call of this run goes to
 Claude, with a ceiling of $45 for all Claude spend of this task. **No held-out model result
-exists yet**: no a11y-stem document, equations or figures run, no chatbot reply, no judge
+exists yet**: no ReadableSTEM document, equations or figures run, no chatbot reply, no judge
 verdict. What exists is what Addenda 3 to 5 say: the headings task (no model call) and the
 open parsers.
 
-## 2. The system under test: a11y-stem on Claude
+## 2. The system under test: ReadableSTEM on Claude
 
-`a11y-stem proof --live --provider anthropic`, with:
+`readablestem proof --live --provider anthropic`, with:
 
 | Setting | Value |
 |---|---|
@@ -39,7 +39,7 @@ changed after this addendum.
 
 The registration's statement that the second check is on (6.1) is replaced by the row above.
 The model names in registration 6.1 and 6.2 (gpt-6.1-sol, gpt-6-luna) are replaced by the ones
-in this addendum. No prompt, rule, threshold or scorer of a11y-stem differs from the code that
+in this addendum. No prompt, rule, threshold or scorer of ReadableSTEM differs from the code that
 Addendum 1 froze, except as section 4 lists.
 
 ## 3. The chatbot comparison
@@ -76,7 +76,7 @@ Addendum 1 froze, except as section 4 lists.
 
 The figure judge (prompt `judge_figure-137e2607`, registration 7.3) is `claude-opus-5-5`.
 For the chatbot arms it is built with the refusal fallback off, so that it never changes model
-inside a call (`eval.judge.make_judge`). For a11y-stem's own figures task the judge is the
+inside a call (`eval.judge.make_judge`). For ReadableSTEM's own figures task the judge is the
 run's own client and main model, so the opus refusal fallback is on there (the harness did not
 separate them, and this is not changed). The invented-content table has one model-judged row,
 figure descriptions, which uses the same verdicts; every other invented-content row is rule
@@ -90,10 +90,10 @@ agreement with this judge, not accuracy.
 |---|---|
 | Branch and commit | `feat/public-proof` at `71eeef1f469884a078559399d073a8e3804374ed`; this addendum's commit adds this file and its hash line and nothing else, and the run starts from it with a clean checkout |
 | Merged before | `feat/claude-provider` (provider, Claude client, prices, judge choice; commit `0ccdf10`); then `94bd6d5` (the chatbot arms and their figure judge on Claude, `--chat-runs`, report text that names the recorded provider) and `71eeef1` (a test, and a line in the set's limits) |
-| Pipeline | version 0.4.0; prompts equation `equation-df0e12f1`, figure `figure-ac51f42d`, judge `judge_figure-137e2607`, table `table-b3769ce7`; `src/a11y_stem/pipeline/`, `models/prompts/` and `eval/equations.py` are identical to `305d2a9` |
+| Pipeline | version 0.4.0; prompts equation `equation-df0e12f1`, figure `figure-ac51f42d`, judge `judge_figure-137e2607`, table `table-b3769ce7`; `src/readablestem/pipeline/`, `models/prompts/` and `eval/equations.py` are identical to `305d2a9` |
 | Invented-content code | fingerprint `672e19fc97e14b7daa97015833b0dbcd913725598f8e6cdaa2b5e4326720d295` (it was `b2f7596b...` in Addendum 1; the Claude-provider branch added provider fields to `eval/invented/figures.py` and `cli.py`, and no rule changed). Caps and thresholds of the rules are as registered: sentences of 7 or more words, 25% of 4-grams, difflib ratio 0.85 for headings and 0.8 for unaligned equations of 3 or more symbols |
 | Dependencies | `uv.lock` SHA-256 `7894d33a4cfc2bf2d30f63c722fde994b017f84d48cde25e0a7f8b0f81c64bf4` (adds the `anthropic` SDK) |
-| Held-out answer key | manifest SHA-256 `e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb`, unchanged |
+| Held-out answer key | manifest SHA-256 `9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3`, unchanged |
 | The 15 PDFs | the ones the parsers were given (`interim/heldout-2026-10/pdfs/`). The run's work folder was seeded with the page, image and equation-picture caches and the archive pages of the earlier attempts (renderings and downloads, no model output; the earlier attempts' partial recordings are not used). Rendering the 15 sections from that folder, with no model call, gave 15 PDFs byte for byte equal to the parsers' PDFs and created no new cache file |
 | Parser plan | `PARSERS-PLAN.md` as frozen in Addendum 1; family B stays at k = 8 with four arms named there |
 
@@ -119,15 +119,15 @@ and not on held-out sections, as the sum of the recorded costs: **$1.08** (a dev
 of the four tasks, $0.41; the Purdue prompt on claude-haiku-5-5 on the three development
 sections with its figure judge, $0.11; the same prompt on claude-opus-5-5 on one development
 section, $0.55; one-word probe requests, under a cent each). From these, before the run:
-a11y-stem's document task cost $0.0058 per element (equation or figure) on the development set;
+ReadableSTEM's document task cost $0.0058 per element (equation or figure) on the development set;
 the chatbot recipe cost $0.043 per PDF page on claude-opus-5-5 (about 4.9k input tokens and
 1.1k output tokens per page) and $0.001 per page on claude-haiku-5-5. For the 242 held-out pages
-that is about $10.3 for one opus run and $0.25 for one haiku run, and for a11y-stem about
+that is about $10.3 for one opus run and $0.25 for one haiku run, and for ReadableSTEM about
 $20 to $25 (uncertain: the held-out sections hold 1,369 equations).
 
 Order, each step with its own cap, and the rules that decide what is run:
 
-1. **a11y-stem**, all four tasks in the order document (x2), headings, figures (x2), equations
+1. **ReadableSTEM**, all four tasks in the order document (x2), headings, figures (x2), equations
    (x2), with `--keep-finished --resume`, cap **$26.00** (the figure judge inside it). If the
    cap stops it, the runs that finished are kept and the report opens with the incomplete-run
    banner; nothing is re-run to fill the gap.

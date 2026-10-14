@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.pipeline.validate import safe_latex_to_mathml
 
 from parsers_bench import equations as eqs
 from parsers_bench.intermediate import Equation

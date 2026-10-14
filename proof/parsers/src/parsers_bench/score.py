@@ -1,6 +1,6 @@
 """Score one arm's intermediate form with the shared scorers.
 
-Equations and headings go through a11y-stem's own evaluation code (`eval.pipeline_eval`,
+Equations and headings go through ReadableSTEM's own evaluation code (`eval.pipeline_eval`,
 `eval.equations`), invented content through `invented.py`, cost and time come from the
 runner's `run.json`. Every number is a count or a rate with its denominator. With two pages
 the intervals are wide and nothing here is a result: `plumbing_only` is set whenever the gold
@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from a11y_stem.eval import pipeline_eval as pe
+from readablestem.eval import pipeline_eval as pe
 
 from parsers_bench import equations as eqs
 from parsers_bench import invented

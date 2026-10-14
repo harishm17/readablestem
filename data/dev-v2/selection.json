@@ -3,7 +3,7 @@
   "set": "dev-v2",
   "title": "Extended development set (T2-0)",
   "config": {
-    "salt": "a11y-stem dev-v2 check split 2026-10-14",
+    "salt": "ReadableSTEM dev-v2 check split 2026-10-14",
     "archive_version": "20260604.144757",
     "books": {
       "algebra-and-trigonometry": "ebc5beb",

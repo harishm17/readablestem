@@ -13,7 +13,7 @@ run's files.
 
 | Step | Time | Result | Recorded spend |
 |---|---|---|---|
-| 1. a11y-stem, `--live --provider anthropic --max-usd 26 --keep-finished --resume --confirm-signoff` | started 23:27; stopped 01:27 (section 2); resumed 01:34; finished 02:16 | all seven runs complete (document x2, headings, figures x2, equations x2), none stopped by the cap, none with a failed model call | $10.8775 (figure judge $0.6882 included) |
+| 1. ReadableSTEM, `--live --provider anthropic --max-usd 26 --keep-finished --resume --confirm-signoff` | started 23:27; stopped 01:27 (section 2); resumed 01:34; finished 02:16 | all seven runs complete (document x2, headings, figures x2, equations x2), none stopped by the cap, none with a failed model call | $10.8775 (figure judge $0.6882 included) |
 | 2. chatbot, opus arm, run 1 (cap $13.00) | 02:16 to 02:31 | 15 of 15 sections `ok` | $11.3385 |
 | 3. chatbot, haiku arm, runs 1 and 2 (cap $2.50) | 02:31 to 02:42 | 30 of 30 `ok` | $1.4878 |
 | 4. chatbot, opus arm, run 2 (cap $13.00) | 02:42 to 02:56 | 15 of 15 `ok` | $11.0022 |
@@ -22,7 +22,7 @@ run's files.
 
 The rule of Addendum 6 section 7 for the second opus run was met: the spend of steps 1 to 3 was
 $23.70, plus 1.15 times $11.3385, plus $0.60, is $37.34, at most $44.00. Recorded Claude spend
-of the held-out run: **$36.21** (a11y-stem $10.88; opus arm $22.34 and its judge $0.72;
+of the held-out run: **$36.21** (ReadableSTEM $10.88; opus arm $22.34 and its judge $0.72;
 haiku arm $1.49 and its judge $0.78). Not in the recorded files, and counted against the
 $45 ceiling: the interrupted run of section 2, about $1.3 (estimated, see below), and the
 $1.08 of development-set checks that Addendum 6 listed before the run. The task's total is
@@ -52,13 +52,13 @@ therefore about **$38.6**, under $45.00. The account balance is the only exact r
    (99.167% intervals, sign-flip threshold 0.0083). After the run the code was changed to count
    the registered four on a held-out set (`proof/parsers.py`, `family_b_k`); a development set
    is unchanged. Nothing was re-run or re-scored. **One verdict differs between the two**: MinerU
-   against a11y-stem on heading F1 reads "a11y-stem is better" at k = 6 and "higher by point
+   against ReadableSTEM on heading F1 reads "ReadableSTEM is better" at k = 6 and "higher by point
    estimate" at k = 8 (interval 0.0047 to 0.0789 at k = 8; sign-flip p = 0.0073 against a
    threshold of 0.00625). The k = 8 reading is the registered one and is in `PROOF.md`. Every
    other verdict, and every number, is the same at both. This is a harness change made after
    the first held-out output existed; it changes a label and not a score, and both readings
    are stated here (registration section 10, item 4).
-4. **Code after the run.** `src/a11y_stem/proof/parsers.py` (item 3) and a test were committed
+4. **Code after the run.** `src/readablestem/proof/parsers.py` (item 3) and a test were committed
    after the run. The recorded run's code identity (pipeline, prompts, models, settings) is
    unchanged, and replay checks it. The bundle names `297126f` as the commit it was recorded
    at.
@@ -71,11 +71,11 @@ therefore about **$38.6**, under $45.00. The account balance is the only exact r
 
 ## 3. Things in the results that the reader should know before reading them
 
-- The Opus chatbot arm scores higher than a11y-stem on end-to-end equations (0.622 against
+- The Opus chatbot arm scores higher than ReadableSTEM on end-to-end equations (0.622 against
   0.504). The registered interval of the difference excludes 0 and the sign-flip test does not,
-  so the report says "higher by point estimate". This is a result against a11y-stem; nothing
+  so the report says "higher by point estimate". This is a result against ReadableSTEM; nothing
   in it was changed or excluded.
-- a11y-stem's review screen asked about none of the wrong headings in the document task, as in
+- ReadableSTEM's review screen asked about none of the wrong headings in the document task, as in
   the interim headings run, and about 34% of the wrong equations. The report's review-load
   table says so.
 - The configuration summary Addendum 6 gave for the development set (0 meaning-level misses

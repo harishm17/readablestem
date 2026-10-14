@@ -1,4 +1,4 @@
-"""Tables that put a11y-stem next to the other systems (chatbot recipe, open parsers).
+"""Tables that put ReadableSTEM next to the other systems (chatbot recipe, open parsers).
 
 Every system is reduced to the same thing: per section, a vector of numerators and
 denominators for each metric, summed over the system's repeats (preregistration section
@@ -181,7 +181,7 @@ def a11y_vectors(
     b = VectorBuilder()
     for item in arm.items("document"):
         _eq_vectors(b, item, g1, item["id"])
-        # allowlist-free row does not apply: a11y-stem's own allowlist is its product rule
+        # allowlist-free row does not apply: ReadableSTEM's own allowlist is its product rule
     for item in arm.items("headings"):
         _heading_vectors(b, item, item["id"])
     for item in arm.items("figures"):

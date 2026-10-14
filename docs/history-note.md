@@ -35,7 +35,7 @@ version of the commit the original tag pointed at.
   was done to commit messages where they appeared. The files concerned are `.gitignore`, `README.md`,
   `SECURITY.md`, `pyproject.toml`, `docs/decisions/0001-scope.md`, `docs/design/beta-architecture.md`,
   `docs/development.md`, `docs/deploy-railway.md`, `docs/launch.md`, `proof/REGISTERED.md`,
-  `src/a11y_stem/pipeline/parse.py` (comments), `tests/test_gold_sample.py` and the five registered
+  `src/readablestem/pipeline/parse.py` (comments), `tests/test_gold_sample.py` and the five registered
   files in the next point.
 - **Version 1 of the registration.** The table in `proof/REGISTERED.md` says that version 2 of the
   registration differs from version 1 only in wording: it removed the names of the people who

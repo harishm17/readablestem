@@ -26,7 +26,7 @@ from readablestem.proof.report import (
 )
 
 DISCLAIMER = (
-    "a11y-stem assists a person who makes course material accessible. Nothing here measures "
+    "ReadableSTEM assists a person who makes course material accessible. Nothing here measures "
     "conformance with WCAG or any other standard, and no number below may be read as a claim "
     "that a document is accessible. Automated HTML checks are reported as what a machine can "
     "detect. Judge numbers are agreement with a model judge, not accuracy."
@@ -57,12 +57,12 @@ def _banner(info: DocumentInfo) -> list[str]:
     if info.fake:
         lines.append(
             "> **PLUMBING CHECK ONLY.** The model answers in this run were produced by the "
-            "offline fake client. The numbers below test the harness, not a11y-stem."
+            "offline fake client. The numbers below test the harness, not ReadableSTEM."
         )
     if not info.pset.held_out:
         lines.append(
             "> **Development set, not held out.** These sections were available while "
-            "a11y-stem was built. The numbers show that the pipeline and this harness work "
+            "ReadableSTEM was built. The numbers show that the pipeline and this harness work "
             "end to end; they are not held-out results."
         )
     if info.drift or info.identity_diffs:
@@ -301,8 +301,8 @@ def _attribution(info: DocumentInfo) -> Section:
             f"original at https://openstax.org/details/books/{book.get('slug')}."
         )
     lines.append(
-        "Changes: each section was reformatted as a printable page for evaluating a11y-stem, "
-        "image alt text was left out of the print, and no wording was edited. a11y-stem is "
+        "Changes: each section was reformatted as a printable page for evaluating ReadableSTEM, "
+        "image alt text was left out of the print, and no wording was edited. ReadableSTEM is "
         "not affiliated with or endorsed by OpenStax."
     )
     return Section("Attribution", [bullets(lines)])

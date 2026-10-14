@@ -41,12 +41,9 @@ tracing = ["langfuse>=4.17.0"]
 
 [project.scripts]
 readablestem = "readablestem.cli.main:main"
-# The old name stays as an alias: commands quoted in the registered proof files use it.
-a11y-stem = "readablestem.cli.main:main"
 
 [tool.uv.build-backend]
-# `a11y_stem` is a small import alias for the registered proof scripts (src/a11y_stem/__init__.py).
-module-name = ["readablestem", "a11y_stem"]
+module-name = "readablestem"
 
 [build-system]
 requires = ["uv_build>=0.12.23,<0.13.0"]
@@ -90,9 +87,8 @@ select = [
 allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 
 [tool.ruff.lint.per-file-ignores]
-# Registered file, kept byte for byte: it imports the old `a11y_stem` alias, which sorts differently
-# from `readablestem` for ruff's import check.
-"proof/interim/report.py" = ["I001"]
+# Registered file, kept as registered (apart from the name): its import block is not sorted and the new name made a line longer.
+"proof/interim/report.py" = ["I001", "E501"]
 # Hand-written LaTeX of the registered scorer-readiness sample: long lines and Unicode on purpose.
 "proof/scorer-readiness/*" = ["E501", "RUF001", "RUF002", "RUF003"]
 # The Unicode "holes" table maps letters to their look-alike styled forms on purpose.

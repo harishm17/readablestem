@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pymupdf
 import pytest
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.pipeline.validate import safe_latex_to_mathml
 
 from parsers_bench import intermediate, invented, score
 from parsers_bench.adapters import adapt_run

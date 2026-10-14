@@ -2,7 +2,7 @@
 
 One page. It says what the tool does, what happens to a document, and where it falls short.
 It is written from how the beta behaves today, not from a contract or an audit by anyone
-outside the project. The command is `readablestem` (the old `a11y-stem` still works); the GitHub repository is `harishm17/readablestem`.
+outside the project. The command is `readablestem` (the old `ReadableSTEM` still works); the GitHub repository is `harishm17/readablestem`.
 
 ## What it does
 
@@ -50,7 +50,7 @@ checks ran, and what was not checked.
   web application itself, and no independent security test. The developer reviewed the
   application against a written checklist and ran automated accessibility tests on its
   pages (`docs/security.md`, `docs/web.md`).
-- **One developer.** The beta is run by an individual, not a company or a university, with
+- **One developer.** The beta is run by an individual developer (an independent project), not a company or a university, with
   no support contract. The source code is published under the AGPL.
 
 ## Where to read more

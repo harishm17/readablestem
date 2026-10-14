@@ -296,7 +296,7 @@ def test_the_report_names_the_arms_the_recording_holds():
     assert "(claude-haiku-5-5, two runs)" in text and "expert-prompt arm is not run" in text
     assert "no system prompt" in comparison.send_text(scored)
     note = comparison.pooled_note(ctx, scored, "chatbot-opus-purdue")
-    assert note.startswith("The chatbot's one run is pooled; a11y-stem's document task has two")
+    assert note.startswith("The chatbot's one run is pooled; ReadableSTEM's document task has two")
     luna = _scored("chatbot-luna-purdue")
     assert comparison.family(luna) is chatbot.ARMS
     assert "`store=False`" in comparison.send_text(luna)

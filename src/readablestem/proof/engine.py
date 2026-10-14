@@ -100,7 +100,7 @@ def default_work_dir(pset: ProofSet) -> Path:
     base = os.environ.get(ENV_CACHE)
     if base:
         return Path(base) / pset.id
-    return cache_dir(pset.id, new="readablestem-proof", old="a11y-stem-proof")
+    return cache_dir(pset.id, name="readablestem-proof")
 
 
 def _default_out(opts: ProofOptions, pset: ProofSet) -> Path:

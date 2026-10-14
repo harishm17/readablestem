@@ -128,7 +128,7 @@ def test_the_report_has_the_tables_and_says_what_is_not_there(recorded):
     for expected in (
         "## Status",
         "## The 2 sections",
-        "## Results: a11y-stem",
+        "## Results: ReadableSTEM",
         "end_to_end_exact_lenient (all gold equations)",
         "heading F1",
         "judge_pass_rate",
@@ -416,7 +416,7 @@ def test_a_registered_stage_replaces_its_stub_in_the_same_place(recorded, monkey
     assert "Invented: 0 of 10 units (demo)." in text
     assert "`invented_content` is a placeholder" not in text
     assert len(result.not_wired) == 3
-    order = [text.index(h) for h in ("## Results: a11y-stem", "## Invented-content rate")]
+    order = [text.index(h) for h in ("## Results: ReadableSTEM", "## Invented-content rate")]
     assert order == sorted(order)
     assert "| Invented-content rate | done |" in text
     assert "Not computed in this build: Comparison" in text  # the other three still say so

@@ -1,10 +1,10 @@
 """Held-out selection, step 1: features of every eligible section (no model calls).
 
-Run from the a11y-stem checkout (read-only use of its gold code):
+Run from the ReadableSTEM checkout (read-only use of its gold code):
     uv run python ~/.cache/a11y-proof/prereg/features.py OUT.json
 
 For each candidate book: every numbered section (slug N-M-...), its exclusion reason if
-any, and input-only features computed with the same extractor `a11y-stem gold fetch`
+any, and input-only features computed with the same extractor `readablestem gold fetch`
 uses (gold.openstax.build_page_records): equations (block/inline), figures, tables,
 headings, words outside MathML, and the word 8-gram containment of the section in the
 development sections' text. Archive JSON is read through the repo's cache
@@ -21,7 +21,7 @@ import re
 import sys
 from pathlib import Path
 
-from a11y_stem.gold import openstax as ox
+from readablestem.gold import openstax as ox
 
 REPO = Path(__file__).resolve().parents[2]
 CACHE = REPO / ".cache" / "openstax"

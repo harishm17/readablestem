@@ -1,7 +1,7 @@
-"""The rules on a real a11y-stem output: the committed demo (OpenStax Physics 2.3, CC BY 4.0,
+"""The rules on a real ReadableSTEM output: the committed demo (OpenStax Physics 2.3, CC BY 4.0,
 converted with the real models on 2026-10-09) against the PDF it was converted from.
 
-a11y-stem copies prose from the text layer, so everything the rules can look at should be
+ReadableSTEM copies prose from the text layer, so everything the rules can look at should be
 supported; what is not is the text the tool wrote itself (the about section). If the demo
 is rebuilt, this test says what changed.
 """

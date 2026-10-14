@@ -262,6 +262,6 @@ Figure 14.23 The graph shows a titration curve for the titration of 25.00 mL of 
 
 Licensed under Creative Commons Attribution License (CC BY 4.0). http://creativecommons.org/licenses/by/4.0/
 
-Original page: https://openstax.org/books/chemistry/pages/14-7-acid-base-titrations Access for free at openstax.org. Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.
+Original page: https://openstax.org/books/chemistry/pages/14-7-acid-base-titrations Access for free at openstax.org. Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited.
 
-a11y-stem is not affiliated with or endorsed by OpenStax.
+ReadableSTEM is not affiliated with or endorsed by OpenStax.

@@ -1,4 +1,4 @@
-"""Runs the a11y-stem arm of a proof: live (record) or replay.
+"""Runs the ReadableSTEM arm of a proof: live (record) or replay.
 
 Both modes run the same eval code (`eval.pipeline_eval`, the tasks `document`,
 `equations`, `headings`, `figures`) on the same gold set; they differ only in what stands
@@ -249,7 +249,7 @@ class RunOutcome:
 @dataclass
 class ArmResults:
     outcomes: list[RunOutcome] = field(default_factory=list)
-    # The HTML a11y-stem wrote for each section, rebuilt by a replay: (repeat, section) ->
+    # The HTML ReadableSTEM wrote for each section, rebuilt by a replay: (repeat, section) ->
     # HTML. The invented-content rate and the comparison read it; it is not stored in the
     # bundle because the replay makes it again from the recorded answers.
     html: dict[tuple[int, str], str] = field(default_factory=dict)

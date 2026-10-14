@@ -6,12 +6,12 @@
   "description": "Fifteen sections of five OpenStax books (242 Letter pages), chosen by rule and registered, with this set's answer key hashed, before any system ran on them. The books are retired first editions, which are CC BY 4.0 (the current editions are CC BY-NC-SA 4.0 and the live CC BY STEM books were used in development).",
   "preregistration": {
     "file": "proof/PREREGISTRATION.md",
-    "sha256": "2c16815a6d18faf452d3e28b3bd4d80721e839a213a08b81b5f5377ecd48cd34",
+    "sha256": "d4d3af030b403a84da2c1a6787dc9773775a826cfa4f86edf9b48f7ec3f288ec",
     "note": "Public copy of the registration. The run stops if the file here does not have this hash."
   },
   "gold": {
     "dir": null,
-    "manifest_sha256": "e9e7e429a5ce20ebc36c4c313ea46a8754d8b47cad6d359ec5dfb7f14d899ceb",
+    "manifest_sha256": "9be8c5650fe492d0c5312199b3040aa6ea741595d5ba97df4b68e816455c9aa3",
     "fetch": {
       "date": "2026-10-13",
       "allow_retired": true,
@@ -118,7 +118,7 @@
   "suggested_max_usd": 50.0,
   "signoff": [
     "retired first editions accepted as ground truth (ADR 0001 question 2)",
-    "spend cap approved for the whole run (the registration estimates about $27 for the a11y-stem arm and the chatbot arms; its cap is $50)",
+    "spend cap approved for the whole run (the registration estimates about $27 for the ReadableSTEM arm and the chatbot arms; its cap is $50)",
     "the frozen items of registration section 12 are in place"
   ],
   "notes": [
@@ -127,12 +127,12 @@
   "limits": [
     "Fifteen sections of five books: intervals come from resampling sections, which is approximate with this few clusters; per-book numbers are point estimates.",
     "The sections come from retired first editions, whose text may differ from the current editions.",
-    "Any change to a11y-stem's prompts, rules, thresholds, models or scorers after the first held-out output exists means these numbers can no longer be quoted as held-out results for the changed system.",
+    "Any change to ReadableSTEM's prompts, rules, thresholds, models or scorers after the first held-out output exists means these numbers can no longer be quoted as held-out results for the changed system.",
     "Docling is run in its default settings (a formula is not decoded); the registered arm with formula recognition on was not carried out (Addendum 4). MinerU is run at its basic tier, not the standard tier its documentation names as the default.",
     "A paired verdict is written only when the registered Bonferroni interval excludes 0; where a sign-flip test on the section differences disagrees, the report says 'higher by point estimate'.",
-    "a11y-stem's review screen asked about none of the 28 wrong headings in the interim headings run: that is a limit of the pipeline, documented here and not fixed on the held-out data.",
-    "The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.",
-    "The model-dependent parts ran on Claude, not on the OpenAI models the registration names (Addendum 6): a11y-stem with claude-haiku-5-5 and claude-opus-5-5 and no second automated check, the Purdue-prompt chatbot arms on claude-opus-5-5 and claude-haiku-5-5, the figure judge on claude-opus-5-5. The expert-prompt chatbot arm was not run. Each arm's number of runs is the one this report states.",
+    "ReadableSTEM's review screen asked about none of the 28 wrong headings in the interim headings run: that is a limit of the pipeline, documented here and not fixed on the held-out data.",
+    "The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and ReadableSTEM's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.",
+    "The model-dependent parts ran on Claude, not on the OpenAI models the registration names (Addendum 6): ReadableSTEM with claude-haiku-5-5 and claude-opus-5-5 and no second automated check, the Purdue-prompt chatbot arms on claude-opus-5-5 and claude-haiku-5-5, the figure judge on claude-opus-5-5. The expert-prompt chatbot arm was not run. Each arm's number of runs is the one this report states.",
     "The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch."
   ]
 }

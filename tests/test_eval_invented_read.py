@@ -102,13 +102,13 @@ def test_the_tools_own_text_is_marked_and_a_label_inside_a_block_is_dropped_from
             "<div class='equation'>"
             "<span class='visually-hidden readablestem'>Equation </span>2.4</div>"
             "<footer class='about readablestem'><h2>About this version</h2>"
-            "<p>Made with a11y-stem, a tool that assists.</p></footer>"
+            "<p>Made with ReadableSTEM, a tool that assists.</p></footer>"
         )
     )
     assert [(b.text, b.authored) for b in out.blocks] == [
         ("Real content of the converted document goes here.", False),
         ("2.4", False),
-        ("Made with a11y-stem, a tool that assists.", True),
+        ("Made with ReadableSTEM, a tool that assists.", True),
     ]
     assert [(h.text, h.authored) for h in out.headings] == [("About this version", True)]
     assert out.tool_fragments == 1

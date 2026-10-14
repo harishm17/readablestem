@@ -325,11 +325,11 @@ the repository, and needs no browser. `full` adds Chromium and the print fonts f
 `--verify-sources` and `--live`.
 
 ```
-docker build -f proof/Dockerfile -t a11y-stem-proof .
-docker run --rm -v "$PWD/out:/out" a11y-stem-proof readablestem proof --out /out/PROOF.md
+docker build -f proof/Dockerfile -t readablestem-proof .
+docker run --rm -v "$PWD/out:/out" readablestem-proof readablestem proof --out /out/PROOF.md
 
-docker build -f proof/Dockerfile --target full -t a11y-stem-proof:full .
-docker run --rm --env OPENAI_API_KEY -v "$PWD/out:/out" a11y-stem-proof:full \
+docker build -f proof/Dockerfile --target full -t readablestem-proof:full .
+docker run --rm --env OPENAI_API_KEY -v "$PWD/out:/out" readablestem-proof:full \
     readablestem proof --live --max-usd 2 --record /out/bundle --out /out/PROOF.md
 ```
 

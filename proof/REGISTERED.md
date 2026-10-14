@@ -8,10 +8,10 @@ cannot.
 
 | File | What it is |
 |---|---|
-| [`PREREGISTRATION.md`](PREREGISTRATION.md) | the registration, **version 2** (SHA-256 `2c16815a...`). It differs from version 1 (SHA-256 `8127b143...`) only in wording: the names of the people who asked for this evidence, an authorship line and paths on the author's machine were removed or made generic. Its sections, metrics, rules, thresholds and set are unchanged. Version 1 is not published; its hash is kept (see below) |
+| [`PREREGISTRATION.md`](PREREGISTRATION.md) | the registration, **version 2** (SHA-256 `d4d3af03...`). It differs from version 1 (SHA-256 `8127b143...`) only in wording: the names of the people who asked for this evidence, an authorship line and paths on the author's machine were removed or made generic. Its sections, metrics, rules, thresholds and set are unchanged. Version 1 is not published; its hash is kept (see below) |
 | `PREREGISTRATION-ADDENDUM-1.md` to `-5.md` | what was frozen later (the parser plan, prompts, caps), what happened to the first attempts, and what was run. Each is hashed in `PREREG-v1.sha256` (1 to 4) or `PREREG-after-review-v1.sha256` (5). They are unchanged, and they and the interim headings result cite version 1's hash |
 | `PREREGISTRATION-ADDENDUM-6.md`, `-7.md` | Addendum 6 was written on 2026-10-13 before any model saw a held-out section: the model-dependent parts run on Claude because the OpenAI account had no credit, the configuration, the judges, the budget rules. Addendum 7 was written after the run and records what happened, with the deviations. Both cite version 2's hash and are hashed at the end of `PREREG-v2.sha256` (they are not in `PREREG-v1.sha256`, which is version 1's list as it was) |
-| [`PARSERS-PLAN.md`](PARSERS-PLAN.md) | the parser plan. Addendum 1 cites version 1 of it (SHA-256 `3ab0e878...`); this is version 2 (`e1e64f4b...`), which differs only in the removal of the requesters' names and the added note on the registration's version |
+| [`PARSERS-PLAN.md`](PARSERS-PLAN.md) | the parser plan. Addendum 1 cites version 1 of it (SHA-256 `3ab0e878...`); this is version 2 (`4689eeb3...`), which differs only in the removal of the requesters' names and the added note on the registration's version |
 | [`DECISION-retired-editions-2026-10-13.md`](DECISION-retired-editions-2026-10-13.md) | the decision to use retired first editions (ADR 0001, question 2), dated before any system ran |
 | [`selection/`](selection/) | how the 15 sections were chosen: `features.py` (properties of each section), `draw.py` (the seeded draw), `budget.py` (the page-count rules), their outputs (`features.json`, `draw.json`, `budget.json`), the logs, `rules-before-draw.sha256`, and the licence table. Three scripts (`selection/features.py`, `selection/scan_used.py`, `scorer-readiness/draw.py`) named directories on the author's machine in version 1; in version 2 only those lines differ (see "How the scripts were run") |
 | [`scorer-readiness/`](scorer-readiness/) | the check of what the scorer gives a perfect transcriber (28 of 40) |
@@ -66,7 +66,7 @@ file of the version in question (`PREREG-v1.sha256` or `PREREG-v2.sha256`).
   and `/tmp`. The scan of section 2 of the registration used the version-1 roots.
 - `scorer-readiness/draw.py`: `python3 proof/scorer-readiness/draw.py sample.json <answer-key folder>`.
   Version 1 read the answer key from a fixed folder; version 2 takes it from the second
-  argument (default `~/.cache/a11y-stem/heldout`, where `make heldout-gold` puts it). The
+  argument (default `~/.cache/readablestem/heldout`, where `make heldout-gold` puts it). The
   output is byte for byte `sample.json`.
 
 ## What you cannot check

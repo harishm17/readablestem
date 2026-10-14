@@ -6,6 +6,6 @@ cda7e1b51db87ecc06afacac9f46e3b080708cd8b58d1991ce5641ca0bcc7660  budget.py
 e0060ee8d1396952da6ffed2519f6cf2b28768ce07623b32ad40c96ce4e1adf2  budget.py
 budget.py edited after the draw: CLI calls run in an isolated env with the browser group (playwright); rules unchanged
 2026-10-13T10:41:52-05:00
-1d54a82ed4ff25791ab6f999c6c98138d5a8006468003da7bf5c83d1d580d747  budget.py
+bc65c243c5ce90d4d838655e93ec470a0f59c60492c014c3fd369f95fc9663d7  budget.py
 budget.py rule A cap changed 40 -> 30 (production max_pages_per_job; convert_pdf raises too_many_pages above it). The first run was stopped and its log not read (kept as budget-stopped-unread.log).
 2026-10-13T10:43:09-05:00

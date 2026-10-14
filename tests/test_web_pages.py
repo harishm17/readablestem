@@ -146,11 +146,13 @@ def test_privacy_and_terms_describe_real_behaviour(pages):
     assert "<strong>7 days</strong>" in privacy and "<strong>30 days</strong>" in privacy
     assert "Both boxes are unticked unless you tick them" in privacy
     assert "We do not use your uploads to train models, sell them or share them" in privacy
-    assert "Harish Manoharan, an individual (a student project)" in privacy
+    operator = "Harish Manoharan, an individual developer (an independent project, not a company"
+    assert operator in privacy and "student project" not in privacy
     assert "student records" in privacy
     assert "never contain document text" in privacy
     terms = " ".join(pages["/terms"].split())
     assert "student records" in terms and "assists" in terms
+    assert operator in terms and "student project" not in terms
     assert "governed by the law of the State of Texas, USA" in terms
     assert "does not certify" in terms
 

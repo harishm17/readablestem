@@ -167,6 +167,6 @@ It is virtually impossible to detect individual photons having frequencies below
 
 "29.3 Photon Energies and the Electromagnetic Spectrum" from College Physics by Paul Peter Urone, Roger Hinrichs, OpenStax. Licensed under Creative Commons Attribution License (CC BY 4.0). http://creativecommons.org/licenses/by/4.0/
 
-Original page: https://openstax.org/books/college-physics/pages/29-3-photon-energies-and-the-electromagnetic-spectrum Access for free at openstax.org. Changes: reformatted as a printable page for evaluating a11y-stem; image alt text left out of this print; no wording edited.
+Original page: https://openstax.org/books/college-physics/pages/29-3-photon-energies-and-the-electromagnetic-spectrum Access for free at openstax.org. Changes: reformatted as a printable page for evaluating ReadableSTEM; image alt text left out of this print; no wording edited.
 
-a11y-stem is not affiliated with or endorsed by OpenStax.
+ReadableSTEM is not affiliated with or endorsed by OpenStax.

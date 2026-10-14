@@ -34,8 +34,7 @@ def data_root(path: Path | None = None) -> Path:
 
 def cache_home() -> Path:
     """Where the sealed part is extracted and its runs are cached: outside the repository,
-    next to the held-out folder (`$XDG_CACHE_HOME/readablestem/dev-v2`; a folder under the old
-    `a11y-stem` name is still used while it is the only one)."""
+    next to the held-out folder (`$XDG_CACHE_HOME/readablestem/dev-v2`)."""
     return cache_dir("dev-v2")
 
 

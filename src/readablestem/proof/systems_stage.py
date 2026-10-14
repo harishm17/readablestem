@@ -2,7 +2,7 @@
 
 The three stages that need the other systems (invented content, the chatbot comparison, the
 parser comparison) share this one computation, cached on the stage context: it reads the
-bundle's `systems/`, scores each output on its section (`proof.systems`), scores a11y-stem's
+bundle's `systems/`, scores each output on its section (`proof.systems`), scores ReadableSTEM's
 own HTML from the replay in the same way, and reduces everything to per-section vectors.
 
 A system section that is missing, or whose status is not ok, scores as found nothing; its
@@ -21,7 +21,7 @@ from readablestem.proof import chatbot, systems, systems_tables
 from readablestem.proof.stages import StageContext
 from readablestem.proof.systems import SectionScore, SystemRun, load_arms, section_golds
 
-A11Y = "a11y-stem"
+A11Y = "ReadableSTEM"
 SEED_KEY = "systems_scored"
 
 
@@ -75,7 +75,7 @@ def get_scored(ctx: StageContext) -> Scored:
         references[section] = inv_text.Reference.from_pdf(ctx.bundle.pdf_bytes(section))
         gold_mathml[section] = [g["mathml"] for g in golds[section].equations]
 
-    # a11y-stem's own HTML (from the replay): invented content and coverage
+    # ReadableSTEM's own HTML (from the replay): invented content and coverage
     entries: list[dict[str, Any]] | None = None
     coverage: dict[str, tuple[float, float]] = {}
     if ctx.arm.html:

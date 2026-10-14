@@ -1,6 +1,6 @@
 # Parser comparison harness (optional)
 
-Runners, adapters and scoring glue for comparing a11y-stem with PDF parsers people already
+Runners, adapters and scoring glue for comparing ReadableSTEM with PDF parsers people already
 use, on OpenStax pages. It is a separate uv project: the app does not depend on it, and the
 parsers (torch, onnxruntime, ...) live in their own environments, one per tool, outside this
 repository.
@@ -12,7 +12,7 @@ frozen by `proof/PREREGISTRATION.md` in the research folder, which allows no sys
 it before the frozen run. The numbers below are counts on two pages. They are not results, and
 they say nothing about which tool is better.
 
-a11y-stem assists people who make course material accessible. Nothing in this folder claims
+ReadableSTEM assists people who make course material accessible. Nothing in this folder claims
 that any output is compliant with, or verified against, a standard.
 
 ## One command
@@ -36,7 +36,7 @@ load average under 1.5 before a timed run).
 
 ```
 proof/parsers/
-  pyproject.toml, uv.lock     the harness: a11y-stem (this checkout) + markdown-it-py
+  pyproject.toml, uv.lock     the harness: ReadableSTEM (this checkout) + markdown-it-py
   arms/<tool>/pyproject.toml  the tool, pinned with ==, and its uv.lock (CPU torch for Docling)
   runners/                    the one script that has to run inside an arm's own environment
   src/parsers_bench/
@@ -46,7 +46,7 @@ proof/parsers/
     adapters/                 native output -> the shared intermediate form (one per tool)
     intermediate.py           the shared form
     devgold.py                gold cut to a few pages of a development section
-    equations.py              LaTeX -> a11y-stem's converter -> the shared equation scorer
+    equations.py              LaTeX -> ReadableSTEM's converter -> the shared equation scorer
     invented.py, symbols.py   invented content (PREREG 7.5) and symbol-sequence matching
     score.py                  one summary per arm
     cli.py                    parsers-bench list | setup | run | adapt | plumbing
@@ -109,13 +109,13 @@ JSON for feeding an LLM, not into accessible HTML.
 | Docling with formulas | the same, with formula recognition | speed on CPU: about 136 s per page in the plan's measurement, which would put most 15-30 page sections past the 30-minute failure rule of the pre-registration |
 | MinerU | high-quality extraction for LLM corpora and RAG (Markdown, JSON), including Chinese | accessible HTML: empty alt text on images, one heading level in Markdown; its documented default tier (`standard`) was not run |
 | PyMuPDF4LLM | fast text-layer to Markdown for LLM and RAG ingestion | mathematics: no formula recognition and no LaTeX; images off by default |
-| a11y-stem | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans |
+| ReadableSTEM | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans |
 
 ### Considered and not run (no runner on purpose)
 
 | System | Why not |
 |---|---|
-| Marker 2.0.0 (P4) | Waits for Harish's decision (plan section 6.1). The weights' licence counts evaluating as use, and restriction 2(c) bars any use by someone offering a competing service, with no research exception; a11y-stem is a hosted PDF-to-HTML service. Not installed. |
+| Marker 2.0.0 (P4) | Waits for Harish's decision (plan section 6.1). The weights' licence counts evaluating as use, and restriction 2(c) bars any use by someone offering a competing service, with no research exception; ReadableSTEM is a hosted PDF-to-HTML service. Not installed. |
 | Nougat 0.1.17 (P5) | On CPU the first of three pages took 19 minutes; trained on arXiv papers, not textbooks; unmaintained since 2023. |
 | olmOCR 0.4.27 (P6) | Needs an NVIDIA GPU with at least 12 GB; the box has no working GPU driver. |
 | Mathpix (P7) | Paid API; no key on the box; its terms on publishing benchmarks are unread. |
@@ -139,7 +139,7 @@ scorer counts every gold item of the section as missed (PREREG section 9). Nothi
 
 ## Scoring
 
-Equations and headings go through a11y-stem's own evaluation code, with nothing re-implemented:
+Equations and headings go through ReadableSTEM's own evaluation code, with nothing re-implemented:
 `eval.pipeline_eval.document_page_item` and `heading_page_item` (weighted alignment in reading
 order, thresholds 0.5 and 0.85), `eval.equations.score_mathml`, `equation_step.clean_latex` and
 `_convert`, `figure_details.numbers_in`.
@@ -148,10 +148,10 @@ order, thresholds 0.5 and 0.85), `eval.equations.score_mathml`, `equation_step.c
   `unflagged_wrong_per_100` (parsers ask nothing, so every wrong aligned equation is unflagged;
   gold equations with the known scorer gap G1 are left out of the headline rate, and the
   plain rate is beside it). Four rows: `primary` (the one that counts), `allowlist_free` (skips
-  a11y-stem's LaTeX allowlist), `normalised_plan` (the plan's two markup-only rewrites) and
+  ReadableSTEM's LaTeX allowlist), `normalised_plan` (the plan's two markup-only rewrites) and
   `normalised_plus` (those plus three proposed after reading the parsers' LaTeX on development
   pages: drop `\tag{...}`, join digits split by spaces, make a single upright letter text).
-  Only `primary` is a measure; the others show how much of a score is a11y-stem's converter and
+  Only `primary` is a measure; the others show how much of a score is ReadableSTEM's converter and
   markup, and each proposal can be struck before the plan is frozen. A tool that writes no
   LaTeX is reported as "does not transcribe equations (by design)", not as a quality score.
   "Retained in any form" asks whether a gold equation's symbols appear anywhere in the output
@@ -216,7 +216,7 @@ What the plumbing showed, beyond the plan's earlier three-page look:
   was aligned to a gold equation, did not match it, and was counted as an invented aligned
   equation (1 of 1). The other gold equation was not found as a formula item.
 - MinerU writes every heading at one level in the structured output as well (`level` 2), and
-  its equations carry markup a11y-stem's allowlist refuses (1 of 5) or that differs from
+  its equations carry markup ReadableSTEM's allowlist refuses (1 of 5) or that differs from
   the gold's (`\tag`, spaced digits): the `normalised_plus` row, which is a proposal and not
   a measure, gets 1 of 2.
 - PyMuPDF4LLM dropped the figure image (images are off by default) and wrote one number

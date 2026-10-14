@@ -1,8 +1,8 @@
 # Proof: Development sample: OpenStax Physics, chapter 2 (not held out)
 
-a11y-stem assists a person who makes course material accessible. Nothing here measures conformance with WCAG or any other standard, and no number below may be read as a claim that a document is accessible. Automated HTML checks are reported as what a machine can detect. Judge numbers are agreement with a model judge, not accuracy.
+ReadableSTEM assists a person who makes course material accessible. Nothing here measures conformance with WCAG or any other standard, and no number below may be read as a claim that a document is accessible. Automated HTML checks are reported as what a machine can detect. Judge numbers are agreement with a model judge, not accuracy.
 
-> **Development set, not held out.** These sections were available while a11y-stem was built. The numbers show that the pipeline and this harness work end to end; they are not held-out results.
+> **Development set, not held out.** These sections were available while ReadableSTEM was built. The numbers show that the pipeline and this harness work end to end; they are not held-out results.
 
 > **Incomplete.** Not computed in this build: Human labels and judge agreement.
 
@@ -37,7 +37,7 @@ Replayed 149 model requests and 134 second-check requests from the bundle; 0 had
 
 | Part | Status |
 |---|---|
-| a11y-stem, production defaults | done |
+| ReadableSTEM, production defaults | done |
 | Invented-content rate | done |
 | Comparison with the chatbot recipe | done |
 | Comparison with open PDF parsers | done |
@@ -45,7 +45,7 @@ Replayed 149 model requests and 134 second-check requests from the bundle; 0 had
 
 ## The 3 sections
 
-The three sections of OpenStax Physics (high school), chapter 2, that a11y-stem was developed on: the sample gold set in data/gold. This set exists so that the whole proof command, from the answer key to PROOF.md, can be run and checked by anyone and in CI. Its numbers say that the pipeline and the harness work end to end. They are not held-out results.
+The three sections of OpenStax Physics (high school), chapter 2, that ReadableSTEM was developed on: the sample gold set in data/gold. This set exists so that the whole proof command, from the answer key to PROOF.md, can be run and checked by anyone and in CI. Its numbers say that the pipeline and the harness work end to end. They are not held-out results.
 
 | Section | Title | PDF pages | Equations (block / inline) | G1 | Figures (with OpenStax alt) | Tables | Headings (in boxes) | PDF sha256 |
 |---|---|---|---|---|---|---|---|---|
@@ -58,11 +58,11 @@ The PDF is the one every system was given. G1: equations whose gold MathML packs
 
 - OpenStax Physics is a live CC BY 4.0 book. These three sections are also the gold set in data/gold and the sample behind docs/eval.md.
 
-## Results: a11y-stem
+## Results: ReadableSTEM
 
 Production settings (`Settings()` defaults: main model gpt-6.1-sol, cheap model gpt-6-luna, every content flag off, the second automated check on). Tables are off in production, so a detected data table is kept as an image with a required decision. Intervals: cluster bootstrap by section (B = 10,000, seed 0), which is approximate with this few sections and tends to be a little narrow; the Wilson interval is shown beside it for comparison and treats items as independent.
 
-### a11y-stem on the whole section (document task)
+### ReadableSTEM on the whole section (document task)
 
 **Equations through the whole pipeline (document task)**
 
@@ -261,9 +261,9 @@ The eval spends from one run-level budget and does not apply the app's per-job l
 
 The invented-content rate of a type of output unit is the share of the system's units of that type that the source PDF does not support (preregistration 7.5). The reference is the PDF's own text layer, footer and attribution included.
 
-Rules: `a11y_stem.eval.invented`, code fingerprint `672e19fc97e14b7daa97015833b0dbcd913725598f8e6cdaa2b5e4326720d295`. Units: prose sentences of 7 or more words (unsupported when under 25% of their word 4-grams are in the PDF); numbers (not among the PDF's numbers); headings (no line of the PDF within difflib ratio 0.85); equations aligned to a gold equation (hold a letter, digit or Greek letter the gold equation does not); equations with no gold partner and 3 or more symbols (no matching run of the PDF's symbols, ratio 0.8); table cells.
+Rules: `readablestem.eval.invented`, code fingerprint `672e19fc97e14b7daa97015833b0dbcd913725598f8e6cdaa2b5e4326720d295`. Units: prose sentences of 7 or more words (unsupported when under 25% of their word 4-grams are in the PDF); numbers (not among the PDF's numbers); headings (no line of the PDF within difflib ratio 0.85); equations aligned to a gold equation (hold a letter, digit or Greek letter the gold equation does not); equations with no gold partner and 3 or more symbols (no matching run of the PDF's symbols, ratio 0.8); table cells.
 
-**Primary rows** are prose sentences and numbers. a11y-stem copies prose from the PDF's text layer, so for it those rows measure the copying, plus the sentences the tool writes itself (the "About this version" section and notices), which are counted in the first table and left out in the second. The types where a11y-stem can invent are equations and figure descriptions.
+**Primary rows** are prose sentences and numbers. ReadableSTEM copies prose from the PDF's text layer, so for it those rows measure the copying, plus the sentences the tool writes itself (the "About this version" section and notices), which are counted in the first table and left out in the second. The types where ReadableSTEM can invent are equations and figure descriptions.
 
 Intervals: cluster bootstrap by section (the number to quote), shown as `rate (unsupported/units) [95% interval]`. With few sections that have units of a type the interval is not given.
 
@@ -271,7 +271,7 @@ Intervals: cluster bootstrap by section (the number to quote), shown as `rate (u
 
 **Unsupported units / units, all text (the rate to quote)**
 
-| Unit | a11y-stem | chatbot-luna-purdue | docling | mineru-basic | pymupdf4llm |
+| Unit | ReadableSTEM | chatbot-luna-purdue | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|---|
 | prose sentences (7+ words) | 0.019 (12/632) [0.013, 0.026] | 0.054 (62/1153) [0.016, 0.162] | 0.000 (0/619) [0.000, 0.000] | 0.000 (0/620) [0.000, 0.000] | 0.002 (1/628) [0.000, 0.006] |
 | numbers in prose and headings | 0.000 (0/278) [0.000, 0.000] | 0.004 (2/477) [0.000, 0.011] | 0.000 (0/276) [0.000, 0.000] | 0.000 (0/273) [0.000, 0.000] | 0.000 (0/448) [0.000, 0.000] |
@@ -280,9 +280,9 @@ Intervals: cluster bootstrap by section (the number to quote), shown as `rate (u
 | equations with no gold partner | 0.000 (0/9) [0.000, 0.000] | 0.339 (20/59) [0.000, 0.381] | 0/0 | 0.111 (2/18) [0.000, 0.500] | 0/0 |
 | table cells | 0/0 | 0.000 (0/8) interval n/a | 0.000 (0/18) [0.000, 0.000] | 0.000 (0/14) [0.000, 0.000] | 0.000 (0/11) [0.000, 0.000] |
 
-**The same without the text a11y-stem wrote itself**
+**The same without the text ReadableSTEM wrote itself**
 
-| Unit | a11y-stem |
+| Unit | ReadableSTEM |
 |---|---|
 | prose sentences (7+ words) | 0.000 (0/620) [0.000, 0.000] |
 | numbers in prose and headings | 0.000 (0/278) [0.000, 0.000] |
@@ -295,7 +295,7 @@ Intervals: cluster bootstrap by section (the number to quote), shown as `rate (u
 
 | System | Added / output symbols | Per 1,000 | Per 1,000, less a kept equation number | Aligned equations |
 |---|---|---|---|---|
-| a11y-stem | 0/368 | 0.00 | 0.00 | 30 |
+| ReadableSTEM | 0/368 | 0.00 | 0.00 | 30 |
 | chatbot-luna-purdue | 6/721 | 8.32 | 8.32 | 57 |
 | docling | 0/0 | n/a | n/a | 0 |
 | mineru-basic | 31/265 | 116.98 | 116.98 | 24 |
@@ -305,7 +305,7 @@ Intervals: cluster bootstrap by section (the number to quote), shown as `rate (u
 
 | System | TeX that did not convert | No gold partner and under 3 symbols |
 |---|---|---|
-| a11y-stem | 0 | 16 |
+| ReadableSTEM | 0 | 16 |
 | chatbot-luna-purdue | 0 | 105 |
 | docling | 0 | 0 |
 | mineru-basic | 5 | 15 |
@@ -317,7 +317,7 @@ These are counted, never scored as correct.
 
 | System | Judge: factual error / descriptions judged | Rate [cluster 95%] |
 |---|---|---|
-| a11y-stem | 0/13 | 0.0000 [0.0000, 0.0000] |
+| ReadableSTEM | 0/13 | 0.0000 [0.0000, 0.0000] |
 | chatbot-luna-purdue | 1/26 | 0.0385 [0.0000, 0.0833] |
 | docling | 0/0 | n/a |
 | mineru-basic | 0/0 | n/a |
@@ -325,7 +325,7 @@ These are counted, never scored as correct.
 
 Agreement with a model judge reading the image (gpt-6.1-sol), not accuracy; the judge is not calibrated against human labels in this run. A figure with no description is not judged here (it is a fail in the figure tables).
 
-Units counted per system and section, with the text of every flagged unit, are not part of this file; `a11y-stem eval invented score --units` writes them for one output.
+Units counted per system and section, with the text of every flagged unit, are not part of this file; `readablestem eval invented score --units` writes them for one output.
 
 ## Comparison with the chatbot recipe
 
@@ -335,15 +335,15 @@ The chatbot recipe is what an instructor does today: upload the PDF to a general
 > Convert to accessible HTML compliant with WCAG 2.2 AA with complete MathJax headers and remove [cite].
 <!-- /quote -->
 
-Each arm sends the PDF as a file and a 150 dpi image of every page, then the prompt; no system instructions, no tools, `store=False`, default reasoning effort, at most 64,000 output tokens (`proof.chatbot`). The HTML in the reply is scored as it comes: a reply that was cut off or empty is a failure of the section, not asked again. Equations are read from the reply's MathJax TeX or MathML, converted the way a11y-stem converts its own model's LaTeX, and aligned to the gold equations by the document task's code, so the same scorer reads both systems.
+Each arm sends the PDF as a file and a 150 dpi image of every page, then the prompt; no system instructions, no tools, `store=False`, default reasoning effort, at most 64,000 output tokens (`proof.chatbot`). The HTML in the reply is scored as it comes: a reply that was cut off or empty is a failure of the section, not asked again. Equations are read from the reply's MathJax TeX or MathML, converted the way ReadableSTEM converts its own model's LaTeX, and aligned to the gold equations by the document task's code, so the same scorer reads both systems.
 
-Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); `chatbot-sol-expert` is a longer, more careful prompt written for this project (one run; the text is `src/a11y_stem/proof/chat_prompts.json`) so that the comparison is not only against the weakest prompt an instructor might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper gpt-6-luna (two runs). The last two are descriptive.
+Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); `chatbot-sol-expert` is a longer, more careful prompt written for this project (one run; the text is `src/readablestem/proof/chat_prompts.json`) so that the comparison is not only against the weakest prompt an instructor might copy; `chatbot-luna-purdue` is the same Purdue prompt on the cheaper gpt-6-luna (two runs). The last two are descriptive.
 
 **Not run in this recording:** `chatbot-sol-purdue`, `chatbot-sol-expert` (see the status table).
 
 **All chatbot arms: equations (preregistration 7.1)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
+| Metric | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | end_to_end_exact_lenient (all gold equations) | 0.7333 [0.6000, 1.0000] | 0.5000 [0.3000, 1.0000] |
 | end_to_end_exact_lenient, without G1 equations | 0.8947 [0.8000, 1.0000] | 0.7368 [0.5000, 1.0000] |
@@ -353,11 +353,11 @@ Arms: `chatbot-sol-purdue` is the primary arm (gpt-6.1-sol, two runs); `chatbot-
 | detection_precision | 0.5455 [0.3810, 0.8000] | 0.2579 [0.1682, 0.4792] |
 | end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0.5000 [0.3000, 1.0000] |
 
-`value [cluster 95% interval by section]`. A system that asks no questions has every wrong equation unflagged. G1 equations (operators packed into OpenStax text) can fail exact match when the answer is right. The allowlist-off row converts a system's TeX without a11y-stem's LaTeX allowlist (descriptive; a11y-stem's own allowlist is a product rule, so it has no such row).
+`value [cluster 95% interval by section]`. A system that asks no questions has every wrong equation unflagged. G1 equations (operators packed into OpenStax text) can fail exact match when the answer is right. The allowlist-off row converts a system's TeX without ReadableSTEM's LaTeX allowlist (descriptive; ReadableSTEM's own allowlist is a product rule, so it has no such row).
 
 **All chatbot arms: headings (7.2)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
+| Metric | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | heading F1 | 0.9344 [0.9130, 0.9600] | 0.4957 [0.4065, 0.5854] |
 | heading precision | 0.8768 [0.8400, 0.9231] | 0.5133 [0.4098, 0.6000] |
@@ -368,7 +368,7 @@ Levels are compared relative to each side's top level in the section. A system t
 
 **All chatbot arms: figures (7.3)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
+| Metric | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | figure judge_pass_rate (no description = fail) | 1.0000 [1.0000, 1.0000] | 0.8846 [0.7500, 0.9167] |
 | figure judge_factual_error_rate (among judged) | 0.0000 [0.0000, 0.0000] | 0.0385 [0.0000, 0.0833] |
@@ -378,7 +378,7 @@ Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.
 
 **All chatbot arms: invented content (7.5; the units are in the invented-content section)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
+| Metric | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | invented prose sentences (text-layer mismatch, rule unaudited) | 0.0190 [0.0133, 0.0261] | 0.0538 [0.0155, 0.1621] |
 | invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0042 [0.0000, 0.0108] |
@@ -386,17 +386,17 @@ Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.
 | aligned equations with an added symbol | 0.0000 [0.0000, 0.0000] | 0.0351 [0.0000, 0.1111] |
 | equations with no gold partner and no match in the PDF | 0.0000 [0.0000, 0.0000] | 0.3390 [0.0000, 0.3810] |
 
-All text, including text a11y-stem wrote itself. A section a system failed on has no units, so it adds nothing here; the raw rates include paraphrase the rule counts as unsupported, and the audit that measures that has not been done. A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): the Wilson upper bound in the last table is the bound to read.
+All text, including text ReadableSTEM wrote itself. A section a system failed on has no units, so it adds nothing here; the raw rates include paraphrase the rule counts as unsupported, and the audit that measures that has not been done. A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): the Wilson upper bound in the last table is the bound to read.
 
 **All chatbot arms: coverage (7.6)**
 
-| Metric | a11y-stem | chatbot-luna-purdue |
+| Metric | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | coverage: PDF word 6-grams found in the output | 0.8060 [0.7788, 0.8232] | 0.5592 [0.2563, 0.6859] |
 
 **All chatbot arms: counts behind the rates**
 
-| Count | a11y-stem | chatbot-luna-purdue |
+| Count | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | end_to_end_exact_lenient (all gold equations) | 22/30 | 30/60 |
 | end_to_end_exact_lenient, without G1 equations | 17/19 | 28/38 |
@@ -421,7 +421,7 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 **All chatbot arms: Wilson 95% intervals (items treated as independent; narrower than the cluster intervals)**
 
-| Wilson 95% (items treated as independent) | a11y-stem | chatbot-luna-purdue |
+| Wilson 95% (items treated as independent) | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | end_to_end_exact_lenient (all gold equations) | [0.5555, 0.8582] | [0.3774, 0.6226] |
 | end_to_end_exact_lenient, without G1 equations | [0.6861, 0.9706] | [0.5799, 0.8503] |
@@ -449,7 +449,7 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 **End-to-end exact match by section**
 
-| Section | Gold equations | a11y-stem | chatbot-luna-purdue |
+| Section | Gold equations | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|---|
 | physics/2-1-relative-motion-distance-and-displacement | 8 | 1.0000 | 1.0000 |
 | physics/2-2-speed-and-velocity | 12 | 0.6667 | 0.3333 |
@@ -457,13 +457,13 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 **End-to-end exact match by book**
 
-| Book (point estimates; three sections each) | a11y-stem | chatbot-luna-purdue |
+| Book (point estimates; three sections each) | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | Physics | 0.7333 | 0.5000 |
 
 **Heading F1 by book**
 
-| Book (point estimates; three sections each) | a11y-stem | chatbot-luna-purdue |
+| Book (point estimates; three sections each) | ReadableSTEM | chatbot-luna-purdue |
 |---|---|---|
 | Physics | 0.9344 | 0.4957 |
 
@@ -471,10 +471,10 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 | System | Total API cost | Cost/page median | p95 | min | max | Seconds/page median | p95 | min | max | Peak memory (MB) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| a11y-stem (document task) | $0.1421 | 0.00371 | 0.00389 | 0.00228 | 0.00391 | 3.58608 | 5.49811 | 2.88243 | 5.71056 | n/a |
+| ReadableSTEM (document task) | $0.1421 | 0.00371 | 0.00389 | 0.00228 | 0.00391 | 3.58608 | 5.49811 | 2.88243 | 5.71056 | n/a |
 | chatbot-luna-purdue | $0.0436 | 0.00050 | 0.00070 | 0.00031 | 0.00071 | 5.13819 | 5.56451 | 4.74615 | 5.57143 | n/a |
 
-Chatbot: list-price cost of each call from its usage, and the call's wall clock, per PDF page of the section. a11y-stem: pipeline plus second check per page, and the document task's wall clock at concurrency 4 on the recording machine. Judge cost is not included for any system.
+Chatbot: list-price cost of each call from its usage, and the call's wall clock, per PDF page of the section. ReadableSTEM: pipeline plus second check per page, and the document task's wall clock at concurrency 4 on the recording machine. Judge cost is not included for any system.
 
 **Sections that did not convert**
 
@@ -488,13 +488,13 @@ A section that is not ok scores as found nothing: its gold items stay in every d
 
 ## Comparison with open PDF parsers
 
-The parsers solve a different problem: getting a PDF's text into an LLM. They are here because they are what an engineer reaches for first, and because equations, headings and reading order are the hard part of both problems. The comparison is on the measures they share, and there is no overall score and no winner. Every parser runs on the same PDFs, byte for byte, with the tool's defaults on CPU, once per section, in a fresh process; a crash, an empty output or a 30-minute limit scores the section as found nothing. Each parser's Markdown export is read by the same reader as the chatbot's HTML (`eval.invented.read`), its maths converted and aligned to gold by the same code as a11y-stem's.
+The parsers solve a different problem: getting a PDF's text into an LLM. They are here because they are what an engineer reaches for first, and because equations, headings and reading order are the hard part of both problems. The comparison is on the measures they share, and there is no overall score and no winner. Every parser runs on the same PDFs, byte for byte, with the tool's defaults on CPU, once per section, in a fresh process; a crash, an empty output or a 30-minute limit scores the section as found nothing. Each parser's Markdown export is read by the same reader as the chatbot's HTML (`eval.invented.read`), its maths converted and aligned to gold by the same code as ReadableSTEM's.
 
 **What each system is built for (not failures: design differences)**
 
 | System | Built for | Not built for |
 |---|---|---|
-| a11y-stem | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans |
+| ReadableSTEM | accessible HTML from STEM course PDFs, with a review screen | re-typing prose (it keeps the PDF's text); tables in production (behind a flag); scans |
 | Docling | lossless document conversion for gen-AI pipelines (Markdown, JSON; HTML is one export) | accessibility remediation: no alt text on pictures, one heading level in the export, formulas left undecoded unless the opt-in enrichment is on |
 | MinerU | extraction for LLM corpora and RAG (Markdown, JSON) | accessible HTML: empty alt text on images, one heading level in its Markdown |
 | PyMuPDF4LLM | fast text-layer to Markdown for LLM and RAG ingestion | mathematics (no formula recognition); images are off by default |
@@ -516,9 +516,9 @@ The parsers solve a different problem: getting a PDF's text into an LLM. They ar
 | mineru-basic | mineru 4.0.12 | 62 | the basic tier on CPU; MinerU's documentation names the standard tier as its default, and that tier was not run, so this is not MinerU at its default settings |
 | pymupdf4llm | pymupdf4llm 1.28.2 | 0 | has no formula recognition |
 
-**Family B: a11y-stem against each parser**
+**Family B: ReadableSTEM against each parser**
 
-| Measure | Against | a11y-stem | Other | Difference (a11y-stem minus other) | Cluster 99.167% (k = 6): the claim | Cluster 95% | Sign-flip p | Result |
+| Measure | Against | ReadableSTEM | Other | Difference (ReadableSTEM minus other) | Cluster 99.167% (k = 6): the claim | Cluster 95% | Sign-flip p | Result |
 |---|---|---|---|---|---|---|---|---|
 | end_to_end_exact_lenient | docling | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | 0.2500 | **not tested, 3 sections** |
 | heading F1 | docling | 0.9344 | 0.8764 | 0.0580 | [0.0000, 0.1219] | [0.0000, 0.1219] | 0.5000 | **not tested, 3 sections** |
@@ -527,11 +527,11 @@ The parsers solve a different problem: getting a PDF's text into an LLM. They ar
 | end_to_end_exact_lenient | pymupdf4llm | 0.7333 | 0.0000 | 0.7333 | [0.6000, 1.0000] | [0.6000, 1.0000] | 0.2500 | **not tested, 3 sections** |
 | heading F1 | pymupdf4llm | 0.9344 | 0.9064 | 0.0280 | [0.0000, 0.0543] | [0.0000, 0.0543] | 0.5000 | **not tested, 3 sections** |
 
-Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% paired cluster-bootstrap interval of the difference decides. For a parser that writes no LaTeX by design (`docling`, `pymupdf4llm`) the equation row compares a11y-stem with a tool that does not attempt equations; read it as a description of what the tool is built for, not as evidence that a11y-stem transcribes better. Flat heading levels in a parser's export are a property of that export. Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section differences, a robustness check that is not part of the registered rule; the Bonferroni threshold for it is 0.00833. With fewer than 10 sections no verdict is written (a bootstrap over so few sections only returns the sections' own extremes), and a "better" that the sign-flip test does not support is written as "higher by point estimate".
+Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% paired cluster-bootstrap interval of the difference decides. For a parser that writes no LaTeX by design (`docling`, `pymupdf4llm`) the equation row compares ReadableSTEM with a tool that does not attempt equations; read it as a description of what the tool is built for, not as evidence that ReadableSTEM transcribes better. Flat heading levels in a parser's export are a property of that export. Sign-flip p: two-sided p-value of a paired sign-flip permutation test on the per-section differences, a robustness check that is not part of the registered rule; the Bonferroni threshold for it is 0.00833. With fewer than 10 sections no verdict is written (a bootstrap over so few sections only returns the sections' own extremes), and a "better" that the sign-flip test does not support is written as "higher by point estimate".
 
 **All parsers: equations (preregistration 7.1)**
 
-| Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Metric | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | end_to_end_exact_lenient (all gold equations) | 0.7333 [0.6000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.2000 [0.0000, 0.3750] | 0.0000 [0.0000, 0.0000] |
 | end_to_end_exact_lenient, without G1 equations | 0.8947 [0.8000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.3158 [0.0000, 0.5000] | 0.0000 [0.0000, 0.0000] |
@@ -541,11 +541,11 @@ Preregistration 8.3 as written: 2 comparisons per parser, k = 6, the 99.167% pai
 | detection_precision | 0.5455 [0.3810, 0.8000] | n/a | 0.3871 [0.3333, 0.5000] | n/a |
 | end_to_end_exact_lenient, allowlist off (descriptive row) | n/a | 0.0000 [0.0000, 0.0000] | 0.1333 [0.0000, 0.3750] | 0.0000 [0.0000, 0.0000] |
 
-`value [cluster 95% interval by section]`. A system that asks no questions has every wrong equation unflagged. G1 equations (operators packed into OpenStax text) can fail exact match when the answer is right. The allowlist-off row converts a system's TeX without a11y-stem's LaTeX allowlist (descriptive; a11y-stem's own allowlist is a product rule, so it has no such row).
+`value [cluster 95% interval by section]`. A system that asks no questions has every wrong equation unflagged. G1 equations (operators packed into OpenStax text) can fail exact match when the answer is right. The allowlist-off row converts a system's TeX without ReadableSTEM's LaTeX allowlist (descriptive; ReadableSTEM's own allowlist is a product rule, so it has no such row).
 
 **All parsers: headings (7.2)**
 
-| Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Metric | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | heading F1 | 0.9344 [0.9130, 0.9600] | 0.8764 [0.8381, 0.9254] | 0.9055 [0.8923, 0.9167] | 0.9064 [0.8986, 0.9130] |
 | heading precision | 0.8768 [0.8400, 0.9231] | 0.8014 [0.7719, 0.8611] | 0.8647 [0.8235, 0.9167] | 0.8288 [0.8158, 0.8400] |
@@ -556,7 +556,7 @@ Levels are compared relative to each side's top level in the section. A system t
 
 **All parsers: figures (7.3)**
 
-| Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Metric | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | figure judge_pass_rate (no description = fail) | 1.0000 [1.0000, 1.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
 | figure judge_factual_error_rate (among judged) | 0.0000 [0.0000, 0.0000] | n/a | n/a | n/a |
@@ -566,7 +566,7 @@ Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.
 
 **All parsers: invented content (7.5; the units are in the invented-content section)**
 
-| Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Metric | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | invented prose sentences (text-layer mismatch, rule unaudited) | 0.0190 [0.0133, 0.0261] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0016 [0.0000, 0.0056] |
 | invented numbers (text-layer mismatch, rule unaudited) | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] | 0.0000 [0.0000, 0.0000] |
@@ -574,17 +574,17 @@ Over the figures with an OpenStax alt text. Agreement with a model judge (gpt-6.
 | aligned equations with an added symbol | 0.0000 [0.0000, 0.0000] | n/a | 0.3750 [0.2857, 0.4286] | n/a |
 | equations with no gold partner and no match in the PDF | 0.0000 [0.0000, 0.0000] | n/a | 0.1111 [0.0000, 0.5000] | n/a |
 
-All text, including text a11y-stem wrote itself. A section a system failed on has no units, so it adds nothing here; the raw rates include paraphrase the rule counts as unsupported, and the audit that measures that has not been done. A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): the Wilson upper bound in the last table is the bound to read.
+All text, including text ReadableSTEM wrote itself. A section a system failed on has no units, so it adds nothing here; the raw rates include paraphrase the rule counts as unsupported, and the audit that measures that has not been done. A rate of exactly 0 has a zero-width bootstrap interval (every resample is 0): the Wilson upper bound in the last table is the bound to read.
 
 **All parsers: coverage (7.6)**
 
-| Metric | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Metric | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | coverage: PDF word 6-grams found in the output | 0.8060 [0.7788, 0.8232] | 0.8583 [0.8242, 0.8912] | 0.8513 [0.8184, 0.8807] | 0.8939 [0.8793, 0.9108] |
 
 **All parsers: counts behind the rates**
 
-| Count | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Count | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | end_to_end_exact_lenient (all gold equations) | 22/30 | 0/30 | 6/30 | 0/30 |
 | end_to_end_exact_lenient, without G1 equations | 17/19 | 0/19 | 6/19 | 0/19 |
@@ -609,7 +609,7 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 **All parsers: Wilson 95% intervals (items treated as independent; narrower than the cluster intervals)**
 
-| Wilson 95% (items treated as independent) | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Wilson 95% (items treated as independent) | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | end_to_end_exact_lenient (all gold equations) | [0.5555, 0.8582] | [0.0000, 0.1135] | [0.0951, 0.3731] | [0.0000, 0.1135] |
 | end_to_end_exact_lenient, without G1 equations | [0.6861, 0.9706] | [0.0000, 0.1682] | [0.1536, 0.5399] | [0.0000, 0.1682] |
@@ -630,7 +630,7 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 **End-to-end exact match by section**
 
-| Section | Gold equations | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Section | Gold equations | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|---|
 | physics/2-1-relative-motion-distance-and-displacement | 8 | 1.0000 | 0.0000 | 0.3750 | 0.0000 |
 | physics/2-2-speed-and-velocity | 12 | 0.6667 | 0.0000 | 0.0000 | 0.0000 |
@@ -638,7 +638,7 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 **Heading F1 by book**
 
-| Book (point estimates; three sections each) | a11y-stem | docling | mineru-basic | pymupdf4llm |
+| Book (point estimates; three sections each) | ReadableSTEM | docling | mineru-basic | pymupdf4llm |
 |---|---|---|---|---|
 | Physics | 0.9344 | 0.8764 | 0.9055 | 0.9064 |
 
@@ -646,12 +646,12 @@ All text, including text a11y-stem wrote itself. A section a system failed on ha
 
 | System | Total API cost | Cost/page median | p95 | min | max | Seconds/page median | p95 | min | max | Peak memory (MB) |
 |---|---|---|---|---|---|---|---|---|---|---|
-| a11y-stem (document task) | $0.1421 | 0.00371 | 0.00389 | 0.00228 | 0.00391 | 3.58608 | 5.49811 | 2.88243 | 5.71056 | n/a |
+| ReadableSTEM (document task) | $0.1421 | 0.00371 | 0.00389 | 0.00228 | 0.00391 | 3.58608 | 5.49811 | 2.88243 | 5.71056 | n/a |
 | docling | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 2.15413 | 2.30521 | 1.92700 | 2.32200 | 2454 |
 | mineru-basic | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 2.52886 | 2.53141 | 2.31869 | 2.53169 | 3563 |
 | pymupdf4llm | $0 | 0.00000 | 0.00000 | 0.00000 | 0.00000 | 0.29557 | 0.29691 | 0.29531 | 0.29706 | 378 |
 
-Parsers: wall clock of one fresh process per section divided by its PDF pages, model load included, CPU only, API cost $0 (hosting not estimated); peak memory is the process tree's maximum. a11y-stem: seconds of the document task at concurrency 4 (it waits on a hosted model, so its time is not CPU time). Timings are from one machine; the load average at each start is in the recorded run, and a busy machine makes a time an upper bound.
+Parsers: wall clock of one fresh process per section divided by its PDF pages, model load included, CPU only, API cost $0 (hosting not estimated); peak memory is the process tree's maximum. ReadableSTEM: seconds of the document task at concurrency 4 (it waits on a hosted model, so its time is not CPU time). Timings are from one machine; the load average at each start is in the recorded run, and a busy machine makes a time an upper bound.
 
 **Sections that did not convert**
 
@@ -675,11 +675,11 @@ Parser timings: 9 runs started on a quiet machine (1-minute load under 1.5) and 
 
 ## What these numbers leave out
 
-- Three sections of one book, all used while building a11y-stem: nothing here shows how it does on material it has not seen.
+- Three sections of one book, all used while building ReadableSTEM: nothing here shows how it does on material it has not seen.
 - One run of each task (the held-out set repeats them), so run-to-run variation is not visible.
 - The paired comparisons need at least 10 sections to print a verdict; with three they print 'not tested', because a bootstrap over three sections returns only the sections' own extremes.
 - The review screen's heading flags look better here (precision 0.5556, recall 0.7778) than they did on the held-out headings, where it asked about none of the 28 wrong headings (proof/interim/INTERIM-heldout-2026-10.md): the rules were tuned on these pages, and the held-out miss is a limit of the pipeline that was not fixed afterwards.
-- The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and a11y-stem's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.
+- The section PDFs are printed from OpenStax's HTML by this project's own print stylesheet, not the publisher's PDFs, and ReadableSTEM's heading rules were developed on pages it printed: a heading result may not carry over to publisher PDFs.
 - The invented-content rows count units the PDF's text layer does not contain, by a rule whose precision and recall have not been audited; for a parser's Markdown they include comment markers and mathematics the reader cannot match. Read them as a text-layer mismatch.
 - Exact match of MathML is strict: a correct answer can fail on markup (see G1), and a wrong digit in a long equation costs little tree-edit similarity. It is not a measure of how a screen reader would speak the result.
 - With this few sections the bootstrap intervals are approximate and tend to be a little narrow. Per-book numbers are point estimates.
@@ -699,4 +699,4 @@ A replay writes byte-identical output on any machine with the same dependency ve
 ## Attribution
 
 - Physics by Paul Peter Urone, Roger Hinrichs, OpenStax, version dfdfd7a, licensed under CC BY 4.0 (https://creativecommons.org/licenses/by/4.0/); original at https://openstax.org/details/books/physics.
-- Changes: each section was reformatted as a printable page for evaluating a11y-stem, image alt text was left out of the print, and no wording was edited. a11y-stem is not affiliated with or endorsed by OpenStax.
+- Changes: each section was reformatted as a printable page for evaluating ReadableSTEM, image alt text was left out of the print, and no wording was edited. ReadableSTEM is not affiliated with or endorsed by OpenStax.
