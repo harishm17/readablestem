@@ -61,7 +61,7 @@ These are design statements that the tests exercise; they are not guarantees.
 - **Logs carry no document content.** Event names, ids, counts, costs and category codes
   only; exceptions are logged as their type and code location, never their message.
 - **Uploads are short-lived.** They live in the database, never on disk, and are deleted
-  after 24 hours (30 days if the user opts in).
+  24 hours after the last activity (7 days if the user keeps it, 30 days from upload if they also let the developer look).
 - **Spend is capped** per job and per day, and every model request reserves its worst-case
   cost before it is sent. Model requests are sent with `store=False`.
 - **Secrets stay out of the repository.** `.env` is git-ignored, CI scans the full history

@@ -1,8 +1,8 @@
 """Export opted-in jobs as labelled examples, for error analysis on Harish's machine.
 
-Only jobs whose owner ticked "Keep my document and results for 30 days to help improve
-the tool" (`Job.opt_in_retention`) are exported, and only finished ones that have not
-passed `retain_until`. For each job, `DIR/<job_id>/` gets:
+Only jobs whose owner ticked "Also let the developer look (30 days)"
+(`Job.opt_in_retention`) are exported, and only finished ones that have not passed
+`retain_until`. For each job, `DIR/<job_id>/` gets:
 
 - `result.json`: the stored `DocumentResult` (elements, fixes, checks, stats; no HTML),
 - `crops/<element_id>.png`: the original image of each equation and figure,

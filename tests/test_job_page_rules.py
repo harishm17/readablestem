@@ -271,7 +271,8 @@ def test_the_card_rows_say_what_is_lost_specifically_and_never_score():
     assert rows["hear what a figure shows"].html == "1 of 1 figure has a short description."
     assert rows["jump from section to section"].html == "Yes: 1 heading in one outline."
     assert rows["hear lists as lists"].html == "Yes: 1 list with 2 items."
-    assert rows["follow the links"].html == "Not yet: links are plain text in the HTML."
+    # T1-15: the count says how many were kept, not "Yes" or "Not yet".
+    assert rows["follow the links"].html == "0 of 2 links kept."
     for row in card.rows:
         for text in (row.pdf, row.html):
             assert "%" not in text and "score" not in text.lower()
@@ -332,7 +333,8 @@ def test_kept_links_are_counted():
     result.elements[5].links = [Link(start=0, end=3, kind="uri", href="https://openstax.org")]
     card = job_page.before_after(result)
     assert card is not None
-    assert {r.question: r for r in card.rows}["follow the links"].html == "Yes: 1 link."
+    # The PDF has two links (UNTAGGED facts) and one was kept (T1-15).
+    assert {r.question: r for r in card.rows}["follow the links"].html == "1 of 2 links kept."
 
 
 def test_examples_are_picked_by_the_structure_their_text_layer_loses():
