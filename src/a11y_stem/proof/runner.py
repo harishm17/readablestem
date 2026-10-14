@@ -4,7 +4,8 @@ Both modes run the same eval code (`eval.pipeline_eval`, the tasks `document`,
 `equations`, `headings`, `figures`) on the same gold set; they differ only in what stands
 in for the outside world:
 
-- model client: live uses the real `OpenAIVisionClient`, wrapped to record every answer;
+- model client: live uses the real client of the chosen provider (`OpenAIVisionClient`, or
+  `AnthropicVisionClient` with `--provider anthropic`), wrapped to record every answer;
   replay uses `ReplayClient`, which answers from the recording;
 - second automated check: the real Decisions API, recorded; or the recorded verdicts;
 - section PDFs: printed by headless Chromium; or the PDFs held in the bundle;
@@ -13,7 +14,9 @@ in for the outside world:
 - axe-core: run in Chromium and recorded; or the recorded result;
 - threads: the production setting (4); or 1, so repeated requests are answered in order.
 
-Settings are `Settings(_env_file=None)`: the defaults plus whatever the environment sets.
+Settings are `Settings(_env_file=None)`: the defaults plus whatever the environment sets,
+for the OpenAI provider unless a run asks for another (`proof_settings`); a replay takes
+the provider and the model ids from the recording (`recorded_settings`).
 A replay refuses to run when the settings, the prompt versions or the pipeline version
 differ from the recorded run (`check_identity`), because the recorded answers belong to
 that code. After a replay, `compare_with_recorded` checks that every number still equals
@@ -43,17 +46,16 @@ from typing import Any
 
 import pymupdf
 
-from a11y_stem.config import Settings
+from a11y_stem.config import Provider, Settings, with_provider
 from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
 from a11y_stem.eval import pipeline_eval as pe
 from a11y_stem.eval.render import RenderError
-from a11y_stem.models import make_vision_client
+from a11y_stem.models import make_live_client, make_vision_client
 from a11y_stem.models.base import VisionClient
 from a11y_stem.models.verifier import (
     EQUATION_VERSION,
     FIGURE_VERSION,
     any_check_enabled,
-    make_verifier,
 )
 from a11y_stem.observability.logging import FIELDS_ATTR
 from a11y_stem.pipeline import html_checks, run
@@ -104,9 +106,47 @@ TASK_LABEL = {
 }
 
 
-def proof_settings() -> Settings:
-    """Defaults plus the environment; never a `.env` file lying in the working directory."""
-    return Settings(_env_file=None)  # type: ignore[call-arg]
+ANTHROPIC_IDENTITY_SETTINGS = (
+    "model_provider",
+    "anthropic_effort_main",
+    "anthropic_effort_cheap",
+    "anthropic_refusal_fallback",
+)
+
+
+def proof_settings(
+    provider: Provider = "openai",
+    *,
+    main_model: str | None = None,
+    cheap_model: str | None = None,
+) -> Settings:
+    """Defaults plus the environment; never a `.env` file lying in the working directory.
+
+    The provider is the OpenAI one unless the run names another: the MODEL_PROVIDER
+    environment variable does not change what a proof is recorded or replayed with.
+    `main_model` and `cheap_model` name models of `provider`.
+    """
+    base = Settings(_env_file=None)  # type: ignore[call-arg]
+    if provider == "openai" and main_model is None and cheap_model is None:
+        # The environment may set another provider; a proof does not follow it.
+        return base if base.model_provider == "openai" else with_provider(base, "openai")
+    return with_provider(base, provider, main_model=main_model, cheap_model=cheap_model)
+
+
+def recorded_settings(recorded: dict[str, Any]) -> Settings:
+    """The settings a recording was made with, as far as they pick the models: the OpenAI
+    defaults for a recording that names no provider (every recording made before the
+    Anthropic provider existed), else the recorded provider and model ids."""
+    provider = recorded.get("model_provider", "openai")
+    if provider == "openai":
+        return proof_settings()
+    base = proof_settings(
+        provider,
+        main_model=recorded.get("main_model"),
+        cheap_model=recorded.get("cheap_model"),
+    )
+    values = {k: recorded[k] for k in ANTHROPIC_IDENTITY_SETTINGS[1:] if k in recorded}
+    return base.model_copy(update=values)
 
 
 def gold_label(pset: ProofSet) -> str:
@@ -120,7 +160,12 @@ def code_identity(settings: Settings) -> dict[str, Any]:
     """What the recorded answers depend on: versions, models, the settings that matter."""
     from a11y_stem.eval.gate import code_versions
 
-    values = {name: getattr(settings, name) for name in IDENTITY_SETTINGS}
+    names = IDENTITY_SETTINGS
+    if settings.model_provider != "openai":
+        # Only a run on another provider records these, so that a recording made on the
+        # OpenAI provider keeps exactly the identity it was made with.
+        names = (*names, *ANTHROPIC_IDENTITY_SETTINGS)
+    values = {name: getattr(settings, name) for name in names}
     return {
         "pipeline_version": run.PIPELINE_VERSION,
         "prompts": dict(sorted(code_versions().items())),
@@ -339,14 +384,11 @@ def replay_arm(
 
 
 def live_client(settings: Settings, budget: JobBudget, *, fake: bool) -> VisionClient:
-    """The real client (or the offline one) with the second check on the same budget."""
+    """The real client of the settings' provider (or the offline one). With the OpenAI
+    provider it carries the second check on the same budget; with Anthropic there is none."""
     if fake:
         return make_vision_client(settings, budget, fake=True)
-    from a11y_stem.models.openai_client import OpenAIVisionClient
-
-    settings.require_openai_key()  # fail before any work, not on the first call
-    verifier = make_verifier(settings, budget) if any_check_enabled(settings) else None
-    return OpenAIVisionClient(settings, budget, verifier=verifier)
+    return make_live_client(settings, budget)  # checks the key before any work
 
 
 def refuse_unsafe_live(
@@ -455,6 +497,8 @@ def probe_api(settings: Settings, *, send: Callable[[], None] | None = None) -> 
     `send` replaces the request (tests). Raises `ProofError` with the HTTP status and the
     provider's error code, never the provider's message (it can echo the request).
     """
+    if settings.model_provider == "anthropic":
+        return _probe_anthropic(settings, send)
     import openai
 
     def real() -> None:
@@ -484,6 +528,44 @@ def probe_api(settings: Settings, *, send: Callable[[], None] | None = None) -> 
             f"{code} ({hint}). Nothing was recorded"
         ) from None
     except openai.OpenAIError as exc:
+        raise ProofError(
+            f"the model API could not be reached for a test request ({type(exc).__name__}). "
+            "Nothing was recorded"
+        ) from None
+
+
+def _probe_anthropic(settings: Settings, send: Callable[[], None] | None) -> None:
+    """`probe_api` for the Anthropic provider: one tiny Messages request on the cheap model."""
+    import anthropic
+
+    from a11y_stem.models.anthropic_client import build_sdk
+
+    def real() -> None:
+        sdk = build_sdk(settings).with_options(timeout=settings.model_timeout_s, max_retries=0)
+        sdk.messages.create(
+            model=settings.cheap_model,
+            max_tokens=512,  # thinking counts toward it
+            output_config={"effort": "low"},
+            messages=[{"role": "user", "content": "Reply with the word ok."}],
+        )
+
+    try:
+        (send or real)()
+    except anthropic.APIStatusError as exc:
+        kind = exc.type if isinstance(getattr(exc, "type", None), str) else "no type"
+        hint = {
+            400: "the request was refused; a key that is not scoped to a workspace needs "
+            "ANTHROPIC_WORKSPACE_ID",
+            401: "the key was refused",
+            403: "the key may not use this model",
+            404: "the model is unknown or not available to this organisation",
+            429: "the account has no credit or is rate limited",
+        }.get(exc.status_code, "the API did not answer a test request")
+        raise ProofError(
+            f"the model API refused a one-word test request: HTTP {exc.status_code}, "
+            f"{kind} ({hint}). Nothing was recorded"
+        ) from None
+    except anthropic.AnthropicError as exc:
         raise ProofError(
             f"the model API could not be reached for a test request ({type(exc).__name__}). "
             "Nothing was recorded"
@@ -631,7 +713,7 @@ def _record_arm(
             media=recording_media(),
             gold_dir=gold_dir,
             date=date,
-            label="fake" if fake else "openai",
+            label="fake" if fake else settings.model_provider,
             concurrency=pset.concurrency,
             budget=budget,
             gaps=gaps,

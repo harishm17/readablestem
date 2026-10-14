@@ -2,6 +2,7 @@
 
 - `base`: the contract (`VisionRequest`, `VisionClient`, `fence_untrusted`)
 - `openai_client`: `OpenAIVisionClient` (Responses API, spend reservation, outcomes)
+- `anthropic_client`: `AnthropicVisionClient` (Messages API, same contract and accounting)
 - `fake`: `FakeVisionClient` (deterministic, offline)
 - `router`: `call_with_fallback` (main model, then the other one once)
 - `verifier`, `decisions_client`: the second automated check (OpenAI Decisions API)
@@ -39,6 +40,7 @@ __all__ = [
     "call_with_fallback",
     "calls_made",
     "fence_untrusted",
+    "make_live_client",
     "make_vision_client",
 ]
 
@@ -103,11 +105,13 @@ def make_vision_client(
 
     `fake=True` gives an offline `FakeVisionClient` with `OFFLINE_DEFAULTS` that still
     reserves and settles against `budget`, so spend limits behave as they would for real.
-    Otherwise an `OpenAIVisionClient`; it reads the API key on its first call, not here.
+    Otherwise the client of `settings.model_provider`: an `OpenAIVisionClient` or an
+    `AnthropicVisionClient`; it reads the API key on its first call, not here.
 
-    The client carries the job's second automated check (`models.verifier`, the
+    The OpenAI client carries the job's second automated check (`models.verifier`, the
     Decisions API; offline, the fake) on the same budget, unless both uses of it are
-    switched off in the settings.
+    switched off in the settings. The check is OpenAI's, so with the Anthropic provider
+    there is none (`any_check_enabled` is False).
     """
     verifier = make_verifier(settings, budget, fake=fake) if any_check_enabled(settings) else None
     if fake:
@@ -118,6 +122,32 @@ def make_vision_client(
             budget=budget,
             verifier=verifier,
         )
+    if settings.model_provider == "anthropic":
+        from a11y_stem.models.anthropic_client import AnthropicVisionClient
+
+        return AnthropicVisionClient(settings, budget)
     from a11y_stem.models.openai_client import OpenAIVisionClient
 
+    return OpenAIVisionClient(settings, budget, verifier=verifier)
+
+
+def make_live_client(
+    settings: Settings, budget: JobBudget, *, second_check: bool = True
+) -> VisionClient:
+    """The real client of `settings.model_provider` for an eval, proof or CLI run.
+
+    Unlike `make_vision_client` this checks the provider's API key now, so a run fails
+    before any work rather than on its first call (`config.ConfigError`). `second_check`
+    False leaves the OpenAI client without the Decisions API check (a judge alone).
+    """
+    settings.require_provider_key()
+    if settings.model_provider == "anthropic":
+        from a11y_stem.models.anthropic_client import AnthropicVisionClient
+
+        return AnthropicVisionClient(settings, budget)
+    from a11y_stem.models.openai_client import OpenAIVisionClient
+
+    verifier = (
+        make_verifier(settings, budget) if second_check and any_check_enabled(settings) else None
+    )
     return OpenAIVisionClient(settings, budget, verifier=verifier)

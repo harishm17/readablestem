@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from a11y_stem.config import Settings
+from a11y_stem.config import Provider, Settings
 from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
 from a11y_stem.eval import pipeline_eval as pe
 from a11y_stem.gold.openstax import HttpFetcher
@@ -67,6 +67,11 @@ class ProofOptions:
     client_factory: Callable[[Settings, JobBudget], VisionClient] | None = None
     fetcher: Any = None
     probe: Callable[[], None] | None = None  # replaces the one-request API check
+    # A live run on another provider (`--provider anthropic`), and its model ids (None: the
+    # settings' own). A replay ignores these: it uses what the recording says.
+    provider: Provider = "openai"
+    main_model: str | None = None
+    cheap_model: str | None = None
 
 
 @dataclass
@@ -216,7 +221,9 @@ def _replay(
             )
         fetched_note = "**matches the pinned manifest**"
 
-    settings = runner.proof_settings()
+    # The provider and models the recording was made with (the OpenAI defaults for a
+    # recording that names none); the identity check below then compares the rest.
+    settings = runner.recorded_settings(bundle.code.get("settings", {}))
     identity = runner.code_identity(settings)
     identity_diffs = runner.check_identity(bundle.code, identity)
     if identity_diffs and not opts.allow_drift:
@@ -292,6 +299,13 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         raise ProofError("a live run needs the recording date (the CLI passes today's)")
     if not opts.fake and opts.max_usd is None:
         raise ProofError("--max-usd is required for real model calls (or pass --fake)")
+    if opts.provider != "openai" and opts.out is None:
+        # PROOF.md is the report of the committed OpenAI recording; a run on another
+        # provider writes its report next to it, never over it.
+        raise ProofError(
+            f"a live run on the {opts.provider} provider needs --out, so that PROOF.md "
+            "(the committed OpenAI recording's report) is not overwritten"
+        )
     work = opts.work_dir or default_work_dir(pset)
     git = runner.git_state(opts.root)
     runner.refuse_unsafe_live(
@@ -304,7 +318,9 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
             # A replay may be shown without the registration file; a run that makes
             # held-out numbers may not (preregistration section 12, item 9).
             raise ProofError(f"a held-out live run needs the registration file: {prereg.detail}")
-    settings = runner.proof_settings()
+    settings = runner.proof_settings(
+        opts.provider, main_model=opts.main_model, cheap_model=opts.cheap_model
+    )
     if not opts.fake and opts.client_factory is None:
         say("checking the model API with one small request")
         runner.probe_api(settings, send=opts.probe)
@@ -367,7 +383,7 @@ def _live(pset: ProofSet, opts: ProofOptions, say: Callable[[str], None]) -> Pro
         "set_id": pset.id,
         "recorded_on": opts.date,
         "mode": "live",
-        "client": "fake" if opts.fake else "openai",
+        "client": "fake" if opts.fake else settings.model_provider,
         "code": {**runner.code_identity(settings), "git": git},
         "environment": runner.environment(),
         "runs": runner.run_entries(arm),

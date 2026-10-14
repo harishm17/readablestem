@@ -207,7 +207,8 @@ def check_web_secrets(settings: Settings) -> None:
         "SESSION_SECRET": settings.session_secret,
         "GOOGLE_CLIENT_SECRET": settings.google_client_secret,
         "CRON_TOKEN": settings.cron_token,
-        "OPENAI_API_KEY": settings.openai_api_key,
+        # The key of the selected provider (the other one is not needed).
+        settings.provider_key_name: settings.provider_key(),
     }
     empty = [
         name

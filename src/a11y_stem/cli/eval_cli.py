@@ -109,6 +109,22 @@ def _add_spend_args(parser: argparse.ArgumentParser) -> None:
         default=DEFAULT_MAX_CALLS,
         help=f"cap on model calls (default {DEFAULT_MAX_CALLS})",
     )
+    parser.add_argument(
+        "--provider",
+        choices=["openai", "anthropic"],
+        help="model provider for this run (default: MODEL_PROVIDER, openai unless set); "
+        "the report records it as `client` and the model ids as `models`",
+    )
+    parser.add_argument(
+        "--main-model",
+        metavar="ID",
+        help="main model of the chosen provider (default: the setting, e.g. claude-opus-5-5)",
+    )
+    parser.add_argument(
+        "--cheap-model",
+        metavar="ID",
+        help="cheap model of the chosen provider (default: the setting, e.g. claude-haiku-5-5)",
+    )
 
 
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
@@ -123,24 +139,42 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
     budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
     if args.fake:
         return FakeVisionClient(budget=budget), budget, "fake"
-    from a11y_stem.models.openai_client import OpenAIVisionClient
-    from a11y_stem.models.verifier import any_check_enabled, make_verifier
+    from a11y_stem.models import make_live_client
 
     try:
-        settings.require_openai_key()  # fail before any work, not on the first call
-        # The second automated check rides on the client and the same budget, as in the
-        # app (DECISIONS_FIGURE_VERIFY, DECISIONS_EQUATION_SHADOW turn it off).
-        verifier = make_verifier(settings, budget) if any_check_enabled(settings) else None
-        client = OpenAIVisionClient(settings, budget, verifier=verifier)
+        # Checks the key before any work, not on the first call. The OpenAI client carries
+        # the second automated check on the same budget, as in the app
+        # (DECISIONS_FIGURE_VERIFY, DECISIONS_EQUATION_SHADOW turn it off); the Claude
+        # client has none.
+        client = make_live_client(settings, budget)
     except ConfigError as exc:
         return str(exc)
-    return client, budget, "openai"
+    return client, budget, settings.model_provider
 
 
 def _settings() -> Any:
     from a11y_stem.config import get_settings
 
     return get_settings()
+
+
+def _settings_for(args: argparse.Namespace) -> Any:
+    """The settings with this run's `--provider`, `--main-model` and `--cheap-model`
+    applied; an error message (str) when they do not make valid settings."""
+    from pydantic import ValidationError
+
+    from a11y_stem.config import with_provider
+
+    try:
+        return with_provider(
+            _settings(),
+            getattr(args, "provider", None),
+            main_model=getattr(args, "main_model", None),
+            cheap_model=getattr(args, "cheap_model", None),
+        )
+    except ValidationError as exc:
+        reasons = "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
+        return f"invalid model settings: {reasons}"
 
 
 # ======================================================================== pipeline
@@ -276,7 +310,9 @@ def _run_pipeline(
     from a11y_stem.eval.render import RenderError
     from a11y_stem.gold.openstax import HttpFetcher
 
-    settings = _settings()
+    settings = _settings_for(args)
+    if isinstance(settings, str):
+        return _error(settings)
     made = _make_client(args, settings)
     if isinstance(made, str):
         return _error(made)
@@ -330,7 +366,9 @@ def _run_tables(args: argparse.Namespace) -> int:
     unknown = [s for s in styles if s not in tables.TABLE_STYLES]
     if unknown or not styles:
         return _error(f"--styles takes {', '.join(tables.TABLE_STYLES)}; got {args.styles!r}")
-    settings = _settings()
+    settings = _settings_for(args)
+    if isinstance(settings, str):
+        return _error(settings)
     client = budget = None
     label = "none"
     if args.mode == "model":
@@ -403,7 +441,12 @@ def _cmd_promote(args: argparse.Namespace) -> int:
     Refuses a partial run, and (for `latest`) a report produced with other prompts or
     models than this code, which the gate would refuse anyway.
     """
-    from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
+    from a11y_stem.config import (
+        ANTHROPIC_CHEAP_MODEL,
+        ANTHROPIC_MAIN_MODEL,
+        CHEAP_MODEL,
+        MAIN_MODEL,
+    )
     from a11y_stem.eval.gate import GateRefused, check_current, code_versions
 
     if not args.report.is_file():
@@ -419,10 +462,24 @@ def _cmd_promote(args: argparse.Namespace) -> int:
         return _error("the report is partial; re-run with a higher --max-usd")
     # A tables run in local mode calls no model ("none"): it is a real measurement too.
     no_model = task == TABLES_TASK and report.get("mode") == "local"
-    if report.get("client") != "openai" and not (no_model and report.get("client") == "none"):
+    client = report.get("client")
+    if client not in ("openai", "anthropic") and not (no_model and client == "none"):
         return _error("only real-model reports can be baselines (this one is a fake run)")
+    if client == "anthropic" and args.out_dir is None:
+        # The committed baselines in data/eval are the OpenAI runs the CI gate compares with.
+        return _error(
+            "a report made with the anthropic provider would replace the OpenAI baseline "
+            "of the same name; give --out-dir to keep it apart"
+        )
     if args.kind == "latest":
-        models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
+        if client == "anthropic":
+            models = {
+                "main": ANTHROPIC_MAIN_MODEL,
+                "cheap": ANTHROPIC_CHEAP_MODEL,
+                "judge": ANTHROPIC_MAIN_MODEL,
+            }
+        else:
+            models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
         try:
             check_current(report, code_versions(), models)
         except GateRefused as exc:
@@ -475,7 +532,9 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
         return _error(f"gold dir not found: {gold_dir}")
     if message := heldout_cli.unselected(gold_dir):
         return _error(message)
-    settings = _settings()
+    settings = _settings_for(args)
+    if isinstance(settings, str):
+        return _error(settings)
     made = _make_client(args, settings)
     if isinstance(made, str):
         return _error(made)
@@ -733,7 +792,9 @@ def _cmd_demo_build(args: argparse.Namespace) -> int:
 
     if args.gold and (message := heldout_cli.unselected(args.gold)):
         return _error(message)
-    settings = _settings()
+    settings = _settings_for(args)
+    if isinstance(settings, str):
+        return _error(settings)
     made = _make_client(args, settings)
     if isinstance(made, str):
         return _error(made)

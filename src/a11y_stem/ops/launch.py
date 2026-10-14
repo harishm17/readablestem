@@ -51,6 +51,11 @@ def launch_blockers(
         # A feature that sends or keeps something new needs its words in the notice.
         for on, word, what in (
             (settings.ms_sign_in_enabled, "Microsoft", "Microsoft sign-in is on (MS_CLIENT_ID)"),
+            (
+                settings.model_provider == "anthropic",
+                "Anthropic",
+                "MODEL_PROVIDER=anthropic sends document images to Anthropic",
+            ),
             (settings.feature_tables, "rebuild tables", "FEATURE_TABLES sends tables to OpenAI"),
             (
                 settings.feature_notation_memory,
