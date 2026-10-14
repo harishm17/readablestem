@@ -119,14 +119,21 @@ def production_app(tmp_path):
     return create_app(settings)  # no lifespan: nothing connects to the database
 
 
-def test_production_adds_hsts_to_every_response_even_a_crash(tmp_path):
+def test_production_adds_hsts_to_every_response_even_a_crash(tmp_path, monkeypatch):
     client = TestClient(production_app(tmp_path), base_url="https://beta.example.org")
     check_headers(client.get("/"), hsts=True, where="/")
     check_headers(client.get("/no-such-page"), hsts=True, where="404")
     check_headers(client.get("/static/app.css"), hsts=True, where="static")
     check_headers(client.get("/static/missing"), hsts=True, where="static 404")
     check_headers(client.delete("/"), hsts=True, where="405")
-    crashed = client.get("/status")  # no database behind the app: the 500 page
+    check_headers(client.get("/status"), hsts=True, where="database down")
+    from a11y_stem.web.routes import pages
+
+    def boom(*args, **kwargs):
+        raise ValueError("boom")
+
+    monkeypatch.setattr(pages, "render", boom)
+    crashed = TestClient(client.app, base_url="https://beta.example.org").get("/privacy")
     assert crashed.status_code == 500
     check_headers(crashed, hsts=True, where="500")
 
@@ -145,5 +152,6 @@ def test_production_session_cookie_is_secure_httponly_lax_and_host_locked(tmp_pa
 
 
 def test_the_development_cookie_has_no_prefix_that_would_break_http(web):
-    response = web.browser.get("/login")
+    with web.client() as fresh:
+        response = fresh.get("/login")
     assert response.headers["set-cookie"].startswith(f"{SESSION_COOKIE}=")
