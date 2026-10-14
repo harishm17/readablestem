@@ -4587,6 +4587,78 @@ def _title_like(text: str) -> bool:
     return False
 
 
+MATHS_HEADING_SHARE = 0.7  # a heading candidate with this share of maths characters is a formula
+_LONGEST_SYMBOL_WORD = 3  # letters: a longer plain word (outside _MATH_WORDS) is prose
+
+
+def _mostly_maths(rows: Sequence[_Row]) -> bool:
+    """Is a heading candidate a formula? ("KE = m v", a large "F = m a" on a slide.)
+
+    It needs a relation sign at full size, no plain word longer than three letters (a
+    function name from `_MATH_WORDS` is fine), and at least MATHS_HEADING_SHARE of its
+    characters (punctuation apart) are maths: digits, operators, brackets, maths symbols
+    and letters that read as variables, or the letters of words up to three letters
+    long, which beside a relation sign are products of variables ("mgh"). A heading that
+    only contains a number or a sign has no relation sign and stays a heading.
+    """
+    counted = mathy = 0
+    relation = False
+    for row in rows:
+        info = _CharInfo.of(row)
+        chars = row.chars
+        i = 0
+        while i < len(chars):
+            c = chars[i]
+            if c.blank or c.c in ",.;:":
+                i += 1
+                continue
+            if info.classes[i] == "L" and not info.script[i] and not info.maths_words[i]:
+                j = i
+                while j < len(chars) and info.classes[j] == "L" and not info.script[j]:
+                    j += 1
+                word = "".join(x.c for x in chars[i:j]).lower()
+                if j - i > _LONGEST_SYMBOL_WORD and word not in _MATH_WORDS and info.words[i] > 1:
+                    return False
+                counted += j - i
+                mathy += j - i
+                i = j
+                continue
+            counted += 1
+            mathy += info.mathy(i)
+            relation = relation or (c.c in _ROW_RELATIONS and not row.is_script(c))
+            i += 1
+    return relation and counted > 0 and mathy / counted >= MATHS_HEADING_SHARE
+
+
+def _equation_block(
+    rows: list[_Row], box: BBox, size: float, ink: list[_Char], *, plain: bool = False
+) -> _Block:
+    """The equation block of maths rows (their region's equation number kept apart).
+
+    `plain`: the text layer keeps no letter styles. For a line set bold as a whole (a
+    heading's weight), where bold says nothing about vectors."""
+    text = _clean(" ".join((r.text if plain else r.styled_text) for r in rows))
+    script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
+    score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
+    if len(rows) > 1:
+        reasons.append(f"{len(rows)} lines merged")
+    region = rows[0].region
+    labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
+    if labels:
+        reasons.append("equation number")
+    return _Block(
+        Kind.EQUATION,
+        box,
+        rows,
+        text=text,
+        font_size=size,
+        score=max([score, *(r.score for r in rows)]),
+        reasons=reasons,
+        label=" ".join(r.clean for r in labels) or None,
+        regular=_regular_letters(ink),
+    )
+
+
 def _classify_run(run: _Run, ctx: _Context) -> _Block:
     rows = run.rows
     box = _union(r.bbox for r in rows)
@@ -4595,26 +4667,7 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
     # A lone ">4" or "+8" (a table cell, a stray sign) is too little to call an equation.
     trivial = len(rows) == 1 and len(ink) <= 2 and not any(c.math for c in ink)
     if run.kind == "math" and not trivial:
-        text = _clean(" ".join(r.styled_text for r in rows))
-        script = any(c.flags & _SUPERSCRIPT_FLAG or c.size < SCRIPT_RATIO * size for c in ink)
-        score, reasons = equation_score(text, sorted({c.font for c in ink}), script)
-        if len(rows) > 1:
-            reasons.append(f"{len(rows)} lines merged")
-        region = rows[0].region
-        labels = sorted(region.labels, key=lambda r: (r.y0, r.x0)) if region else []
-        if labels:
-            reasons.append("equation number")
-        return _Block(
-            Kind.EQUATION,
-            box,
-            rows,
-            text=text,
-            font_size=size,
-            score=max([score, *(r.score for r in rows)]),
-            reasons=reasons,
-            label=" ".join(r.clean for r in labels) or None,
-            regular=_regular_letters(ink),
-        )
+        return _equation_block(rows, box, size, ink)
     text = _join_text(rows)
     letters = sum(c.isalpha() for c in text)
     bold = all(r.bold for r in rows)
@@ -4664,6 +4717,12 @@ def _classify_run(run: _Run, ctx: _Context) -> _Block:
         and text[-1:] != "."
     ):
         heading = [REASON_NUMBERED_LINE, *evidence]
+    if heading is not None and _mostly_maths(rows):
+        # A formula set large or bold on a slide is not a title: it goes to the equation
+        # step like any display equation, and the page keeps its real headings.
+        block = _equation_block(rows, box, size, ink, plain=bold)
+        block.reasons.append("heading candidate that is mostly maths")
+        return block
     if heading is not None:
         if bold:
             heading.append("bold")
