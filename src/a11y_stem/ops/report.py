@@ -96,9 +96,12 @@ def _second_check(counts: dict[tuple[str, str], int], step: str) -> list[tuple[s
 
 def _canary(counts: dict[tuple[str, str], int]) -> list[tuple[str, str]]:
     return [
-        (c.removeprefix("decisions:"), str(n))
+        (
+            c.replace(":", " ", 1) if c.startswith("claude:") else c.removeprefix("decisions:"),
+            str(n),
+        )
         for (s, c), n in sorted(counts.items())
-        if s == "canary" and c.startswith("decisions:")
+        if s == "canary" and c.startswith(("decisions:", "claude:"))
     ]
 
 
@@ -162,7 +165,9 @@ def render_report(counts: dict[tuple[str, str], int], *, since: date, until: dat
         lines += _table(
             "Second automated check: spend", [("total", f"${verify_micro / 1e6:.4f}{per_page}")]
         )
-    lines += _table("Decisions canary (days run, drift, failed)", _canary(counts))
+    lines += _table(
+        "Decisions canary (days run, drift, failed; claude = the Claude check)", _canary(counts)
+    )
     lines += _table("Output HTML: failed static checks", _top(counts, "document", "check:"))
     return "\n".join(lines).rstrip() + "\n"
 

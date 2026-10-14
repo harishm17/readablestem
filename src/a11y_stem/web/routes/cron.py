@@ -4,9 +4,10 @@ Aggregation runs first so the content-free counts survive deletion, but deletion
 runs, even when aggregation fails (privacy beats statistics). A failed aggregation still
 answers 500 so the scheduler and monitoring see it.
 
-Then, at most once per UTC day, the Decisions API drift canary (`ops.canary`). It is
-fail-open: whatever happens to it, the response is the aggregate-and-purge result. Its
-status goes in the `cron_done` line; drift logs its own ERROR line.
+Then, at most once per UTC day, the Decisions API drift canary (`ops.canary`) and the
+Claude second-check canary (`ops.claude_canary`). Each is fail-open: whatever happens to
+it, the response is the aggregate-and-purge result. Its status goes in the `cron_done`
+line; drift logs its own ERROR line.
 """
 
 from __future__ import annotations
@@ -52,6 +53,9 @@ def aggregate_and_purge(
     from a11y_stem.ops import canary
 
     canary_status = canary.maybe_run_daily(ctx.factory, ctx.settings, ctx.guard, now)
+    from a11y_stem.ops import claude_canary
+
+    claude_status = claude_canary.maybe_run_daily(ctx.factory, ctx.settings, ctx.guard, now)
     body = {
         "status": "ok" if aggregated is not None else "aggregate_failed",
         "jobs_aggregated": aggregated,
@@ -67,5 +71,6 @@ def aggregate_and_purge(
         blobs_deleted=purged.blobs_deleted,
         unaggregated_deleted=purged.unaggregated_deleted,
         decisions_canary=canary_status,
+        claude_canary=claude_status,
     )
     return JSONResponse(body, status_code=200 if aggregated is not None else 500)
