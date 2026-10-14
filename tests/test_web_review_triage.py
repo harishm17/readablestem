@@ -262,8 +262,8 @@ def test_optional_checks_are_folded_and_say_what_the_note_is(tri):
 def test_job_page_counts_decisions_and_optional_checks(tri):
     page = tri.browser.get(f"/jobs/{tri.job_id}").text
     base = f"/jobs/{tri.job_id}/review"
-    assert "<dt>Need your decision</dt><dd>2</dd>" in page
-    assert '<span class="meta">(2 with a note)</span>' in page
+    assert "<dt>Decisions to make</dt><dd>2</dd>" in page
+    assert "2 parts were accepted for you with a note: " in page
     breakdown = page[
         page.index('id="review-breakdown"') : page.index("</p>", page.index("breakdown"))
     ]

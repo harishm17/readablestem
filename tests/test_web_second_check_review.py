@@ -204,12 +204,12 @@ def test_without_a_second_check_note_the_wording_is_as_before(pages):
     assert "1 optional check can be looked at if you want; it does not hold anything up." in (
         progress(review)
     )
-    assert re.search(r'<dt>Accepted for you</dt><dd>\d+ <span class="meta">\(1 with a note\)', job)
+    assert 'id="notes-line">1 part was accepted for you with a note: ' in job
 
 
 def test_the_job_page_does_not_say_nothing_to_do_for_a_second_check_note(pages):
     _, job = pages(second=1, small=2)
-    assert '<span class="meta">(3 with a note, 1 worth a look)</span>' in job
+    assert "3 parts were accepted for you with a note (1 worth a look): " in job
     assert "nothing to do" not in job
 
 

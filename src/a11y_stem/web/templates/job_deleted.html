@@ -7,8 +7,7 @@
 {% block content %}
 <h1>This document has been deleted</h1>
 {% if kept %}
-<p>It was kept for {{ kept }} from upload and then deleted automatically, as promised when
-  you uploaded it.</p>
+<p>It was deleted automatically {{ kept }} after upload, as promised when you uploaded it.</p>
 {% else %}
 <p>Documents are deleted automatically {{ retention_hours }} hours after you last worked on
   them (7 days if you chose to keep them, {{ opt_in_days }} if you also let the developer

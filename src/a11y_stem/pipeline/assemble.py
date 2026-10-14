@@ -244,11 +244,10 @@ def _clean_title(title: str | None) -> str:
     return text or DEFAULT_TITLE
 
 
-# A section number in front of a title ("1 Derivatives", "2.1 Speed", "Chapter 3: Forces").
-# One or two digits per part, so a year ("2024 Annual report") stays. T1-7.
+# A section number in front of a title ("1 Derivatives", "2.1 Speed"). One or two digits per
+# part, so a year ("2024 Annual report") stays, and no words ("Week 1: Vectors" is a title). T1-7.
 _SECTION_NUMBER = re.compile(
-    r"^(?:(?:chapter|section|unit|lecture|part|week)\s+)?\d{1,2}(?:\.\d{1,2}){0,3}[.):]?\s+(?=\S)",
-    re.IGNORECASE,
+    r"^\d{1,2}(?:\.\d{1,2}){0,3}[.):]?\s+(?=\S)",
 )
 # Titles that name a part of a document, not the document.
 GENERIC_TITLES = frozenset(

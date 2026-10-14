@@ -15,8 +15,10 @@ from a11y_stem.pipeline import assemble, html_checks
     [
         ("1 Derivatives", "Derivatives"),
         ("2.1 Speed and velocity", "Speed and velocity"),
-        ("Chapter 3: Forces", "Forces"),
-        ("Section 4. Energy", "Energy"),
+        ("3. Forces", "Forces"),
+        ("4) Energy", "Energy"),
+        ("Chapter 3: Forces", "Chapter 3: Forces"),  # words are part of the title
+        ("Week 1: Vectors", "Week 1: Vectors"),
         ("12.3.4 Deep", "Deep"),
         ("2024 Annual report", "2024 Annual report"),  # a year is not a section number
         ("3", "3"),  # nothing would be left
@@ -38,7 +40,9 @@ def test_the_suggested_title_skips_a_part_name_and_falls_back_to_a_heading():
 
 
 def _heading(eid: str, order: int, text: str, level: int) -> tuple[Element, Fix]:
-    element = Element(id=eid, kind=Kind.HEADING, page=0, bbox=(0, 0, 10, 10), order=order, text=text)
+    element = Element(
+        id=eid, kind=Kind.HEADING, page=0, bbox=(0, 0, 10, 10), order=order, text=text
+    )
     fix = Fix(
         element_id=eid,
         kind=Kind.HEADING,
@@ -82,11 +86,11 @@ def test_the_title_is_not_a_second_top_heading_when_the_file_has_one():
     html = render("Calculus", headings=(("Limits", 1), ("Rules", 2)), title_set=True)
     assert title_of(html) == "Calculus"
     assert html.count("<h1") == 1
-    assert '>Limits</h1>' in html
+    assert ">Limits</h1>" in html
 
 
 def test_a_chosen_title_is_escaped():
-    html = render("Forces <script>x</script> & \"more\"", title_set=True)
+    html = render('Forces <script>x</script> & "more"', title_set=True)
     assert "<script>x" not in html
     assert title_of(html) == "Forces &lt;script&gt;x&lt;/script&gt; &amp; &quot;more&quot;"
 
@@ -121,7 +125,7 @@ def test_a_web_address_contact_line_is_a_link_in_the_footer():
         "ftp://example.edu/x",
         '"><script>x</script>',
         "two words@example.edu",
-        "https://example.edu/\"quoted",
+        'https://example.edu/"quoted',
         "not an address",
         "https://" + "a" * 400 + ".edu",
     ],

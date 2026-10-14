@@ -45,7 +45,9 @@
     <button type="submit" class="button">Allow</button>
   </form>
 
-  <div class="table-scroll">
+  {# A table wider than the screen scrolls in its box; the box is a named region a keyboard can
+     reach (axe scrollable-region-focusable, T1-16). #}
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="allowlist-heading">
   <table>
     <caption class="visually-hidden">People on the allowlist</caption>
     <thead>
@@ -78,7 +80,7 @@
 <section aria-labelledby="aggregates-heading">
   <h2 id="aggregates-heading">Recent counts (last {{ aggregate_days }} days)</h2>
   {% if aggregates %}
-  <div class="table-scroll">
+  <div class="table-scroll" tabindex="0" role="region" aria-labelledby="aggregates-heading">
   <table>
     <caption class="visually-hidden">Daily counts by step and category</caption>
     <thead>

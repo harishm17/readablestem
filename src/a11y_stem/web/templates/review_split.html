@@ -258,26 +258,54 @@
 </form>
 {% endmacro %}
 
+{# The two direct answers for a group still waiting. The advice (web/heading_groups.py)
+   decides which is the main button and goes first; the other stays one click away. #}
+{% macro group_keep_button(hg, main) %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ hg.key }}" class="inline-form">
+  {{ hidden_fields() }}
+  <button type="submit" name="action" value="accept" class="{{ 'button' if main else 'button-secondary' }}" data-role="accept">Keep as headings{% if hg.level %} at level {{ hg.level }}{% endif %}<span class="visually-hidden"> (all {{ hg.keep }} “{{ hg.text }}”)</span></button>
+</form>
+{% endmacro %}
+{% macro group_bold_button(hg, main) %}
+<form method="post" action="/jobs/{{ job.id }}/review/{{ hg.key }}" class="inline-form">
+  {{ hidden_fields() }}
+  <button type="submit" name="action" value="reject" class="{{ 'button' if main else 'button-secondary' }}">Make bold text<span class="visually-hidden"> (all {{ hg.waiting }} “{{ hg.text }}”)</span></button>
+</form>
+{% endmacro %}
+
+{# Up to three of the copies, each with the lines around it (the same region image as a
+   single heading's card), so the instructor sees what the repeat looks like. #}
+{% macro group_crops(hg) %}
+{% if hg.crops %}
+<ul class="group-crops" aria-label="Some of the copies in the PDF">
+  {% for c in hg.crops %}
+  <li><figure>
+    <img class="region-image" loading="lazy" src="/jobs/{{ job.id }}/regions/{{ c.element_id }}.png" alt="“{{ hg.text }}” on page {{ c.page }} of the PDF, with the lines around it.">
+    <figcaption>Page {{ c.page }}</figcaption>
+  </figure></li>
+  {% endfor %}
+</ul>
+{% endif %}
+{% endmacro %}
+
 {% macro group_body(p) %}
 {% set hg = p.group %}
 {% set key = hg.key %}
 {% set n = hg.waiting %}
 <p class="group-question">“{{ hg.text }}” appears {{ "twice" if hg.size == 2 else hg.size ~ " times" }} {{ hg.style }}{% if n and n != hg.size %} ({{ n }} still waiting){% endif %}.</p>
-{{ region(p) }}
+{% if n and hg.fact %}<p class="group-fact" id="group-fact-{{ key }}"><strong>Suggested: {{ "make them bold text" if hg.suggest == "bold" else "keep them as headings" }}.</strong> {{ hg.fact }}</p>{% endif %}
+{% if hg.crops %}{{ group_crops(hg) }}{% else %}{{ region(p) }}{% endif %}
 {% if p.group_pages %}<p class="group-pages">On {{ "page" if p.group_pages|length == 1 else "pages" }} {% for pl in p.group_pages %}{% if not loop.first %}{{ " and " if loop.last else ", " }}{% endif %}<a href="{{ pl.href }}">{{ pl.number }}</a>{% endfor %}.</p>{% endif %}
 {% if n %}
 {% if hg.error %}<p class="error-message" id="group-error-{{ key }}"><span class="visually-hidden">Error: </span>{{ hg.error }}</p>{% endif %}
 <div class="decide-row" id="group-actions-{{ key }}" tabindex="-1">
-  {% if hg.keep %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
-    {{ hidden_fields() }}
-    <button type="submit" name="action" value="accept" class="button" data-role="accept">Keep as headings{% if hg.level %} at level {{ hg.level }}{% endif %}<span class="visually-hidden"> (all {{ hg.keep }} “{{ hg.text }}”)</span></button>
-  </form>
+  {% if hg.bold_first %}
+  {{ group_bold_button(hg, true) }}
+  {% if hg.keep %}{{ group_keep_button(hg, false) }}{% endif %}
+  {% else %}
+  {{ group_keep_button(hg, true) }}
+  {{ group_bold_button(hg, false) }}
   {% endif %}
-  <form method="post" action="/jobs/{{ job.id }}/review/{{ key }}" class="inline-form">
-    {{ hidden_fields() }}
-    <button type="submit" name="action" value="reject" class="button-secondary">Make bold text<span class="visually-hidden"> (all {{ n }} “{{ hg.text }}”)</span></button>
-  </form>
 </div>
 {% if not hg.keep %}<p class="hint">At level {{ hg.level }} they would skip a level after the heading before them, so choose the level to keep them at.</p>
 {% elif hg.keep < n %}<p class="hint">Keeping them leaves out {{ n - hg.keep }} the document would show at another level: choose a level for {{ "it" if n - hg.keep == 1 else "them" }} below.</p>{% endif %}
@@ -298,7 +326,6 @@
     </div>
   </form>
 </details>
-<p class="hint">Bold labels that start a paragraph (like “Solution”) are usually not headings; titles of boxes and sections usually are.</p>
 <p class="aside-link"><a href="{{ list_url }}#{{ hg.anchor }}">Decide them one by one</a> in the list view</p>
 {% else %}
 {# Decided: say what they are now, and offer the other choice again for all of them

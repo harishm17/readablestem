@@ -126,18 +126,19 @@
   <p>All {{ s.checks_run }} checks passed. They look at the structure of the file (language,
     title, headings, lists, image alt attributes), not at whether its content is right.</p>
   {% endif %}
+  {% endif %}
   {# T1-11: say what ran and what did not, so a pass is not read as more than it is. #}
   <details class="tech" id="checks-ran">
     <summary>What was checked, and what was not</summary>
-    <p><strong>Ran on this file:</strong> {{ s.checks_run }} checks of its structure: the
-      language, the title, the order of the headings, lists, links, tables and the alt
-      attribute of every image.</p>
+    <p><strong>Ran on this file:</strong>{% if s.checks_run %} {{ s.checks_run }} checks of its
+      structure: the language, the title, the order of the headings, lists, links, tables
+      and the alt attribute of every image.{% else %} no structure checks are stored for this
+      file.{% endif %}</p>
     <p><strong>Did not run on this file:</strong> the axe accessibility test (it runs on
       our own test documents, not on yours) and testing with a screen reader. Nobody has
       listened to this file with NVDA, JAWS or VoiceOver. Read the student version through
       once before you share it.</p>
   </details>
-  {% endif %}
 </section>
 
 {% include "_job_language.html" %}

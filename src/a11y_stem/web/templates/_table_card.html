@@ -144,10 +144,18 @@
 {{ table_error(item, "actions") }}
 <div class="decide-row" id="actions-{{ eid }}" tabindex="-1">
   {% if t.proposal %}
+  {% if t.only_headers_missing %}
+  {# T1-19: the only finding is that no cell is a header, so the main action sets the first
+     row as the headers (an edit, which re-checks the table and settles it). #}
+  <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+    {{ table_fields("split") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
+    <button type="submit" class="button" data-role="headers">Use the first row as headers<span class="visually-hidden"> in {{ name }}</span></button>
+  </form>
+  {% endif %}
   {% if item.can_accept %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
     {{ table_fields("split") }}
-    <button type="submit" name="action" value="accept" class="button" data-role="accept">Accept<span class="visually-hidden"> {{ name }}</span></button>
+    <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}" data-role="accept">{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
   </form>
   {% endif %}
   <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
@@ -203,10 +211,16 @@
 <div class="review-form">
   {{ table_error(item, "actions") }}
   <div class="button-row" id="actions-{{ eid }}" tabindex="-1">
+    {% if t.proposal and t.only_headers_missing %}
+    <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
+      {{ table_fields("list") }}<input type="hidden" name="action" value="edit"><input type="hidden" name="change" value="headers"><input type="hidden" name="header_row" value="on">{% if t.header_col %}<input type="hidden" name="header_col" value="on">{% endif %}
+      <button type="submit" class="button">Use the first row as headers<span class="visually-hidden"> in {{ name }}</span></button>
+    </form>
+    {% endif %}
     {% if t.proposal and item.can_accept %}
     <form method="post" action="/jobs/{{ job.id }}/review/{{ eid }}" class="inline-form">
       {{ table_fields("list") }}
-      <button type="submit" name="action" value="accept" class="button">Accept<span class="visually-hidden"> {{ name }}</span></button>
+      <button type="submit" name="action" value="accept" class="{{ 'button-secondary' if t.only_headers_missing else 'button' }}">{{ "Accept without headers" if t.only_headers_missing else "Accept" }}<span class="visually-hidden"> {{ name }}</span></button>
     </form>
     {% endif %}
     {# Also for a grid written as text (the model said it is not a data table): the

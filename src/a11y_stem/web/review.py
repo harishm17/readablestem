@@ -1420,10 +1420,16 @@ def rerender_html(
     """
     from a11y_stem.pipeline import assemble, html_checks
 
+    # The instructor's choices are passed only when there are any, so a file made without
+    # them is made exactly as before.
+    chosen: dict[str, Any] = {}
+    if title_override:
+        chosen |= {"title_set": True}
+    if contact:
+        chosen |= {"contact": contact}
     html = assemble.render_html(
         title=title_override or result.title,
-        title_set=bool(title_override),
-        contact=contact,
+        **chosen,
         lang=result.lang,
         elements=result.elements,
         fixes=result.fixes,

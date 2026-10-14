@@ -351,11 +351,11 @@ def test_every_decision_then_done(split):
     assert response.headers["location"] == f"/jobs/{split.job_id}/review"
     page = split.browser.get(response.headers["location"]).text
     body = panel(page)
-    # The finish line, as the job page says it: one part of this document stays an
-    # image, so "Ready" (not "Ready to share") with what that is.
+    # The finish line, as the job page says it. Three headings made bold text are a
+    # decision, not an image kept from the PDF (T1-3), so it is "Ready to share".
     title = re.search(r'<h2 id="decision-title"[^>]*>([^<]*)<', body)
-    assert title and title.group(1) == "Ready", title and title.group(1)
-    assert "shown as an image that screen readers cannot read." in text_of(body)
+    assert title and title.group(1) == "Ready to share", title and title.group(1)
+    assert "shown as an image" not in text_of(body)
     assert "You made 3 decisions on " in text_of(body)
     assert f'href="/jobs/{split.job_id}/download">Download the HTML file</a>' in body
     assert f'href="/jobs/{split.job_id}/view">Preview the student version</a>' in body

@@ -634,6 +634,8 @@ mark.said-diff {
    breaks long words anywhere, which would squeeze a wide table into one-letter columns.
    Every cell has a rule round it, so a cell spanning the wrong rows or columns shows. */
 .table-crop { width: auto; max-width: 100%; }
+/* On a phone the picture of the table from the PDF takes the whole width (T1-19). */
+@media (max-width: 40rem) { .table-compare .table-crop { width: 100%; max-width: none; } }
 .table-view { background: #fff; border: 1px solid var(--rule); border-radius: 4px; overflow-wrap: normal; margin: 0 0 0.5rem; }
 .table-view table { width: auto; margin: 0; }
 .table-view caption { text-align: left; font-weight: 700; padding: 0.4rem 0.55rem 0.3rem; }
@@ -711,3 +713,9 @@ input[type="text"].input-short { width: 8rem; }
 .inline-details > form { margin-top: 0.75rem; }
 .student-setting { margin: 0 0 1.25rem; max-width: 40rem; }
 .student-setting input[type="text"] { width: 100%; max-width: 40rem; }
+.group-fact { margin: 0.5rem 0; }
+.group-crops { list-style: none; padding: 0; margin: 0.75rem 0; display: grid; gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr)); }
+.group-crops figure { margin: 0; }
+.group-crops img { display: block; width: 100%; height: auto; border: 1px solid var(--rule); }
+.group-crops figcaption { color: var(--muted); font-size: 0.95rem; margin-top: 0.25rem; }

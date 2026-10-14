@@ -283,10 +283,10 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     assert "<strong>Read aloud roughly as:</strong> x plus 1" in equation
     assert "\\SECRETLATEX{x}</textarea>" in equation
     assert '<label for="latex-p1-e3">LaTeX for equation 2</label>' in equation
-    assert "<dd>Low (55%)</dd>" in equation and ">Needs review</span>" in equation
-    # The check is explained in words; the raw code stays as a small secondary line.
+    # No confidence percentage and no internal code on the list view (T1-11).
+    assert ">Needs review</span>" in equation and "55%" not in equation
     assert "<strong>Worth checking:</strong> The LaTeX uses a command that is not on" in equation
-    assert "Code: <code>latex.allowed_commands: unknown_command</code>" in equation
+    assert "Code:" not in equation and "unknown_command" not in equation
     for action in ("edit", "accept", "reject"):
         assert f'name="action" value="{action}"' in equation
 
@@ -300,7 +300,7 @@ def test_each_fix_shows_crop_mathml_speech_editor_confidence_and_checks(web):
     abstained = card(page, "p1-e5")
     assert 'value="accept"' not in abstained  # nothing to accept
     assert "<strong>Why it was not converted:</strong> The model was not sure enough" in abstained
-    assert "Code: <code>low_confidence</code>" in abstained
+    assert "Code:" not in abstained and "low_confidence" not in abstained
     assert "Type the LaTeX for the equation in the image" in abstained
 
 
@@ -445,7 +445,7 @@ def test_an_edit_with_warnings_is_saved_and_the_warning_explained(web):
     )
     changed = card(page, "p1-e3")
     assert "Text inside \\text{...} contains characters that would turn into markup." in changed
-    assert "markup_in_text" in changed  # the code, in the secondary line
+    assert "markup_in_text" not in changed  # no internal code on the list view (T1-11)
 
 
 def test_an_equation_edit_that_fails_a_check_is_not_saved(web):

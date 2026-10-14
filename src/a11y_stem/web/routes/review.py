@@ -53,7 +53,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import Check, DocumentResult, Element, Fix, Kind, Status
 from a11y_stem.pipeline.layout import REASON_LARGER_FONT
 from a11y_stem.pipeline.validate import ALT_WARN_CHARS
-from a11y_stem.web import events, notation, retention
+from a11y_stem.web import events, heading_groups, notation, retention
 from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
 from a11y_stem.web.deps import (
     ELEMENT_ID,
@@ -441,6 +441,17 @@ class HeadingGroupView:
     error: str | None = None
     notices: list[str] = field(default_factory=list)
     members_open: bool = False  # one of them was just decided on its own
+    # The advice (`web.heading_groups`, T1-18): the answer to suggest ("bold" or "keep"),
+    # the fact that decides it, and up to three copies to look at.
+    suggest: str = "keep"
+    fact: str = ""
+    crops: list[heading_groups.Crop] = field(default_factory=list)
+
+    @property
+    def bold_first(self) -> bool:
+        """The suggested answer is the main button: bold text when that is the advice, or
+        the only direct choice (keeping them would move their level)."""
+        return self.suggest == "bold" or not self.keep
 
     @property
     def waiting(self) -> int:
@@ -838,6 +849,9 @@ def _heading_group(
         pages=[m.page for m in members if m.page],
         keep=keep,
         values={"level": str(level or 1)},
+        suggest=(advised := heading_groups.advice(result, unit)).suggest,
+        fact=advised.fact,
+        crops=heading_groups.crops(unit, elements),
     )
 
 

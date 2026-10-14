@@ -257,8 +257,7 @@ def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
             conn.execute(text(INSERT_JOB), {"id": "j3"})
             found = conn.execute(
                 text(
-                    "SELECT id, retention_mode, title_override, contact_line FROM jobs "
-                    "ORDER BY id"
+                    "SELECT id, retention_mode, title_override, contact_line FROM jobs ORDER BY id"
                 )
             ).all()
         assert [tuple(row) for row in found] == [

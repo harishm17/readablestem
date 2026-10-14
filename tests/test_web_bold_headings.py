@@ -77,7 +77,7 @@ def test_a_heading_group_made_bold_leaves_the_job_ready_when_the_rest_is_decided
 
     page = ux.browser.get(f"/jobs/{ux.job_id}").text
     text = text_of(page)
-    assert "<title>Ready to share: notes.pdf" in page
+    assert "<title>Ready to share: Vectors" in page
     assert 'id="ready"' in page
     assert "shown as an image" not in text
     assert "shown as images" not in text

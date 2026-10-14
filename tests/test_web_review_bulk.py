@@ -137,25 +137,25 @@ def test_labels_stay_the_same_after_a_decision(rich):
     assert title in page_of(rich)  # not renumbered by the move of equation 1
 
 
-def test_confidence_is_a_word_and_a_number(rich):
+def test_the_list_view_shows_no_confidence(rich):
+    """T1-11: the model's confidence is for the developer, not on the instructor's list."""
     page = page_of(rich)
-    assert "<dd>Medium (82%)</dd>" in card(page, "p1-e1")
-    assert "<dd>Low (45%)</dd>" in card(page, "p2-e0")
-    assert "<dd>High (90%)</dd>" in card(page, "p3-e0")
-    assert "<dd>Not given</dd>" in card(page, "p3-e2")
+    for eid in ("p1-e1", "p2-e0", "p3-e0", "p3-e2"):
+        assert "Confidence" not in card(page, eid)
+    assert not re.search(r"\(\d+%\)", re.sub(r"<[^>]+>", " ", page))
 
 
 def test_checks_and_reasons_are_explained_not_coded(rich):
     page = page_of(rich)
     style = card(page, "p2-e2")
     assert "a bold letter, a vector, is plain here" in style
-    assert "<code>equation.text_layer_style: style_mismatch</code>" in style
+    assert "style_mismatch" not in style and "<code>" not in style
     heading = card(page, "p1-e3")
     assert "Only weak signs say this is a heading" in heading
-    assert "Code: <code>heading.evidence: heading.weak_evidence</code>" in heading
+    assert "weak_evidence" not in heading and "<code>" not in heading
     timeout = card(page, "p3-e2")
     assert "The model did not answer in time." in timeout
-    assert "<code>model_timeout</code>" in timeout
+    assert "model_timeout" not in timeout and "<code>" not in timeout
     blocked = card(page, "p3-e0")
     assert "<strong>Must be fixed:</strong> A fraction, root, subscript" in blocked
     assert 'value="accept"' not in blocked
