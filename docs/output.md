@@ -46,7 +46,8 @@ and opening it never sends a request anywhere. `html_checks.static_checks` fails
 
 ## Posting it in a course
 
-The file is meant to be uploaded as a file and linked, not pasted into a page. Pasting
+The file is meant to be uploaded as a file and linked, not pasted into a page (for Canvas
+pages there is a separate export, below). Pasting
 breaks it: Canvas's sanitizer keeps only http, https and relative image sources, so every
 `data:` image (every figure and every equation kept as an image) is dropped, and it
 removes the `<style>` block, `<main>` and `tabindex`, so the hidden "Equation" labels
@@ -63,7 +64,68 @@ Files, link it where the PDF was, check it in Student View), says to make the HT
 main version, with the PDF kept only as a labelled print copy (28 CFR 35.202 and the
 Justice Department's fact sheet on the rule), and that it is guidance, not legal advice. The job
 page links to it under the download link. TODO(Harish): try the steps in a real Canvas
-course (Canvas Lite, then UTD) and update both.
+course (Canvas Lite, then UTD) and update both, and the Canvas export's.
+
+### The Canvas export (`pipeline/export_canvas.py`)
+
+The paragraph above is about the file as written. For Canvas there is a second form of the
+same document, made from the finished HTML alone (no pipeline step changes, and the
+default file is byte for byte as before; the golden tests cover that). The job page's
+"For Canvas (zip with images)" (`GET /jobs/{id}/download/canvas`, owner only; optional
+`?course=<digits>`) returns a zip:
+
+| File | What it is |
+|---|---|
+| `index.html` | The whole document with no `<style>` block. Each rule of the stylesheet is written into `style` attributes (selectors by tag, class, attribute, descendant and child, in cascade order), keeping only properties Canvas keeps. Every `data:` image is `images/image-NN.png` (or `.jpg`; one file per distinct picture). `tabindex` and `headers` stay, because a file is not sanitized. |
+| `images/` | The pictures, as files. |
+| `canvas-page.html` | Only with a course number. The same content as a fragment: no `<html>`, `<head>`, `<title>`, `<main>`, inside `<div lang>`; no `tabindex` and `headers` (Canvas removes them, so the file says what survives); rules for bare `p`, `h1`-`h6`, `ul`, `ol`, `li` left to Canvas's own styles; headings one level down (Canvas shows the page title as the top heading) unless the document has an `h6`; pictures at `/courses/<number>/file_contents/course%20files/<folder>/images/image-NN.png`. Not offered when it would exceed a Page's 500 KB body limit. |
+| `README.txt` | Plain steps for the instructor, with the folder name and course number filled in, and only the "what Canvas still changes" notes that apply to this document. |
+
+The folder name is `<ascii title>-<first 6 characters of the job id>` (`folder_name`). The
+instructor makes that folder in Files, uploads the zip into it and expands it, so the
+pictures sit where `canvas-page.html` says. Canvas resolves
+`/courses/<id>/file_contents/<path>` through the folder tree
+(`config/routes.rb`, `Folder.find_attachment_in_context_with_path`), so the address does
+not depend on the file's id. Whether the pictures of an uploaded `.html` file load in
+Canvas from relative addresses is not settled by Canvas's code, so the README does not
+promise it and offers the Page as the route.
+
+What Canvas decides is read from its source, not memory: the allowlist of
+`gems/canvas_sanitize/lib/canvas_sanitize/canvas_sanitize.rb` in instructure/canvas-lms at
+commit `c4912103269a6afa9e6957460b6d2bc6a1d8605f` (blob `1c70bcfb`, last changed
+2026-03-19; unchanged on master `1c9f0bb8` on 2026-10-14), with the `sanitize` gem 7.0.0 default for what
+happens to a removed element (`script`, `style`, `svg` go with their contents; `main`,
+`html`, `head` and `body` are dropped and their text stays; a `<title>`'s text would show
+in the page). `tests/fixtures/canvas/extract_allowlist.py` writes it to
+`canvas_sanitize_allowlist.json` (elements, attributes by element, protocols, CSS
+properties), and `tests/canvas_sanitizer.py` applies it. `tests/test_export_canvas.py`
+runs the export of the demo result, the golden files and the LaTeX fixtures (every content
+feature on) through it and asserts that the paste page loses nothing (sanitizing it changes
+no byte) and that every picture keeps its alt text and an address Canvas keeps, every
+equation its MathML, and headings, tables (caption, `th`, `scope`, spans), links, ids,
+language and text are as in the source.
+
+What Canvas still removes, and why that is accepted:
+
+- `tabindex` (not allowed on any element): the sideways-scroll boxes of wide tables and
+  equations cannot be focused by `tabindex` in a pasted page. Chrome and Firefox make a
+  scroll container reachable by keyboard when it has nothing focusable inside; Safari may
+  not. The README names the count of such boxes. `index.html` keeps the attribute.
+- `headers` on `td`/`th` (not allowed): an irregular table loses its explicit cell to
+  header links in a pasted page; `scope`, `colspan`, `rowspan` and `caption` stay. The
+  README names the count of such tables. `index.html` keeps it.
+- `font-weight` and `overflow-wrap`, `caption-side` (not in Canvas's CSS list): bold on the
+  "Not converted." label, table captions and figure-description summaries shows in normal
+  weight, and a very long unbroken string may not wrap. The label's text and the border
+  still carry the meaning ("never by colour alone").
+- `:focus-visible`, `@media print` and the narrow-screen margin of the about section: Canvas
+  has its own focus rings, and its pages have their own layout.
+- `.visually-hidden` uses `clip: rect(0,0,0,0)` instead of `clip-path` (not allowed), plus
+  Canvas's own `screenreader-only` class, so the hidden "Equation" labels stay hidden.
+- MathML is kept (all presentation elements the pipeline writes are on the list). Canvas
+  draws it with its own MathJax when the page has equations (`enhance-user-content/mathml.js`);
+  that happens in the browser and is not tested here.
+- Not tested against a live Canvas, UT Dallas's included; the README says so.
 
 ## How each element is written
 

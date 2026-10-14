@@ -3,14 +3,17 @@
 {% block content %}
 {# UX review MF11 and FEATURE-REVIEW "Beta 5". TODO(Harish): try the Canvas steps in a
    real course (Canvas Lite, then UTD's Canvas) and update this page: whether an .html
-   file in Files opens or downloads, the Canvas Student app, and the wording of the "main
-   version" section with UTD's accessibility office. Guidance, not legal advice. #}
+   file in Files opens or downloads, whether the pictures of the page made for Canvas load
+   from the Files folder by its address (/courses/N/file_contents/course files/...), the
+   Canvas Student app, and the wording of the "main version" section with UTD's
+   accessibility office. Guidance, not legal advice. #}
 <h1>Posting the file in your course</h1>
 <p class="lede">The file you download is one web page (an .html file) with everything
   built in: the text, the equations and the images. Share it by uploading the file and
-  linking to it. Do not paste it into a page.</p>
+  linking to it. Do not paste it into a page. For a Canvas page there is a separate download,
+  described under "In Canvas, as a page".</p>
 
-<h2>In Canvas</h2>
+<h2>In Canvas, as a file</h2>
 <ol class="steps-list">
   <li>In your course, open <strong>Files</strong> and upload the .html file.</li>
   <li>Link to it where students look for the material: in a module (add an item, then
@@ -25,12 +28,36 @@
   figures disappear, list numbers can show twice, coloured text loses its colour, and
   wide tables can no longer be scrolled from the keyboard. In some tables, the links
   between each value and its headers are removed too, so screen readers stop saying
-  which row and column a value belongs to.</p>
+  which row and column a value belongs to. (The page in the Canvas zip, below, is made
+  differently so that it can be pasted.)</p>
 <p>In some Canvas courses an .html file in Files downloads instead of opening. Students
   can still open the downloaded file in any browser. If this happens in your course,
   please tell us{% if contact_email %} at <a href="mailto:{{ contact_email }}">{{ contact_email }}</a>{% endif %}.</p>
-<p class="hint">These steps follow Canvas's published rules for files and pages. We have
-  not yet tried them in a live Canvas course.</p>
+
+<h2>In Canvas, as a page</h2>
+<p>Canvas's page editor keeps the text, headings, lists, tables and equations of pasted
+  HTML, but removes style blocks and any image stored inside the page. The job page has a
+  second download for this, <strong>For Canvas (zip with images)</strong>: the pictures
+  are separate files and the styles are written into the page itself.</p>
+<ol class="steps-list">
+  <li>On the job page, type your Canvas course number (the number after /courses/ in your
+    course's web address) and download the zip. Without the number the zip has the web
+    page and its pictures to link, but no page to paste.</li>
+  <li>In your course, open <strong>Files</strong>, make a folder with the name the README
+    in the zip gives, upload the zip into it and choose to expand it.</li>
+  <li>Make a new Page, switch the editor to its HTML view, paste the contents of
+    <code>canvas-page.html</code> and save.</li>
+  <li>Open the page in Student View. Check a picture and an equation.</li>
+</ol>
+<p>The README in the zip repeats these steps with your folder name and course number. A
+  pasted page still loses three things: the setting that lets a keyboard user move into a
+  box that scrolls sideways (wide tables and equations), the links between cells and
+  headers in an irregular table, and the bold of labels such as &ldquo;Not converted.&rdquo;
+  The README says which of these apply to your document.</p>
+
+<p class="hint">These steps follow Canvas's published rules for files and pages
+  (the sanitizer in its open-source code). We have not yet tried them in a live Canvas
+  course, and your Canvas may differ: check one picture and one equation.</p>
 
 <h2>Make it the main version</h2>
 <p>Post the HTML as the main course material, where students look first. If students
@@ -56,5 +83,6 @@
 <ul>
   <li><a href="https://www.ecfr.gov/current/title-28/chapter-I/part-35/subpart-H/section-35.202">28 CFR 35.202, conforming alternate versions</a> (Electronic Code of Federal Regulations)</li>
   <li><a href="https://www.ada.gov/resources/2024-03-08-web-rule/">Fact sheet: new rule on the accessibility of web content and mobile apps</a> (ADA.gov, U.S. Department of Justice)</li>
+  <li><a href="https://github.com/instructure/canvas-lms/blob/c4912103269a6afa9e6957460b6d2bc6a1d8605f/gems/canvas_sanitize/lib/canvas_sanitize/canvas_sanitize.rb">What Canvas keeps in a page</a> (canvas_sanitize.rb, instructure/canvas-lms)</li>
 </ul>
 {% endblock %}

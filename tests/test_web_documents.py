@@ -313,6 +313,15 @@ def test_the_posting_help_says_upload_and_link_never_paste(web):
     assert "Do not paste the file into a Canvas page" in flat
     assert "open Files and upload the .html file" in flat
     assert "Post the HTML as the main course material" in flat
+    # Canvas pages: the zip from the job page, in steps, with what it cannot keep.
+    assert "For Canvas (zip with images)" in flat and "In Canvas, as a page" in flat
+    assert "the number after /courses/ in your course's web address" in flat
+    assert "paste the contents of canvas-page.html and save" in flat
+    assert "Check a picture and an equation" in flat
+    assert "the links between cells and headers" in flat
+    assert "We have not yet tried them in a live Canvas course" in flat
+    assert "compliant" not in flat.lower()
+    assert "canvas_sanitize.rb" in page.text
     assert "keep the PDF as a print copy" in flat
     assert "28 CFR 35.202" in flat and "guidance, not legal advice" in flat
     assert "https://www.ada.gov/resources/2024-03-08-web-rule/" in page.text
