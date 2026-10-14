@@ -26,11 +26,11 @@ import openai
 import pytest
 from pydantic import BaseModel, Field
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL, ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget, Reservation
-from a11y_stem.models import openai_client
-from a11y_stem.models.base import UNTRUSTED_NOTICE, VisionRequest, fence_untrusted
-from a11y_stem.models.openai_client import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL, ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget, Reservation
+from readablestem.models import openai_client
+from readablestem.models.base import UNTRUSTED_NOTICE, VisionRequest, fence_untrusted
+from readablestem.models.openai_client import (
     PNG_SIGNATURE,
     OpenAIVisionClient,
     defang_context,
@@ -39,8 +39,8 @@ from a11y_stem.models.openai_client import (
     png_data_url,
     prompt_cache_key,
 )
-from a11y_stem.models.pricing import UnknownModelError, cost_usd, estimate_max_cost_usd
-from a11y_stem.models.router import call_with_fallback
+from readablestem.models.pricing import UnknownModelError, cost_usd, estimate_max_cost_usd
+from readablestem.models.router import call_with_fallback
 
 PNG = PNG_SIGNATURE + b"tiny test image"
 PNG_2 = PNG_SIGNATURE + b"another test image"
@@ -278,7 +278,7 @@ def test_cached_tokens_are_billed_at_the_cached_rate():
 def test_cost_above_the_reservation_is_settled_in_full_and_warned(caplog):
     huge = usage_block(input_tokens=5_000_000, cached=0, output=10, reasoning=0)
     client, budget = client_for(ScriptedHTTP(ok(response_body(usage=huge))), budget=make_budget(50))
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.models.openai_client"):
         _, call = client.run(make_request(), Out)
     assert call.cost_usd > estimate_max_cost_usd(
         MAIN_MODEL, n_images=1, text_chars=0, max_output_tokens=1024
@@ -301,7 +301,7 @@ def test_request_wire_format():
     assert body["instructions"] == INSTRUCTIONS
     assert body["store"] is False
     assert body["max_output_tokens"] == 321
-    assert body["prompt_cache_key"] == "a11y-stem:equation:equation-test"
+    assert body["prompt_cache_key"] == "readablestem:equation:equation-test"
     assert "safety_identifier" not in body
     assert body["text"]["format"]["type"] == "json_schema"
     assert body["text"]["format"]["strict"] is True
@@ -461,7 +461,7 @@ def test_outcome_mapping(reply: Reply, outcome: str, charged: str):
 def test_status_and_error_code_of_an_unexpected_200_body_are_logged(caplog):
     body = b'{"error": {"message": "secret ' + SECRET.encode() + b'", "code": "server_error"}}'
     client, _ = client_for(ScriptedHTTP(raw_reply(200, body)))
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.models.openai_client"):
         client.run(make_request(), Out)
     fields = logged_fields(caplog, "model_call")
     assert (fields["error"], fields["status"], fields["code"]) == (
@@ -657,7 +657,7 @@ def test_logs_and_call_records_carry_no_document_content(caplog, reply: Reply):
 
 def test_failure_log_names_the_error_class_status_and_code(caplog):
     client, _ = client_for(ScriptedHTTP(http_error(429, "rate_limit_exceeded")))
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.models.openai_client"):
         client.run(make_request(), Out)
     fields = logged_fields(caplog, "model_call")
     assert fields["outcome"] == "api_error"
@@ -668,7 +668,7 @@ def test_failure_log_names_the_error_class_status_and_code(caplog):
 
 def test_free_text_error_codes_are_not_logged(caplog):
     client, _ = client_for(ScriptedHTTP(http_error(400, f"Weird {SECRET} code")))
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.models.openai_client"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.models.openai_client"):
         client.run(make_request(), Out)
     assert logged_fields(caplog, "model_call")["code"] == "other"
     assert SECRET not in caplog.text
@@ -891,7 +891,7 @@ def test_a_huge_context_reserves_no_more_than_the_capped_text_it_sends():
 
 def logged_fields(caplog, event: str) -> dict:
     """Fields of the last `event` line (`observability.logging.log_fields`)."""
-    from a11y_stem.observability.logging import FIELDS_ATTR
+    from readablestem.observability.logging import FIELDS_ATTR
 
     records = [r for r in caplog.records if r.getMessage() == event]
     assert records, f"no {event} line logged"

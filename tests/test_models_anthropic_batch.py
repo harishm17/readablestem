@@ -15,17 +15,17 @@ from typing import Any
 import httpx2
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.eval import staged
-from a11y_stem.eval.answers import CachedClient, load_rows
-from a11y_stem.models import router
-from a11y_stem.models.anthropic_batch import BatchRunner, PendingPool, StagingClient
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.openai_client import PNG_SIGNATURE
-from a11y_stem.models.pricing import BATCH_DISCOUNT, cost_usd
-from a11y_stem.pipeline.equation_step import EquationOutput
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.eval import staged
+from readablestem.eval.answers import CachedClient, load_rows
+from readablestem.models import router
+from readablestem.models.anthropic_batch import BatchRunner, PendingPool, StagingClient
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.base import VisionRequest
+from readablestem.models.openai_client import PNG_SIGNATURE
+from readablestem.models.pricing import BATCH_DISCOUNT, cost_usd
+from readablestem.pipeline.equation_step import EquationOutput
 
 PNG = PNG_SIGNATURE + b"crop"
 RESULTS = "https://api.anthropic.com/v1/messages/batches/msgbatch_1/results"
@@ -191,7 +191,7 @@ def test_a_dropped_connection_while_waiting_does_not_lose_the_batch(tmp_path: Pa
     carried it (a second batch would be paid for twice)."""
     import anthropic
 
-    from a11y_stem.models.anthropic_batch import with_retries
+    from readablestem.models.anthropic_batch import with_retries
 
     calls = {"n": 0}
     request = httpx2.Request("GET", "https://api.anthropic.com/x")

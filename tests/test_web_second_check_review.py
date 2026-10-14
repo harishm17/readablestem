@@ -11,8 +11,9 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core import triage
-from a11y_stem.core.types import (
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.core import triage
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -24,8 +25,7 @@ from a11y_stem.core.types import (
     Status,
     Verification,
 )
-from a11y_stem.web.messages import CHECK_MESSAGES
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.web.messages import CHECK_MESSAGES
 
 NOTE = CHECK_MESSAGES[("figure.second_check", "second_check_mismatch")]
 SMALL_LEAD = (

@@ -2,7 +2,7 @@
 
 How much of a system's output says something the source PDF does not. It works on any
 output: a11y-stem HTML, a chatbot's HTML, a PDF parser's Markdown. Code:
-`src/a11y_stem/eval/invented/`; command: `a11y-stem eval invented ...`.
+`src/readablestem/eval/invented/`; command: `a11y-stem eval invented ...`.
 
 The rules are the table in section 7.5 of the held-out pre-registration. This page says how
 each rule is read where that table leaves room, what was added next to it, what it found on
@@ -248,7 +248,7 @@ Docling's default setting keeps equations as pictures, so it has none to check.
 
 ## Files
 
-- `src/a11y_stem/eval/invented/`: `text.py` (R and the normalisations), `read.py` (HTML and
+- `src/readablestem/eval/invented/`: `text.py` (R and the normalisations), `read.py` (HTML and
   Markdown into units), `score.py` (the rules), `pool.py` (rates and intervals),
   `figures.py` (the sampled judge), `audit.py` (sheet, key, precision and recall),
   `plant.py` (planted inventions), `report.py`, `cli.py`.

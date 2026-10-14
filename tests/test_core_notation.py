@@ -6,8 +6,8 @@ import unicodedata
 
 import pytest
 
-from a11y_stem.core.mathchars import VARIANT_NAMES, styled_char
-from a11y_stem.core.notation import (
+from readablestem.core.mathchars import VARIANT_NAMES, styled_char
+from readablestem.core.notation import (
     _TRAITS_OF_VARIANT,
     MAX_SYMBOL_CHARS,
     canonical_from_parts,

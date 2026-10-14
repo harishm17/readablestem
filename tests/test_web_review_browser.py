@@ -26,15 +26,15 @@ from collections.abc import Iterator
 
 import pytest
 
-from a11y_stem.core.types import ConversionOutput
-from a11y_stem.web.routes.review import (
+from fixtures.web.support import ALICE, WebEnv, make_pdf
+from readablestem.core.types import ConversionOutput
+from readablestem.web.routes.review import (
     BOLD_TEXT_WORDS,
     OTHER_WORDS,
     PLAIN_TEXT_WORDS,
     REJECT_WORDS,
 )
-from a11y_stem.web.views import FIX_STATUS_LABELS, REVIEWER_ACCEPTED_LABEL
-from fixtures.web.support import ALICE, WebEnv, make_pdf
+from readablestem.web.views import FIX_STATUS_LABELS, REVIEWER_ACCEPTED_LABEL
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import axe_violations, describe, free_port, sign_in
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
@@ -74,7 +74,7 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
     validators and speech."""
     import uvicorn
 
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     patch = pytest.MonkeyPatch()
     patch.setattr(assemble, "render_html", lambda **kw: "<html><body>re-rendered</body></html>")

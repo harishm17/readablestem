@@ -6,11 +6,11 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from a11y_stem.config import ConfigError
-from a11y_stem.web.app import create_app
-from a11y_stem.web.auth import set_allowed
-from a11y_stem.web.db import session_scope
 from fixtures.web.support import ADMIN, ALICE, WebEnv, csrf_from, login, make_settings
+from readablestem.config import ConfigError
+from readablestem.web.app import create_app
+from readablestem.web.auth import set_allowed
+from readablestem.web.db import session_scope
 
 
 def prod(tmp_path, **overrides):

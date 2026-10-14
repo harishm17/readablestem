@@ -13,16 +13,16 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Element, Fix, Kind, ProgressEvent, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step, figure_step, layout, run
-from a11y_stem.pipeline.layout import Layout
-from a11y_stem.web import worker as worker_module
-from a11y_stem.web.db import Job, JobStatus, session_scope, utcnow
-from a11y_stem.web.worker import JobCancelled
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import Element, Fix, Kind, ProgressEvent, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step, figure_step, layout, run
+from readablestem.pipeline.layout import Layout
+from readablestem.web import worker as worker_module
+from readablestem.web.db import Job, JobStatus, session_scope, utcnow
+from readablestem.web.worker import JobCancelled
 
 
 def settings(**kw) -> Settings:
@@ -120,7 +120,7 @@ def test_a_failed_crop_and_a_spent_budget_count_as_done(fake_steps, monkeypatch)
         return png()
 
     def spend_it(element, png, *, client, settings, context_text=None):
-        from a11y_stem.core.budget import BudgetExceeded
+        from readablestem.core.budget import BudgetExceeded
 
         raise BudgetExceeded("job_usd", "cap")
 

@@ -7,8 +7,8 @@ import io
 
 import pytest
 
-from a11y_stem.eval.invented import read
-from a11y_stem.eval.invented.text import MATH
+from readablestem.eval.invented import read
+from readablestem.eval.invented.text import MATH
 
 MML_X = "<math display='inline'><mi>x</mi><mo>=</mo><mn>5</mn></math>"
 
@@ -100,8 +100,8 @@ def test_the_tools_own_text_is_marked_and_a_label_inside_a_block_is_dropped_from
         html(
             "<p>Real content of the converted document goes here.</p>"
             "<div class='equation'>"
-            "<span class='visually-hidden a11y-stem'>Equation </span>2.4</div>"
-            "<footer class='about a11y-stem'><h2>About this version</h2>"
+            "<span class='visually-hidden readablestem'>Equation </span>2.4</div>"
+            "<footer class='about readablestem'><h2>About this version</h2>"
             "<p>Made with a11y-stem, a tool that assists.</p></footer>"
         )
     )
@@ -138,7 +138,7 @@ def test_descriptions_from_alt_figure_text_details_svg_and_aria_label():
             f"<figure><img src='{uri}' alt='Alt text of the first figure.'>"
             "<figcaption>Figure 1.1 Caption one.</figcaption></figure>"
             "<details class='figure-description'>"
-            "<summary class='a11y-stem'>Long description</summary>"
+            "<summary class='readablestem'>Long description</summary>"
             "<p>A long description of the first figure.</p></details>"
             "<figure><div class='description'><p>Text description of figure two.</p></div>"
             "<figcaption>Figure 1.2 Caption two.</figcaption></figure>"

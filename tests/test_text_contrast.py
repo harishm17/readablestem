@@ -10,7 +10,7 @@ import itertools
 
 import pytest
 
-from a11y_stem.pipeline.contrast import (
+from readablestem.pipeline.contrast import (
     MIN_TEXT_CONTRAST,
     WHITE,
     contrast_ratio,

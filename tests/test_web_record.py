@@ -11,9 +11,9 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.web import record as rec
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token
+from readablestem.web import record as rec
 
 
 @pytest.fixture

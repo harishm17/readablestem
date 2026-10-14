@@ -17,7 +17,18 @@ from html import escape, unescape
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.core.types import (
+from fixtures.web.support import (
+    ALICE,
+    PNG,
+    WebEnv,
+    job_id_from,
+    login,
+    make_pdf,
+    token,
+    upload,
+    with_file,
+)
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -30,19 +41,8 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.web.db import ReviewEdit, session_scope
-from a11y_stem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
-from fixtures.web.support import (
-    ALICE,
-    PNG,
-    WebEnv,
-    job_id_from,
-    login,
-    make_pdf,
-    token,
-    upload,
-    with_file,
-)
+from readablestem.web.db import ReviewEdit, session_scope
+from readablestem.web.mathml import UnsafeMathML, sanitize_mathml, try_sanitize_mathml
 
 
 class FakePipeline:
@@ -67,7 +67,7 @@ class FakePipeline:
         ]
 
     def safe_latex_to_mathml(self, latex: str, display: str = "block") -> str:
-        from a11y_stem.pipeline.validate import LatexConversionError
+        from readablestem.pipeline.validate import LatexConversionError
 
         if "\\fail" in latex:
             raise LatexConversionError("cannot convert")
@@ -108,7 +108,7 @@ class FakePipeline:
 
 
 def install_fake_pipeline(monkeypatch) -> FakePipeline:
-    from a11y_stem.pipeline import assemble, speech, validate
+    from readablestem.pipeline import assemble, speech, validate
 
     fake = FakePipeline()
     for name in ("check_latex", "safe_latex_to_mathml", "check_mathml", "check_alt"):
@@ -572,7 +572,7 @@ def test_nothing_to_accept_on_an_abstained_fix(web):
 
 
 def test_a_proposal_that_failed_a_required_check_cannot_be_accepted_as_is(web):
-    from a11y_stem.web.db import Job
+    from readablestem.web.db import Job
 
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, web.job_id)
@@ -801,7 +801,7 @@ def test_levels_that_fit_are_always_1_to_n():
     headings at levels 1 to 6, with some rejected."""
     import itertools
 
-    from a11y_stem.web.review import heading_level_written, heading_levels_that_fit
+    from readablestem.web.review import heading_level_written, heading_levels_that_fit
 
     def doc(spec: tuple[int | None, ...]) -> DocumentResult:
         elements = [
@@ -866,9 +866,9 @@ def written_levels(data: DocumentResult) -> dict[str, int]:
     review screen speaks of the outline repair's levels."""
     from unittest.mock import patch
 
-    from a11y_stem.pipeline.assemble import render_html
+    from readablestem.pipeline.assemble import render_html
 
-    with patch("a11y_stem.pipeline.assemble.title_shift", return_value=0):
+    with patch("readablestem.pipeline.assemble.title_shift", return_value=0):
         html = render_html(title="t", lang="en", elements=data.elements, fixes=data.fixes, crops={})
     return {eid: int(n) for n, eid in re.findall(r'<h([1-6]) id="(p1-e\d+)"', html)}
 
@@ -882,7 +882,7 @@ def test_heading_places_say_the_level_the_output_writes():
     assembler writes, for every outline of up to four headings, some rejected."""
     import itertools
 
-    from a11y_stem.web.review import heading_places
+    from readablestem.web.review import heading_places
 
     for n in range(1, 5):
         for spec in itertools.product((None, 1, 2, 3, 4, 5, 6), repeat=n):
@@ -899,7 +899,7 @@ def test_heading_places_say_the_level_the_output_writes():
 def test_accepting_a_level_the_output_would_move_is_refused():
     """h1, h2, h3; the reviewer rejects the h2. Accepting the h3 as proposed used to
     store 3 while the document wrote <h2>; "Save edit" with 3 was already refused."""
-    from a11y_stem.web.review import ReviewInvalid, apply_review
+    from readablestem.web.review import ReviewInvalid, apply_review
 
     data = heading_doc(1, 2, 3)
     apply_review(data, "p1-e1", "reject", {})
@@ -922,7 +922,7 @@ def test_a_change_to_an_earlier_heading_names_the_headings_it_moves():
     """h1, h2, h3 with the h3 accepted; the h2 is then edited to level 1. The document
     writes the h3 as <h2>: the decision says so, and the review screen shows level 2
     (`heading_places`). The stored level is kept, so undoing the change puts it back."""
-    from a11y_stem.web.review import apply_review, heading_places
+    from readablestem.web.review import apply_review, heading_places
 
     data = heading_doc(1, 2, 3)
     assert apply_review(data, "p1-e2", "accept", {}).moved == []
@@ -936,7 +936,7 @@ def test_a_change_to_an_earlier_heading_names_the_headings_it_moves():
 
 
 def test_rejecting_and_restoring_a_heading_moves_its_children_and_back():
-    from a11y_stem.web.review import apply_review
+    from readablestem.web.review import apply_review
 
     data = heading_doc(1, 2, 3, 3, 2)
     assert apply_review(data, "p1-e1", "reject", {}).moved == ["p1-e2", "p1-e3"]
@@ -993,7 +993,7 @@ def test_a_decision_that_moves_later_headings_says_so(outline):
 
 
 def test_moved_headings_are_named_then_counted():
-    from a11y_stem.web.routes.review import _moved_message
+    from readablestem.web.routes.review import _moved_message
 
     numbers = {f"p1-e{i}": i + 1 for i in range(9)}
     assert _moved_message([], numbers) == ""
@@ -1009,7 +1009,7 @@ def test_moved_headings_are_named_then_counted():
 
 
 def test_static_checks_are_rerun_on_the_rerendered_html(web):
-    from a11y_stem.pipeline.html_checks import static_checks
+    from readablestem.pipeline.html_checks import static_checks
 
     assert post(web, "p1-e3", action="accept").status_code == 303
     job = with_file(web)  # the checks are of the file, so they are made with it

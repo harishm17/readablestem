@@ -12,9 +12,9 @@ import time
 
 import pytest
 
-from a11y_stem.web import linked_emails
-from a11y_stem.web.db import session_scope
 from fixtures.web.support import ADMIN, ALICE, OutboxSender, WebEnv
+from readablestem.web import linked_emails
+from readablestem.web.db import session_scope
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
 from test_web_browser import describe, free_port

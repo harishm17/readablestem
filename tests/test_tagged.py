@@ -11,13 +11,13 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.config import MAIN_MODEL
-from a11y_stem.core.types import Kind, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import figure_step, tagged
-from a11y_stem.pipeline.heading_step import heading_fixes
-from a11y_stem.pipeline.layout import analyze, heading_levels, tagged_level
-from a11y_stem.pipeline.run import convert_pdf
+from readablestem.config import MAIN_MODEL
+from readablestem.core.types import Kind, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import figure_step, tagged
+from readablestem.pipeline.heading_step import heading_fixes
+from readablestem.pipeline.layout import analyze, heading_levels, tagged_level
+from readablestem.pipeline.run import convert_pdf
 from test_steps_support import figure_element, make_settings, use_fallback_router
 
 FIXTURE = Path(__file__).parent / "fixtures" / "tagged" / "tagged_notes.pdf"

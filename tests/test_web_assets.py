@@ -8,9 +8,9 @@ import re
 import pytest
 from fastapi.testclient import TestClient
 
-from a11y_stem.web import assets
-from a11y_stem.web.app import create_app
 from fixtures.web.support import make_settings
+from readablestem.web import assets
+from readablestem.web.app import create_app
 
 STATIC = assets.STATIC_DIR
 

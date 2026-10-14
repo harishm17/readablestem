@@ -15,7 +15,10 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.core.types import (
+from fixtures.web.review_doc import GROUP, review_output, review_pdf
+from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token, upload
+from fixtures.web.table_doc import table_output, table_pdf
+from readablestem.core.types import (
     Check,
     DocumentResult,
     DocumentStats,
@@ -27,13 +30,10 @@ from a11y_stem.core.types import (
     SourceFacts,
     Status,
 )
-from a11y_stem.ops.retention import purge_expired
-from a11y_stem.web import heading_groups, job_page, retention
-from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Job, session_scope, utcnow
-from fixtures.web.review_doc import GROUP, review_output, review_pdf
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, token, upload
-from fixtures.web.table_doc import table_output, table_pdf
+from readablestem.ops.retention import purge_expired
+from readablestem.web import heading_groups, job_page, retention
+from readablestem.web.database import as_utc
+from readablestem.web.db import Job, session_scope, utcnow
 
 
 def text_of(html: str) -> str:
@@ -507,7 +507,7 @@ def test_the_link_row_on_the_job_page_links_to_its_notice(tmp_path):
 
 
 def heading(eid: str, order: int, text: str, level: int = 2) -> tuple[Element, Fix]:
-    from a11y_stem.core.types import HeadingFix
+    from readablestem.core.types import HeadingFix
 
     element = Element(id=eid, kind=Kind.HEADING, page=0, bbox=(72, 10 * order, 300, 10 * order + 9),
                       order=order, text=text, bold=True)  # fmt: skip

@@ -21,36 +21,6 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import (
-    Check,
-    DocumentResult,
-    DocumentStats,
-    Element,
-    Fix,
-    Kind,
-    Status,
-    TableCell,
-    TableFix,
-    TableGrid,
-    grid_problems,
-)
-from a11y_stem.observability.logging import FIELDS_ATTR
-from a11y_stem.pipeline import table_step
-from a11y_stem.pipeline.table_html import render_table
-from a11y_stem.web import queue
-from a11y_stem.web.db import ReviewEdit, session_scope
-from a11y_stem.web.messages import CHECK_MESSAGES
-from a11y_stem.web.review import (
-    NO_TABLE_TO_ACCEPT,
-    ReviewInvalid,
-    apply_review,
-    first_col_is_header,
-    first_row_is_header,
-    usable_local_grid,
-    with_header_col,
-    with_header_row,
-)
-from a11y_stem.web.routes.review import STALE_MESSAGE, STALE_TITLE
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
 from fixtures.web.table_doc import (
     MATHS_LATEX,
@@ -63,6 +33,36 @@ from fixtures.web.table_doc import (
     table_output,
     table_pdf,
 )
+from readablestem.core.types import (
+    Check,
+    DocumentResult,
+    DocumentStats,
+    Element,
+    Fix,
+    Kind,
+    Status,
+    TableCell,
+    TableFix,
+    TableGrid,
+    grid_problems,
+)
+from readablestem.observability.logging import FIELDS_ATTR
+from readablestem.pipeline import table_step
+from readablestem.pipeline.table_html import render_table
+from readablestem.web import queue
+from readablestem.web.db import ReviewEdit, session_scope
+from readablestem.web.messages import CHECK_MESSAGES
+from readablestem.web.review import (
+    NO_TABLE_TO_ACCEPT,
+    ReviewInvalid,
+    apply_review,
+    first_col_is_header,
+    first_row_is_header,
+    usable_local_grid,
+    with_header_col,
+    with_header_row,
+)
+from readablestem.web.routes.review import STALE_MESSAGE, STALE_TITLE
 
 
 @pytest.fixture
@@ -827,7 +827,7 @@ def test_the_card_does_not_say_a_problem_twice():
     """A structural problem the table step already reported under its broader code
     (`table.grid` grid_invalid, `table.headers` header_problem) is not listed again in
     the card's own sentences; one the step did not report still is."""
-    from a11y_stem.web.table_card import table_card
+    from readablestem.web.table_card import table_card
 
     g = plain([["a", "b"], ["c", "d"]])
     g = g.model_copy(update={"cells": g.cells[:3]})  # a hole where "d" was
@@ -885,7 +885,7 @@ def test_the_card_makes_a_grid_with_flattened_maths_a_second_choice():
     """The grid read from the PDF gives K = 1/2 mv^2 flat: "Use the grid read from the
     PDF" is not the main button, and its flattened cell is edited as LaTeX, with the
     PDF's text shown."""
-    from a11y_stem.web.table_card import table_card
+    from readablestem.web.table_card import table_card
 
     flat = "K = ¹2mv²"
     local = with_header_row(plain([["Quantity", "Definition"], ["Kinetic energy", flat]]), True)
@@ -916,7 +916,7 @@ def test_tables_are_named_by_their_printed_numbers_when_every_one_has_its_own():
     """tables.pdf: a missed table shifted the ordinals, so the card titled "Table 3" showed
     the caption "Table 4". Tables carry their printed numbers when each has a "Table N"
     caption of its own; otherwise all keep their ordinals, so no two names clash."""
-    from a11y_stem.web.review import item_labels
+    from readablestem.web.review import item_labels
 
     def result(captions: list[str | None]) -> DocumentResult:
         elements = [

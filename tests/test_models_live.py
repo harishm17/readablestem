@@ -15,10 +15,10 @@ import pymupdf
 import pytest
 from pydantic import BaseModel
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL, Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.openai_client import OpenAIVisionClient
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL, Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.models.base import VisionRequest
+from readablestem.models.openai_client import OpenAIVisionClient
 
 pytestmark = pytest.mark.live_model
 

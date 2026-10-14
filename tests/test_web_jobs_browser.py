@@ -22,8 +22,6 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import ConversionOutput, Status
-from a11y_stem.web.db import Job, PendingUpload, QuotaDay, session_scope
 from fixtures.web.support import (
     ALICE,
     WebEnv,
@@ -34,6 +32,8 @@ from fixtures.web.support import (
     make_pdf,
     token,
 )
+from readablestem.core.types import ConversionOutput, Status
+from readablestem.web.db import Job, PendingUpload, QuotaDay, session_scope
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
 from test_web_browser import describe, free_port, sign_in
@@ -87,7 +87,7 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
 def clean_slate(site: WebEnv) -> Iterator[None]:
     """Every test starts with nothing: the caps on documents waiting would otherwise fill
     up over the module's tests."""
-    from a11y_stem.ops.retention import delete_jobs
+    from readablestem.ops.retention import delete_jobs
 
     with session_scope(site.ctx.factory) as session:
         delete_jobs(session, list(session.scalars(select(Job.id))))
@@ -208,7 +208,7 @@ def test_a_conversion_during_an_outage_says_so_and_offers_the_missing_parts(
 
 @SIZES
 def test_the_status_page_names_the_ai_service(site, browser, axe_source, viewport):
-    from a11y_stem.web.provider_health import HEALTH, MIN_CALLS
+    from readablestem.web.provider_health import HEALTH, MIN_CALLS
 
     for _ in range(MIN_CALLS):
         HEALTH.record("api_error")

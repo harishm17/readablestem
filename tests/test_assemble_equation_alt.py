@@ -13,9 +13,9 @@ import re
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Fix, Kind, Status, inline_marker
-from a11y_stem.eval.invented.read import _placeholder_alts
-from a11y_stem.pipeline.assemble import (
+from readablestem.core.types import Element, Fix, Kind, Status, inline_marker
+from readablestem.eval.invented.read import _placeholder_alts
+from readablestem.pipeline.assemble import (
     EQUATION_FLAT_ALT_SUFFIX,
     EQUATION_NOT_CONVERTED_ALT,
     EQUATION_TEXT_ALT_SUFFIX,

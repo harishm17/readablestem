@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.cli.main import main
-from a11y_stem.eval import gate
-from a11y_stem.eval.gate import DEFAULT_TOLERANCES, GateRefused, compare, load_tolerances
+from readablestem.cli.main import main
+from readablestem.eval import gate
+from readablestem.eval.gate import DEFAULT_TOLERANCES, GateRefused, compare, load_tolerances
 
 REPO = Path(__file__).resolve().parents[1]
 

@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.gold import openstax
-from a11y_stem.gold.openstax import fetch_gold
-from a11y_stem.proof import engine, registry, sources
-from a11y_stem.proof.errors import ProofError
+from readablestem.gold import openstax
+from readablestem.gold.openstax import fetch_gold
+from readablestem.proof import engine, registry, sources
+from readablestem.proof.errors import ProofError
 from test_openstax import FakeFetcher
 
 DATE = "2026-10-06"

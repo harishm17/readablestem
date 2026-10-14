@@ -14,9 +14,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.ops.retention import purge_expired
-from a11y_stem.web import events
-from a11y_stem.web.db import Event, Job, User, session_scope
 from fixtures.web.support import (
     ADMIN,
     ALICE,
@@ -29,6 +26,9 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.ops.retention import purge_expired
+from readablestem.web import events
+from readablestem.web.db import Event, Job, User, session_scope
 
 
 @pytest.fixture
@@ -112,7 +112,7 @@ def test_a_whole_journey_is_recorded_as_content_free_events(web, monkeypatch):
     """Sign-in, upload, finish, review, view, download and re-upload: each is one event
     with a code and a number, and nothing from the document (the fake document carries
     SECRET markers in its text, alt text, LaTeX, title and file name)."""
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>re-rendered</html>")
     alice = user_id(web, ALICE)
@@ -168,7 +168,7 @@ def test_a_whole_journey_is_recorded_as_content_free_events(web, monkeypatch):
 
 
 def test_bob_signing_in_is_bobs_event_and_a_failed_job_says_why(web):
-    from a11y_stem.core.budget import BudgetExceeded
+    from readablestem.core.budget import BudgetExceeded
 
     bob = web.client()
     login(bob, BOB)
@@ -184,7 +184,7 @@ def test_bob_signing_in_is_bobs_event_and_a_failed_job_says_why(web):
 
 
 def test_nothing_is_recorded_when_events_are_off(tmp_path, monkeypatch):
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>re-rendered</html>")
     env = WebEnv(tmp_path, events_enabled=False)
@@ -240,7 +240,7 @@ def test_admin_sees_counts_per_day_and_per_pseudonymous_person(web):
 
 
 def test_usage_counts_feedback_and_minutes(tmp_path):
-    from a11y_stem.web import db
+    from readablestem.web import db
 
     engine = db.make_engine(f"sqlite:///{tmp_path}/usage.db")
     db.create_all(engine)

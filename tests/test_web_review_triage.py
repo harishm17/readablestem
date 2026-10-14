@@ -13,21 +13,6 @@ import re
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core import triage
-from a11y_stem.core.types import (
-    Check,
-    ConversionOutput,
-    DocumentResult,
-    DocumentStats,
-    Element,
-    EquationFix,
-    Fix,
-    HeadingFix,
-    Kind,
-    Status,
-)
-from a11y_stem.web import review
-from a11y_stem.web.db import ReviewEdit, session_scope
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -40,6 +25,21 @@ from fixtures.web.support import (
     with_file,
 )
 from fixtures.web.support import upload as upload_pdf
+from readablestem.core import triage
+from readablestem.core.types import (
+    Check,
+    ConversionOutput,
+    DocumentResult,
+    DocumentStats,
+    Element,
+    EquationFix,
+    Fix,
+    HeadingFix,
+    Kind,
+    Status,
+)
+from readablestem.web import review
+from readablestem.web.db import ReviewEdit, session_scope
 from test_web_review import cards, install_fake_pipeline
 
 GROUP = "hg-p1-e1"

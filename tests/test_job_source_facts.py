@@ -13,7 +13,7 @@ import logging
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     Element,
     EquationFix,
     Fix,
@@ -21,8 +21,8 @@ from a11y_stem.core.types import (
     SourceFacts,
     Status,
 )
-from a11y_stem.pipeline import source_facts
-from a11y_stem.pipeline.source_facts import flattened_parts, measure, structure_parts
+from readablestem.pipeline import source_facts
+from readablestem.pipeline.source_facts import flattened_parts, measure, structure_parts
 
 MATH = "http://www.w3.org/1998/Math/MathML"
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Look at, and take, Cloud SQL backups of the a11y-stem database. Runbook: docs/operations.md,
+# Look at, and take, Cloud SQL backups of the readablestem database. Runbook: docs/operations.md,
 # "Backups and restore".
 #
 #   ./deploy/backups.sh status    # is the daily backup running, how old is the newest,
@@ -20,7 +20,7 @@ die() { printf 'error: %s\n' "$*" >&2; exit 1; }
 note() { printf '    %s\n' "$*"; }
 
 : "${PROJECT_ID:?PROJECT_ID is not set (see deploy/deploy.env.example)}"
-SQL_INSTANCE=${SQL_INSTANCE:-a11y-stem-db}
+SQL_INSTANCE=${SQL_INSTANCE:-readablestem-db}
 SQL_RETAINED_BACKUPS=${SQL_RETAINED_BACKUPS:-1}
 # An automated backup is taken once a day; allow a missed window plus the time it takes.
 MAX_BACKUP_AGE_H=${MAX_BACKUP_AGE_H:-36}

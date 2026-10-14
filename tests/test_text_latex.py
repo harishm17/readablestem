@@ -11,14 +11,14 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.types import ConversionOptions, Element, Kind
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import text_pass
-from a11y_stem.pipeline.html_checks import axe_checks, static_checks
-from a11y_stem.pipeline.layout import analyze, page_glyphs
-from a11y_stem.pipeline.run import convert_pdf
-from a11y_stem.pipeline.text_pass import TextPassResult
+from readablestem.config import Settings
+from readablestem.core.types import ConversionOptions, Element, Kind
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import text_pass
+from readablestem.pipeline.html_checks import axe_checks, static_checks
+from readablestem.pipeline.layout import analyze, page_glyphs
+from readablestem.pipeline.run import convert_pdf
+from readablestem.pipeline.text_pass import TextPassResult
 
 FIXTURE = Path(__file__).parent / "fixtures" / "layout" / "latex" / "links_language_colour.pdf"
 

@@ -15,12 +15,12 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from a11y_stem.core.mathchars import bake_bold_variants, char_variant, styled_char
-from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
-from a11y_stem.pipeline.assemble import render_html, sanitize_mathml
-from a11y_stem.pipeline.equation_step import text_layer_style
-from a11y_stem.pipeline.speech import mathml_to_speech
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.core.mathchars import bake_bold_variants, char_variant, styled_char
+from readablestem.core.types import Element, EquationFix, Fix, Kind, Status
+from readablestem.pipeline.assemble import render_html, sanitize_mathml
+from readablestem.pipeline.equation_step import text_layer_style
+from readablestem.pipeline.speech import mathml_to_speech
+from readablestem.pipeline.validate import safe_latex_to_mathml
 
 
 def tokens(mathml: str) -> list[tuple[str, str | None]]:

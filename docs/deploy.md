@@ -546,7 +546,7 @@ set -a; . deploy/.env.deploy; set +a
 ```
 
 Before any step, the script runs the same spend-limit check the app makes at start-up
-(`python -m a11y_stem.ops.limits`, through `uv`) and stops if a number cannot work for the
+(`python -m readablestem.ops.limits`, through `uv`) and stops if a number cannot work for the
 provider. The first run takes 15-20 minutes, most of it creating the Cloud SQL instance. The steps,
 in order (run any subset with `./deploy/deploy.sh STEP ...`):
 

@@ -12,9 +12,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.proof import engine, registry
-from a11y_stem.proof.bundle import Bundle
-from a11y_stem.proof.report import wording_problems
+from readablestem.proof import engine, registry
+from readablestem.proof.bundle import Bundle
+from readablestem.proof.report import wording_problems
 
 ROOT = Path(__file__).resolve().parent.parent
 

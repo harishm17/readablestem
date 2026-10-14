@@ -8,9 +8,9 @@ import json
 import pytest
 from PIL import Image
 
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.eval.invented import figures, read
-from a11y_stem.models.fake import FakeVisionClient
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.eval.invented import figures, read
+from readablestem.models.fake import FakeVisionClient
 from test_eval_support import settings
 
 NO_ERROR = {"conveys_key_information": True, "factual_error": False, "score": 4, "confidence": 0.8}

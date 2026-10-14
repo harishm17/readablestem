@@ -5,7 +5,7 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
@@ -15,9 +15,9 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
-from a11y_stem.web import queue
-from a11y_stem.web.compare import (
+from readablestem.pipeline.validate import safe_latex_to_mathml
+from readablestem.web import queue
+from readablestem.web.compare import (
     COMPARE_PX_PER_PT,
     band_clip,
     compare_equation,
@@ -25,7 +25,7 @@ from a11y_stem.web.compare import (
     context_clip,
     suggest_fix,
 )
-from a11y_stem.web.mathml import sanitize_mathml
+from readablestem.web.mathml import sanitize_mathml
 
 BOLD_D, BOLD_ZERO = "\U0001d41d", "\U0001d7ce"  # MATHEMATICAL BOLD SMALL D, DIGIT ZERO
 ITALIC_V, ITALIC_D, ITALIC_T = "\U0001d463", "\U0001d451", "\U0001d461"  # math italic

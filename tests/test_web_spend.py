@@ -9,10 +9,10 @@ from datetime import UTC, date, datetime, timedelta
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.budget import BudgetExceeded, JobBudget
-from a11y_stem.web import db
-from a11y_stem.web.quota import pages_left, pages_used, try_consume_pages
-from a11y_stem.web.spend import DbSpendGuard
+from readablestem.core.budget import BudgetExceeded, JobBudget
+from readablestem.web import db
+from readablestem.web.quota import pages_left, pages_used, try_consume_pages
+from readablestem.web.spend import DbSpendGuard
 
 DAY = date(2026, 10, 7)
 

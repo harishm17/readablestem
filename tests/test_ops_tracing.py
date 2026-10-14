@@ -17,9 +17,9 @@ from concurrent.futures import ThreadPoolExecutor
 import pytest
 from structlog.testing import capture_logs
 
-from a11y_stem.config import Settings
-from a11y_stem.observability import tracing
-from a11y_stem.observability.tracing import (
+from readablestem.config import Settings
+from readablestem.observability import tracing
+from readablestem.observability.tracing import (
     ALLOWED_ATTRIBUTES,
     MASKED,
     LangfuseTracer,

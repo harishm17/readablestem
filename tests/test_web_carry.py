@@ -13,20 +13,6 @@ import re
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import (
-    ConversionOutput,
-    DocumentResult,
-    DocumentStats,
-    Element,
-    EquationFix,
-    FigureFix,
-    Fix,
-    HeadingFix,
-    Kind,
-    Status,
-)
-from a11y_stem.web import carry
-from a11y_stem.web.db import Job, ReviewEdit, session_scope
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -40,6 +26,20 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.core.types import (
+    ConversionOutput,
+    DocumentResult,
+    DocumentStats,
+    Element,
+    EquationFix,
+    FigureFix,
+    Fix,
+    HeadingFix,
+    Kind,
+    Status,
+)
+from readablestem.web import carry
+from readablestem.web.db import Job, ReviewEdit, session_scope
 
 # --------------------------------------------------------------------------- the rules
 

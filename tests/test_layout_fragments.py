@@ -12,9 +12,9 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind
-from a11y_stem.pipeline import layout
-from a11y_stem.pipeline.layout import analyze
+from readablestem.core.types import Element, Kind
+from readablestem.pipeline import layout
+from readablestem.pipeline.layout import analyze
 
 BODY = 11.0
 

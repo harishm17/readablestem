@@ -3,8 +3,8 @@ are cut out once, as offsets into the final text."""
 
 from __future__ import annotations
 
-from a11y_stem.core.types import ScriptRun
-from a11y_stem.pipeline import script_marks as marks
+from readablestem.core.types import ScriptRun
+from readablestem.pipeline import script_marks as marks
 
 
 def run(start: int, end: int, kind: str) -> ScriptRun:

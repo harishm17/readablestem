@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.notation import canonical_symbol
-from a11y_stem.core.types import (
+from readablestem.core.notation import canonical_symbol
+from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
@@ -15,7 +15,7 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.pipeline import notation_suggest as ns
+from readablestem.pipeline import notation_suggest as ns
 
 BOLD_D = "\U0001d41d"
 

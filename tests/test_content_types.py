@@ -12,9 +12,9 @@ from typing import get_args
 import pytest
 from pydantic import ValidationError
 
-from a11y_stem.config import Settings
-from a11y_stem.core import triage
-from a11y_stem.core.types import (
+from readablestem.config import Settings
+from readablestem.core import triage
+from readablestem.core.types import (
     GRID_PROBLEMS,
     MAX_TABLE_COLS,
     MAX_TABLE_ROWS,

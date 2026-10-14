@@ -18,13 +18,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-from a11y_stem.core.types import DocumentResult, Kind
-from a11y_stem.models import make_vision_client
-from a11y_stem.ops.aggregate import aggregate_finished
-from a11y_stem.pipeline.html_checks import static_checks
-from a11y_stem.web.app import create_app
-from a11y_stem.web.db import Blob, ErrorAggregate, Job, ReviewEdit, session_scope
-from a11y_stem.web.review import rerender_html
 from fixtures.web.support import (
     ALICE,
     csrf_from,
@@ -34,6 +27,13 @@ from fixtures.web.support import (
     upload,
     with_file,
 )
+from readablestem.core.types import DocumentResult, Kind
+from readablestem.models import make_vision_client
+from readablestem.ops.aggregate import aggregate_finished
+from readablestem.pipeline.html_checks import static_checks
+from readablestem.web.app import create_app
+from readablestem.web.db import Blob, ErrorAggregate, Job, ReviewEdit, session_scope
+from readablestem.web.review import rerender_html
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "worked_example.pdf"
 
@@ -62,14 +62,14 @@ class Site:
 def site(tmp_path):
     site = Site(tmp_path)
     with TestClient(site.app, follow_redirects=False) as browser:
-        from a11y_stem.web.auth import set_allowed
+        from readablestem.web.auth import set_allowed
 
         with session_scope(site.ctx.factory) as session:
             set_allowed(session, ALICE, allowed=True)
         login(browser, ALICE)
         site.browser = browser
         site.job_id = job_id_from(upload(browser, PDF.read_bytes(), filename="worked.pdf"))
-        from a11y_stem.web.worker import Worker
+        from readablestem.web.worker import Worker
 
         worker = Worker(
             site.ctx.settings,
@@ -187,8 +187,8 @@ def test_a_review_decision_reruns_the_checks_on_the_real_output(site):
 def test_the_student_note_gives_the_date_once_the_last_decision_is_made(site):
     """While a decision is open the file says some parts are not checked yet; after the
     last one, the re-rendered file says the instructor checked them, and on which day."""
-    from a11y_stem.pipeline.assemble import CHECKED, NOT_CHECKED_YET, long_date
-    from a11y_stem.web.db import utcnow
+    from readablestem.pipeline.assemble import CHECKED, NOT_CHECKED_YET, long_date
+    from readablestem.web.db import utcnow
 
     assert NOT_CHECKED_YET in about(site.job(site.job_id).html or "")
     result = DocumentResult.model_validate(site.job(site.job_id).result_json)
@@ -210,7 +210,7 @@ def test_the_output_rerendered_after_review_passes_axe(site):
     """The review browser tests stub the assembler, so they check the review page, not
     the file a review produces. Here the real file after an edit and a reject
     goes through axe-core."""
-    from a11y_stem.pipeline.html_checks import axe_checks
+    from readablestem.pipeline.html_checks import axe_checks
 
     # Differs from the PDF's own text: used only with "Use my edit anyway" (web.edit_check).
     assert review(site, "p1-e9", action="edit_anyway", latex="v = 2 t").status_code == 303

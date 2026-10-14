@@ -14,9 +14,9 @@ from pathlib import Path
 import pytest
 from latex2mathml.converter import convert
 
-from a11y_stem.core.types import Kind
-from a11y_stem.pipeline.equation_step import text_layer_style
-from a11y_stem.pipeline.layout import _Char, analyze
+from readablestem.core.types import Kind
+from readablestem.pipeline.equation_step import text_layer_style
+from readablestem.pipeline.layout import _Char, analyze
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "latex" / "letter_styles.pdf"
 RIGHT = (

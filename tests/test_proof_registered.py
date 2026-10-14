@@ -19,7 +19,7 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.proof import registry
+from readablestem.proof import registry
 
 ROOT = Path(__file__).resolve().parent.parent
 PROOF = ROOT / "proof"
@@ -147,7 +147,7 @@ def test_the_registration_hash_is_the_one_the_set_the_code_and_the_readme_cite()
     pset = registry.resolve_set(ROOT, "heldout-2026-10")
     assert pset.prereg is not None and pset.prereg.sha256 == registered
     assert registered in (ROOT / "README.md").read_text(encoding="utf-8")
-    assert registered in (ROOT / "src/a11y_stem/gold/heldout.py").read_text(encoding="utf-8")
+    assert registered in (ROOT / "src/readablestem/gold/heldout.py").read_text(encoding="utf-8")
 
 
 def test_the_seeded_draw_reproduces_the_committed_draw(tmp_path):

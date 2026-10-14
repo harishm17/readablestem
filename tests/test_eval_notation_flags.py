@@ -7,11 +7,11 @@ import json
 
 import pytest
 
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli.main import main
-from a11y_stem.eval import notation_flags
-from a11y_stem.pipeline import equation_step, options
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.cli import eval_cli
+from readablestem.cli.main import main
+from readablestem.eval import notation_flags
+from readablestem.pipeline import equation_step, options
+from readablestem.pipeline.validate import safe_latex_to_mathml
 from test_eval_cli import fake_inputs as fake_inputs  # fixture, re-exported for pytest
 from test_eval_cli import gold as gold  # fixture, re-exported for pytest
 from test_eval_cli import pipeline_args
@@ -49,7 +49,7 @@ def test_flags_are_counted_with_and_without_the_styles_of_the_text_layer():
 
 
 def test_rows_come_from_an_items_file_and_the_render_cache(tmp_path, monkeypatch):
-    from a11y_stem.eval import pipeline_eval, render
+    from readablestem.eval import pipeline_eval, render
 
     records = [{"id": "g/eq-0", "kind": "equation", "mathml": "<math><mi>v</mi></math>"}]
     monkeypatch.setattr(pipeline_eval, "load_gold", lambda _: records)

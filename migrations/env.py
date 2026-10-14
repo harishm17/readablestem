@@ -1,7 +1,7 @@
-"""Alembic environment for a11y-stem.
+"""Alembic environment for readablestem.
 
-The target schema is `a11y_stem.web.db.Base.metadata`. The database URL comes from, in
-order: an explicit `sqlalchemy.url` set by the caller (tests, `a11y-stem db upgrade`),
+The target schema is `readablestem.web.db.Base.metadata`. The database URL comes from, in
+order: an explicit `sqlalchemy.url` set by the caller (tests, `readablestem db upgrade`),
 the DATABASE_URL environment variable, then the app settings (which also read .env).
 SQLite uses batch mode so later ALTERs work there too.
 """
@@ -14,7 +14,7 @@ from logging.config import fileConfig
 from alembic import context
 from sqlalchemy import engine_from_config, pool
 
-from a11y_stem.web.db import Base
+from readablestem.web.db import Base
 
 config = context.config
 
@@ -30,7 +30,7 @@ def database_url() -> str:
         return explicit
     if os.environ.get("DATABASE_URL"):
         return os.environ["DATABASE_URL"]
-    from a11y_stem.config import get_settings
+    from readablestem.config import get_settings
 
     return get_settings().database_url
 

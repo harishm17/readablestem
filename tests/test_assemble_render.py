@@ -13,7 +13,7 @@ import pymupdf
 import pytest
 from latex2mathml.converter import convert
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     Element,
     EquationFix,
     FigureFix,
@@ -23,7 +23,7 @@ from a11y_stem.core.types import (
     Status,
     inline_marker,
 )
-from a11y_stem.pipeline.assemble import (
+from readablestem.pipeline.assemble import (
     ABOUT_TITLE,
     ABOUT_WORDING,
     CHECKED,
@@ -37,7 +37,7 @@ from a11y_stem.pipeline.assemble import (
     render_html,
     sanitize_mathml,
 )
-from a11y_stem.pipeline.html_checks import static_checks
+from readablestem.pipeline.html_checks import static_checks
 
 FIXTURE = Path(__file__).parent / "fixtures" / "assemble" / "sample_document.json"
 VOID = {"area", "base", "br", "col", "embed", "hr", "img", "input", "link", "meta", "source"}
@@ -304,7 +304,7 @@ def test_notice_is_the_first_thing_in_main_and_is_escaped():
     html = render([element], [fix], notice="Offline <b>test</b> run:\n placeholders.")
     after_main = html.split("<main>\n", 1)[1]
     assert after_main.startswith(
-        '<p class="notice a11y-stem" role="note"><span class="flag-label">Note:</span> '
+        '<p class="notice readablestem" role="note"><span class="flag-label">Note:</span> '
         "Offline &lt;b&gt;test&lt;/b&gt; run: placeholders.</p>\n<h1"
     )
     assert all(c.passed for c in static_checks(html))

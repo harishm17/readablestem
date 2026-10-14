@@ -20,15 +20,15 @@ from pathlib import Path
 import pydantic
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import ModelCall, Status
-from a11y_stem.eval.equations import score_mathml
-from a11y_stem.eval.gold_scoring import iter_gold_records
-from a11y_stem.models.base import T, VisionRequest, fence_untrusted
-from a11y_stem.models.pricing import cost_usd, estimate_max_cost_usd
-from a11y_stem.pipeline.equation_step import transcribe
-from a11y_stem.pipeline.figure_step import describe
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import ModelCall, Status
+from readablestem.eval.equations import score_mathml
+from readablestem.eval.gold_scoring import iter_gold_records
+from readablestem.models.base import T, VisionRequest, fence_untrusted
+from readablestem.models.pricing import cost_usd, estimate_max_cost_usd
+from readablestem.pipeline.equation_step import transcribe
+from readablestem.pipeline.figure_step import describe
 from test_steps_support import (
     equation_element,
     figure_element,

@@ -9,8 +9,6 @@ import pytest
 from pydantic import ValidationError
 from sqlalchemy import select
 
-from a11y_stem.web import feedback
-from a11y_stem.web.db import Event, session_scope
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -23,6 +21,8 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.web import feedback
+from readablestem.web.db import Event, session_scope
 
 
 @pytest.fixture

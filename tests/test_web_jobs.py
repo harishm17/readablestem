@@ -10,17 +10,6 @@ import pytest
 from sqlalchemy import func, select
 from starlette.requests import Request
 
-from a11y_stem.web.database import as_utc, utc_today
-from a11y_stem.web.db import Blob, Job, QuotaDay, SpendDay, User, session_scope
-from a11y_stem.web.routes.jobs import content_disposition, download_filename
-from a11y_stem.web.security import VIEW_CSP
-from a11y_stem.web.uploads import (
-    UploadRejected,
-    inspect_pdf,
-    inspect_pdf_isolated,
-    read_upload_form,
-    safe_filename,
-)
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -32,6 +21,17 @@ from fixtures.web.support import (
     make_pdf,
     token,
     upload,
+)
+from readablestem.web.database import as_utc, utc_today
+from readablestem.web.db import Blob, Job, QuotaDay, SpendDay, User, session_scope
+from readablestem.web.routes.jobs import content_disposition, download_filename
+from readablestem.web.security import VIEW_CSP
+from readablestem.web.uploads import (
+    UploadRejected,
+    inspect_pdf,
+    inspect_pdf_isolated,
+    read_upload_form,
+    safe_filename,
 )
 
 
@@ -429,7 +429,7 @@ def test_status_poll_for_a_deleted_job_reloads_the_page(web):
 
 
 def test_failed_job_explains_why(web):
-    from a11y_stem.core.budget import BudgetExceeded
+    from readablestem.core.budget import BudgetExceeded
 
     web.converter.raises = BudgetExceeded("daily", "cap")
     job_id = job_id_from(upload(web.browser, make_pdf(1)))
@@ -563,7 +563,7 @@ def test_delete_now_removes_the_job_and_everything_derived(web):
     assert '<div class="notice" role="status" tabindex="-1" autofocus>' in page
     assert web.browser.get(f"/jobs/{job_id}").status_code == 404
     # The upload's usage event stays for the counts, without the file's fingerprint.
-    from a11y_stem.web.db import Event
+    from readablestem.web.db import Event
 
     with session_scope(web.ctx.factory) as session:
         uploads = session.scalars(select(Event).where(Event.job_ref == job_id)).all()
@@ -601,7 +601,7 @@ def test_a_job_past_its_retention_time_is_gone_before_the_purge_runs(web):
 def test_the_worker_purges_expired_jobs_if_the_scheduler_does_not(web, caplog, monkeypatch):
     import logging
 
-    from a11y_stem.web import worker as worker_module
+    from readablestem.web import worker as worker_module
 
     caplog.set_level(logging.INFO)
     job_id = finished_job(web)

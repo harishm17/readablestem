@@ -7,13 +7,13 @@ from __future__ import annotations
 import threading
 from pathlib import Path
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Kind
-from a11y_stem.models import OFFLINE_DEFAULTS, FakeVisionClient
-from a11y_stem.pipeline import run, tables, text_pass
-from a11y_stem.web.worker import Worker
 from fixtures.web.support import WebEnv, fake_client_factory, make_settings
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import Kind
+from readablestem.models import OFFLINE_DEFAULTS, FakeVisionClient
+from readablestem.pipeline import run, tables, text_pass
+from readablestem.web.worker import Worker
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "lecture_notes.pdf"
 
@@ -114,7 +114,7 @@ def test_the_worker_loads_the_table_models_at_start_in_production_only(tmp_path,
 
 
 def test_preload_loads_both_models_under_the_pdf_lock_and_never_raises(monkeypatch):
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     calls: list[str] = []
     monkeypatch.setattr(tables, "load_detector", lambda: calls.append("detector") or True)

@@ -12,8 +12,8 @@ from datetime import UTC, datetime, timedelta
 
 from sqlalchemy.orm import Session
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.types import (
     Check,
     DocumentResult,
     DocumentStats,
@@ -26,7 +26,7 @@ from a11y_stem.core.types import (
     ModelCall,
     Status,
 )
-from a11y_stem.web import db
+from readablestem.web import db
 
 SENTINEL = "quokka"  # lower case on purpose: codes are lower-cased before matching
 SENTENCE = f"Secret {SENTINEL} sentence with spaces"

@@ -18,9 +18,9 @@ import pytest
 from sqlalchemy import DateTime, Float, Integer, String, func, inspect, select
 from sqlalchemy.exc import IntegrityError
 
-from a11y_stem.core.types import ProgressEvent
-from a11y_stem.ops.retention import delete_jobs, erase_user
-from a11y_stem.web import db
+from readablestem.core.types import ProgressEvent
+from readablestem.ops.retention import delete_jobs, erase_user
+from readablestem.web import db
 
 GOOGLE_ISSUER = "https://accounts.google.com"
 EVENT_COLUMNS = {

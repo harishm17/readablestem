@@ -11,11 +11,11 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.notation import canonical_symbol
-from a11y_stem.core.types import ConversionOptions, Element, Kind, NotationEntry
-from a11y_stem.eval import bold_letters
-from a11y_stem.pipeline import layout, options
-from a11y_stem.pipeline.notation_memory import (
+from readablestem.core.notation import canonical_symbol
+from readablestem.core.types import ConversionOptions, Element, Kind, NotationEntry
+from readablestem.eval import bold_letters
+from readablestem.pipeline import layout, options
+from readablestem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
     EVIDENCE_COURSE,
     EVIDENCE_DOCUMENT,

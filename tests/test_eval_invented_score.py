@@ -6,8 +6,8 @@ import json
 
 import pytest
 
-from a11y_stem.eval.invented import read, score
-from a11y_stem.eval.invented import text as T
+from readablestem.eval.invented import read, score
+from readablestem.eval.invented import text as T
 
 PAGE_ONE = """2.1 Speed and Velocity
 Average speed is the distance traveled divided by the time it takes to travel it.
@@ -99,7 +99,7 @@ def test_maths_is_cut_out_and_no_gram_spans_the_gap():
 
 def test_the_tools_own_sentences_count_apart():
     result = scored(
-        FAITHFUL + "<footer class='about a11y-stem'><h2>About this version</h2>"
+        FAITHFUL + "<footer class='about readablestem'><h2>About this version</h2>"
         "<p>This is a web version of a PDF from your course, made with a tool.</p></footer>"
     )
     sentences = result.counts["sentence"]

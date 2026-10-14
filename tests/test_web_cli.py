@@ -5,15 +5,15 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import create_engine, inspect, select
 
-from a11y_stem.cli.main import build_parser, main
-from a11y_stem.web import db
 from fixtures.web.support import make_settings
+from readablestem.cli.main import build_parser, main
+from readablestem.web import db
 
 
 @pytest.fixture
 def settings(tmp_path, monkeypatch):
     s = make_settings(tmp_path, env="dev")
-    monkeypatch.setattr("a11y_stem.config.get_settings", lambda: s)
+    monkeypatch.setattr("readablestem.config.get_settings", lambda: s)
     return s
 
 
@@ -43,7 +43,7 @@ def test_serve_runs_uvicorn_with_the_app_factory(monkeypatch):
     seen = {}
     monkeypatch.setattr(uvicorn, "run", lambda app, **kw: seen.update(app=app, **kw))
     assert main(["serve", "--host", "0.0.0.0", "--port", "9000", "--reload"]) == 0
-    assert seen["app"] == "a11y_stem.web.app:create_app" and seen["factory"] is True
+    assert seen["app"] == "readablestem.web.app:create_app" and seen["factory"] is True
     assert (seen["host"], seen["port"], seen["reload"]) == ("0.0.0.0", 9000, True)
 
 
@@ -65,7 +65,7 @@ def test_users_delete_erases_the_account_and_every_document(settings, capsys):
     """The privacy page offers deletion on request; this is how it is done."""
     from datetime import timedelta
 
-    from a11y_stem.web.db import ErrorAggregate, Job, User
+    from readablestem.web.db import ErrorAggregate, Job, User
 
     assert main(["users", "allow", "prof@example.org"]) == 0
     engine = db.make_engine(settings.database_url)
@@ -108,15 +108,15 @@ def test_users_allow_rejects_a_malformed_email(settings, capsys):
 
 def test_users_commands_refuse_an_unmigrated_production_database(tmp_path, monkeypatch, capsys):
     prod = make_settings(tmp_path, env="prod")
-    monkeypatch.setattr("a11y_stem.config.get_settings", lambda: prod)
+    monkeypatch.setattr("readablestem.config.get_settings", lambda: prod)
     assert main(["users", "list"]) == 2
     assert "a11y-stem db upgrade" in capsys.readouterr().err
 
 
 def test_db_upgrade_applies_the_migrations(tmp_path, monkeypatch, capsys):
     s = make_settings(tmp_path, env="prod")
-    monkeypatch.setattr("a11y_stem.config.get_settings", lambda: s)
-    from a11y_stem.web import database
+    monkeypatch.setattr("readablestem.config.get_settings", lambda: s)
+    from readablestem.web import database
 
     original = database.alembic_config
 

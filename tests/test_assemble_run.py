@@ -18,9 +18,9 @@ import pytest
 from latex2mathml.converter import convert
 from pydantic import BaseModel
 
-from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import (
+from readablestem.config import ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
     Element,
     EquationFix,
     FigureFix,
@@ -30,12 +30,12 @@ from a11y_stem.core.types import (
     Status,
     inline_marker,
 )
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.pricing import UnknownModelError
-from a11y_stem.pipeline import equation_step, figure_step, heading_step, layout, run, table_step
-from a11y_stem.pipeline.layout import Layout, LayoutError
-from a11y_stem.pipeline.run import CONTEXT_CHARS, PipelineOutput, convert_pdf
+from readablestem.models.base import VisionRequest
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.pricing import UnknownModelError
+from readablestem.pipeline import equation_step, figure_step, heading_step, layout, run, table_step
+from readablestem.pipeline.layout import Layout, LayoutError
+from readablestem.pipeline.run import CONTEXT_CHARS, PipelineOutput, convert_pdf
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 SECRET = "SECRET-DOCUMENT-TEXT"

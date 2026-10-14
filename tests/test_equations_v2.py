@@ -9,11 +9,11 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.core.types import Element, Kind
-from a11y_stem.eval import equations_v2 as v2
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.eval.equations import latex_to_mathml, score_latex
-from a11y_stem.eval.gold_scoring import iter_gold_records, load_predictions, score_equations
+from readablestem.core.types import Element, Kind
+from readablestem.eval import equations_v2 as v2
+from readablestem.eval import pipeline_eval as pe
+from readablestem.eval.equations import latex_to_mathml, score_latex
+from readablestem.eval.gold_scoring import iter_gold_records, load_predictions, score_equations
 from test_eval_support import eq_fix, equation
 
 GOLD = Path(__file__).parent.parent / "data" / "gold"

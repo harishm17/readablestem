@@ -12,8 +12,8 @@ import re
 import pytest
 
 import canvas_sanitizer as cs
-from a11y_stem.pipeline import export_canvas as ec
-from a11y_stem.pipeline.export_canvas import export_canvas
+from readablestem.pipeline import export_canvas as ec
+from readablestem.pipeline.export_canvas import export_canvas
 from test_export_canvas import DEMO, made  # noqa: F401  (made is a fixture)
 
 

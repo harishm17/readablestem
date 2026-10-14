@@ -16,12 +16,12 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Kind
-from a11y_stem.eval.equations import latex_to_mathml
-from a11y_stem.eval.gold_scoring import score_equations
-from a11y_stem.gold import devset as ds
-from a11y_stem.gold import devset_classify as dc
-from a11y_stem.pipeline.layout import analyze
+from readablestem.core.types import Kind
+from readablestem.eval.equations import latex_to_mathml
+from readablestem.eval.gold_scoring import score_equations
+from readablestem.gold import devset as ds
+from readablestem.gold import devset_classify as dc
+from readablestem.pipeline.layout import analyze
 
 ROOT = Path(__file__).resolve().parents[1] / "data" / "dev-v2" / "dev" / "authored"
 DOCS = sorted(p.name for p in ROOT.iterdir() if p.is_dir()) if ROOT.is_dir() else []

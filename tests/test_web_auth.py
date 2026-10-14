@@ -6,9 +6,6 @@ import pytest
 from sqlalchemy import select
 from starlette.middleware.sessions import SessionMiddleware
 
-from a11y_stem.web.app import create_app
-from a11y_stem.web.db import User, session_scope
-from a11y_stem.web.security import SecurityHeadersMiddleware
 from fixtures.web.support import (
     ADMIN,
     ALICE,
@@ -18,6 +15,9 @@ from fixtures.web.support import (
     login,
     make_settings,
 )
+from readablestem.web.app import create_app
+from readablestem.web.db import User, session_scope
+from readablestem.web.security import SecurityHeadersMiddleware
 
 JOB = "0" * 32
 PROTECTED_GETS = [
@@ -106,7 +106,7 @@ def test_session_cookie_is_httponly_lax_and_lasts_seven_days(web):
     web.allow(ALICE)
     response = login(web.browser, ALICE)
     cookie = response.headers["set-cookie"].lower()
-    assert "a11y_stem_session=" in cookie
+    assert "readablestem_session=" in cookie
     assert "httponly" in cookie and "samesite=lax" in cookie
     assert "max-age=604800" in cookie
     assert "secure" not in cookie  # https_only only in production
@@ -135,7 +135,7 @@ def test_production_cookie_is_secure_and_hsts_is_on(tmp_path):
 
 
 def test_production_refuses_to_start_without_its_limits(tmp_path):
-    from a11y_stem.config import ConfigError
+    from readablestem.config import ConfigError
 
     with pytest.raises(ConfigError):
         create_app(make_settings(tmp_path, env="prod", dev_login_enabled=False))
@@ -154,7 +154,7 @@ def test_production_refuses_to_start_without_its_limits(tmp_path):
 def test_production_refuses_empty_or_weak_secrets(tmp_path, overrides, named):
     """Blank secrets (`SecretStr("")`, whitespace) are refused by the spine's
     `check_production`; a weak session secret passes it and is refused by the web app."""
-    from a11y_stem.config import ConfigError
+    from readablestem.config import ConfigError
 
     settings = prod_settings(tmp_path, **overrides)
     with pytest.raises(ConfigError, match=named) as refused:
@@ -163,8 +163,8 @@ def test_production_refuses_empty_or_weak_secrets(tmp_path, overrides, named):
 
 
 def test_production_never_falls_back_to_a_random_session_secret(tmp_path):
-    from a11y_stem.config import ConfigError
-    from a11y_stem.web.app import _session_secret
+    from readablestem.config import ConfigError
+    from readablestem.web.app import _session_secret
 
     with pytest.raises(ConfigError):
         _session_secret(prod_settings(tmp_path, session_secret=None))
@@ -203,7 +203,7 @@ def test_removing_someone_from_the_allowlist_ends_their_access_immediately(web):
     web.allow(ALICE)
     login(web.browser, ALICE)
     assert web.browser.get("/app").status_code == 200
-    from a11y_stem.web.auth import set_allowed
+    from readablestem.web.auth import set_allowed
 
     with session_scope(web.ctx.factory) as session:
         set_allowed(session, ALICE, allowed=False)
@@ -239,7 +239,7 @@ def test_signing_out_ends_copied_sessions_too(web):
 
 
 def test_a_session_from_before_removal_stays_ended_when_allowed_back(web):
-    from a11y_stem.web.auth import set_allowed
+    from readablestem.web.auth import set_allowed
 
     web.allow(ALICE)
     login(web.browser, ALICE)

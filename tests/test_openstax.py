@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval.equations import canonical
-from a11y_stem.gold import openstax
-from a11y_stem.gold.openstax import (
+from readablestem.eval.equations import canonical
+from readablestem.gold import openstax
+from readablestem.gold.openstax import (
     BookNotFoundError,
     BookStateError,
     GoldError,

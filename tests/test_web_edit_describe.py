@@ -15,7 +15,10 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import (
+from fixtures.web.review_doc import review_output, review_pdf
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+from fixtures.web.table_doc import table_output, table_pdf
+from readablestem.core.types import (
     ConversionOutput,
     DocumentResult,
     Element,
@@ -23,10 +26,10 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.pipeline import assemble
-from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
-from a11y_stem.web.page_edits import omit_page, restore_page
-from a11y_stem.web.review import (
+from readablestem.pipeline import assemble
+from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
+from readablestem.web.page_edits import omit_page, restore_page
+from readablestem.web.review import (
     DESCRIBE_EMPTY,
     DESCRIBE_FIRST,
     ReviewInvalid,
@@ -34,9 +37,6 @@ from a11y_stem.web.review import (
     can_describe,
     undo_last,
 )
-from fixtures.web.review_doc import review_output, review_pdf
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
-from fixtures.web.table_doc import table_output, table_pdf
 
 # --------------------------------------------------------------------------- fixtures
 
@@ -272,7 +272,7 @@ def test_a_refused_description_comes_back_with_the_text_kept(review):
 
 
 def test_a_described_image_is_not_counted_as_a_silent_one(review):
-    from a11y_stem.web.job_page import shown_as_image
+    from readablestem.web.job_page import shown_as_image
 
     post(review, "p1-e2", action="reject")
     fix = stored(review).fix_for("p1-e2")
@@ -355,7 +355,7 @@ def test_undo_last_knows_older_snapshots_without_the_field():
     result = review_output().result
     fix = result.fix_for("p1-e2")
     assert fix is not None
-    from a11y_stem.web.review import snapshot
+    from readablestem.web.review import snapshot
 
     before = snapshot(fix)
     before.pop("described", None)  # a snapshot from before T3-16

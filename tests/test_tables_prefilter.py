@@ -11,7 +11,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.pipeline import layout, table_model, tables
+from readablestem.pipeline import layout, table_model, tables
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURES = Path(__file__).parent / "fixtures"

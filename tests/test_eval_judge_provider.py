@@ -10,17 +10,17 @@ import json
 
 import pytest
 
-from a11y_stem import config as app_config
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli.main import main
-from a11y_stem.config import ConfigError
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.eval import judge, pipeline_eval
-from a11y_stem.models import anthropic_client, openai_client
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import figure_step
+from readablestem import config as app_config
+from readablestem.cli import eval_cli
+from readablestem.cli.main import main
+from readablestem.config import ConfigError
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.eval import judge, pipeline_eval
+from readablestem.models import anthropic_client, openai_client
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import figure_step
 from test_eval_support import (
     FakeMedia,
     fake_describe,
@@ -217,7 +217,7 @@ def test_without_a_chosen_judge_the_run_judges_itself_as_before(monkeypatch, tmp
 
 
 def pipeline_eval_key(png: bytes) -> str:
-    from a11y_stem.models.fake import image_key
+    from readablestem.models.fake import image_key
 
     return image_key(png)
 

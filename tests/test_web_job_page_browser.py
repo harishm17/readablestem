@@ -15,9 +15,9 @@ from datetime import timedelta
 
 import pytest
 
-from a11y_stem.core.types import ConversionOutput, Notice, SourceFacts, Status
-from a11y_stem.web.db import Job, JobStatus, session_scope, utcnow
 from fixtures.web.support import ALICE, PNG, WebEnv, fake_output, make_pdf
+from readablestem.core.types import ConversionOutput, Notice, SourceFacts, Status
+from readablestem.web.db import Job, JobStatus, session_scope, utcnow
 from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
@@ -65,7 +65,7 @@ def ready_output() -> ConversionOutput:
 def site(tmp_path_factory) -> Iterator[WebEnv]:
     import uvicorn
 
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     patch = pytest.MonkeyPatch()
     # The language control re-renders the file; the fake result's file is a stub.

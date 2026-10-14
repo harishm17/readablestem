@@ -21,37 +21,6 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import (
-    DocumentResult,
-    DocumentStats,
-    Element,
-    Fix,
-    Kind,
-    PageStats,
-    PageType,
-    Status,
-)
-from a11y_stem.models import OFFLINE_DEFAULTS, make_vision_client
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.pricing import estimate_max_cost_usd
-from a11y_stem.pipeline import page_type
-from a11y_stem.pipeline.run import convert_pdf
-from a11y_stem.web.auth import set_allowed
-from a11y_stem.web.database import as_utc, utc_today
-from a11y_stem.web.db import Job, JobStatus, SpendDay, User, session_scope, utcnow
-from a11y_stem.web.outcome import job_outcome
-from a11y_stem.web.pdf_probe import MAX_PAGE_SIDE_PT
-from a11y_stem.web.spend import largest_reservation_usd
-from a11y_stem.web.worker import (
-    JobCancelled,
-    Worker,
-    default_client_factory,
-    error_code_for,
-    job_caps,
-    result_outcome,
-)
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -61,6 +30,37 @@ from fixtures.web.support import (
     login,
     make_pdf,
     upload,
+)
+from readablestem.config import ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
+    DocumentResult,
+    DocumentStats,
+    Element,
+    Fix,
+    Kind,
+    PageStats,
+    PageType,
+    Status,
+)
+from readablestem.models import OFFLINE_DEFAULTS, make_vision_client
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.pricing import estimate_max_cost_usd
+from readablestem.pipeline import page_type
+from readablestem.pipeline.run import convert_pdf
+from readablestem.web.auth import set_allowed
+from readablestem.web.database import as_utc, utc_today
+from readablestem.web.db import Job, JobStatus, SpendDay, User, session_scope, utcnow
+from readablestem.web.outcome import job_outcome
+from readablestem.web.pdf_probe import MAX_PAGE_SIDE_PT
+from readablestem.web.spend import largest_reservation_usd
+from readablestem.web.worker import (
+    JobCancelled,
+    Worker,
+    default_client_factory,
+    error_code_for,
+    job_caps,
+    result_outcome,
 )
 
 LAYOUT = Path(__file__).parent / "fixtures" / "layout"
@@ -227,7 +227,7 @@ def test_uploads_close_when_less_than_the_largest_single_call_is_left(env):
 
 def test_largest_reservation_matches_the_biggest_step_request():
     settings = Settings(_env_file=None)
-    from a11y_stem.pipeline import equation_step
+    from readablestem.pipeline import equation_step
 
     biggest = estimate_max_cost_usd(
         settings.main_model,
@@ -652,7 +652,7 @@ def test_page_types_tell_scans_from_text_figures_and_blank_pages():
 def test_the_upload_probe_child_caps_its_own_address_space():
     code = (
         "import resource\n"
-        "from a11y_stem.web.pdf_probe import limit_memory\n"
+        "from readablestem.web.pdf_probe import limit_memory\n"
         "limit_memory(512 * 1024 * 1024)\n"
         "print(resource.getrlimit(resource.RLIMIT_AS)[0])\n"
     )

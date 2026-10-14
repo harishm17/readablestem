@@ -9,11 +9,11 @@ from datetime import UTC, datetime, timedelta
 import pytest
 import structlog
 
-from a11y_stem.cli.main import build_parser, main
-from a11y_stem.config import get_settings
-from a11y_stem.ops import aggregate
-from a11y_stem.web import db
 from fixtures.ops.seed import SENTINEL, add_job, add_user, sentinel_result
+from readablestem.cli.main import build_parser, main
+from readablestem.config import get_settings
+from readablestem.ops import aggregate
+from readablestem.web import db
 
 PAST = datetime.now(UTC) - timedelta(days=2)
 
@@ -115,7 +115,7 @@ def test_weekly_report_prints_the_error_analysis_tables(database, capsys):
 def test_export_writes_opted_in_jobs_only_and_prune_honours_their_deadline(
     database, capsys, tmp_path
 ):
-    from a11y_stem.ops.export import EXPIRES
+    from readablestem.ops.export import EXPIRES
 
     soon = datetime.now(UTC) + timedelta(days=3)
     with db.session_scope(database) as s:

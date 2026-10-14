@@ -9,7 +9,6 @@ from __future__ import annotations
 import pytest
 from starlette.requests import Request
 
-from a11y_stem.web.abuse import RateLimiter, Rule, client_ip
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -20,6 +19,7 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.web.abuse import RateLimiter, Rule, client_ip
 
 
 class Clock:
@@ -182,9 +182,9 @@ def test_the_cron_endpoint_limits_wrong_tokens(web):
 
 
 def test_production_does_not_start_with_the_limits_off(tmp_path):
-    from a11y_stem.config import ConfigError
-    from a11y_stem.web.app import create_app
     from fixtures.web.support import make_settings
+    from readablestem.config import ConfigError
+    from readablestem.web.app import create_app
 
     settings = make_settings(
         tmp_path,

@@ -12,9 +12,9 @@ from datetime import timedelta
 import pytest
 
 import test_web_postgres as shared
-from a11y_stem.ops.retention import purge_old_events
-from a11y_stem.web import db, documents, events
 from fixtures.web.support import fake_result, make_pdf, make_settings
+from readablestem.ops.retention import purge_old_events
+from readablestem.web import db, documents, events
 
 pytestmark = pytest.mark.postgres
 

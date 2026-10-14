@@ -46,7 +46,7 @@ sys.path.insert(0, str(HERE))
 
 import authored_core as core  # noqa: E402
 
-from a11y_stem.eval.equations import latex_to_mathml  # noqa: E402
+from readablestem.eval.equations import latex_to_mathml  # noqa: E402
 
 ORDER = [
     "latex-exercises",

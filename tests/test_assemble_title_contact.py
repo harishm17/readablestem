@@ -6,8 +6,8 @@ import re
 
 import pytest
 
-from a11y_stem.core.types import Element, Fix, HeadingFix, Kind, Status
-from a11y_stem.pipeline import assemble, html_checks
+from readablestem.core.types import Element, Fix, HeadingFix, Kind, Status
+from readablestem.pipeline import assemble, html_checks
 
 
 @pytest.mark.parametrize(
@@ -138,7 +138,7 @@ def test_no_outline_of_up_to_four_headings_ends_with_two_h1s():
     (`title_shift`) is made exactly when the repaired outline would have had two."""
     import itertools
 
-    from a11y_stem.core.types import Status
+    from readablestem.core.types import Status
 
     for n in range(1, 5):
         for spec in itertools.product((None, 1, 2, 3), repeat=n):

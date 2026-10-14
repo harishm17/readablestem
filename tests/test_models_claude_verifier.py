@@ -9,20 +9,20 @@ import logging
 import httpx2
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Status
-from a11y_stem.models import make_vision_client
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.claude_verifier import (
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import Status
+from readablestem.models import make_vision_client
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.claude_verifier import (
     ClaudeVerifier,
     equation_probabilities,
     figure_probabilities,
     figure_version,
     make_claude_verifier,
 )
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.verifier import (
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.verifier import (
     EQUATION_CHECK,
     FIGURE_CHECK,
     FakeVerifier,
@@ -32,8 +32,8 @@ from a11y_stem.models.verifier import (
     figure_score,
     verifier_of,
 )
-from a11y_stem.pipeline.equation_step import transcribe
-from a11y_stem.pipeline.figure_step import describe
+from readablestem.pipeline.equation_step import transcribe
+from readablestem.pipeline.figure_step import describe
 from test_models_anthropic_client import PNG, SECRET, Wire, error_body, message_body
 from test_steps_support import equation_element, figure_element, use_fallback_router
 
@@ -85,7 +85,7 @@ def test_the_check_model_is_neither_model_that_reads_the_page():
 
 
 def test_the_audit_prompts_are_not_the_first_pass_prompts():
-    from a11y_stem.models.prompts import load_prompt
+    from readablestem.models.prompts import load_prompt
 
     for check, first in (("check_figure", "figure"), ("check_equation", "equation")):
         assert load_prompt(check).text != load_prompt(first).text
@@ -152,7 +152,7 @@ def test_equation_answers_become_the_decisions_check_answer_codes(text, expected
 
 
 def test_probability_helpers_are_one_hot():
-    from a11y_stem.models.claude_verifier import EquationAudit, FigureAudit
+    from readablestem.models.claude_verifier import EquationAudit, FigureAudit
 
     audit = FigureAudit(conveys_key_information=False, contradicts_image=False, problem="generic")
     assert figure_probabilities(audit) == {"ok": 0.0, "factual_error": 0.0}

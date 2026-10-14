@@ -9,11 +9,11 @@ import httpx2
 import openai
 import pytest
 
-from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Verification
-from a11y_stem.models import FakeVisionClient, make_vision_client
-from a11y_stem.models.decisions_client import (
+from readablestem.config import ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import Verification
+from readablestem.models import FakeVisionClient, make_vision_client
+from readablestem.models.decisions_client import (
     Answer,
     DecisionRequest,
     DecisionResult,
@@ -22,8 +22,8 @@ from a11y_stem.models.decisions_client import (
     TextPart,
     request_content,
 )
-from a11y_stem.models.openai_client import PNG_SIGNATURE, OpenAIVisionClient
-from a11y_stem.models.verifier import (
+from readablestem.models.openai_client import PNG_SIGNATURE, OpenAIVisionClient
+from readablestem.models.verifier import (
     EQUATION_CHECK,
     EQUATION_VERSION,
     FIGURE_CHECK,
@@ -39,8 +39,8 @@ from a11y_stem.models.verifier import (
     verification_score,
     verifier_of,
 )
-from a11y_stem.observability.tracing import NoopTracer
-from a11y_stem.pipeline.run import _RecordingClient
+from readablestem.observability.tracing import NoopTracer
+from readablestem.pipeline.run import _RecordingClient
 
 PNG = PNG_SIGNATURE + b"figure"
 

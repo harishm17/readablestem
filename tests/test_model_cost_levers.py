@@ -11,15 +11,15 @@ import httpx2
 import pytest
 from PIL import Image
 
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Status
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.base import UNTRUSTED_NOTICE, VisionRequest
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.images import shrink_png
-from a11y_stem.models.openai_client import PNG_SIGNATURE
-from a11y_stem.pipeline.equation_step import EquationOutput, transcribe
-from a11y_stem.pipeline.figure_step import describe
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import Status
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.base import UNTRUSTED_NOTICE, VisionRequest
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.images import shrink_png
+from readablestem.models.openai_client import PNG_SIGNATURE
+from readablestem.pipeline.equation_step import EquationOutput, transcribe
+from readablestem.pipeline.figure_step import describe
 from test_steps_support import (
     equation_element,
     figure_element,

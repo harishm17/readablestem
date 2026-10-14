@@ -10,11 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import Fix, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step
-from a11y_stem.pipeline.equation_step import SKIP_ESCALATION_FROM, transcribe
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.types import Fix, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step
+from readablestem.pipeline.equation_step import SKIP_ESCALATION_FROM, transcribe
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 PNG = b"\x89PNG equation crop"
@@ -115,7 +115,7 @@ def test_an_invalid_cheap_answer_in_the_band_still_asks_again():
 
 
 def test_a_failed_speech_note_in_the_band_keeps_the_old_rule(monkeypatch):
-    from a11y_stem.pipeline.speech import SpeechError
+    from readablestem.pipeline.speech import SpeechError
 
     def broken(*args, **kwargs):
         raise SpeechError("no")

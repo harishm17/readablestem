@@ -29,7 +29,7 @@ def report():
 def _gold_dir() -> Path:
     base = os.environ.get("XDG_CACHE_HOME")
     root = Path(base) if base else Path.home() / ".cache"
-    return Path(os.environ.get("HELDOUT_GOLD", root / "a11y-stem" / "heldout" / "gold"))
+    return Path(os.environ.get("HELDOUT_GOLD", root / "readablestem" / "heldout" / "gold"))
 
 
 def test_a_missing_answer_key_says_how_to_get_it_instead_of_a_traceback(report, tmp_path):
@@ -47,7 +47,8 @@ def test_another_answer_key_is_refused(report, tmp_path):
 def test_the_makefile_reads_the_same_folder_the_fetch_writes():
     makefile = (ROOT / "Makefile").read_text(encoding="utf-8")
     line = next(ln for ln in makefile.splitlines() if "proof/interim/report.py" in ln)
-    assert "XDG_CACHE_HOME" in line, "proof-interim must honour the cache folder heldout-gold uses"
+    # heldout-gold writes to `heldout.default_root()`; proof-interim asks the same function.
+    assert "default_root" in line, "proof-interim must read the folder heldout-gold uses"
 
 
 def test_recall_is_split_by_where_the_gold_heading_sits(report):

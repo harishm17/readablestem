@@ -10,8 +10,8 @@ import numpy as np
 import pymupdf
 from PIL import Image, ImageDraw
 
-from a11y_stem.core.types import Element, Kind
-from a11y_stem.pipeline import equation_images, layout
+from readablestem.core.types import Element, Kind
+from readablestem.pipeline import equation_images, layout
 
 
 def equation_png(width: int = 90, height: int = 60, *, pieces: int = 5) -> bytes:

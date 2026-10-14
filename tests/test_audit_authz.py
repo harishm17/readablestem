@@ -11,7 +11,9 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.web.db import (
+from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, csrf_from, job_id_from, login, upload
+from fixtures.web.support import make_pdf as pdf
+from readablestem.web.db import (
     Course,
     CourseNotation,
     Job,
@@ -20,8 +22,6 @@ from a11y_stem.web.db import (
     User,
     session_scope,
 )
-from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, csrf_from, job_id_from, login, upload
-from fixtures.web.support import make_pdf as pdf
 
 PUBLIC = "public"
 USER = "user"

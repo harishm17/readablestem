@@ -21,11 +21,11 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.models import OFFLINE_DEFAULTS
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline.run import convert_pdf
 from fixtures.web.support import ALICE, WebEnv
+from readablestem.config import Settings
+from readablestem.models import OFFLINE_DEFAULTS
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline.run import convert_pdf
 from test_web_browser import TEXT_SPACING, WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest

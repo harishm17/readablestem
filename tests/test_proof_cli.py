@@ -4,10 +4,10 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.cli import main as cli_main
-from a11y_stem.proof import engine
-from a11y_stem.proof.errors import BundleError, Drift, PinMismatch, ReplayMiss
 from proof_support import SET_ID, make_project
+from readablestem.cli import main as cli_main
+from readablestem.proof import engine
+from readablestem.proof.errors import BundleError, Drift, PinMismatch, ReplayMiss
 
 
 @pytest.fixture

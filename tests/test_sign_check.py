@@ -22,16 +22,16 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.triage import review_load, tier_reasons
-from a11y_stem.core.types import Check, DocumentResult, Element, Kind, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step, signs
-from a11y_stem.pipeline.equation_step import _symbol_bag, transcribe
-from a11y_stem.pipeline.layout import Layout, analyze
-from a11y_stem.pipeline.signs import compare_signs, layer_signs
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
-from a11y_stem.web.messages import explain_check
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.triage import review_load, tier_reasons
+from readablestem.core.types import Check, DocumentResult, Element, Kind, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step, signs
+from readablestem.pipeline.equation_step import _symbol_bag, transcribe
+from readablestem.pipeline.layout import Layout, analyze
+from readablestem.pipeline.signs import compare_signs, layer_signs
+from readablestem.pipeline.validate import safe_latex_to_mathml
+from readablestem.web.messages import explain_check
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 FIXTURES = Path(__file__).parent / "fixtures" / "layout"
@@ -976,7 +976,7 @@ PAGE_CASES = [
 MATH_CSS = 'math { font-family: "Noto Sans Math", "STIX Two Math", "Latin Modern Math", math; }'
 VENDORED_MATH_FONT = (
     Path(__file__).resolve().parents[1]
-    / "src/a11y_stem/web/static/vendor/fonts/latinmodern-math.otf"
+    / "src/readablestem/web/static/vendor/fonts/latinmodern-math.otf"
 )
 
 
@@ -1001,7 +1001,7 @@ def _page_html(math_css: str = MATH_CSS) -> str:
 
 @pytest.mark.browser
 def test_a_chromium_printed_course_page():
-    from a11y_stem.eval.render import ChromiumRenderer
+    from readablestem.eval.render import ChromiumRenderer
 
     with ChromiumRenderer() as renderer:
         pdf = renderer.pdf(_page_html())
@@ -1031,7 +1031,7 @@ def test_a_display_equation_in_a_type3_maths_font_stays_display():
     # The same page with the maths in the vendored Latin Modern Math (CFF, so Type3 in
     # Chromium's PDF): v(t) = -g t (time-dependent) should stay one display equation, as
     # it does with a TrueType maths font that names itself.
-    from a11y_stem.eval.render import ChromiumRenderer
+    from readablestem.eval.render import ChromiumRenderer
 
     font = base64.b64encode(VENDORED_MATH_FONT.read_bytes()).decode("ascii")
     css = (
@@ -1068,7 +1068,7 @@ TYPED_LINES = [
 
 @pytest.mark.browser
 def test_typed_superscripts_printed_by_chromium():
-    from a11y_stem.eval.render import ChromiumRenderer
+    from readablestem.eval.render import ChromiumRenderer
 
     body = "".join(
         f"<p>Paragraph {i} of ordinary prose about the motion of a body.</p>"

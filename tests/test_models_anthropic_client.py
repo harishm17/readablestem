@@ -17,25 +17,25 @@ import httpx2
 import pytest
 from pydantic import BaseModel, Field
 
-from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.models import anthropic_client
-from a11y_stem.models.anthropic_client import (
+from readablestem.config import ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.models import anthropic_client
+from readablestem.models.anthropic_client import (
     FALLBACK_BETA,
     WORKSPACE_HEADER,
     AnthropicVisionClient,
 )
-from a11y_stem.models.base import UNTRUSTED_NOTICE, VisionRequest
-from a11y_stem.models.openai_client import PNG_SIGNATURE
-from a11y_stem.models.pricing import (
+from readablestem.models.base import UNTRUSTED_NOTICE, VisionRequest
+from readablestem.models.openai_client import PNG_SIGNATURE
+from readablestem.models.pricing import (
     ANTHROPIC_MODELS,
     THINKING_ALLOWANCE_TOKENS,
     cost_usd,
     estimate_max_cost_usd,
 )
-from a11y_stem.pipeline.equation_step import EquationOutput
-from a11y_stem.pipeline.figure_step import FigureOutput
-from a11y_stem.pipeline.table_step import TableOutput
+from readablestem.pipeline.equation_step import EquationOutput
+from readablestem.pipeline.figure_step import FigureOutput
+from readablestem.pipeline.table_step import TableOutput
 
 PNG = PNG_SIGNATURE + b"tiny test image"
 INSTRUCTIONS = "Transcribe the equation in the image as LaTeX."
@@ -413,7 +413,7 @@ def test_invalid_json_or_no_text_is_invalid_output():
 def test_refusal_is_refused_and_still_billed(caplog: pytest.LogCaptureFixture):
     details = {"type": "refusal", "category": "cyber", "explanation": SECRET}
     wire = Wire(message_body(text=None, stop_reason="refusal", stop_details=details))
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.models.anthropic_client"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.models.anthropic_client"):
         parsed, call = run(wire)
     assert parsed is None and call.outcome == "refused"
     assert call.cost_usd > 0

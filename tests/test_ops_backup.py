@@ -19,13 +19,13 @@ from alembic import command
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from a11y_stem.cli.main import main
-from a11y_stem.config import get_settings
-from a11y_stem.ops import backup
-from a11y_stem.ops.backup import DrillError, check_database, restore_drill
-from a11y_stem.web import db
-from a11y_stem.web.database import alembic_config
 from fixtures.ops.seed import SENTINEL, add_job, add_user
+from readablestem.cli.main import main
+from readablestem.config import get_settings
+from readablestem.ops import backup
+from readablestem.ops.backup import DrillError, check_database, restore_drill
+from readablestem.web import db
+from readablestem.web.database import alembic_config
 
 pytestmark = pytest.mark.postgres
 

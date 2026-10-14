@@ -16,29 +16,6 @@ from pydantic import BaseModel
 from sqlalchemy import select, update
 from sqlalchemy.exc import IntegrityError, OperationalError
 
-from a11y_stem.core.budget import BudgetExceeded, JobBudget
-from a11y_stem.core.types import ConversionOutput
-from a11y_stem.models import make_vision_client
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.verifier import FakeVerifier
-from a11y_stem.pipeline.layout import LayoutError
-from a11y_stem.web import worker as worker_module
-from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Blob, Job, SpendDay, User, session_scope, utcnow
-from a11y_stem.web.spend import DbSpendGuard
-from a11y_stem.web.views import job_error_message
-from a11y_stem.web.worker import (
-    MAX_ATTEMPTS,
-    JobCancelled,
-    Worker,
-    db_safe,
-    default_converter,
-    error_code_for,
-    job_caps,
-    job_time_limit_s,
-    process_next_job,
-)
 from fixtures.web.support import (
     ALICE,
     SECRETS,
@@ -51,6 +28,29 @@ from fixtures.web.support import (
     output_with_nul,
     token,
     upload,
+)
+from readablestem.core.budget import BudgetExceeded, JobBudget
+from readablestem.core.types import ConversionOutput
+from readablestem.models import make_vision_client
+from readablestem.models.base import VisionRequest
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.verifier import FakeVerifier
+from readablestem.pipeline.layout import LayoutError
+from readablestem.web import worker as worker_module
+from readablestem.web.database import as_utc
+from readablestem.web.db import Blob, Job, SpendDay, User, session_scope, utcnow
+from readablestem.web.spend import DbSpendGuard
+from readablestem.web.views import job_error_message
+from readablestem.web.worker import (
+    MAX_ATTEMPTS,
+    JobCancelled,
+    Worker,
+    db_safe,
+    default_converter,
+    error_code_for,
+    job_caps,
+    job_time_limit_s,
+    process_next_job,
 )
 
 
@@ -849,8 +849,8 @@ class RecordingTracer:
 
 def test_with_tracing_on_the_app_hands_one_tracer_to_every_conversion(tmp_path, monkeypatch):
     """make_tracer used to have no caller: TRACING_ENABLED did nothing."""
-    from a11y_stem.pipeline.run import convert_pdf
-    from a11y_stem.web import app as app_module
+    from readablestem.pipeline.run import convert_pdf
+    from readablestem.web import app as app_module
 
     tracer = RecordingTracer()
     monkeypatch.setattr(app_module, "make_tracer", lambda settings: tracer)
@@ -903,7 +903,7 @@ def test_the_converter_runs_the_setting_many_steps_at_once(env):
 
 def test_a_job_whose_cap_cannot_hold_that_many_calls_runs_fewer_steps(tmp_path):
     """One page on Claude is capped at $1.00 and a call can hold $0.14: seven at once."""
-    from a11y_stem.ops.limits import largest_reservation_usd
+    from readablestem.ops.limits import largest_reservation_usd
 
     env = WebEnv(tmp_path, model_provider="anthropic")
     with env.running():

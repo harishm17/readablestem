@@ -11,11 +11,12 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.core.types import Check
-from a11y_stem.pipeline import html_checks, run
-from a11y_stem.proof import engine, registry, runner
-from a11y_stem.proof.bundle import MANIFEST_NAME, Bundle
-from a11y_stem.proof.errors import (
+from proof_support import SET_ID, PdfMedia, fake_client, make_project
+from readablestem.core.types import Check
+from readablestem.pipeline import html_checks, run
+from readablestem.proof import engine, registry, runner
+from readablestem.proof.bundle import MANIFEST_NAME, Bundle
+from readablestem.proof.errors import (
     BundleError,
     Drift,
     Incomplete,
@@ -23,8 +24,7 @@ from a11y_stem.proof.errors import (
     ProofError,
     ReplayMiss,
 )
-from a11y_stem.proof.report import wording_problems
-from proof_support import SET_ID, PdfMedia, fake_client, make_project
+from readablestem.proof.report import wording_problems
 
 DATE = "2026-10-14"
 N_BOOT = 200  # the intervals are tested in test_proof_stats; fewer draws keep this quick
@@ -402,13 +402,13 @@ class DemoStage:
         self.recorded = True
 
     def run(self, ctx):
-        from a11y_stem.proof.report import Section, StageResult
+        from readablestem.proof.report import Section, StageResult
 
         return StageResult("ok", [Section(self.title, [self.text])])
 
 
 def test_a_registered_stage_replaces_its_stub_in_the_same_place(recorded, monkeypatch):
-    from a11y_stem.proof import stages
+    from readablestem.proof import stages
 
     monkeypatch.setitem(stages.STAGES, "invented_content", DemoStage())
     result = engine.run_proof(options(recorded, out=recorded.root / "demo.md"), say=lambda _m: None)
@@ -423,7 +423,7 @@ def test_a_registered_stage_replaces_its_stub_in_the_same_place(recorded, monkey
 
 
 def test_a_stage_that_writes_a_forbidden_word_stops_the_report(recorded, monkeypatch):
-    from a11y_stem.proof import stages
+    from readablestem.proof import stages
 
     monkeypatch.setitem(stages.STAGES, "invented_content", DemoStage("The output is compliant."))
     with pytest.raises(ProofError, match="wording rules"):
@@ -432,7 +432,7 @@ def test_a_stage_that_writes_a_forbidden_word_stops_the_report(recorded, monkeyp
 
 
 def test_a_live_run_calls_every_stage_record_hook(tmp_path, monkeypatch):
-    from a11y_stem.proof import stages
+    from readablestem.proof import stages
 
     root = make_project(tmp_path)
     demo = DemoStage()
@@ -458,7 +458,7 @@ def test_a_live_run_calls_every_stage_record_hook(tmp_path, monkeypatch):
 
 
 def _client_that_runs_out_after(finished_runs: int):
-    from a11y_stem.core.budget import BudgetExceeded
+    from readablestem.core.budget import BudgetExceeded
 
     made = {"n": 0}
 
@@ -563,13 +563,13 @@ def _fake_chat_records(arm_ids, refused=()):
 def test_chatbot_arms_that_finished_whole_are_added_and_a_cap_stopped_arm_is_not(
     recorded, tmp_path, monkeypatch
 ):
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
 
     record = _fake_chat_records(
         ["chatbot-sol-purdue", "chatbot-sol-expert"], refused=["chatbot-sol-expert/x.run1"]
     )
-    from a11y_stem.eval import render
-    from a11y_stem.proof import chatbot
+    from readablestem.eval import render
+    from readablestem.proof import chatbot
 
     monkeypatch.setattr(chatbot, "record_arms", record)
     monkeypatch.setattr(render.ImageCache, "png", lambda self, url: b"not a picture")
@@ -593,7 +593,7 @@ def test_chatbot_arms_that_finished_whole_are_added_and_a_cap_stopped_arm_is_not
 
 
 def test_a_primary_chatbot_arm_the_cap_cannot_hold_adds_nothing(recorded, tmp_path, monkeypatch):
-    from a11y_stem.proof import chatbot
+    from readablestem.proof import chatbot
 
     monkeypatch.setattr(
         chatbot,
@@ -614,9 +614,9 @@ def test_a_primary_chatbot_arm_the_cap_cannot_hold_adds_nothing(recorded, tmp_pa
 def test_claude_arms_are_added_one_after_the_other_with_the_runs_that_were_made(
     recorded, tmp_path, monkeypatch
 ):
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.eval import render
-    from a11y_stem.proof import chatbot
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.eval import render
+    from readablestem.proof import chatbot
 
     asked = []
 

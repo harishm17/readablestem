@@ -11,8 +11,8 @@ import threading
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.web import db
-from a11y_stem.web.identities import (
+from readablestem.web import db
+from readablestem.web.identities import (
     GOOGLE,
     GOOGLE_ISSUER,
     MICROSOFT,

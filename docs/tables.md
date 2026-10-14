@@ -164,7 +164,7 @@ SLANet-plus is the 7.5 MB ONNX file RapidTable 3.0.2 ships (`slanet-plus.onnx`,
 | Source | `https://www.modelscope.cn/models/RapidAI/RapidTable/resolve/v2.0.0/slanet-plus.onnx` (RapidTable 3.0.2's `default_models.yaml`, entry `slanet_plus`) |
 | SHA-256 | `d57a942af6a2f57d6a4a0372573c696a2379bf5857c45e2ac69993f3b334514b` (the same file) |
 | Where | `$TABLE_MODEL_DIR/slanet-plus.onnx`; default `~/.cache/a11y-stem/models` (or under `$XDG_CACHE_HOME`); the image sets `TABLE_MODEL_DIR=/app/models` |
-| Fetch | the Docker build (`python -m a11y_stem.pipeline.table_model --dir /app/models`); for development `make table-model`; `--from FILE` installs a copy you already have |
+| Fetch | the Docker build (`python -m readablestem.pipeline.table_model --dir /app/models`); for development `make table-model`; `--from FILE` installs a copy you already have |
 
 A download whose checksum differs is refused and nothing is installed; a file on disk
 with the wrong checksum is not loaded. **Without the file nothing breaks**: tables are

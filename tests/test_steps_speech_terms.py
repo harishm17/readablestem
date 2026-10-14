@@ -5,9 +5,9 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.pipeline.speech import mathml_to_speech
-from a11y_stem.pipeline.speech_units import unit_words
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.pipeline.speech import mathml_to_speech
+from readablestem.pipeline.speech_units import unit_words
+from readablestem.pipeline.validate import safe_latex_to_mathml
 
 NS = 'xmlns="http://www.w3.org/1998/Math/MathML"'
 

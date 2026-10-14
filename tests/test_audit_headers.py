@@ -9,8 +9,6 @@ from __future__ import annotations
 import pytest
 from fastapi.testclient import TestClient
 
-from a11y_stem.web.app import SESSION_COOKIE, create_app
-from a11y_stem.web.security import APP_CSP, VIEW_CSP
 from fixtures.web.support import (
     ALICE,
     WebEnv,
@@ -21,6 +19,8 @@ from fixtures.web.support import (
     make_settings,
 )
 from fixtures.web.support import upload as upload_pdf
+from readablestem.web.app import SESSION_COOKIE, create_app
+from readablestem.web.security import APP_CSP, VIEW_CSP
 
 BASELINE = {
     "x-content-type-options": "nosniff",
@@ -135,7 +135,7 @@ def test_production_adds_hsts_to_every_response_even_a_crash(tmp_path, monkeypat
     check_headers(client.get("/static/missing"), hsts=True, where="static 404")
     check_headers(client.delete("/"), hsts=True, where="405")
     check_headers(client.get("/status"), hsts=True, where="database down")
-    from a11y_stem.web.routes import pages
+    from readablestem.web.routes import pages
 
     def boom(*args, **kwargs):
         raise ValueError("boom")

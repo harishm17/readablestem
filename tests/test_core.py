@@ -8,13 +8,13 @@ import threading
 import pytest
 from pydantic import BaseModel
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL, ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import DocumentResult, DocumentStats, Fix, Kind, ModelCall, Status
-from a11y_stem.models.base import VisionRequest, fence_untrusted
-from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.models.pricing import UnknownModelError, cost_usd, estimate_max_cost_usd
-from a11y_stem.web import db
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL, ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import DocumentResult, DocumentStats, Fix, Kind, ModelCall, Status
+from readablestem.models.base import VisionRequest, fence_untrusted
+from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.models.pricing import UnknownModelError, cost_usd, estimate_max_cost_usd
+from readablestem.web import db
 
 
 def settings(**kw) -> Settings:

@@ -10,12 +10,12 @@ from decimal import Decimal
 
 import pytest
 
-from a11y_stem.config import MAIN_MODEL
-from a11y_stem.core.types import ConversionOptions, Element, Fix, Kind, Status, grid_problems
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import figure_details, figure_step, options
-from a11y_stem.pipeline.figure_step import (
+from readablestem.config import MAIN_MODEL
+from readablestem.core.types import ConversionOptions, Element, Fix, Kind, Status, grid_problems
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import figure_details, figure_step, options
+from readablestem.pipeline.figure_step import (
     LONG_MAX_OUTPUT_TOKENS,
     LONG_PROMPT_VERSION,
     MAX_OUTPUT_TOKENS,
@@ -192,7 +192,7 @@ def test_values_printed_in_the_figure_need_no_decision(long_on):
 def test_values_read_from_the_image_are_an_optional_extra_not_a_decision(long_on):
     # Additive extras never add a required decision: the table is kept on the fix,
     # offered on the review screen, and not written until a reviewer adds it.
-    from a11y_stem.pipeline import figure_details
+    from readablestem.pipeline import figure_details
 
     fix, _ = run(long(), element(text=None))  # a raster chart: no PDF text in the region
     assert fix.figure is not None and fix.figure.data_values_from_text is False

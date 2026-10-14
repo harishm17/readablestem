@@ -14,9 +14,6 @@ import zlib
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.web import uploads
-from a11y_stem.web.db import Blob, Job, QuotaDay, session_scope
-from a11y_stem.web.uploads import UploadRejected, inspect_pdf_isolated, safe_filename
 from fixtures.web.support import (
     ALICE,
     WebEnv,
@@ -27,6 +24,9 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.web import uploads
+from readablestem.web.db import Blob, Job, QuotaDay, session_scope
+from readablestem.web.uploads import UploadRejected, inspect_pdf_isolated, safe_filename
 
 
 @pytest.fixture
@@ -56,7 +56,7 @@ def test_an_oversized_body_is_refused_before_the_pdf_is_opened(web, monkeypatch)
     opened = []
     monkeypatch.setattr(uploads, "probe", lambda *a, **k: opened.append(1))
     monkeypatch.setattr(
-        "a11y_stem.web.routes.jobs.inspect_pdf_isolated", lambda *a, **k: opened.append(1)
+        "readablestem.web.routes.jobs.inspect_pdf_isolated", lambda *a, **k: opened.append(1)
     )
     big = b"%PDF-1.4\n" + b"0" * (2 * 1024 * 1024)
     response = upload(web.browser, big)
@@ -136,7 +136,7 @@ def test_a_streamed_body_with_no_length_is_cut_off_at_the_limit(tmp_path):
 
 def test_too_many_parts_or_files_is_a_bad_form_not_a_crash(web):
     csrf = token(web.browser)
-    from a11y_stem.web.uploads import MAX_FILES_PER_UPLOAD
+    from readablestem.web.uploads import MAX_FILES_PER_UPLOAD
 
     # Several files are allowed (T3-4, tests/test_web_multiupload.py); a flood of them is not.
     files = [
@@ -386,7 +386,7 @@ def test_hostile_names_are_shown_escaped_and_never_reach_headers(web):
 def test_one_person_cannot_queue_without_limit(web):
     """At most a few conversions wait or run at once for one person: a long queue of
     their own files must not push everyone else back."""
-    from a11y_stem.web.routes.jobs import MAX_ACTIVE_JOBS_PER_USER
+    from readablestem.web.routes.jobs import MAX_ACTIVE_JOBS_PER_USER
 
     queued = 0
     for _ in range(MAX_ACTIVE_JOBS_PER_USER + 3):
@@ -403,7 +403,7 @@ def test_one_person_cannot_queue_without_limit(web):
 
 
 def test_one_person_cannot_store_without_limit(tmp_path):
-    from a11y_stem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER
+    from readablestem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER
 
     env = WebEnv(tmp_path, per_user_daily_page_quota=1000)
     with env.running() as client:
@@ -424,7 +424,7 @@ def test_one_person_cannot_store_without_limit(tmp_path):
 
 
 def test_child_env_keeps_only_what_an_interpreter_needs(monkeypatch):
-    from a11y_stem.core.childenv import child_env
+    from readablestem.core.childenv import child_env
 
     for name in ("SESSION_SECRET", "CRON_TOKEN", "GOOGLE_CLIENT_SECRET", "MS_CLIENT_SECRET"):
         monkeypatch.setenv(name, "secret-value")
@@ -438,13 +438,13 @@ def test_the_probe_child_caps_its_own_memory_and_the_parent_caps_its_time(monkey
     import subprocess
     import sys
 
-    from a11y_stem.web.pdf_probe import MEMORY_LIMIT_BYTES
+    from readablestem.web.pdf_probe import MEMORY_LIMIT_BYTES
 
     shown = subprocess.run(
         [
             sys.executable,
             "-c",
-            "import resource; from a11y_stem.web.pdf_probe import limit_memory; limit_memory(); "
+            "import resource; from readablestem.web.pdf_probe import limit_memory; limit_memory(); "
             "print(resource.getrlimit(resource.RLIMIT_AS)[0])",
         ],
         capture_output=True,

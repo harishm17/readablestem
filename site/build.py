@@ -3,7 +3,7 @@
     uv run python site/build.py [--out site/_build]
 
 Everything on the site comes from files committed in this repository: the stored results
-of past conversions (site/examples/*, and the demo under src/a11y_stem/web/static/demo),
+of past conversions (site/examples/*, and the demo under src/readablestem/web/static/demo),
 the committed PROOF.md, the text and the stylesheet in site/. The build calls no model,
 fetches nothing, reads no clock and reads no environment variable, so the same inputs give
 the same bytes. docs/site.md describes the pages, the inputs and how to add an example.
@@ -29,12 +29,12 @@ from typing import Any
 import jinja2
 import pymupdf
 
-from a11y_stem.core.types import DocumentResult, Element, Fix, Kind
-from a11y_stem.web import messages, speech_diff
-from a11y_stem.web.compare import band_clip, compare_equation, context_clip
-from a11y_stem.web.review import group_fixes, item_labels
-from a11y_stem.web.routes.review import reject_words
-from a11y_stem.web.views import KIND_LABELS
+from readablestem.core.types import DocumentResult, Element, Fix, Kind
+from readablestem.web import messages, speech_diff
+from readablestem.web.compare import band_clip, compare_equation, context_clip
+from readablestem.web.review import group_fixes, item_labels
+from readablestem.web.routes.review import reject_words
+from readablestem.web.views import KIND_LABELS
 
 SITE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SITE_DIR.parent
@@ -410,7 +410,8 @@ def extract_images(fragment: str, out: Out, base: str) -> str:
     return re.sub(r'src="data:image/([a-zA-Z+.-]+);base64,([^"]+)"', swap, fragment)
 
 
-MARKER = ".a11y-stem-site-build"
+MARKER = ".readablestem-site-build"
+OLD_MARKER = ".a11y-stem-site-build"  # folders built before the rename
 
 
 class Out:
@@ -426,7 +427,9 @@ class Out:
         """Replace `root` with the files. A folder that was not made by this script (it has
         no marker file) and is not empty is refused, so a wrong --out cannot delete work."""
         if root.exists():
-            if any(root.iterdir()) and not (root / MARKER).exists():
+            if any(root.iterdir()) and not (
+                (root / MARKER).exists() or (root / OLD_MARKER).exists()
+            ):
                 raise SystemExit(f"refusing to replace {root}: not a site build folder")
             shutil.rmtree(root)
         root.mkdir(parents=True)

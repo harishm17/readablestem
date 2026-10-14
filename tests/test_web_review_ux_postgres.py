@@ -16,9 +16,9 @@ import threading
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.web.db import ReviewEdit, session_scope
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from readablestem.web.db import ReviewEdit, session_scope
 from test_web_postgres import pg_url as pg_url  # fixture, re-exported for pytest
 from test_web_postgres import server_url as server_url  # fixture, re-exported for pytest
 

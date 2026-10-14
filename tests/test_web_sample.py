@@ -14,11 +14,12 @@ from html import unescape
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.core.types import DocumentResult
-from a11y_stem.ops.aggregate import aggregate_finished
-from a11y_stem.ops.retention import purge_expired
-from a11y_stem.web import sample
-from a11y_stem.web.db import (
+from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, login, make_pdf, token, upload
+from readablestem.core.types import DocumentResult
+from readablestem.ops.aggregate import aggregate_finished
+from readablestem.ops.retention import purge_expired
+from readablestem.web import sample
+from readablestem.web.db import (
     Blob,
     ErrorAggregate,
     Event,
@@ -29,7 +30,6 @@ from a11y_stem.web.db import (
     session_scope,
     utcnow,
 )
-from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, login, make_pdf, token, upload
 
 
 def text_of(html: str) -> str:
@@ -101,7 +101,7 @@ def test_the_sample_is_the_recorded_conversion_in_the_persons_list(web):
 
 
 def test_no_model_is_called_for_anyone(web, monkeypatch):
-    import a11y_stem.models as models
+    import readablestem.models as models
 
     def never(*args, **kwargs):
         raise AssertionError("a model client was made for the sample")
@@ -124,7 +124,7 @@ def test_opening_it_twice_gives_the_same_document_and_each_person_has_their_own(
 
 
 def test_it_uses_no_pages_no_spend_and_takes_no_place_from_the_caps(web):
-    from a11y_stem.web.intake import (
+    from readablestem.web.intake import (
         MAX_ACTIVE_JOBS_PER_USER,
         MAX_LIVE_JOBS_PER_USER,
         live_job_count,
@@ -306,8 +306,8 @@ def test_the_sample_is_written_by_todays_assembler_and_cut_as_a_conversion_cuts(
     """Recorded once, shown as the current output: one h1, the dark colour scheme, the About
     region, and an equation's picture cut sharp for the size of the text (its resolution is
     in the PNG), as `pipeline.run.recrop` does for a conversion."""
-    from a11y_stem.core.types import Kind
-    from a11y_stem.pipeline import equation_scale
+    from readablestem.core.types import Kind
+    from readablestem.pipeline import equation_scale
 
     recorded = sample.load()
     html = recorded.html

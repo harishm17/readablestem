@@ -21,8 +21,8 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval.equations import score_latex
-from a11y_stem.eval.gold_scoring import iter_gold_records
+from readablestem.eval.equations import score_latex
+from readablestem.eval.gold_scoring import iter_gold_records
 
 REPO = Path(__file__).resolve().parents[1]
 GOLD_DIR = REPO / "data" / "gold"
@@ -57,6 +57,6 @@ def test_correct_latex_matches_gold_leniently(pred):
 def test_correct_latex_matches_gold_under_the_secondary_stream_scorer(pred):
     """The known gaps above are packing gaps; the labelled secondary scorer
     (`eval.equations_v2`, backlog T2-12) closes all of them. The primary stays strict."""
-    from a11y_stem.eval.equations_v2 import score_stream_latex
+    from readablestem.eval.equations_v2 import score_stream_latex
 
     assert score_stream_latex(pred["latex"], GOLD[pred["id"]]["mathml"]).exact

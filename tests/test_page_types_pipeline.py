@@ -20,16 +20,16 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.config import Settings
-from a11y_stem.core import triage
-from a11y_stem.core.types import Kind, Status
-from a11y_stem.models import OFFLINE_DEFAULTS
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import layout, page_type
-from a11y_stem.pipeline.run import convert_pdf
-from a11y_stem.web.db import Job, User, session_scope
-from a11y_stem.web.worker import Worker, result_outcome
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, upload
+from readablestem.config import Settings
+from readablestem.core import triage
+from readablestem.core.types import Kind, Status
+from readablestem.models import OFFLINE_DEFAULTS
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import layout, page_type
+from readablestem.pipeline.run import convert_pdf
+from readablestem.web.db import Job, User, session_scope
+from readablestem.web.worker import Worker, result_outcome
 
 HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
 TEXT_KINDS = (Kind.PARAGRAPH, Kind.HEADING, Kind.LIST_ITEM, Kind.EQUATION, Kind.TABLE)

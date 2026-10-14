@@ -10,9 +10,9 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.pricing import (
+from readablestem.config import Settings
+from readablestem.models.base import VisionRequest
+from readablestem.models.pricing import (
     ANTHROPIC_MODELS,
     IMAGE_TOKEN_MARGIN,
     THINKING_ALLOWANCE_TOKENS,
@@ -21,8 +21,8 @@ from a11y_stem.models.pricing import (
     image_tokens_upper_bound,
     png_size,
 )
-from a11y_stem.pipeline import equation_step, figure_step
-from a11y_stem.web.worker import job_caps
+from readablestem.pipeline import equation_step, figure_step
+from readablestem.web.worker import job_caps
 
 OPUS, HAIKU = "claude-opus-5-5", "claude-haiku-5-5"
 
@@ -133,7 +133,7 @@ def test_the_client_reserves_for_the_image_it_sends():
         images=[png(400, 300)],
         max_output_tokens=1024,
     )
-    from a11y_stem.models.anthropic_client import AnthropicVisionClient
+    from readablestem.models.anthropic_client import AnthropicVisionClient
 
     settings = Settings(_env_file=None, model_provider="anthropic", anthropic_api_key="sk-a")  # type: ignore[call-arg]
     client = AnthropicVisionClient(settings, Spy(), client=Sdk())  # type: ignore[arg-type]

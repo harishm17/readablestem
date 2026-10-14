@@ -7,7 +7,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.pipeline.parse import (
+from readablestem.pipeline.parse import (
     equation_score,
     parse_pdf,
     render_region,

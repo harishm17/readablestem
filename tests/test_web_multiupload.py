@@ -16,9 +16,6 @@ from html import unescape
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.web.db import Event, Job, QuotaDay, session_scope
-from a11y_stem.web.intake import MAX_ACTIVE_JOBS_PER_USER
-from a11y_stem.web.uploads import MAX_FILES_PER_UPLOAD
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -29,6 +26,9 @@ from fixtures.web.support import (
     make_pdf,
     token,
 )
+from readablestem.web.db import Event, Job, QuotaDay, session_scope
+from readablestem.web.intake import MAX_ACTIVE_JOBS_PER_USER
+from readablestem.web.uploads import MAX_FILES_PER_UPLOAD
 
 
 def text_of(html: str) -> str:
@@ -234,8 +234,8 @@ def test_the_results_page_is_for_its_owner_and_for_an_hour(web):
     # Past its hour the page is gone (404) and the purge deletes the row, names and all.
     from datetime import timedelta
 
-    from a11y_stem.ops.retention import purge_upload_results
-    from a11y_stem.web.db import UploadResult, utcnow
+    from readablestem.ops.retention import purge_upload_results
+    from readablestem.web.db import UploadResult, utcnow
 
     later = utcnow() + timedelta(hours=2)
     with session_scope(web.ctx.factory) as session:
@@ -372,7 +372,7 @@ def test_a_course_zip_holds_only_that_courses_documents(web):
 
 
 def test_the_zip_is_bounded(monkeypatch):
-    from a11y_stem.web import bundle
+    from readablestem.web import bundle
 
     monkeypatch.setattr(bundle, "MAX_DOCUMENTS", 2)
     made = bundle.build([(f"T{n}", f"t{n}.html", "<html></html>") for n in range(5)])

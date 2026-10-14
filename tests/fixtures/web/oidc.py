@@ -24,7 +24,7 @@ from authlib.integrations.httpx_client._compat import httpx2
 from joserfc import jwt
 from joserfc.jwk import RSAKey
 
-from a11y_stem.web.microsoft import MS_METADATA_URL
+from readablestem.web.microsoft import MS_METADATA_URL
 
 TENANT = "11111111-1111-4111-8111-111111111111"
 OTHER_TENANT = "22222222-2222-4222-8222-222222222222"

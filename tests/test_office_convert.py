@@ -20,10 +20,10 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.pipeline import tagged
-from a11y_stem.web import office_convert
-from a11y_stem.web.office_convert import OfficeRejected, preflight
 from fixtures import office
+from readablestem.pipeline import tagged
+from readablestem.web import office_convert
+from readablestem.web.office_convert import OfficeRejected, preflight
 
 SOFFICE = office_convert.soffice_command()
 HAS_WRITER = "docx" in office_convert.available_kinds(SOFFICE)
@@ -264,7 +264,7 @@ def test_a_conversion_that_works_returns_the_pdf_and_leaves_nothing_behind(tmp_p
         tmp_path, OUT_DIR + f"open(out + '/input.pdf', 'wb').write(open({str(pdf)!r}, 'rb').read())"
     )
     assert run_convert(soffice).startswith(b"%PDF-")
-    assert [p for p in tmp_path.iterdir() if p.name.startswith("a11y-office-")] == []
+    assert [p for p in tmp_path.iterdir() if p.name.startswith("readablestem-office-")] == []
 
 
 def test_the_command_line_is_fixed_and_the_file_name_is_never_the_users(tmp_path, monkeypatch):
@@ -300,7 +300,7 @@ def test_libreoffice_runs_with_no_secrets_and_in_its_own_directory(tmp_path, mon
     environment = json.loads(dump.read_text())
     assert "secret-value" not in json.dumps(environment)
     assert environment["HOME"] == environment["TMPDIR"]
-    assert "a11y-office-" in environment["HOME"]
+    assert "readablestem-office-" in environment["HOME"]
 
 
 def test_a_conversion_that_hangs_is_killed_with_its_helpers(tmp_path, monkeypatch):
@@ -320,7 +320,7 @@ def test_a_conversion_that_hangs_is_killed_with_its_helpers(tmp_path, monkeypatc
     assert time_now() - started < 15
     for pid in map(int, pids.read_text().split()):
         assert not alive(pid), pid
-    assert [p for p in tmp_path.iterdir() if p.name.startswith("a11y-office-")] == []
+    assert [p for p in tmp_path.iterdir() if p.name.startswith("readablestem-office-")] == []
 
 
 def time_now() -> float:
@@ -386,7 +386,7 @@ def test_a_missing_program_is_a_failure(tmp_path):
 
 def child(data: bytes, soffice: str, timeout_s: float = 60) -> tuple[dict, bytes]:
     done = subprocess.run(
-        [sys.executable, "-m", "a11y_stem.web.office_convert", soffice, str(timeout_s)],
+        [sys.executable, "-m", "readablestem.web.office_convert", soffice, str(timeout_s)],
         input=data,
         capture_output=True,
         timeout=timeout_s + 30,
@@ -422,8 +422,8 @@ def test_the_child_says_when_a_kind_is_not_installed(tmp_path):
 
 def test_the_child_has_a_memory_cap_of_its_own(tmp_path):
     code = (
-        "import resource; from a11y_stem.web.pdf_probe import limit_memory; "
-        "from a11y_stem.web import office_convert as o; limit_memory(o.WRAPPER_MEMORY_BYTES); "
+        "import resource; from readablestem.web.pdf_probe import limit_memory; "
+        "from readablestem.web import office_convert as o; limit_memory(o.WRAPPER_MEMORY_BYTES); "
         "print(resource.getrlimit(resource.RLIMIT_AS)[0])"
     )
     soft = int(subprocess.run([sys.executable, "-c", code], capture_output=True, check=True).stdout)

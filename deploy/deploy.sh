@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploy a11y-stem to Google Cloud Run. Walkthrough: docs/deploy.md.
+# Deploy readablestem to Google Cloud Run. Walkthrough: docs/deploy.md.
 #
 #   ./deploy/deploy.sh            # everything, in order (safe to re-run)
 #   ./deploy/deploy.sh STEP ...   # only some steps: apis iam registry build database
@@ -57,10 +57,10 @@ load_config() {
   [[ "$DAILY_SPEND_CAP_USD" =~ ^[0-9]+([.][0-9]+)?$ ]] || die "DAILY_SPEND_CAP_USD must be a number"
   [[ "$PER_USER_DAILY_PAGE_QUOTA" =~ ^[0-9]+$ ]] || die "PER_USER_DAILY_PAGE_QUOTA must be a whole number"
 
-  SERVICE=${SERVICE:-a11y-stem}
-  AR_REPO=${AR_REPO:-a11y-stem}
+  SERVICE=${SERVICE:-readablestem}
+  AR_REPO=${AR_REPO:-readablestem}
   DB_MODE=${DB_MODE:-cloudsql}
-  SQL_INSTANCE=${SQL_INSTANCE:-a11y-stem-db}
+  SQL_INSTANCE=${SQL_INSTANCE:-readablestem-db}
   SQL_TIER=${SQL_TIER:-db-f1-micro}
   SQL_DATABASE=${SQL_DATABASE:-a11y}
   SQL_USER=${SQL_USER:-a11y}
@@ -145,7 +145,7 @@ load_config() {
 preflight_limits() {
   local out status=0
   command -v uv >/dev/null || { note "uv not found: spend limits not checked here"; return 0; }
-  out=$(MODEL_PROVIDER="$MODEL_PROVIDER" uv run --quiet --no-sync python -m a11y_stem.ops.limits 2>&1) ||
+  out=$(MODEL_PROVIDER="$MODEL_PROVIDER" uv run --quiet --no-sync python -m readablestem.ops.limits 2>&1) ||
     status=$?
   case "$status" in
     0) [ -z "$out" ] || printf '%s\n' "$out" | sed 's/^/    /' ;;
@@ -176,7 +176,7 @@ step_iam() {
   if exists iam service-accounts describe "$RUN_SA"; then
     note "$RUN_SA exists"
   else
-    gc iam service-accounts create "$SERVICE-run" --display-name="a11y-stem Cloud Run"
+    gc iam service-accounts create "$SERVICE-run" --display-name="readablestem Cloud Run"
   fi
   if [ "$DB_MODE" = cloudsql ]; then
     gc projects add-iam-policy-binding "$PROJECT_ID" --member="serviceAccount:$RUN_SA" \
@@ -198,7 +198,7 @@ step_registry() {
     note "exists"
   else
     gc artifacts repositories create "$AR_REPO" --repository-format=docker \
-      --location="$REGION" --description="a11y-stem images"
+      --location="$REGION" --description="readablestem images"
   fi
 }
 
@@ -345,13 +345,13 @@ cloudsql_flag() { # $1: --set-cloudsql-instances flag form for services and jobs
 }
 
 step_migrate() {
-  step "Database migration (Cloud Run job $SERVICE-migrate: a11y-stem db upgrade)"
+  step "Database migration (Cloud Run job $SERVICE-migrate: readablestem db upgrade)"
   local sql
   sql=$(cloudsql_flag --set-cloudsql-instances)
   # shellcheck disable=SC2086  # $sql is empty or one flag
   gc run jobs deploy "$SERVICE-migrate" --image="$IMAGE" --region="$REGION" \
     --service-account="$RUN_SA" --set-secrets=DATABASE_URL=database-url:latest \
-    --command=a11y-stem --args=db,upgrade --max-retries=0 --task-timeout=10m $sql
+    --command=readablestem --args=db,upgrade --max-retries=0 --task-timeout=10m $sql
   gc run jobs execute "$SERVICE-migrate" --region="$REGION" --wait
 }
 
@@ -463,7 +463,7 @@ alert_channel() {
     --filter="type=\"email\" AND labels.email_address=\"$ALERT_EMAIL\"" \
     --format='value(name)' | head -n 1)
   if [ -z "$channel" ]; then
-    channel=$(gc beta monitoring channels create --display-name="a11y-stem alerts" \
+    channel=$(gc beta monitoring channels create --display-name="readablestem alerts" \
       --type=email --channel-labels="email_address=$ALERT_EMAIL" --format='value(name)')
   fi
   printf '%s' "$channel"

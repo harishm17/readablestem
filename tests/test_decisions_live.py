@@ -13,16 +13,16 @@ import json
 
 import pytest
 
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.models.decisions_client import DecisionsClient, reservation_usd
-from a11y_stem.models.verifier import (
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.models.decisions_client import DecisionsClient, reservation_usd
+from readablestem.models.verifier import (
     MEANING_CHANGING,
     DecisionsVerifier,
     equation_request,
     figure_request,
     figure_score,
 )
-from a11y_stem.ops.canary import REQUESTS_FILE
+from readablestem.ops.canary import REQUESTS_FILE
 from test_steps_support import make_settings
 
 pytestmark = pytest.mark.live_model

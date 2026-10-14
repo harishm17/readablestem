@@ -8,15 +8,15 @@ import logging
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core import triage
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import DocumentResult, Fix, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.verifier import EQUATION_CHECK, FIGURE_CHECK, FakeVerifier
-from a11y_stem.pipeline.equation_step import transcribe
-from a11y_stem.pipeline.figure_step import describe
-from a11y_stem.web.messages import explain_check
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core import triage
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import DocumentResult, Fix, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.verifier import EQUATION_CHECK, FIGURE_CHECK, FakeVerifier
+from readablestem.pipeline.equation_step import transcribe
+from readablestem.pipeline.figure_step import describe
+from readablestem.web.messages import explain_check
 from test_steps_support import (
     equation_element,
     figure_element,

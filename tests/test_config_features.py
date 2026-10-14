@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import ConfigError, Settings
+from readablestem.config import ConfigError, Settings
 
 TENANT = "72f988bf-86f1-41af-91ab-2d7cd011db47"
 OTHER_TENANT = "00000000-0000-0000-0000-000000000001"

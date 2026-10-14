@@ -15,10 +15,10 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind, Status, inline_marker
-from a11y_stem.pipeline import layout, table_model
-from a11y_stem.pipeline.heading_step import heading_fixes
-from a11y_stem.pipeline.layout import (
+from readablestem.core.types import Element, Kind, Status, inline_marker
+from readablestem.pipeline import layout, table_model
+from readablestem.pipeline.heading_step import heading_fixes
+from readablestem.pipeline.layout import (
     REASON_NUMBERED,
     REASON_NUMBERED_LINE,
     analyze,

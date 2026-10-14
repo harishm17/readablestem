@@ -31,7 +31,7 @@ sync_api = pytest.importorskip("playwright.sync_api")
 def wide_output():
     """The described figure with a chart table of six columns of decimals: wider than a
     320 px card, so it must scroll in its box, not break its numbers."""
-    from a11y_stem.pipeline import figure_details
+    from readablestem.pipeline import figure_details
 
     output = described_output()
     fix = output.result.fix_for("p1-e6")

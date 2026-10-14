@@ -20,11 +20,11 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import DocumentResult
-from a11y_stem.web.db import Job, ReviewEdit, session_scope
-from a11y_stem.web.review import bump_result_version, is_stale
 from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from readablestem.core.types import DocumentResult
+from readablestem.web.db import Job, ReviewEdit, session_scope
+from readablestem.web.review import bump_result_version, is_stale
 
 
 @pytest.fixture
@@ -237,7 +237,7 @@ def test_a_correct_edit_passes_the_same_checks_as_a_proposal(ux):
 
 
 def test_the_one_click_fix_is_offered_only_when_save_edit_takes_it(ux, monkeypatch):
-    from a11y_stem.web import compare, edit_check
+    from readablestem.web import compare, edit_check
 
     result = stored(ux)
     element = next(e for e in result.elements if e.id == "p1-e2")
@@ -288,8 +288,8 @@ def test_saving_a_rejected_figures_text_unchanged_puts_it_back(ux):
     ],
 )
 def test_latex_that_cannot_be_used_is_explained_by_naming_the_problem(latex, sentence):
-    from a11y_stem.pipeline.validate import check_latex
-    from a11y_stem.web.edit_check import latex_problems
+    from readablestem.pipeline.validate import check_latex
+    from readablestem.web.edit_check import latex_problems
 
     failed = [c for c in check_latex(latex) if not c.passed]
     said = " ".join(latex_problems(latex, failed))
@@ -300,9 +300,9 @@ def test_latex_that_cannot_be_used_is_explained_by_naming_the_problem(latex, sen
 def test_the_edit_checks_are_the_equation_steps_own():
     """`web.edit_check.evaluate` runs the step's evaluation without a model answer: the
     same checks, codes and MathML as `equation_step._evaluate` on the same LaTeX."""
-    from a11y_stem.core.types import Element, Kind
-    from a11y_stem.pipeline import equation_step
-    from a11y_stem.web.edit_check import evaluate
+    from readablestem.core.types import Element, Kind
+    from readablestem.pipeline import equation_step
+    from readablestem.web.edit_check import evaluate
 
     cases = [
         (r"\omega", "𝛚", "inline"),
@@ -589,7 +589,7 @@ def test_an_equation_without_text_in_the_pdf_says_so(tmp_path):
     ],
 )
 def test_the_readings_mark_only_the_symbols_that_differ(said, text_layer, marked, pdf_marked):
-    from a11y_stem.web.speech_diff import spoken_diff
+    from readablestem.web.speech_diff import spoken_diff
 
     diff = spoken_diff(said, text_layer)
     assert diff is not None
@@ -610,7 +610,7 @@ def test_the_readings_mark_only_the_symbols_that_differ(said, text_layer, marked
     ],
 )
 def test_structure_and_unseen_styles_are_never_marked(said, text_layer):
-    from a11y_stem.web.speech_diff import spoken_diff
+    from readablestem.web.speech_diff import spoken_diff
 
     assert spoken_diff(said, text_layer) is None
 
@@ -645,7 +645,7 @@ JOB = "0123456789abcdef0123456789abcdef"
     ],
 )
 def test_only_pages_of_this_app_are_come_back_to(path, kept):
-    from a11y_stem.web.return_to import safe_return
+    from readablestem.web.return_to import safe_return
 
     assert safe_return(path) == (path if kept else None)
 

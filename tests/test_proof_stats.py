@@ -6,7 +6,7 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from a11y_stem.proof import stats
+from readablestem.proof import stats
 
 
 def test_ratio_and_f1_of_counts_are_none_when_undefined():

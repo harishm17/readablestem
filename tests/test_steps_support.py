@@ -12,10 +12,10 @@ import dataclasses
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.types import Element, Kind, ModelCall
-from a11y_stem.models import router
-from a11y_stem.models.base import T, VisionClient, VisionRequest
+from readablestem.config import Settings
+from readablestem.core.types import Element, Kind, ModelCall
+from readablestem.models import router
+from readablestem.models.base import T, VisionClient, VisionRequest
 
 
 def make_settings(**kw) -> Settings:

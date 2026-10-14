@@ -14,7 +14,7 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.pipeline import html_checks
+from readablestem.pipeline import html_checks
 
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")

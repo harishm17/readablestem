@@ -23,7 +23,7 @@ from functools import cache
 
 import pymupdf
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -85,7 +85,7 @@ def _box(page: pymupdf.Page, needle: str, index: int = 0) -> tuple[float, float,
 
 
 def _mathml(latex: str, display: str) -> str:
-    from a11y_stem.pipeline.validate import safe_latex_to_mathml
+    from readablestem.pipeline.validate import safe_latex_to_mathml
 
     return safe_latex_to_mathml(latex, display)
 

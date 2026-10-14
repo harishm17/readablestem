@@ -8,8 +8,8 @@ import time
 import httpx2
 import pytest
 
-from a11y_stem.models import anthropic_client, base
-from a11y_stem.models.base import RateGate, rate_gate
+from readablestem.models import anthropic_client, base
+from readablestem.models.base import RateGate, rate_gate
 from test_models_anthropic_client import (
     Wire,
     error_body,

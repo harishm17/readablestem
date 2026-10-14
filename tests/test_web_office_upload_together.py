@@ -18,10 +18,10 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.web.db import Blob, Job, PendingUpload, session_scope
-from a11y_stem.web.routes import jobs as jobs_routes
 from fixtures import office
 from fixtures.web.support import ALICE, WebEnv, login, make_pdf, token
+from readablestem.web.db import Blob, Job, PendingUpload, session_scope
+from readablestem.web.routes import jobs as jobs_routes
 
 DOCX = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
 

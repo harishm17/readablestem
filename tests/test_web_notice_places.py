@@ -14,11 +14,11 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.core.types import ConversionOutput, DocumentResult, Link, Notice
-from a11y_stem.web import notice_places
-from a11y_stem.web.review import item_labels
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from readablestem.core.types import ConversionOutput, DocumentResult, Link, Notice
+from readablestem.web import notice_places
+from readablestem.web.review import item_labels
 
 PARAGRAPH = "p1-e4"
 TEXT = "Open the simulation here to practise vectors and scalars."

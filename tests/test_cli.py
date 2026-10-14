@@ -8,8 +8,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.cli import main as cli
-from a11y_stem.cli.main import build_parser, main, project_root
+from readablestem.cli import main as cli
+from readablestem.cli.main import build_parser, main, project_root
 
 GOLD_LINE = {
     "id": "openstax/physics/x/eq-000",
@@ -45,7 +45,7 @@ def test_gold_fetch_rejects_non_positive_pages(pages, capsys):
 
 def _fake_fetch(monkeypatch, tmp_path):
     """Replace the network fetch with a stub; return the fetchers the CLI built."""
-    from a11y_stem.gold import openstax
+    from readablestem.gold import openstax
 
     built = []
 

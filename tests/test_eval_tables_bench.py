@@ -18,7 +18,7 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval import tables as T
+from readablestem.eval import tables as T
 
 ROOT = Path(__file__).resolve().parents[1]
 EXCERPT = Path(__file__).parent / "fixtures" / "tables" / "table_bench_excerpt.json"

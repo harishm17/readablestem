@@ -13,7 +13,7 @@ from datetime import date
 
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
@@ -27,8 +27,8 @@ from a11y_stem.core.types import (
     SourceFacts,
     Status,
 )
-from a11y_stem.web import job_page
-from a11y_stem.web.outcome import JobOutcome, job_outcome
+from readablestem.web import job_page
+from readablestem.web.outcome import JobOutcome, job_outcome
 
 MATH = "http://www.w3.org/1998/Math/MathML"
 
@@ -282,7 +282,7 @@ def test_the_card_rows_say_what_is_lost_specifically_and_never_score():
 
 def test_tables_still_waiting_for_a_decision_are_said_so():
     # tables.pdf: five rebuilt tables waiting for review were "5 of 5 tables rebuilt".
-    from a11y_stem.core.types import TableCell, TableFix, TableGrid
+    from readablestem.core.types import TableCell, TableFix, TableGrid
 
     result = card_result(UNTAGGED.model_copy(update={"tables": 2}))
     grid = TableGrid(rows=1, cols=1, cells=[TableCell(row=0, col=0, text="x")])
@@ -439,7 +439,7 @@ def test_the_language_line_says_where_the_language_came_from():
 
 def test_setting_the_language_answers_its_notices_and_unmarks_passages():
     """The job page's control uses the text work's rule (`set_document_language`)."""
-    from a11y_stem.pipeline.text_pass import set_document_language
+    from readablestem.pipeline.text_pass import set_document_language
 
     result = card_result(UNTAGGED, notices=[Notice(code="lang_assumed"), Notice(code="footnote")])
     result.elements[5].lang = "fr"

@@ -13,11 +13,11 @@ import re
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import Check, Kind, Status
-from a11y_stem.web import review
-from a11y_stem.web.db import ErrorAggregate, ReviewEdit, session_scope
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, token
 from fixtures.web.support import upload as upload_pdf
+from readablestem.core.types import Check, Kind, Status
+from readablestem.web import review
+from readablestem.web.db import ErrorAggregate, ReviewEdit, session_scope
 from test_web_review import card, cards, edits, install_fake_pipeline, result, rich_output
 
 EQUATIONS_PENDING = ["p1-e1", "p2-e1", "p2-e2", "p3-e0"]

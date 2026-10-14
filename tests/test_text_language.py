@@ -9,9 +9,9 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.types import inline_marker
-from a11y_stem.pipeline import language
-from a11y_stem.pipeline.language import (
+from readablestem.core.types import inline_marker
+from readablestem.pipeline import language
+from readablestem.pipeline.language import (
     document_language,
     document_tag,
     is_language_tag,

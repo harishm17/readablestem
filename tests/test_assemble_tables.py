@@ -10,7 +10,7 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     INLINE_MARKER_RE,
     Element,
     Fix,
@@ -21,10 +21,10 @@ from a11y_stem.core.types import (
     TableGrid,
     inline_marker,
 )
-from a11y_stem.pipeline import assemble, assemble_tables, html_checks, inline_text, safe_html
-from a11y_stem.pipeline.assemble import FLAGGED_NOTE, STYLE, render_html
-from a11y_stem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
-from a11y_stem.pipeline.html_checks import static_checks
+from readablestem.pipeline import assemble, assemble_tables, html_checks, inline_text, safe_html
+from readablestem.pipeline.assemble import FLAGGED_NOTE, STYLE, render_html
+from readablestem.pipeline.assemble_tables import TABLE_CSS, TABLE_NOT_CONVERTED_ALT, TABLE_NOTE
+from readablestem.pipeline.html_checks import static_checks
 
 
 def png() -> bytes:
@@ -481,6 +481,6 @@ def test_at_320_px_a_wide_table_scrolls_in_its_focusable_box_and_the_page_does_n
     ],
 )
 def test_flattened_maths_in_the_grid_read_from_the_pdf(text, flat):
-    from a11y_stem.pipeline.assemble_tables import flattened_maths
+    from readablestem.pipeline.assemble_tables import flattened_maths
 
     assert flattened_maths(TableCell(row=0, col=0, text=text)) is flat

@@ -6,9 +6,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval.gold_scoring import iter_gold_records
-from a11y_stem.pipeline.speech import SpeechError, mathml_to_speech
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.eval.gold_scoring import iter_gold_records
+from readablestem.pipeline.speech import SpeechError, mathml_to_speech
+from readablestem.pipeline.validate import safe_latex_to_mathml
 
 REPO = Path(__file__).resolve().parents[1]
 GOLD = list(iter_gold_records(REPO / "data" / "gold", kind="equation"))

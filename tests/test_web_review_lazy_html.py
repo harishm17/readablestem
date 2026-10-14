@@ -6,12 +6,12 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.types import DocumentResult
-from a11y_stem.pipeline import assemble
-from a11y_stem.pipeline.assemble import CHECKED
-from a11y_stem.web.db import Job, session_scope
-from a11y_stem.web.review import rerender_html
-from a11y_stem.web.views import last_decision
+from readablestem.core.types import DocumentResult
+from readablestem.pipeline import assemble
+from readablestem.pipeline.assemble import CHECKED
+from readablestem.web.db import Job, session_scope
+from readablestem.web.review import rerender_html
+from readablestem.web.views import last_decision
 from test_web_pipeline import Site, csrf_from, paragraph, review, site  # noqa: F401
 
 
@@ -133,7 +133,7 @@ def test_the_student_note_is_dated_by_the_last_decision_not_by_the_render(site):
     for element_id in decisions(site):
         assert review(site, element_id, action="reject").status_code == 303
     with session_scope(site.ctx.factory) as session:
-        from a11y_stem.web.db import ReviewEdit
+        from readablestem.web.db import ReviewEdit
 
         for edit in session.query(ReviewEdit).filter_by(job_id=site.job_id):
             edit.created_at = edit.created_at.replace(year=2026, month=1, day=2)
@@ -145,7 +145,7 @@ def test_the_file_made_again_keeps_the_mathml_setting_of_the_first_render(site):
     """`MATHML_ALTTEXT` is in the settings the app runs with: a re-render (a click, the
     contact line) writes the same <math> attributes as the conversion would, not the
     process-wide default."""
-    from a11y_stem.core.types import EquationFix, Fix, Kind, Status
+    from readablestem.core.types import EquationFix, Fix, Kind, Status
 
     mathml = (
         '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo><mn>2</mn></math>'

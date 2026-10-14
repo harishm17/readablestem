@@ -16,10 +16,10 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.web import office_convert, uploads
-from a11y_stem.web.db import Blob, Job, QuotaDay, session_scope
 from fixtures import office
 from fixtures.web.support import ALICE, WebEnv, csrf_from, job_id_from, login, make_pdf
+from readablestem.web import office_convert, uploads
+from readablestem.web.db import Blob, Job, QuotaDay, session_scope
 
 REAL = office_convert.soffice_command()
 HAS_WRITER = "docx" in office_convert.available_kinds(REAL)
@@ -249,7 +249,7 @@ def test_the_log_carries_a_category_and_never_the_file_name(web, caplog):
 
 def test_an_office_upload_is_counted_as_one_upload_by_the_limits(web):
     """The per-person and per-address upload limits sit in front of the conversion."""
-    from a11y_stem.web.abuse import RateLimiter, Rule
+    from readablestem.web.abuse import RateLimiter, Rule
 
     web.ctx.limiter = RateLimiter(rules={**web.ctx.limiter.rules, "upload_user": Rule(2, 600)})
     web.settings.__dict__["rate_limits_enabled"] = True
@@ -273,7 +273,7 @@ def test_a_real_word_file_goes_all_the_way_to_a_job_with_its_tags(tmp_path):
         stored = stored_upload(env, job_id)
         document = pymupdf.open(stream=stored)
         assert document.page_count == 1 and "Kinematics in one dimension" in document[0].get_text()
-        from a11y_stem.pipeline import tagged
+        from readablestem.pipeline import tagged
 
         found = tagged.read(stored, [0])
         assert [h.level for h in found.headings] == [1, 2]

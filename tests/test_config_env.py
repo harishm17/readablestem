@@ -12,8 +12,8 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.cli.main import main
-from a11y_stem.config import Settings, get_settings
+from readablestem.cli.main import main
+from readablestem.config import Settings, get_settings
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -50,4 +50,4 @@ def test_quick_start_allow_command_works_from_a_copied_env_example(clean_env, tm
     clean_env.chdir(tmp_path)
     assert main(["users", "allow", "you@example.org", "--admin"]) == 0
     assert "allowed you@example.org (admin)" in capsys.readouterr().out
-    assert (tmp_path / ".local" / "a11y-stem.db").is_file()
+    assert (tmp_path / ".local" / "readablestem.db").is_file()

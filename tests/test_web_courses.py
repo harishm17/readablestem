@@ -11,11 +11,11 @@ from html import unescape
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.core.types import ConversionOptions
-from a11y_stem.ops.retention import erase_user
-from a11y_stem.web.db import Course, CourseNotation, Job, User, session_scope
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token
+from readablestem.core.types import ConversionOptions
+from readablestem.ops.retention import erase_user
+from readablestem.web.db import Course, CourseNotation, Job, User, session_scope
 
 BOLD_D = "\U0001d41d"
 BOLD_OMEGA = "\U0001d6da"
@@ -471,9 +471,9 @@ def test_an_equation_edit_is_checked_with_the_courses_notation(web):
     review MF3): with the course listing bold d as a vector, a plain d typed into a PDF
     whose font shows no bold is a meaning-level difference ("Use my edit anyway"), and
     the bold d of an edit is read as "vector d"."""
-    from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
-    from a11y_stem.web import notation
-    from a11y_stem.web.edit_check import check_equation_edit
+    from readablestem.core.types import Element, EquationFix, Fix, Kind, Status
+    from readablestem.web import notation
+    from readablestem.web.edit_check import check_equation_edit
 
     element = Element(id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(0, 0, 10, 10), order=0,
                       text="d = v t", display="block")  # fmt: skip

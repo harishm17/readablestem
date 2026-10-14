@@ -13,9 +13,9 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind
-from a11y_stem.pipeline import layout
-from a11y_stem.pipeline.layout import DOCUMENT_CACHE_SIZE, LayoutError, analyze, crop, release
+from readablestem.core.types import Element, Kind
+from readablestem.pipeline import layout
+from readablestem.pipeline.layout import DOCUMENT_CACHE_SIZE, LayoutError, analyze, crop, release
 
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
 
@@ -278,7 +278,7 @@ def test_the_probe_output_is_discarded(monkeypatch, unprobed, capfd):
 PROBE_PEAK = """
 import resource, sys
 import pymupdf
-from a11y_stem.pipeline import layout
+from readablestem.pipeline import layout
 side, max_side, memory = float(sys.argv[1]), float(sys.argv[2]), int(sys.argv[3])
 doc = pymupdf.open()
 page = doc.new_page(width=200, height=200)

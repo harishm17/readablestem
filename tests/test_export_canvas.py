@@ -19,10 +19,10 @@ from pathlib import Path
 
 import pytest
 
-import a11y_stem
 import canvas_sanitizer as cs
-from a11y_stem.pipeline import export_canvas as ec
-from a11y_stem.pipeline.export_canvas import (
+import readablestem
+from readablestem.pipeline import export_canvas as ec
+from readablestem.pipeline.export_canvas import (
     CanvasExportError,
     build_zip,
     export_canvas,
@@ -33,7 +33,7 @@ from a11y_stem.pipeline.export_canvas import (
 from test_content_e2e import FIXTURES, converted
 
 HERE = Path(__file__).parent
-DEMO = Path(a11y_stem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
 GOLDEN = sorted((HERE / "fixtures" / "assemble" / "golden").glob("*.html"))
 IMAGE_NAME = r"images/image-\d\d\.(png|jpg)"
 COURSE = "12345"
@@ -123,7 +123,7 @@ def test_hidden_labels_stay_hidden_with_properties_canvas_keeps():
     html = (
         "<html><head><style>.visually-hidden { position: absolute; width: 1px; height: 1px;"
         " overflow: hidden; clip-path: inset(50%); white-space: nowrap; }</style></head>"
-        '<body><main><p>Eq <span class="visually-hidden a11y-stem">Equation </span>2.4</p>'
+        '<body><main><p>Eq <span class="visually-hidden readablestem">Equation </span>2.4</p>'
         "</main></body></html>"
     )
     made = export_canvas(html, title="t", folder=FOLDER, course_number=COURSE)

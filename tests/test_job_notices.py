@@ -6,8 +6,8 @@ result is the same with or without its notices.
 
 from __future__ import annotations
 
-from a11y_stem.core import triage
-from a11y_stem.core.types import (
+from readablestem.core import triage
+from readablestem.core.types import (
     NOTICE_CODES,
     DocumentResult,
     DocumentStats,
@@ -19,8 +19,8 @@ from a11y_stem.core.types import (
     Notice,
     Status,
 )
-from a11y_stem.pipeline import notices
-from a11y_stem.web.messages import NOTICE_MESSAGES
+from readablestem.pipeline import notices
+from readablestem.web.messages import NOTICE_MESSAGES
 
 
 def el(eid: str, kind: Kind, page: int, order: int) -> Element:
@@ -216,7 +216,7 @@ def code_and_footnote_pdf(code_font: str = "cour") -> bytes:
 
 
 def test_layout_lists_a_code_block_and_a_footnote_as_notices_with_no_decision():
-    from a11y_stem.pipeline.layout import analyze
+    from readablestem.pipeline.layout import analyze
 
     layout = analyze(code_and_footnote_pdf())
     by_id = {e.id: e for e in layout.elements}
@@ -228,10 +228,10 @@ def test_layout_lists_a_code_block_and_a_footnote_as_notices_with_no_decision():
 
 
 def test_a_conversion_carries_the_layout_notices_to_the_job_page():
-    from a11y_stem.config import Settings
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.models.fake import FakeVisionClient
-    from a11y_stem.pipeline.run import convert_pdf
+    from readablestem.config import Settings
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline.run import convert_pdf
 
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
     output = convert_pdf(

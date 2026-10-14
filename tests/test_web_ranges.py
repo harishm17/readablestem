@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.web import ranges
-from a11y_stem.web.ranges import Part, PartsError, label, parse_parts, suggest_parts
+from readablestem.web import ranges
+from readablestem.web.ranges import Part, PartsError, label, parse_parts, suggest_parts
 
 
 @pytest.mark.parametrize(

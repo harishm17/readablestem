@@ -16,24 +16,6 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
-from a11y_stem.config import ConfigError
-from a11y_stem.core.types import (
-    ConversionOptions,
-    DocumentResult,
-    Element,
-    Fix,
-    Kind,
-    ModelCall,
-    Status,
-)
-from a11y_stem.models import make_vision_client
-from a11y_stem.models.fake import image_key
-from a11y_stem.pipeline import run as pipeline_run
-from a11y_stem.web import provider_health, retry
-from a11y_stem.web.app import create_app
-from a11y_stem.web.auth import set_allowed
-from a11y_stem.web.db import Job, QuotaDay, StepRecord, session_scope
-from a11y_stem.web.worker import Worker
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -43,6 +25,24 @@ from fixtures.web.support import (
     make_settings,
     upload,
 )
+from readablestem.config import ConfigError
+from readablestem.core.types import (
+    ConversionOptions,
+    DocumentResult,
+    Element,
+    Fix,
+    Kind,
+    ModelCall,
+    Status,
+)
+from readablestem.models import make_vision_client
+from readablestem.models.fake import image_key
+from readablestem.pipeline import run as pipeline_run
+from readablestem.web import provider_health, retry
+from readablestem.web.app import create_app
+from readablestem.web.auth import set_allowed
+from readablestem.web.db import Job, QuotaDay, StepRecord, session_scope
+from readablestem.web.worker import Worker
 
 PDF = Path(__file__).parent / "fixtures" / "layout" / "worked_example.pdf"
 
@@ -170,7 +170,7 @@ def fixes_json(result: DocumentResult) -> list[dict]:
 def test_a_cache_gives_back_finished_steps_and_the_model_is_not_asked_again(site):
     """convert_pdf with a cache: the second run of the same file makes no request at all
     and returns the same fixes."""
-    from a11y_stem.config import Settings
+    from readablestem.config import Settings
 
     kept: dict[str, tuple[str, Fix]] = {}
 
@@ -189,7 +189,7 @@ def test_a_cache_gives_back_finished_steps_and_the_model_is_not_asked_again(site
 
     settings = site.settings
     assert isinstance(settings, Settings)
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
 
     def client():
         budget = JobBudget(InMemorySpendGuard(cap_usd=5.0), max_usd=5.0, max_calls=500)
@@ -368,7 +368,7 @@ def test_trying_again_asks_only_for_the_items_the_service_missed(site):
     clean, clean_requests, _ = baseline(site)
     # Find the pictures of the items as the model is sent them: the crop a conversion cuts
     # first (an unconverted equation's stored crop is another, sharper one: T3-15).
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     pdf = PDF.read_bytes()
     by_id = {e.id: e for e in clean.elements}
@@ -462,7 +462,7 @@ def test_a_job_can_be_tried_again_only_a_few_times(site):
 
 
 def test_a_person_with_a_full_queue_cannot_add_to_it_by_trying_again(site):
-    from a11y_stem.web.routes.jobs import MAX_ACTIVE_JOBS_PER_USER
+    from readablestem.web.routes.jobs import MAX_ACTIVE_JOBS_PER_USER
 
     site.state["fatal_after"] = 1
     stopped = job_id_from(upload(site.browser, PDF.read_bytes()))
@@ -500,8 +500,8 @@ def test_the_daily_budget_still_holds_a_retried_job_in_the_queue(site):
     site.post_retry(site.browser, job_id)
     cap = site.ctx.guard.cap_usd
     assert cap
-    from a11y_stem.web.database import utc_today
-    from a11y_stem.web.db import SpendDay
+    from readablestem.web.database import utc_today
+    from readablestem.web.db import SpendDay
 
     with session_scope(site.ctx.factory) as session:
         session.merge(SpendDay(day=utc_today(), spent_usd=cap, held_usd=0.0))
@@ -515,7 +515,7 @@ def test_interrupted_attempts_are_counted_from_the_last_try_again(site):
     """A job interrupted three times is failed; after "Try again" it gets three more."""
     from datetime import timedelta
 
-    from a11y_stem.web.db import utcnow
+    from readablestem.web.db import utcnow
 
     job_id = job_id_from(upload(site.browser, PDF.read_bytes()))
     with session_scope(site.ctx.factory) as session:

@@ -18,12 +18,12 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import DocumentResult
-from a11y_stem.web import page_images
-from a11y_stem.web.db import Job, ReviewEdit, session_scope
-from a11y_stem.web.routes.split import headline
 from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from readablestem.core.types import DocumentResult
+from readablestem.web import page_images
+from readablestem.web.db import Job, ReviewEdit, session_scope
+from readablestem.web.routes.split import headline
 
 
 @pytest.fixture
@@ -288,8 +288,8 @@ def test_optional_checks_are_folded_and_open_on_their_own(split):
 def test_a_style_the_pdf_text_cannot_show_is_not_called_a_difference(tmp_path):
     """The LaTeX handout's R^n: a double-struck R from an MSBM font is a plain "R" in the
     text layer. Neither the optional list nor the card may say the PDF has a plain R."""
-    from a11y_stem.core.types import EquationFix
-    from a11y_stem.pipeline.validate import safe_latex_to_mathml
+    from readablestem.core.types import EquationFix
+    from readablestem.pipeline.validate import safe_latex_to_mathml
 
     output = review_output()
     reals = r"\mathbb{R}^{n}"
@@ -528,7 +528,7 @@ def _contrast(a: str, b: str) -> float:
 def test_the_review_colours_have_enough_contrast():
     from pathlib import Path
 
-    css = (Path(__file__).parents[1] / "src/a11y_stem/web/static/app.css").read_text()
+    css = (Path(__file__).parents[1] / "src/readablestem/web/static/app.css").read_text()
     colours = dict(re.findall(r"(--[\w-]+):\s*(#[0-9a-fA-F]{6})", css))
     white = "#ffffff"
     # Marks are graphics on the white page image: 3:1 (WCAG 1.4.11).

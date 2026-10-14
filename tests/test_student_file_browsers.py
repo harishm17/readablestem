@@ -20,13 +20,13 @@ from pathlib import Path
 
 import pytest
 
-import a11y_stem
-from a11y_stem.pipeline.export_canvas import MATH_FONT_STACK, export_canvas
+import readablestem
+from readablestem.pipeline.export_canvas import MATH_FONT_STACK, export_canvas
 
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")
 
-DEMO = Path(a11y_stem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
 ENGINES = ["chromium", "firefox", "webkit"]
 WIDTHS = [1280, 375]
 

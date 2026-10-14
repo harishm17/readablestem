@@ -1,9 +1,9 @@
 # Equation and figure steps
 
 How the two model-backed steps turn a crop into a fix, and the deterministic checks that
-decide whether a fix is trusted. Code: `src/a11y_stem/pipeline/{equation_step,
+decide whether a fix is trusted. Code: `src/readablestem/pipeline/{equation_step,
 figure_step, validate, speech, signs, notation_memory}.py`; prompts:
-`src/a11y_stem/models/prompts/{equation, equation_notation, figure}.md`; tests:
+`src/readablestem/models/prompts/{equation, equation_notation, figure}.md`; tests:
 `tests/test_steps_*.py`, `tests/test_notation_steps.py`.
 
 The steps assist a reviewer. They never treat model output as correct on its own: every
@@ -493,7 +493,7 @@ v and a are vectors", real models (docs/eval.md "Course notation"):
   equations with a bold d), 30 model calls instead of 36, $0.038 instead of $0.048.
 - The course evidence never fires on that gold as printed (Chromium marks every weight).
   On the same transcriptions with every style removed from the text layer (a font that
-  marks no weight; `python -m a11y_stem.eval.notation_flags`), it flags 6 of 30, all
+  marks no weight; `python -m readablestem.eval.notation_flags`), it flags 6 of 30, all
   false: the equations that print a plain v (average speed) or a plain d (`d_Q`), which
   the course list does not mention. Listing plain v and d as well removes all 6. On two
   earlier runs (2026-10-08, before later pipeline fixes; `equations-run1` and `-run2` in

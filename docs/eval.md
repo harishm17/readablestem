@@ -673,7 +673,7 @@ uv run a11y-stem demo build --page 2-2-speed-and-velocity --max-usd 1.00
 It prints the page to PDF, converts it, and writes `index.html` (the converted page with a
 short note saying it is a precomputed demo of an OpenStax CC BY page, with attribution
 and a link to the original), `report.json` (the `DocumentResult` without the HTML) and
-`source.pdf` (the exact input) to `src/a11y_stem/web/static/demo/`. Pages outside the
+`source.pdf` (the exact input) to `src/readablestem/web/static/demo/`. Pages outside the
 gold set are looked up live and pass the same license gate as `gold fetch`.
 
 ## Results (pipeline 0.4.0, 2026-10-12, gpt-6.1-sol and gpt-6-luna)
@@ -1160,7 +1160,7 @@ part of the gate's baseline).
 uv run --env-file .env a11y-stem eval pipeline --task equations --max-usd 0.15 \
   --notation "bold d" "bold v" "bold a" \
   --out .local/eval/notation/equations-notation.json --items .local/eval/notation/items-equations-notation.jsonl
-uv run python -m a11y_stem.eval.notation_flags .local/eval/notation/items-equations-notation.jsonl \
+uv run python -m readablestem.eval.notation_flags .local/eval/notation/items-equations-notation.jsonl \
   --notation "bold d" "bold v" "bold a"
 ```
 
@@ -1186,7 +1186,7 @@ uv run python -m a11y_stem.eval.notation_flags .local/eval/notation/items-equati
   answers often dropped a bold letter flags every answer the style check flags as
   printed (16 and 5), plus the same 6.
 - Bold letters in running text (layout, no model call; docs/layout.md "Bold letters in
-  prose") are scored by `python -m a11y_stem.eval.bold_letters --openstax`: 9 of 9 on the
+  prose") are scored by `python -m readablestem.eval.bold_letters --openstax`: 9 of 9 on the
   three gold pages and 11 of 11 on the LaTeX fixtures (the two-column handout's 10 bold
   vectors and its bold omega), no false positives. The equations task does not see them:
   it scores the gold's equations, not its prose.
@@ -1393,7 +1393,7 @@ for now).
 is handwritten or scanned (docs/layout.md "Hidden text and page types"). Its scorer:
 
 ```bash
-uv run python -m a11y_stem.eval.page_types --labels LABELS.json [--labels ...] [--out rows.json]
+uv run python -m readablestem.eval.page_types --labels LABELS.json [--labels ...] [--out rows.json]
 ```
 
 A labels file is a JSON list of `{"file", "page" (1-based), "label" (a page kind),
@@ -1847,7 +1847,7 @@ letter's case flipped, the text layer left alone) they find 457 of 481 swaps and
 - Gold for the prose sub- and superscripts is the page's own markup. An OpenStax paragraph
   that writes a unit with a plain digit (`cm3`) is not in it.
 
-**Structure check** (T2-16, 2026-10-14). `uv run python -m a11y_stem.eval.structure_check
+**Structure check** (T2-16, 2026-10-14). `uv run python -m readablestem.eval.structure_check
 [--out REPORT.json]` converts the four dev documents that have code or glossary gold
 (`html-code-glossary`, `latex-structure`, `word-lecture` and the OpenStax Chemistry key-terms
 page) with the offline fake client and reads the output HTML. It reads the dev part and the
@@ -2136,33 +2136,33 @@ exact rate is 0.53), so its rates are not course PDFs' rates.
 
 | Path | Role |
 |---|---|
-| `src/a11y_stem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
-| `src/a11y_stem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
-| `src/a11y_stem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |
-| `src/a11y_stem/models/prompts/judge_long_description.md` | the long-description and data-table rubric (versioned by hash) |
+| `src/readablestem/eval/render.py` | equation PNGs, printable page HTML and PDF, image cache, demo wrapper |
+| `src/readablestem/eval/pipeline_eval.py` | the four tasks, metrics, report, markdown summary |
+| `src/readablestem/eval/judge.py` | figure judge request, schema, pass rule; the long-description judge (`judge_long`) |
+| `src/readablestem/models/prompts/judge_long_description.md` | the long-description and data-table rubric (versioned by hash) |
 | `data/eval/figures-long-descriptions.json` | the figures report with long descriptions on (2026-10-09) |
 | `data/eval/document-flags-on.json` | the document report with every content flag on (pipeline 0.4.0, 2026-10-12) |
-| `src/a11y_stem/eval/verifier_metrics.py` | the second automated check's eval metrics |
-| `src/a11y_stem/models/prompts/judge_figure.md` | judge instructions (versioned by hash) |
-| `src/a11y_stem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
-| `src/a11y_stem/eval/gate.py` | regression gate (comparability, judge and stale-report checks) |
-| `src/a11y_stem/eval/sample.py` | the weekly seeded sample of the gold set |
-| `src/a11y_stem/eval/bold_letters.py` | bold letters in running text: found against the LaTeX and OpenStax sources (offline) |
-| `src/a11y_stem/eval/notation_flags.py` | course notation as style evidence: new flags on stored answers, with and without the text layer's styles (offline) |
-| `src/a11y_stem/cli/eval_cli.py` | `eval pipeline/gate/calibrate/render`, `demo build` |
-| `src/a11y_stem/gold/heldout.py` | the pre-registered held-out set: its 15 sections, registered hashes and page counts, pinned fetch, `verify_gold` |
-| `src/a11y_stem/cli/heldout.py` | `--set heldout`: where its files live (outside the repository), the guards |
+| `src/readablestem/eval/verifier_metrics.py` | the second automated check's eval metrics |
+| `src/readablestem/models/prompts/judge_figure.md` | judge instructions (versioned by hash) |
+| `src/readablestem/eval/calibration.py` | kappa, bootstrap CI, label template, bias probes |
+| `src/readablestem/eval/gate.py` | regression gate (comparability, judge and stale-report checks) |
+| `src/readablestem/eval/sample.py` | the weekly seeded sample of the gold set |
+| `src/readablestem/eval/bold_letters.py` | bold letters in running text: found against the LaTeX and OpenStax sources (offline) |
+| `src/readablestem/eval/notation_flags.py` | course notation as style evidence: new flags on stored answers, with and without the text layer's styles (offline) |
+| `src/readablestem/cli/eval_cli.py` | `eval pipeline/gate/calibrate/render`, `demo build` |
+| `src/readablestem/gold/heldout.py` | the pre-registered held-out set: its 15 sections, registered hashes and page counts, pinned fetch, `verify_gold` |
+| `src/readablestem/cli/heldout.py` | `--set heldout`: where its files live (outside the repository), the guards |
 | `tests/test_heldout.py` | held-out registration, fetch, verification and CLI (offline; one `network` test rebuilds the registered gold) |
-| `src/a11y_stem/gold/devset.py`, `devset_classify.py`, `devset_build.py` | the extended development set: classes, selection against the held-out text, parts, seal, verification, build |
-| `src/a11y_stem/cli/devset.py`, `src/a11y_stem/eval/devset_media.py` | `gold devset ...`, `--set dev-v2`; authored PDFs as eval inputs |
+| `src/readablestem/gold/devset.py`, `devset_classify.py`, `devset_build.py` | the extended development set: classes, selection against the held-out text, parts, seal, verification, build |
+| `src/readablestem/cli/devset.py`, `src/readablestem/eval/devset_media.py` | `gold devset ...`, `--set dev-v2`; authored PDFs as eval inputs |
 | `data/dev-v2/` | the extended development set (`README.md` there): dev gold, authored documents and their builder, sealed check archive, seal, selection |
 | `tests/test_devset*.py` | classes, selection, seal and the committed set (offline) |
-| `src/a11y_stem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
-| `src/a11y_stem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
+| `src/readablestem/eval/tables.py` | the tables task: documents, page assignment, matching, TEDS, headers, maths, fidelity, review load, real documents, report |
+| `src/readablestem/eval/ted.py` | tree edit distance with a relabel-cost hook (equations, table TEDS) |
 | `data/gold/tables/` | table gold: 13 OpenStax pages (CC BY), `reference_pages.json` |
 | `data/authored/tables/` | authored table documents (MIT): sources, PDFs, gold, `make_authored.py` |
 | `tests/fixtures/tables/table_bench_excerpt.json` | table-bench predictions and its scores on five documents |
-| `src/a11y_stem/eval/page_types.py` | the page-type scorer: confusion matrices, actions, errors, time (no model) |
+| `src/readablestem/eval/page_types.py` | the page-type scorer: confusion matrices, actions, errors, time (no model) |
 | `data/eval/tolerances.json` | gate tolerances |
-| `src/a11y_stem/eval/invented/` | the invented-content rate for any system's output, with its audit and a planted-inventions check (docs/eval-invented.md); `eval invented ...` |
+| `src/readablestem/eval/invented/` | the invented-content rate for any system's output, with its audit and a planted-inventions check (docs/eval-invented.md); `eval invented ...` |
 | `tests/test_eval_*.py` | offline tests; `-m browser` runs the Chromium ones |

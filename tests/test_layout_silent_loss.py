@@ -18,13 +18,6 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.types import Kind
-from a11y_stem.models import OFFLINE_DEFAULTS
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import layout, page_type
-from a11y_stem.pipeline.run import convert_pdf
-from a11y_stem.web.worker import result_outcome
 from fixtures.handwriting.make_fixtures import (
     INK_BLACK,
     INK_BLUE,
@@ -34,6 +27,13 @@ from fixtures.handwriting.make_fixtures import (
     scan_png,
     text_layer,
 )
+from readablestem.config import Settings
+from readablestem.core.types import Kind
+from readablestem.models import OFFLINE_DEFAULTS
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import layout, page_type
+from readablestem.pipeline.run import convert_pdf
+from readablestem.web.worker import result_outcome
 
 HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
 LETTER = (612.0, 792.0)

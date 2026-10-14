@@ -657,7 +657,7 @@ bold letter in a heading or a caption is never touched; bold words and labels ar
 alone, not raised as notes. The evidence is the element's last reason (content-free,
 like every reason).
 
-Measured on 2026-10-09 (`uv run python -m a11y_stem.eval.bold_letters --openstax`;
+Measured on 2026-10-09 (`uv run python -m readablestem.eval.bold_letters --openstax`;
 `tests/test_layout_bold_letters.py` pins the LaTeX numbers):
 
 | Documents | Bold letters in the source's prose | Found | Missed | False positives |
@@ -1217,7 +1217,7 @@ fails a result with the same rule (`worker.result_outcome`).
   into blocks; lines that do not are lost, so the safety net keeps the page image too
   (one decision for the document's kept pages).
 
-**Accuracy, honestly.** Measured with `python -m a11y_stem.eval.page_types --labels
+**Accuracy, honestly.** Measured with `python -m readablestem.eval.page_types --labels
 LABELS.json` (docs/eval.md "Page types") on sets that are not in this repository (they
 hold derivatives of a real lecturer's notes and local research PDFs). "Right action"
 means the app does with the page what its true kind calls for (read the text, keep the

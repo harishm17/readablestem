@@ -17,11 +17,6 @@ import pytest
 from sqlalchemy import create_engine, func, select, text
 from sqlalchemy.engine import make_url
 
-from a11y_stem.core.budget import BudgetExceeded
-from a11y_stem.web import db
-from a11y_stem.web.quota import pages_used, try_consume_pages
-from a11y_stem.web.spend import DbSpendGuard
-from a11y_stem.web.worker import Worker
 from fixtures.web.support import (
     FakeConverter,
     fake_client_factory,
@@ -29,6 +24,11 @@ from fixtures.web.support import (
     make_settings,
     output_with_nul,
 )
+from readablestem.core.budget import BudgetExceeded
+from readablestem.web import db
+from readablestem.web.quota import pages_used, try_consume_pages
+from readablestem.web.spend import DbSpendGuard
+from readablestem.web.worker import Worker
 
 pytestmark = pytest.mark.postgres
 
@@ -239,7 +239,7 @@ def test_job_cap_on_the_job_row_does_not_overshoot_with_20_threads(factory, tmp_
 
 
 def worker_caps(worker: Worker) -> tuple[float, int]:
-    from a11y_stem.web.worker import job_caps
+    from readablestem.web.worker import job_caps
 
     return job_caps(worker.settings, 1)
 
@@ -260,7 +260,7 @@ def test_jobs_of_removed_users_are_skipped_by_the_skip_locked_claim(factory, tmp
 def test_queue_position_follows_the_claim_order_on_postgres(factory, tmp_path):
     """views.queue_ahead compares (attempts, created_at, id) as a row value, the order
     Worker.claim takes jobs in; checked here against the real claims."""
-    from a11y_stem.web.views import queue_ahead
+    from readablestem.web.views import queue_ahead
 
     retried, fresh, last = queue_jobs(factory, 3)
     with db.session_scope(factory) as session:
@@ -313,7 +313,7 @@ def test_initial_migration_matches_the_models_on_postgres(pg_url):
     from alembic.autogenerate import compare_metadata
     from alembic.runtime.migration import MigrationContext
 
-    from a11y_stem.web.database import alembic_config, require_migrated
+    from readablestem.web.database import alembic_config, require_migrated
 
     config = alembic_config(pg_url)
     config.attributes["configure_logger"] = False
@@ -335,7 +335,7 @@ def test_the_content_migration_round_trips_on_postgres(pg_url):
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy import inspect
 
-    from a11y_stem.web.database import alembic_config
+    from readablestem.web.database import alembic_config
     from test_web_migrations import (
         BEFORE_CONTENT,
         CONTENT_TABLES,
@@ -377,7 +377,7 @@ def test_the_list_facts_migration_round_trips_on_postgres(pg_url):
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy import inspect
 
-    from a11y_stem.web.database import alembic_config
+    from readablestem.web.database import alembic_config
     from test_web_migrations import EXAM_REVISION, FACTS_COLUMNS, INSERT_JOB, INSERT_USER
 
     config = alembic_config(pg_url)
@@ -414,7 +414,7 @@ def test_the_stale_html_migration_round_trips_on_postgres(pg_url):
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy import inspect
 
-    from a11y_stem.web.database import alembic_config
+    from readablestem.web.database import alembic_config
     from test_web_migrations import (
         FACTS_REVISION,
         INSERT_DONE_JOB,
@@ -460,7 +460,7 @@ def test_erasure_and_course_deletion_on_postgres(factory):
     """Real ON DELETE behaviour: a deleted course leaves its job (course_id NULL) and
     takes its notation; erasing a user leaves nothing of theirs and keeps the other
     user's rows."""
-    from a11y_stem.ops.retention import erase_user
+    from readablestem.ops.retention import erase_user
 
     def seed(email: str) -> tuple[str, str, str]:
         with db.session_scope(factory) as session:
@@ -519,9 +519,9 @@ def test_only_one_of_20_tabs_writing_from_the_same_version_gets_through(factory)
     form's version (`web.review.is_stale`) and count the write (`bump_result_version`) in
     one transaction: of 20 tabs made from version 0 and writing at once, exactly one write
     is applied."""
-    from a11y_stem.web.deps import CurrentUser
-    from a11y_stem.web.review import ReviewStale, bump_result_version, is_stale
-    from a11y_stem.web.routes.jobs import owned_job
+    from readablestem.web.deps import CurrentUser
+    from readablestem.web.review import ReviewStale, bump_result_version, is_stale
+    from readablestem.web.routes.jobs import owned_job
 
     [job_id] = queue_jobs(factory, 1)
     with db.session_scope(factory) as session:
@@ -560,7 +560,7 @@ def test_the_jobs_migrations_round_trip_on_postgres(pg_url):
     from alembic.runtime.migration import MigrationContext
     from sqlalchemy import inspect
 
-    from a11y_stem.web.database import alembic_config
+    from readablestem.web.database import alembic_config
     from test_web_jobs_migrations import CHAIN
     from test_web_migrations import INSERT_JOB, INSERT_USER
 
@@ -598,9 +598,9 @@ def test_the_step_cache_round_trips_on_postgres(factory):
     """T3-1: a finished step is kept as JSON (NUL characters dropped, which Postgres
     refuses), replaced for the same element, given back under its key only, and removed
     with the job."""
-    from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
-    from a11y_stem.ops.retention import delete_jobs
-    from a11y_stem.web.step_cache import DbStepCache
+    from readablestem.core.types import Element, EquationFix, Fix, Kind, Status
+    from readablestem.ops.retention import delete_jobs
+    from readablestem.web.step_cache import DbStepCache
 
     [job_id] = queue_jobs(factory, 1)
     element = Element(id="p1-e1", kind=Kind.EQUATION, page=0, bbox=(0, 0, 1, 1), order=1)

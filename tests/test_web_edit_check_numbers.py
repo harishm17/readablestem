@@ -4,9 +4,9 @@ codes as the equation step, said in plain words, and a meaning-level difference 
 
 from __future__ import annotations
 
-from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
-from a11y_stem.web import edit_check
+from readablestem.core.types import Element, EquationFix, Fix, Kind, Status
+from readablestem.pipeline.validate import safe_latex_to_mathml
+from readablestem.web import edit_check
 
 
 def case(text: str, stored: str):

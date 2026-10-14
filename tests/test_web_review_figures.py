@@ -12,11 +12,11 @@ import re
 
 import pytest
 
-from a11y_stem.core.types import Check, ConversionOutput, FigureFix, ModelCall, Status
-from a11y_stem.pipeline import figure_details
-from a11y_stem.pipeline.figure_step import LONG_PROMPT_VERSION
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, upload
+from readablestem.core.types import Check, ConversionOutput, FigureFix, ModelCall, Status
+from readablestem.pipeline import figure_details
+from readablestem.pipeline.figure_step import LONG_PROMPT_VERSION
 from test_web_review_split import panel, post, screen, stored, text_of
 
 ALT = "A car on a road between a house and a school."
@@ -220,7 +220,7 @@ def test_add_the_data_table_puts_it_in_the_file_and_keeps_the_decision_open(card
 
 
 def test_add_on_an_automatically_accepted_figure_records_the_reviewers_choice(optional):
-    from a11y_stem.core import triage
+    from readablestem.core import triage
 
     result = stored(optional)
     others = [f for f in result.fixes if f.element_id != "p1-e6"]

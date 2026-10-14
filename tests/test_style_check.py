@@ -21,18 +21,18 @@ second reading of something the heuristic might have under-rated.
 
 from __future__ import annotations
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.mathchars import base_char, char_variant, styled_char
-from a11y_stem.core.types import Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step
-from a11y_stem.pipeline.equation_step import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.mathchars import base_char, char_variant, styled_char
+from readablestem.core.types import Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step
+from readablestem.pipeline.equation_step import (
     text_layer_style,
     text_layer_style_mismatch,
     transcribe,
 )
-from a11y_stem.pipeline.layout import _Char, _regular_letters
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.pipeline.layout import _Char, _regular_letters
+from readablestem.pipeline.validate import safe_latex_to_mathml
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 BOLD_D = "\U0001d41d"  # MATHEMATICAL BOLD SMALL D

@@ -8,10 +8,6 @@ from datetime import date, timedelta
 import pytest
 from sqlalchemy import create_engine
 
-from a11y_stem.ops import aggregate, retention
-from a11y_stem.ops.aggregate import aggregate_finished
-from a11y_stem.ops.retention import PurgeStats, aggregate_and_purge, delete_jobs, purge_expired
-from a11y_stem.web import db
 from fixtures.ops.seed import (
     EXPECTED_DONE_COUNTS,
     NOW,
@@ -22,6 +18,10 @@ from fixtures.ops.seed import (
     review,
     sentinel_result,
 )
+from readablestem.ops import aggregate, retention
+from readablestem.ops.aggregate import aggregate_finished
+from readablestem.ops.retention import PurgeStats, aggregate_and_purge, delete_jobs, purge_expired
+from readablestem.web import db
 
 EXPIRED = NOW - timedelta(minutes=1)
 KEPT = NOW + timedelta(hours=1)

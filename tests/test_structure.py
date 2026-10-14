@@ -8,10 +8,10 @@ from __future__ import annotations
 
 import pymupdf
 
-from a11y_stem.core.types import Element, Kind
-from a11y_stem.pipeline.assemble import render_html
-from a11y_stem.pipeline.heading_step import heading_fixes
-from a11y_stem.pipeline.layout import analyze
+from readablestem.core.types import Element, Kind
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.heading_step import heading_fixes
+from readablestem.pipeline.layout import analyze
 
 BODY = 11.0
 CODE = 10.0
@@ -306,7 +306,7 @@ def test_a_mark_that_cannot_be_found_once_gets_no_link():
     layout = analyze(footnote_pdf())
     body, note = layout.elements
     twice = body.model_copy(update={"text": "x", "links": []})
-    from a11y_stem.pipeline import layout as layout_module
+    from readablestem.pipeline import layout as layout_module
 
     marks = {note.id: layout_module._FootnoteMark(body.id, "no such text", "1")}
     assert layout_module._footnote_links([twice, note], marks)[0].links == []
@@ -399,7 +399,7 @@ def test_chapter_lines_with_their_number_at_the_margin_are_entries_on_a_contents
 def test_code_definitions_and_contents_pass_axe_in_chromium():
     import pytest
 
-    from a11y_stem.pipeline.html_checks import axe_checks
+    from readablestem.pipeline.html_checks import axe_checks
 
     def fill(page):
         page.insert_text((72, 80), "Contents", fontsize=18, fontname="hebo")

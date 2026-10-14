@@ -7,12 +7,12 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from a11y_stem.eval import judge
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.models.base import fence_untrusted
-from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import figure_details
+from readablestem.eval import judge
+from readablestem.eval import pipeline_eval as pe
+from readablestem.models.base import fence_untrusted
+from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import figure_details
 from test_eval_support import FakeMedia, fake_png, figure, settings, write_gold
 from test_steps_support import use_fallback_router
 

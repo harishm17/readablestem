@@ -9,13 +9,13 @@ from datetime import timedelta
 import pytest
 from sqlalchemy import select, update
 
-from a11y_stem.config import ConfigError
-from a11y_stem.web import email_login, linked_emails
-from a11y_stem.web.app import create_app
-from a11y_stem.web.auth import set_allowed
-from a11y_stem.web.db import LoginLink, session_scope, utcnow
-from a11y_stem.web.email_senders import sender_names
 from fixtures.web.support import ALICE, BOB, OutboxSender, WebEnv, csrf_from, make_settings
+from readablestem.config import ConfigError
+from readablestem.web import email_login, linked_emails
+from readablestem.web.app import create_app
+from readablestem.web.auth import set_allowed
+from readablestem.web.db import LoginLink, session_scope, utcnow
+from readablestem.web.email_senders import sender_names
 
 PERSONAL = "alice.personal@gmail.com"
 LINK = re.compile(r"https://beta\.example\.org(/login/email/confirm\?token=[A-Za-z0-9_-]+)")

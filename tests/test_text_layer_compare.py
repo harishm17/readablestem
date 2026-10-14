@@ -5,12 +5,12 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import text_layer_compare as tl
-from a11y_stem.pipeline.equation_step import text_layer_number_case_checks, transcribe
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.types import Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import text_layer_compare as tl
+from readablestem.pipeline.equation_step import text_layer_number_case_checks, transcribe
+from readablestem.pipeline.validate import safe_latex_to_mathml
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 SETTINGS = make_settings()

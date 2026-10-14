@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from a11y_stem.gold.openstax import extract_elements
+from readablestem.gold.openstax import extract_elements
 
 REPO = Path(__file__).resolve().parents[1]
 PAGE = (Path(__file__).parent / "fixtures" / "eval" / "page.xhtml").read_text(encoding="utf-8")

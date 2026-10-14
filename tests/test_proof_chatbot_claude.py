@@ -10,7 +10,7 @@ from types import SimpleNamespace
 import pymupdf
 import pytest
 
-from a11y_stem.proof import chatbot, comparison, systems_stage
+from readablestem.proof import chatbot, comparison, systems_stage
 
 
 class FakeMessages:

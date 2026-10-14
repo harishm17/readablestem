@@ -13,10 +13,12 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import ConversionOutput, DocumentResult, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.web.db import ReviewEdit, session_scope
-from a11y_stem.web.review import (
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+from fixtures.web.table_doc import MATHS_LATEX, table_output, table_pdf
+from readablestem.core.types import ConversionOutput, DocumentResult, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.web.db import ReviewEdit, session_scope
+from readablestem.web.review import (
     NO_CLEAN_TABLES,
     NO_TEXT_GRID,
     ReviewInvalid,
@@ -26,8 +28,6 @@ from a11y_stem.web.review import (
     grid_as_text,
     is_clean_table,
 )
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
-from fixtures.web.table_doc import MATHS_LATEX, table_output, table_pdf
 
 CELL_BOX = (182.0, 184.0, 402.0, 202.0)  # row 3, columns 1 to 2 of Table 1
 
@@ -282,8 +282,8 @@ def with_model(env, answer):
 
 def set_cell_latex(env, latex: str) -> None:
     """Give the maths cell of Table 1 other LaTeX than the PDF says, so a read is a change."""
-    from a11y_stem.pipeline.validate import safe_latex_to_mathml
-    from a11y_stem.web.db import Job
+    from readablestem.pipeline.validate import safe_latex_to_mathml
+    from readablestem.web.db import Job
 
     result = stored(env)
     fix = result.fix_for("p1-e1")

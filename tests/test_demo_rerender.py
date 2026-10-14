@@ -7,10 +7,10 @@ import json
 import shutil
 from pathlib import Path
 
-import a11y_stem
-from a11y_stem.cli.eval_cli import rerender_demo
+import readablestem
+from readablestem.cli.eval_cli import rerender_demo
 
-DEMO = Path(a11y_stem.__file__).parent / "web" / "static" / "demo"
+DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo"
 SITE = Path(__file__).resolve().parent.parent / "site" / "examples"
 
 

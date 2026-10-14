@@ -14,14 +14,14 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Element, Kind, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import table_model, tables
-from a11y_stem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT
-from a11y_stem.pipeline.layout import Layout, analyze, release
-from a11y_stem.pipeline.run import convert_pdf
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import Element, Kind, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import table_model, tables
+from readablestem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT
+from readablestem.pipeline.layout import Layout, analyze, release
+from readablestem.pipeline.run import convert_pdf
 
 LATEX = Path(__file__).parent / "fixtures" / "layout" / "latex" / "tables.pdf"
 WORD = Path(__file__).parent / "fixtures" / "tables" / "word_tables.pdf"
@@ -192,9 +192,9 @@ def test_flattened_maths_in_the_grid_read_from_the_pdf_never_reaches_the_student
     gives the maths flat. Neither the one-click "Use the grid read from the PDF" nor the
     model-outage fallback writes it into the file; the decision stays open until the
     flattened cells are LaTeX."""
-    from a11y_stem.pipeline import table_step
-    from a11y_stem.pipeline.assemble_tables import flattened_cells
-    from a11y_stem.web.review import apply_review, can_accept, rerender_html
+    from readablestem.pipeline import table_step
+    from readablestem.pipeline.assemble_tables import flattened_cells
+    from readablestem.web.review import apply_review, can_accept, rerender_html
 
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
     output = convert_pdf(

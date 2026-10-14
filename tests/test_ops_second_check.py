@@ -13,24 +13,24 @@ import pytest
 import structlog
 from sqlalchemy import select
 
-from a11y_stem.cli.main import main
-from a11y_stem.config import Settings, get_settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard
-from a11y_stem.core.types import Fix, Kind, Status, Verification
-from a11y_stem.models.decisions_client import (
+from readablestem.cli.main import main
+from readablestem.config import Settings, get_settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard
+from readablestem.core.types import Fix, Kind, Status, Verification
+from readablestem.models.decisions_client import (
     Answer,
     DecisionRequest,
     DecisionResult,
     check_questions,
     request_content,
 )
-from a11y_stem.models.openai_client import PNG_SIGNATURE
-from a11y_stem.models.verifier import EQUATION_VERSION, FIGURE_VERSION
-from a11y_stem.ops import aggregate, canary
-from a11y_stem.ops.aggregate import fix_counts, score_bucket
-from a11y_stem.ops.report import render_report
-from a11y_stem.web import db
-from a11y_stem.web.db import ErrorAggregate, session_scope
+from readablestem.models.openai_client import PNG_SIGNATURE
+from readablestem.models.verifier import EQUATION_VERSION, FIGURE_VERSION
+from readablestem.ops import aggregate, canary
+from readablestem.ops.aggregate import fix_counts, score_bucket
+from readablestem.ops.report import render_report
+from readablestem.web import db
+from readablestem.web.db import ErrorAggregate, session_scope
 
 DAY = date(2026, 10, 8)
 NOW = datetime(2026, 10, 8, 13, 0, tzinfo=UTC)
@@ -226,7 +226,7 @@ def test_a_move_of_two_hundredths_is_tolerated_more_is_drift(caplog):
     moved = canary.run_canary(Replay(shift={"text-product-false": 0.03}), model="gpt-6-luna")
     assert moved.status == "drift"
     assert moved.drifted == [("text-product-false", "true", 0.03)]
-    with caplog.at_level(logging.INFO, logger="a11y_stem.ops.canary"):
+    with caplog.at_level(logging.INFO, logger="readablestem.ops.canary"):
         canary.report(moved, source="test")
     (line,) = [r for r in caplog.records if r.getMessage() == "decisions_canary_drift"]
     assert line.levelno == logging.ERROR
@@ -355,9 +355,9 @@ def test_the_cron_canary_fails_open_and_counts_drift(factory, caplog):
 
 
 def test_the_cron_route_runs_the_canary_after_the_purge(tmp_path, monkeypatch, caplog):
-    from a11y_stem.ops import retention
-    from a11y_stem.ops.retention import PurgeStats
     from fixtures.web.support import WebEnv
+    from readablestem.ops import retention
+    from readablestem.ops.retention import PurgeStats
 
     order: list[str] = []
     monkeypatch.setattr(aggregate, "aggregate_finished", lambda f, now=None: order.append("a") or 0)
@@ -410,7 +410,7 @@ def cli_state(monkeypatch):
 
 
 def use_replay(monkeypatch, replay: Replay) -> None:
-    from a11y_stem.models import decisions_client
+    from readablestem.models import decisions_client
 
     monkeypatch.setattr(decisions_client, "DecisionsClient", lambda settings, budget: replay)
 

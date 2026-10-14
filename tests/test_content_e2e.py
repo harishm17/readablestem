@@ -24,10 +24,10 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core import triage
-from a11y_stem.core.notation import canonical_symbol
-from a11y_stem.core.types import (
+from readablestem.config import Settings
+from readablestem.core import triage
+from readablestem.core.notation import canonical_symbol
+from readablestem.core.types import (
     NOTICE_CODES,
     ConversionOptions,
     ConversionOutput,
@@ -37,13 +37,13 @@ from a11y_stem.core.types import (
     Status,
     TableGrid,
 )
-from a11y_stem.models import OFFLINE_DEFAULTS
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.pipeline import assemble, table_step
-from a11y_stem.pipeline.html_checks import axe_checks, static_checks
-from a11y_stem.pipeline.run import convert_pdf
-from a11y_stem.web.messages import NOTICE_MESSAGES
+from readablestem.models import OFFLINE_DEFAULTS
+from readablestem.models.base import VisionRequest
+from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.pipeline import assemble, table_step
+from readablestem.pipeline.html_checks import axe_checks, static_checks
+from readablestem.pipeline.run import convert_pdf
+from readablestem.web.messages import NOTICE_MESSAGES
 
 LATEX = Path(__file__).parent / "fixtures" / "layout" / "latex"
 FIXTURES = sorted(p.name for p in LATEX.glob("*.pdf"))

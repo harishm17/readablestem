@@ -15,8 +15,8 @@ import zipfile
 
 import pytest
 
-from a11y_stem.pipeline import export_cartridge as cc
-from a11y_stem.pipeline.export_canvas import export_canvas
+from readablestem.pipeline import export_cartridge as cc
+from readablestem.pipeline.export_canvas import export_canvas
 from test_export_canvas import FOLDER, made, source_html, source_ids  # noqa: F401
 
 

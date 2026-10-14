@@ -24,13 +24,13 @@ from pathlib import Path
 
 import pytest
 
-import a11y_stem
-from a11y_stem.core.types import DocumentResult, Element, Fix
-from a11y_stem.pipeline.assemble import render_html
+import readablestem
+from readablestem.core.types import DocumentResult, Element, Fix
+from readablestem.pipeline.assemble import render_html
 
 HERE = Path(__file__).parent
 GOLDEN = HERE / "fixtures" / "assemble" / "golden"
-DEMO_REPORT = Path(a11y_stem.__file__).parent / "web" / "static" / "demo" / "report.json"
+DEMO_REPORT = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "report.json"
 STORED_DEMO_0_2_0 = HERE / "fixtures" / "stored" / "demo-report-0.2.0.json"
 SAMPLE = HERE / "fixtures" / "assemble" / "sample_document.json"
 
@@ -60,11 +60,11 @@ def converted(name: str) -> str:
     pipeline-level promise (layout, the always-on text pass, figure images, assembly)
     that documents without the new things are unchanged. `problem_set` has equations
     and lists; `kinematics_slides` has a figure crop (MF23's smaller image)."""
-    from a11y_stem.config import Settings
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.core.types import ConversionOptions
-    from a11y_stem.models.fake import FakeVisionClient
-    from a11y_stem.pipeline.run import convert_pdf
+    from readablestem.config import Settings
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.core.types import ConversionOptions
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline.run import convert_pdf
 
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
     output = convert_pdf(

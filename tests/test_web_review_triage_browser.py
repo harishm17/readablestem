@@ -40,7 +40,7 @@ def site(tmp_path_factory) -> Iterator[WebEnv]:
     HTML assembler is stubbed."""
     import uvicorn
 
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     patch = pytest.MonkeyPatch()
     patch.setattr(assemble, "render_html", lambda **kw: "<html><body>re-rendered</body></html>")

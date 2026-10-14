@@ -5,11 +5,11 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_images, equation_step
-from a11y_stem.pipeline.equation_step import NO_TEXT_LAYER_CODE, transcribe
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.types import Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_images, equation_step
+from readablestem.pipeline.equation_step import NO_TEXT_LAYER_CODE, transcribe
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 PNG = b"\x89PNG picture of an equation"
@@ -56,6 +56,6 @@ def test_a_picture_that_is_not_an_equation_is_abstained_not_checked():
 
 
 def test_the_code_has_a_sentence_for_the_review_screen():
-    from a11y_stem.web.messages import CHECK_MESSAGES
+    from readablestem.web.messages import CHECK_MESSAGES
 
     assert ("equation.no_text_layer", equation_step.NO_TEXT_LAYER_CODE) in CHECK_MESSAGES

@@ -6,11 +6,11 @@ import re
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
-from a11y_stem.pipeline.assemble import MAX_ALTTEXT_CHARS, alttext_from_speech, render_html
-from a11y_stem.pipeline.html_checks import static_checks
-from a11y_stem.pipeline.safe_html import sanitize_mathml
+from readablestem.config import Settings
+from readablestem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
+from readablestem.pipeline.assemble import MAX_ALTTEXT_CHARS, alttext_from_speech, render_html
+from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.safe_html import sanitize_mathml
 
 MATHML = (
     '<math xmlns="http://www.w3.org/1998/Math/MathML"><mi>x</mi><mo>=</mo>'

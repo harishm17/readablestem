@@ -10,15 +10,15 @@ from datetime import UTC, date, datetime
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.cli.main import main
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.models.verifier import EQUATION_CHECK, FIGURE_CHECK, FakeVerifier
-from a11y_stem.observability.logging import FIELDS_ATTR
-from a11y_stem.ops import canary, claude_canary
-from a11y_stem.ops.report import render_report
-from a11y_stem.web import db
-from a11y_stem.web.db import ErrorAggregate, session_scope
+from readablestem.cli.main import main
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.models.verifier import EQUATION_CHECK, FIGURE_CHECK, FakeVerifier
+from readablestem.observability.logging import FIELDS_ATTR
+from readablestem.ops import canary, claude_canary
+from readablestem.ops.report import render_report
+from readablestem.web import db
+from readablestem.web.db import ErrorAggregate, session_scope
 
 DAY = date(2026, 10, 14)
 NOW = datetime(2026, 10, 14, 13, 0, tzinfo=UTC)
@@ -72,7 +72,7 @@ def test_the_cases_are_the_synthetic_figure_and_equation_ones_with_a_known_truth
 
 
 def test_a_check_that_gets_every_case_right_is_ok(caplog):
-    with caplog.at_level(logging.INFO, logger="a11y_stem.ops.claude_canary"):
+    with caplog.at_level(logging.INFO, logger="readablestem.ops.claude_canary"):
         result = claude_canary.run_canary(perfect(), settings())
         claude_canary.report(result, source="test")
     assert (result.status, result.answered, result.missed, result.failed) == ("ok", 12, [], [])
@@ -82,7 +82,7 @@ def test_a_check_that_gets_every_case_right_is_ok(caplog):
 def test_one_miss_is_tolerated_two_are_drift(caplog):
     one = claude_canary.run_canary(perfect({"figure-bars-wrong-value"}), settings())
     assert one.status == "ok" and one.missed == ["figure-bars-wrong-value"]
-    with caplog.at_level(logging.INFO, logger="a11y_stem.ops.claude_canary"):
+    with caplog.at_level(logging.INFO, logger="readablestem.ops.claude_canary"):
         claude_canary.report(one, source="test")
     (line,) = caplog.records
     assert line.getMessage() == "claude_canary_incomplete" and line.levelno == logging.WARNING
@@ -92,7 +92,7 @@ def test_one_miss_is_tolerated_two_are_drift(caplog):
     )
     assert two.status == "drift"
     caplog.clear()
-    with caplog.at_level(logging.INFO, logger="a11y_stem.ops.claude_canary"):
+    with caplog.at_level(logging.INFO, logger="readablestem.ops.claude_canary"):
         claude_canary.report(two, source="test")
     (line,) = caplog.records
     assert line.getMessage() == "claude_canary_drift" and line.levelno == logging.ERROR
@@ -191,7 +191,7 @@ def test_the_cli_needs_a_key(monkeypatch, capsys, tmp_path):
     monkeypatch.chdir(tmp_path)  # no .env here: a developer's own key must not be found
     monkeypatch.setenv("MODEL_PROVIDER", "anthropic")
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    from a11y_stem.config import get_settings
+    from readablestem.config import get_settings
 
     get_settings.cache_clear()
     try:

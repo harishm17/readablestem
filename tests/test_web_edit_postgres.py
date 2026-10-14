@@ -15,10 +15,10 @@ import threading
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.core.types import DocumentResult, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.web.db import Blob, ReviewEdit, session_scope
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+from readablestem.core.types import DocumentResult, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.web.db import Blob, ReviewEdit, session_scope
 from test_web_edit_page import edit_output
 from test_web_edit_tables import clean_output
 from test_web_postgres import pg_url as pg_url  # fixture, re-exported for pytest

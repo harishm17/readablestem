@@ -15,12 +15,12 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline.equation_step import EquationOutput
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.base import VisionRequest
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline.equation_step import EquationOutput
 
 pytestmark = pytest.mark.live_model
 

@@ -12,10 +12,6 @@ from starlette.responses import PlainTextResponse
 from starlette.routing import Route
 from starlette.testclient import TestClient
 
-from a11y_stem.observability.logging import FIELDS_ATTR
-from a11y_stem.ops.retention import PurgeStats
-from a11y_stem.web.db import ErrorAggregate, SpendDay, User, session_scope
-from a11y_stem.web.security import APP_CSP, SecurityHeadersMiddleware
 from fixtures.web.support import (
     ADMIN,
     ALICE,
@@ -27,6 +23,10 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.observability.logging import FIELDS_ATTR
+from readablestem.ops.retention import PurgeStats
+from readablestem.web.db import ErrorAggregate, SpendDay, User, session_scope
+from readablestem.web.security import APP_CSP, SecurityHeadersMiddleware
 
 CRON = "/internal/cron/aggregate-and-purge"
 TOKEN = "c" * 40
@@ -43,7 +43,7 @@ def web(tmp_path):
 @pytest.fixture
 def ops(monkeypatch):
     """Stand-ins for WP6's aggregate_finished and purge_expired, recording call order."""
-    from a11y_stem.ops import aggregate, retention
+    from readablestem.ops import aggregate, retention
 
     calls: list[str] = []
     state = {"aggregate_raises": None}
@@ -108,7 +108,7 @@ def test_cron_purges_even_when_aggregation_fails(web, ops, caplog):
 
 def test_healthz_pings_the_database(web, monkeypatch):
     assert web.browser.get("/healthz").json() == {"status": "ok"}
-    from a11y_stem.web.routes import pages
+    from readablestem.web.routes import pages
 
     monkeypatch.setattr(pages, "ping", lambda engine: False)
     response = web.browser.get("/healthz")
@@ -233,7 +233,7 @@ def test_404_and_405_pages_are_html_and_friendly(web):
 def test_document_content_never_reaches_the_logs(tmp_path, monkeypatch, caplog):
     """Upload, convert, review (with an edit) and fail a job, all with SECRET-* content;
     no log record, argument or structured field may contain any of it, or the email."""
-    from a11y_stem.pipeline import assemble, speech, validate
+    from readablestem.pipeline import assemble, speech, validate
 
     monkeypatch.setattr(validate, "check_latex", lambda latex: [])
     monkeypatch.setattr(validate, "safe_latex_to_mathml", lambda latex, display="block": "<math/>")
@@ -275,7 +275,7 @@ def test_document_content_never_reaches_the_logs(tmp_path, monkeypatch, caplog):
 
 
 def test_unhandled_errors_give_a_500_page_and_log_only_the_type(web, monkeypatch, caplog):
-    from a11y_stem.web.routes import pages
+    from readablestem.web.routes import pages
 
     def boom(request):
         raise ValueError("SECRET-DOC-TEXT leaked into an exception")

@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import re
 
-from a11y_stem.core.types import Element, Fix, Kind, Status
-from a11y_stem.pipeline.assemble import AUTHORED_CLASS, render_html
-from a11y_stem.pipeline.html_checks import static_checks
+from readablestem.core.types import Element, Fix, Kind, Status
+from readablestem.pipeline.assemble import AUTHORED_CLASS, render_html
+from readablestem.pipeline.html_checks import static_checks
 
 ELEMENTS = [
     Element(id="p1-e0", kind=Kind.HEADING, page=0, bbox=(0, 0, 1, 1), order=0,
@@ -42,7 +42,7 @@ def test_the_tools_words_are_marked_english_in_a_french_document():
     assert html.startswith('<!doctype html>\n<html lang="fr">')
     tags = authored_tags(html)
     kinds = {re.search(r'class="([^"]*)"', t).group(1) for t in tags}  # type: ignore[union-attr]
-    assert {"notice a11y-stem", "flag-note a11y-stem", "about a11y-stem"} <= kinds
+    assert {"notice readablestem", "flag-note readablestem", "about readablestem"} <= kinds
     assert all(' lang="en"' in tag for tag in tags)
     # The document's own text is not marked.
     assert '<p id="p1-e1">La vitesse moyenne' in html
@@ -75,7 +75,7 @@ def test_the_tools_words_in_the_student_file_speak_to_students():
         Fix(element_id="p1-e5", kind=Kind.EQUATION, status=Status.REJECTED),
     ]  # fmt: skip
     html = render_html(title="T", lang="en", elements=elements, fixes=fixes, crops={})
-    notes = re.findall(r'<p class="flag-note a11y-stem"[^>]*>(.*?)</p>', html)
+    notes = re.findall(r'<p class="flag-note readablestem"[^>]*>(.*?)</p>', html)
     assert len(notes) == 4
     words = " ".join(re.sub(r"<[^>]+>", " ", n) for n in notes).casefold()
     for reviewer_word in ("review", "publish", "reject", "proposal", "decision"):
@@ -90,7 +90,7 @@ PNG = bytes.fromhex(
 
 
 def test_the_fixed_alt_text_of_an_original_is_marked_english():
-    from a11y_stem.core.types import Fix as F
+    from readablestem.core.types import Fix as F
 
     figure = Element(id="p1-e1", kind=Kind.FIGURE, page=0, bbox=(0, 0, 100, 100), order=1)
     fix = F(element_id="p1-e1", kind=Kind.FIGURE, status=Status.ABSTAINED, reason="low_confidence")
@@ -102,7 +102,7 @@ def test_the_fixed_alt_text_of_an_original_is_marked_english():
 
 
 def test_a_chart_data_tables_caption_is_marked_english():
-    from a11y_stem.core.types import FigureFix, TableCell, TableGrid
+    from readablestem.core.types import FigureFix, TableCell, TableGrid
 
     grid = TableGrid(
         rows=2, cols=2, header_rows=1, source="model",

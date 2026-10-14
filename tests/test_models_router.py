@@ -8,13 +8,13 @@ from typing import Any
 import pytest
 from pydantic import BaseModel
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import ModelCall, Outcome
-from a11y_stem.models.base import T, VisionRequest
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.pricing import cost_usd, estimate_max_cost_usd
-from a11y_stem.models.router import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import ModelCall, Outcome
+from readablestem.models.base import T, VisionRequest
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.pricing import cost_usd, estimate_max_cost_usd
+from readablestem.models.router import (
     RETRYABLE,
     FallbackBudgetExceeded,
     call_with_fallback,

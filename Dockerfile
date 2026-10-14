@@ -1,6 +1,6 @@
-# a11y-stem web app (FastAPI + worker thread) for Cloud Run.
-#   docker build -t a11y-stem .
-#   docker run --rm -p 8080:8080 -e DATABASE_URL=sqlite:////tmp/a11y.db a11y-stem
+# readablestem web app (FastAPI + worker thread) for Cloud Run.
+#   docker build -t readablestem .
+#   docker run --rm -p 8080:8080 -e DATABASE_URL=sqlite:////tmp/a11y.db readablestem
 #
 # Base images are pinned by tag and digest; Dependabot (docker ecosystem) proposes updates.
 # Digests read from the registries on 2026-10-07.
@@ -37,8 +37,8 @@ RUN uv sync --locked --no-dev --no-editable --extra tracing
 
 # The SLANet-plus table-structure model (7.5 MB, Apache-2.0; see THIRD_PARTY_NOTICES.md),
 # downloaded once here and refused unless its SHA-256 matches the pin in
-# src/a11y_stem/pipeline/table_model.py. Without it, tables use PyMuPDF's own grid.
-RUN /app/.venv/bin/python -m a11y_stem.pipeline.table_model --dir /app/models
+# src/readablestem/pipeline/table_model.py. Without it, tables use PyMuPDF's own grid.
+RUN /app/.venv/bin/python -m readablestem.pipeline.table_model --dir /app/models
 
 # ---------------------------------------------------------------- runtime
 FROM python:3.12-slim-trixie@sha256:05cda9777409a9c3ffddd94a4c476b79f0769a0b4857f0c7ed9226b6800b0d6f AS runtime
@@ -48,7 +48,7 @@ RUN groupadd --system --gid 10001 app \
        --shell /usr/sbin/nologin app
 
 # Word and PowerPoint uploads (T3-30) need LibreOffice's Writer and Impress components, run
-# headless in a limited child process (src/a11y_stem/web/office_convert.py). They add a few
+# headless in a limited child process (src/readablestem/web/office_convert.py). They add a few
 # hundred megabytes to the image and about 300 MB of memory while a file converts, so they
 # are installed only when asked for: docker build --build-arg INSTALL_LIBREOFFICE=true .
 # Without them the upload form takes PDFs only and says so (docs/deploy.md).
@@ -78,4 +78,4 @@ EXPOSE 8080
 HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
     CMD ["python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/healthz', timeout=4)"]
 
-CMD ["a11y-stem", "serve", "--host", "0.0.0.0", "--port", "8080"]
+CMD ["readablestem", "serve", "--host", "0.0.0.0", "--port", "8080"]

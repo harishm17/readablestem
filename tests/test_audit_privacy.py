@@ -18,11 +18,6 @@ from datetime import UTC, datetime, timedelta
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.ops import retention
-from a11y_stem.web import db
-from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
-from a11y_stem.web.routes import cron as cron_routes
-from a11y_stem.web.routes import jobs as job_routes
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -34,6 +29,11 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.ops import retention
+from readablestem.web import db
+from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
+from readablestem.web.routes import cron as cron_routes
+from readablestem.web.routes import jobs as job_routes
 
 TOKEN_HEADER = {"X-Cron-Token": "c" * 40}
 CRON = "/internal/cron/aggregate-and-purge"
@@ -158,8 +158,8 @@ def test_failed_jobs_keep_a_category_not_the_error(web):
 def test_the_model_sdk_loggers_cannot_be_switched_to_debug_by_the_environment(monkeypatch):
     """The Anthropic and OpenAI SDKs log whole request bodies (document text and page
     images) at DEBUG when ANTHROPIC_LOG or OPENAI_LOG is set to debug."""
-    from a11y_stem.config import Settings
-    from a11y_stem.observability.logging import configure_logging
+    from readablestem.config import Settings
+    from readablestem.observability.logging import configure_logging
 
     monkeypatch.setenv("ANTHROPIC_LOG", "debug")
     monkeypatch.setenv("OPENAI_LOG", "debug")

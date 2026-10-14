@@ -11,8 +11,6 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.notation import canonical_symbol
-from a11y_stem.web.db import CourseNotation, session_scope
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -23,6 +21,8 @@ from fixtures.web.support import (
     make_pdf,
     token,
 )
+from readablestem.core.notation import canonical_symbol
+from readablestem.web.db import CourseNotation, session_scope
 
 BOLD_D = canonical_symbol(r"\mathbf{d}")
 REALS = canonical_symbol(r"\mathbb{R}")

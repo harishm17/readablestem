@@ -21,11 +21,11 @@ from collections.abc import Callable, Iterator
 
 import pytest
 
-from a11y_stem.core.types import ConversionOutput, Link, Notice
-from a11y_stem.models.fake import FakeVisionClient
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv
 from fixtures.web.table_doc import table_pdf
+from readablestem.core.types import ConversionOutput, Link, Notice
+from readablestem.models.fake import FakeVisionClient
 from test_web_browser import WCAG_TAGS, describe, free_port, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest

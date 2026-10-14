@@ -15,7 +15,9 @@ from html import unescape
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import (
+from fixtures.web.review_doc import review_output, review_pdf
+from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+from readablestem.core.types import (
     ConversionOutput,
     DocumentResult,
     Element,
@@ -23,11 +25,9 @@ from a11y_stem.core.types import (
     Link,
     Status,
 )
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.web import page_edits, reread
-from a11y_stem.web.db import Blob, Job, ReviewEdit, session_scope
-from fixtures.web.review_doc import review_output, review_pdf
-from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload, with_file
+from readablestem.models.fake import FakeVisionClient
+from readablestem.web import page_edits, reread
+from readablestem.web.db import Blob, Job, ReviewEdit, session_scope
 
 PARAGRAPH = "p1-e1"  # "A rigid body turning with angular velocity ⟦p1-e2⟧ moves a point ..."
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."

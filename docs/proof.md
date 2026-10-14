@@ -192,7 +192,7 @@ has a different body.
 | `reports/<task>.run<N>.json` | that run's report without per-item rows: the numbers a replay must reproduce |
 | `media/pdfs/` | the exact PDF every system was given |
 | `media/*.jsonl` | per equation and figure: picture identity, size, text layer, context |
-| `systems/<arm>/` | other systems' outputs in the form `a11y_stem.proof.intermediate` defines |
+| `systems/<arm>/` | other systems' outputs in the form `readablestem.proof.intermediate` defines |
 | `gold/` | optional copy of the answer key (CC BY, with `ATTRIBUTION.md`) |
 
 It holds content derived from CC BY OpenStax sections and nothing else: no keys, host names
@@ -201,7 +201,7 @@ or user data. Course material from other sources never goes into a bundle.
 ## The other systems and the other parts
 
 The a11y-stem arm is in the bundle as model answers. Everything else in `PROOF.md` is
-computed from files the bundle holds, by stages (`src/a11y_stem/proof/stages.py`):
+computed from files the bundle holds, by stages (`src/readablestem/proof/stages.py`):
 
 | Stage | Module | What it reads |
 |---|---|---|
@@ -316,8 +316,8 @@ example the `ghcr.io/astral-sh/uv:python3.12-bookworm` image); then run `make pr
 
 ## Files
 
-- `src/a11y_stem/cli/proof.py`: the command.
-- `src/a11y_stem/proof/`: `registry` (sets and pins), `bundle`, `replay`, `runner`,
+- `src/readablestem/cli/proof.py`: the command.
+- `src/readablestem/proof/`: `registry` (sets and pins), `bundle`, `replay`, `runner`,
   `engine` (the flow), `stages`, `a11y_tables`, `report`, `document` (PROOF.md), `stats`,
   `goldinfo`, `sources`, `intermediate`; the other systems: `chatbot`, `judging`, `systems`,
   `systems_stage`, `systems_tables`, `invented`, `comparison`, `parsers`.

@@ -12,13 +12,13 @@ from typing import Any
 import pymupdf
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.eval.judge import JudgeVerdict
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.proof import chatbot, chatbot_batch, judging
-from a11y_stem.proof.chatbot_batch import record_arms_batch
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.eval.judge import JudgeVerdict
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.base import VisionRequest
+from readablestem.proof import chatbot, chatbot_batch, judging
+from readablestem.proof.chatbot_batch import record_arms_batch
 
 OPUS = chatbot.ARM_BY_ID["chatbot-opus-purdue"]
 HAIKU = chatbot.ARM_BY_ID["chatbot-haiku-purdue"]

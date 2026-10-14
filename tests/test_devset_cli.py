@@ -7,12 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli.main import main
-from a11y_stem.eval import devset_media
-from a11y_stem.gold import devset as ds
-from a11y_stem.pipeline import equation_step
 from devset_support import tiny_set
+from readablestem.cli import eval_cli
+from readablestem.cli.main import main
+from readablestem.eval import devset_media
+from readablestem.gold import devset as ds
+from readablestem.pipeline import equation_step
 from test_eval_support import FakeMedia, fake_transcribe, settings
 
 REPO = Path(__file__).resolve().parents[1]
@@ -79,7 +79,7 @@ def test_a_dev_run_uses_the_dev_folder_and_the_repository_cache(tmp_path, media)
 
 
 def test_a_dev_run_without_out_reports_under_local_eval(tmp_path, media, monkeypatch) -> None:
-    from a11y_stem.cli import main as cli_main
+    from readablestem.cli import main as cli_main
 
     monkeypatch.setattr(cli_main, "project_root", lambda start=None: tmp_path / "project")
     root = tiny_set(tmp_path)
@@ -93,7 +93,7 @@ def test_the_check_part_runs_from_the_sealed_archive_and_stays_outside_the_repos
     root = tiny_set(tmp_path)
     assert run(root, part="check") == 0
     ((gold_dir, cache_dir, archive_cache),) = Media.built
-    xdg = tmp_path / "xdg" / "a11y-stem" / "dev-v2"
+    xdg = tmp_path / "xdg" / "readablestem" / "dev-v2"
     assert xdg in gold_dir.parents
     assert cache_dir == xdg / "eval-cache" and archive_cache == xdg / "openstax"
     report = json.loads((xdg / "reports" / "check-equations.json").read_text(encoding="utf-8"))

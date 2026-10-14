@@ -7,9 +7,9 @@ from typing import ClassVar
 
 import pytest
 
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli.main import build_parser, main
-from a11y_stem.core.types import (
+from readablestem.cli import eval_cli
+from readablestem.cli.main import build_parser, main
+from readablestem.core.types import (
     ConversionOutput,
     DocumentResult,
     DocumentStats,
@@ -18,9 +18,9 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.eval import pipeline_eval, render
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step, run
+from readablestem.eval import pipeline_eval, render
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step, run
 from test_eval_support import (
     EQ_A,
     EQ_F,
@@ -152,9 +152,9 @@ def test_max_usd_builds_the_openai_client_with_the_cap(gold, tmp_path, fake_inpu
 
     verifiers: list = []
 
-    from a11y_stem.cli import eval_cli
-    from a11y_stem.config import Settings
-    from a11y_stem.models import openai_client
+    from readablestem.cli import eval_cli
+    from readablestem.config import Settings
+    from readablestem.models import openai_client
 
     monkeypatch.setattr(openai_client, "OpenAIVisionClient", StubOpenAIVisionClient)
     monkeypatch.setattr(
@@ -165,15 +165,15 @@ def test_max_usd_builds_the_openai_client_with_the_cap(gold, tmp_path, fake_inpu
     assert (budget.max_usd, budget.max_calls, budget.guard.cap_usd) == (1.5, 7, 1.5)
     assert json.loads((tmp_path / "report.json").read_text())["client"] == "openai"
     # The second automated check rides on the same client (and so the same budget).
-    from a11y_stem.models.verifier import DecisionsVerifier
+    from readablestem.models.verifier import DecisionsVerifier
 
     (verifier,) = verifiers
     assert isinstance(verifier, DecisionsVerifier)
 
 
 def test_missing_api_key_is_explained(gold, tmp_path, fake_inputs, monkeypatch, capsys):
-    from a11y_stem.cli import eval_cli
-    from a11y_stem.config import Settings
+    from readablestem.cli import eval_cli
+    from readablestem.config import Settings
 
     monkeypatch.setattr(eval_cli, "_settings", lambda: Settings(_env_file=None))
     assert main(pipeline_args(gold, tmp_path, "--max-usd", "1")) == 2
@@ -259,8 +259,8 @@ def test_weekly_sample_scores_a_seeded_share_of_the_gold_set(gold, tmp_path, fak
 def test_the_sample_always_has_at_least_one_unit(gold):
     from datetime import date
 
-    from a11y_stem.eval.pipeline_eval import load_gold
-    from a11y_stem.eval.sample import iso_week, sample_units
+    from readablestem.eval.pipeline_eval import load_gold
+    from readablestem.eval.sample import iso_week, sample_units
 
     assert len(sample_units("equations", load_gold(gold), fraction=0.05, seed="w")) == 1
     assert iso_week(date(2026, 10, 8)) == "2026-W41"
@@ -269,7 +269,7 @@ def test_the_sample_always_has_at_least_one_unit(gold):
 
 
 def test_promote_copies_only_complete_real_and_current_reports(tmp_path, capsys):
-    from a11y_stem.eval.gate import code_versions
+    from readablestem.eval.gate import code_versions
 
     def write(name: str, **changes) -> str:
         data = {
@@ -447,7 +447,7 @@ def test_provider_anthropic_runs_with_claude_and_the_report_records_it(
             super().__init__(budget=budget)
             built.append((settings, budget, kw))
 
-    from a11y_stem.models import anthropic_client
+    from readablestem.models import anthropic_client
 
     monkeypatch.setattr(anthropic_client, "AnthropicVisionClient", StubAnthropicVisionClient)
     monkeypatch.setattr(eval_cli, "_settings", lambda: settings(anthropic_api_key="sk-ant-test"))
@@ -497,7 +497,7 @@ def test_provider_anthropic_without_a_key_names_its_key(gold, tmp_path, fake_inp
 
 
 def test_a_claude_report_is_promoted_only_beside_the_openai_baselines(tmp_path, capsys):
-    from a11y_stem.eval.gate import code_versions
+    from readablestem.eval.gate import code_versions
 
     data = {
         "task": "equations",

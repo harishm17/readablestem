@@ -206,7 +206,7 @@ Every line on stdout is one JSON object. Cloud Logging reads `severity`, `messag
 
 ```json
 {"method": "POST", "route": "/jobs/{job_id}/review", "status": 303, "latency_ms": 41,
- "logger": "a11y_stem.http", "time": "2026-10-07T18:02:11.204518Z",
+ "logger": "readablestem.http", "time": "2026-10-07T18:02:11.204518Z",
  "severity": "INFO", "message": "request"}
 ```
 
@@ -241,7 +241,7 @@ Logs are about the system, not the documents. The chain in
   a path cannot leak through its `repr`. Strings are cut at 200 characters.
 - Exceptions are logged as `error_type` plus a `stack` of `file:line:function` entries.
   The message is dropped: a pydantic error on model output quotes the LaTeX it rejected.
-- Below WARNING, only `a11y_stem.*`, `uvicorn.error` and alembic's migration logger are
+- Below WARNING, only `readablestem.*`, `uvicorn.error` and alembic's migration logger are
   written. Libraries that log URLs with query strings or request bodies at INFO or DEBUG
   (the OpenAI SDK's `httpx2`, `httpx`, SQLAlchemy) stay quiet even with `LOG_LEVEL=DEBUG`.
 - Uvicorn's access log is off; `request_logging_middleware` logs the route template
@@ -259,7 +259,7 @@ its access lines whether uvicorn configures logging before or after it, but unti
 Writing a log line:
 
 ```python
-from a11y_stem.observability.logging import get_logger
+from readablestem.observability.logging import get_logger
 
 log = get_logger(__name__)
 log.info(
@@ -293,13 +293,13 @@ under them move, and the API is in beta: one model, no version pinning. Its answ
 deterministic, so a fixed set of requests answered differently on one day is a change
 of the model or the service, seen the day it happens.
 
-- **Requests:** `src/a11y_stem/ops/canary_requests.json`: 20 synthetic cases (6 figure
+- **Requests:** `src/readablestem/ops/canary_requests.json`: 20 synthetic cases (6 figure
   checks on a bar chart and a force diagram drawn with PyMuPDF, with right, wrong and
   generic alt texts; 6 equation checks on three drawn equations, right and wrong
   LaTeX; 8 plain true/false statements). The figure and equation cases are built with
   the production question builders, so they ask what the pipeline asks. No document
   content.
-- **Expected answers:** `src/a11y_stem/ops/canary_expected.json`, recorded live on
+- **Expected answers:** `src/readablestem/ops/canary_expected.json`, recorded live on
   2026-10-08 and checked on a second run the same day (20 of 20 identical). Each case
   stores the SHA-256 of its request as sent; `tests/test_ops_second_check.py` fails when
   the question wording, the framing or an image changes without a re-recording.

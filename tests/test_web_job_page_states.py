@@ -14,7 +14,8 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.core.types import (
+from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token, upload
+from readablestem.core.types import (
     DocumentResult,
     Element,
     Fix,
@@ -23,8 +24,7 @@ from a11y_stem.core.types import (
     SourceFacts,
     Status,
 )
-from a11y_stem.web.db import Job, JobStatus, ReviewEdit, session_scope, utcnow
-from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token, upload
+from readablestem.web.db import Job, JobStatus, ReviewEdit, session_scope, utcnow
 
 
 @pytest.fixture

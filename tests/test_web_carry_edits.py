@@ -15,11 +15,11 @@ import pymupdf
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import DocumentResult, Kind, Status
-from a11y_stem.web import carry
-from a11y_stem.web.db import Job, JobStatus, ReviewEdit, session_scope
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from readablestem.core.types import DocumentResult, Kind, Status
+from readablestem.web import carry
+from readablestem.web.db import Job, JobStatus, ReviewEdit, session_scope
 
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."
 LATER = "p2-e1"  # "Average speed is distance over time." (page 2)

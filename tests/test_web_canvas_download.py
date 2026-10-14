@@ -14,15 +14,15 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
-import a11y_stem
 import canvas_sanitizer as cs
-from a11y_stem.core.types import Status
-from a11y_stem.web import events
-from a11y_stem.web.db import Job, session_scope
-from a11y_stem.web.security import VIEW_CSP
+import readablestem
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.core.types import Status
+from readablestem.web import events
+from readablestem.web.db import Job, session_scope
+from readablestem.web.security import VIEW_CSP
 
-DEMO = Path(a11y_stem.__file__).parent / "web" / "static" / "demo" / "index.html"
+DEMO = Path(readablestem.__file__).parent / "web" / "static" / "demo" / "index.html"
 
 
 @pytest.fixture
@@ -225,7 +225,7 @@ def test_the_form_does_not_need_the_script(web):
     page = web.browser.get(f"/jobs/{ready_job(web)}").text
     form = re.search(r'<form class="canvas-download".*?</form>', page, re.S)
     assert form and "onsubmit" not in form.group(0) and "<script" not in form.group(0)
-    app_js = (Path(a11y_stem.__file__).parent / "web" / "static" / "app.js").read_text()
+    app_js = (Path(readablestem.__file__).parent / "web" / "static" / "app.js").read_text()
     assert 'closest("form.canvas-download")' in app_js
 
 

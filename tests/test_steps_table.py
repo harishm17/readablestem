@@ -14,9 +14,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
     Check,
     ConversionOptions,
     DocumentResult,
@@ -28,12 +28,12 @@ from a11y_stem.core.types import (
     TableCell,
     TableGrid,
 )
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import options, table_step
-from a11y_stem.pipeline.assemble import render_html
-from a11y_stem.pipeline.html_checks import AXE_SKIPPED, axe_checks, static_checks
-from a11y_stem.pipeline.table_step import (
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import options, table_step
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.html_checks import AXE_SKIPPED, axe_checks, static_checks
+from readablestem.pipeline.table_step import (
     PROMPT_VERSION,
     TableOutput,
     apply_header_policy,
@@ -1073,9 +1073,9 @@ def test_axe_finds_no_problems_with_rebuilt_tables():
 
 
 def test_a_conversion_with_tables_on_writes_the_rebuilt_table(monkeypatch):
-    from a11y_stem.pipeline import layout
-    from a11y_stem.pipeline import run as run_module
-    from a11y_stem.pipeline.layout import Layout
+    from readablestem.pipeline import layout
+    from readablestem.pipeline import run as run_module
+    from readablestem.pipeline.layout import Layout
 
     table = element(local(FREE_FALL)).model_copy(update={"id": "p1-e1", "order": 1})
     intro = Element(id="p1-e0", kind=Kind.PARAGRAPH, page=0, bbox=(72, 100, 400, 120), order=0,
@@ -1179,7 +1179,7 @@ SPLIT = [
 def test_a_last_row_the_page_break_split_gets_the_pdfs_whole_text():
     # The crop ends at the page bottom: the model reads "... the known"; layout joined
     # "universe" from the next page's table into the grid read from the PDF.
-    from a11y_stem.pipeline.tables import REASON_ROW_SPLIT
+    from readablestem.pipeline.tables import REASON_ROW_SPLIT
 
     cut = [*SPLIT[:2], ["10^26", "Distance from Earth to the edges of the known"]]
     target = element(local(SPLIT)).model_copy(update={"reasons": [REASON_ROW_SPLIT]})
@@ -1194,7 +1194,7 @@ def test_a_last_row_the_page_break_split_gets_the_pdfs_whole_text():
 
 
 def test_the_end_of_a_split_row_is_left_out_of_the_next_tables_answer():
-    from a11y_stem.pipeline.tables import REASON_ROW_CONTINUED
+    from readablestem.pipeline.tables import REASON_ROW_CONTINUED
 
     rest = [["Length (m)", "Phenomenon"], ["10^30", "Mass of the Sun"]]
     with_end = [rest[0], ["", "universe"], rest[1]]

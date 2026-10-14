@@ -14,12 +14,12 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.web.database import utc_today
-from a11y_stem.web.db import SpendDay, session_scope
-from a11y_stem.web.security import VIEW_CSP
 from fixtures.web.support import ADMIN, ALICE, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.web.database import utc_today
+from readablestem.web.db import SpendDay, session_scope
+from readablestem.web.security import VIEW_CSP
 
-WEB = Path(__file__).resolve().parents[1] / "src" / "a11y_stem" / "web"
+WEB = Path(__file__).resolve().parents[1] / "src" / "readablestem" / "web"
 TEMPLATES = WEB / "templates"
 DOCS = Path(__file__).resolve().parents[1] / "docs" / "web.md"
 
@@ -62,7 +62,7 @@ class Page(HTMLParser):
 @pytest.fixture(scope="module")
 def pages(tmp_path_factory) -> dict[str, str]:
     """Every kind of page, rendered once, as the user who can see it."""
-    from a11y_stem.web.routes import pages as pages_module
+    from readablestem.web.routes import pages as pages_module
 
     root = tmp_path_factory.mktemp("pages")
     env = WebEnv(root)
@@ -166,7 +166,7 @@ class StubTracer:
 
 
 def test_privacy_page_names_langfuse_when_tracing_is_on(tmp_path, monkeypatch):
-    from a11y_stem.web import app as app_module
+    from readablestem.web import app as app_module
 
     monkeypatch.setattr(app_module, "make_tracer", lambda settings: StubTracer())
     env = WebEnv(tmp_path, tracing_enabled=True)
@@ -189,8 +189,8 @@ def test_privacy_page_describes_the_content_features_that_are_on(tmp_path, pages
 
 
 def test_launch_check_wants_tables_and_notation_in_the_privacy_notice(tmp_path, monkeypatch):
-    from a11y_stem.ops import launch
     from fixtures.web.support import make_settings
+    from readablestem.ops import launch
 
     templates = tmp_path / "templates"
     templates.mkdir()
@@ -232,8 +232,8 @@ def test_limits_page_is_an_honest_draft_left_for_harish(pages):
 
 
 def test_launch_check_lists_what_is_unfinished(capsys):
-    from a11y_stem.cli.main import main
-    from a11y_stem.ops.launch import launch_blockers
+    from readablestem.cli.main import main
+    from readablestem.ops.launch import launch_blockers
 
     items = launch_blockers()
     assert "web/templates/limits.html: still has a TODO(Harish) note" in items
@@ -243,10 +243,10 @@ def test_launch_check_lists_what_is_unfinished(capsys):
 
 
 def test_a_placeholder_demo_is_not_counted_as_done(tmp_path, monkeypatch):
-    from a11y_stem.ops import launch
+    from readablestem.ops import launch
 
     demo = tmp_path / "index.html"
-    demo.write_text('<p data-a11y-stem-demo="placeholder">x</p>')
+    demo.write_text('<p data-readablestem-demo="placeholder">x</p>')
     monkeypatch.setattr(launch, "DEMO_PAGE", demo)
     assert any("placeholder output" in item for item in launch.launch_blockers())
 
@@ -256,7 +256,7 @@ def test_demo_page_without_a_demo_file(pages):
 
 
 def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
-    from a11y_stem.web.routes import pages as pages_module
+    from readablestem.web.routes import pages as pages_module
 
     demo = tmp_path / "index.html"
     demo.write_text("<!doctype html><title>demo</title><p style='color:red'>maths</p>")
@@ -269,13 +269,13 @@ def test_demo_file_is_served_sandboxed(tmp_path, monkeypatch):
 
 
 def test_committed_demo_is_real_output_and_served_sandboxed(tmp_path):
-    from a11y_stem.web.routes import pages as pages_module
+    from readablestem.web.routes import pages as pages_module
 
     demo = pages_module.DEMO_PAGE
     if not demo.is_file():
         pytest.skip("no demo built (a11y-stem demo build)")
     text = demo.read_text(encoding="utf-8")
-    assert 'data-a11y-stem-demo="placeholder"' not in text  # built with the real models
+    assert 'data-readablestem-demo="placeholder"' not in text  # built with the real models
     assert "openstax.org" in text and "CC BY" in text  # attribution travels with it
     env = WebEnv(tmp_path)
     with env.running() as client:

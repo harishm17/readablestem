@@ -8,8 +8,8 @@ import math
 
 import pytest
 
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import (
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -20,12 +20,12 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.eval import render
-from a11y_stem.eval.render import RenderError
-from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.pipeline import equation_step, figure_step, heading_step, html_checks, layout, run
-from a11y_stem.pipeline.layout import Layout
+from readablestem.eval import pipeline_eval as pe
+from readablestem.eval import render
+from readablestem.eval.render import RenderError
+from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.pipeline import equation_step, figure_step, heading_step, html_checks, layout, run
+from readablestem.pipeline.layout import Layout
 from test_eval_support import (
     EQ_A,
     EQ_F,
@@ -768,7 +768,7 @@ def test_document_cost_is_reported_per_pdf_page_as_well_as_per_section(monkeypat
     """A document item is one OpenStax section printed to a PDF of many pages. The first
     real run cost $0.161 for sections of 16, 14 and 13 PDF pages: $0.054 per section but
     $0.0037 per PDF page, and only the second compares with production cost per page."""
-    from a11y_stem.core.types import ModelCall
+    from readablestem.core.types import ModelCall
 
     gold = write_gold(
         tmp_path,

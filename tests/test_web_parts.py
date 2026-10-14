@@ -17,11 +17,11 @@ import pymupdf
 import pytest
 from sqlalchemy import func, select
 
-from a11y_stem.ops.retention import erase_user, purge_expired
-from a11y_stem.web import ranges
-from a11y_stem.web.db import Blob, Job, PendingUpload, QuotaDay, User, session_scope, utcnow
-from a11y_stem.web.uploads import ExtractFailed, extract_part_isolated
 from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, login, make_pdf, token
+from readablestem.ops.retention import erase_user, purge_expired
+from readablestem.web import ranges
+from readablestem.web.db import Blob, Job, PendingUpload, QuotaDay, User, session_scope, utcnow
+from readablestem.web.uploads import ExtractFailed, extract_part_isolated
 
 
 def text_of(html: str) -> str:
@@ -277,7 +277,7 @@ def test_what_was_typed_wrongly_is_explained_and_kept_in_the_box(web):
 
 
 def test_the_caps_on_documents_still_hold_for_parts(web):
-    from a11y_stem.web.intake import MAX_ACTIVE_JOBS_PER_USER
+    from readablestem.web.intake import MAX_ACTIVE_JOBS_PER_USER
 
     web.settings.per_user_daily_page_quota = 500
     for n in range(MAX_ACTIVE_JOBS_PER_USER - 1):
@@ -414,7 +414,7 @@ def test_a_waiting_file_is_gone_at_its_deletion_time_and_with_its_owner(web):
 def test_a_waiting_file_does_not_count_toward_the_documents_a_person_keeps(web):
     keep_big(web, 12)
     assert jobs_of(web) == []
-    from a11y_stem.web.intake import live_job_count
+    from readablestem.web.intake import live_job_count
 
     with session_scope(web.ctx.factory) as session:
         user_id = session.scalar(select(User.id).where(User.email == ALICE))

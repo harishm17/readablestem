@@ -11,8 +11,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.eval import render
-from a11y_stem.eval.render import (
+from readablestem.eval import render
+from readablestem.eval.render import (
     ImageCache,
     PageSource,
     RenderError,
@@ -298,9 +298,9 @@ def test_demo_links_back_to_the_app_and_to_the_source_and_marks_placeholders():
     )
     assert '<a href="/">Back to a11y-stem</a>' in wrapped
     assert '<a href="https://example.org/src">' in wrapped and "Affero" in wrapped
-    assert "data-a11y-stem-demo" not in wrapped
+    assert "data-readablestem-demo" not in wrapped
     fake = wrap_demo_html("<main></main>", page, date="2026-10-07", placeholder=True)
-    assert 'data-a11y-stem-demo="placeholder"' in fake and "Placeholder output." in fake
+    assert 'data-readablestem-demo="placeholder"' in fake and "Placeholder output." in fake
 
 
 def test_demo_note_links_say_where_they_go_not_raw_urls():

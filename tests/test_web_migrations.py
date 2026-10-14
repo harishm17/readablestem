@@ -15,16 +15,16 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
-from a11y_stem.config import ConfigError
-from a11y_stem.web import database, db
-from a11y_stem.web.database import (
+from fixtures.web.support import make_settings
+from readablestem.config import ConfigError
+from readablestem.web import database, db
+from readablestem.web.database import (
     alembic_config,
     alembic_ini_path,
     migration_heads,
     prepare_database,
     require_migrated,
 )
-from fixtures.web.support import make_settings
 
 
 def upgrade(url: str) -> None:

@@ -12,9 +12,9 @@ import threading
 import pymupdf
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import (
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
     ConversionOptions,
     Element,
     FigureFix,
@@ -24,10 +24,10 @@ from a11y_stem.core.types import (
     ProgressEvent,
     Status,
 )
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step, figure_step, layout, options, run, table_step
-from a11y_stem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT
-from a11y_stem.pipeline.layout import Layout
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step, figure_step, layout, options, run, table_step
+from readablestem.pipeline.assemble_tables import TABLE_NOT_CONVERTED_ALT
+from readablestem.pipeline.layout import Layout
 
 
 def settings(**kw) -> Settings:
@@ -202,7 +202,7 @@ def test_the_table_step_keeps_tables_as_images_until_it_is_built():
 def test_every_kind_that_asks_for_a_decision_is_on_the_review_screen():
     """A required decision the review screen cannot show would keep a job from ever
     being done (the job page counts every pending fix)."""
-    from a11y_stem.web.review import GROUP_KINDS
+    from readablestem.web.review import GROUP_KINDS
 
     asking = {Kind.EQUATION, Kind.FIGURE, Kind.HEADING, Kind.TABLE}
     assert asking <= set(GROUP_KINDS)

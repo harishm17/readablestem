@@ -14,10 +14,10 @@ import defusedxml.ElementTree as DET
 import pytest
 from latex2mathml.converter import convert
 
-from a11y_stem.eval.equations import canonical, score_mathml
-from a11y_stem.eval.gold_scoring import iter_gold_records
-from a11y_stem.pipeline import validate
-from a11y_stem.pipeline.validate import (
+from readablestem.eval.equations import canonical, score_mathml
+from readablestem.eval.gold_scoring import iter_gold_records
+from readablestem.pipeline import validate
+from readablestem.pipeline.validate import (
     LatexConversionError,
     check_alt,
     check_latex,

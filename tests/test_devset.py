@@ -13,10 +13,10 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.gold import devset as ds
-from a11y_stem.gold import devset_classify as dc
-from a11y_stem.gold import heldout as heldout_registry
 from devset_support import PAGE, book, page, tiny_set, write_authored
+from readablestem.gold import devset as ds
+from readablestem.gold import devset_classify as dc
+from readablestem.gold import heldout as heldout_registry
 
 REPO = Path(__file__).resolve().parents[1]
 ROOT = REPO / "data" / "dev-v2"

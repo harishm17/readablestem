@@ -12,8 +12,8 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
-from a11y_stem.config import Settings
-from a11y_stem.observability.logging import (
+from readablestem.config import Settings
+from readablestem.observability.logging import (
     DENYLIST,
     MAX_STRING,
     TRUNCATION_MARK,
@@ -165,7 +165,7 @@ def test_configured_output_drops_other_spellings(capsys):
         def __repr__(self) -> str:
             return f"Doc(text={SENTINEL!r})"
 
-    get_logger("a11y_stem.test").info(
+    get_logger("readablestem.test").info(
         "e1",
         MathML=SENTINEL,
         LaTeX=SENTINEL,
@@ -219,7 +219,7 @@ def test_exceptions_are_logged_by_type_and_location_only():
 
 def test_configured_output_is_cloud_run_json(capsys):
     configure_logging(Settings(_env_file=None, log_level="INFO"))  # type: ignore[call-arg]
-    log = get_logger("a11y_stem.test")
+    log = get_logger("readablestem.test")
     log.info("job_done", job_id="j1", alt=SENTINEL, latex=SENTINEL)
     log.debug("hidden")
     try:
@@ -231,7 +231,7 @@ def test_configured_output_is_cloud_run_json(capsys):
     records = lines(capsys)
     assert [r["message"] for r in records] == ["job_done", "job_failed", "pool exhausted"]
     first = records[0]
-    assert first["severity"] == "INFO" and first["logger"] == "a11y_stem.test"
+    assert first["severity"] == "INFO" and first["logger"] == "readablestem.test"
     assert first["time"].endswith("Z")
     assert first["job_id"] == "j1" and "alt" not in first and "latex" not in first
     assert records[1]["severity"] == "ERROR"
@@ -242,7 +242,7 @@ def test_configured_output_is_cloud_run_json(capsys):
 
 def test_debug_level_never_enables_chatty_libraries(capsys):
     configure_logging(Settings(_env_file=None, log_level="DEBUG"))  # type: ignore[call-arg]
-    get_logger("a11y_stem.test").debug("ours")
+    get_logger("readablestem.test").debug("ours")
     logging.getLogger("openai").debug("request body would be here")
     logging.getLogger("httpx2").info(f"HTTP Request: GET /x?email={SENTINEL}")
     logging.getLogger("some.new.library").info(f"GET /x?q={SENTINEL}")
@@ -316,7 +316,7 @@ def test_uvicorn_log_options_leave_logging_to_us(capsys):
 def test_configure_logging_is_idempotent(capsys):
     configure_logging()
     configure_logging()
-    get_logger("a11y_stem.test").info("once")
+    get_logger("readablestem.test").info("once")
     assert len(lines(capsys)) == 1
 
 
@@ -369,10 +369,10 @@ def test_web_events_are_structured_json_with_the_event_as_the_message(capsys):
     """`log_event` lines used to put every field into the message string, so
     `jsonPayload.message="job_failed"` never matched and `jsonPayload.error_code` did not
     exist; the exception location was cut off at 200 characters."""
-    from a11y_stem.web.logsafe import log_event, log_exception
+    from readablestem.web.logsafe import log_event, log_exception
 
     configure_logging(Settings(_env_file=None))
-    logger = logging.getLogger("a11y_stem.web.worker")
+    logger = logging.getLogger("readablestem.web.worker")
     log_event(logger, "cron_refused", logging.WARNING)
     try:
         raise RuntimeError(f"{SENTINEL} quoted from the document")

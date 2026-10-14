@@ -11,12 +11,6 @@ from pathlib import Path
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.core.types import Status
-from a11y_stem.ops.retention import purge_expired
-from a11y_stem.web.app import make_templates
-from a11y_stem.web.database import utc_today
-from a11y_stem.web.db import Job, SpendDay, session_scope
-from a11y_stem.web.pdf_probe import ProbeRejected, probe
 from fixtures.web.support import (
     ALICE,
     BOB,
@@ -28,6 +22,12 @@ from fixtures.web.support import (
     token,
     upload,
 )
+from readablestem.core.types import Status
+from readablestem.ops.retention import purge_expired
+from readablestem.web.app import make_templates
+from readablestem.web.database import utc_today
+from readablestem.web.db import Job, SpendDay, session_scope
+from readablestem.web.pdf_probe import ProbeRejected, probe
 
 LAYOUT = Path(__file__).resolve().parent / "fixtures" / "layout"
 
@@ -168,7 +168,7 @@ def test_the_lists_delete_is_a_link_to_the_confirmation(web):
 
 
 def test_the_confirmation_counts_the_decisions_that_go_with_it(web, monkeypatch):
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     monkeypatch.setattr(assemble, "render_html", lambda **kw: "<html>re-rendered</html>")
     job_id = finish(web)
@@ -399,7 +399,7 @@ def test_the_list_is_built_with_one_query_for_the_jobs_and_one_for_their_facts(w
 def test_a_decision_in_review_changes_the_number_the_list_shows(web):
     job_id = finish(web)
     assert web.job(job_id).open_decisions == 3
-    from a11y_stem.core.types import DocumentResult
+    from readablestem.core.types import DocumentResult
 
     with session_scope(web.ctx.factory) as session:
         job = session.get(Job, job_id)

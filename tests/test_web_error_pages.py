@@ -9,9 +9,9 @@ from sqlalchemy.exc import InterfaceError, OperationalError
 from sqlalchemy.exc import TimeoutError as PoolTimeout
 from starlette.exceptions import HTTPException
 
-from a11y_stem.web import deps
-from a11y_stem.web.security import APP_CSP
 from fixtures.web.support import ALICE, WebEnv, login
+from readablestem.web import deps
+from readablestem.web.security import APP_CSP
 
 TITLES = {
     500: "Something went wrong",

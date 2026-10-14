@@ -9,8 +9,8 @@ from decimal import Decimal
 import pymupdf
 import pytest
 
-from a11y_stem.eval.invented import text as T
-from a11y_stem.pipeline import equation_step
+from readablestem.eval.invented import text as T
+from readablestem.pipeline import equation_step
 
 MINUS = "−"
 

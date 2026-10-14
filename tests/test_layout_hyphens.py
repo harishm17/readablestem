@@ -14,14 +14,14 @@ from importlib import resources
 import pymupdf
 import pytest
 
-from a11y_stem.pipeline import hyphens
-from a11y_stem.pipeline.layout import _line_break, analyze
+from readablestem.pipeline import hyphens
+from readablestem.pipeline.layout import _line_break, analyze
 
 WORDS_SHA256 = "1e2e548ab2be7d641a24470ec121034f6d9b03f36df8a0b66fbe2ecaddbfbb8e"
 
 
 def test_the_word_list_is_the_documented_file():
-    data = resources.files("a11y_stem.pipeline").joinpath("data/words-en.txt.gz").read_bytes()
+    data = resources.files("readablestem.pipeline").joinpath("data/words-en.txt.gz").read_bytes()
     assert hashlib.sha256(data).hexdigest() == WORDS_SHA256
     words = gzip.decompress(data).decode("utf-8").split("\n")
     assert words[-1] == "" and len(words) - 1 == 63_849  # the README says so

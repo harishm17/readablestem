@@ -202,19 +202,19 @@ jobs:
         with:
           persist-credentials: false
       - name: Build the image
-        run: docker build --tag a11y-stem:ci .
+        run: docker build --tag readablestem:ci .
       # deploy.sh builds with `gcloud builds submit --tag`: a plain `docker build` in Cloud
       # Build's docker 20.10 image, which can use the legacy builder. This runner defaults
       # to BuildKit, so build once more without it to catch BuildKit-only syntax.
       - name: Build again with the legacy builder (as Cloud Build may)
         env:
           DOCKER_BUILDKIT: "0"
-        run: docker build --tag a11y-stem:legacy .
+        run: docker build --tag readablestem:legacy .
       - name: Smoke test the entry point and the non-root user
         run: |
-          docker run --rm a11y-stem:ci a11y-stem --version
-          docker run --rm a11y-stem:ci a11y-stem ops --help
-          test "$(docker run --rm a11y-stem:ci id -u)" = "10001"
+          docker run --rm readablestem:ci readablestem --version
+          docker run --rm readablestem:ci readablestem ops --help
+          test "$(docker run --rm readablestem:ci id -u)" = "10001"
 
   eval-gate:
     name: eval gate (when a baseline exists)
@@ -251,7 +251,7 @@ jobs:
             if [ ! -f "$current" ]; then
               echo "::error::$baseline has no matching $current"; exit 1
             fi
-            uv run a11y-stem eval gate --require-current --current "$current" --baseline "$baseline"
+            uv run readablestem eval gate --require-current --current "$current" --baseline "$baseline"
           done
 
   secret-scan:

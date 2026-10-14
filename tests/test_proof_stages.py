@@ -11,13 +11,13 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.proof import stages
-from a11y_stem.proof.bundle import Bundle, BundleWriter
-from a11y_stem.proof.errors import BundleError, ProofError
-from a11y_stem.proof.intermediate import load_systems, parse_system_section
-from a11y_stem.proof.report import Section, StageResult
+from readablestem.proof import stages
+from readablestem.proof.bundle import Bundle, BundleWriter
+from readablestem.proof.errors import BundleError, ProofError
+from readablestem.proof.intermediate import load_systems, parse_system_section
+from readablestem.proof.report import Section, StageResult
 
-PLUGIN = "a11y_stem.proof.invented"
+PLUGIN = "readablestem.proof.invented"
 
 # Contract with proof/parsers: `make proof PDF_DIR=... OUT_DIR=...` writes
 # OUT_DIR/<arm>/<book>__<page>.json for each PDF in PDF_DIR. This one writes "{}".
@@ -42,29 +42,29 @@ def test_the_default_stages_are_one_real_arm_and_four_stubs():
 
 def test_load_plugins_skips_absent_modules_and_reports_the_ones_it_found(monkeypatch):
     loaded = types.ModuleType(PLUGIN)
-    monkeypatch.setattr(stages, "PLUGIN_MODULES", (PLUGIN, "a11y_stem.proof.not_written_yet"))
+    monkeypatch.setattr(stages, "PLUGIN_MODULES", (PLUGIN, "readablestem.proof.not_written_yet"))
     monkeypatch.setitem(sys.modules, PLUGIN, loaded)
     assert stages.load_plugins() == [PLUGIN]
-    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("a11y_stem.proof.not_written_yet",))
+    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("readablestem.proof.not_written_yet",))
     assert stages.load_plugins() == []
 
 
 def test_the_repository_wires_every_stage_plugin():
     loaded = stages.load_plugins()
     assert loaded == [
-        "a11y_stem.proof.invented",
-        "a11y_stem.proof.comparison",
-        "a11y_stem.proof.parsers",
-        "a11y_stem.proof.labels",
+        "readablestem.proof.invented",
+        "readablestem.proof.comparison",
+        "readablestem.proof.parsers",
+        "readablestem.proof.labels",
     ]
 
 
 def test_a_plugin_that_exists_but_fails_to_import_is_not_hidden(monkeypatch, tmp_path):
-    import a11y_stem.proof as package
+    import readablestem.proof as package
 
     (tmp_path / "broken_plugin.py").write_text("import a_module_that_does_not_exist\n")
     monkeypatch.setattr(package, "__path__", [*package.__path__, str(tmp_path)])
-    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("a11y_stem.proof.broken_plugin",))
+    monkeypatch.setattr(stages, "PLUGIN_MODULES", ("readablestem.proof.broken_plugin",))
     with pytest.raises(ModuleNotFoundError, match="a_module_that_does_not_exist"):
         stages.load_plugins()
 

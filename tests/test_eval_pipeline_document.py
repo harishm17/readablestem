@@ -3,8 +3,8 @@ which gold equations the layout cut into pieces (pipeline_eval.document_page_ite
 
 from __future__ import annotations
 
-from a11y_stem.core.types import Element, Kind
-from a11y_stem.eval import pipeline_eval as pe
+from readablestem.core.types import Element, Kind
+from readablestem.eval import pipeline_eval as pe
 from test_eval_support import eq_fix, equation
 
 # Delta d = d_f - d_0 (OpenStax 2-1) and v = Delta d / Delta t (2-3), as gold MathML.

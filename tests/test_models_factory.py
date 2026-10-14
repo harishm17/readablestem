@@ -8,16 +8,16 @@ from typing import Literal
 
 from pydantic import BaseModel
 
-from a11y_stem.config import MAIN_MODEL, Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.models import (
+from readablestem.config import MAIN_MODEL, Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.models import (
     OFFLINE_DEFAULTS,
     FakeVisionClient,
     VisionRequest,
     call_with_fallback,
     make_vision_client,
 )
-from a11y_stem.models.openai_client import OpenAIVisionClient
+from readablestem.models.openai_client import OpenAIVisionClient
 
 SETTINGS = Settings(_env_file=None)  # type: ignore[call-arg]  (no API key)
 
@@ -76,8 +76,8 @@ def test_offline_answers_always_need_review():
 
 
 def test_offline_tables_and_long_figures_get_a_placeholder_that_asks_for_a_decision():
-    from a11y_stem.core.types import ConversionOptions, Element, Kind, Status
-    from a11y_stem.pipeline import figure_step, options, table_step
+    from readablestem.core.types import ConversionOptions, Element, Kind, Status
+    from readablestem.pipeline import figure_step, options, table_step
 
     client = make_vision_client(SETTINGS, budget(), fake=True)
     table = Element(id="p1-e1", kind=Kind.TABLE, page=0, bbox=(0, 0, 100, 50), order=0,
@@ -114,7 +114,7 @@ def test_real_client_is_built_without_needing_a_key_yet():
 
 
 def test_importing_the_package_does_not_import_the_openai_sdk():
-    code = "import sys, a11y_stem.models; print('openai' in sys.modules)"
+    code = "import sys, readablestem.models; print('openai' in sys.modules)"
     result = subprocess.run(
         [sys.executable, "-c", code], capture_output=True, text=True, check=True
     )

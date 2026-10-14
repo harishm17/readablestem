@@ -21,10 +21,10 @@ from datetime import timedelta
 import pymupdf
 import pytest
 
-from a11y_stem.web import page_images, pdf_probe
-from a11y_stem.web.db import Job, session_scope, utcnow
 from fixtures.web.review_doc import PAGE, review_output, review_pdf
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.web import page_images, pdf_probe
+from readablestem.web.db import Job, session_scope, utcnow
 
 CONTENT = ("Teacher", "Vectors", "car on a road", "ω", "rigid body")
 
@@ -105,7 +105,7 @@ def test_past_its_retention_time_a_job_has_no_images(web):
 
 
 def test_a_deleted_job_has_no_images(web):
-    from a11y_stem.ops.retention import delete_jobs
+    from readablestem.ops.retention import delete_jobs
 
     with session_scope(web.ctx.factory) as session:
         delete_jobs(session, [web.job_id])
@@ -158,7 +158,7 @@ def test_a_failed_render_is_a_503_and_the_review_screen_still_works(web, monkeyp
 def _user_id(env, email: str) -> str:
     from sqlalchemy import select
 
-    from a11y_stem.web.db import User
+    from readablestem.web.db import User
 
     with session_scope(env.ctx.factory) as session:
         user_id = session.scalar(select(User.id).where(User.email == email))
@@ -180,7 +180,7 @@ def test_one_user_cannot_tie_up_the_renders_and_waits_hold_no_pdf(web, monkeypat
     """A burst of image requests from one signed-in user: beyond two renders in
     progress each is refused at once (429), before the upload is loaded, so no thread
     waits holding a copy of the PDF. Someone else is not held up."""
-    from a11y_stem.web.routes import split
+    from readablestem.web.routes import split
 
     gate = page_images.RenderGate(total=4, per_user=2, wait_s=5.0)
     monkeypatch.setattr(page_images, "GATE", gate)
@@ -245,7 +245,7 @@ def test_the_gate_counts_each_user_and_frees_slots_on_errors():
 def test_nothing_is_stored_for_the_images(web):
     from sqlalchemy import func, select
 
-    from a11y_stem.web.db import Blob
+    from readablestem.web.db import Blob
 
     def blob_count() -> int:
         with session_scope(web.ctx.factory) as session:

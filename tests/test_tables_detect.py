@@ -19,10 +19,10 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Kind, TableCell, TableGrid, grid_problems
-from a11y_stem.pipeline import layout, table_model, tables
-from a11y_stem.pipeline.layout import LayoutError, analyze, release
-from a11y_stem.pipeline.tables import Proposal, Slot
+from readablestem.core.types import Kind, TableCell, TableGrid, grid_problems
+from readablestem.pipeline import layout, table_model, tables
+from readablestem.pipeline.layout import LayoutError, analyze, release
+from readablestem.pipeline.tables import Proposal, Slot
 
 BODY = 11.0
 FIXTURES = Path(__file__).parent / "fixtures" / "layout"
@@ -512,7 +512,7 @@ def test_without_the_model_file_tables_still_get_a_grid_and_one_warning(caplog):
         grid_table(page, PENDULUM)
 
     data = pdf(fill)
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.pipeline.tables"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.tables"):
         first = analyze(data)
         release()
         analyze(data)
@@ -530,7 +530,7 @@ def test_a_model_file_with_the_wrong_checksum_is_not_loaded(caplog):
     path = table_model.model_path()
     path.parent.mkdir(parents=True)
     path.write_bytes(b"not the model")
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.pipeline.tables"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.tables"):
         assert tables._structurer() is None
     assert any("wrong checksum" in r.getMessage() for r in caplog.records)
 
@@ -681,7 +681,7 @@ def test_a_failure_in_table_detection_leaves_the_page_as_it_was(monkeypatch, cap
         raise ZeroDivisionError
 
     monkeypatch.setattr(tables, "judge", broken)
-    with caplog.at_level(logging.WARNING, logger="a11y_stem.pipeline.tables"):
+    with caplog.at_level(logging.WARNING, logger="readablestem.pipeline.tables"):
         result = analyze(pdf(captioned_page))
     assert Kind.TABLE not in {e.kind for e in result.elements}
     assert "12.69" in " ".join(e.text or "" for e in result.elements)

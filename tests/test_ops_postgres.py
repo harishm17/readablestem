@@ -19,10 +19,6 @@ import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.engine import make_url
 
-from a11y_stem.ops import aggregate, retention
-from a11y_stem.ops.aggregate import aggregate_finished
-from a11y_stem.ops.retention import PurgeStats, purge_expired
-from a11y_stem.web import db
 from fixtures.ops.seed import (
     EXPECTED_DONE_COUNTS,
     NOW,
@@ -31,6 +27,10 @@ from fixtures.ops.seed import (
     aggregate_rows,
     sentinel_result,
 )
+from readablestem.ops import aggregate, retention
+from readablestem.ops.aggregate import aggregate_finished
+from readablestem.ops.retention import PurgeStats, purge_expired
+from readablestem.web import db
 
 pytestmark = pytest.mark.postgres
 

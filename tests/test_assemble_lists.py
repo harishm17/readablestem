@@ -6,9 +6,9 @@ import re
 
 import pytest
 
-from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
-from a11y_stem.pipeline.assemble import render_html
-from a11y_stem.pipeline.html_checks import axe_checks, static_checks
+from readablestem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.html_checks import axe_checks, static_checks
 
 MATHML = '<math display="inline"><mi>x</mi><mo>=</mo><mn>5</mn></math>'
 
@@ -233,7 +233,7 @@ def test_an_equation_number_follows_its_maths_and_is_announced():
     assert html == (
         '<div class="equation equation-labelled" id="p1-e0"><math display="block">'
         "<mi>x</mi><mo>=</mo><mn>5</mn></math>"
-        '<span class="equation-label"><span class="visually-hidden a11y-stem">Equation </span>'
+        '<span class="equation-label"><span class="visually-hidden readablestem">Equation </span>'
         "(2.4)</span></div>"
     )
 

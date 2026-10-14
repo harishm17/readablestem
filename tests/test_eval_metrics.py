@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from a11y_stem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.eval.equations import latex_to_mathml
+from readablestem.core.types import Check, Element, EquationFix, Fix, Kind, ModelCall, Status
+from readablestem.eval import pipeline_eval as pe
+from readablestem.eval.equations import latex_to_mathml
 from test_eval_support import EQ_A, EQ_V, EQ_X, base_record, eq_fix, equation
 
 MAIN, CHEAP = "gpt-6.1-sol", "gpt-6-luna"
@@ -272,7 +272,7 @@ def test_heading_metrics_with_no_predictions():
 
 
 def test_predicted_headings_skip_abstained_and_failed():
-    from a11y_stem.core.types import HeadingFix
+    from readablestem.core.types import HeadingFix
 
     def fix(status, text="T"):
         return Fix(

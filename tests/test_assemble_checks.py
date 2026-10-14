@@ -10,10 +10,10 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Fix
-from a11y_stem.pipeline import html_checks
-from a11y_stem.pipeline.assemble import render_html
-from a11y_stem.pipeline.html_checks import (
+from readablestem.core.types import Element, Fix
+from readablestem.pipeline import html_checks
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.html_checks import (
     AXE_SHA256,
     AXE_SKIPPED,
     AXE_VERSION,
@@ -113,8 +113,11 @@ def test_minimal_document_passes_every_rule():
         (doc('<p style="background:url(http://x/y)">x</p>'), "external_resource"),
         (doc("<p>x</p>", head="<style>@import 'x.css';</style>"), "external_resource"),
         (doc('<iframe src="data:text/html,x" title="t"></iframe>'), "external_resource"),
-        (doc(f'<p class="note a11y-stem">This file is WCAG {CLAIM}.</p>'), "banned_wording"),
-        (doc('<div class="a11y-stem"><p>Ensures <b>compliance</b>.</p></div>'), "banned_wording"),
+        (doc(f'<p class="note readablestem">This file is WCAG {CLAIM}.</p>'), "banned_wording"),
+        (
+            doc('<div class="readablestem"><p>Ensures <b>compliance</b>.</p></div>'),
+            "banned_wording",
+        ),
         (doc('<p><a href="https://example.org"> </a></p>'), "empty_link"),
         (doc('<p><a href="#x"><img src="data:," alt=""></a></p><p id="x">x</p>'), "empty_link"),
         (doc('<p><a href="javascript:alert(1)">x</a></p>'), "unsafe_link"),
@@ -148,7 +151,7 @@ def test_each_rule_reports_its_code(html, code):
         doc('<p lang="fr">Bonjour.</p><p lang="zh-Hant-TW">x</p><p lang="">x</p>', lang="en-GB"),
         doc('<p class="tc-ff0000">x</p>', head="<style>.tc-ff0000 { color: #ee0000; }</style>"),
         doc(f"<p>{CLAIM.title()} mechanisms flex instead of using hinges.</p>"),
-        doc(f'<div class="a11y-stem"><p>Assists with accessibility.</p></div><p>{CLAIM}</p>'),
+        doc(f'<div class="readablestem"><p>Assists with accessibility.</p></div><p>{CLAIM}</p>'),
         doc("<p>a<br/>b</p><mspace/>"),
         doc('<ol type="a" start="3"><li>c<ul><li>nested</li></ul></li><li>d</li></ol>'),
         doc('<ol class="printed-markers" role="list"><li><span>(a)</span> x</li></ol>'),
@@ -285,7 +288,7 @@ def test_axe_finds_no_serious_problems_in_an_assembled_document():
 
 @pytest.mark.browser
 def test_axe_finds_no_problems_with_the_offline_run_notice():
-    from a11y_stem.cli.convert import FAKE_NOTICE
+    from readablestem.cli.convert import FAKE_NOTICE
 
     html = sample_html(notice=FAKE_NOTICE)
     assert 'class="notice' in html

@@ -11,9 +11,9 @@ from datetime import timedelta
 
 from sqlalchemy import select
 
-from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import Course, CourseNotation, Job, ReviewEdit, User, session_scope
 from fixtures.web.support import ALICE, WebEnv, csrf_from, login, make_pdf
+from readablestem.web.database import as_utc
+from readablestem.web.db import Course, CourseNotation, Job, ReviewEdit, User, session_scope
 from test_audit_authz import CRON, ROUTES, fill, site  # noqa: F401  (site is a fixture)
 
 STATE_CHANGING = [

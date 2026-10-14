@@ -5,7 +5,7 @@ uploads a PDF, watches it convert, reviews the uncertain fixes and downloads one
 accessible HTML file. One FastAPI process serves the pages and runs the background worker
 (ADR 0004).
 
-Code: `src/a11y_stem/web/`. Tests: `tests/test_web_*.py`.
+Code: `src/readablestem/web/`. Tests: `tests/test_web_*.py`.
 
 ## Run it locally
 
@@ -36,13 +36,13 @@ are not set up on this server yet") rather than a generic error.
 test the tables are created on start-up; there is no session secret, so a random one is
 made per process and a restart (or `--reload`) signs everyone out.
 
-`a11y-stem serve` runs `uvicorn a11y_stem.web.app:create_app --factory`. Options:
+`a11y-stem serve` runs `uvicorn readablestem.web.app:create_app --factory`. Options:
 `--host` (default 127.0.0.1; use 0.0.0.0 in a container), `--port` (default `$PORT` or
 8000), `--reload`.
 
 ## Settings the web app uses
 
-All live in `a11y_stem.config.Settings` (environment or `.env`).
+All live in `readablestem.config.Settings` (environment or `.env`).
 
 | Setting | Used for |
 |---|---|
@@ -240,8 +240,8 @@ yours to see". It is a 404 either way. The
   `/admin`. It is checked on every request, so removing someone ends their access at
   once. People who are not on it see a polite 403 page with `CONTACT_EMAIL`; no row is
   created for them.
-- **Sessions.** Starlette `SessionMiddleware`: a signed cookie `a11y_stem_session`
-  (`__Host-a11y_stem_session` in production), HttpOnly, SameSite=Lax, 7 days, Secure in
+- **Sessions.** Starlette `SessionMiddleware`: a signed cookie `readablestem_session`
+  (`__Host-readablestem_session` in production), HttpOnly, SameSite=Lax, 7 days, Secure in
   production. The session is cleared and a new
   CSRF token issued at sign-in. It holds the user id, the user's session version, the
   CSRF token, one-time notices (never document content) and Authlib's sign-in state (the
@@ -281,7 +281,7 @@ yours to see". It is a 404 either way. The
    container goes to `web/office_convert.py` first, in a child process, and the PDF that
    comes back is what the next step sees (below, "Word and PowerPoint files");
 5b. the PDF: magic bytes (`%PDF-` in the first 1024 bytes, else 415), then opened in a
-   child process (`python -m a11y_stem.web.pdf_probe`) with a 30 s timeout. A crash or
+   child process (`python -m readablestem.web.pdf_probe`) with a 30 s timeout. A crash or
    hang in MuPDF *while opening the file and counting pages* kills the child, not the
    server. Password-protected, unreadable or empty files and more than
    `MAX_PAGES_PER_JOB` pages are refused (422); a file that only opens after MuPDF
@@ -325,7 +325,7 @@ messages say which). The kind is decided by the file's parts, never by its name 
 type: a Word file called `notes.pdf` is converted, a PDF called `notes.docx` is a PDF.
 
 The conversion is a child process like the PDF probe: `python -m
-a11y_stem.web.office_convert SOFFICE TIMEOUT`, file on stdin, a JSON line and then the
+readablestem.web.office_convert SOFFICE TIMEOUT`, file on stdin, a JSON line and then the
 PDF on stdout; a minimal environment (`core/childenv.py`); its own address-space cap; one
 at a time per instance (a second waits five seconds and is told to try again, 503). Before
 LibreOffice sees the file the child refuses, with a category: a ZIP that is damaged,
@@ -1448,7 +1448,7 @@ theme, and system colours would make them white on white. The page itself never 
 sideways (320 CSS px included).
 
 **Page images.** Rendered when the browser asks, from the job's own upload, in the
-upload probe's child process (`python -m a11y_stem.web.pdf_probe render ...`, 768 MB
+upload probe's child process (`python -m readablestem.web.pdf_probe render ...`, 768 MB
 address space cap, 20 s timeout; `web.page_images`), never in the web process: a page
 that crashes MuPDF kills a child. Whole pages at 144 dpi (long side at most 2000 px),
 regions at most 1600 px, never more than 2400 px whatever is asked. A render needs a

@@ -8,21 +8,21 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import MAIN_MODEL
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.notation import canonical_symbol
-from a11y_stem.core.types import ConversionOptions, Element, Kind, NotationEntry, Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.openai_client import fenced_context
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import notation_memory, options
-from a11y_stem.pipeline.equation_step import (
+from readablestem.config import MAIN_MODEL
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.notation import canonical_symbol
+from readablestem.core.types import ConversionOptions, Element, Kind, NotationEntry, Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.openai_client import fenced_context
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import notation_memory, options
+from readablestem.pipeline.equation_step import (
     NOTATION_PROMPT_VERSION,
     PROMPT_VERSION,
     text_layer_style,
     transcribe,
 )
-from a11y_stem.pipeline.notation_memory import (
+from readablestem.pipeline.notation_memory import (
     BOLD_LETTER_REASON,
     EVIDENCE_DOCUMENT,
     bold_letter_fix,
@@ -34,9 +34,9 @@ from a11y_stem.pipeline.notation_memory import (
     phrase,
     readings,
 )
-from a11y_stem.pipeline.run import convert_pdf
-from a11y_stem.pipeline.speech import mathml_to_speech
-from a11y_stem.pipeline.validate import safe_latex_to_mathml
+from readablestem.pipeline.run import convert_pdf
+from readablestem.pipeline.speech import mathml_to_speech
+from readablestem.pipeline.validate import safe_latex_to_mathml
 from test_steps_support import equation_element, make_settings, use_fallback_router
 
 PNG = b"\x89PNG equation crop"

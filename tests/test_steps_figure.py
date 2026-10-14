@@ -5,13 +5,13 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Status
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import figure_step
-from a11y_stem.pipeline.figure_step import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import Status
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import figure_step
+from readablestem.pipeline.figure_step import (
     PROMPT_VERSION,
     FigureOutput,
     describe,

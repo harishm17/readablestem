@@ -6,9 +6,9 @@ import json
 
 import pytest
 
-from a11y_stem.cli.main import main
-from a11y_stem.eval.invented import plant
-from a11y_stem.eval.invented import text as T
+from readablestem.cli.main import main
+from readablestem.eval.invented import plant
+from readablestem.eval.invented import text as T
 
 PAGE = """2.1 Speed and Velocity
 Average speed is the distance traveled divided by the time it takes to travel it.

@@ -10,9 +10,9 @@ from types import SimpleNamespace
 import pymupdf
 import pytest
 
-from a11y_stem.proof import chatbot, stats, systems, systems_tables
-from a11y_stem.proof.bundle import Bundle, BundleWriter
-from a11y_stem.proof.errors import BundleError
+from readablestem.proof import chatbot, stats, systems, systems_tables
+from readablestem.proof.bundle import Bundle, BundleWriter
+from readablestem.proof.errors import BundleError
 
 # ----------------------------------------------------------------------- chatbot recorder
 
@@ -288,7 +288,7 @@ def test_the_claims_table_prints_the_sign_flip_p_and_says_what_it_is():
 
 
 def test_family_b_counts_the_registered_four_parsers_on_a_held_out_set():
-    from a11y_stem.proof import parsers
+    from readablestem.proof import parsers
 
     assert parsers.family_b_k(3, held_out=True) == 8  # Addendum 1, D3; three ran
     assert parsers.family_b_k(4, held_out=True) == 8

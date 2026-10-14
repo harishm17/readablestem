@@ -12,8 +12,8 @@ import logging
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind, inline_marker
-from a11y_stem.pipeline.layout import (
+from readablestem.core.types import Element, Kind, inline_marker
+from readablestem.pipeline.layout import (
     REASON_BOLD_BODY,
     REASON_LARGER_FONT,
     REASON_NUMBERED,
@@ -724,5 +724,5 @@ def test_max_pages_applies_to_the_requested_pages_only():
 def test_analysis_logs_nothing_about_the_document(caplog):
     caplog.set_level(logging.DEBUG)
     analyze(one_page(lambda p: write(p, 72, 100, ["Confidential student feedback here."])))
-    assert not [r for r in caplog.records if r.name.startswith("a11y_stem")]
+    assert not [r for r in caplog.records if r.name.startswith("readablestem")]
     assert "Confidential" not in caplog.text

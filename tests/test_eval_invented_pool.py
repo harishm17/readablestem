@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.eval.invented import pool
-from a11y_stem.eval.invented.score import TYPES
+from readablestem.eval.invented import pool
+from readablestem.eval.invented.score import TYPES
 
 
 def entry(section, run="1", pages=10, **counts):

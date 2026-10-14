@@ -5,13 +5,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from a11y_stem.config import Settings
-from a11y_stem.eval.answers import CachedClient, answer_key, load_rows
-from a11y_stem.eval.pipeline_eval import select_units
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.openai_client import PNG_SIGNATURE
-from a11y_stem.pipeline.equation_step import EquationOutput
+from readablestem.config import Settings
+from readablestem.eval.answers import CachedClient, answer_key, load_rows
+from readablestem.eval.pipeline_eval import select_units
+from readablestem.models.base import VisionRequest
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.openai_client import PNG_SIGNATURE
+from readablestem.pipeline.equation_step import EquationOutput
 
 PNG = PNG_SIGNATURE + b"one crop"
 ANSWER = {"is_equation": True, "latex": "x^2", "confidence": 0.9}
@@ -93,8 +93,8 @@ def test_the_second_check_keeps_its_answers_in_the_file_too(tmp_path: Path) -> N
     """A replay of a Claude run must not pay for the Claude check again."""
     import argparse
 
-    from a11y_stem.cli import eval_cli
-    from a11y_stem.models.claude_verifier import ClaudeVerifier
+    from readablestem.cli import eval_cli
+    from readablestem.models.claude_verifier import ClaudeVerifier
 
     class Inner(FakeVisionClient):
         settings = settings()  # what a real Claude client exposes

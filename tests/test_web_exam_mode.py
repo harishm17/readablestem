@@ -14,12 +14,12 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.core.types import Check, ConversionOptions
-from a11y_stem.pipeline.equation_step import SINGLE_READING_CODE
-from a11y_stem.web import notation
-from a11y_stem.web.messages import CHECK_MESSAGES, explain_check
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, make_pdf, token, upload
+from readablestem.core.types import Check, ConversionOptions
+from readablestem.pipeline.equation_step import SINGLE_READING_CODE
+from readablestem.web import notation
+from readablestem.web.messages import CHECK_MESSAGES, explain_check
 
 
 def text_of(html: str) -> str:

@@ -7,18 +7,6 @@ from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import Check, Fix, HeadingFix, Kind, ModelCall, Status
-from a11y_stem.ops import aggregate
-from a11y_stem.ops.aggregate import (
-    Reviewed,
-    aggregate_finished,
-    code,
-    fix_counts,
-    job_counts,
-    utc_day,
-)
-from a11y_stem.web import db
 from fixtures.ops.seed import (
     EXPECTED_DONE_COUNTS,
     FINISHED,
@@ -31,6 +19,18 @@ from fixtures.ops.seed import (
     review,
     sentinel_result,
 )
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.types import Check, Fix, HeadingFix, Kind, ModelCall, Status
+from readablestem.ops import aggregate
+from readablestem.ops.aggregate import (
+    Reviewed,
+    aggregate_finished,
+    code,
+    fix_counts,
+    job_counts,
+    utc_day,
+)
+from readablestem.web import db
 
 
 @pytest.fixture
@@ -294,9 +294,9 @@ def test_tiers_of_results_stored_before_tiers_come_from_the_pipeline_status():
 
 
 def test_the_weekly_report_counts_table_decisions_and_every_reviewable_kind():
-    from a11y_stem.core.triage import REVIEWABLE_KINDS
-    from a11y_stem.core.types import DocumentResult, DocumentStats, Element
-    from a11y_stem.ops import export, report
+    from readablestem.core.triage import REVIEWABLE_KINDS
+    from readablestem.core.types import DocumentResult, DocumentStats, Element
+    from readablestem.ops import export, report
 
     assert set(report.STEPS) == {k.value for k in REVIEWABLE_KINDS}
     assert set(export.PROPOSAL_KEYS) == {k.value for k in REVIEWABLE_KINDS}

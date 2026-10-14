@@ -7,10 +7,10 @@ import threading
 import time
 from pathlib import Path
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.models import OFFLINE_DEFAULTS, FakeVisionClient
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.eval import pipeline_eval as pe
+from readablestem.models import OFFLINE_DEFAULTS, FakeVisionClient
 
 LAYOUT = Path(__file__).resolve().parent / "fixtures" / "layout"
 PDFS = [

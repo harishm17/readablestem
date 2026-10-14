@@ -16,10 +16,10 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.web import health
-from a11y_stem.web.database import as_utc
-from a11y_stem.web.db import utcnow
 from fixtures.web.support import WebEnv, fake_output, job_id_from, make_pdf, upload
+from readablestem.web import health
+from readablestem.web.database import as_utc
+from readablestem.web.db import utcnow
 
 SECRET_KEY = "sk-never-in-the-output-0123456789"
 
@@ -192,7 +192,7 @@ def test_a_served_app_answers_readyz_and_exits_quickly_on_sigterm(tmp_path):
     log = Path(tmp_path / "serve.log")
     with log.open("wb") as out:
         proc = subprocess.Popen(
-            [sys.executable, "-m", "a11y_stem.cli.main", "serve", "--port", str(port)],
+            [sys.executable, "-m", "readablestem.cli.main", "serve", "--port", str(port)],
             cwd=tmp_path,
             env=env,
             stdout=out,

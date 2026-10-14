@@ -25,7 +25,7 @@ hosted, allowlisted beta is planned for 9 November 2026.
 ## See it
 
 A converted page is committed so you can judge the output without running anything: open
-[`src/a11y_stem/web/static/demo/index.html`](src/a11y_stem/web/static/demo/index.html) in a
+[`src/readablestem/web/static/demo/index.html`](src/readablestem/web/static/demo/index.html) in a
 browser. It is OpenStax *Physics* section 2.3, converted with the real models; the PDF it
 came from sits beside it. The page shows the pipeline's proposals as they came, including a
 mistake that the review screen asks about (a plain *v* where the book has a bold vector).

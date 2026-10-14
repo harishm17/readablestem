@@ -1,4 +1,4 @@
-"""`python -m a11y_stem.eval.reproduce`: the offline reproduction command (make reproduce).
+"""`python -m readablestem.eval.reproduce`: the offline reproduction command (make reproduce).
 
 The checks run on the repository's own committed gold data and reports. The failure paths
 use small copies in tmp_path, so a tampered file or a stale report must be reported and
@@ -13,7 +13,7 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval import reproduce as R
+from readablestem.eval import reproduce as R
 
 ROOT = Path(__file__).resolve().parents[1]
 

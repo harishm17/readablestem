@@ -22,7 +22,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from a11y_stem.eval.equations import latex_to_mathml
+from readablestem.eval.equations import latex_to_mathml
 
 SOURCE_DATE_EPOCH = "1791331200"  # 2026-10-07 00:00 UTC, as the layout fixtures
 FIXED_PDF_DATE = "D:20261007000000Z"

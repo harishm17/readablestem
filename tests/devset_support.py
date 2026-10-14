@@ -6,8 +6,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from a11y_stem.gold import devset as ds
-from a11y_stem.gold import openstax as ox
+from readablestem.gold import devset as ds
+from readablestem.gold import openstax as ox
 
 NS = "http://www.w3.org/1998/Math/MathML"
 

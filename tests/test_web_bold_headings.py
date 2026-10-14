@@ -18,10 +18,10 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.core.types import DocumentResult
-from a11y_stem.web import job_page
 from fixtures.web.review_doc import GROUP, review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
+from readablestem.core.types import DocumentResult
+from readablestem.web import job_page
 
 
 @pytest.fixture
@@ -85,7 +85,7 @@ def test_a_heading_group_made_bold_leaves_the_job_ready_when_the_rest_is_decided
 
 
 def test_the_three_screens_count_the_same_decisions(ux):
-    from a11y_stem.web import documents
+    from readablestem.web import documents
 
     decide(ux, GROUP, action="reject")
     job_text = text_of(ux.browser.get(f"/jobs/{ux.job_id}").text)

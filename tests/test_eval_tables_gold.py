@@ -11,9 +11,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval import render
-from a11y_stem.eval import tables as T
-from a11y_stem.gold.openstax import fetch_gold, render_attribution
+from readablestem.eval import render
+from readablestem.eval import tables as T
+from readablestem.gold.openstax import fetch_gold, render_attribution
 from test_openstax import CC_BY, FakeFetcher
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -63,14 +63,14 @@ def test_reference_pages_cover_every_table_in_every_style_with_the_4_2_fix():
 def test_the_tables_gold_does_not_join_the_other_tasks_gold():
     """data/gold/tables is a gold dir of its own: the equations, headings, figures and
     document tasks read data/gold/openstax/*/ only, so their selection is unchanged."""
-    from a11y_stem.eval.pipeline_eval import load_gold
+    from readablestem.eval.pipeline_eval import load_gold
 
     main_gold = load_gold(ROOT / "data" / "gold")
     assert main_gold and not any(r["book_slug"] == "statistics" for r in main_gold)
 
 
 def test_a_nested_gold_set_is_read_only_on_its_own(tmp_path):
-    from a11y_stem.eval.gold_scoring import iter_gold_records
+    from readablestem.eval.gold_scoring import iter_gold_records
 
     (tmp_path / "openstax" / "b").mkdir(parents=True)
     (tmp_path / "openstax" / "b" / "p.jsonl").write_text('{"id": "outer"}\n')

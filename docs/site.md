@@ -36,7 +36,7 @@ Everything is committed. Nothing is fetched or generated at build time.
   the three files that `a11y-stem demo build` writes: `report.json` (the stored result),
   `converted.html` (the output) and `source.pdf` (the exact input). `meta.json` may point at
   the files elsewhere in the repository with `artefacts`, `html`, `pdf` and `report`: the
-  Physics 2.3 example uses the app's own demo under `src/a11y_stem/web/static/demo/`, and the
+  Physics 2.3 example uses the app's own demo under `src/readablestem/web/static/demo/`, and the
   lecture-notes fixture uses `tests/fixtures/layout/lecture_notes.pdf`.
 - **The review decisions.** The build loads the stored result with the app's own models and
   helpers (`web.review.group_fixes`, `web.messages`, `web.compare`, `web.speech_diff`) and

@@ -14,11 +14,11 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.core.types import Check, Element, Fix, Kind, PageStats, Status
-from a11y_stem.web.db import Job, User, session_scope, utcnow
-from a11y_stem.web.outcome import FAILED_MESSAGES
-from a11y_stem.web.views import job_error_message, queue_ahead
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, upload
+from readablestem.core.types import Check, Element, Fix, Kind, PageStats, Status
+from readablestem.web.db import Job, User, session_scope, utcnow
+from readablestem.web.outcome import FAILED_MESSAGES
+from readablestem.web.views import job_error_message, queue_ahead
 
 
 @pytest.fixture

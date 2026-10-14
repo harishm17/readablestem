@@ -20,9 +20,9 @@ from typing import Any
 import pymupdf
 from fastapi.testclient import TestClient
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import JobBudget
-from a11y_stem.core.types import (
+from readablestem.config import Settings
+from readablestem.core.budget import JobBudget
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -36,12 +36,12 @@ from a11y_stem.core.types import (
     ModelCall,
     Status,
 )
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.web.app import create_app
-from a11y_stem.web.auth import set_allowed
-from a11y_stem.web.db import Job, session_scope
-from a11y_stem.web.email_senders import LoginEmail, register_sender
-from a11y_stem.web.worker import Worker
+from readablestem.models.fake import FakeVisionClient
+from readablestem.web.app import create_app
+from readablestem.web.auth import set_allowed
+from readablestem.web.db import Job, session_scope
+from readablestem.web.email_senders import LoginEmail, register_sender
+from readablestem.web.worker import Worker
 
 SECRETS = (
     "SECRET-DOC-TEXT",

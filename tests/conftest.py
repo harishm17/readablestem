@@ -5,8 +5,8 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.models import base
-from a11y_stem.web import provider_health
+from readablestem.models import base
+from readablestem.web import provider_health
 
 
 @pytest.fixture(autouse=True)

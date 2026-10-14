@@ -13,12 +13,14 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import PageType
-from a11y_stem.pipeline import page_type
+from readablestem.core.types import PageType
+from readablestem.pipeline import page_type
 
 HANDWRITING = Path(__file__).parent / "fixtures" / "handwriting"
 LAYOUT = Path(__file__).parent / "fixtures" / "layout"
-DEMO = Path(__file__).parent.parent / "src" / "a11y_stem" / "web" / "static" / "demo" / "source.pdf"
+DEMO = (
+    Path(__file__).parent.parent / "src" / "readablestem" / "web" / "static" / "demo" / "source.pdf"
+)
 
 
 def classify(path: Path, **kwargs) -> list[page_type.PageTypeResult]:

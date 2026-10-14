@@ -13,12 +13,12 @@ import httpx
 import openai
 import pytest
 
-from a11y_stem.core.types import Check
-from a11y_stem.observability.logging import log_fields
-from a11y_stem.pipeline import html_checks
-from a11y_stem.proof import engine, runner
-from a11y_stem.proof.errors import Incomplete, ProofError
 from proof_support import SET_ID, PdfMedia, fake_client, make_project
+from readablestem.core.types import Check
+from readablestem.observability.logging import log_fields
+from readablestem.pipeline import html_checks
+from readablestem.proof import engine, runner
+from readablestem.proof.errors import Incomplete, ProofError
 
 DATE = "2026-10-14"
 
@@ -96,7 +96,7 @@ def test_the_second_check_failing_counts_as_a_failed_call():
 
 def test_the_tally_names_the_status_and_code_the_provider_sent():
     tally = runner.CallTally()
-    logger = logging.getLogger("a11y_stem.models.test_tally")
+    logger = logging.getLogger("readablestem.models.test_tally")
     logger.addHandler(tally)
     try:
         for _ in range(3):
@@ -115,7 +115,7 @@ def test_the_tally_names_the_status_and_code_the_provider_sent():
 
 def test_the_failure_message_carries_the_status_and_code():
     tally = runner.CallTally()
-    logger = logging.getLogger("a11y_stem.models.test_message")
+    logger = logging.getLogger("readablestem.models.test_message")
     logger.addHandler(tally)
     try:
         log_fields(

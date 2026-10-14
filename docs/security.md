@@ -200,7 +200,7 @@ read from a pipe); on Cloud Run that file system is memory. Hostile files end in
 never an exception or a hang; byte-mutated files never escape as another exception. The PDF
 that comes out is probed like any upload, and only it is stored.
 
-The PDF is opened first in a child process (`python -m a11y_stem.web.pdf_probe`) that has no
+The PDF is opened first in a child process (`python -m readablestem.web.pdf_probe`) that has no
 secrets in its environment, caps its own memory and is killed at its timeout; MuPDF is C code
 reading bytes from the internet and is never run in the web process on first contact.
 `test_audit_uploads.py` feeds it a decompression bomb, a page tree that points at itself, a

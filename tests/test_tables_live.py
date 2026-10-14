@@ -21,12 +21,20 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import ConversionOptions, Element, Fix, Kind, Status, TableCell, TableGrid
-from a11y_stem.models import make_vision_client
-from a11y_stem.pipeline import layout, options
-from a11y_stem.pipeline.table_step import rebuild
+from readablestem.config import Settings
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
+    ConversionOptions,
+    Element,
+    Fix,
+    Kind,
+    Status,
+    TableCell,
+    TableGrid,
+)
+from readablestem.models import make_vision_client
+from readablestem.pipeline import layout, options
+from readablestem.pipeline.table_step import rebuild
 from test_steps_support import make_settings
 
 pytestmark = pytest.mark.live_model

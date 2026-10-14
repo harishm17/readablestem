@@ -8,9 +8,9 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Fix, Kind, Status
-from a11y_stem.pipeline import equation_scale as es
-from a11y_stem.pipeline.assemble import render_html
+from readablestem.core.types import Element, Fix, Kind, Status
+from readablestem.pipeline import equation_scale as es
+from readablestem.pipeline.assemble import render_html
 
 
 def text(eid: str, size: float | None, chars: int = 100, kind=Kind.PARAGRAPH, **kw) -> Element:
@@ -198,11 +198,11 @@ FIXTURES = Path(__file__).parent / "fixtures" / "layout" / "latex"
 
 
 def converted(name: str):
-    from a11y_stem.config import Settings
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.core.types import ConversionOptions
-    from a11y_stem.models.fake import FakeVisionClient
-    from a11y_stem.pipeline.run import convert_pdf
+    from readablestem.config import Settings
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.core.types import ConversionOptions
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.pipeline.run import convert_pdf
 
     budget = JobBudget(guard=InMemorySpendGuard(cap_usd=1.0), max_usd=1.0, max_calls=100)
     client = FakeVisionClient(budget=budget)
@@ -216,7 +216,7 @@ def converted(name: str):
 
 
 def test_equation_crops_are_cut_for_the_text_size_and_the_model_sees_the_usual_one():
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     output, client = converted("problem_set")
     result = output.result
@@ -236,7 +236,7 @@ def test_equation_crops_are_cut_for_the_text_size_and_the_model_sees_the_usual_o
 
 
 def test_figure_crops_are_as_they_were():
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     output, _ = converted("kinematics_slides")
     figures = [e for e in output.result.elements if e.kind is Kind.FIGURE]

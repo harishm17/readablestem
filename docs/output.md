@@ -747,7 +747,7 @@ must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), an
 | `html.text_contrast` | `low_contrast` (a `tc-` colour class below 4.5:1 on white) |
 
 `html_checks.axe_checks(html)` runs the vendored axe-core 4.14.0
-(`src/a11y_stem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
+(`src/readablestem/pipeline/vendor/README.md`) in headless Chromium with the `wcag2a`,
 `wcag2aa` and `wcag21aa` rules. The page runs with networking off. Each violation
 becomes `Check(name="axe.<rule>", code="<rule>")`, an error for serious or critical
 impact and a warning otherwise; only rule ids and impact leave the browser, never page

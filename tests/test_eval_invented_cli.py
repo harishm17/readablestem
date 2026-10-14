@@ -11,9 +11,9 @@ import pymupdf
 import pytest
 from PIL import Image
 
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli.main import main
-from a11y_stem.eval.invented import report
+from readablestem.cli import eval_cli
+from readablestem.cli.main import main
+from readablestem.eval.invented import report
 from test_eval_support import settings
 
 PDF_LINES = [
@@ -58,7 +58,7 @@ def html_file(tmp_path, name, body):
 @pytest.fixture(autouse=True)
 def offline_settings(monkeypatch):
     monkeypatch.setattr(eval_cli, "_settings", lambda: settings())
-    monkeypatch.setattr("a11y_stem.config.get_settings", lambda: settings())
+    monkeypatch.setattr("readablestem.config.get_settings", lambda: settings())
 
 
 def run(*args):

@@ -25,9 +25,9 @@ import time
 
 import pytest
 
-from a11y_stem.web.db import Job, session_scope
 from fixtures.web.review_doc import GROUP
 from fixtures.web.support import ALICE
+from readablestem.web.db import Job, session_scope
 from test_web_browser import TEXT_SPACING, describe, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
@@ -299,7 +299,7 @@ def test_signing_out_in_the_tab_forgets_its_drafts(site, browser, job):
     page.goto(url)
     page.get_by_label("Alt text for figure 1").fill(ALT)
     stored = page.evaluate("Object.keys(sessionStorage).filter(k => k.includes('draft'))")
-    assert stored == [f"a11y-stem.draft:/jobs/{job}/review/p1-e6"]
+    assert stored == [f"readablestem.draft:/jobs/{job}/review/p1-e6"]
     page.get_by_role("button", name="Sign out").click()
     page.wait_for_url(f"{site.base}/")
     assert page.evaluate("Object.keys(sessionStorage).filter(k => k.includes('draft'))") == []

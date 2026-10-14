@@ -17,15 +17,6 @@ import time
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.observability.logging import FIELDS_ATTR
-from a11y_stem.web.auth import make_oauth
-from a11y_stem.web.db import AuthIdentity, User, session_scope
-from a11y_stem.web.identities import GOOGLE_ISSUER
-from a11y_stem.web.microsoft import (
-    TokenRefused,
-    email_claims,
-    verify_id_token,
-)
 from fixtures.web.oidc import (
     CLIENT_ID,
     CLIENT_SECRET,
@@ -37,6 +28,15 @@ from fixtures.web.oidc import (
     new_key,
 )
 from fixtures.web.support import ALICE, BOB, WebEnv, csrf_from, make_settings
+from readablestem.observability.logging import FIELDS_ATTR
+from readablestem.web.auth import make_oauth
+from readablestem.web.db import AuthIdentity, User, session_scope
+from readablestem.web.identities import GOOGLE_ISSUER
+from readablestem.web.microsoft import (
+    TokenRefused,
+    email_claims,
+    verify_id_token,
+)
 
 MS_SETTINGS = {
     "ms_client_id": CLIENT_ID,
@@ -275,7 +275,7 @@ def test_no_address_at_all_is_refused(ms):
 
 
 def test_someone_removed_from_the_allowlist_cannot_sign_in_with_a_linked_identity(ms):
-    from a11y_stem.web.auth import set_allowed
+    from readablestem.web.auth import set_allowed
 
     ms.allow(ALICE)
     assert ms_sign_in(ms).status_code == 303
@@ -462,7 +462,7 @@ def test_google_access_is_still_by_verified_email(ms):
     """A recorded Google identity changes nobody's access. The same Google account, now
     with Bob's verified address, signs in as Bob, by email as before, and the identity
     stays with Alice; once Bob is removed from the allowlist it is refused."""
-    from a11y_stem.web.auth import set_allowed
+    from readablestem.web.auth import set_allowed
 
     ms.allow(ALICE)
     ms.allow(BOB)
@@ -488,7 +488,7 @@ def test_a_first_sign_in_that_loses_a_race_finds_the_link(ms, monkeypatch):
     """Two first sign-ins at once: the one whose insert hits the unique key (the other
     linked the identity meanwhile) is tried again and finds the link (Postgres, for
     real: test_web_auth_postgres.py)."""
-    from a11y_stem.web import identities as store
+    from readablestem.web import identities as store
 
     ms.allow(ALICE)
     alice = user_id(ms, ALICE)
@@ -527,7 +527,7 @@ def test_signing_out_ends_microsoft_sessions_and_their_copies(ms):
 
 
 def test_removal_ends_a_microsoft_session_and_it_stays_ended(ms):
-    from a11y_stem.web.auth import set_allowed
+    from readablestem.web.auth import set_allowed
 
     ms.allow(ALICE)
     assert ms_sign_in(ms).status_code == 303
@@ -570,7 +570,7 @@ def test_nothing_from_the_tokens_reaches_the_logs(ms, caplog):
 
 
 def test_launch_check_wants_microsoft_in_the_privacy_notice_once_it_is_on(tmp_path, monkeypatch):
-    from a11y_stem.ops import launch
+    from readablestem.ops import launch
 
     templates = tmp_path / "templates"
     templates.mkdir()
@@ -591,7 +591,7 @@ def test_launch_check_wants_microsoft_in_the_privacy_notice_once_it_is_on(tmp_pa
 
 
 def test_launch_check_reads_the_sign_in_pages(tmp_path, monkeypatch):
-    from a11y_stem.ops import launch
+    from readablestem.ops import launch
 
     (tmp_path / "org_not_set_up.html").write_text("<p>TODO(Harish): wording</p>")
     monkeypatch.setattr(launch, "TEMPLATES_DIR", tmp_path)
@@ -684,7 +684,7 @@ def test_a_university_sign_in_comes_back_to_the_page_asked_for_and_is_counted(ms
     """Microsoft sign-in ends where every sign-in ends (`auth._signed_in`): back to the
     page asked for while signed out (`web.return_to`, the review-screen work) and one
     `signed_in` usage event (`web.events`)."""
-    from a11y_stem.web.db import Event
+    from readablestem.web.db import Event
 
     ms.allow(ALICE)
     asked = ms.browser.get("/app?from=bookmark")

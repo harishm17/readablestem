@@ -18,11 +18,11 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.core.types import Check
-from a11y_stem.web.db import ErrorAggregate, session_scope
 from fixtures.web.review_doc import GROUP
 from fixtures.web.support import ADMIN
 from fixtures.web.table_doc import table_output, table_pdf
+from readablestem.core.types import Check
+from readablestem.web.db import ErrorAggregate, session_scope
 from test_web_browser import TEXT_SPACING, describe, sign_in
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import browser as browser  # fixture, re-exported for pytest

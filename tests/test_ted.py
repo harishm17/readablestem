@@ -7,7 +7,7 @@ from functools import cache
 
 import pytest
 
-from a11y_stem.eval.ted import Node, teds, tree_edit_distance
+from readablestem.eval.ted import Node, teds, tree_edit_distance
 
 
 def T(spec) -> Node:

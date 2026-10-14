@@ -15,9 +15,9 @@ from html.parser import HTMLParser
 import pytest
 from latex2mathml.converter import convert
 
-from a11y_stem.core.types import TableCell, TableGrid, grid_problems
-from a11y_stem.pipeline import html_checks
-from a11y_stem.pipeline.table_html import needs_header_ids, render_table
+from readablestem.core.types import TableCell, TableGrid, grid_problems
+from readablestem.pipeline import html_checks
+from readablestem.pipeline.table_html import needs_header_ids, render_table
 
 
 def c(row: int, col: int, text: str = "", **kw) -> TableCell:
@@ -407,7 +407,7 @@ def test_a_header_that_is_only_maths_is_named_by_its_reading():
     # column of g values would be announced with no header.
     html = render_table(maths_header_grid(), id_prefix="t1")
     assert (
-        '<th scope="col"><span class="visually-hidden a11y-stem">g open parenthesis m/s '
+        '<th scope="col"><span class="visually-hidden readablestem">g open parenthesis m/s '
         'squared close parenthesis</span><span aria-hidden="true"><math display="inline">'
     ) in html
     assert html.count("<math") == 1

@@ -11,13 +11,13 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
-from a11y_stem.core.types import ConversionOptions, Status
-from a11y_stem.eval.gate import code_versions
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.prompts import load_prompt
-from a11y_stem.pipeline import figure_step, options
-from a11y_stem.pipeline.figure_step import (
+from readablestem.config import CHEAP_MODEL, MAIN_MODEL
+from readablestem.core.types import ConversionOptions, Status
+from readablestem.eval.gate import code_versions
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.prompts import load_prompt
+from readablestem.pipeline import figure_step, options
+from readablestem.pipeline.figure_step import (
     EXAM_PROMPT_NAME,
     EXAM_PROMPT_VERSION,
     LONG_PROMPT_VERSION,

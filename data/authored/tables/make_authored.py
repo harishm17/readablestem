@@ -74,7 +74,7 @@ def gold_records(name: str, source: str, pdf: bytes) -> list[dict]:
     """One record per table (per page for a split table), in document order."""
     import pymupdf
 
-    from a11y_stem.eval.tables import tokens
+    from readablestem.eval.tables import tokens
 
     with pymupdf.open(stream=pdf, filetype="pdf") as doc:
         page_words = [

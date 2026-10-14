@@ -13,13 +13,13 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.config import Settings
-from a11y_stem.core.types import Check
-from a11y_stem.pipeline import html_checks
-from a11y_stem.proof import engine, runner
-from a11y_stem.proof.bundle import MANIFEST_NAME, Bundle
-from a11y_stem.proof.errors import ProofError
 from proof_support import SET_ID, PdfMedia, fake_client, make_project
+from readablestem.config import Settings
+from readablestem.core.types import Check
+from readablestem.pipeline import html_checks
+from readablestem.proof import engine, runner
+from readablestem.proof.bundle import MANIFEST_NAME, Bundle
+from readablestem.proof.errors import ProofError
 
 DATE = "2026-10-14"
 OPUS, HAIKU = "claude-opus-5-5", "claude-haiku-5-5"
@@ -165,8 +165,8 @@ def test_the_api_check_names_a_missing_workspace_and_hides_the_message():
 
 def test_a_missing_claude_key_stops_a_live_run_before_any_work(tmp_path, monkeypatch):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
-    from a11y_stem.config import ConfigError
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.config import ConfigError
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
 
     budget = JobBudget(InMemorySpendGuard(cap_usd=1), max_usd=1, max_calls=5)
     with pytest.raises(ConfigError, match="ANTHROPIC_API_KEY"):

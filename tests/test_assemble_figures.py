@@ -11,7 +11,7 @@ import re
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
@@ -21,9 +21,9 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.pipeline import figure_details, figure_images
-from a11y_stem.pipeline.assemble import FIGURE_NOT_DESCRIBED_ALT, render_html
-from a11y_stem.pipeline.html_checks import static_checks
+from readablestem.pipeline import figure_details, figure_images
+from readablestem.pipeline.assemble import FIGURE_NOT_DESCRIBED_ALT, render_html
+from readablestem.pipeline.html_checks import static_checks
 
 LONG = (
     "Line graph of the position of a car against time.\n"
@@ -83,7 +83,7 @@ def test_a_long_description_follows_the_figure_folded():
     figure_end = html.index("</figure>")
     assert html[figure_end:].startswith('</figure><details class="figure-description">')
     block = details(html)
-    assert '<summary class="a11y-stem">Description of Figure 2.3</summary>' in block
+    assert '<summary class="readablestem">Description of Figure 2.3</summary>' in block
     assert "<p>Line graph of the position of a car against time.</p>" in block
     assert "<p>Position rises in a straight line" in block
     assert "<table" not in block
@@ -96,7 +96,7 @@ def test_a_table_read_from_the_image_is_not_written_until_a_reviewer_adds_it():
     offered = figure_fix(long_description=LONG, data_table=grid(), data_values_from_text=False)
     html = render(offered)
     assert "<table" not in html and "th, td {" not in html
-    assert '<summary class="a11y-stem">Description of Figure 2.3</summary>' in details(html)
+    assert '<summary class="readablestem">Description of Figure 2.3</summary>' in details(html)
     only_table = figure_fix(data_table=grid(), data_values_from_text=False)
     assert "<details" not in render(only_table) and "figure-description" not in render(only_table)
 
@@ -126,7 +126,7 @@ def test_values_read_from_the_image_are_captioned_as_approximate():
 def test_values_printed_in_the_pdf_are_not_called_approximate():
     html = render(figure_fix(data_table=grid(), data_values_from_text=True))
     block = details(html)
-    assert '<summary class="a11y-stem">Data for Figure 2.3</summary>' in block
+    assert '<summary class="readablestem">Data for Figure 2.3</summary>' in block
     assert ">Data shown in Figure 2.3</caption>" in block
 
 
@@ -137,10 +137,10 @@ def test_without_a_figure_number_the_summary_names_the_figure_by_its_alt_text():
     assert fix.figure is not None
     words = fix.figure.alt.split()
     html = render(fix, figure_element(caption=None))
-    start = html.index('<summary class="a11y-stem">Description of the figure \u201c')
+    start = html.index('<summary class="readablestem">Description of the figure \u201c')
     summary = html[start : html.index("</summary>", start)]
     assert " ".join(words[:3]) in summary
-    from a11y_stem.pipeline import figure_details
+    from readablestem.pipeline import figure_details
 
     short = fix.figure.model_copy(update={"alt": "A cart."})
     assert figure_details.figure_name(short, None) == "the figure \u201cA cart\u201d"
@@ -331,8 +331,8 @@ def test_an_image_not_used_for_a_while_is_dropped(fresh_cache, monkeypatch):
 def test_deleting_a_job_forgets_the_images_made_from_its_figures(fresh_cache):
     from datetime import UTC, datetime
 
-    from a11y_stem.ops.retention import delete_jobs
-    from a11y_stem.web import db
+    from readablestem.ops.retention import delete_jobs
+    from readablestem.web import db
 
     figure_images.student_image(png(100, 60, noise=True), "photo")
     assert figure_images._cache
@@ -439,7 +439,7 @@ def opened(html: str) -> str:
 @pytest.mark.parametrize("state", ["folded", "open"])
 def test_axe_finds_no_problems_with_a_described_figure(state):
     pytest.importorskip("playwright.sync_api")
-    from a11y_stem.pipeline import html_checks
+    from readablestem.pipeline import html_checks
 
     html = described_page()
     checks = html_checks.axe_checks(opened(html) if state == "open" else html)

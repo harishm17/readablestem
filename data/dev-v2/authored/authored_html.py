@@ -9,7 +9,7 @@ import html as htmllib
 import authored_text as tx
 from authored_core import Built, Doc, html_text
 
-from a11y_stem.eval.equations import latex_to_mathml
+from readablestem.eval.equations import latex_to_mathml
 
 CSS_SLIDES = """
 @page { size: 1280px 720px; margin: 0; }

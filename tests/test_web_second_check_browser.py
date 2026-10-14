@@ -5,7 +5,7 @@ sentence from web/messages.py, never under "Needs your decision"; the page has z
 serious or critical axe-core violations at 1280 and 320 CSS px and does not scroll
 sideways on a phone. Run with: uv run pytest -m browser tests/test_web_second_check_browser.py
 
-Set A11Y_STEM_SCREENSHOTS=/some/dir to also save screenshots of the page there.
+Set READABLESTEM_SCREENSHOTS=/some/dir to also save screenshots of the page there.
 """
 
 from __future__ import annotations
@@ -20,7 +20,8 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.core.types import (
+from fixtures.web.support import ALICE, WebEnv, make_pdf
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -32,9 +33,8 @@ from a11y_stem.core.types import (
     Status,
     Verification,
 )
-from a11y_stem.ops.canary import REQUESTS_FILE
-from a11y_stem.web.messages import CHECK_MESSAGES
-from fixtures.web.support import ALICE, WebEnv, make_pdf
+from readablestem.ops.canary import REQUESTS_FILE
+from readablestem.web.messages import CHECK_MESSAGES
 from test_web_browser import axe_source as axe_source  # fixture, re-exported for pytest
 from test_web_browser import axe_violations, describe, free_port, sign_in
 from test_web_browser import browser as browser  # fixture, re-exported for pytest
@@ -90,7 +90,7 @@ def second_check_output() -> ConversionOutput:
 def site(tmp_path_factory) -> Iterator[WebEnv]:
     import uvicorn
 
-    from a11y_stem.pipeline import assemble
+    from readablestem.pipeline import assemble
 
     patch = pytest.MonkeyPatch()
     patch.setattr(assemble, "render_html", lambda **kw: "<html><body>re-rendered</body></html>")
@@ -132,7 +132,7 @@ def job(site, browser) -> str:
 
 
 def _screenshot(page, name: str) -> None:
-    target = os.environ.get("A11Y_STEM_SCREENSHOTS")
+    target = os.environ.get("READABLESTEM_SCREENSHOTS")
     if target:
         Path(target).mkdir(parents=True, exist_ok=True)
         page.screenshot(path=str(Path(target) / name), full_page=True)

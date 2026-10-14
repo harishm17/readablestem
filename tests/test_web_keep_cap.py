@@ -14,10 +14,10 @@ from datetime import timedelta
 
 import pytest
 
-from a11y_stem.web.db import Job, JobStatus, User, session_scope, utcnow
-from a11y_stem.web.routes import job_settings
-from a11y_stem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER, live_job_count
 from fixtures.web.support import ALICE, BOB, WebEnv, job_id_from, login, make_pdf, token, upload
+from readablestem.web.db import Job, JobStatus, User, session_scope, utcnow
+from readablestem.web.routes import job_settings
+from readablestem.web.routes.jobs import MAX_LIVE_JOBS_PER_USER, live_job_count
 
 
 @pytest.fixture

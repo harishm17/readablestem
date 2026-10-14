@@ -16,13 +16,13 @@ sync:
 # the gold they were scored on, the scorer's ceiling, then the committed numbers. No API
 # key, no network, no browser; a few seconds (eval/reproduce.py, docs/eval.md).
 reproduce:
-	uv run python -m a11y_stem.eval.reproduce
+	uv run python -m readablestem.eval.reproduce
 
 # The same, plus a re-run of the two tasks that call no model (headings, tables in local
 # mode) compared with the committed reports. Needs network on the first run, Chromium
 # (uv run playwright install chromium) and the fonts in docs/development.md.
 reproduce-rerun:
-	uv run python -m a11y_stem.eval.reproduce --rerun-offline
+	uv run python -m readablestem.eval.reproduce --rerun-offline
 
 test:
 	uv run pytest
@@ -31,9 +31,9 @@ test-network:  ## live OpenStax API check (skipped by default)
 	uv run pytest -m network
 
 # The SLANet-plus table-structure model (7.5 MB), SHA-256 checked, into
-# ~/.cache/a11y-stem/models (or TABLE_MODEL_DIR). Without it tables use PyMuPDF's grid.
+# ~/.cache/readablestem/models (or TABLE_MODEL_DIR). Without it tables use PyMuPDF's grid.
 table-model:
-	uv run python -m a11y_stem.pipeline.table_model
+	uv run python -m readablestem.pipeline.table_model
 
 # Upgrade check before any PyMuPDF bump: byte mutants of the repo's own fixtures through
 # the probe and the table detector; fails if a file passes the probe and then kills the
@@ -66,35 +66,35 @@ ci-local:
 	$(CI_314) uv run --python 3.14 pytest -q
 
 gold:
-	uv run a11y-stem gold fetch --book $(GOLD_BOOK) --pages $(GOLD_PAGES) $(if $(GOLD_CHAPTER),--chapter $(GOLD_CHAPTER))
+	uv run readablestem gold fetch --book $(GOLD_BOOK) --pages $(GOLD_PAGES) $(if $(GOLD_CHAPTER),--chapter $(GOLD_CHAPTER))
 
 gold-licenses:
-	uv run a11y-stem gold licenses --csv data/openstax-licenses.csv
+	uv run readablestem gold licenses --csv data/openstax-licenses.csv
 
 # Pipeline plumbing only: scores each gold equation against itself, so it prints 1.0
 # even if normalisation is broken. It does NOT test the scorer. Use eval-latex-check.
 eval-plumbing:
-	uv run a11y-stem eval equations --gold data/gold --self-check
+	uv run readablestem eval equations --gold data/gold --self-check
 
 # Scorer check: known-correct LaTeX for every sample equation must match leniently
 # (known gaps are strict xfails). Then prints the summary for the same predictions.
 eval-latex-check:
 	uv run pytest -q tests/test_gold_sample.py
-	uv run a11y-stem eval equations --gold data/gold --pred $(SAMPLE_PREDICTIONS)
+	uv run readablestem eval equations --gold data/gold --pred $(SAMPLE_PREDICTIONS)
 
 # The pre-registered held-out set (docs/eval.md "Held-out set"). Its files go to
-# ~/.cache/a11y-stem/heldout, never into the repository. heldout-gold rebuilds the
+# ~/.cache/readablestem/heldout, never into the repository. heldout-gold rebuilds the
 # registered gold byte for byte from OpenStax's pinned archive (retired first editions,
 # hence --allow-retired: ADR 0001 question 2) and checks it; no model is called.
 .PHONY: heldout-gold heldout-verify heldout-pdfs
 heldout-gold:
-	uv run a11y-stem gold fetch --set heldout --allow-retired --date 2026-10-13
+	uv run readablestem gold fetch --set heldout --allow-retired --date 2026-10-13
 
 heldout-verify:
-	uv run a11y-stem gold verify --set heldout
+	uv run readablestem gold verify --set heldout
 
 heldout-pdfs:  ## print the 15 sections and check the page counts (242)
-	uv run --group browser a11y-stem eval render --set heldout --all
+	uv run --group browser readablestem eval render --set heldout --all
 
 # One-command reproduction of the public proof (docs/proof.md). `make proof` replays the
 # recorded run committed under proof/bundles/: no key, no network, no cost, same bytes
@@ -118,7 +118,7 @@ PROOF_ARGS = $(if $(SET),--set $(SET)) $(if $(BUNDLE),--bundle $(BUNDLE)) $(PROO
 PROOF_TAG = proof-heldout-2026-10
 
 proof:  ## replay the recorded run and write PROOF.md (no key, no network, no cost); reproduce at the tag
-	uv run a11y-stem proof $(PROOF_ARGS) || { status=$$?; \
+	uv run readablestem proof $(PROOF_ARGS) || { status=$$?; \
 		if [ "$$(git rev-parse -q --verify HEAD 2>/dev/null)" != "$$(git rev-parse -q --verify '$(PROOF_TAG)^{commit}' 2>/dev/null)" ]; then \
 			echo >&2; \
 			echo "make proof failed, and this is not the commit the recorded run belongs to." >&2; \
@@ -131,36 +131,36 @@ proof:  ## replay the recorded run and write PROOF.md (no key, no network, no co
 		exit $$status; }
 
 proof-check:  ## check the pins and the recorded run's hashes; run nothing
-	uv run a11y-stem proof --check $(PROOF_ARGS)
+	uv run readablestem proof --check $(PROOF_ARGS)
 
 proof-list:
-	uv run a11y-stem proof --list
+	uv run readablestem proof --list
 
 # Needs network and Chromium: `uv sync --group browser` and
 # `uv run playwright install --with-deps chromium` (docs/development.md for the fonts).
 # Writes proof/PROOF-sources.md (OUT=<file> to change), never PROOF.md: this check replaces
 # the report with one that holds the fetch and print results, which would leave the tree dirty.
 proof-sources:  ## also fetch the answer key from OpenStax and print the PDFs again (network, Chromium)
-	uv run --group browser a11y-stem proof --verify-sources --out $(or $(OUT),proof/PROOF-sources.md) $(PROOF_ARGS)
+	uv run --group browser readablestem proof --verify-sources --out $(or $(OUT),proof/PROOF-sources.md) $(PROOF_ARGS)
 
 # A live run of the default set records about $0.30 and stops without a result below that:
 # use MAX_USD=0.50 or more. Needs Chromium like proof-sources.
 proof-live:  ## re-call the models (costs money, needs Chromium): make proof-live MAX_USD=2 ENV_FILE=.env
 	@test -n "$(MAX_USD)" || { echo "usage: make proof-live MAX_USD=<dollars> [ENV_FILE=.env] [SET=<id>]"; exit 2; }
-	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser a11y-stem proof --live \
+	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser readablestem proof --live \
 		--max-usd $(MAX_USD) $(if $(RECORD),--record $(RECORD)) $(PROOF_ARGS)
 
 
 proof-add-chatbot:  ## record the chatbot arms into a recorded run: make proof-add-chatbot MAX_USD=10 ENV_FILE=.env
 	@test -n "$(MAX_USD)" || { echo "usage: make proof-add-chatbot MAX_USD=<dollars> [ENV_FILE=.env] [SET=<id>]"; exit 2; }
-	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser a11y-stem proof --add-systems chatbot \
+	uv run $(if $(ENV_FILE),--env-file $(ENV_FILE)) --group browser readablestem proof --add-systems chatbot \
 		--max-usd $(MAX_USD) $(PROOF_ARGS)
 
 proof-interim:  ## the held-out results that need no model (headings, parsers): needs `make heldout-gold`
-	uv run python proof/interim/report.py --gold $${HELDOUT_GOLD:-$${XDG_CACHE_HOME:-$$HOME/.cache}/a11y-stem/heldout/gold}
+	uv run python proof/interim/report.py --gold "$${HELDOUT_GOLD:-$$(uv run python -c 'from readablestem.cli.heldout import default_root; print(default_root() / "gold")')}"
 
 proof-add-parsers:  ## record the open parsers (hours, resumable; run `make -C proof/parsers setup` once)
-	uv run a11y-stem proof --add-systems parsers $(PROOF_ARGS)
+	uv run readablestem proof --add-systems parsers $(PROOF_ARGS)
 
 # The static reviewer demo (docs/site.md): plain HTML written from committed results and
 # PROOF.md into site/_build (OUT=<dir> for another folder). No key, no network, no model

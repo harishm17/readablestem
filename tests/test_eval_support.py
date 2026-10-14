@@ -17,8 +17,8 @@ from pathlib import Path
 
 from pydantic import BaseModel
 
-from a11y_stem.config import Settings
-from a11y_stem.core.types import (
+from readablestem.config import Settings
+from readablestem.core.types import (
     Check,
     Element,
     EquationFix,
@@ -27,10 +27,10 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.eval.equations import latex_to_mathml
-from a11y_stem.eval.render import math_tokens
-from a11y_stem.gold.openstax import write_manifest
-from a11y_stem.models.base import VisionRequest
+from readablestem.eval.equations import latex_to_mathml
+from readablestem.eval.render import math_tokens
+from readablestem.gold.openstax import write_manifest
+from readablestem.models.base import VisionRequest
 
 FIXTURES = Path(__file__).parent / "fixtures" / "eval"
 CC_BY = "http://creativecommons.org/licenses/by/4.0/"
@@ -299,7 +299,7 @@ def eq_fix(element_id: str, latex: str, confidence: float = 0.9) -> Fix:
 
 
 def test_fake_png_has_a_readable_size_and_is_unique_per_key():
-    from a11y_stem.eval.pipeline_eval import _png_size
+    from readablestem.eval.pipeline_eval import _png_size
 
     assert _png_size(fake_png("a", 40, 20)) == (40, 20)
     assert fake_png("a") != fake_png("b")

@@ -24,11 +24,11 @@ from typing import get_args
 
 import pytest
 
-import a11y_stem
-from a11y_stem.core.types import NOTICE_CODES, Check, Notice, Outcome
-from a11y_stem.pipeline import run
-from a11y_stem.web import messages
-from a11y_stem.web.messages import (
+import readablestem
+from readablestem.core.types import NOTICE_CODES, Check, Notice, Outcome
+from readablestem.pipeline import run
+from readablestem.web import messages
+from readablestem.web.messages import (
     CHECK_MESSAGES,
     NOTICE_MESSAGES,
     REASON_MESSAGES,
@@ -38,7 +38,7 @@ from a11y_stem.web.messages import (
     explain_reason,
 )
 
-SRC = Path(a11y_stem.__file__).resolve().parent
+SRC = Path(readablestem.__file__).resolve().parent
 PIPELINE_MODULES = (
     "validate",
     "equation_step",
@@ -215,7 +215,7 @@ def budget_scopes() -> set[str]:
     """Every BudgetExceeded scope: the literal first argument wherever one is raised
     (core.budget, web.spend), the worker's cancellation scope, and the orchestrator's
     fallback when no scope was recorded."""
-    from a11y_stem.web.worker import JobCancelled
+    from readablestem.web.worker import JobCancelled
 
     pattern = re.compile(r'BudgetExceeded\(\s*"([a-z_]+)"')
     scopes = {m for path in SRC.rglob("*.py") for m in pattern.findall(path.read_text())}

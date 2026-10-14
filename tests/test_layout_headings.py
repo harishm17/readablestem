@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.core.types import Element, Kind, Status
-from a11y_stem.pipeline.heading_step import ACCEPT_AT, heading_fixes, repair_outline
-from a11y_stem.pipeline.layout import (
+from readablestem.core.types import Element, Kind, Status
+from readablestem.pipeline.heading_step import ACCEPT_AT, heading_fixes, repair_outline
+from readablestem.pipeline.layout import (
     REASON_BOLD_BODY,
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
@@ -287,7 +287,7 @@ def test_a_heading_with_other_text_between_two_copies_is_not_a_repeat():
 
 
 def test_the_repeated_heading_is_written_as_bold_text_in_the_html():
-    from a11y_stem.pipeline.assemble import render_html
+    from readablestem.pipeline.assemble import render_html
 
     elements = [
         large(0, "Motion", 18.0),

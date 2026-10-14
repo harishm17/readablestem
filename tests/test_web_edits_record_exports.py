@@ -14,10 +14,10 @@ from html import unescape
 
 import pytest
 
-from a11y_stem.models.fake import FakeVisionClient
 from fixtures.web.review_doc import review_output, review_pdf
 from fixtures.web.support import ALICE, WebEnv, job_id_from, login, token, upload
 from fixtures.web.table_doc import MATHS_LATEX, table_pdf
+from readablestem.models.fake import FakeVisionClient
 from test_web_edit_tables import clean_output, set_cell_latex
 
 PLAIN = "p1-e4"
@@ -166,7 +166,7 @@ def test_clean_tables_accepted_together_and_a_cell_read_by_the_model_are_marked(
 def test_carried_decisions_say_what_was_carried():
     from types import SimpleNamespace
 
-    from a11y_stem.web import record
+    from readablestem.web import record
 
     row = SimpleNamespace(action="carried", after={"carried_edit": "picture"})
     assert record._decision_words(row) == (
@@ -231,7 +231,7 @@ class review_session:
     """A transaction on the app's database, with `get_job`."""
 
     def __init__(self, env) -> None:
-        from a11y_stem.web.db import session_scope
+        from readablestem.web.db import session_scope
 
         self.scope = session_scope(env.ctx.factory)
 
@@ -243,7 +243,7 @@ class review_session:
         return self.scope.__exit__(*exc)
 
     def get_job(self, job_id: str):
-        from a11y_stem.web.db import Job
+        from readablestem.web.db import Job
 
         job = self.session.get(Job, job_id)
         assert job is not None

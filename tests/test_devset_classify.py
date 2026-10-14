@@ -9,7 +9,7 @@ import xml.etree.ElementTree as ET
 
 import pytest
 
-from a11y_stem.gold import devset_classify as dc
+from readablestem.gold import devset_classify as dc
 
 NS = 'xmlns="http://www.w3.org/1998/Math/MathML"'
 

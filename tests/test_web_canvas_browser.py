@@ -14,8 +14,8 @@ import zipfile
 import pytest
 
 import test_web_browser as shared
-from a11y_stem.core.types import Status
 from fixtures.web.support import ALICE, fake_output
+from readablestem.core.types import Status
 from test_web_browser import sign_in, upload_pdf
 
 site = shared.site

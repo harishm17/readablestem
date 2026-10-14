@@ -38,7 +38,7 @@ def env(tmp_path) -> dict[str, str]:
         "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
         "HOME": str(tmp_path),
         "FAKE_GCLOUD_DIR": str(state),
-        "PROJECT_ID": "a11y-stem-test",
+        "PROJECT_ID": "readablestem-test",
         "REGION": "us-central1",
         "BASE_URL": "https://a11y.example.org",
         "DAILY_SPEND_CAP_USD": "5",
@@ -51,7 +51,7 @@ def env(tmp_path) -> dict[str, str]:
         "IMAGE_TAG": "test",
         "OPENAI_API_KEY": OPENAI_KEY,
         "GOOGLE_CLIENT_SECRET": GOOGLE_SECRET,
-        "SOURCE_URL": "https://github.com/o'brien/a11y-stem",  # quote must survive YAML
+        "SOURCE_URL": "https://github.com/o'brien/readablestem",  # quote must survive YAML
     }
 
 
@@ -122,7 +122,7 @@ def test_service_flags_and_environment(env):
         "--memory=1Gi",
         "--timeout=300",
         "--port=8080",
-        "--set-cloudsql-instances=proj:us-central1:a11y-stem-db",
+        "--set-cloudsql-instances=proj:us-central1:readablestem-db",
     ):
         assert expected in argv
     secrets = next(a for a in argv if a.startswith("--set-secrets="))
@@ -132,14 +132,14 @@ def test_service_flags_and_environment(env):
     env_file = deploy["env_file"]
     assert "ENV: 'prod'" in env_file
     assert "ADMIN_EMAILS: 'a@example.org,b@example.org'" in env_file
-    assert "SOURCE_URL: 'https://github.com/o''brien/a11y-stem'" in env_file
+    assert "SOURCE_URL: 'https://github.com/o''brien/readablestem'" in env_file
     assert OPENAI_KEY not in env_file and GOOGLE_SECRET not in env_file
 
     (migrate,) = [c for c in calls(env) if c["argv"][2:5] == ["run", "jobs", "deploy"]]
     assert "--args=db,upgrade" in migrate["argv"]
     (cron,) = [c for c in calls(env) if c["argv"][2:5] == ["scheduler", "jobs", "create"]]
     assert (
-        "--uri=https://a11y-stem-abc123-uc.a.run.app/internal/cron/aggregate-and-purge"
+        "--uri=https://readablestem-abc123-uc.a.run.app/internal/cron/aggregate-and-purge"
         in (cron["argv"])
     )
     assert f"--headers=X-Cron-Token={CRON_TOKEN}" in cron["argv"]
@@ -251,22 +251,22 @@ def test_the_hourly_purge_has_alerts_of_its_own(env):
         if c["argv"][2:5] == ["logging", "metrics", "create"]
     }
     assert set(metrics) == {
-        "a11y-stem-cron-done",
-        "a11y-stem-cron-problems",
-        "a11y-stem-scheduler-errors",
+        "readablestem-cron-done",
+        "readablestem-cron-problems",
+        "readablestem-scheduler-errors",
     }
-    assert 'jsonPayload.message="cron_done"' in metrics["a11y-stem-cron-done"]
+    assert 'jsonPayload.message="cron_done"' in metrics["readablestem-cron-done"]
     for event in ("cron_refused", "aggregate_failed", "purge_backstop_deleted"):
-        assert event in metrics["a11y-stem-cron-problems"]
-    assert 'resource.labels.job_id="a11y-stem-cron"' in metrics["a11y-stem-scheduler-errors"]
+        assert event in metrics["readablestem-cron-problems"]
+    assert 'resource.labels.job_id="readablestem-cron"' in metrics["readablestem-scheduler-errors"]
 
     found = policies(env)
     assert set(found) == {
-        "a11y-stem readyz failing",
-        "a11y-stem cron not running",
-        "a11y-stem cron or purge problem",
+        "readablestem readyz failing",
+        "readablestem cron not running",
+        "readablestem cron or purge problem",
     }
-    (absent,) = found["a11y-stem cron not running"]["conditions"]
+    (absent,) = found["readablestem cron not running"]["conditions"]
     assert absent["conditionAbsent"]["duration"] == "7200s"
     # One series across revisions, so a deploy does not look like the cron stopping.
     assert absent["conditionAbsent"]["aggregations"][0]["crossSeriesReducer"] == "REDUCE_SUM"

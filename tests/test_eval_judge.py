@@ -5,10 +5,10 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.eval import judge
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.prompts import load_prompt
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.eval import judge
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.prompts import load_prompt
 from test_eval_support import settings
 
 VERDICT = {"conveys_key_information": True, "factual_error": False, "score": 4, "confidence": 0.7}
@@ -54,7 +54,7 @@ def test_nested_tags_cannot_rebuild_a_closing_tag():
 
 
 def test_worst_case_context_fits_the_fence_without_being_cut():
-    from a11y_stem.models.base import fence_untrusted
+    from readablestem.models.base import fence_untrusted
 
     long = "y" * 5000
     context = judge.judge_context(long, long, long)

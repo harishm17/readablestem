@@ -43,7 +43,7 @@ cpus = sorted(os.sched_getaffinity(0))
 os.sched_setaffinity(0, {cpus[int(sys.argv[1]) % len(cpus)]})
 limit = int(sys.argv[2])
 resource.setrlimit(resource.RLIMIT_AS, (limit, limit))
-from a11y_stem.pipeline import layout
+from readablestem.pipeline import layout
 data = sys.stdin.buffer.read()
 try:
     layout.analyze(data, max_pages=30)

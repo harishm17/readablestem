@@ -26,7 +26,7 @@ from functools import cache
 
 import pymupdf
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     Check,
     ConversionOutput,
     DocumentResult,
@@ -144,7 +144,7 @@ def grid_of(table, *, header_rows: int = 1, source: str = "local") -> TableGrid:
 def table_1_proposal() -> TableGrid:
     """The model's grid: the header row not marked, and the formula as a maths cell
     spanning the last two columns."""
-    from a11y_stem.pipeline.validate import safe_latex_to_mathml
+    from readablestem.pipeline.validate import safe_latex_to_mathml
 
     caption, _corner, _widths, rows = TABLE_1
     cells = [

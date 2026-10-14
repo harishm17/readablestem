@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 from pydantic import ValidationError
 
-from a11y_stem.config import (
+from readablestem.config import (
     ANTHROPIC_CHEAP_MODEL,
     ANTHROPIC_MAIN_MODEL,
     CHEAP_MODEL,
@@ -19,20 +19,20 @@ from a11y_stem.config import (
     get_settings,
     with_provider,
 )
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import Status
-from a11y_stem.models import (
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.core.types import Status
+from readablestem.models import (
     FakeVisionClient,
     VisionRequest,
     call_with_fallback,
     make_live_client,
     make_vision_client,
 )
-from a11y_stem.models.anthropic_client import AnthropicVisionClient
-from a11y_stem.models.claude_verifier import ClaudeVerifier
-from a11y_stem.models.openai_client import OpenAIVisionClient
-from a11y_stem.models.verifier import FakeVerifier, any_check_enabled, verifier_of
-from a11y_stem.pipeline.equation_step import transcribe
+from readablestem.models.anthropic_client import AnthropicVisionClient
+from readablestem.models.claude_verifier import ClaudeVerifier
+from readablestem.models.openai_client import OpenAIVisionClient
+from readablestem.models.verifier import FakeVerifier, any_check_enabled, verifier_of
+from readablestem.pipeline.equation_step import transcribe
 from test_steps_support import equation_element, use_fallback_router
 
 HAIKU, SONNET, OPUS = "claude-haiku-5-5", "claude-sonnet-5-5", "claude-opus-5-5"
@@ -148,7 +148,7 @@ def test_production_needs_the_key_of_the_selected_provider_only():
 
 
 def test_web_secret_check_follows_the_provider():
-    from a11y_stem.web.app import check_web_secrets
+    from readablestem.web.app import check_web_secrets
 
     full = {**PROD, "model_provider": "anthropic", "anthropic_api_key": "sk-ant"}
     check_web_secrets(settings(**full))
@@ -218,7 +218,7 @@ def test_the_decisions_check_is_skipped_with_the_anthropic_provider():
 
 
 def test_the_canary_is_not_due_with_the_anthropic_provider():
-    from a11y_stem.ops import canary
+    from readablestem.ops import canary
 
     s = settings(model_provider="anthropic", env="dev", openai_api_key="sk-o")
     assert canary.due(s) == "provider_not_openai"
@@ -301,7 +301,7 @@ def test_confident_cheap_answer_stays_on_the_cheap_model(monkeypatch):
 
 
 def test_spend_admission_prices_the_claude_models():
-    from a11y_stem.web.spend import largest_reservation_usd
+    from readablestem.web.spend import largest_reservation_usd
 
     openai_largest = largest_reservation_usd(settings())
     claude_largest = largest_reservation_usd(settings(model_provider="anthropic"))
@@ -331,7 +331,7 @@ def test_the_privacy_page_names_the_provider_that_receives_the_images(tmp_path):
 def test_launch_check_wants_anthropic_in_the_privacy_notice_once_it_is_the_provider(
     tmp_path, monkeypatch
 ):
-    from a11y_stem.ops import launch
+    from readablestem.ops import launch
 
     templates = tmp_path / "templates"
     templates.mkdir()

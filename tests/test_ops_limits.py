@@ -4,9 +4,9 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.config import ConfigError, Settings, with_provider
-from a11y_stem.ops import launch, limits
-from a11y_stem.web.worker import job_caps
+from readablestem.config import ConfigError, Settings, with_provider
+from readablestem.ops import launch, limits
+from readablestem.web.worker import job_caps
 
 PROD = {
     "env": "prod",

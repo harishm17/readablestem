@@ -11,9 +11,9 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind, inline_marker
-from a11y_stem.pipeline import layout
-from a11y_stem.pipeline.layout import analyze, marker_readings, roman_value
+from readablestem.core.types import Element, Kind, inline_marker
+from readablestem.pipeline import layout
+from readablestem.pipeline.layout import analyze, marker_readings, roman_value
 
 BODY = 11.0
 PITCH = 15.0

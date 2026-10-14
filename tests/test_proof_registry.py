@@ -8,9 +8,9 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.proof import registry
-from a11y_stem.proof.errors import PinMismatch, ProofError
 from proof_support import SET_ID, make_project
+from readablestem.proof import registry
+from readablestem.proof.errors import PinMismatch, ProofError
 
 SHA = "a" * 64
 

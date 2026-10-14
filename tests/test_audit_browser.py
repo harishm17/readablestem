@@ -16,8 +16,8 @@ import time
 
 import pytest
 
-from a11y_stem.web.db import Job, session_scope
 from fixtures.web.support import ALICE, WebEnv, make_pdf
+from readablestem.web.db import Job, session_scope
 
 pytestmark = pytest.mark.browser
 sync_api = pytest.importorskip("playwright.sync_api")

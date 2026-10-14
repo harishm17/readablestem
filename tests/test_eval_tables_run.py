@@ -15,8 +15,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
-from a11y_stem.core.types import (
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget
+from readablestem.core.types import (
     Check,
     Element,
     Fix,
@@ -27,9 +27,9 @@ from a11y_stem.core.types import (
     TableFix,
     TableGrid,
 )
-from a11y_stem.eval import tables as T
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import layout, table_step
+from readablestem.eval import tables as T
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import layout, table_step
 from test_eval_support import base_record, settings, write_gold
 
 SPEEDS_HTML = (
@@ -257,7 +257,7 @@ def model_rebuild(answers: dict[str, Fix]):
     seen = []
 
     def rebuild(element, png, *, client, settings, context_text=None):
-        from a11y_stem.pipeline import options
+        from readablestem.pipeline import options
 
         seen.append((element.id, options.current().tables, context_text))
         return answers[element.id].model_copy()

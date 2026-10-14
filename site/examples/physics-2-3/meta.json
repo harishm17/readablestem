@@ -4,7 +4,7 @@
   "kind": "openstax",
   "title": "OpenStax Physics 2.3: Position vs. Time Graphs",
   "short": "Physics 2.3, position vs. time graphs",
-  "artefacts": "../../../src/a11y_stem/web/static/demo",
+  "artefacts": "../../../src/readablestem/web/static/demo",
   "html": "index.html",
   "pdf": "source.pdf",
   "report": "report.json",

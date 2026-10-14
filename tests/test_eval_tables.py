@@ -6,9 +6,9 @@ from __future__ import annotations
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import TableCell, TableGrid
-from a11y_stem.eval import tables as T
-from a11y_stem.eval import ted
+from readablestem.core.types import TableCell, TableGrid
+from readablestem.eval import tables as T
+from readablestem.eval import ted
 
 SPEEDS = (
     "<table><thead><tr><th scope='col'>Medium</th><th scope='col'>v (m/s)</th></tr></thead>"

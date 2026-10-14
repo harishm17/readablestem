@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     ColourRun,
     Element,
     Fix,
@@ -20,10 +20,10 @@ from a11y_stem.core.types import (
     Status,
     inline_marker,
 )
-from a11y_stem.pipeline import inline_text
-from a11y_stem.pipeline.assemble import render_html
-from a11y_stem.pipeline.html_checks import static_checks
-from a11y_stem.pipeline.inline_text import colour_css, passage_attrs, render_inline_text
+from readablestem.pipeline import inline_text
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.html_checks import static_checks
+from readablestem.pipeline.inline_text import colour_css, passage_attrs, render_inline_text
 
 MATHS = '<math display="inline"><mi>v</mi></math>'
 

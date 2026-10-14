@@ -15,10 +15,10 @@ from datetime import UTC, datetime, timedelta
 import pytest
 
 import test_web_browser as shared
-from a11y_stem.core.types import Status
-from a11y_stem.web.database import utc_today
-from a11y_stem.web.db import Job, QuotaDay, User, session_scope
 from fixtures.web.support import ADMIN, ALICE, BOB, fake_output, make_pdf
+from readablestem.core.types import Status
+from readablestem.web.database import utc_today
+from readablestem.web.db import Job, QuotaDay, User, session_scope
 from test_web_browser import (
     STRICT_IMPACTS,
     TEXT_SPACING,

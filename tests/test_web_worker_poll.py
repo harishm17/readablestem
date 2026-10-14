@@ -5,7 +5,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 
-from a11y_stem.web.db import utcnow
+from readablestem.web.db import utcnow
 from test_web_worker import env, queue_job  # noqa: F401  (the fixture and the helper)
 
 

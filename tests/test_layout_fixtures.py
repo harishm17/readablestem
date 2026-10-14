@@ -17,8 +17,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind, inline_marker
-from a11y_stem.pipeline.layout import Layout, analyze, crop, heading_levels
+from readablestem.core.types import Element, Kind, inline_marker
+from readablestem.pipeline.layout import Layout, analyze, crop, heading_levels
 
 FIXTURES = Path(__file__).parent / "fixtures" / "layout"
 NAMES = ("lecture_notes", "two_column", "worked_example")

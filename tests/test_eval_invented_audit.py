@@ -7,9 +7,9 @@ import json
 
 import pytest
 
-from a11y_stem.eval.invented import audit
-from a11y_stem.eval.invented.score import Verdict
-from a11y_stem.eval.invented.text import Reference
+from readablestem.eval.invented import audit
+from readablestem.eval.invented.score import Verdict
+from readablestem.eval.invented.text import Reference
 
 REFERENCE = Reference.from_pages(
     ["Average speed is the distance traveled divided by the time.\nA drop of 5 degrees today."]

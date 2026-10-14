@@ -12,11 +12,11 @@ import hashlib
 import json
 from pathlib import Path
 
-from a11y_stem.config import Settings
-from a11y_stem.core.budget import JobBudget
-from a11y_stem.models import OFFLINE_DEFAULTS
-from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.models.verifier import FakeVerifier, any_check_enabled
+from readablestem.config import Settings
+from readablestem.core.budget import JobBudget
+from readablestem.models import OFFLINE_DEFAULTS
+from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.models.verifier import FakeVerifier, any_check_enabled
 from test_eval_support import (
     EQ_A,
     EQ_F,

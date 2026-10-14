@@ -7,9 +7,9 @@ import json
 
 import pytest
 
-from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-from a11y_stem.eval import calibration as cal
-from a11y_stem.models.fake import FakeVisionClient
+from readablestem.core.budget import InMemorySpendGuard, JobBudget
+from readablestem.eval import calibration as cal
+from readablestem.models.fake import FakeVisionClient
 from test_eval_support import figure, settings
 
 # Wikipedia's worked example for Cohen's kappa (50 proposals, two readers):

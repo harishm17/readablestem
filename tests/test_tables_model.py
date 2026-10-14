@@ -12,8 +12,8 @@ import httpx
 import numpy as np
 import pytest
 
-from a11y_stem.pipeline import table_model
-from a11y_stem.pipeline.vendor import rapid_table
+from readablestem.pipeline import table_model
+from readablestem.pipeline.vendor import rapid_table
 
 ROOT = Path(__file__).resolve().parents[1]
 FAKE = b"slanet-plus stand-in"
@@ -47,7 +47,7 @@ def test_the_model_directory_comes_from_the_environment(monkeypatch, tmp_path):
     assert table_model.model_path() == tmp_path / "m" / "slanet-plus.onnx"
     monkeypatch.delenv("TABLE_MODEL_DIR")
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path / "cache"))
-    assert table_model.model_dir() == tmp_path / "cache" / "a11y-stem" / "models"
+    assert table_model.model_dir() == tmp_path / "cache" / "readablestem" / "models"
 
 
 def test_fetch_installs_a_file_with_the_pinned_checksum(tmp_path, pinned_to_fake):
@@ -86,14 +86,14 @@ def test_the_command_installs_a_local_copy(tmp_path, pinned_to_fake, capsys):
 
 def test_the_image_fetches_the_model_and_points_the_app_at_it():
     dockerfile = (ROOT / "Dockerfile").read_text()
-    assert "python -m a11y_stem.pipeline.table_model --dir /app/models" in dockerfile
+    assert "python -m readablestem.pipeline.table_model --dir /app/models" in dockerfile
     assert "TABLE_MODEL_DIR=/app/models" in dockerfile
     makefile = (ROOT / "Makefile").read_text()
-    assert "table-model:" in makefile and "a11y_stem.pipeline.table_model" in makefile
+    assert "table-model:" in makefile and "readablestem.pipeline.table_model" in makefile
 
 
 def test_the_vendored_code_keeps_its_licence_and_notice():
-    vendor = ROOT / "src" / "a11y_stem" / "pipeline" / "vendor"
+    vendor = ROOT / "src" / "readablestem" / "pipeline" / "vendor"
     head = (vendor / "rapid_table.py").read_text().splitlines()[:20]
     assert any("Licensed under the Apache License, Version 2.0" in line for line in head)
     assert any("PaddlePaddle Authors" in line for line in head)

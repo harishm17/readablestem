@@ -10,8 +10,8 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval.equations import canonical, score_latex
-from a11y_stem.eval.render import clean_mathml
+from readablestem.eval.equations import canonical, score_latex
+from readablestem.eval.render import clean_mathml
 
 GOLD = Path(__file__).resolve().parents[1] / "data" / "gold"
 NS = 'xmlns="http://www.w3.org/1998/Math/MathML"'

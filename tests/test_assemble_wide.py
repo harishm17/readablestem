@@ -15,14 +15,14 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
-from a11y_stem.pipeline.assemble import (
+from readablestem.core.types import Element, EquationFix, Fix, Kind, Status, inline_marker
+from readablestem.pipeline.assemble import (
     WIDE_EQUATION_EM,
     estimate_width_em,
     render_html,
     sanitize_mathml,
 )
-from a11y_stem.pipeline.html_checks import axe_checks, static_checks
+from readablestem.pipeline.html_checks import axe_checks, static_checks
 
 GOLD = Path(__file__).resolve().parents[1] / "data" / "gold" / "openstax"
 SHORT = "<math><mi>v</mi><mo>=</mo><mfrac><mi>d</mi><mi>t</mi></mfrac></math>"

@@ -109,7 +109,7 @@ def test_dockerfile_builds_a_locked_non_root_image():
     assert text.count("uv sync --locked --no-dev --no-editable") == 2
     assert "--group" not in text and "--all-groups" not in text  # no browser group
     assert "USER 10001:10001" in text
-    assert 'CMD ["a11y-stem", "serve", "--host", "0.0.0.0", "--port", "8080"]' in text
+    assert 'CMD ["readablestem", "serve", "--host", "0.0.0.0", "--port", "8080"]' in text
     assert "EXPOSE 8080" in text
 
 

@@ -9,8 +9,8 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval import prose_classes as pc
-from a11y_stem.eval.gold_scoring import iter_gold_records
+from readablestem.eval import prose_classes as pc
+from readablestem.eval.gold_scoring import iter_gold_records
 
 DEV = Path(__file__).parent.parent / "data" / "dev-v2" / "dev"
 

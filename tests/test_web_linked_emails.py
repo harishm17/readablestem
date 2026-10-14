@@ -6,11 +6,11 @@ from __future__ import annotations
 import pytest
 from sqlalchemy import select
 
-from a11y_stem.cli.main import main
-from a11y_stem.web import linked_emails
-from a11y_stem.web.auth import set_allowed
-from a11y_stem.web.db import User, session_scope
 from fixtures.web.support import ADMIN, ALICE, BOB, WebEnv, csrf_from, login
+from readablestem.cli.main import main
+from readablestem.web import linked_emails
+from readablestem.web.auth import set_allowed
+from readablestem.web.db import User, session_scope
 
 PERSONAL = "alice.personal@gmail.com"
 
@@ -209,7 +209,7 @@ def test_the_command_line_links_and_unlinks(tmp_path, monkeypatch, capsys):
     monkeypatch.chdir(tmp_path)
     monkeypatch.setenv("DATABASE_URL", f"sqlite:///{tmp_path}/cli.db")
     monkeypatch.setenv("ENV", "dev")
-    from a11y_stem.config import get_settings
+    from readablestem.config import get_settings
 
     get_settings.cache_clear()
     try:

@@ -11,12 +11,12 @@ import pymupdf
 import pytest
 from latex2mathml.converter import convert
 
-from a11y_stem import models
-from a11y_stem.cli import convert as convert_cli
-from a11y_stem.cli.main import build_parser, main
-from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import JobBudget
-from a11y_stem.core.types import (
+from readablestem import models
+from readablestem.cli import convert as convert_cli
+from readablestem.cli.main import build_parser, main
+from readablestem.config import ConfigError, Settings
+from readablestem.core.budget import JobBudget
+from readablestem.core.types import (
     Check,
     Element,
     EquationFix,
@@ -25,11 +25,11 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.models.pricing import UnknownModelError
-from a11y_stem.pipeline import equation_step, figure_step, heading_step, html_checks, layout
-from a11y_stem.pipeline.layout import Layout, LayoutError
+from readablestem.models.base import VisionRequest
+from readablestem.models.fake import FakeVisionClient
+from readablestem.models.pricing import UnknownModelError
+from readablestem.pipeline import equation_step, figure_step, heading_step, html_checks, layout
+from readablestem.pipeline.layout import Layout, LayoutError
 
 TITLE = "Private lecture notes on kinematics"
 PARAGRAPH = "Confidential paragraph text from the instructor."
@@ -153,7 +153,7 @@ def test_convert_with_fake_writes_html_report_and_a_content_free_summary(
     assert html.count('<math display="block">') == 2
     # Placeholder answers must not pass for a conversion: the file says so first.
     assert html.index(convert_cli.FAKE_NOTICE) < html.index(PARAGRAPH)
-    assert '<main>\n<p class="notice a11y-stem" role="note">' in html
+    assert '<main>\n<p class="notice readablestem" role="note">' in html
 
     data = json.loads(report.read_text(encoding="utf-8"))
     assert set(data) == {"result", "checks", "axe"}
@@ -250,7 +250,7 @@ def test_a_small_run_cap_suggests_fewer_steps_at_once(pdf, tmp_path, pipeline, m
 
 
 def test_concurrency_is_passed_to_the_pipeline(pdf, tmp_path, pipeline, monkeypatch):
-    from a11y_stem.pipeline import run as run_module
+    from readablestem.pipeline import run as run_module
 
     seen: list[int] = []
     real = run_module.convert_pdf

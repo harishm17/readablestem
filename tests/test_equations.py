@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.eval.equations import (
+from readablestem.eval.equations import (
     MathMLError,
     canonical,
     latex_to_mathml,

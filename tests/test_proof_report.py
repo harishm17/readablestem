@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.proof.report import (
+from readablestem.proof.report import (
     Section,
     Table,
     bullets,
@@ -71,6 +71,6 @@ def test_plain_words_and_quoted_blocks_pass():
 
 
 def test_the_fixed_disclaimer_passes_its_own_guard():
-    from a11y_stem.proof.document import DISCLAIMER
+    from readablestem.proof.document import DISCLAIMER
 
     assert wording_problems(DISCLAIMER) == []

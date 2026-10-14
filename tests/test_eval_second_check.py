@@ -6,11 +6,11 @@ from __future__ import annotations
 
 import pytest
 
-from a11y_stem.core.types import Fix, Kind, Status, Verification
-from a11y_stem.eval import pipeline_eval as pe
-from a11y_stem.eval import verifier_metrics as vm
-from a11y_stem.models.fake import FakeVisionClient, image_key
-from a11y_stem.models.verifier import EQUATION_VERSION, FIGURE_VERSION, FakeVerifier
+from readablestem.core.types import Fix, Kind, Status, Verification
+from readablestem.eval import pipeline_eval as pe
+from readablestem.eval import verifier_metrics as vm
+from readablestem.models.fake import FakeVisionClient, image_key
+from readablestem.models.verifier import EQUATION_VERSION, FIGURE_VERSION, FakeVerifier
 from test_eval_support import (
     EQ_A,
     EQ_F,

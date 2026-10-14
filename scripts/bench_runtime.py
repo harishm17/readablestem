@@ -69,7 +69,7 @@ def latency_client(
 ):
     """The offline client, answering after `latency_s` seconds (+/-30%, a fixed pattern);
     `on_start` and `on_end` are called around every request."""
-    from a11y_stem.models import OFFLINE_DEFAULTS, FakeVisionClient
+    from readablestem.models import OFFLINE_DEFAULTS, FakeVisionClient
 
     pattern = (0.7, 1.3, 1.0, 0.85, 1.15, 1.0, 0.9, 1.1)
     counter = iter(range(10**9))
@@ -92,7 +92,7 @@ def latency_client(
 
 
 def settings(**kw: Any):
-    from a11y_stem.config import Settings
+    from readablestem.config import Settings
 
     return Settings(_env_file=None, fake_models=True, max_pages_per_job=60, **kw)  # type: ignore[call-arg]
 
@@ -127,8 +127,8 @@ class Marks:
 
 
 def run_convert(pdf: bytes, *, latency: float, concurrency: int) -> dict[str, Any]:
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.pipeline import layout, run
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.pipeline import layout, run
 
     marks = Marks()
     budget = JobBudget(InMemorySpendGuard(1000.0), max_usd=1000.0, max_calls=100000)
@@ -170,7 +170,7 @@ def run_convert(pdf: bytes, *, latency: float, concurrency: int) -> dict[str, An
 
 
 def cmd_convert(args: argparse.Namespace) -> None:
-    from a11y_stem.pipeline import layout
+    from readablestem.pipeline import layout
 
     pdf = corpus_pdf(args.pages)
     layout.analyze(pdf, max_pages=args.pages)  # warm up: the table model is loaded once
@@ -202,11 +202,11 @@ def web_site(tmp: Path, **overrides: Any):
     sys.path.insert(0, str(ROOT / "tests"))
     from fastapi.testclient import TestClient
 
-    from a11y_stem.models import make_vision_client
-    from a11y_stem.web.app import create_app
-    from a11y_stem.web.auth import set_allowed
-    from a11y_stem.web.db import session_scope
     from fixtures.web.support import ALICE, login, make_settings
+    from readablestem.models import make_vision_client
+    from readablestem.web.app import create_app
+    from readablestem.web.auth import set_allowed
+    from readablestem.web.db import session_scope
 
     cfg = make_settings(tmp, max_pages_per_job=60, max_upload_mb=20, per_user_daily_page_quota=500)
     cfg = cfg.model_copy(update=overrides)
@@ -221,8 +221,8 @@ def web_site(tmp: Path, **overrides: Any):
 
 def convert_in_site(ctx: Any, browser: Any, pdf: bytes) -> str:
     sys.path.insert(0, str(ROOT / "tests"))
-    from a11y_stem.web.worker import Worker
     from fixtures.web.support import job_id_from, upload
+    from readablestem.web.worker import Worker
 
     job_id = job_id_from(upload(browser, pdf, filename="bench.pdf"))
     worker = Worker(
@@ -236,9 +236,9 @@ def cmd_review(args: argparse.Namespace) -> None:
     import tempfile
 
     sys.path.insert(0, str(ROOT / "tests"))
-    from a11y_stem.pipeline import figure_images
-    from a11y_stem.web.db import Job, session_scope
     from fixtures.web.support import csrf_from
+    from readablestem.pipeline import figure_images
+    from readablestem.web.db import Job, session_scope
 
     encodes = [0]
     inner = figure_images._student_image if hasattr(figure_images, "_student_image") else None
@@ -318,8 +318,8 @@ def cmd_static(args: argparse.Namespace) -> None:
     sys.path.insert(0, str(ROOT / "tests"))
     from fastapi.testclient import TestClient
 
-    from a11y_stem.web.app import create_app
     from fixtures.web.support import make_settings
+    from readablestem.web.app import create_app
 
     with tempfile.TemporaryDirectory() as tmp:
         app = create_app(make_settings(Path(tmp)))
@@ -376,8 +376,8 @@ def cmd_static(args: argparse.Namespace) -> None:
 
 def cmd_sections(args: argparse.Namespace) -> None:
     """The document task over several sections, one after the other and together."""
-    from a11y_stem.eval import pipeline_eval as pe
-    from a11y_stem.pipeline import layout
+    from readablestem.eval import pipeline_eval as pe
+    from readablestem.pipeline import layout
 
     pdfs = [corpus_pdf(args.pages) for _ in range(args.sections)]
     units = [
@@ -432,10 +432,10 @@ def cmd_documents(args: argparse.Namespace) -> None:
     from sqlalchemy import create_engine, text
     from sqlalchemy.engine import make_url
 
-    from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.pipeline import run
-    from a11y_stem.web import db, documents
-    from a11y_stem.web.db import Job, User, session_scope, utcnow
+    from readablestem.core.budget import InMemorySpendGuard, JobBudget
+    from readablestem.pipeline import run
+    from readablestem.web import db, documents
+    from readablestem.web.db import Job, User, session_scope, utcnow
 
     budget = JobBudget(InMemorySpendGuard(1000.0), max_usd=1000.0, max_calls=100000)
     output = run.convert_pdf(
@@ -547,10 +547,10 @@ def cmd_spend(args: argparse.Namespace) -> None:
     sys.path.insert(0, str(ROOT / "tests"))
     from sqlalchemy import select
 
-    from a11y_stem.models.base import VisionRequest
-    from a11y_stem.models.fake import FakeVisionClient
-    from a11y_stem.web.db import Blob, Job, User, session_scope, utcnow
     from fixtures.web.support import ALICE, WebEnv, fake_output
+    from readablestem.models.base import VisionRequest
+    from readablestem.models.fake import FakeVisionClient
+    from readablestem.web.db import Blob, Job, User, session_scope, utcnow
 
     class Out(__import__("pydantic").BaseModel):
         latex: str
@@ -622,7 +622,7 @@ def cmd_first(args: argparse.Namespace) -> None:
     import subprocess
 
     if args.child:
-        from a11y_stem.pipeline import tables
+        from readablestem.pipeline import tables
 
         pdf = corpus_pdf(args.pages)
         loading = 0.0

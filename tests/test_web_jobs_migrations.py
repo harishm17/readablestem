@@ -13,8 +13,8 @@ from alembic.runtime.migration import MigrationContext
 from alembic.script import ScriptDirectory
 from sqlalchemy import create_engine, inspect, text
 
-from a11y_stem.web import db
-from a11y_stem.web.database import alembic_config
+from readablestem.web import db
+from readablestem.web.database import alembic_config
 from test_web_migrations import INSERT_JOB, INSERT_USER, migrate, upgrade
 
 STALE = "c4a7e9b05d18"

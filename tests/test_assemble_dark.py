@@ -14,7 +14,7 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     ColourRun,
     Element,
     EquationFix,
@@ -22,9 +22,9 @@ from a11y_stem.core.types import (
     Kind,
     Status,
 )
-from a11y_stem.pipeline import assemble, assemble_tables, contrast, html_checks, inline_text
-from a11y_stem.pipeline.assemble import STYLE, render_html
-from a11y_stem.pipeline.html_checks import split_dark_css, static_checks
+from readablestem.pipeline import assemble, assemble_tables, contrast, html_checks, inline_text
+from readablestem.pipeline.assemble import STYLE, render_html
+from readablestem.pipeline.html_checks import split_dark_css, static_checks
 
 GOLDEN = Path(__file__).parent / "fixtures" / "assemble" / "golden"
 HEX = re.compile(r"#([0-9a-f]{6})\b")

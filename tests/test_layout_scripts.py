@@ -11,8 +11,8 @@ from pathlib import Path
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import Element, Kind, Notice
-from a11y_stem.pipeline import layout
+from readablestem.core.types import Element, Kind, Notice
+from readablestem.pipeline import layout
 
 REPO = Path(__file__).resolve().parents[1]
 BODY = 11.0

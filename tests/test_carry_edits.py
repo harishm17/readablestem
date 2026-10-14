@@ -12,15 +12,15 @@ those onto an item whose words, picture or page changed.
 
 from __future__ import annotations
 
-from a11y_stem.core.types import (
+from fixtures.web.review_doc import review_output
+from readablestem.core.types import (
     DocumentResult,
     EquationFix,
     Fix,
     Kind,
     Status,
 )
-from a11y_stem.web import carry, carry_edits, page_edits, review
-from fixtures.web.review_doc import review_output
+from readablestem.web import carry, carry_edits, page_edits, review
 
 PARAGRAPH = "p1-e1"  # "A rigid body turning with angular velocity ⟦p1-e2⟧ moves a point ..."
 PLAIN = "p1-e4"  # "Discuss vectors and scalars with the class."

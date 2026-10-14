@@ -11,7 +11,7 @@ import logging
 import pymupdf
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     DocumentResult,
     DocumentStats,
     Element,
@@ -20,10 +20,10 @@ from a11y_stem.core.types import (
     Notice,
     inline_marker,
 )
-from a11y_stem.pipeline import language, text_pass
-from a11y_stem.pipeline.assemble import render_html
-from a11y_stem.pipeline.layout import Glyph
-from a11y_stem.pipeline.text_pass import (
+from readablestem.pipeline import language, text_pass
+from readablestem.pipeline.assemble import render_html
+from readablestem.pipeline.layout import Glyph
+from readablestem.pipeline.text_pass import (
     PdfLink,
     PdfText,
     align,

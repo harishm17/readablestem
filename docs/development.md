@@ -70,16 +70,16 @@ mean anything).
 
 | Path | Contents |
 |---|---|
-| `src/a11y_stem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
-| `src/a11y_stem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
-| `src/a11y_stem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
-| `src/a11y_stem/eval/ted.py` | Zhang-Shasha tree edit distance |
-| `src/a11y_stem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
-| `src/a11y_stem/pipeline/parse.py` | the quick line-level view behind `a11y-stem parse` (a debugging aid) and `equation_score`, which the layout step reuses |
-| `src/a11y_stem/pipeline/` | the conversion pipeline (layout, steps, assemble, run); see docs/layout.md, docs/steps.md, docs/tables.md, docs/output.md |
-| `src/a11y_stem/web/`, `src/a11y_stem/ops/` | the hosted app and its cron, retention and reports; see docs/web.md, docs/operations.md |
-| `src/a11y_stem/cli/main.py` | `a11y-stem` command |
-| `src/a11y_stem/proof/`, `proof/` | the one-command reproduction: code, proof sets, recorded runs; see docs/proof.md |
+| `src/readablestem/gold/openstax.py` | OpenStax fetcher: book lookup, CC BY gate, page selection, extraction, JSONL + manifest |
+| `src/readablestem/gold/heldout.py` | the pre-registered held-out set: 15 sections, registered hashes, pinned fetch, `verify_gold` (see docs/eval.md) |
+| `src/readablestem/eval/equations.py` | MathML normalisation, exact match (strict/lenient), TEDS, LaTeX -> MathML |
+| `src/readablestem/eval/ted.py` | Zhang-Shasha tree edit distance |
+| `src/readablestem/eval/gold_scoring.py` | Scores a predictions JSONL against the gold set |
+| `src/readablestem/pipeline/parse.py` | the quick line-level view behind `a11y-stem parse` (a debugging aid) and `equation_score`, which the layout step reuses |
+| `src/readablestem/pipeline/` | the conversion pipeline (layout, steps, assemble, run); see docs/layout.md, docs/steps.md, docs/tables.md, docs/output.md |
+| `src/readablestem/web/`, `src/readablestem/ops/` | the hosted app and its cron, retention and reports; see docs/web.md, docs/operations.md |
+| `src/readablestem/cli/main.py` | `a11y-stem` command |
+| `src/readablestem/proof/`, `proof/` | the one-command reproduction: code, proof sets, recorded runs; see docs/proof.md |
 | `data/gold/` | Committed sample gold set, `manifest.json`, `ATTRIBUTION.md` |
 | `docs/decisions/` | Architecture decision records |
 | `private-inputs/` | **Git-ignored.** Your own course PDFs and any outputs from them |

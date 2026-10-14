@@ -12,10 +12,10 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.eval.invented import pool, read, score, text
+from readablestem.eval.invented import pool, read, score, text
 
 ROOT = Path(__file__).resolve().parents[1]
-DEMO = ROOT / "src" / "a11y_stem" / "web" / "static" / "demo"
+DEMO = ROOT / "src" / "readablestem" / "web" / "static" / "demo"
 GOLD = ROOT / "data" / "gold"
 
 

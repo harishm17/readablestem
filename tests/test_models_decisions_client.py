@@ -16,9 +16,9 @@ import httpx2
 import openai
 import pytest
 
-from a11y_stem.config import ConfigError, Settings
-from a11y_stem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget, Reservation
-from a11y_stem.models.decisions_client import (
+from readablestem.config import ConfigError, Settings
+from readablestem.core.budget import BudgetExceeded, InMemorySpendGuard, JobBudget, Reservation
+from readablestem.models.decisions_client import (
     Choice,
     DecisionRequest,
     DecisionsClient,
@@ -27,8 +27,8 @@ from a11y_stem.models.decisions_client import (
     TextPart,
     parse_answers,
 )
-from a11y_stem.models.openai_client import PNG_SIGNATURE
-from a11y_stem.models.pricing import (
+from readablestem.models.openai_client import PNG_SIGNATURE
+from readablestem.models.pricing import (
     DECISIONS_LONG_CONTEXT_TOKENS,
     MAX_IMAGE_TOKENS,
     UnknownModelError,
@@ -296,7 +296,7 @@ def test_http_errors_are_outcomes_charged_nothing_and_never_logged_with_content(
         return httpx2.Response(400, json={"error": error}, headers={"x-request-id": "req_e1"})
 
     client, budget, _ = make(reply)
-    with caplog.at_level(logging.DEBUG, logger="a11y_stem"):
+    with caplog.at_level(logging.DEBUG, logger="readablestem"):
         result = client.decide(request())
     assert result.outcome == "api_error" and result.answers == {}
     assert result.cost_usd == 0 and budget.spent_usd == 0 and len(budget.reserved) == 1

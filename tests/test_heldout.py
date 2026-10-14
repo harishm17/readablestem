@@ -18,13 +18,13 @@ from typing import ClassVar
 import pymupdf
 import pytest
 
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli import heldout as heldout_cli
-from a11y_stem.cli.main import build_parser, main
-from a11y_stem.config import Settings
-from a11y_stem.eval import pipeline_eval, render
-from a11y_stem.gold import heldout, openstax
-from a11y_stem.gold.heldout import (
+from readablestem.cli import eval_cli
+from readablestem.cli import heldout as heldout_cli
+from readablestem.cli.main import build_parser, main
+from readablestem.config import Settings
+from readablestem.eval import pipeline_eval, render
+from readablestem.gold import heldout, openstax
+from readablestem.gold.heldout import (
     REGISTERED,
     HeldoutError,
     Registration,
@@ -35,9 +35,9 @@ from a11y_stem.gold.heldout import (
     require_gold,
     verify_gold,
 )
-from a11y_stem.gold.openstax import BookPin, BookStateError, GoldError, fetch_gold
-from a11y_stem.models.fake import FakeVisionClient
-from a11y_stem.pipeline import equation_step
+from readablestem.gold.openstax import BookPin, BookStateError, GoldError, fetch_gold
+from readablestem.models.fake import FakeVisionClient
+from readablestem.pipeline import equation_step
 from test_eval_support import EQ_A, EQ_V, EQ_X, FakeMedia, equation, fake_transcribe, write_gold
 from test_openstax import ARCHIVE as CURRENT_ARCHIVE
 from test_openstax import CC_BY, FIXTURE, TREE
@@ -530,7 +530,7 @@ def eval_set(monkeypatch, tmp_path):
     )
     monkeypatch.setattr(heldout, "REGISTERED", registration)
     monkeypatch.setattr(eval_cli, "_settings", lambda: Settings(_env_file=None, openai_api_key="k"))
-    from a11y_stem.models import openai_client
+    from readablestem.models import openai_client
 
     monkeypatch.setattr(openai_client, "OpenAIVisionClient", StubClient)
     Media.built = []
@@ -760,11 +760,23 @@ def test_render_all_and_out_dir_need_the_set(printed, capsys):
 
 def test_default_folder_follows_xdg_cache_home(monkeypatch, tmp_path):
     monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
-    assert heldout_cli.default_root() == tmp_path / "a11y-stem" / "heldout"
+    assert heldout_cli.default_root() == tmp_path / "readablestem" / "heldout"
     loc = heldout_cli.locations(None)
-    assert loc.gold == tmp_path / "a11y-stem" / "heldout" / "gold"
+    assert loc.gold == tmp_path / "readablestem" / "heldout" / "gold"
     monkeypatch.delenv("XDG_CACHE_HOME")
-    assert heldout_cli.default_root() == Path.home() / ".cache" / "a11y-stem" / "heldout"
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    assert heldout_cli.default_root() == tmp_path / "home" / ".cache" / "readablestem" / "heldout"
+
+
+def test_a_cache_folder_under_the_old_name_is_still_used_while_it_is_the_only_one(
+    monkeypatch, tmp_path
+):
+    monkeypatch.setenv("XDG_CACHE_HOME", str(tmp_path))
+    old = tmp_path / "a11y-stem" / "heldout"
+    old.mkdir(parents=True)
+    assert heldout_cli.default_root() == old
+    (tmp_path / "readablestem" / "heldout").mkdir(parents=True)
+    assert heldout_cli.default_root() == tmp_path / "readablestem" / "heldout"
 
 
 def test_inside_the_repository_means_the_checkout_this_runs_in(monkeypatch, tmp_path):

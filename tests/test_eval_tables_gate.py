@@ -9,13 +9,13 @@ from pathlib import Path
 
 import pytest
 
-from a11y_stem.cli import eval_cli
-from a11y_stem.cli import main as cli_main
-from a11y_stem.cli.main import build_parser, main
-from a11y_stem.eval import gate
-from a11y_stem.eval import tables as T
-from a11y_stem.eval.gate import DEFAULT_FLOORS, DEFAULT_TOLERANCES, GateRefused
-from a11y_stem.pipeline import layout
+from readablestem.cli import eval_cli
+from readablestem.cli import main as cli_main
+from readablestem.cli.main import build_parser, main
+from readablestem.eval import gate
+from readablestem.eval import tables as T
+from readablestem.eval.gate import DEFAULT_FLOORS, DEFAULT_TOLERANCES, GateRefused
+from readablestem.pipeline import layout
 from test_eval_support import settings
 
 
@@ -270,7 +270,7 @@ def test_gold_fetch_set_tables_fetches_the_13_pages_table_records_only(tmp_path,
             },
         )(), []
 
-    monkeypatch.setattr("a11y_stem.gold.openstax.fetch_gold", fake_fetch)
+    monkeypatch.setattr("readablestem.gold.openstax.fetch_gold", fake_fetch)
     argv = ["gold", "fetch", "--set", "tables", "--out", str(tmp_path), "--date", "2026-10-08"]
     assert main(argv) == 0
     assert [c[0] for c in calls] == ["physics", "statistics"]

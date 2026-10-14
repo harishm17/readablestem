@@ -8,10 +8,10 @@ import pytest
 from PIL import Image
 from pydantic import BaseModel
 
-from a11y_stem.core.types import Check, ModelCall
-from a11y_stem.models.base import VisionRequest
-from a11y_stem.proof import replay
-from a11y_stem.proof.replay import AnswerSet, AnswerStore, ReplayClient
+from readablestem.core.types import Check, ModelCall
+from readablestem.models.base import VisionRequest
+from readablestem.proof import replay
+from readablestem.proof.replay import AnswerSet, AnswerStore, ReplayClient
 
 
 class Answer(BaseModel):

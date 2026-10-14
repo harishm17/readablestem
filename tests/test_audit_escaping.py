@@ -15,7 +15,7 @@ from html.parser import HTMLParser
 
 import pytest
 
-from a11y_stem.core.types import (
+from readablestem.core.types import (
     Element,
     EquationFix,
     FigureFix,
@@ -28,7 +28,7 @@ from a11y_stem.core.types import (
     TableFix,
     TableGrid,
 )
-from a11y_stem.pipeline.assemble import render_html, sanitize_mathml
+from readablestem.pipeline.assemble import render_html, sanitize_mathml
 
 BREAKOUT = '"><script>alert(1)</script><img src=x onerror=alert(2)><svg onload=alert(3)>'
 PAYLOADS = [
@@ -294,7 +294,7 @@ HOSTILE_LATEX = [
 
 @pytest.mark.parametrize("latex", HOSTILE_LATEX)
 def test_hostile_latex_is_refused_or_becomes_inert_mathml(latex):
-    from a11y_stem.pipeline import validate
+    from readablestem.pipeline import validate
 
     validate.check_latex(latex)  # must not raise on any input
     try:

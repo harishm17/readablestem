@@ -3,9 +3,9 @@ The package itself is tested in test_export_cartridge.py."""
 
 from __future__ import annotations
 
-from a11y_stem.pipeline import export_cartridge
-from a11y_stem.web.security import VIEW_CSP
 from fixtures.web.support import BOB, job_id_from, login, make_pdf, upload
+from readablestem.pipeline import export_cartridge
+from readablestem.web.security import VIEW_CSP
 from test_web_canvas_download import finished_job, folder_of, ready_job, web, zip_of  # noqa: F401
 
 
