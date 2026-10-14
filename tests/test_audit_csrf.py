@@ -7,9 +7,11 @@ classification, so a new state-changing route cannot skip these checks.
 from __future__ import annotations
 
 import json
+from datetime import timedelta
 
 from sqlalchemy import select
 
+from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Course, CourseNotation, Job, ReviewEdit, User, session_scope
 from fixtures.web.support import ALICE, WebEnv, csrf_from, login, make_pdf
 from test_audit_authz import CRON, ROUTES, fill, site  # noqa: F401  (site is a fixture)
@@ -21,12 +23,14 @@ STATE_CHANGING = [
 ]
 
 
-def snapshot(env) -> dict:
-    """Everything a forged request could change that the owner would notice."""
+def snapshot(env, *, clock: bool = True) -> dict:
+    """Everything a forged request could change that the owner would notice. `clock` False
+    leaves out the deletion time (a download restarts it: `retention.restart_clock`)."""
     with session_scope(env.ctx.factory) as session:
         return {
             "jobs": sorted(
-                (j.id, j.status, j.result_version, j.course_id, j.retain_until.isoformat())
+                (j.id, j.status, j.result_version, j.course_id)
+                + ((j.retain_until.isoformat(),) if clock else ())
                 for j in session.scalars(select(Job))
             ),
             "courses": sorted((c.id, c.name) for c in session.scalars(select(Course))),
@@ -39,6 +43,11 @@ def snapshot(env) -> dict:
                 for u in session.scalars(select(User))
             ),
         }
+
+
+def deletion_times(env) -> dict:
+    with session_scope(env.ctx.factory) as session:
+        return {j.id: as_utc(j.retain_until) for j in session.scalars(select(Job))}
 
 
 def forged_attempts(env, path: str):
@@ -88,14 +97,19 @@ def test_the_upload_refuses_a_forged_token_after_reading_nothing_it_keeps(site):
 
 def test_get_requests_change_nothing(site):  # noqa: F811
     """GET is not protected by the token, so no GET may change what a person would notice."""
-    before = snapshot(site)
+    before = snapshot(site, clock=False)
+    kept_until = deletion_times(site)
     for (method, template), who in ROUTES.items():
         if method != "GET" or who not in {"user", "public"}:
             continue
         site.alice.get(fill(site, template))
     for path in ("/jobs/{job_id}/delete", "/courses/{course_id}/delete"):
         assert site.alice.get(fill(site, path)).status_code == 200  # asks first
-    assert snapshot(site) == before
+    assert snapshot(site, clock=False) == before
+    # The one thing a GET may do: a download is activity, so it restarts the deletion
+    # clock of a document (T1-8). Never earlier, and never by more than the new window.
+    for job_id, later in deletion_times(site).items():
+        assert kept_until[job_id] <= later <= kept_until[job_id] + timedelta(minutes=5), job_id
 
 
 def test_a_token_from_before_signing_in_is_worthless_afterwards(tmp_path):

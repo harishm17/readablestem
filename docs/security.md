@@ -65,10 +65,19 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/login` (GET, POST), `/login/microsoft`, `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner only | `/app`, `/app/documents`, `POST /jobs`, everything under `/jobs/{id}/...`, everything under `/courses/...` |
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove` |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
+
+The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, are owner-only
+and CSRF-checked like every other write on a job. They are not rate limited: each costs one
+re-render of the person's own document (the same as a review decision or a language change,
+which are not limited either), the body limit applies, and the number of documents a person
+can hold is capped. `/jobs/{id}/download/canvas` is a GET for the owner, like `/download`. A
+download restarts the deletion clock of the person's own document (`retention.restart_clock`),
+which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
+other change.
 
 Every route that takes a job, course or entry id loads it through one owner check
 (`owned_job`, `notation.owned_course`). A stranger gets the **same** 404 as for an id that does

@@ -29,6 +29,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/help/posting"): PUBLIC,
     ("GET", "/status"): PUBLIC,
     ("GET", "/healthz"): PUBLIC,
+    ("GET", "/readyz"): PUBLIC,  # is the database reachable; no document data
     ("GET", "/login"): PUBLIC,
     ("POST", "/login"): PUBLIC,
     ("POST", "/login/microsoft"): PUBLIC,
@@ -60,9 +61,12 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/jobs/{job_id}/delete"): USER,
     ("POST", "/jobs/{job_id}/delete"): USER,
     ("GET", "/jobs/{job_id}/download"): USER,
+    ("GET", "/jobs/{job_id}/download/canvas"): USER,  # the same file, packaged for Canvas
     ("GET", "/jobs/{job_id}/draft"): USER,
     ("GET", "/jobs/{job_id}/feedback"): USER,
     ("POST", "/jobs/{job_id}/feedback"): USER,
+    ("POST", "/jobs/{job_id}/contact"): USER,  # T1-17: CSRF, owner only, not rate limited
+    ("POST", "/jobs/{job_id}/keep"): USER,  # T1-8: CSRF, owner only, per-person kept cap
     ("POST", "/jobs/{job_id}/language"): USER,
     ("GET", "/jobs/{job_id}/pages/{number}.png"): USER,
     ("GET", "/jobs/{job_id}/progress"): USER,
@@ -73,6 +77,7 @@ ROUTES: dict[tuple[str, str], str] = {
     ("POST", "/jobs/{job_id}/review/{element_id}"): USER,
     ("POST", "/jobs/{job_id}/review/{element_id}/check"): USER,
     ("GET", "/jobs/{job_id}/status"): USER,
+    ("POST", "/jobs/{job_id}/title"): USER,  # T1-7: CSRF, owner only, not rate limited
     ("POST", "/jobs/{job_id}/undo"): USER,
     ("GET", "/jobs/{job_id}/view"): USER,
 }

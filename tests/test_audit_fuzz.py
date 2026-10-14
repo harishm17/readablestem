@@ -36,7 +36,13 @@ FIELDS = [
     "result_version", "bulk", "ids", "csrf_token", "remove_data_table", "text", "caption",
 ]  # fmt: skip
 
-SKIP = {("POST", "/jobs"), ("POST", "/internal/cron/aggregate-and-purge")}
+# /readyz answers 503 on purpose when the worker or the provider is not set up (as in these
+# tests); it reads no parameter, and its own tests cover it (test_web_health.py).
+SKIP = {
+    ("POST", "/jobs"),
+    ("POST", "/internal/cron/aggregate-and-purge"),
+    ("GET", "/readyz"),
+}
 
 
 def test_no_route_answers_junk_with_a_server_error(site):  # noqa: F811
