@@ -69,11 +69,11 @@ def main() -> int:
         if "retainedBackups" in fmt:
             print(backups.read_text() if backups.exists() else "7")
         elif "connectionName" in fmt:
-            print("proj:us-central1:a11y-stem-db")
+            print("proj:us-central1:readablestem-db")
         elif "projectNumber" in fmt:
             print("123456789")
         elif "status.url" in fmt:
-            print("https://a11y-stem-abc123-uc.a.run.app")
+            print("https://readablestem-abc123-uc.a.run.app")
         elif resource_key(words, "describe") not in have:
             return 1
     elif words[:3] == ["monitoring", "policies", "list"]:  # alert policies, by display name

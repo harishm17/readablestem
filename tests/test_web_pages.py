@@ -127,7 +127,7 @@ def test_page_titles_are_unique(pages):
     titles = {name: Page(html).title.strip() for name, html in pages.items()}
     distinct = {t for name, t in titles.items() if name != "/jobs/{id} queued"}
     assert len(distinct) == len(titles) - 1, titles
-    assert all(t.endswith("| a11y-stem") for t in titles.values())
+    assert all(t.endswith("| ReadableSTEM") for t in titles.values())
 
 
 def test_landing_page_says_assists_and_links_the_demo(pages):
@@ -273,7 +273,7 @@ def test_committed_demo_is_real_output_and_served_sandboxed(tmp_path):
 
     demo = pages_module.DEMO_PAGE
     if not demo.is_file():
-        pytest.skip("no demo built (a11y-stem demo build)")
+        pytest.skip("no demo built (readablestem demo build)")
     text = demo.read_text(encoding="utf-8")
     assert 'data-readablestem-demo="placeholder"' not in text  # built with the real models
     assert "openstax.org" in text and "CC BY" in text  # attribution travels with it
