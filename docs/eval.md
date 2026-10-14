@@ -463,7 +463,9 @@ well above one main-model reservation (the actual cost of a call is far less; a 
 equation crop costs a fraction of a cent on haiku). `eval promote` refuses a Claude report
 unless `--out-dir` is given, so it cannot replace the OpenAI baselines the CI gate reads;
 `eval gate` between a Claude and an OpenAI report prints the differences and notes that
-`models` and `client` changed.
+`models` and `client` changed. The figure judge of `eval pipeline` is the run's main model,
+so it is Claude too; the `eval invented judge` command and the registered chatbot arms stay
+on OpenAI (their code is part of the pre-registered fingerprint in `PROOF.md`).
 
 ```
 uv run a11y-stem eval pipeline --task equations --provider anthropic --limit 10 --max-usd 1.00 --out .local/eval/equations-claude.json
