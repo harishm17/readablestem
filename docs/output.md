@@ -270,9 +270,21 @@ that overflows is a tab stop, that arrow keys scroll it, and axe.
 ## Flagged items
 
 Anything the pipeline could not convert keeps the original crop. Sighted readers lose
-nothing, and screen reader users hear a fixed, honest alt text ("Equation not converted",
-"Figure without a description") and a note, instead of a guess read aloud as if it were
-right.
+nothing, and screen reader users hear a fixed, honest alt text ("Figure without a
+description") and a note, instead of a guess read aloud as if it were right.
+
+An equation kept as an image (`assemble.equation_alt`) has the text the PDF holds for its
+region as alt text, with a marker that says where it comes from and that nobody has checked
+it: `6.0 m/s, read from the PDF text; not checked`, or `Equation (2.4): v = d / t, read from
+the PDF text; not checked` when it has a number. Where layout saw fractions, roots,
+exponents or several lines in the region, the marker adds that the text may run them
+together (`v2 = v20 + 2ad` for v squared = v0 squared + 2ad), because the flat text layer
+loses their order and size; an inline equation's exponents are not always known, so
+`g = 9.8 m/s2` can be one. Without usable text (none, no letter or digit, or more than 200
+characters) the alt text is `Equation (2.4), not converted` (the number as printed) or
+`Equation not converted`. Nothing is written that the PDF does not hold. The visible note
+and label are unchanged. In a document in another language the alt text is marked
+`lang="en"`, as the other fixed words are.
 
 - The flag is a dashed border **and** a text label, never colour alone (WCAG 1.4.1). The
   border survives forced-colours mode and printing.
