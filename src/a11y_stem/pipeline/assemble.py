@@ -1091,6 +1091,9 @@ pre { margin: 0 0 1em; padding: 0.75em 1em; background: #f3f3f3; border: 1px sol
   border-radius: 4px; overflow-x: auto; }
 pre code { font: 0.9rem/1.45 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
   white-space: pre; }
+@media screen and (prefers-color-scheme: dark) {
+  pre { background: #1f1f1f; border-color: #767676; }
+}
 """
 DEFINITIONS_CSS = """\
 dl { margin: 0 0 1em; }
@@ -1099,7 +1102,7 @@ dd { margin: 0.1em 0 0 1.5em; }
 """
 
 STYLE = """\
-:root { color-scheme: light; }
+:root { color-scheme: light dark; }
 body { margin: 0; background: #ffffff; color: #1b1b1b;
   font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
 main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
@@ -1141,6 +1144,13 @@ figcaption { margin-top: 0.5em; }
 .about-title { font-size: 1.5em; font-weight: 700; line-height: 1.25; margin: 1.6em 0 0.5em; }
 :focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
 @media print { .flagged { break-inside: avoid; } }
+@media screen and (prefers-color-scheme: dark) {
+  body { background: #121212; color: #ececec; }
+  .flagged, .notice, .flagged-inline { border-color: #ffa066; }
+  .about { border-top-color: #ececec; }
+  :focus-visible { outline-color: #8ab4f8; }
+  img { outline: 1px solid #8c8c8c; outline-offset: -1px; }
+}
 """
 
 

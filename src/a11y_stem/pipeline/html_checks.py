@@ -89,8 +89,9 @@ _BANNED = re.compile(r"\bcomplian(?:t|ce)\b", re.IGNORECASE)
 _CSS_EXTERNAL = re.compile(r"@import|url\(\s*['\"]?(?!data:)", re.IGNORECASE)
 # A colour class rule as `inline_text.colour_css` writes it: ".tc-ff0000 { color: #ee0000; }".
 _COLOUR_RULE = re.compile(
-    rf"\.{re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}}\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
+    rf"\.({re.escape(COLOUR_CLASS_PREFIX)}[0-9a-f]{{6}})\s*\{{\s*color:\s*#([0-9a-fA-F]{{6}})\s*;?\s*\}}"
 )
+_DARK_BLOCK = re.compile(r"@media[^{}]*prefers-color-scheme\s*:\s*dark[^{}]*\{")
 
 AXE_VERSION = "4.14.0"
 AXE_SHA256 = "20c09fe157a8a34a30e241aaa1fcdade657734f08ab379ecfbeb7d45cc46e878"
@@ -433,13 +434,50 @@ def _hex_rgb(digits: str) -> tuple[int, int, int]:
     return int(digits[0:2], 16), int(digits[2:4], 16), int(digits[4:6], 16)
 
 
+def split_dark_css(css: str) -> tuple[str, str]:
+    """(the rules for every reader, the rules inside `prefers-color-scheme: dark` blocks)."""
+    plain: list[str] = []
+    dark: list[str] = []
+    position = 0
+    while match := _DARK_BLOCK.search(css, position):
+        plain.append(css[position : match.start()])
+        depth, end = 1, match.end()
+        while end < len(css) and depth:
+            depth += (css[end] == "{") - (css[end] == "}")
+            end += 1
+        dark.append(css[match.end() : end - 1])
+        position = end
+    plain.append(css[position:])
+    return "".join(plain), "".join(dark)
+
+
+def _readable_colours(css: str) -> bool:
+    """Every colour class's text colour reaches 4.5:1 on the white page and, when the
+    stylesheet has rules for the dark page, on that page too: by the class's own rule
+    inside a dark-scheme block when it has one, else by its plain rule."""
+    plain, dark = split_dark_css(css)
+    light_colours = {m.group(1): _hex_rgb(m.group(2)) for m in _COLOUR_RULE.finditer(plain)}
+    dark_colours = {m.group(1): _hex_rgb(m.group(2)) for m in _COLOUR_RULE.finditer(dark)}
+    minimum = contrast.MIN_TEXT_CONTRAST
+    if not all(
+        contrast.contrast_ratio(rgb, contrast.OUTPUT_BACKGROUND) >= minimum
+        for rgb in light_colours.values()
+    ):
+        return False
+    if not dark.strip():  # a stylesheet with no dark page: only the white one is shown
+        return True
+    return all(
+        contrast.contrast_ratio(dark_colours.get(name, rgb), contrast.DARK_BACKGROUND) >= minimum
+        for name, rgb in light_colours.items()
+    ) and all(
+        contrast.contrast_ratio(rgb, contrast.DARK_BACKGROUND) >= minimum
+        for rgb in dark_colours.values()
+    )
+
+
 def _text_checks(doc: _Collector) -> list[Check]:
     """The text work's rules: links, lang values and the contrast of colour classes."""
-    readable = all(
-        contrast.contrast_ratio(_hex_rgb(m.group(1)), contrast.OUTPUT_BACKGROUND)
-        >= contrast.MIN_TEXT_CONTRAST
-        for m in _COLOUR_RULE.finditer("".join(doc.style))
-    )
+    readable = _readable_colours("".join(doc.style))
     return [
         _check("html.link_text", all(text.strip() for _, text in doc.links), "empty_link"),
         _check("html.link_href", all(_safe_link(h, doc.ids) for h, _ in doc.links), "unsafe_link"),
@@ -478,8 +516,9 @@ def violations_to_checks(violations: list[dict[str, Any]]) -> list[Check]:
     return checks or [Check(name="axe", passed=True)]
 
 
-def axe_checks(html: str) -> list[Check]:
-    """Run axe-core (WCAG 2.0 A/AA and 2.1 AA rules) on `html` in headless Chromium.
+def axe_checks(html: str, *, color_scheme: Literal["light", "dark"] = "light") -> list[Check]:
+    """Run axe-core (WCAG 2.0 A/AA and 2.1 AA rules) on `html` in headless Chromium, with
+    the browser asking for light or dark colours (`color_scheme`, T3-14).
 
     The page runs offline: the document cannot load anything even if it tried. Returns
     `AXE_SKIPPED` when Playwright or its Chromium is not installed, and a single
@@ -498,7 +537,7 @@ def axe_checks(html: str) -> list[Check]:
             except PlaywrightError:  # browser not installed (or cannot start here)
                 return [AXE_SKIPPED]
             try:
-                context = browser.new_context(offline=True)
+                context = browser.new_context(offline=True, color_scheme=color_scheme)
                 page = context.new_page()
                 page.set_content(html, wait_until="load")
                 page.add_script_tag(content=axe_source())

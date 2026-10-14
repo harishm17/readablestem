@@ -22,9 +22,10 @@ cross-references", "Language", "Coloured text"):
 
 Colour: each printed colour gets one class, `tc-rrggbb` after the colour as printed, and
 one CSS rule (`add_style`) with the colour made dark enough for 4.5:1 contrast on the
-output's white background, its hue kept (`pipeline.contrast`). The output has no dark
-mode, so there is no second rule. Text without links or colour runs is written exactly
-as before these features existed.
+output's white background, its hue kept (`pipeline.contrast`), and a second rule inside
+the dark-scheme `@media` block with the printed colour lightened as far as the dark page
+needs (no colour reaches 4.5:1 on both pages). Text without links or colour runs is written
+exactly as before these features existed.
 
 Rendering reads the stored element only (no options), so the review screen's re-render
 of a stored result writes the same file.
@@ -80,9 +81,16 @@ def colour_class(rgb: tuple[int, int, int]) -> str:
 
 
 def colour_css(rgb: tuple[int, int, int]) -> str:
-    """The rule for that class: the colour at 4.5:1 or more on the output background."""
+    """The rules for that class: the colour at 4.5:1 or more on the white page, and, for
+    readers who prefer dark colours, the printed colour lightened as far as it needs on the
+    dark page. No colour reaches 4.5:1 on both (that needs a luminance of at most 0.18 on
+    one and at least 0.20 on the other), so every class has both rules."""
+    name = colour_class(rgb)
     shown = contrast.hex_colour(contrast.with_contrast(rgb))
-    return f".{colour_class(rgb)} {{ color: {shown}; }}\n"
+    dark = contrast.hex_colour(contrast.with_contrast(rgb, contrast.DARK_BACKGROUND))
+    return (
+        f".{name} {{ color: {shown}; }}\n{contrast.DARK_MEDIA} {{ .{name} {{ color: {dark}; }} }}\n"
+    )
 
 
 def _href(link: Link) -> str | None:

@@ -118,8 +118,8 @@ What Canvas still removes, and why that is accepted:
   "Not converted." label, table captions and figure-description summaries shows in normal
   weight, and a very long unbroken string may not wrap. The label's text and the border
   still carry the meaning ("never by colour alone").
-- `:focus-visible`, `@media print` and the narrow-screen margin of the about section: Canvas
-  has its own focus rings, and its pages have their own layout.
+- `:focus-visible`, `@media print`, the dark-scheme block and the narrow-screen margin of
+  the about section: Canvas has its own focus rings, colours and layout.
 - `.visually-hidden` uses `clip: rect(0,0,0,0)` instead of `clip-path` (not allowed), plus
   Canvas's own `screenreader-only` class, so the hidden "Equation" labels stay hidden.
 - MathML is kept (all presentation elements the pipeline writes are on the list). Canvas
@@ -499,8 +499,10 @@ The rule's colour reaches 4.5:1 on the white background (WCAG 1.4.3): a colour t
 already does is kept exactly; any other is made darker, keeping its hue, in OKLCH
 (`pipeline.contrast.with_contrast`: lightness lowered until the contrast is reached,
 chroma lowered only as far as sRGB needs). So pure red becomes `#ee0000`, light grey
-`#767676`, yellow a dark yellow. The output has no dark mode, so there is no second
-rule. Colour spans sit inside links and may wrap maths (which takes the colour); linked
+`#767676`, yellow a dark yellow. For a reader whose browser asks for dark colours (see
+"Dark colours") each class has a second rule in the dark-scheme `@media` block: the
+printed colour, lightened as far as 4.5:1 on `#121212` needs (no colour reaches 4.5:1 on
+both pages). Colour spans sit inside links and may wrap maths (which takes the colour); linked
 text itself keeps the link colour.
 
 Colour alone tells a screen reader nothing, so text that refers to colour near coloured
@@ -619,7 +621,7 @@ words like "compliance" (beam flexibility in mechanics) is not flagged.
 About 35 lines of inline CSS:
 
 - system font at 1.125rem with 1.6 line height, a 42rem column, near-black on white
-  (about 17:1 contrast; a dark scheme follows below);
+  (about 17:1 contrast; for a dark scheme see "Dark colours");
 - images at their printed size (PDF points x 96/72) and never wider than the column;
 - display equations scroll sideways inside their `.equation` box when wider than the
   screen (see "Wide equations");
@@ -633,9 +635,25 @@ About 35 lines of inline CSS:
 - only in documents that have one: a figure's folded description (a bold summary with
   the browser's own marker, no new colours) and table rules.
 
-There is no dark mode yet. Documents with coloured text (FEATURE_COLOUR) get one rule
-per printed colour (see "Coloured text"); documents with rebuilt tables get the table
-rules.
+Documents with coloured text (FEATURE_COLOUR) get two rules per printed colour (see
+"Coloured text"); documents with rebuilt tables get the table rules.
+
+### Dark colours (T3-14)
+
+`:root { color-scheme: light dark; }` lets the browser choose its own scheme for what the
+file does not style (links, scrollbars), and a `@media screen and (prefers-color-scheme:
+dark)` block sets the file's colours for a reader whose browser asks for dark: `#121212`
+page, `#ececec` text (about 15:1), the dashed boxes of unconverted items and the notice
+in `#ffa066` and the focus ring in `#8ab4f8` (both above 3:1 on the page), a thin
+`#8c8c8c` edge on pictures (they are white-backed crops and would otherwise be a bare
+white block), and dark versions of the code block and table rules (borders `#767676` and
+`#a6a6a6`). MathML takes the text colour (nothing sets one on it), so equations follow the
+scheme. Pictures are not inverted: a figure's colours mean something. The block is
+`screen` only, so printing a file from a dark browser gives dark text on white paper.
+Features add their dark rules to their own CSS (code, tables), so a document pays for
+what it uses. The static check `html.text_contrast` reads both pages (a colour class
+must reach 4.5:1 on white, and on `#121212` once the file has any dark rule), and
+`tests/test_assemble_dark.py` runs axe in both schemes in Chromium (browser suite).
 
 ## Checks
 

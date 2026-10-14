@@ -1,9 +1,11 @@
 """Colour maths for coloured text in the output (FEATURE_COLOUR): contrast and lightness.
 
 Coloured text keeps its colour in the output (`Element.colour_runs`), but the output's
-text must reach 4.5:1 contrast on its background (WCAG 1.4.3). A colour that does not is
-made darker, keeping its hue: the colour is moved to OKLCH (OKLab's lightness, chroma
-and hue; Ottosson 2020), its lightness lowered until the contrast is reached, and its
+text must reach 4.5:1 contrast on its background (WCAG 1.4.3), on the white page and on
+the dark page shown to a reader who prefers dark colours (T3-14). A colour that does not
+is made darker (lighter, on the dark page), keeping its hue: the colour is moved to OKLCH
+(OKLab's lightness, chroma and hue; Ottosson 2020), its lightness lowered until the
+contrast is reached, and its
 chroma lowered only as far as needed to stay inside sRGB. So light grey stays grey, red
 stays red and yellow becomes a dark yellow, not brown or black.
 
@@ -18,9 +20,12 @@ import math
 RGB = tuple[int, int, int]
 
 WHITE: RGB = (255, 255, 255)
-# The output's background (`assemble.STYLE`: body background #ffffff). The output has no
-# dark mode (`color-scheme: light`), so there is one background to reach contrast on.
+# The output's backgrounds (`assemble.STYLE`: body background #ffffff, and #121212 for a
+# reader whose browser asks for dark colours).
 OUTPUT_BACKGROUND: RGB = WHITE
+DARK_BACKGROUND: RGB = (18, 18, 18)
+# Rules for the dark page sit in this block (not when printing: paper is white).
+DARK_MEDIA = "@media screen and (prefers-color-scheme: dark)"
 MIN_TEXT_CONTRAST = 4.5  # WCAG 1.4.3 (AA), normal-size text
 
 _STEPS = 32  # bisection steps: far finer than one 8-bit step of a channel
@@ -105,13 +110,25 @@ def _at_lightness(lightness: float, chroma: float, hue: float) -> RGB:
 def with_contrast(
     rgb: RGB, background: RGB = OUTPUT_BACKGROUND, minimum: float = MIN_TEXT_CONTRAST
 ) -> RGB:
-    """`rgb` itself when it reaches `minimum` contrast on `background`, else the lightest
-    colour of the same hue that does (darker than `rgb`; the background is light)."""
+    """`rgb` itself when it reaches `minimum` contrast on `background`, else the nearest
+    colour of the same hue that does: darker than `rgb` on a light background, lighter on
+    a dark one."""
     if contrast_ratio(rgb, background) >= minimum:
         return rgb
     lightness, chroma, hue = oklch(rgb)
     if chroma < _NEUTRAL_CHROMA:
         chroma = 0.0  # a grey has no hue to keep: stay exactly neutral
+    if relative_luminance(background) < 0.18:  # a dark page: lighten
+        lightest: RGB = WHITE
+        low, high = lightness, 1.0
+        for _ in range(_STEPS):
+            mid = (low + high) / 2
+            candidate = _at_lightness(mid, chroma, hue)
+            if contrast_ratio(candidate, background) >= minimum:
+                lightest, high = candidate, mid
+            else:
+                low = mid
+        return lightest
     best: RGB = (0, 0, 0)
     low, high = 0.0, lightness
     for _ in range(_STEPS):
