@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Before and after</h1>
+<p class="lede measure">The same equations, as a screen reader user would meet them in the PDF and in
+  the HTML.</p>
+
+<div class="callout flag">
+  <h2>How to read this page</h2>
+  <ul>
+    <li>The readings are made by the tool's own speech rules. They are not recordings of NVDA, JAWS
+      or VoiceOver, and real screen readers differ from one another.</li>
+    <li>“Before” is the PDF's own text layer, read one character at a time. These PDFs are
+      untagged print-outs of OpenStax web pages. A PDF with tags, or one with alt text on its
+      equations, would give a different “before”.</li>
+    <li>The equations were chosen to show different kinds of maths. They were not picked at random.
+      They show what the HTML can do, not how often it gets an equation right. For that, see the
+      numbers on the <a href="{{ root }}index.html#numbers">home page</a>.</li>
+    <li>The “after” is the tool's proposal. Where a proposal is wrong, a person is meant to catch it
+      on the review screen. Each equation links to its example.</li>
+  </ul>
+</div>
+
+{% for e in examples %}
+<h2>{{ e.meta.short }}</h2>
+{% for r in e.speech %}
+<h3 id="{{ e.id }}-{{ r.element_id }}">Page {{ r.page }}, equation {{ loop.index }}</h3>
+<p><img src="{{ root }}{{ r.crop }}" width="{{ r.crop_size[0] }}" height="{{ r.crop_size[1] }}" loading="lazy" style="max-width:100%;height:auto;border:1px solid var(--line)" alt="The equation as printed in the PDF, with the words around it."></p>
+<div class="ba">
+  <section class="before">
+    <h4 id="b-{{ e.id }}-{{ r.element_id }}">Before: the PDF's text layer</h4>
+    <p class="part-label">The PDF holds this text</p>
+    <p class="quote">{{ r.pdf_text }}</p>
+    <p class="part-label">Read aloud roughly as</p>
+    <p class="quote readout">“{{ r.pdf_said or "(the speech rules cannot read it)" }}”</p>
+  </section>
+  <section class="after">
+    <h4 id="a-{{ e.id }}-{{ r.element_id }}">After: the HTML</h4>
+    <p class="part-label">The equation as MathML</p>
+    <div class="proposal" tabindex="0" role="group" aria-label="Equation as MathML">{{ r.mathml|safe }}</div>
+    <p class="part-label">Read aloud roughly as</p>
+    <p class="quote readout">“{{ r.html_said }}”</p>
+  </section>
+</div>
+{% if r.notes %}
+<p class="part-label">What differs</p>
+<ul class="measure">
+  {% for n in r.notes %}<li>{{ n }}</li>{% endfor %}
+</ul>
+{% endif %}
+<p class="small"><a href="{{ root }}examples/{{ e.id }}/index.html">The whole example</a></p>
+{% endfor %}
+{% endfor %}
+{% endblock %}

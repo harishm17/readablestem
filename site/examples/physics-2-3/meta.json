@@ -1,0 +1,24 @@
+{
+  "id": "physics-2-3",
+  "order": 1,
+  "kind": "openstax",
+  "title": "OpenStax Physics 2.3: Position vs. Time Graphs",
+  "short": "Physics 2.3, position vs. time graphs",
+  "artefacts": "../../../src/a11y_stem/web/static/demo",
+  "html": "index.html",
+  "pdf": "source.pdf",
+  "report": "report.json",
+  "blurb": "The demo page that ships with the app. It has vector equations in bold, graphs and worked examples, and one equation the review screen asks about.",
+  "pages": [
+    1,
+    4,
+    8
+  ],
+  "speech": [
+    "p3-e5",
+    "p4-e5",
+    "p8-e11",
+    "p10-e11"
+  ],
+  "set": "development: one of the three sections used while the tool was built"
+}

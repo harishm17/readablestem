@@ -36,3 +36,7 @@ private-inputs/
 
 # Output of `make proof-sources` (a check, not the committed report)
 proof/PROOF-sources.md
+
+# Static demo site build (make site)
+site/_build/
+site/_build_again/

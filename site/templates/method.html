@@ -1,0 +1,80 @@
+{% extends "base.html" %}
+{% block content %}
+<h1>Method and limits</h1>
+<p class="lede measure">How the numbers on this site were made, how the examples were made, and what
+  both leave out.</p>
+
+<h2>How the proof numbers are made</h2>
+<ol class="measure">
+  <li>A set of sections from OpenStax books under CC BY 4.0 is fixed first. The answer key is the
+    MathML, headings and figure descriptions that OpenStax publishes in its web editions.</li>
+  <li>Each section is printed to a PDF from OpenStax's web page, using this project's own print
+    stylesheet. These are not the publisher's PDFs.</li>
+  <li>a11y-stem converts the PDF. Its output is scored against the answer key.</li>
+  <li>The run is recorded. <code>make proof</code> replays the recording with no key, no network
+    and no cost, and writes <a href="{{ repo_url }}/blob/main/PROOF.md">PROOF.md</a>. A continuous
+    integration job checks that the committed file is what the command writes.</li>
+</ol>
+<p class="measure">Two sets exist. The <strong>development</strong> set is the sections the tool was
+  built on, so its numbers show that the pipeline and the harness work. The <strong>held-out</strong>
+  set was chosen and registered before any system ran on it. Only held-out numbers say something
+  about material the tool has not seen. The home page labels which set its figures come from.</p>
+<p class="measure">The protocol is in
+  <a href="{{ repo_url }}/blob/main/proof/PREREGISTRATION.md">proof/PREREGISTRATION.md</a>, and the
+  method in full is in <a href="{{ repo_url }}/blob/main/docs/eval.md">docs/eval.md</a> and
+  <a href="{{ repo_url }}/blob/main/docs/proof.md">docs/proof.md</a>.</p>
+
+<h2>How the examples were made</h2>
+<ul class="measure">
+  <li>Each example is a stored result. This site calls no model when it is built or opened.</li>
+  <li>The OpenStax pages are printed to PDF, converted with <code>a11y-stem demo build</code>, and the
+    result is stored with the PDF and the HTML. The fixture was converted with
+    <code>a11y-stem convert</code>. Each page names the provider, the model and the date.</li>
+  <li>The pages and equations shown on each example were <strong>chosen</strong> to show different
+    kinds of content. They are illustrations. They are not a sample and they are not evidence of how
+    often the tool is right.</li>
+  <li>The review decisions are the ones the tool would ask for. No decision was taken for the
+    stored result, so the output shows the tool's proposals as they came.</li>
+</ul>
+
+<h2>Limits</h2>
+{% if proof.available and proof.limits %}
+<p class="measure">From {{ proof.file_name }}, “What these numbers leave out”:</p>
+<ul class="measure">
+  {% for line in proof.limits %}<li>{{ line }}</li>{% endfor %}
+</ul>
+{% endif %}
+<p class="measure">From the README:</p>
+<ul class="measure">
+  <li>Input is a PDF. Word and PowerPoint files must be exported to PDF first.</li>
+  <li>A model is in the loop, so two runs on the same file can differ. Document images and the text
+    around them go to the model provider.</li>
+  <li>Equations are the hard part. A symbol, sign or relation that differs from the PDF's text layer
+    is sent to review. An error that agrees with the text layer, or a PDF with no usable text layer,
+    can still pass.</li>
+  <li>Scans, handwriting and drawings are kept as images and flagged.</li>
+  <li>Tables are off by default and have been checked on a local benchmark and the sample, not on a
+    broad set of real course PDFs.</li>
+  <li>Figure alt text is short. It does not replace a long description for a complex diagram.</li>
+  <li>The hosted beta has an allowlist, spend caps and short retention. This site is not that app.</li>
+</ul>
+{% if sets %}
+<h3>What each proof set says about itself</h3>
+{% for s in sets %}
+<h4>{{ s.title or s.id }} ({{ "held out" if s.held_out else "development" }})</h4>
+<ul class="measure">
+  {% for line in s.limits %}<li>{{ line }}</li>{% endfor %}
+</ul>
+{% endfor %}
+{% endif %}
+
+<h2>About this site</h2>
+<ul class="measure">
+  <li>It is plain HTML and one stylesheet. It has no scripts, no frameworks, no web fonts, no
+    trackers and no outside requests.</li>
+  <li>Every page is checked with axe-core at 1280 and 320 CSS pixels as part of the repository's
+    tests. Automated checks find some problems only. Please tell the author about any barrier you
+    meet.</li>
+  <li>It is built by <code>site/build.py</code> from files in the repository. <a href="{{ repo_url }}/blob/main/docs/site.md">docs/site.md</a> says how.</li>
+</ul>
+{% endblock %}

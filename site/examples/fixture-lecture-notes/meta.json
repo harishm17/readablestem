@@ -1,0 +1,22 @@
+{
+  "id": "fixture-lecture-notes",
+  "order": 4,
+  "kind": "fixture",
+  "title": "Lecture notes: Motion in One Dimension (project test fixture)",
+  "short": "Lecture notes fixture",
+  "artefacts": "../../..",
+  "pdf": "tests/fixtures/layout/lecture_notes.pdf",
+  "html": "site/examples/fixture-lecture-notes/converted.html",
+  "report": "site/examples/fixture-lecture-notes/report.json",
+  "blurb": "Two pages of invented lecture notes with a fraction, a square root and a figure, converted with the Claude provider. The text was written for this project's tests.",
+  "pages": [
+    1,
+    2
+  ],
+  "speech": [
+    "p1-e17",
+    "p1-e6",
+    "p2-e3"
+  ],
+  "set": "fixture: invented text, not part of any proof set"
+}

@@ -80,6 +80,35 @@ jobs:
       - name: PROOF.md is what the command writes
         run: git diff --exit-code -- PROOF.md
 
+  site:
+    name: make site (static demo, no deploy)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      # The build reads committed files only (no key, no network, no browser). It imports
+      # the app's own message and compare helpers, so it needs the locked project install.
+      - name: Install (locked)
+        run: uv sync --locked
+      - name: Build the site
+        run: make site
+      - name: The site has its pages
+        run: |
+          test -f site/_build/index.html
+          test -f site/_build/examples/index.html
+          test -f site/_build/before-after/index.html
+      # The same files twice must give the same bytes.
+      - name: The build is repeatable
+        run: |
+          uv run python site/build.py --out site/_build_again
+          diff -r site/_build site/_build_again
+
   postgres:
     name: pytest -m postgres (Postgres 16)
     runs-on: ubuntu-24.04
