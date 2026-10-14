@@ -206,6 +206,11 @@ class AnswerSet:
             else:
                 raise BundleError(f"an answers file holds a row of unknown type {row['t']!r}")
 
+    def add(self, row: dict[str, Any]) -> None:
+        """Make one more model row answerable (a live run that records as it goes)."""
+        with self._lock:
+            self._model[row["k"]].append(row)
+
     @classmethod
     def load(cls, bundle: Bundle, task: str, repeat: int) -> AnswerSet:
         return cls(bundle.jsonl(f"answers/{task}.run{repeat}.jsonl"))

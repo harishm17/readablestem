@@ -39,6 +39,9 @@ class VisionRequest:
     context_text: str | None = None  # untrusted document text, fenced by the client
     max_output_tokens: int = 1024
     image_detail: str = "high"  # "low" | "high" | "auto"
+    # Claude only: the thinking effort for this request (`output_config.effort`). None: the
+    # client's own setting for the model (`Settings.anthropic_effort_for`).
+    effort: str | None = None
 
 
 class VisionClient(Protocol):
@@ -62,9 +65,13 @@ UNTRUSTED_NOTICE = (
 )
 
 
-def fence_untrusted(text: str, limit: int = 2000) -> str:
-    """Wrap document text as data. Strips our own tag names so text cannot close the fence."""
+def fence_untrusted(text: str, limit: int = 2000, *, notice: bool = True) -> str:
+    """Wrap document text as data. Strips our own tag names so text cannot close the fence.
+
+    `notice` False leaves the fixed `UNTRUSTED_NOTICE` out: the caller then carries it in
+    the (cached) system block instead of repeating it in every request's user message."""
     cleaned = text.replace("<document_text>", "").replace("</document_text>", "")
     if len(cleaned) > limit:
         cleaned = cleaned[:limit] + " [truncated]"
-    return f"{UNTRUSTED_NOTICE}\n<document_text>\n{cleaned}\n</document_text>"
+    fenced = f"<document_text>\n{cleaned}\n</document_text>"
+    return f"{UNTRUSTED_NOTICE}\n{fenced}" if notice else fenced

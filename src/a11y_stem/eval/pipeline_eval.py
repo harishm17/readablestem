@@ -264,10 +264,13 @@ def manifest_sha256(gold_dir: Path) -> str:
     return digest.hexdigest()
 
 
-def select_units(task: str, records: list[dict], limit: int | None) -> list[Any]:
+def select_units(
+    task: str, records: list[dict], limit: int | None, every: int | None = None
+) -> list[Any]:
     """What one task iterates over: equation or figure records, or pages of records.
 
-    `limit` counts those units: equations, figures, or pages (headings, document).
+    `limit` counts those units: equations, figures, or pages (headings, document). `every`
+    keeps every Nth unit from the first, before `limit` is applied.
     """
     units: list[Any]
     if task == "equations":
@@ -284,6 +287,8 @@ def select_units(task: str, records: list[dict], limit: int | None) -> list[Any]
         units = group_pages(records)
     else:
         raise ValueError(f"unknown task {task!r}; expected one of {', '.join(TASKS)}")
+    if every:
+        units = units[::every]
     return units[:limit] if limit is not None else units
 
 
@@ -402,6 +407,7 @@ class EvalConfig:
     date: str  # YYYY-MM-DD, passed in by the caller
     gold_dir: Path
     limit: int | None = None
+    every: int | None = None  # every Nth unit (`select_units`)
     client_label: str = "openai"  # "fake" for FakeVisionClient runs
     gold_label: str | None = None  # how to show gold_dir in the report (no home paths)
     concurrency: int = 4  # document task: convert_pdf's thread pool
@@ -1758,6 +1764,7 @@ def build_report(
             "gold_dir": cfg.gold_label or cfg.gold_dir.name,
             "manifest_sha256": manifest_sha256(cfg.gold_dir),
             "limit": cfg.limit,
+            **({"every": cfg.every} if cfg.every else {}),
             "unit": {"equations": "equation", "figures": "figure"}.get(task, "page"),
             "selection_sha256": hashlib.sha256("\n".join(planned_ids).encode()).hexdigest(),
         },
@@ -1783,7 +1790,7 @@ def run_pipeline_eval(cfg: EvalConfig) -> EvalRun:
     """
     if cfg.task not in RUNNERS:
         raise ValueError(f"unknown task {cfg.task!r}; expected one of {', '.join(TASKS)}")
-    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit)
+    units = select_units(cfg.task, load_gold(cfg.gold_dir), cfg.limit, cfg.every)
     planned = unit_ids(cfg.task, units)
     # All inputs before the first model call (see the module docstring): a RenderError
     # raises here, with nothing spent. Then the browser goes, before any step runs.

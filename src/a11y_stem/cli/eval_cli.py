@@ -153,7 +153,7 @@ def _make_judge(
     from a11y_stem.eval import judge as judge_mod
 
     try:
-        return judge_mod.make_judge(
+        made = judge_mod.make_judge(
             settings,
             budget,
             run_client=client,
@@ -161,11 +161,24 @@ def _make_judge(
             model=getattr(args, "judge_model", None),
             fake=label == "fake",
         )
+        if made.client is not client:  # the judge's own client: behind the file as well
+            made = judge_mod.JudgeSetup(_cached(args, made.settings, made.client), made.settings)
+        return made
     except ValidationError as exc:
         reasons = "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
         return f"invalid judge settings: {reasons}"
     except ConfigError as exc:
         return str(exc)
+
+
+def _cached(args: argparse.Namespace, settings: Any, client: Any) -> Any:
+    """`client` behind the answers file when the run has one (`--answers`)."""
+    path = getattr(args, "answers", None)
+    if path is None and not getattr(args, "answers_offline", False):
+        return client
+    from a11y_stem.eval.answers import CachedClient
+
+    return CachedClient(None if args.answers_offline else client, path, settings)
 
 
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
@@ -190,6 +203,7 @@ def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str
         client = make_live_client(settings, budget)
     except ConfigError as exc:
         return str(exc)
+    client = _cached(args, settings, client)
     return client, budget, settings.model_provider
 
 
@@ -222,6 +236,12 @@ def _settings_for(args: argparse.Namespace) -> Any:
 
 
 def _cmd_pipeline(args: argparse.Namespace) -> int:
+    if (args.answers or args.answers_offline) and (
+        args.gold_set == "heldout" or (args.gold_set == "dev-v2" and args.part == "check")
+    ):
+        return _error("--answers is for development sets: not for the held-out or check parts")
+    if args.answers_offline and not args.answers:
+        return _error("--answers-offline needs --answers FILE")
     if args.gold_set == "dev-v2":
         return _run_devset(args)
     if args.gold_set:
@@ -422,6 +442,7 @@ def _run_pipeline(
             date=args.date,
             gold_dir=gold_dir,
             limit=getattr(args, "limit", None),
+            every=getattr(args, "every", None),
             client_label=label,
             gold_label=gold_label,
             concurrency=args.concurrency,
@@ -438,11 +459,15 @@ def _run_pipeline(
         except NotImplementedError as exc:
             return _error(f"a pipeline module is still a stub ({exc}); integrate it first")
     run.report.update(extra or {})
+    if hasattr(client, "summary"):
+        run.report["answers_file"] = client.summary()
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
     print(pe.format_markdown(run.report), end="")
     print(f"\nwrote {_shown(out)}" + (f" and {_shown(args.items)}" if args.items else ""))
+    if hasattr(client, "summary"):
+        print(f"answers file: {dict(client.summary())}")
     return 0
 
 
@@ -1013,12 +1038,31 @@ def register(
         help="private real documents with labels.json (default: private-inputs/tables "
         "when it has one; counts only are reported)",
     )
+    pipeline.add_argument(
+        "--every",
+        type=_positive_int,
+        help="equations and figures: every Nth item, from the first (a spread over the set "
+        "where --limit takes only its start); with --limit, the first N of those",
+    )
     pipeline.add_argument("--items", type=Path, help="also write per-item rows as JSONL")
     pipeline.add_argument("--date", type=_iso_date, default=today, help="run date to record")
     pipeline.add_argument("--cache", type=Path, help="render cache (default: .cache/eval)")
     pipeline.add_argument("--paper", choices=["Letter", "A4"], default="Letter")
     pipeline.add_argument(
         "--concurrency", type=_positive_int, default=4, help="document task: worker threads"
+    )
+    pipeline.add_argument(
+        "--answers",
+        type=Path,
+        help="a file of recorded model answers (eval/answers.py): a request already in it is "
+        "answered from it at no cost, any other goes to the model and is appended. One "
+        "baseline recording serves every experiment that asks the same thing. Development "
+        "sets only",
+    )
+    pipeline.add_argument(
+        "--answers-offline",
+        action="store_true",
+        help="with --answers: a request not in the file is refused, not sent (spends nothing)",
     )
     pipeline.add_argument(
         "--notation",
