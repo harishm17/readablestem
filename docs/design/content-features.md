@@ -114,6 +114,7 @@ for things without an element.
 | `colour_only` | optional | a figure fix with `colour_only` |
 | `long_description_missing` | optional | a chart or diagram fix without `long_description`, with long descriptions on |
 | `code_block`, `footnote` | none | layout facts (`Layout.notices`, `layout._layout_notices`) |
+| `scripts_flattened` | optional | layout: raised or lowered text that `Element.script_runs` cannot carry (a figure caption, a table cell's lowered text, a script with nothing before it; docs/layout.md "Raised and lowered text in prose") |
 | `colour_reference`, `link_scheme_dropped`, `link_text_unclear` | optional | the text pass |
 | `lang_detected`, `lang_assumed` | optional (confirm on the job page) | the text pass |
 

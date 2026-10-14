@@ -436,6 +436,15 @@ class ColourRun(_Span):
     rgb: tuple[Channel, Channel, Channel]
 
 
+class ScriptRun(_Span):
+    """Raised or lowered text in an element's `text` (Na+, H2O, cm3, a nuclide's mass number
+    in 226Ra): the characters are in `text` as they were read, and the assembler writes
+    them as `<sup>` or `<sub>`. Only upright text (not a variable set in a maths font,
+    which stays an inline equation)."""
+
+    kind: Literal["sup", "sub"]
+
+
 class HeadingFix(BaseModel):
     level: int = Field(ge=1, le=6)
     text: str
@@ -476,6 +485,8 @@ class Element(BaseModel):
     # Links and coloured runs in `text` (offsets into `text` as stored, markers included).
     links: list[Link] = Field(default_factory=list)
     colour_runs: list[ColourRun] = Field(default_factory=list)
+    # Raised and lowered runs of the text (`ScriptRun`), written as <sup> and <sub>.
+    script_runs: list[ScriptRun] = Field(default_factory=list)
     # BCP 47 language of this passage, only when it differs from the document's
     # (`DocumentResult.lang`); written as a `lang` attribute on its block.
     lang: str | None = None
@@ -602,6 +613,7 @@ NOTICE_CODES = frozenset(
         "lang_detected",  # the document language was detected from the text
         "lang_assumed",  # no language in the PDF and none detected: the default is used
         "long_description_missing",  # a complex figure without a long description
+        "scripts_flattened",  # raised or lowered text (an exponent, a charge) written flat
         # Hidden text and page types (pipeline.page_type, docs/layout.md "Hidden text
         # and page types"). The first four have a decision: the page's (or region's)
         # FAILED figure fix with the same reason, grouped by reason.

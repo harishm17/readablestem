@@ -325,6 +325,8 @@ NOTICE_MESSAGES: dict[str, str] = {
     "link_scheme_dropped": "A link in the PDF was not kept because it was not a web or "
     "email address.",
     "link_text_unclear": "A link's text does not say where it goes (for example, click "
+    "scripts_flattened": "Raised or lowered text here (an exponent, a charge, a subscript) "
+    "could not be kept and is written on the line, so check it reads right.",
     "here), so reword it.",
     "lang_detected": "The language of the document was detected from its text, so check it "
     "is right.",
