@@ -18,6 +18,33 @@ Cron service "cron" (same repo and Dockerfile, hourly) ── `readablestem ops 
 GitHub uptime.yml (weekly) ── GET /readyz and /demo ──> readablestem.com
 ```
 
+## As deployed (2026-10-14)
+
+What the first deploy found, and how production is actually configured:
+
+- **Railway ignores `railway.json` for new services.** `railway config migrate status` reported
+  "No services in production read Config as Code", so the first deploy ran no migration and
+  crash-looped on an empty database. The settings were applied through Railway's API instead
+  (`railway api 'mutation { serviceInstanceUpdate(...) }'`), and are what production uses now:
+
+  | Service | Settings |
+  |---|---|
+  | `web` | Dockerfile; pre-deploy `readablestem db upgrade`; health check `/healthz` (300 s); restart on failure, 10 retries; domains readablestem.com and www.readablestem.com |
+  | `cron` | Same image; start `readablestem ops cron`; schedule `7 * * * *`; restart never; every variable a reference to `web` (`${{web.NAME}}`) |
+  | `backup` | Image `postgres:18`; daily at 08:17 UTC `pg_dump` of the database (`PGURL=${{Postgres.DATABASE_URL}}`), gzipped onto the private volume `/backups`; copies older than 6 days are deleted |
+
+  A redeploy reuses the old deployment's settings; after changing a setting, deploy afresh with
+  `railway up --service <name>`.
+- **Backups.** Railway's own scheduled backups need a Pro workspace, so the `backup` service
+  above does the daily copy inside the same project. The privacy page's "kept for about 6 days"
+  matches it. To restore: `railway ssh --service backup`, then
+  `gunzip -c /backups/readablestem-<date>.sql.gz | psql "$PGURL"` into an empty database.
+  **Do not rely on it until one restore has been tested.**
+- **Google sign-in** is published (In production): any Google account can reach the sign-in;
+  the app's own allowlist decides who gets in (`/admin`).
+- **Smoke test, 2026-10-14:** sign-in, the sample job, a 2-page LaTeX handout converted in 19 s
+  (31 model calls, $0.087), and a 28.9 MB upload accepted into "choose pages".
+
 ## What is in the repository
 
 | File | Used for |
