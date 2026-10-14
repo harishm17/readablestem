@@ -724,7 +724,7 @@ def _degrees(kids: list[ET.Element], i: int) -> tuple[list[str], int] | None:
     unit = unit_words(f"°{scale}", count) if count is not None else None
     if unit is None or sign not in _DEGREE_SIGNS:
         return None
-    return ([count, unit] if own_number else [unit]), 2
+    return ([count or "", unit] if own_number else [unit]), 2
 
 
 def _speak_children(node: ET.Element) -> list[str]:
