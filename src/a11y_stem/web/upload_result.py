@@ -59,6 +59,9 @@ def load(
     """The outcomes stored under `result_id` when they are this person's and not past their
     time; else None (the same answer for someone else's, a missing and an old one)."""
     row = session.get(UploadResult, result_id)
-    if row is None or row.user_id != user_id or as_utc(row.retain_until) <= (now or utcnow()):
+    if row is None or row.user_id != user_id:
+        return None
+    until = as_utc(row.retain_until)
+    if until is None or until <= (now or utcnow()):
         return None
     return [dict(item) for item in row.items]
