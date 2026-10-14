@@ -463,7 +463,11 @@ the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered 
   into pieces (the symbol of the nuclide lost, a heading made of "238"). A row whose small
   glyphs are 62-85 % of a larger size, each run of them off the larger glyphs' baseline by
   at least 4 % and at most 70 % and within 60 % of a larger glyph, is now set in the larger
-  size. The numbers of a fraction (half the size, a whole line off) do not qualify.
+  size, provided the larger glyphs include a letter and no word of three letters. The numbers
+  of a fraction do not qualify: they are half the size (OpenStax), or they stand beside an
+  operator or a sentence (`Simplify: 5/12 + 2/36`: the larger glyphs are a plus sign, or a
+  word), which a first version of this rule took for scripts: it turned three equations of
+  "Simplify complex rational expressions" into figures.
 - **Spaces**: TeX sets no space glyph after a script (`Cl-and`); a gap of 30 % of the glyph
   size at the edge of a script gets one (`_marked`).
 - **Carrying the offsets**: pieces of a paragraph are cleaned, joined and de-hyphenated on

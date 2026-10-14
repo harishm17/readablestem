@@ -1007,9 +1007,10 @@ class _Row:
         """Font size covering most characters. A row whose small glyphs are all scripts of
         its larger ones (a nuclide's "92 U -> 234": five script glyphs, two full-size) is set
         in the larger size: the small glyphs are at least `SCRIPT_MIN_RATIO` of it, sit off
-        its baseline by at most `SCRIPT_MAX_LIFT` of it and no more than 60 % of it from
-        a larger glyph. The numbers of a fraction (half the size, a full line
-        off) are not scripts of anything."""
+        its baseline by at least 4 % and at most `SCRIPT_MAX_LIFT` of it, and no more than
+        60 % of it from a larger glyph; and the larger glyphs hold a letter and no word of three
+        letters. The numbers of a fraction (beside an operator, or in a sentence) are not
+        scripts of anything."""
         counts = Counter(round(c.size * 2) / 2 for c in self.ink)
         size = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
         larger = [s for s in counts if SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
@@ -1017,6 +1018,13 @@ class _Row:
             return size
         big = max(larger, key=lambda s: (counts[s], s))
         large = [c for c in self.ink if round(c.size * 2) / 2 == big]
+        if not any(c.c.isalpha() for c in large):
+            return size  # nothing to hang scripts on: an operator and the numbers of a fraction
+        letters = 0  # a word in the larger size: a sentence with small numbers in it (a fraction)
+        for c in sorted(large, key=lambda g: g.x0):
+            letters = letters + 1 if c.c.isalpha() else 0
+            if letters >= 3:
+                return size
         base = statistics.median(c.baseline for c in large)
         reach = 0.6 * big  # a script sits next to its base, with at most a space between
         run: list[_Char] = []  # small glyphs side by side: one script, the end glyphs touch

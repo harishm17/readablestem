@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 
 import pymupdf
+import pytest
 
 from a11y_stem.core.types import Element, Kind, Notice
 from a11y_stem.pipeline import layout
@@ -179,3 +180,42 @@ def test_a_lowered_script_in_a_table_cell_is_flagged_and_a_plain_cell_is_not():
         tables[0].id
     ]
     assert not any(n.code == "scripts_flattened" for n in plain.notices)
+
+
+def _row(parts: list[tuple[str, float, float]], *, font: str = "CMR10") -> layout._Row:
+    """A row built glyph by glyph: (text, size, baseline), each glyph 4 pt wide, side by side."""
+    chars, x = [], 100.0
+    for text, size, baseline in parts:
+        for c in text:
+            chars.append(
+                layout._Char(c, x, baseline - size, x + 4, baseline, baseline, size, font, 0)
+            )
+            x += 4
+    return layout._Row(chars)
+
+
+def test_a_row_of_mostly_scripts_is_set_in_the_size_of_its_text():
+    # "92 U -> 234": five glyphs at 8 pt lifted or dropped, three at 10.9 pt on the baseline.
+    row = _row([("92", 8.0, 318.6), ("U", 10.9, 315.9), ("→", 10.9, 315.9), ("234", 8.0, 311.4)])
+    assert row.size == 11.0  # 10.9 rounded as sizes are
+    assert row.baseline == 315.9
+
+
+@pytest.mark.parametrize(
+    "parts",
+    [
+        # the numbers of a fraction beside an operator: nothing to hang scripts on
+        [("3", 4.5, 100.0), ("+", 6.5, 103.0), ("1", 4.5, 106.0)],
+        # a sentence with small numbers in it: the larger glyphs hold a word
+        [("Simplify", 9.0, 100.0), ("5", 6.5, 97.0), ("12", 6.5, 104.0)],
+        # half the size is not a script
+        [("A", 9.0, 100.0), ("12", 4.5, 97.0)],
+    ],
+)
+def test_the_numbers_of_a_fraction_are_not_taken_for_scripts_of_the_row(parts):
+    sizes = {round(size * 2) / 2 for _, size, _ in parts}
+    dominant = max(
+        sizes,
+        key=lambda s: sum(len(t) for t, size, _ in parts if round(size * 2) / 2 == s) * 1000 + s,
+    )
+    assert _row(parts).size == dominant

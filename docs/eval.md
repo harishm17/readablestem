@@ -1668,6 +1668,94 @@ manifest hashes are in the reports (`8156ea5e6677...` dev, `2cea9ea7f587...` che
 - Gold for the prose sub- and superscripts is the page's own markup. An OpenStax paragraph
   that writes a unit with a plain digit (`cm3`) is not in it.
 
+### Prose scripts, nuclides and pictures of equations (T2-3, T2-4, T2-5, 2026-10-14)
+
+Measured on the dev part of this set only (nothing from the check part was opened, and it was
+not run), before and after the changes of `docs/layout.md` "Raised and lowered text in prose"
+and "Equations pasted as pictures". Before is the code of `feat/launch-integration` (6c8bbda),
+after is this branch; both ran the pipeline on the same 17 development documents (the 14
+OpenStax sections and authored documents holding chemistry, nuclides, units and the pictured
+equations, plus `word-lecture`, `latex-structure` and `1-4-measurements`; 741 of the 746 prose
+script runs and every gold equation of the five classes) with claude-opus-5-5 and
+claude-haiku-5-5 (the Anthropic defaults). Every model answer was recorded once under the hash
+of the whole request; the run after the change took an answer from the record when its request
+was identical (the crop, the context and the prompt) and paid only for the new ones: before
+$1.664 (960 calls), after $0.453 (221 new calls), $2.117 in all. Two later replays (a
+normalisation of `clean_latex`, the reading order of a stacked pair) made no call and cost
+nothing.
+
+Prose runs are scored by the `prose_classes` scorer of `feat/t2-scorers` (read from that
+branch, not merged here) on the converted HTML: a run is scripted when the output shows it as
+`<sub>`/`<sup>` or as a script inside inline MathML, flattened when its digits are glued on as
+text, lost when its context is not there (counts of runs):
+
+| Class | n | before: scripted (sub/sup + maths) | flattened | lost | after: scripted | flattened | lost |
+|---|---|---|---|---|---|---|---|
+| Units with superscripts (`prose_unit_power`) | 146 | 77 (0 + 77) | 55 | 14 | 129 (120 + 9) | 4 | 13 |
+| Chemical scripts (`prose_chem_script`) | 263 | 76 (0 + 76) | 144 | 43 | 235 (214 + 21) | 13 | 15 |
+| Nuclide prefix scripts (`prose_nuclide`) | 79 | 1 (0 + 1) | 77 | 1 | 78 (77 + 1) | 0 | 1 |
+| Other scripts (`prose_script_other`) | 253 | 166 (0 + 166) | 48 | 39 | 198 (49 + 149) | 17 | 38 |
+| All | 741 | 320 | 324 | 97 | 640 | 34 | 67 |
+
+What is left is almost all in tables (`1-4-measurements` 25 lost and 10 flattened, `rate-laws`
+22 and 18: a cell keeps raised marks as superscript characters, `tables._marked`, which the
+scorer does not count, and lowered ones flat; the notice `scripts_flattened` says which
+tables), and variables with scripts that stay inline equations (`prose_script_other`: 149 of
+the 198 scripted are inline MathML, as before).
+
+Equations are paired to the gold by the document task's alignment (`document_page_item`); for
+each gold equation of a class: matched (a predicted equation is paired with it), exact (the
+primary scorer, `exact_lenient`), stream v2 (the secondary scorer of `feat/t2-scorers`), and
+content-equal (a diagnostic of this work, not a scorer: the LaTeX is equal once `\text` and
+`\mathrm`, spacing, braces and the order of a stacked pair of scripts are ignored; the primary
+scorer calls the authored `\mathrm{Th}` and a model's `\text{Th}` different, the OpenStax gold
+writes `<mtext>`):
+
+| Class | n | before: matched / exact / v2 / content-equal / required | after: matched / exact / v2 / content-equal / required | written as sup/sub text instead |
+|---|---|---|---|---|
+| Chemical formulas | 211 | 143 / 11 / 40 / 32 / 32 | 125 / 8 / 37 / 28 / 18 | 20 |
+| Charges on ions | 111 | 75 / 0 / 12 / 11 / 20 | 65 / 0 / 12 / 11 / 11 | 10 |
+| Chemical equations | 148 | 95 / 2 / 27 / 17 / 16 | 89 / 2 / 27 / 17 / 11 | 0 |
+| Nuclide notation | 98 | 69 / 21 / 31 / 36 / 35 | 70 / 20 / 30 / 45 / 11 | 0 |
+| Equations as pictures | 37 | 0 / 0 / 0 / 0 / 0 | 37 / 33 / 32 / - / 37 | 0 |
+
+- **Equations as pictures.** Before, the 37 pictures of `word-eq-images` were 34 figures (3 were
+  dropped silently, a one-letter picture is under the 12 pt limit), all accepted by the figure
+  step (33 with no review, 1 optional): no equation was read or checked. After, all 37 are
+  equations (9 inline in their sentence, 28 displays, the equation numbers as labels), 33 read
+  exactly, and each is a required decision (`equation.no_text_layer`). In four OpenStax algebra
+  sections that are not in the live set (layout only, no model) 56 pictures that were figures
+  are now equations: 26 in "Solve systems of equations by substitution", 26 in "Simplify
+  complex rational expressions", 3 in Cramer's rule and 1 in "Sequences" (two sequences joined
+  by arrows). A crop of each was looked at: all are pictures of equations, and the one
+  picture that was not (a right triangle with two letters) is kept as a figure by the rule
+  that a picture on a line of its own has at least three pieces of ink.
+- **Chemical formulas and ions** that the PDF cannot tell from running text (`H$_2$O` and
+  `$\mathrm{H_2O}$ ` are the same glyphs in a TeX PDF) are text with `<sub>`/`<sup>` now, so
+  they leave the equation counts: 20 formulas and 10 charges of the authored documents are
+  found only as raised or lowered text (matched, exact and v2 fall by that much), and the model
+  is no longer asked about half a formula ("2O3", "34-"): 236 fewer model calls over the 17
+  documents (960 to 724), 50 fewer required decisions (212 to 162, with the 37 of the pictures
+  added), the recorded cost of the documents $1.665 to $1.463.
+- **Nuclide notation.** A display nuclear equation used to be cut into four pieces (the mass
+  numbers a heading, the symbol of the last nuclide lost); each is one equation now, and 45
+  of 98 nuclide equations are content-equal against 36. 22 more are cells of the table
+  "Nuclear Compositions of Atoms" in `2-3-atomic-structure-and-symbolism` and are found in
+  neither run. The model also leaves out the
+  empty group before a prefix script (`+ ^{4}_{2}He`, which LaTeX hangs on the plus sign);
+  `clean_latex` adds `{}`, which gave back 5 equations that read right and scored wrong.
+- **Where the equation classes do not move.** The scorers make most of the gap: primary exact
+  stays low because the authored gold writes `\mathrm{...}` and the model `\text{...}` (and
+  the speech of `\text` is the better one: "H sub 2 O", not "capital H sub 2 capital O"), and many
+  gold equations of the OpenStax chemistry sections are cells of tables (the half-reactions
+  of `16-3-standard-reduction-potentials`: 36 not found, before and after). The classes
+  these changes were built for are the scripts and the pictures.
+
+No gold file, golden output or held-out number changed. Three tests that encoded the old
+behaviour were rewritten (`test_layout_analyze`: an upright x with a raised 2 is raised text,
+not maths; `test_layout_fixtures`: "3 m/s2" in a text font is raised text; `test_layout_silent_loss`:
+a picture of maths is held as an equation, not as a figure).
+
 ## What the numbers do not show
 
 - **Small samples.** 30 equations: one equation is 3.3 points, and at 0.80 the 95%
