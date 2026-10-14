@@ -56,7 +56,9 @@
     nearby text, are sent to Anthropic's API (the Claude models).{% if notation_on %} For a document you upload
     for one of your courses, that course's notation (its symbols and what they mean) is
     sent with the equations.{% endif %} Anthropic states that it does not use API data to train its models by
-    default; see Anthropic's own API data policies for how long it keeps requests.</li>
+    default. Anthropic's published policy is to delete API inputs and outputs from its systems
+    within 30 days (longer for material its safety systems flag), so a document you delete here
+    can remain with Anthropic for up to that long; see Anthropic's own API data policies.</li>
   {% else %}
   <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the

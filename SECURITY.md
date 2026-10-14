@@ -45,6 +45,9 @@ for those.
 
 ## What the design assumes
 
+The threat model, every control with the test that exercises it, and the findings of the
+pre-launch audit are in [docs/security.md](docs/security.md).
+
 These are design statements that the tests exercise; they are not guarantees.
 
 - **PDFs and everything extracted from them are untrusted.** A PDF is first opened in a
