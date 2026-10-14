@@ -535,6 +535,36 @@ them and promote each as the baseline. Earlier runs were kept in a git-ignored
 `.local/eval/` and are not in the repository. figures-run1 was graded by the older text-only judge and cannot be a
 baseline for runs graded with the image.
 
+Recorded answers, replays and batches (`--answers`, `--batch`; development sets only). A live
+run is paid for once. `--answers FILE` keeps every model answer in a JSON-lines file keyed by
+everything the model is given (step, model, prompt version, instructions, the images by what
+they show, the text, the token limit, the thinking effort the client will send, and whether
+the untrusted-text notice rides in the system block). A request already in the file is
+answered from it, with the recorded tokens and cost, at no charge; any other goes to the model
+and is appended. So one baseline recording serves every experiment that asks the same
+thing, and an experiment pays only for requests that differ from the baseline's.
+`--answers-offline` turns a miss into a refusal instead of a call (a replay that cannot spend),
+and `--every N` takes every Nth equation or figure instead of the first few. `--answers` is
+refused for the held-out set and the sealed check part.
+
+```
+uv run a11y-stem eval pipeline --task equations --provider anthropic --max-usd 2 --answers .local/answers.jsonl
+uv run a11y-stem eval pipeline --task equations --provider anthropic --answers .local/answers.jsonl --answers-offline
+```
+
+`--batch` (with `--answers` and `--provider anthropic`) sends what the file cannot answer to
+the Message Batches API, which bills half the price and answers in minutes to an hour. A run
+is made in stages (`eval/staged.py`, `models/anthropic_batch.py`): a pass that only collects
+the requests it has no answer for, one batch, the same pass again (now reaching the
+escalations and the judge calls the first answers led to), until a pass asks for nothing new;
+that last pass is the run. The requests are the ones a live call sends (`batch_params`),
+less the server-side refusal fallback, which the Batches API does not take; an answer is
+recorded at list price, so runs made either way compare, and the cap is charged what the batch
+billed. A batch's prompt-cache hits are best effort: cache numbers come from live runs. The
+chatbot arms and the figure judge of a proof take `--batch` too
+(`proof --add-systems chatbot --provider anthropic --batch`, `proof/chatbot_batch.py`): the
+same message per section, `billed_usd` beside `cost_usd` (list price) in each record.
+
 Weekly sample (drift check between full runs): a 5% share of the gold units, seeded by
 the ISO week, scored like any other run (`eval/sample.py`). Reports go to
 `.local/eval/weekly/<week>-<task>.json` (git-ignored):
