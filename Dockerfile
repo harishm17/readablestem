@@ -47,6 +47,20 @@ RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home --home-dir /app \
        --shell /usr/sbin/nologin app
 
+# Word and PowerPoint uploads (T3-30) need LibreOffice's Writer and Impress components, run
+# headless in a limited child process (src/a11y_stem/web/office_convert.py). They add a few
+# hundred megabytes to the image and about 300 MB of memory while a file converts, so they
+# are installed only when asked for: docker build --build-arg INSTALL_LIBREOFFICE=true .
+# Without them the upload form takes PDFs only and says so (docs/deploy.md).
+ARG INSTALL_LIBREOFFICE=false
+RUN if [ "$INSTALL_LIBREOFFICE" = "true" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            libreoffice-writer-nogui libreoffice-impress-nogui \
+            fonts-crosextra-carlito fonts-crosextra-caladea fonts-liberation2 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 WORKDIR /app
 # Owned by root and read-only to the app user: the process cannot rewrite its own code.
 COPY --from=build /app /app

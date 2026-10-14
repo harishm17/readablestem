@@ -297,3 +297,21 @@ def test_the_child_that_reads_the_file_gets_no_secrets(web, monkeypatch):
     assert len(seen) >= 2  # the converter's child, then the probe's
     for environment in seen:
         assert environment is not None and "secret-value" not in " ".join(environment.values())
+
+
+def test_nothing_of_the_file_is_left_in_the_temporary_folder(web, tmp_path, monkeypatch):
+    scratch = tmp_path / "scratch"
+    scratch.mkdir()
+    monkeypatch.setenv("TMPDIR", str(scratch))
+    assert send(web.browser, office.docx(), "notes.docx").status_code == 303
+    assert send(web.browser, office.with_external_picture(), "linked.docx").status_code == 422
+    assert list(scratch.iterdir()) == []
+
+
+def test_the_privacy_page_says_how_these_files_are_handled_only_when_they_are_taken(web, tmp_path):
+    page = web.browser.get("/privacy").text
+    assert "Word or PowerPoint file is checked in a separate process" in page
+    assert "the Word or PowerPoint file itself is not kept" in page
+    env = WebEnv(tmp_path / "off", office_input_enabled=False)
+    with env.running() as client:
+        assert "Word or PowerPoint file is checked" not in client.get("/privacy").text

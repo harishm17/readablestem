@@ -249,3 +249,22 @@ def with_hyperlink(url: str = "https://example.org/") -> bytes:
         "</Relationships>",
     )
     return rebuild(parts, replace={"word/_rels/document.xml.rels": rels})
+
+
+def docx_with_equation() -> bytes:
+    """`docx()` plus a displayed equation, v = d / t, written as Word's own maths (OMML)."""
+    parts = docx_parts()
+    math = (
+        "<w:p><m:oMathPara><m:oMath><m:r><m:t>v=</m:t></m:r><m:f><m:num><m:r><m:t>d</m:t></m:r>"
+        "</m:num><m:den><m:r><m:t>t</m:t></m:r></m:den></m:f></m:oMath></m:oMathPara></w:p>"
+    )
+    document = (
+        str(parts["word/document.xml"])
+        .replace(
+            "<w:document ",
+            '<w:document xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math" ',
+            1,
+        )
+        .replace("<w:sectPr>", math + "<w:sectPr>", 1)
+    )
+    return rebuild(parts, replace={"word/document.xml": document})
