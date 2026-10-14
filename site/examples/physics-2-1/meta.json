@@ -1,0 +1,17 @@
+{
+  "id": "physics-2-1",
+  "order": 3,
+  "kind": "openstax",
+  "title": "OpenStax Physics 2.1: Relative Motion, Distance, and Displacement",
+  "short": "Physics 2.1, relative motion, distance and displacement",
+  "blurb": "Bold displacement vectors with subscripts, and figures, converted with the Claude provider.",
+  "pages": [
+    6,
+    11
+  ],
+  "speech": [
+    "p11-e10",
+    "p12-e10"
+  ],
+  "set": "development: one of the three sections used while the tool was built"
+}

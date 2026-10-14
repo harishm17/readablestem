@@ -1,0 +1,19 @@
+{
+  "id": "physics-2-2",
+  "order": 2,
+  "kind": "openstax",
+  "title": "OpenStax Physics 2.2: Speed and Velocity",
+  "short": "Physics 2.2, speed and velocity",
+  "blurb": "Fractions, subscripts and long worked equations, converted with the Claude provider.",
+  "pages": [
+    2,
+    5,
+    10
+  ],
+  "speech": [
+    "p2-e19",
+    "p5-e7",
+    "p10-e6"
+  ],
+  "set": "development: one of the three sections used while the tool was built"
+}

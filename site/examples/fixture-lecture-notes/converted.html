@@ -1,0 +1,82 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="generator" content="a11y-stem 0.1.0">
+<title>Motion in One Dimension: Lecture Notes</title>
+<style>
+:root { color-scheme: light; }
+body { margin: 0; background: #ffffff; color: #1b1b1b;
+  font: 1.125rem/1.6 system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; }
+main { max-width: 42rem; margin: 0 auto; padding: 1.5rem 1rem 3rem; overflow-wrap: break-word; }
+h1, h2, h3, h4, h5, h6 { line-height: 1.25; margin: 1.6em 0 0.5em; }
+p { margin: 0 0 1em; }
+img { max-width: 100%; height: auto; }
+.equation { margin: 1em 0; padding: 0.25em 0; text-align: center; position: relative;
+  overflow-x: auto; overflow-y: hidden; }
+.equation-scroll { display: inline-block; max-width: 100%; vertical-align: middle;
+  overflow-x: auto; overflow-y: hidden; }
+.equation-labelled { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25em 1em; }
+.equation-labelled > math { flex: 1 0 auto; }
+.equation-label { flex: none; margin-left: auto; }
+math { font-size: 1.1em; }
+math[display="block"] { margin: 0 auto; }
+ul, ol { margin: 0 0 1em; padding-left: 1.75em; }
+li > ul, li > ol { margin: 0.25em 0 0; }
+.printed-markers { list-style: none; }
+.printed-markers > li { text-indent: -1.75em; padding-left: 1.75em; }
+.printed-markers > li > * { text-indent: 0; }
+.list-marker { display: inline-block; min-width: 1.5em; text-indent: 0; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden;
+  clip-path: inset(50%); white-space: nowrap; }
+figure { margin: 1.5em 0; }
+figure img { display: block; }
+figcaption { margin-top: 0.5em; }
+.flagged { border: 3px dashed #8a3c00; border-radius: 4px; padding: 0.75rem; margin: 1.5em 0; }
+.notice { border: 3px solid #8a3c00; border-radius: 4px; padding: 0.75rem; }
+.flagged figure { margin: 0; }
+.flagged > img { display: block; margin: 0 auto; }
+.flagged-inline { border: 2px dashed #8a3c00; padding: 0 0.2em; }
+.flagged-inline img { vertical-align: middle; }
+.flag-note { margin: 0.75em 0 0; }
+.flag-label { font-weight: 700; }
+.original-text { font-family: ui-monospace, Menlo, Consolas, monospace; }
+.about { max-width: 42rem; margin: 0 1rem; padding: 0.5em 0 3rem;
+  border-top: 2px solid #1b1b1b; }
+@media (min-width: 44rem) { .about { margin: 0 auto; } }
+:focus-visible { outline: 3px solid #0b57d0; outline-offset: 2px; }
+@media print { .flagged { break-inside: avoid; } }
+</style>
+</head>
+<body>
+<main>
+<h1 id="p1-e0">Chapter 2: Motion in One Dimension</h1>
+<p id="p1-e1">These notes describe motion along a straight line. We track where an object is, how far it has moved, and how quickly its position changes. Every quantity comes with a unit, and checking units is the fastest way to catch a mistake in a calculation.</p>
+<h2 id="p1-e2">2.1 Position and Displacement</h2>
+<p id="p1-e3">Position is measured from a chosen origin. When a cart moves from an initial position <math display="inline" id="p1-e4"><mrow><msub><mi>x</mi><mn>0</mn></msub></mrow></math> to a final position <math display="inline" id="p1-e5"><mrow><msub><mi>x</mi><mi>f</mi></msub></mrow></math>, its displacement is the change in position:</p>
+<div class="equation" id="p1-e6"><math display="block"><mrow><mi>Δ</mi><mi>x</mi><mo>=</mo><msub><mi>x</mi><mi>f</mi></msub><mo>−</mo><msub><mi>x</mi><mn>0</mn></msub></mrow></math></div>
+<p id="p1-e7">Displacement has a direction. A cart that ends up behind its starting point has a negative displacement, even though the distance it travelled is positive.</p>
+<h3 id="p1-e8">Units</h3>
+<p id="p1-e9">Positions and displacements are measured in metres. A displacement of 3 m to the left is written as <math display="inline" id="p1-e10"><mrow><mo>−</mo><mn>3</mn><mtext> </mtext><mtext>m</mtext></mrow></math> when the positive direction points right.</p>
+<h2 id="p1-e11">2.2 Speed and Velocity</h2>
+<p id="p1-e12">Average velocity is displacement divided by the time taken. For a trip that lasts <math display="inline" id="p1-e13"><mrow><mi>Δ</mi><mi>t</mi></mrow></math>, the average velocity is <math display="inline" id="p1-e14"><mrow><mi>v</mi><mo>=</mo><mi>Δ</mi><mi>x</mi><mo>/</mo><mi>Δ</mi><mi>t</mi></mrow></math>, and its unit is metres per second.</p>
+<div class="equation" id="p1-e15"><math display="block"><mrow><mi>v</mi><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>x</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></mrow></math></div>
+<p id="p1-e16">If we know the kinetic energy of the cart and its mass, its speed follows from</p>
+<div class="equation" id="p1-e17"><math display="block"><mrow><mi>v</mi><mo>=</mo><msqrt><mrow><mfrac><mrow><mn>2</mn><mi>K</mi></mrow><mrow><mi>m</mi></mrow></mfrac></mrow></msqrt></mrow></math></div>
+<figure id="p1-e18"><img src="data:image/png;base64,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" alt="Line graph with unlabelled axes: a straight line rises steadily from a positive starting value, with two points marked on it, showing constant slope." width="260" height="120"><figcaption>Figure 2.1 Position against time for a cart moving at constant velocity.</figcaption></figure>
+<h2 id="p2-e0">2.3 Acceleration</h2>
+<p id="p2-e1">Acceleration is the rate at which velocity changes. A cart that speeds up from rest to 6 m/s in two seconds has an average acceleration of <math display="inline" id="p2-e2"><mrow><mn>3</mn><mtext> </mtext><msup><mtext>m/s</mtext><mrow><mn>2</mn></mrow></msup></mrow></math>.</p>
+<div class="equation" id="p2-e3"><math display="block"><mrow><mi>a</mi><mo>=</mo><mfrac><mrow><mi>Δ</mi><mi>v</mi></mrow><mrow><mi>Δ</mi><mi>t</mi></mrow></mfrac></mrow></math></div>
+<p id="p2-e4">When the acceleration is constant, the velocity grows by the same amount every second and a graph of velocity against time is a straight line.</p>
+<h3 id="p2-e5">Free fall</h3>
+<p id="p2-e6">Near the surface of the Earth, a dropped ball has a nearly constant downward acceleration <math display="inline" id="p2-e7"><mrow><mi>g</mi></mrow></math> as long as air resistance is small. Timing a fall over a known height is a simple way to estimate it in the lab.</p>
+</main>
+<footer id="about-conversion" class="about a11y-stem" aria-labelledby="about-conversion-title">
+<h2 id="about-conversion-title">About this version</h2>
+<p>This is a web version of a PDF from your course, made with a11y-stem, a tool that assists with accessibility. Its equations are written so that screen readers can read them aloud.</p>
+<p>Some parts were made by the tool and have not been checked by your instructor yet.</p>
+<p>If something is hard to read or looks wrong, tell your instructor.</p>
+</footer>
+</body>
+</html>

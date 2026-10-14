@@ -1,0 +1,14 @@
+{
+  "version": "stemcheck 0.2.0 (rules-6d574061)",
+  "commit": "1e37fa0",
+  "pdf": "long_2-2_2-3.pdf (OpenStax Physics 2.2 and 2.3, 27 pages, printed by this project)",
+  "pdf_sha256": "31cd2a53c2f7c9724df03e3036ae1973368e5822cb53734eee905405edd6b30e",
+  "html": "long_2-2_2-3.html, written by a chatbot (gpt-6-luna) from that PDF",
+  "html_sha256": "dc8e0fdd868fdc562e547539cbc12253dfc397da748218ff769257fee15d2265",
+  "command": "stemcheck check long_2-2_2-3.pdf long_2-2_2-3.html",
+  "pages": 27,
+  "checkable": 27,
+  "line_compared": "25 of 34 PDF equations, 185 of 292 text blocks, 14 of 14 questions",
+  "line_places": "131 places to look at (questions 24, maths 13, text 94), and 26 notes",
+  "line_rewrite": "125 of 154 paragraphs differ in wording"
+}
