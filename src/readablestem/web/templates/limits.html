@@ -57,7 +57,18 @@
 </ul>
 
 <h2 id="accuracy">How accurate it is</h2>
-<p>Measured on a small sample only: three sections of one high-school physics textbook
+<p>In a pre-registered test on 15 sections of five OpenStax textbooks it had not seen
+  (version 0.4.0, October 2026; <a href="{{ source_url }}/blob/main/PROOF.md">full results</a>):</p>
+<ul>
+  <li>Equations: about half came out exactly right end to end (0.50); given each equation
+    on its own, about two in three (0.68). A general chatbot (Claude Opus) did better end
+    to end (0.62).</li>
+  <li>Headings: F1 0.96, with every matched heading at the right level.</li>
+  <li>Figure descriptions: 97% passed a model judge (not yet checked by people).</li>
+  <li>Decisions it asked for: about 1.8 per page; it asked about only a third of the
+    equations that were wrong.</li>
+</ul>
+<p>Earlier, on a small development sample only: three sections of one high-school physics textbook
   (OpenStax <cite>Physics</cite>, chapter 2), 43 PDF pages, on 9 and 12 October 2026.</p>
 <ul>
   <li>Equations: 23 of 30 came out exactly right (95% interval: 59% to 88%).</li>

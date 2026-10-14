@@ -331,8 +331,9 @@ def test_the_posting_help_says_upload_and_link_never_paste(web):
 def test_the_landing_page_says_why_now_how_long_and_how_accurate(web):
     flat = text(web.client().get("/").text)
     assert "public universities" in flat
-    assert "a 16-page textbook section needed 3 decisions" in flat
-    assert "23 of 30 equations" in flat and "It makes mistakes" in flat
+    assert "one or two per page" in flat and "pre-registered test" in flat
+    assert "about half of all equations" in flat and "It makes mistakes" in flat
+    assert "/blob/main/PROOF.md" in web.client().get("/").text
     assert "How to post it in your course" in flat
     assert "confidence score" not in flat
 

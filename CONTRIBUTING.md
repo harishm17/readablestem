@@ -37,6 +37,11 @@ is.
 - **Numbers carry their sample size and an interval,** and say what they do not show.
   Changing a prompt or a model means re-running the relevant eval task and committing the
   new report (`docs/eval.md`, "How to rerun"); CI's eval gate fails on a regression.
+- **`--max-usd` caps reservations, not spend.** Each model call reserves its worst case
+  (a main-model call reserves far more than it costs), so a cap near the expected spend
+  stops a run part-way. Set it to at least four times the expected spend, keep
+  `MODEL_CONCURRENCY` low for small runs, and record answers once with `--answers` so
+  reruns replay for free.
 - **Style.** ruff with line length 100, type hints that pass `ty check src`, and docstrings
   that say why. A new runtime dependency needs a note in the pull request, and its licence
   has to fit `THIRD_PARTY_NOTICES.md`.

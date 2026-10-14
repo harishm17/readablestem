@@ -16,26 +16,25 @@
   <li>figures have short alt text, or a clear flag where a description is still needed.</li>
 </ul>
 
-{# The numbers below are the committed eval reports (data/eval/latest-*.json, pipeline
-   0.4.0, 2026-10-12: equations exact_lenient 0.767, 23 of 30; document flag precision
-   0.60, 6 of 10) and the triage re-runs in docs/eval.md "Review load" (OpenStax 2.1, 16
-   pages: 3 decisions in both runs; the one-page LaTeX handout: 2, then 1). Update them
-   when the eval is rerun. FEATURE-REVIEW 10.3, row 3, prefers a link to "how we measure"
-   over numbers; the beta shows them with that link (docs/launch.md P7). #}
+{# The numbers below are the pre-registered held-out test in PROOF.md (tag
+   proof-heldout-2026-10, pipeline 0.4.0, 15 OpenStax sections): equations end to end
+   0.504, equations given one at a time 0.684, heading F1 0.961, figure judge pass 0.971,
+   1.76 required decisions per page. Update them only from a new registered test. #}
 <h2>How long it takes</h2>
 <p>Converting takes a few minutes. Then you decide only what could change what a student
-  reads; everything else is accepted for you and listed, so you can look it over. In our
-  tests a 16-page textbook section needed 3 decisions, and a one-page handout 1 or 2 (it
-  varies from run to run). <a href="{{ source_url }}/blob/main/docs/eval.md#review-load-equations-headings-document">How
-  this was measured</a>.</p>
+  reads; everything else is accepted for you and listed, so you can look it over. Dense
+  maths means more decisions: on textbook sections in our held-out test it asked about
+  one or two per page.</p>
 
 <h2>How accurate it is</h2>
-<p>It makes mistakes, so look over the equations your students rely on. In our small
-  test, 23 of 30 equations from one physics textbook came out exactly right, and about 6
-  in 10 of the decisions it asked for pointed at a real problem. Its checks against the
-  PDF's own text catch some wrong equations, not all.
-  <a href="{{ source_url }}/blob/main/docs/eval.md">How we measured this, and what the
-  numbers do not show</a>.</p>
+<p>It makes mistakes, so look over the equations your students rely on. In a
+  pre-registered test on 15 textbook sections it had not seen (version 0.4.0, October
+  2026), about half of all equations came out exactly right end to end, mostly because
+  some were cut or missed on the page; given each equation on its own, about two in three
+  did. Headings scored 0.96 and figure descriptions passed a model judge 97% of the time.
+  Its checks against the PDF's own text catch some wrong equations, not all.
+  <a href="{{ source_url }}/blob/main/PROOF.md">The full results, including where it
+  loses to a general chatbot</a>.</p>
 
 <h2>What you do with the file</h2>
 <p>Post it in your course in place of the PDF. Students open it in any browser.
