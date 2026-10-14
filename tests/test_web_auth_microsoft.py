@@ -307,8 +307,10 @@ def refusals(caplog) -> list[str]:
         ({"exp": int(time.time()) - 600}, "expired"),
         ({"exp": None}, "expired"),
         ({"exp": "tomorrow"}, "expired"),
-        ({"nbf": int(time.time()) + 600}, "not_yet_valid"),
-        ({"iat": int(time.time()) + 600}, "not_yet_valid"),
+        # A day ahead, not minutes: these values are fixed at collection, and a long suite run
+        # would otherwise carry them past the clock-skew allowance before the test runs.
+        ({"nbf": int(time.time()) + 86400}, "not_yet_valid"),
+        ({"iat": int(time.time()) + 86400}, "not_yet_valid"),
         ({"nonce": None}, "bad_nonce"),
         ({"nonce": "nonce-of-an-earlier-sign-in"}, "bad_nonce"),  # a replayed token
         ({"nonce": "nonce-é"}, "bad_nonce"),
