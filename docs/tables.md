@@ -21,6 +21,30 @@ Layout calls `tables.find(page, lines, paths)` for every analysed page, before c
 rows, headings and equations are worked out ([layout.md](layout.md), "How a page is
 read", step 0). No model call; the same PDF always gives the same tables.
 
+### Which pages are looked at
+
+Layout runs the detector below only on a page that could hold a table
+(`tables.may_hold_table`), because the detector is most of a page's analysis time (85-90%
+of `layout.analyze` on OpenStax sections). `judge` keeps a box only with a grid (step 2),
+so a page is left out when it has no rule pieces enough for a ruled table (three row or
+three column rules, or two of each, counted per position, every drawn rule, stroked
+rectangle and thin image included), nothing for aligned text (no x position at which three
+visual lines have a gap wider than half the font size, or a rule between two glyphs), and
+no ruled grid with a line of text in two columns. The thresholds are looser than the
+arbitration's (a gap counts from 0.5 of the font size, not 0.8), so a glyph the box leaves
+out cannot decide it; the test only ever over-passes. The result is the same either way:
+`tests/test_tables_prefilter.py` analyses every table fixture with and without it and
+compares the elements and notices (the rest of the repository's PDFs in a slow test), and a
+check over 553 PDFs (the repository's fixtures and the author's research PDFs, the first
+eight pages of each, 725 pages) found the detector's tables on 82 pages, none of them among
+the 289 (40%) the test skipped. How many pages it skips depends on the document: it saves
+little on pages with boxed callouts (OpenStax Physics 2.2, 14 pages: layout 3.9 s, of
+which 3.2 s detection, against 2.8 s; 2.3, 13 pages: 4.3 s against 2.4 s) and about 40% of
+the layout time on lecture notes and problem sets (`scripts/bench_runtime.py convert`:
+7.1 s of CPU in layout, 4.0 s after; two-column text and runs of numbered equations pass
+the test). `layout.TABLE_PREFILTER`
+turns it off (for that comparison).
+
 ### How a page's tables are found
 
 1. **Propose.** PyMuPDF Layout (`pymupdf-layout`, ONNX layout models in the wheel) with

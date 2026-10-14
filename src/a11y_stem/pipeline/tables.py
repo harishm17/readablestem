@@ -54,7 +54,7 @@ import sys
 import threading
 import unicodedata
 from collections import Counter
-from collections.abc import Callable, Generator, Sequence
+from collections.abc import Callable, Generator, Iterable, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from itertools import pairwise
@@ -112,6 +112,12 @@ GUTTER_PT = 3.0  # narrowest white gap between two columns of text
 SCRIPT_SIZE = 0.85  # x the line's largest glyph: smaller glyphs may be scripts (as layout)
 RAISED = 0.2  # x the full-size glyph: a smaller one with its baseline this far up is raised
 STACK_GAP = 3.0  # x font size: furthest apart two rules of one booktabs table may be
+
+# The page test before detection (`may_hold_table`): a gap counts from this wide (x font
+# size; the arbitration's own cut is SEGMENT_GAP, 0.8), and aligned text needs this many
+# lines with such a gap at one x position (the arbitration's MIN_GRID_LINES).
+PREFILTER_GAP = 0.5
+PREFILTER_LINES = 3
 
 # Reasons on a TABLE element (`Element.reasons`), content-free like layout's.
 REASON_RULED = "ruled grid"
@@ -459,6 +465,76 @@ def _display(page: pymupdf.Page) -> Callable[[Sequence[float]], BBox]:
         return min(xs), min(ys), max(xs), max(ys)
 
     return box
+
+
+def may_hold_table(
+    page: pymupdf.Page, lines: Sequence[LineLike], paths: Sequence[PathLike]
+) -> bool:
+    """Could `find` return a table on this page? False only when it cannot, and then the
+    detector (an ONNX layout model, most of a page's analysis time) need not run.
+
+    `judge` keeps a box only with a grid (module docstring, step 2), which is one of:
+
+    - *aligned text*: text on at least three lines in two or more columns. Columns come
+      from a gutter, an x position where each of those lines has a gap between two cells
+      (wider than `SEGMENT_GAP`), or from a drawn column rule through them;
+    - *ruled*: three row rules, or three column rules, or two of each, and text in two
+      columns on at least one line;
+    - *ruled cells*: three row rules and three column rules.
+
+    So a page is left out when none of these can hold anywhere on it, counted loosely: a
+    gap counts from `PREFILTER_GAP` (0.5 of the font size, looser than the 0.8 above, so a
+    glyph the box leaves out cannot make the difference), a rule counts per position
+    (pieces of one rule merged), and the three conditions are tested on the whole page,
+    not in a box. It passes the pages it could keep a table on (checked on every PDF in
+    the repository: tests/test_tables_prefilter.py) and many with none (columns of text, a
+    callout box with a list in it), which the arbitration then drops as before.
+    """
+    view = _PageView.of(page, lines, paths)
+    rows, columns = _positions(y for _, _, y in view.hsegs), _positions(x for _, _, x in view.vsegs)
+    cells = rows >= 3 and columns >= 3
+    ruled = rows >= 3 or columns >= 3 or (rows >= 2 and columns >= 2)
+    if cells:
+        return True
+    cuts = sorted({x for _, _, x in view.vsegs}) if columns < 3 else []
+    gaps: list[tuple[float, int]] = []  # (x, +1 a gap opens / -1 it closes), over all lines
+    lines_with_gap = 0
+    for chars in _visual_lines(view.glyphs_in((-1e9, -1e9, 1e9, 1e9), pad=0.0)):
+        last: GlyphLike | None = None
+        wide = False
+        for ch in chars:
+            if ch.blank:
+                continue
+            if last is not None:
+                gap = ch.x0 - last.x1
+                size = max(ch.size, last.size, 1.0)
+                if gap > PREFILTER_GAP * size or any(
+                    last.x1 - 0.5 <= x <= ch.x0 + 0.5 for x in cuts
+                ):
+                    wide = True
+                    gaps.append((min(last.x1, ch.x0), 1))
+                    gaps.append((max(last.x1, ch.x0), -1))
+            last = ch
+        lines_with_gap += wide
+    if ruled and lines_with_gap:
+        return True
+    # A gap opens before one closes at the same x: touching gaps share that position.
+    depth = 0
+    for _, step in sorted(gaps, key=lambda g: (g[0], -g[1])):
+        depth += step
+        if depth >= PREFILTER_LINES:
+            return True
+    return False
+
+
+def _positions(values: Iterable[float]) -> int:
+    """How many rule positions: values within `RULE_JOIN` of the one before are one."""
+    count, last = 0, -1e9
+    for value in sorted(values):
+        if value - last > RULE_JOIN:
+            count += 1
+        last = value
+    return count
 
 
 def propose(page: pymupdf.Page) -> list[Proposal]:
