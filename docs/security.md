@@ -35,6 +35,20 @@ provider's own handling of what is sent to it (see "Where document data goes").
   from a tenant in `MS_ALLOWED_TENANTS`, the ID token is checked against that tenant's keys
   (`web/microsoft.py`), and an email whose domain the directory has not verified is not
   trusted. Tests: `test_web_auth.py`, `test_web_auth_microsoft.py`.
+- Another Google account for one instructor (T3-10): an admin links a second address to an
+  allowed instructor (`web/linked_emails.py`). Google's verified email is still the only
+  thing trusted; the instructor's own `is_allowed` decides on every request, so removing
+  them ends the linked address too; a linked address can never also be another person's
+  own address; unlinking ends the instructor's sessions. Tests: `test_web_linked_emails.py`.
+- Email sign-in link (T3-10), **off** (`EMAIL_LOGIN_ENABLED=false`) and with **no email
+  provider wired in**: the settings check refuses turning it on without a registered
+  sender, and production refuses any sender not marked for production, of which there is
+  none. When on: one answer for every address (no list of who is invited), a 32-byte random
+  token of which only the SHA-256 is stored, one use, 15 minutes, a newer link replacing
+  older ones, a button page so a mail scanner cannot use the link up, CSRF on the
+  button, a limit of three messages per target address per 15 minutes besides the
+  sign-in rate limits, nothing about the address or token logged. Tests:
+  `test_web_email_login.py`, `test_web_signin_browser.py`.
 - Access is the allowlist (`users.is_allowed`), checked on **every request**, so removing
   someone ends their session at once, and admin demotion likewise (`test_audit_auth.py`).
 - The session is a signed cookie: HttpOnly, SameSite=Lax, 7 days, and in production Secure
@@ -65,16 +79,16 @@ cannot skip these checks unnoticed.
 
 | Class | Routes |
 |---|---|
-| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
+| Public | `/`, `/demo`, `/privacy`, `/terms`, `/limits`, `/help/posting`, `/status`, `/healthz`, `/readyz`, `/login` (GET, POST), `/login/microsoft`, `/login/email` and `/login/email/confirm` (GET, POST; 404 unless `EMAIL_LOGIN_ENABLED`, which is off), `/auth/callback`, `/auth/microsoft/callback`, `/logout`, `/static/*`; `/dev-login` (404 outside dev and test) |
 | Signed-in user, owner only | `/app`, `/app/documents`, `POST /jobs`, everything under `/jobs/{id}/...`, everything under `/courses/...` |
-| Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove` |
+| Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove`, `POST /admin/linked-emails`, `POST /admin/linked-emails/remove` |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
 
 The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, are owner-only
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
 which are not limited either), the body limit applies, and the number of documents a person
-can hold is capped. `/jobs/{id}/download/canvas` is a GET for the owner, like `/download`. A
+can hold is capped. `/jobs/{id}/download/canvas` and `/jobs/{id}/download/cartridge` (the same page as an IMS Common Cartridge) are GETs for the owner, like `/download`. A
 download restarts the deletion clock of the person's own document (`retention.restart_clock`),
 which is the one thing a GET changes; `test_get_requests_change_nothing` allows that and no
 other change.
@@ -111,16 +125,18 @@ script injected into an app page is refused by the policy.
 | Limit | Value | Where |
 |---|---|---|
 | Request body, any route but the upload | 1 MiB, cut off while streaming | `RequestSizeLimitMiddleware` |
-| Upload size | `MAX_UPLOAD_MB`, checked while streaming, never spooled to disk | `web/uploads.py` |
+| Upload size | `MAX_UPLOAD_MB`, checked while streaming, never spooled to disk (a Word or PowerPoint file is written to a private temporary directory by the converter for the seconds it takes: below) | `web/uploads.py` |
 | Pages per upload | `MAX_PAGES_PER_JOB` | the probe, before quota or model |
 | Page size | 5000 pt a side | probe |
 | Uploads in progress | 3 per instance, 1 per person | `UploadGate` |
 | Probe child | 30 s timeout, 768 MiB address space, minimal environment | `inspect_pdf_isolated`, `pdf_probe` |
+| Word and PowerPoint (T3-30) | File checks in a child with a minimal environment and a 768 MiB cap; LibreOffice in its own session and process group with 2 GiB address space, CPU, output-size and open-file limits and `OFFICE_TIMEOUT_S` (90 s) then killed; one conversion at a time per instance; the PDF it makes is probed like any upload | `convert_office_isolated`, `office_convert` |
 | Daily pages per person | `PER_USER_DAILY_PAGE_QUOTA` | `web/quota.py` |
 | Waiting or running documents per person | 10 | `routes/jobs.py` |
 | Kept documents per person | 40 | `routes/jobs.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
 | Sign-in starts, per address | 10 per 5 minutes | `web/abuse.py` |
+| Emailed sign-in links, per target address (off) | 3 per 15 minutes, whoever asks | `web/abuse.py` (`email_link`) |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |
 | Cron route, per address | 10 per 5 minutes | `web/abuse.py` |
@@ -131,6 +147,23 @@ entry `TRUSTED_PROXY_HOPS` places from the right of `X-Forwarded-For` (1 on Clou
 an external load balancer); entries further left are written by the client and never
 believed. **If this is set wrong the limits are shared by everyone or by no one**; see
 [launch.md](launch.md).
+
+A Word or PowerPoint file (T3-30) is handled the same way, with more care because
+LibreOffice is far larger than MuPDF and, unlike it, reads files and not pipes. In a child
+with no secrets in its environment (`web/office_convert.py`, `test_office_convert.py`,
+`test_web_office.py`): the ZIP is checked before LibreOffice sees it (entry count, unpacked
+size, encrypted entries, exactly one Word document or presentation, no macros, no DOCTYPE
+or ENTITY declaration or UTF-16 in any XML part, and no relationship that points outside
+the file except an ordinary hyperlink, because **LibreOffice fetches a linked picture's
+address when it converts**: tested with a listening socket, and refused before it can); then
+LibreOffice runs headless with macros off, links never updated and an unreachable proxy for
+every protocol (a second line of defence: with the check skipped, the socket still sees no
+connection), a private profile in a private directory that is removed afterwards, resource
+limits, and its process group killed at the timeout. The upload exists on disk, in a
+directory only the child can read, for the seconds the conversion takes (LibreOffice cannot
+read from a pipe); on Cloud Run that file system is memory. Hostile files end in a category,
+never an exception or a hang; byte-mutated files never escape as another exception. The PDF
+that comes out is probed like any upload, and only it is stored.
 
 The PDF is opened first in a child process (`python -m a11y_stem.web.pdf_probe`) that has no
 secrets in its environment, caps its own memory and is killed at its timeout; MuPDF is C code
@@ -253,6 +286,14 @@ Triage of what the scanners reported:
 
 ## Residual risks, accepted for the beta
 
+- Word and PowerPoint input puts LibreOffice, a large C++ program, in front of files from
+  the internet. The checks, the limits and the unreachable proxy reduce that and do not remove
+  it: a bug in LibreOffice's own parsers is contained by the child's environment, limits and
+  timeout, not prevented. Turning `OFFICE_INPUT_ENABLED` off, or not installing LibreOffice
+  (the production image does not unless built with it), removes the exposure.
+- The emailed sign-in link (when it is switched on) is in a URL: Cloud Run's request logs and
+  the recipient's mail provider hold it until it expires or is used, and anyone who reads the
+  mailbox can sign in.
 - Rate limits and the upload gate are per instance and in memory.
 - The session cookie is readable by its owner (signed, not encrypted).
 - A copy of the converted HTML opened from disk has no CSP; it is built to need none.

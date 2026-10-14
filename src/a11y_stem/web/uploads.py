@@ -5,8 +5,8 @@ Uploads are untrusted bytes from the internet, so:
 - The size limit is enforced *while the body streams in* (`read_upload_form`), not after
   the whole body has been buffered. A Content-Length over the limit is refused before
   reading anything.
-- The file is kept in memory (never spooled to disk) and is only stored once every check
-  has passed.
+- The file is kept in memory (never spooled to disk; a Word or PowerPoint file is the one
+  exception, see `web.office_convert`) and is only stored once every check has passed.
 - The PDF is opened in a short-lived child process (`inspect_pdf_isolated`, see
   `web.pdf_probe`): a malformed file that crashes or hangs MuPDF takes down a child, not
   the web server.

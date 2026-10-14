@@ -153,3 +153,16 @@ step) needs to account for this.
   `--set heldout` command refuses a path inside the repository, `--fake`, and gold that
   is not the registered gold.
 - No secrets in the repo; `.env.example` holds placeholder names only. CI runs gitleaks.
+
+
+## The student file in three browsers
+
+`tests/test_student_file_browsers.py` opens the committed demo document (as the pipeline
+writes it, and as the Canvas export's `index.html`) in Chromium, Firefox and WebKit at 1280
+and 375 CSS px and checks that the page loads without errors, the pictures load, and the
+MathML is drawn as maths (fractions stacked, scripts raised and lowered, nothing cut off).
+Install the engines you want (`uv run playwright install chromium firefox webkit`; WebKit
+also needs `uv run playwright install-deps webkit`) and run
+`uv run pytest -m browser tests/test_student_file_browsers.py -rs`. An engine that is not
+installed is skipped, and `-rs` says so. On the development box only Chromium is installed,
+so the Firefox and WebKit rows are not exercised there.

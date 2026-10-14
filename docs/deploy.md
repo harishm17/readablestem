@@ -397,6 +397,26 @@ What follows from it:
   REQUEST_TIMEOUT=300`, all overridable in `deploy/.env.deploy`; CPU always allocated
   (`--no-cpu-throttling`), because the worker thread runs between requests.
 
+### Word and PowerPoint uploads (T3-30)
+
+The upload form takes `.docx` and `.pptx` files only where LibreOffice is installed.
+The production image does **not** include it: it adds a few hundred megabytes, and about
+300 MB of memory while a file converts, on top of the 0.5 GB above, which is too much for
+`MEMORY=1Gi` with a second job's upload in memory. To turn it on:
+
+1. Build the image with LibreOffice: `docker build --build-arg INSTALL_LIBREOFFICE=true .`
+   (or change the `ARG INSTALL_LIBREOFFICE` default in the Dockerfile to `true`:
+   `gcloud builds submit --tag`, which `deploy/deploy.sh` uses, cannot pass build arguments).
+   It installs the Writer and Impress components without the graphical interface, and three
+   metric-compatible fonts (Carlito for Calibri, Caladea for Cambria, Liberation).
+2. Set `MEMORY=2Gi` in `deploy/.env.deploy`.
+3. Read the privacy page's new line (it appears when the form takes these files) and the
+   `TODO(Harish)` above it, docs/launch.md "Sign-in fallback and Word input".
+
+With no LibreOffice in the image nothing else changes: the form takes PDFs only and a Word
+file is refused with a message that says to save it as a PDF. `OFFICE_INPUT_ENABLED=false`
+turns it off where it is installed. One conversion runs at a time per instance.
+
 ## 3. Create the Google sign-in client
 
 1. In the Cloud console for the new project, open **Google Auth Platform**. Under
