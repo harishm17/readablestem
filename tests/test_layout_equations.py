@@ -258,3 +258,34 @@ def test_a_prefixed_equation_number_close_to_the_maths_becomes_its_label(label, 
     assert equation.equation_label == label
     assert nospace(equation.text) == "v=d/t"
     assert equation.bbox[2] < 250 + width + gap  # the number is not in the crop
+
+
+# ---------------------------------------------------------------- rows of a table
+
+
+def centred_rows(page: pymupdf.Page, rows: list[str], pitch: float) -> None:
+    """Whole equations, each centred on x = 300 (OpenStax prints a system so)."""
+    for i, text in enumerate(rows):
+        width = pymupdf.get_text_length(text, fontname="helv", fontsize=BODY)
+        page.insert_text((300 - width / 2, 140 + i * pitch), text, fontsize=BODY)
+
+
+def test_centred_rows_set_close_together_are_one_system():
+    def fill(page):
+        prose(page, 100, "Set up a system of equations for the coefficients.")
+        centred_rows(page, ["3 = A + B", "0 = - A + 2 B", "5 = 4 A + 3 B"], pitch=13.5)
+        prose(page, 230, "Adding the first two equations eliminates the first unknown.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements] == [Kind.PARAGRAPH, Kind.EQUATION, Kind.PARAGRAPH]
+    assert nospace(elements[1].text) == "3=A+B0=-A+2B5=4A+3B"
+
+
+def test_centred_whole_equations_set_an_em_apart_stay_separate():
+    def fill(page):
+        prose(page, 100, "Set up a system of equations for the coefficients.")
+        centred_rows(page, ["3 = A + B", "0 = - A + 2 B"], pitch=26)
+        prose(page, 230, "Adding the two equations eliminates the first unknown.")
+
+    elements = analyze(one_page(fill)).elements
+    assert [e.kind for e in elements].count(Kind.EQUATION) == 2
