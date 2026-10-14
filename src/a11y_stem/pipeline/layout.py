@@ -3487,13 +3487,15 @@ def _equation_regions(rows: list[_Row], rules: list[_Path]) -> list[_Region]:
     return _stack_lines(lines)
 
 
-def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
+def _joins_line(above: _Line, box: BBox, line: _Line, earlier: Sequence[_Line] = ()) -> bool:
     """Does `line` continue the display equation whose last line is `above` (box `box`)?
 
     A line that starts with "=" or an operator may sit a little further down (half as
     far again): nothing else starts a line that way. A line whose middle is above the
     bottom of the equation sits beside it, not under it: "f(t) =" level with the middle
     row of a cases brace, whose rows are whole equations ("1 if t > 0") of their own.
+    `earlier` are the lines of the equation above `above`: a row of a system may line up
+    with the one before the last ("z = 1" under "y - 12 z = -15" lines up with the first).
     """
     size = max(above.size, line.size)
     reach = MAX_LINE_GAP * size * (1.5 if line.continues else 1.0)
@@ -3509,10 +3511,13 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
         return True  # beside the equation: rows of a brace, a matrix or an array
     if min(above.size, line.size) <= SCRIPT_RATIO * size:
         return True  # limits under a big operator ("i = 1" under a sum) or over it
-    if _table_rows(above, line, box, size):
-        return True
-    x0, x1 = above.relation_x, line.relation_x
-    return x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size
+    for peer in (above, *earlier):  # one row of the equation to line up with is enough
+        if _table_rows(peer, line, box, size):
+            return True
+        x0, x1 = peer.relation_x, line.relation_x
+        if x0 is not None and x1 is not None and abs(x0 - x1) <= 0.3 * size:
+            return True
+    return False
 
 
 def _table_rows(above: _Line, line: _Line, box: BBox, size: float) -> bool:
@@ -3533,22 +3538,30 @@ def _stack_lines(lines: list[_Line]) -> list[_Region]:
     """Join lines into display equations top to bottom (see `_equation_regions`)."""
     regions: list[_Region] = []
     last: list[_Line] = []  # the lowest line of each region so far
+    peers: list[list[_Line]] = []  # every line of each region so far
     active: list[int] = []  # regions whose bottom is still within reach
     for line in sorted(lines, key=lambda ln: (ln.box[1], ln.box[0])):
         reach = line.box[1] - 2 * MAX_LINE_GAP * line.size  # beyond any _joins_line reach
         active = [k for k in active if regions[k].box[3] >= reach]
         host = next(
-            (k for k in reversed(active) if _joins_line(last[k], regions[k].box, line)), None
+            (
+                k
+                for k in reversed(active)
+                if _joins_line(last[k], regions[k].box, line, peers[k])
+            ),
+            None,
         )
         if host is None:
             regions.append(_Region(box=line.box))
             last.append(line)
+            peers.append([])
             active.append(len(regions) - 1)
             host = len(regions) - 1
         region = regions[host]
         region.rows.extend(line.rows)
         region.rules.extend(p for p in line.rules if p not in region.rules)
         region.labels.extend(line.labels)
+        peers[host].append(line)
         region.box = _union([region.box, line.box])
         if any(c.c.isalnum() for c in line.ink) or not last[host].ink:
             last[host] = line  # a stray mark does not stand for the line above
