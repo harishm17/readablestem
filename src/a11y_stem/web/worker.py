@@ -378,6 +378,9 @@ class Worker:
         self._current: _Attempt | None = None
         self._paused = False
         self._next_purge = time.monotonic() + PURGE_FIRST_S
+        # When the loop (or a running conversion's heartbeat) last showed life; /readyz.
+        self._seen_at = time.monotonic()
+        self._shutdown_thread: threading.Thread | None = None
 
     # ------------------------------------------------------------------ queue
 
@@ -584,6 +587,7 @@ class Worker:
 
     def _beat(self, attempt: _Attempt, *, pages_done: int | None = None) -> None:
         """Extend the lease and record progress; cancel if the job is gone."""
+        self._seen_at = time.monotonic()
         try:
             owned = self.extend_lease(attempt.claim, pages_done=pages_done)
         except Exception as exc:  # a missed beat is retried; the lease has slack
@@ -930,6 +934,7 @@ class Worker:
 
     def _loop(self) -> None:
         while not self._stop.is_set():
+            self._seen_at = time.monotonic()
             self.purge_backstop()
             try:
                 ran = self.run_once()
@@ -946,6 +951,35 @@ class Worker:
         self._thread = threading.Thread(target=self._loop, name="a11y-stem-worker", daemon=True)
         self._thread.start()
         log_event(logger, "worker_started")
+
+    @property
+    def alive(self) -> bool:
+        """The worker thread is running and has not been told to stop."""
+        return self._thread is not None and self._thread.is_alive() and not self._stop.is_set()
+
+    @property
+    def draining(self) -> bool:
+        """Stop was asked for (SIGTERM or app shutdown): no new job is claimed."""
+        return self._stop.is_set()
+
+    def seconds_since_seen(self) -> float:
+        """Seconds since the loop last came round or a running conversion last beat. A
+        long conversion beats every `lease_s / 3`, so a value past `lease_s` means the
+        thread is stuck (a database call that never returns, say)."""
+        return time.monotonic() - self._seen_at
+
+    def begin_shutdown(self, timeout: float = 6.0) -> None:
+        """Start `stop` on another thread and return at once. Called from the SIGTERM
+        handler: Cloud Run kills the process 10 seconds after the signal, so the claim
+        loop must stop and the running job's lease must end now, not after uvicorn has
+        finished draining connections. Safe to call twice; `stop` is idempotent."""
+        if self._shutdown_thread is not None:
+            return
+        self._stop.set()
+        self._shutdown_thread = threading.Thread(
+            target=self.stop, kwargs={"timeout": timeout}, name="a11y-stem-shutdown", daemon=True
+        )
+        self._shutdown_thread.start()
 
     def stop(self, timeout: float = 10.0) -> None:
         """Stop the loop. A job being converted is cancelled (no more model calls) and its

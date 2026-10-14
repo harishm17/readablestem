@@ -26,6 +26,8 @@ from fastapi.responses import RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from markupsafe import Markup
+from sqlalchemy.exc import InterfaceError, OperationalError
+from sqlalchemy.exc import TimeoutError as SATimeoutError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.middleware.sessions import SessionMiddleware
 from starlette.responses import HTMLResponse
@@ -46,7 +48,8 @@ from a11y_stem.web.deps import (
     current_user,
     render,
 )
-from a11y_stem.web.logsafe import log_event
+from a11y_stem.web.health import stop_worker_on_sigterm
+from a11y_stem.web.logsafe import log_event, log_exception
 from a11y_stem.web.return_to import decision_link, remember_return, signed_out_page
 from a11y_stem.web.routes import admin, courses, cron, feedback, jobs, pages, review, split
 from a11y_stem.web.security import (
@@ -74,6 +77,13 @@ SESSION_COOKIE = "a11y_stem_session"
 SESSION_MAX_AGE_S = 7 * 24 * 60 * 60
 MIN_SESSION_SECRET_CHARS = 32
 
+WORKER_STOP_S = 3.0
+
+
+def _no_op() -> None:
+    return None
+
+
 ERROR_TEXT = {
     400: ("Something was wrong with that request", "Please go back and try again."),
     401: ("Please sign in", "Sign in to continue."),
@@ -81,6 +91,17 @@ ERROR_TEXT = {
     404: ("Page not found", "There is nothing at this address. Check the link."),
     405: ("Not allowed", "That action is not available at this address."),
     413: ("Request too large", "That request was larger than this page accepts."),
+    500: (
+        "Something went wrong",
+        "The error has been recorded without any of your document's content. Please try again "
+        "in a moment.",
+    ),
+    502: ("Not available right now", "The service is restarting. Please try again in a minute."),
+    503: (
+        "Not available right now",
+        "The service is busy or restarting. Please try again in a minute or two.",
+    ),
+    504: ("That took too long", "The request timed out. Please try again."),
 }
 
 
@@ -189,6 +210,23 @@ def _plain_500_page() -> Response:
     return HTMLResponse((TEMPLATES_DIR / "500.html").read_text(encoding="utf-8"), status_code=500)
 
 
+def _on_database_unavailable(request: Request, exc: Exception) -> Response:
+    """The database does not answer (down, restarting, out of connections): a calm 503
+    page from a static file, because the normal error page looks the signed-in user up in
+    that database. Only the exception type is logged, never its message (it can hold the
+    connection string)."""
+    log_exception(logger, "database_unavailable", exc, route=route_of(request))
+    return HTMLResponse(
+        (TEMPLATES_DIR / "503.html").read_text(encoding="utf-8"),
+        status_code=503,
+        headers={"Retry-After": "30"},
+    )
+
+
+def route_of(request: Request) -> str:
+    return getattr(request.scope.get("route"), "path", "unmatched")
+
+
 # --------------------------------------------------------------------------- app
 
 
@@ -275,6 +313,7 @@ def create_app(
     async def lifespan(app: FastAPI) -> AsyncGenerator[None]:
         await run_in_threadpool(prepare_database, engine, settings)
         await run_in_threadpool(seed_admins, factory, settings.admin_email_list)
+        restore_sigterm = _no_op
         if settings.env == "prod" and (blockers := launch_blockers(settings=settings)):
             # Not a refusal: a staging deploy runs as prod before the copy is final.
             log_event(logger, "launch_blockers", logging.WARNING, count=len(blockers))
@@ -289,6 +328,7 @@ def create_app(
                 tracer=ctx.tracer,
             )
             ctx.worker.start()
+            restore_sigterm = stop_worker_on_sigterm(ctx.worker)
         log_event(
             logger,
             "app_started",
@@ -300,8 +340,11 @@ def create_app(
         try:
             yield
         finally:
+            restore_sigterm()
             if ctx.worker is not None:
-                await run_in_threadpool(ctx.worker.stop)
+                # Cloud Run kills the process 10 s after SIGTERM; uvicorn waits at most
+                # `GRACEFUL_SHUTDOWN_S` for connections first (cli.serve), so keep this short.
+                await run_in_threadpool(ctx.worker.stop, WORKER_STOP_S)
             if ctx.tracer is not None:
                 await run_in_threadpool(ctx.tracer.flush)
             engine.dispose()
@@ -335,6 +378,8 @@ def create_app(
     app.add_exception_handler(CsrfFailed, _on_csrf_failed)
     app.add_exception_handler(StarletteHTTPException, _on_http_error)
     app.add_exception_handler(RequestValidationError, _on_validation_error)
+    for unavailable in (OperationalError, InterfaceError, SATimeoutError):
+        app.add_exception_handler(unavailable, _on_database_unavailable)
 
     app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
     for module in (pages, jobs, split, review, feedback, admin, cron, courses):

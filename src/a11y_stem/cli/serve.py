@@ -18,6 +18,8 @@ import argparse
 import os
 import sys
 
+GRACEFUL_SHUTDOWN_S = 5
+
 
 def register(
     group: argparse._SubParsersAction, top: argparse._SubParsersAction | None = None
@@ -81,6 +83,10 @@ def _cmd_serve(args: argparse.Namespace) -> int:
         reload=args.reload,
         proxy_headers=True,
         server_header=False,
+        # Cloud Run stops the process 10 s after SIGTERM. uvicorn waits this long for open
+        # connections (an htmx poll or a slow upload), then runs the app's shutdown, which
+        # stops the worker and ends the running job's lease (web.app.WORKER_STOP_S).
+        timeout_graceful_shutdown=GRACEFUL_SHUTDOWN_S,
         **uvicorn_log_options(),
     )
     return 0
