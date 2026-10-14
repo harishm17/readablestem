@@ -539,7 +539,7 @@ def readme(export: CanvasExport) -> str:
     n = export.notes
     paste = export.page_html is not None
     lines = [
-        f"Canvas version of: {export.title}",
+        f"Canvas version of: {' '.join(export.title.split())}",
         "Made by a11y-stem, a tool that assists with accessibility. Read the result through",
         "once before you share it.",
         "",
@@ -559,8 +559,15 @@ def readme(export: CanvasExport) -> str:
             f"         {export.folder}",
             "  2. Open that folder, upload this zip file, and choose to expand it when Canvas",
             "     asks. Wait until the images folder is listed.",
-            "  3. Open Pages and make a new page with a title. Canvas shows the title as the top",
-            "     heading, so the headings in the page start one level lower than in the PDF.",
+            "  3. Open Pages and make a new page with a title.",
+            *(
+                [
+                    "     Canvas shows the title as the top heading, so the headings in the page",
+                    "     start one level lower than in the PDF.",
+                ]
+                if n.headings_shifted
+                else []
+            ),
             "  4. Switch the editor to its HTML view (the </> button).",
             "  5. Open canvas-page.html in a plain text editor (Notepad, TextEdit), copy all of",
             "     it, paste it into the HTML view, and save.",
@@ -656,5 +663,6 @@ def build_zip(export: CanvasExport) -> bytes:
             info = zipfile.ZipInfo(name, ZIP_TIME)
             info.compress_type = zipfile.ZIP_DEFLATED
             info.external_attr = 0o644 << 16
+            info.create_system = 3  # unix, whatever machine built it
             archive.writestr(info, data)
     return out.getvalue()
