@@ -171,6 +171,20 @@ Element conventions:
   In a larger font any section number counts (`3 Forces` is a chapter title); at body size
   only the section shape above does.
 - Rotated and diagonal text is never a heading.
+- **A heading that is mostly maths is an equation** (`_mostly_maths`): a large or bold run
+  with a relation sign at full size, no plain word of more than three letters and at least
+  70 % maths characters (`KE = m v` set large on a slide, a bold `PE = mgh`; a letter
+  group of up to three letters counts as variables beside a relation sign) goes to the
+  equation step, not to the outline. A line set bold as a whole keeps no bold in its text
+  layer, since the weight is the heading's, not a vector's. `2.3 Units`, `Summary of
+  results` and a title with a number but no relation sign stay headings.
+- **A heading with the same text as the heading directly above it** (nothing between
+  them, case, spacing and punctuation aside: `heading_step.repeated_above`) is not a
+  heading. Its fix is ACCEPTED, review `none`, reason `repeats_heading_above`, with no
+  `HeadingFix`, and the assembler writes it as `<p><strong>`. It takes no part in levels,
+  the outline or the repeated-label groups: a box title the book sets twice ("Teacher
+  Support" under "Teacher Support") is one heading and one line of bold text. On the
+  public demo this removes 7 doubled headings.
 - A bare chapter number (`4`, `Chapter 4`) in a large font directly above the title is
   merged into it (`4 Energy and Work`).
 
@@ -249,6 +263,20 @@ style and is not listed. On the two-column handout: `𝐯 ∈ Rn` gives `n` (R i
 bold omega gives nothing.
 
 ### Lists
+
+- **A line of key terms.** Right under a heading that ends in "Key Terms", a paragraph of
+  plain text whose lines break at gaps of at least 0.7 x the font size, with at most six
+  words between gaps, becomes one list item per piece (`_key_term_lines`): OpenStax's
+  unruled "Key Terms" box is `dependent variable independent variable tangent` in the
+  text layer, one box per term in print. A ruled box found as a table is turned into
+  items the same way (`_term_items`). A paragraph with no wide gap, or a long piece, stays
+  a paragraph; a term that wraps onto a second line becomes two items (not told apart).
+- **Teacher tags.** OpenStax's level tags at the start of a paragraph or item, `[BL]`,
+  `[OL]`, `[AL]`, `[All]` and runs of them (`[BL][OL] Describe a scenario ...`), are dropped
+  (`_strip_teacher_tags`); a screen reader would spell them out. Only those four, in
+  capitals, before other text. `[Visual]` and similar stay, and so do `[1]` and a tag in
+  the middle of a sentence. The tag tells a teacher which students a prompt is for, so a
+  document that uses them loses that information in the student file.
 
 A row starts a list item when it begins with a marker followed by the item's text
 within 3 x font size:

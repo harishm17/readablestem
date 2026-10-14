@@ -1015,9 +1015,9 @@ def demo_note_html(
         + "<p><strong>Precomputed demo.</strong> This is a11y-stem's output for a PDF print "
         f"of “{esc(page.page_title)}” from <cite>{esc(page.book_title)}</cite> by "
         f"{esc(authors)} (OpenStax), converted on {esc(date)}. Equations, headings and "
-        "image descriptions below are the tool's proposals with confidence scores; the "
-        "ones marked for review have not been checked by a person. a11y-stem assists "
-        "with accessibility work; it does not replace review.</p>\n"
+        "image descriptions below are the tool's proposals; the ones marked for review "
+        "have not been checked by a person. a11y-stem assists with accessibility work; "
+        "it does not replace review.</p>\n"
         f'<p>Read <a href="{esc(page.page_url, quote=True)}">the original page on '
         "openstax.org</a>. Licensed under "
         f'<a href="{esc(page.license_url, quote=True)}">{esc(page.license_name)}</a> '

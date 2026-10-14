@@ -105,6 +105,12 @@ def default_review(status: Status | str | None) -> Review:
         return "none"
 
 
+# `Fix.reason` of a heading fix that is not a heading: its text is the same as the heading
+# directly above it (a box title repeated under the section's own heading), so it is
+# written as bold text (`heading_step`).
+HEADING_REPEATS_ABOVE = "repeats_heading_above"
+
+
 class Check(BaseModel):
     """Result of one deterministic validator. Content-free by design."""
 

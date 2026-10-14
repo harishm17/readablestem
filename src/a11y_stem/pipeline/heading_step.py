@@ -50,8 +50,17 @@ from __future__ import annotations
 import unicodedata
 from collections.abc import Sequence
 from dataclasses import dataclass
+from itertools import pairwise
 
-from a11y_stem.core.types import Check, Element, Fix, HeadingFix, Kind, Status
+from a11y_stem.core.types import (
+    HEADING_REPEATS_ABOVE,
+    Check,
+    Element,
+    Fix,
+    HeadingFix,
+    Kind,
+    Status,
+)
 from a11y_stem.pipeline.layout import (
     REASON_LARGER_FONT,
     REASON_LIST_NUMBER,
@@ -66,13 +75,52 @@ GROUP_PREFIX = "hg-"
 
 
 def heading_fixes(elements: list[Element]) -> list[Fix]:
-    """One fix per heading element, in reading order, with a repaired outline."""
-    headings = sorted((e for e in elements if e.kind == Kind.HEADING), key=lambda e: e.order)
+    """One fix per heading element, in reading order, with a repaired outline.
+
+    A heading whose text is the same as the heading directly above it (nothing between
+    them) is not a second heading: it gets a fix that writes it as bold text
+    (`repeated_above`), and takes no part in the outline, the levels or the groups."""
+    repeats = repeated_above(elements)
+    headings = sorted(
+        (e for e in elements if e.kind == Kind.HEADING and e.id not in repeats),
+        key=lambda e: e.order,
+    )
     raw = heading_levels(headings)
     levels = repair_outline([raw[h.id] for h in headings])
     fixes = [_fix(h, raw[h.id], level) for h, level in zip(headings, levels, strict=True)]
     group_repeated(headings, fixes)
-    return fixes
+    bold = [_bold_text_fix(e) for e in elements if e.id in repeats]
+    order = {e.id: e.order for e in elements}
+    return sorted([*fixes, *bold], key=lambda fix: order[fix.element_id])
+
+
+def repeated_above(elements: Sequence[Element]) -> set[str]:
+    """Ids of the headings that repeat the heading directly above them.
+
+    "Directly above" is the previous element in reading order (any page), and its text is
+    the same after `label_key` (case, spacing and punctuation aside). A third copy repeats
+    the second, so a run of copies keeps only the first as a heading. A label with no
+    letters or digits ("-") never counts."""
+    found: set[str] = set()
+    ordered = sorted(elements, key=lambda e: e.order)
+    for above, element in pairwise(ordered):
+        if above.kind != Kind.HEADING or element.kind != Kind.HEADING:
+            continue
+        label = label_key(element.text or "")
+        if label and label == label_key(above.text or ""):
+            found.add(element.id)
+    return found
+
+
+def _bold_text_fix(element: Element) -> Fix:
+    """Accepted, with no heading: the assembler writes the text bold, in a paragraph."""
+    return Fix(
+        element_id=element.id,
+        kind=Kind.HEADING,
+        status=Status.ACCEPTED,
+        reason=HEADING_REPEATS_ABOVE,
+        review="none",
+    )
 
 
 def repair_outline(levels: Sequence[int]) -> list[int]:

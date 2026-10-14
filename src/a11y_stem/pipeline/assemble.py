@@ -48,8 +48,15 @@ import defusedxml.ElementTree as SafeET
 from defusedxml import DefusedXmlException
 
 from a11y_stem import __version__
+from a11y_stem.core.types import (
+    HEADING_REPEATS_ABOVE,
+    KEPT_ORIGINAL_STATUSES,
+    Element,
+    Fix,
+    Kind,
+    Status,
+)
 from a11y_stem.core.types import INLINE_MARKER_RE as INLINE_MARKER_RE
-from a11y_stem.core.types import KEPT_ORIGINAL_STATUSES, Element, Fix, Kind, Status
 from a11y_stem.pipeline import (
     assemble_tables,
     figure_details,
@@ -699,9 +706,15 @@ class _Renderer:
         level, text = self.heading_parts(element)
         if level is None:
             fix = self.fixes.get(element.id)
-            if element.bold and fix is not None and fix.status is Status.REJECTED and text.strip():
+            decided = fix is not None and (
+                (element.bold and fix.status is Status.REJECTED)
+                # The same text as the heading above: bold text, by the heading step's rule.
+                or (fix.status is Status.ACCEPTED and fix.reason == HEADING_REPEATS_ABOVE)
+            )
+            if decided and text.strip():
                 # A reviewer said this bold line is a label, not a heading ("Make them
-                # bold text"): it stays bold, as in the PDF.
+                # bold text"), or the heading step saw it repeat the heading above: it
+                # stays bold, as in the PDF.
                 attrs = self.id_attr(element.id) + inline_text.passage_attrs(element)
                 return f"<p{attrs}><strong>{self.rich(text, element)}</strong></p>"
             return self.paragraph(element, text)

@@ -4837,7 +4837,29 @@ def _paragraph_pieces(block: _Block) -> list[str | _Inline]:
             cursor = end
         row_pieces.append("".join(c.c for c in row.chars[cursor:]))
         _append_row(pieces, row_pieces)
-    return _tidy(pieces)
+    return _strip_teacher_tags(_tidy(pieces))
+
+
+# OpenStax's teacher-support tags at the start of a paragraph: the level of student a
+# prompt is for, "[BL][OL] Describe a scenario ...", "[AL] ...", "[All] ...". They are
+# notes to a teacher, not words of the lesson, and a screen reader would read them out
+# letter by letter. Only these four, in capitals as OpenStax prints them, and only before
+# other text; "[1]", "[Visual]" and a "[BL]" in the middle of a sentence stay.
+_TEACHER_TAGS = re.compile(r"^\s*(?:\[(?:BL|OL|AL|All)\]\s*)+")
+
+
+def _strip_teacher_tags(pieces: list[str | _Inline]) -> list[str | _Inline]:
+    """`pieces` without OpenStax level tags at the start (see `_TEACHER_TAGS`); unchanged
+    when nothing but the tags would be left."""
+    if not pieces or not isinstance(pieces[0], str):
+        return pieces
+    stripped = _TEACHER_TAGS.sub("", pieces[0], count=1)
+    if stripped == pieces[0]:
+        return pieces
+    if not stripped.strip() and len(pieces) == 1:
+        return pieces
+    rest = pieces[1:]
+    return [stripped, *rest] if stripped else rest
 
 
 def _clear_of_punctuation(box: BBox, row: _Row, end: int) -> BBox:
@@ -5002,6 +5024,67 @@ def _term_items(blocks: list[_Block]) -> list[_Block]:
     return out
 
 
+KEY_TERMS_HEADING = re.compile(r"\bkey\s+terms?\s*$", re.IGNORECASE)
+TERM_GAP = 0.7  # x font size: a gap this wide on a line of terms separates two terms
+MAX_TERM_WORDS = 6  # a term is a few words; more is a sentence, and stays a paragraph
+
+
+def _key_term_lines(blocks: list[_Block]) -> list[_Block]:
+    """A line of terms under a "Key Terms" heading becomes its terms as list items.
+
+    OpenStax sets the terms of an unruled "Key Terms" box side by side on one line, each
+    in a box of its own; the text layer reads "dependent variable independent variable
+    tangent". Right under a heading that ends in "Key Terms", a paragraph of plain text
+    whose lines break into pieces at gaps of at least TERM_GAP x the font size (a space
+    between words is a quarter of that) with at most MAX_TERM_WORDS words in each piece
+    is read as a list of terms: one item per piece, in reading order (`_term_items`
+    does the same for a ruled box found as a table). A paragraph with no such gap, or
+    with a long piece, is left as it is.
+    """
+    out: list[_Block] = []
+    for block in blocks:
+        previous = out[-1] if out else None
+        if (
+            block.kind == Kind.PARAGRAPH
+            and previous is not None
+            and previous.kind == Kind.HEADING
+            and KEY_TERMS_HEADING.search(previous.text or "")
+            and all(isinstance(piece, str) for piece in block.pieces)
+        ):
+            terms = _term_pieces(block.rows)
+            if terms:
+                out.extend(_Block(Kind.LIST_ITEM, box, text=t, pieces=[t]) for box, t in terms)
+                continue
+        out.append(block)
+    return out
+
+
+def _term_pieces(rows: Sequence[_Row]) -> list[tuple[BBox, str]]:
+    """(box, text) of each piece of the rows' lines, or [] unless they are a line of terms
+    (`_key_term_lines`)."""
+    found: list[tuple[BBox, str]] = []
+    spread = False
+    for row in rows:
+        if row.vertical:
+            return []
+        pieces: list[list[_Char]] = []
+        previous: _Char | None = None
+        for char in row.chars:
+            if char.blank:
+                continue
+            if previous is None or char.x0 - previous.x1 >= TERM_GAP * row.size:
+                pieces.append([])
+            pieces[-1].append(char)
+            previous = char
+        spread = spread or len(pieces) > 1
+        for chars in pieces:
+            text = _clean("".join(c.c for c in row.chars if chars[0].x0 <= c.x0 <= chars[-1].x0))
+            if not text or len(text.split()) > MAX_TERM_WORDS:
+                return []
+            found.append((_union((c.x0, c.y0, c.x1, c.y1) for c in chars), text))
+    return found if spread else []
+
+
 # ============================================================================ pages
 
 
@@ -5148,7 +5231,7 @@ def _page_blocks(
         if block.kind in _TEXT_BLOCKS:
             block.pieces = _paragraph_pieces(block)
     final = [b for b in final if b.kind not in _TEXT_BLOCKS or _has_content(b.pieces)]
-    final = _term_items(final)
+    final = _key_term_lines(_term_items(final))
     origins = _column_origins(text_rows)
     for block in final:
         if block.marker is not None:
