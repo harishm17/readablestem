@@ -127,6 +127,8 @@ button, .button, .button-secondary, .button-danger {
 .inline-form { display: inline; margin: 0; }
 .button-row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.75rem; }
 .actions { list-style: none; padding: 0; display: flex; flex-wrap: wrap; gap: 0.75rem 1.5rem; align-items: center; }
+.canvas-download { margin: 1.25rem 0 0; max-width: 40rem; }
+.canvas-download .hint { margin-bottom: 0.75rem; }
 
 /* Forms */
 .field { margin: 0 0 1.25rem; }

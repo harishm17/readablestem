@@ -27,8 +27,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from a11y_stem.core.types import DocumentResult
+from a11y_stem.pipeline import export_canvas, text_pass
 from a11y_stem.pipeline import language as languages
-from a11y_stem.pipeline import text_pass
 from a11y_stem.web import documents, events, notation
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
@@ -685,6 +685,62 @@ def download(request: Request, job_id: str, user: UserDep) -> Response:
         media_type="text/html; charset=utf-8",
         headers={
             "Content-Disposition": content_disposition(name),
+            "Content-Security-Policy": VIEW_CSP,
+        },
+    )
+
+
+def canvas_filename(title: str, job_id: str) -> str:
+    """The Canvas zip's name: the HTML file's name, with a zip's ending."""
+    return "canvas-" + download_filename(title, job_id).removesuffix(".html") + ".zip"
+
+
+@router.get("/jobs/{job_id}/download/canvas")
+def download_canvas(request: Request, job_id: str, user: UserDep, course: str = "") -> Response:
+    """The same document for Canvas (pipeline/export_canvas.py): a zip with index.html, its
+    pictures as files, and a README; with `course` (the Canvas course number) also a page to
+    paste. A GET like the HTML download, for the owner only; no script is needed."""
+    number = course.strip() or None
+    if number is not None and not export_canvas.valid_course_number(number):
+        raise PageError(
+            400,
+            "Check the course number",
+            "A Canvas course number is digits only: it is the number after /courses/ in the "
+            "address of your course. Go back and try again, or leave it empty.",
+            context={"job_id": job_id},
+        )
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        job = owned_job(session, job_id, user)
+        require_done(job)
+        result = job.result_json or {}
+        title = documents.display_title(result.get("title"), job.filename)
+        html, job_ref = job.html or "", job.id
+        still_open = documents.open_decisions(result.get("fixes"))
+    try:
+        export = export_canvas.export_canvas(
+            html,
+            title=title,
+            folder=export_canvas.folder_name(title, job_ref),
+            course_number=number,
+        )
+    except export_canvas.CanvasExportError:
+        log_event(logger, "canvas_export_failed", code="image_type")
+        raise PageError(
+            409,
+            "This document cannot be made for Canvas",
+            "It has a picture in a form the Canvas version cannot hold. The HTML file is "
+            "still available from the job page.",
+            context={"job_id": job_ref},
+        ) from None
+    events.record_download(
+        ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, open_decisions=still_open
+    )
+    return Response(
+        export_canvas.build_zip(export),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": content_disposition(canvas_filename(title, job_ref)),
             "Content-Security-Policy": VIEW_CSP,
         },
     )
