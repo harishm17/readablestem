@@ -118,7 +118,6 @@ def test_lecture_notes_inline_equations_and_paragraph_markers():
         "\u22123m",
         "\u0394t",
         "v=\u0394x/\u0394t",
-        "3m/s2",
         "g",
     ]
     position = paragraph_starting(layout, "Position is measured")
@@ -132,8 +131,11 @@ def test_lecture_notes_inline_equations_and_paragraph_markers():
     # "3 m" typed as <mn>3</mn><mtext>m</mtext> has no maths font or symbol: it stays text.
     assert "A displacement of 3 m to the left" in (units.text or "")
     acceleration = paragraph_starting(layout, "Acceleration is the rate")
-    (rate,) = children(layout, acceleration)
-    assert (acceleration.text or "").endswith(f"average acceleration of {inline_marker(rate.id)}.")
+    # "3 m/s2" has no maths font: a unit with a raised 2 is text, written with <sup> (T2-4).
+    assert (acceleration.text or "").endswith("average acceleration of 3 m / s2 .")
+    assert [
+        ((acceleration.text or "")[r.start : r.end], r.kind) for r in acceleration.script_runs
+    ] == [("2", "sup")]
 
 
 def test_lecture_notes_figure_and_reading_order():

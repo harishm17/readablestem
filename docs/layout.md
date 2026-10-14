@@ -429,6 +429,86 @@ Modern Sans):
   letters, or has a relation sign and no longer italic run: "at" in `v = v₀ + at` is
   not the English word. Beamer captions have no number ("Figure: ...") and still attach.
 
+### Raised and lowered text in prose (backlog T2-4, T2-5)
+
+Text sets formulas, ions, units and nuclides with scripts that the text layer flattens:
+H2O, Na+, SO4 2-, g/cm3, 226Ra. A paragraph or list item or heading now keeps them as
+`Element.script_runs` (`ScriptRun(start, end, kind="sup"|"sub")`, offsets into `text`), which
+the assembler writes as `<sup>` and `<sub>` (docs/output.md "Raised and lowered text").
+
+- **Which glyphs** (`_script_glyphs`): smaller than the row's text (`SCRIPT_RATIO`) and off
+  its baseline by 4 % of the row size (`SCRIPT_OFFSET`: Word and LibreOffice lower a subscript
+  by 8 % of its size, TeX by 15 %), or full size with MuPDF's superscript flag and raised by
+  20 % (`FLAGGED_RAISE`).
+- **Whose scripts** (`_script_base`): a run belongs to upright text. The base is the
+  letter, digit or closing bracket just before it (a gap of at most 35 % of the row size), a
+  closing bracket only when the group it closes holds upright text (`(SO4)3`, `[Zn]2+`), or,
+  for digits only, the capital letter right after it (`226Ra`, a mass number; before a word,
+  never after one). A script of an italic letter or a letter in a maths font (`E` with a
+  subscript `k`, `x2`) is not given to this: it stays an inline equation, as before, and the
+  model reads it.
+- **Evidence** (`_inline_evidence`): a script of upright text is no evidence that a run is
+  maths. `H2` was an inline equation, `SO4` was not, and half a formula reached the model
+  ("2O3", "34-"); now a run that only such scripts made is dropped. Inside a run that is
+  maths for another reason (an arrow, a relation, an italic variable with an operator: `2H2 + O2
+  -> 2H2O`, `E = mc2`) the scripts stay part of it.
+- **Stacked scripts** (`_merge_baselines`, `_insert_script`, `_stack_position`): a lowered and
+  a raised script one over the other (the 4 and the 2- of SO4 2-, the 6 and the 14 of a
+  nuclide) arrive as two fragments, and the lowered one used to start a paragraph of its own
+  (MuPDF starts a line with it). It is now folded into the row it is under, read lowered
+  first after a base (`SO42-`) and raised first before one (`14 6 C`).
+- **Rows of mostly scripts** (`_Row.size`): a row's size is the size of most of its glyphs,
+  and a nuclide's "92 U -> 234" has five script glyphs and three full-size ones, so its
+  scripts were taken for its text, never recognised as scripts, and the equation was cut
+  into pieces (the symbol of the nuclide lost, a heading made of "238"). A row whose small
+  glyphs are 62-85 % of a larger size, each run of them off the larger glyphs' baseline by
+  at least 4 % and at most 70 % and within 60 % of a larger glyph, is now set in the larger
+  size. The numbers of a fraction (half the size, a whole line off) do not qualify.
+- **Spaces**: TeX sets no space glyph after a script (`Cl-and`); a gap of 30 % of the glyph
+  size at the edge of a script gets one (`_marked`).
+- **Carrying the offsets**: pieces of a paragraph are cleaned, joined and de-hyphenated on
+  the way, so the runs travel as private-use marks around their text
+  (`pipeline/script_marks.py`) and are cut out once when the element is made.
+- **Looser fallback** (`_loose_scripts`): raised or lowered glyphs that no equation took and
+  that are not a script of upright text (the 2 of `(a + b)2` after a line break, the `cell`
+  of `E°cell`) are still given a kind when something stands before them: written raised they
+  read better than flat.
+- **Flagged when flat** (`scripts_flattened`, optional "Worth checking"): raised or lowered
+  glyphs left with no base, those in a figure caption, and lowered glyphs in a table (a
+  table cell keeps raised marks as superscript characters, `tables._marked`, and not lowered
+  ones).
+
+Not done: lowered text in table cells (the cell text stays flat, the notice says so);
+a script that is part of a word the text layer splits across rows.
+
+### Equations pasted as pictures (backlog T2-3)
+
+A MathType or Word equation pasted as a picture, a formula saved from a slide: raster images
+and small vector drawings were figures, so the figure step wrote alt text for them and
+nobody checked the formula. A picture of an equation has no text layer, so `layout` now
+decides before it makes a figure (`_equation_pictures`, `pipeline/equation_images.py`):
+
+- **The picture**: not larger than a few lines of text (at most 10 body sizes and 110 pt tall,
+  520 pt wide), black marks on white with almost no colour (`MAX_COLOUR`), 0.4 to 25 % of the
+  area inked, at least 60 % white, and no single piece of ink spanning 70 % of both sides
+  (a plot's axes, a box). It is rendered at 144 dpi, shrunk to 400 px, and read as a bitmap;
+  no model is asked. Neither a picture with labels nor one with a caption ("Figure 2.1" within
+  36 pt, overlapping it) is ever one.
+- **In a line of prose** (text on both sides, or prose on one side and punctuation on the
+  other): the picture becomes one character of the row (`PICTURE_CHAR`), the rows beside it
+  are joined, and the paragraph keeps one text with an inline marker; the equation has
+  `display="inline"`, `text=None` and the reason `equation image`. Pictures drawn under 12 pt
+  on a side were dropped as bullets and spacers before this (a one-letter equation is that
+  small); `_raster_figures` now lets `_equation_pictures` keep one when it stands in a line.
+- **On a line of its own**: a block equation (`display="block"`, `text=None`, reason
+  `equation image`); the equation number printed to its right is its `equation_label`.
+- **Then the equation step** (docs/steps.md "Equations as pictures"): a usable reading is
+  always a decision, because nothing can confirm it.
+
+Not done: equations that Word exports as vector drawings (EMF/WMF, drawn as paths) are only
+considered when the layout already made them a figure by `_vector_figures`; they are
+classified like a raster picture, but they have not been measured; handwritten equations.
+
 ### Bold letters in prose
 
 Only with `FEATURE_NOTATION_MEMORY` on (the run's `ConversionOptions.notation_memory`);
