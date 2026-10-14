@@ -239,7 +239,7 @@ def test_launch_check_lists_what_is_unfinished(capsys):
     assert "web/templates/limits.html: still has a TODO(Harish) note" in items
     assert main(["ops", "launch-check"]) == 1
     out = capsys.readouterr().out
-    assert "limits.html" in out and f"launch_blockers={len(items)}" in out  # baselines are committed
+    assert "limits.html" in out and f"launch_blockers={len(items)}" in out
 
 
 def test_a_placeholder_demo_is_not_counted_as_done(tmp_path, monkeypatch):
