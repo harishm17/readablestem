@@ -6,7 +6,7 @@ upload probe's child process, never stored.
   once the job is past its retention time or deleted, `Cache-Control: private, no-store`,
   a 503 (and a content-free log line) when the child fails, and the review screen still
   works when it does; a render slot is taken before the upload is loaded, and one user's
-  burst is refused at once (429) beyond two renders in progress;
+  burst is refused at once (429) beyond four renders in progress (MAX_RENDERS_PER_USER);
 - the child (`web.pdf_probe render | sizes`): sizes, caps, the outline of a flagged
   symbol, a heading's band snapped to whole lines and words, and a clean failure on bad
   input.
@@ -206,6 +206,21 @@ def test_one_user_cannot_tie_up_the_renders_and_waits_hold_no_pdf(web, monkeypat
         web.run_worker()
         assert bob.get(f"/jobs/{own}/pages/1.png").status_code == 200
     assert web.browser.get(f"/jobs/{web.job_id}/pages/1.png").status_code == 200
+
+
+def test_the_real_gate_lets_the_repeated_heading_card_load_all_its_images():
+    """The card for a group of repeated headings loads the page and three crops at once (T1-18),
+    so the per-person limit is four; a fifth at the same time is refused. The audit
+    (docs/security.md) names no number for it, and no audit test depends on it."""
+    assert page_images.MAX_RENDERS_PER_USER == 4
+    gate = page_images.RenderGate(  # the real per-person number, room for them on the instance
+        total=8, per_user=page_images.MAX_RENDERS_PER_USER, wait_s=0.01
+    )
+    with gate.slot("card"), gate.slot("card"), gate.slot("card"), gate.slot("card"):
+        with pytest.raises(page_images.RenderLimited), gate.slot("card"):
+            pass
+    with gate.slot("card"):  # all four were freed
+        pass
 
 
 def test_the_gate_counts_each_user_and_frees_slots_on_errors():
