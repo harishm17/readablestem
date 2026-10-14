@@ -234,6 +234,8 @@ def cli_claude(monkeypatch):
         class Recorder(FakeVisionClient):
             def __init__(self, used, spend, **kw):
                 super().__init__(budget=spend)
+                if kw.get("count_calls") is False:
+                    return  # the Claude second check's own client, not one the run chose
                 built.append((name, used, spend))
 
         return Recorder
