@@ -103,9 +103,12 @@ DEFAULT_LEASE_S = 120.0
 # Time limit for one conversion: a base (layout, assembly, a slow start) plus a share per
 # page for the model calls, with retries and fallback. Generous for real documents; it is
 # there so a hung conversion cannot hold the worker for ever. Not a setting yet; tune it
-# here.
-JOB_BASE_S = 300.0
-JOB_PER_PAGE_S = 90.0
+# here. Measured on 1 vCPU (docs/deploy.md, "Sizing"): 30 dense pages on Claude took 42-51 s
+# (1.4-1.7 s a page; 3.6 s a page median and 5.7 at most on OpenAI), so 30 pages get 18
+# minutes, 20 times the measurement and 6 times the slowest page rate seen. It was 300 s
+# plus 90 s a page (50 minutes for 30 pages), which would hold the only worker that long.
+JOB_BASE_S = 180.0
+JOB_PER_PAGE_S = 30.0
 # After a timeout, how long to wait for the cancelled conversion to wind down before the
 # next job starts (PyMuPDF is not thread-safe, so two conversions should not overlap).
 TIMEOUT_GRACE_S = 30.0
