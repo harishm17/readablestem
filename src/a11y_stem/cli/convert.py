@@ -12,7 +12,8 @@ with a small `--max-usd` the concurrent reservations, not the spend, fill the ca
 steps of about $0.02 worst case each, a $0.10 cap refused a call after $0.016 had been
 spent. For a small cap, lower the concurrency (1 reserves one call at a time).
 
-A real run checks its setup before converting anything: no OPENAI_API_KEY or a model
+A real run checks its setup before converting anything: no API key for the provider
+(OPENAI_API_KEY, or ANTHROPIC_API_KEY with MODEL_PROVIDER=anthropic) or a model
 without a price is `error: ...` and exit 2. (WP1's client only reads the key on its first
 request; without this check, every equation and figure would just come back flagged.)
 
@@ -149,7 +150,7 @@ def _check_model_setup(settings: Settings) -> None:
     neither problem would surface until the steps run, one element at a time.
     """
     try:
-        settings.require_openai_key()  # the key itself is not kept or printed
+        settings.require_provider_key()  # the key itself is not kept or printed
         for model in dict.fromkeys([settings.main_model, settings.cheap_model]):
             price_for(model)
     except (ConfigError, UnknownModelError) as exc:

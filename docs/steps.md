@@ -697,6 +697,14 @@ probabilities are not calibrated, so they are compared with thresholds from sett
 never shown to a reader as a confidence. Wording, as everywhere: "a second automated
 check found a possible mismatch" or "found no contradiction", never "verified".
 
+**OpenAI only.** The Decisions API belongs to OpenAI, so this check runs only with
+`MODEL_PROVIDER=openai`. With the Anthropic provider it is skipped cleanly
+(`verifier.any_check_enabled` is false whatever the `DECISIONS_*` settings say): no verifier
+is built, no request goes to OpenAI, no OpenAI key is needed, figures get no optional note,
+equations no shadow, and the daily canary is not due. Fixes then carry no `verifications`.
+(Keeping it on OpenAI when an OpenAI key is also configured was rejected: it would send the
+same images to a second company.)
+
 Code: `models/verifier.py` (the narrow `Verifier` protocol, its content-free
 `VerifierVerdict(probabilities, reason_code)`, the question wording, `FakeVerifier`),
 `models/decisions_client.py` (the API client), `pipeline/figure_step.py`

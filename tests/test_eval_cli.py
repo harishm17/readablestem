@@ -432,3 +432,84 @@ def test_demo_build_warns_when_the_cap_cut_it_short(tmp_path, monkeypatch, demo_
 def test_demo_build_requires_a_cap_or_fake(tmp_path, capsys):
     assert main(["demo", "build", "--page", "x", "--out", str(tmp_path)]) == 2
     assert "--max-usd is required" in capsys.readouterr().err
+
+
+# ------------------------------------------------------------ the Anthropic provider
+
+
+def test_provider_anthropic_runs_with_claude_and_the_report_records_it(
+    gold, tmp_path, fake_inputs, monkeypatch
+):
+    built = []
+
+    class StubAnthropicVisionClient(FakeVisionClient):
+        def __init__(self, settings, budget, **kw):
+            super().__init__(budget=budget)
+            built.append((settings, budget))
+
+    from a11y_stem.models import anthropic_client
+
+    monkeypatch.setattr(anthropic_client, "AnthropicVisionClient", StubAnthropicVisionClient)
+    monkeypatch.setattr(eval_cli, "_settings", lambda: settings(anthropic_api_key="sk-ant-test"))
+    args = pipeline_args(gold, tmp_path, "--provider", "anthropic", "--max-usd", "1.5")
+    assert main(args) == 0
+    ((used, budget),) = built
+    assert (used.model_provider, used.main_model, used.cheap_model) == (
+        "anthropic",
+        "claude-opus-5-5",
+        "claude-haiku-5-5",
+    )
+    assert (budget.max_usd, budget.guard.cap_usd) == (1.5, 1.5)
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["client"] == "anthropic"
+    assert report["models"] == {"main": "claude-opus-5-5", "cheap": "claude-haiku-5-5"}
+
+
+def test_models_can_be_chosen_per_run(gold, tmp_path, fake_inputs, capsys):
+    args = pipeline_args(
+        gold,
+        tmp_path,
+        *("--provider", "anthropic", "--cheap-model", "claude-sonnet-5-5", "--fake"),
+    )
+    assert main(args) == 0
+    report = json.loads((tmp_path / "report.json").read_text())
+    assert report["client"] == "fake"
+    assert report["models"] == {"main": "claude-opus-5-5", "cheap": "claude-sonnet-5-5"}
+
+
+def test_an_unpriced_model_is_an_error_not_a_traceback(gold, tmp_path, fake_inputs, capsys):
+    args = pipeline_args(
+        gold, tmp_path, "--provider", "anthropic", "--main-model", "gpt-6", "--fake"
+    )
+    assert main(args) == 2
+    err = capsys.readouterr().err
+    assert "invalid model settings" in err and "no price for ANTHROPIC_MAIN_MODEL" in err
+
+
+def test_provider_anthropic_without_a_key_names_its_key(gold, tmp_path, fake_inputs, capsys):
+    args = pipeline_args(gold, tmp_path, "--provider", "anthropic", "--max-usd", "1")
+    assert main(args) == 2
+    assert "ANTHROPIC_API_KEY is not set" in capsys.readouterr().err
+
+
+def test_a_claude_report_is_promoted_only_beside_the_openai_baselines(tmp_path, capsys):
+    from a11y_stem.eval.gate import code_versions
+
+    data = {
+        "task": "equations",
+        "complete": True,
+        "client": "anthropic",
+        "prompt_versions": {"equation": code_versions()["equation"]},
+        "models": {"main": "claude-opus-5-5", "cheap": "claude-haiku-5-5"},
+    }
+    report = tmp_path / "claude.json"
+    report.write_text(json.dumps(data))
+    assert main(["eval", "promote", str(report), "--as", "baseline"]) == 2
+    assert "give --out-dir" in capsys.readouterr().err
+    target = ["--out-dir", str(tmp_path / "apart")]
+    assert main(["eval", "promote", str(report), "--as", "latest", *target]) == 0
+    # A Claude report is current against the Claude models, not the OpenAI ones.
+    data["models"]["cheap"] = "claude-sonnet-5-5"
+    report.write_text(json.dumps(data))
+    assert main(["eval", "promote", str(report), "--as", "latest", *target]) == 2
+    assert "cheap model claude-sonnet-5-5" in capsys.readouterr().err

@@ -239,8 +239,8 @@ which stays idle until baseline reports are promoted (`docs/eval.md`, "How to re
 - **PDF in, HTML out.** Word and PowerPoint files must be exported to PDF first. Uploads are
   limited to 30 pages and 20 MB by default.
 - **A model is in the loop.** Document images and the text around them are sent to OpenAI's
-  API (with `store=False`). Models are not deterministic, so two runs on the same file can
-  differ.
+  API (with `store=False`), or to Anthropic's Claude API when `MODEL_PROVIDER=anthropic` is
+  set. Models are not deterministic, so two runs on the same file can differ.
 - **Equations are the hard part.** On the development sample 23 of 30 equations match the
   answer key under the lenient scorer, and 5 of the 7 misses are gaps in the scorer, not in
   the transcription. A symbol, sign or relation that differs from the PDF's text layer is

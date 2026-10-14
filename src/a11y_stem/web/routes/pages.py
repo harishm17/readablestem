@@ -57,6 +57,8 @@ def privacy(request: Request) -> Response:
         "tables_on": ctx.settings.feature_tables,
         "notation_on": ctx.settings.feature_notation_memory,
         "microsoft_on": ctx.settings.ms_sign_in_enabled,
+        # Which company receives the images and nearby text (MODEL_PROVIDER).
+        "provider": ctx.settings.model_provider,
     }
     return render(request, "privacy.html", context)
 

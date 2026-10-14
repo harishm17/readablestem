@@ -254,7 +254,7 @@ out of values, and never pass document text under a neutral key name: the filter
 names, not meaning.
 
 Code on a standard-library logger (the web app and worker use `web.logsafe.log_event`
-and `log_exception`; the OpenAI client logs `model_call`, `model_call_retry` and
+and `log_exception`; the OpenAI and Anthropic clients log `model_call`, `model_call_retry` and
 `model_call_retry_skipped`) goes through `observability.logging.log_fields`: the message
 is the event name alone and the fields become top-level keys, so
 `jsonPayload.message="job_failed" AND jsonPayload.error_code="internal_error"` or
@@ -355,7 +355,7 @@ otherwise each step shows up as its own trace. `pipeline.run` does this.
 | Uptime alert email | `severity>=WARNING` logs; `gcloud run revisions list` | Roll back traffic to the last good revision (deploy.md, "Roll back") |
 | `/healthz` answers 503 | The database: Cloud SQL instance state, connections | See "Too many connections" below |
 | Conversions fail with `reason:budget_daily`, jobs end `error:budget_daily`, or `claims_paused` in the logs | Spend today vs `DAILY_SPEND_CAP_USD` | Working as designed: users see "Stopped early" or "Waiting", and queued jobs start after 00:00 UTC. Raise the cap only on purpose |
-| Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`) |
+| Conversions fail with provider errors | `call:<model>:outcome:api_error` counts; OpenAI or Anthropic dashboard | The OpenAI project limit may be reached (HTTP 429 `project_spend_limit_exceeded`); with Claude, the workspace limit or rate limit (HTTP 429 `rate_limit_error`), or a key not scoped to a workspace (HTTP 400, set `ANTHROPIC_WORKSPACE_ID`) |
 | "cron not running" or "cron or purge problem" alert | `jsonPayload.message=("cron_done" OR "cron_refused" OR "aggregate_failed" OR "purge_backstop_deleted")`; Cloud Scheduler > job history | See the next rows. The worker's backstop keeps purging meanwhile, so documents are still deleted on time; fix the scheduler anyway |
 | Cron returns 403 | `cron_refused` in logs | The scheduler's token differs from the secret, usually after a rotation: `./deploy/deploy.sh cron` |
 | Cron returns 500 | `aggregate_failed` with `error_type` and `stack` | Purge still ran. Fix the bug; jobs stay unaggregated until then. A job that expires first is aggregated as it is deleted, or, if that fails too (`aggregate_on_delete_failed`), counted in `unaggregated_deleted` |

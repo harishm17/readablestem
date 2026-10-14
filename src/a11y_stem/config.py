@@ -13,12 +13,19 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 # The two models Harish chose on 2026-10-07 (ADR 0002). Each is the other's fallback.
 MAIN_MODEL = "gpt-6.1-sol"
 CHEAP_MODEL = "gpt-6-luna"
+# The Claude models used when MODEL_PROVIDER=anthropic (docs/design/beta-architecture.md):
+# the cheap model reads first, the main model re-reads what the cheap one is unsure about,
+# and each is the other's fallback, as with the OpenAI pair.
+ANTHROPIC_MAIN_MODEL = "claude-opus-5-5"
+ANTHROPIC_CHEAP_MODEL = "claude-haiku-5-5"
+Provider = Literal["openai", "anthropic"]
+Effort = Literal["low", "medium", "high", "xhigh", "max"]
 
 
 class ConfigError(RuntimeError):
@@ -39,9 +46,32 @@ class Settings(BaseSettings):
     env: Literal["dev", "test", "prod"] = "dev"
 
     # --- models
+    # Which provider answers the model requests. "openai" (the default) uses
+    # OPENAI_API_KEY with MAIN_MODEL / CHEAP_MODEL; "anthropic" uses ANTHROPIC_API_KEY with
+    # ANTHROPIC_MAIN_MODEL / ANTHROPIC_CHEAP_MODEL. Either way the rest of the code reads
+    # `main_model` and `cheap_model`: with "anthropic" they are set from the Anthropic pair
+    # (`_resolve_models`), and MAIN_MODEL / CHEAP_MODEL are ignored.
+    model_provider: Provider = "openai"
     openai_api_key: SecretStr | None = None
     main_model: str = MAIN_MODEL
     cheap_model: str = CHEAP_MODEL
+    anthropic_api_key: SecretStr | None = None
+    # Sent as the `anthropic-workspace-id` header on every Anthropic request. Needed for an
+    # organisation-level key (one not scoped to a workspace), which the API refuses
+    # without it; leave unset for a workspace-scoped key.
+    anthropic_workspace_id: str | None = None
+    anthropic_main_model: str = ANTHROPIC_MAIN_MODEL
+    anthropic_cheap_model: str = ANTHROPIC_CHEAP_MODEL
+    # How hard the Claude models think (`output_config.effort`). claude-opus-5-5 cannot
+    # turn thinking off, so effort is the control; the main model is asked to be more
+    # careful than the cheap one.
+    anthropic_effort_main: Effort = "medium"
+    anthropic_effort_cheap: Effort = "low"
+    # Server-side refusal fallback on claude-opus-5-5 and claude-sonnet-5-5 (`fallbacks:
+    # "default"`, beta header server-side-fallback-2026-07-01): a request a safety
+    # classifier declines is re-run by Anthropic on the model it recommends. Turn off to
+    # have a refusal come back as a refusal.
+    anthropic_refusal_fallback: bool = True
     model_timeout_s: float = Field(default=60.0, gt=0)
     model_max_retries: int = Field(default=2, ge=0, le=5)
     # Confidence at or above which a validated fix is accepted without review.
@@ -159,6 +189,45 @@ class Settings(BaseSettings):
     def _lower(cls, value: str) -> str:
         return value.strip().lower()
 
+    @field_validator("anthropic_workspace_id")
+    @classmethod
+    def _workspace_id(cls, value: str | None) -> str | None:
+        """A header value: one token of plain characters, or unset when blank."""
+        if value is None or not value.strip():
+            return None
+        value = value.strip()
+        if not re.fullmatch(r"[A-Za-z0-9_\-]{1,128}", value):
+            raise ValueError("ANTHROPIC_WORKSPACE_ID must be a workspace id like wrkspc_...")
+        return value
+
+    @model_validator(mode="after")
+    def _resolve_models(self) -> Settings:
+        """With the Anthropic provider the role models are the Anthropic pair, and each must
+        have a price (the spend limits cannot work without one)."""
+        if self.model_provider != "anthropic":
+            return self
+        from a11y_stem.models.pricing import ANTHROPIC_MODELS
+
+        unpriced = [
+            f"{name}={model!r}"
+            for name, model in (
+                ("ANTHROPIC_MAIN_MODEL", self.anthropic_main_model),
+                ("ANTHROPIC_CHEAP_MODEL", self.anthropic_cheap_model),
+            )
+            if model not in ANTHROPIC_MODELS
+        ]
+        if unpriced:
+            raise ValueError(
+                "no price for "
+                + ", ".join(unpriced)
+                + "; the Claude models with a price are "
+                + ", ".join(sorted(ANTHROPIC_MODELS))
+                + " (add others to models/pricing.py)"
+            )
+        self.main_model = self.anthropic_main_model
+        self.cheap_model = self.anthropic_cheap_model
+        return self
+
     @field_validator("feedback_url")
     @classmethod
     def _web_url(cls, value: str | None) -> str | None:
@@ -196,6 +265,28 @@ class Settings(BaseSettings):
         """Fallback model per primary model: each of the two models covers the other."""
         return {self.main_model: self.cheap_model, self.cheap_model: self.main_model}
 
+    def anthropic_effort_for(self, model: str) -> Effort:
+        """The effort to ask `model` for: the main model's, else the cheap model's."""
+        return (
+            self.anthropic_effort_main if model == self.main_model else self.anthropic_effort_cheap
+        )
+
+    def require_anthropic_key(self) -> str:
+        key = self.anthropic_api_key
+        if key is None or not key.get_secret_value().strip():
+            raise ConfigError("ANTHROPIC_API_KEY is not set (put it in .env; never commit it)")
+        return key.get_secret_value().strip()
+
+    def require_provider_key(self) -> str:
+        """The key of the selected provider (MODEL_PROVIDER); raises `ConfigError` if unset."""
+        if self.model_provider == "anthropic":
+            return self.require_anthropic_key()
+        return self.require_openai_key()
+
+    @property
+    def provider_key_name(self) -> str:
+        return "ANTHROPIC_API_KEY" if self.model_provider == "anthropic" else "OPENAI_API_KEY"
+
     def require_openai_key(self) -> str:
         if self.openai_api_key is None or not self.openai_api_key.get_secret_value():
             raise ConfigError("OPENAI_API_KEY is not set (put it in .env; never commit it)")
@@ -221,7 +312,7 @@ class Settings(BaseSettings):
                 ("GOOGLE_CLIENT_ID", self.google_client_id),
                 ("GOOGLE_CLIENT_SECRET", self.google_client_secret),
                 ("CRON_TOKEN", self.cron_token),
-                ("OPENAI_API_KEY", self.openai_api_key),
+                (self.provider_key_name, self.provider_key()),
                 ("CONTACT_EMAIL", self.contact_email),
             ]
             if _blank(value)
@@ -236,6 +327,9 @@ class Settings(BaseSettings):
             raise ConfigError("production needs Postgres (DATABASE_URL=postgresql+psycopg://...)")
         if not self.base_url.startswith("https://"):
             raise ConfigError("BASE_URL must be https in production")
+
+    def provider_key(self) -> SecretStr | None:
+        return self.anthropic_api_key if self.model_provider == "anthropic" else self.openai_api_key
 
     def _check_microsoft(self) -> None:
         """A client id needs its secret; a secret needs the tenants it may sign in from
@@ -269,6 +363,36 @@ def _blank(value: object) -> bool:
 @lru_cache(maxsize=1)
 def get_settings() -> Settings:
     return Settings()
+
+
+def with_provider(
+    base: Settings,
+    provider: Provider | None = None,
+    *,
+    main_model: str | None = None,
+    cheap_model: str | None = None,
+) -> Settings:
+    """`base` with another provider and/or other role models, for one eval or proof run.
+
+    `main_model` and `cheap_model` name models of the provider the result uses. Everything
+    else (keys, limits, flags) is copied. With no change asked for, `base` itself is returned.
+    """
+    if provider is None and main_model is None and cheap_model is None:
+        return base
+    chosen = provider or base.model_provider
+    values = base.model_dump(exclude={"main_model", "cheap_model"})
+    values["model_provider"] = chosen
+    if chosen == "anthropic":
+        if main_model:
+            values["anthropic_main_model"] = main_model
+        if cheap_model:
+            values["anthropic_cheap_model"] = cheap_model
+    else:
+        if main_model:
+            values["main_model"] = main_model
+        if cheap_model:
+            values["cheap_model"] = cheap_model
+    return Settings(**values)
 
 
 def local_dir() -> Path:

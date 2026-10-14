@@ -44,12 +44,27 @@
 
 <h2>Who else sees your documents</h2>
 <ul>
+  {% if provider == "anthropic" %}
+  {# TODO(Harish): final wording for Anthropic. What is known (docs/design/beta-architecture.md,
+     "Data path and retention with Anthropic"): the commercial API terms say inputs and outputs
+     are not used to train models by default; Anthropic's standard API retention is 30 days;
+     content its safety systems flag can be kept longer; zero data retention exists only by
+     agreement. Check Anthropic's current pages and say here exactly what applies to this
+     account (and whether a zero-retention agreement is in place). #}
+  <li><strong>Anthropic.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
+    and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
+    nearby text, are sent to Anthropic's API (the Claude models).{% if notation_on %} For a document you upload
+    for one of your courses, that course's notation (its symbols and what they mean) is
+    sent with the equations.{% endif %} Anthropic states that it does not use API data to train its models by
+    default; see Anthropic's own API data policies for how long it keeps requests.</li>
+  {% else %}
   <li><strong>OpenAI.</strong> To propose LaTeX for equations and alt text for figures{% if tables_on %},
     and to rebuild tables{% endif %}, images of those parts of the page, and a little of the
     nearby text, are sent to OpenAI's API.{% if notation_on %} For a document you upload
     for one of your courses, that course's notation (its symbols and what they mean) is
     sent with the equations.{% endif %} OpenAI states that it does not use API data to train its models by
     default; see OpenAI's own API data policies for how long it keeps requests.</li>
+  {% endif %}
   <li><strong>Google Cloud</strong> hosts the app and its database.</li>
   {% if tracing %}
   {# TODO(Harish): state how long Langfuse keeps traces once its project retention is set

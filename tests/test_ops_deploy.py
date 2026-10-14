@@ -295,3 +295,34 @@ def test_the_default_budget_is_above_the_fixed_monthly_cost(env):
     (create,) = [c for c in calls(env) if "budgets" in c["argv"] and "create" in c["argv"]]
     amount = next(a for a in create["argv"] if a.startswith("--budget-amount="))
     assert float(amount.removeprefix("--budget-amount=").removesuffix("USD")) >= 60
+
+
+def test_the_anthropic_provider_deploys_its_own_key_and_not_the_openai_one(env):
+    key = "sk-ant-should-never-print"
+    env.update(
+        MODEL_PROVIDER="anthropic",
+        ANTHROPIC_API_KEY=key,
+        ANTHROPIC_WORKSPACE_ID="wrkspc_test1",
+        ANTHROPIC_CHEAP_MODEL="claude-sonnet-5-5",
+    )
+    del env["OPENAI_API_KEY"]
+    result = run(env)
+    assert result.returncode == 0, result.stderr
+    assert key not in result.stdout + result.stderr
+    (deploy,) = [c for c in calls(env) if c["argv"][2:4] == ["run", "deploy"]]
+    secrets = next(a for a in deploy["argv"] if a.startswith("--set-secrets="))
+    assert "ANTHROPIC_API_KEY=anthropic-api-key:latest" in secrets
+    assert "OPENAI_API_KEY" not in secrets
+    env_file = deploy["env_file"]
+    assert "MODEL_PROVIDER: 'anthropic'" in env_file
+    assert "ANTHROPIC_WORKSPACE_ID: 'wrkspc_test1'" in env_file
+    assert "ANTHROPIC_CHEAP_MODEL: 'claude-sonnet-5-5'" in env_file
+    assert key not in env_file
+    created = [c["argv"][4] for c in calls(env) if c["argv"][2:4] == ["secrets", "create"]]
+    assert "anthropic-api-key" in created and "openai-api-key" not in created
+
+
+def test_an_unknown_model_provider_is_refused(env):
+    env["MODEL_PROVIDER"] = "gemini"
+    result = run(env)
+    assert result.returncode != 0 and "MODEL_PROVIDER must be openai or anthropic" in result.stderr

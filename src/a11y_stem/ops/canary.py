@@ -325,6 +325,8 @@ def due(settings: Settings) -> str | None:
         return "test_env"  # offline test runs never reach the network from the cron
     if settings.fake_models:
         return "fake_models"
+    if settings.model_provider != "openai":
+        return "provider_not_openai"  # the Decisions API is OpenAI's: unused with Claude
     if settings.openai_api_key is None or not settings.openai_api_key.get_secret_value():
         return "no_key"
     return None

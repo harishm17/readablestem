@@ -6,6 +6,11 @@
                                          the PDFs again (network, Chromium)
     a11y-stem proof --live --max-usd N   call the models again (OPENAI_API_KEY), record a
                                          new bundle, then replay it to write PROOF.md
+    a11y-stem proof --live --provider anthropic --max-usd N --record DIR --out FILE
+                                         the same with Claude (ANTHROPIC_API_KEY; models
+                                         from ANTHROPIC_MAIN_MODEL / ANTHROPIC_CHEAP_MODEL
+                                         or --main-model / --cheap-model); --out keeps
+                                         PROOF.md, the OpenAI recording's report, as it is
     a11y-stem proof --add-systems chatbot --max-usd N [--bundle DIR]
                                          record the chatbot arms into a recorded run
     a11y-stem proof --add-systems parsers [--bundle DIR]
@@ -98,6 +103,9 @@ def _cmd_proof(args: argparse.Namespace) -> int:
             require_complete=args.require_complete,
             n_boot=args.bootstrap,
             date=args.date,
+            provider=args.provider,
+            main_model=args.main_model,
+            cheap_model=args.cheap_model,
         )
         if args.add_systems:
             engine.add_systems(opts, args.add_systems, _say, arms=args.arms or None)
@@ -160,6 +168,15 @@ def register(sub: argparse._SubParsersAction) -> None:
     live.add_argument("--live", action="store_true", help="re-call the models and record a bundle")
     live.add_argument("--max-usd", type=_positive_float, help="hard spend cap for the whole run")
     live.add_argument("--max-calls", type=_positive_int, default=5000)
+    live.add_argument(
+        "--provider",
+        choices=("openai", "anthropic"),
+        default="openai",
+        help="model provider of the live run (default openai; anthropic needs "
+        "ANTHROPIC_API_KEY). The recording stores it, and a replay uses what it says",
+    )
+    live.add_argument("--main-model", metavar="ID", help="main model of --provider")
+    live.add_argument("--cheap-model", metavar="ID", help="cheap model of --provider")
     live.add_argument("--record", type=Path, help="where to write the new bundle")
     live.add_argument("--date", type=_iso_date, default=today, help="recording date")
     live.add_argument("--fake", action="store_true", help="offline fake client; not for held out")

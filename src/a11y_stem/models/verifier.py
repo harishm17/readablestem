@@ -459,4 +459,9 @@ def make_verifier(settings: Settings, budget: JobBudget, *, fake: bool = False) 
 
 
 def any_check_enabled(settings: Settings) -> bool:
+    """The second automated check runs on OpenAI's Decisions API, so it is used only with
+    the OpenAI provider: with MODEL_PROVIDER=anthropic it is skipped (nothing is sent to
+    OpenAI, no OpenAI key is needed) whatever the DECISIONS_* settings say."""
+    if settings.model_provider != "openai":
+        return False
     return settings.decisions_figure_verify or settings.decisions_equation_shadow

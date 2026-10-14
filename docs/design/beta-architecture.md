@@ -34,6 +34,7 @@ flowchart LR
   E & F -->|VisionRequest| R[router: main model, fallback model, escalation]
   R -->|reserve spend first| B[JobBudget + daily SpendGuard]
   R --> O[OpenAI Responses API: gpt-6.1-sol / gpt-6-luna]
+  R -.->|MODEL_PROVIDER=anthropic| AN[Anthropic Messages API: claude-opus-5-5 / claude-haiku-5-5]
   H & E & F --> A[assemble: accessible HTML + report]
   A --> C[html_checks: static + axe-core]
   A --> DB
@@ -60,6 +61,8 @@ sign-in) have their own contracts, flags and ownership map in
 | `models/pricing.py` | `PRICES`, `cost_usd`, `estimate_max_cost_usd` | spine |
 | `models/fake.py` | `FakeVisionClient` | spine |
 | `models/openai_client.py` | `OpenAIVisionClient(settings, budget, *, client=None)` | WP1 |
+| `models/anthropic_client.py` | `AnthropicVisionClient(settings, budget, *, client=None, http_client=None)`: the same `VisionClient` contract on the Anthropic Messages API | provider |
+| `models/__init__.py` | `make_vision_client(settings, budget, *, fake)` (the app), `make_live_client(settings, budget)` (CLI, eval, proof; checks the key first): both pick the client from `Settings.model_provider` | provider |
 | `models/router.py` | `call_with_fallback(client, request, schema, *, settings)` | WP1 |
 | `models/prompts/` | versioned prompt text files + loader `load_prompt(name) -> (version, text)` | WP1 |
 | `pipeline/layout.py` | `analyze(pdf_bytes, *, pages, max_pages) -> Layout` (elements: headings, paragraphs, list items, equations, figures; `page_types`, `kept_pages`), `crop(...)`, `release(pdf_bytes=None)`, `LayoutError` | WP2 |
@@ -145,6 +148,81 @@ numbers the decisions, `web/compare.py` says what differs in an equation from th
 own rules, and `web/routes/split.py` shows each with its page, rendered on demand in the
 upload probe's child process (`web/page_images.py`). The full list stays at
 `/jobs/{id}/review/list`.
+
+## Model providers
+
+OpenAI is the default. `MODEL_PROVIDER=anthropic` (per deployment, or `--provider anthropic`
+per eval or proof run) switches every model request to the Claude API; nothing else in the
+pipeline knows which provider answered.
+
+- **Roles.** The code reads `settings.main_model` and `settings.cheap_model`. With the
+  OpenAI provider they are `MAIN_MODEL` / `CHEAP_MODEL` (gpt-6.1-sol, gpt-6-luna). With
+  Anthropic they are `ANTHROPIC_MAIN_MODEL` (default `claude-opus-5-5`) and
+  `ANTHROPIC_CHEAP_MODEL` (default `claude-haiku-5-5`; `claude-sonnet-5-5` is the other
+  priced choice), and `MAIN_MODEL` / `CHEAP_MODEL` are ignored. The pairs are chosen the
+  same way: the cheap model reads first, the main model re-reads what the cheap one is
+  unsure about, and each is the other's fallback, so **fallback and escalation never leave
+  the selected provider** (`Settings.fallback_for` is built from the resolved pair).
+- **Contract.** `AnthropicVisionClient` implements `VisionClient` as `OpenAIVisionClient`
+  does: reserve the worst case before every send, settle with the real usage, retry here
+  (the SDK's own retries are off) with a reservation per resend, report failures as
+  `ModelCall.outcome` codes, never log content. Images are base64 content blocks, the
+  step's constant instructions are the cached system prefix, the fenced untrusted text is
+  unchanged, and the output schema goes through `output_config.format`.
+- **Model rules** (from Anthropic's reference for these models): no `temperature` or other
+  sampling parameter, no assistant prefill, no forced `tool_choice`; thinking cannot be
+  turned off on claude-opus-5-5, so `output_config.effort` is set on every request
+  (`ANTHROPIC_EFFORT_MAIN=medium`, `ANTHROPIC_EFFORT_CHEAP=low`) and `max_tokens` is the
+  step's limit plus a thinking allowance (8,192).
+- **Refusal fallback.** claude-opus-5-5 (and claude-sonnet-5-5) requests carry
+  `fallbacks: "default"` under the beta header `server-side-fallback-2026-07-01`:
+  Anthropic re-runs a request its classifiers decline on the model it recommends, inside the
+  same call. The fallback model runs without the first model's thinking, and is billed at its
+  own rate (the reservation uses the dearer rate). It is on by default
+  (`ANTHROPIC_REFUSAL_FALLBACK`). claude-haiku-5-5 has no server-side fallback; its refusal
+  is a `refused` outcome and the router's fallback to the other model applies.
+- **The second automated check is OpenAI-only.** The Decisions API (ADR 0005) belongs to
+  OpenAI. With the Anthropic provider the check is skipped cleanly: `any_check_enabled` is
+  false, no verifier is built, steps record no verification and the canary is not due; no
+  request goes to OpenAI and no OpenAI key is needed. It was not kept on OpenAI "if a key is
+  configured": that would send the same figure and equation images to a second company in a
+  deployment whose privacy page names one, for a check that only ranks.
+- **Records.** Eval and proof reports record the provider as `client` (`openai`,
+  `anthropic`, `fake`) and the model ids as `models`. A proof recording made with Claude
+  also records `model_provider` and the effort settings in its code identity; a replay takes
+  the provider and the models from the recording. The recordings made before the provider
+  existed carry neither and mean OpenAI, so they replay exactly as before.
+
+### Data path and retention with Anthropic
+
+With the Anthropic provider, Anthropic is a data processor in place of OpenAI. The data
+path is the same as in the diagram: the images cut from the PDF (equations, figures, and
+tables when `FEATURE_TABLES` is on) and a short fenced text around each, and with
+`FEATURE_NOTATION_MEMORY` the course's notation, go to the Anthropic API over HTTPS from the
+worker. Nothing else is sent: no file name, no email address, no PDF. The request carries
+the API key and, when set, the workspace id.
+
+What is known, from Anthropic's privacy centre ("How long do you store my organization's
+data?", read 2026-10-13):
+
+- Inputs and outputs of the API are deleted from Anthropic's backend within 30 days of
+  receipt or generation, unless a zero-data-retention (or other) agreement says otherwise.
+- Inputs and outputs that Anthropic's systems flag as Usage Policy violations can be
+  retained for up to 2 years, and the classification scores for up to 7 years.
+- Anthropic's commercial terms say API data is not used to train its models by default. That
+  is not on the page above and was not re-checked for this change.
+- This app's own retention (24 hours, 30 days with the opt-in) does not reach Anthropic's
+  copy: a document deleted here can still be at Anthropic for up to 30 days.
+- Not known: whether a zero-data-retention agreement is in place for Harish's account, and
+  whether the account's workspace uses any retention setting other than the default.
+
+TODO(Harish): the final wording for the privacy page and the deploy checklist: whether to
+say "up to 30 days" and the 2-year flagged-content exception in the notice, whether to ask
+Anthropic for zero data retention, and a decision on the sentence "Uploads are never used to
+train AI models". The privacy page (`web/templates/privacy.html`) names Anthropic instead of
+OpenAI when the provider is anthropic, with the same words as for OpenAI plus a pointer to
+Anthropic's own policies; `a11y-stem ops launch-check` lists the page as a launch blocker on
+this provider if it does not name Anthropic.
 
 ## Rules every work package follows
 

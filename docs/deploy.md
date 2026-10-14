@@ -29,7 +29,8 @@ notification channels and Cloud Run domain mappings.
 
 - The gcloud CLI, signed in: `gcloud auth login`.
 - A Google Cloud billing account (`gcloud billing accounts list` shows its ID).
-- An OpenAI account with API access to `gpt-6.1-sol` and `gpt-6-luna`.
+- An OpenAI account with API access to `gpt-6.1-sol` and `gpt-6-luna`, or, to use Claude
+  instead, an Anthropic API key ("Using Claude" below).
 - `openssl` (the script uses it to generate random secrets) and this repository checked
   out at the commit you want to deploy.
 - Optional: a domain you control, for a URL nicer than `*.run.app`.
@@ -68,6 +69,67 @@ checked 2026-10-07.)
 
 In the app, a 429 from the provider ends up as a failed model call; the document is still
 assembled with the originals kept, and the fixes that could not run are flagged.
+
+### Using Claude (Anthropic) instead of OpenAI
+
+`MODEL_PROVIDER=anthropic` answers every model request with the Claude API instead
+(`models/anthropic_client.py`); OpenAI is then not called at all. Anthropic becomes a data
+processor for the app, so the privacy page changes with the setting and
+`a11y-stem ops launch-check` flags a deployment whose page does not name Anthropic
+(`docs/design/beta-architecture.md`, "Data path and retention with Anthropic").
+
+1. In the Anthropic Console, create a workspace for the app (for example "a11y-stem prod")
+   and an API key inside it. **Use a workspace-scoped key.** A key that is not scoped to a
+   workspace (an organisation-level key) is refused with HTTP 400 "This API key is not
+   scoped to a workspace" unless every request carries the workspace id. The id is
+   `ANTHROPIC_WORKSPACE_ID` (`wrkspc_...`; the client sends it as the `anthropic-workspace-id`
+   header). Set it only for such a key; the settings cannot tell the two kinds of key apart
+   (the key text does not say), so a deployment with an organisation-level key and no id
+   starts, and then fails each model call with that 400 (`call:<model>:outcome:api_error`
+   in the aggregates, HTTP status 400 in the log lines). The proof's one-request API check
+   (`a11y-stem proof --live --provider anthropic`) names the missing id.
+2. Cap spend in the Console: **Settings > Limits** for the workspace (a monthly spend limit)
+   and usage alerts, the same two layers as step 2 above. The app's own caps still apply.
+3. In `deploy/.env.deploy` set `MODEL_PROVIDER=anthropic`, leave `ANTHROPIC_API_KEY` empty
+   and type it when asked (the secret is `anthropic-api-key`; `OPENAI_API_KEY` is neither
+   asked for nor given to the service). Optional: `ANTHROPIC_WORKSPACE_ID`,
+   `ANTHROPIC_MAIN_MODEL` (default `claude-opus-5-5`) and `ANTHROPIC_CHEAP_MODEL` (default
+   `claude-haiku-5-5`; `claude-sonnet-5-5` is the usual alternative). Models without a price
+   in `models/pricing.py` are refused at start-up.
+4. Locally, the same names go in `.env` (`.env.example`). `Settings.check_production` asks
+   for `ANTHROPIC_API_KEY` instead of `OPENAI_API_KEY` when the provider is anthropic.
+
+Things that differ from OpenAI, all on by default and safe to leave:
+
+- The second automated check (the Decisions API, ADR 0005) is OpenAI's and is **not used**
+  with Claude: no figure note, no equation shadow, no daily canary (`DECISIONS_*` are
+  ignored; the canary command still needs an OpenAI key if you run it by hand). A deployment
+  on Claude therefore has one automated check fewer than one on OpenAI, and recorded
+  numbers from the two are not comparable on that point.
+- `claude-opus-5-5` cannot turn thinking off, and `claude-sonnet-5-5` and `claude-haiku-5-5`
+  think by default; the control is `ANTHROPIC_EFFORT_MAIN` (default `medium`) and
+  `ANTHROPIC_EFFORT_CHEAP` (default `low`). Thinking is billed as output, so a call can cost
+  more than the same call on OpenAI; the reservation allows for it (8,192 tokens above the
+  step's output limit).
+- Refusal fallback: for `claude-opus-5-5` (and `claude-sonnet-5-5`) each request asks
+  Anthropic to re-run a request its safety classifiers decline on the model it recommends
+  (`fallbacks: "default"`, beta header `server-side-fallback-2026-07-01`,
+  `ANTHROPIC_REFUSAL_FALLBACK=false` turns it off). `claude-haiku-5-5` has no such fallback;
+  a decline there is a `refused` outcome, which the app then retries on the other model as
+  usual. The fallback model is billed at its own rates; the reservation uses the dearer.
+- Prices (`models/pricing.py`, checked 2026-10-13): claude-opus-5-5 $4 / $20 per million
+  tokens (cache read $0.20, write $5), claude-sonnet-5-5 $2 / $10 (read $0.20, write $2.50),
+  claude-haiku-5-5 $0.10 / $0.50 for prompts up to 100K tokens, $0.50 / $2.50 above
+  (read 0.1x, write 1.25x).
+- The instructions are cached (5 minutes), so from a job's second call on, the instruction
+  tokens are billed at the cache-read rate.
+- A reservation (the worst case held before each call) is larger than on OpenAI because it
+  covers thinking and a large image: about $0.29 for one call on `claude-opus-5-5`, $0.12 on
+  `claude-sonnet-5-5`, $0.006 on `claude-haiku-5-5` (one image, 1,024 output tokens). The
+  default `MAX_USD_PER_PAGE` ($0.30) is barely above one main-model reservation, so with
+  Claude as the main model raise `MAX_USD_PER_PAGE` (for example to 1.00) and
+  `MAX_USD_PER_JOB`, and keep `DAILY_SPEND_CAP_USD` several times higher than a day's
+  reservations in flight; actual spend per call is a small fraction of its reservation.
 
 ## 3. Create the Google sign-in client
 
@@ -415,6 +477,9 @@ gcloud run services update a11y-stem --region="$REGION" --project="$PROJECT_ID" 
 ```
 
 ## Rotate a secret
+
+With `MODEL_PROVIDER=anthropic`, the model key is the secret `anthropic-api-key`; use that
+name where the commands below say `openai-api-key`.
 
 ```sh
 read -rs VALUE            # paste the new value; nothing is echoed

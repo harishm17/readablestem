@@ -127,8 +127,11 @@ class ModelCall(BaseModel):
     step: Step
     model: str
     prompt_version: str
-    input_tokens: int = 0
-    cached_input_tokens: int = 0
+    input_tokens: int = 0  # the whole prompt, cached and cache-written tokens included
+    cached_input_tokens: int = 0  # read from the provider's prompt cache
+    # Written to the prompt cache (Anthropic bills these above the input rate). Left out of
+    # the JSON when 0, so a record that never has any (OpenAI) is unchanged.
+    cache_creation_input_tokens: int = Field(default=0, exclude_if=lambda v: v == 0)
     output_tokens: int = 0  # includes reasoning tokens, which are billed as output
     reasoning_tokens: int = 0
     cost_usd: float = 0.0

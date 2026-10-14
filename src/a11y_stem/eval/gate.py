@@ -502,9 +502,18 @@ def run_gate(
     baseline = json.loads(baseline_path.read_text(encoding="utf-8")) if baseline_path else None
     try:
         if require_current:
-            from a11y_stem.config import CHEAP_MODEL, MAIN_MODEL
+            from a11y_stem.config import (
+                ANTHROPIC_CHEAP_MODEL,
+                ANTHROPIC_MAIN_MODEL,
+                CHEAP_MODEL,
+                MAIN_MODEL,
+            )
 
-            models = {"main": MAIN_MODEL, "cheap": CHEAP_MODEL, "judge": MAIN_MODEL}
+            if current.get("client") == "anthropic":
+                main, cheap = ANTHROPIC_MAIN_MODEL, ANTHROPIC_CHEAP_MODEL
+            else:
+                main, cheap = MAIN_MODEL, CHEAP_MODEL
+            models = {"main": main, "cheap": cheap, "judge": main}
             check_current(current, code_versions(), models)
         result = gate(
             current, baseline, load_tolerances(tolerance_path), load_floors(tolerance_path)

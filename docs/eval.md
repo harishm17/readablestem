@@ -411,7 +411,7 @@ with or without a baseline (see "Tables": "Gate").
 |---|---|
 | `schema_version`, `task`, `date` | `date` comes from `--date` (default: today, taken in the CLI) |
 | `pipeline_version`, `prompt_versions` | `run.PIPELINE_VERSION`; prompt versions as seen on the model calls, module constants when no call ran. 0.3.0 (2026-10-08) changed the review rules (a sign or relation that differs from the text layer is a required decision): reports before 0.3.0 used the old review policy, so compare review-load numbers (required decisions, flags) only between reports of the same pipeline version. 0.4.0 (2026-10-09) added the content features (docs/design/content-features.md) without changing equations, figures or headings while the flags are off, so 0.4.0 and 0.3.0 reports compare. Layout detects tables whatever the flags say, and each data table kept as an image is a required decision of its own; on the document gold it claims no data table (its two ruled key-term grids are claimed as grids of terms and written as lists, `tables.is_term_grid`, with no decision). Chart data tables read from the image are optional extras, never a decision (since 2026-10-09; "Content features after integration"). Which version made each committed `data/eval/latest-*.json`: "Results" |
-| `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, `openai` or `fake` |
+| `models`, `models_used`, `client` | configured main/cheap (and judge) ids, ids actually called, and the provider that answered: `openai`, `anthropic` or `fake` |
 | `dataset` | `gold_dir`, `manifest_sha256`, `limit`, `unit`, `selection_sha256` (hash of the planned item ids) |
 | `n_planned`, `n`, `complete`, `stopped_reason` | `stopped_reason` is a budget category (e.g. `budget_job_usd`) when spend ran out |
 | `metrics` | per task, as above |
@@ -444,11 +444,42 @@ uv run a11y-stem gold fetch --book physics --pages 3 --chapter 2 --date 2026-10-
 printed from and the equation contexts are read from. After that, rendering is offline
 except for figure images (downloaded once).
 
-Real runs need `OPENAI_API_KEY` in `.env` and a spend cap. Each model call reserves its
+Real runs need `OPENAI_API_KEY` in `.env` (or `ANTHROPIC_API_KEY` with `--provider
+anthropic`) and a spend cap. Each model call reserves its
 worst case before it is sent (about $0.020 on gpt-6.1-sol, $0.001 on gpt-6-luna, from
 `estimate_max_cost_usd`), so the cap must stay above actual spend by at least one
 reservation. When a reservation is refused the run stops, keeps what finished, and marks
 the report partial.
+
+With `--provider anthropic` (key `ANTHROPIC_API_KEY`) the same run is made with Claude:
+`--main-model` and `--cheap-model` choose the models (defaults `claude-opus-5-5` and
+`claude-haiku-5-5`; for example `--cheap-model claude-sonnet-5-5`), the report's `client` is
+`anthropic` and `models` holds the Claude ids, and `--max-usd` works the same. The second
+automated check does not run (it is OpenAI's), so the verifier numbers of a Claude report are
+empty. A reservation is larger because it covers thinking (8,192 tokens above the step's
+output limit) and a large image: about $0.29 on claude-opus-5-5, $0.12 on claude-sonnet-5-5
+and $0.006 on claude-haiku-5-5 for one image and 1,024 output tokens, so keep `--max-usd`
+well above one main-model reservation (the actual cost of a call is far less; a real
+equation crop costs a fraction of a cent on haiku). `eval promote` refuses a Claude report
+unless `--out-dir` is given, so it cannot replace the OpenAI baselines the CI gate reads;
+`eval gate` between a Claude and an OpenAI report prints the differences and notes that
+`models` and `client` changed.
+
+Who judges the figures is a choice of its own: `--judge-provider` and `--judge-model` on
+`eval pipeline --task figures`, `eval sample`, `eval calibrate --probes` and
+`eval invented judge`. The default is the run's provider: its main model on OpenAI, and
+`claude-opus-5-5` on Anthropic whatever the run's main model is, so a run with Sonnet as
+main model is still graded by the same judge as one with Opus. The judge has its own client
+on the run's budget (one `--max-usd` covers both), the same prompt on both providers, and on
+Claude no server-side refusal fallback. The report records it: `models.judge` and
+`judge_client` (provider and model); the invented-content judge result has `judge_provider`
+and `judge_model`, the probe report `judge`. Figure pass rates graded by an OpenAI judge and
+by a Claude judge are two instruments and do not compare (the gate refuses, `judge_changed`).
+The chatbot arms of the registered comparison stay on OpenAI.
+
+```
+uv run a11y-stem eval pipeline --task equations --provider anthropic --limit 10 --max-usd 1.00 --out .local/eval/equations-claude.json
+```
 
 ```
 uv run a11y-stem eval pipeline --task equations --max-usd 0.50 --items data/eval/items-equations.jsonl
