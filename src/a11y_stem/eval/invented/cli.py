@@ -131,23 +131,34 @@ def _cmd_summary(args: argparse.Namespace) -> int:
 
 
 def _judge_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any] | str:
+    """(judge, budget) or an error message. The judge is `eval.judge.make_judge`'s: the
+    run has no model of its own here, so `--judge-provider` defaults to MODEL_PROVIDER."""
+    from pydantic import ValidationError
+
     from a11y_stem.config import ConfigError
     from a11y_stem.core.budget import InMemorySpendGuard, JobBudget
-    from a11y_stem.models.fake import FakeVisionClient
+    from a11y_stem.eval import judge as judge_mod
 
     if not args.fake and args.max_usd is None:
         return "--max-usd is required for real model calls (or pass --fake)"
     cap = args.max_usd if args.max_usd is not None else float("inf")
-    budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
-    if args.fake:
-        return FakeVisionClient(budget=budget), budget
-    from a11y_stem.models.openai_client import OpenAIVisionClient
-
+    budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_calls=args.max_calls, max_usd=cap)
     try:
-        settings.require_openai_key()
-        return OpenAIVisionClient(settings, budget), budget  # no second check: the judge alone
+        # No second check: the judge alone. The judge's own client is built on `budget`.
+        judge = judge_mod.make_judge(
+            settings,
+            budget,
+            run_client=None,
+            provider=args.judge_provider,
+            model=args.judge_model,
+            fake=args.fake,
+        )
+    except ValidationError as exc:
+        reasons = "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
+        return f"invalid judge settings: {reasons}"
     except ConfigError as exc:
         return str(exc)
+    return judge, budget
 
 
 def _cmd_judge(args: argparse.Namespace) -> int:
@@ -174,14 +185,14 @@ def _cmd_judge(args: argparse.Namespace) -> int:
     made = _judge_client(args, settings)
     if isinstance(made, str):
         return _error(made)
-    client, budget = made
+    judge, budget = made
     try:
         result = figures.judge_sample(
             items,
             population=len(output.descriptions),
             skipped=skipped,
-            client=client,
-            settings=settings,
+            client=judge.client,
+            settings=judge.settings,
             k=args.sample,
             seed=args.seed,
         )
@@ -357,6 +368,16 @@ def register(group: argparse._SubParsersAction) -> None:
     judge.add_argument("--max-usd", type=_positive_float, help="hard spend cap in USD")
     judge.add_argument("--max-calls", type=_positive_int, default=500)
     judge.add_argument("--fake", action="store_true", help="offline FakeVisionClient")
+    judge.add_argument(
+        "--judge-provider",
+        choices=["openai", "anthropic"],
+        help="provider of the judge (default: MODEL_PROVIDER); the result records it",
+    )
+    judge.add_argument(
+        "--judge-model",
+        metavar="ID",
+        help="model of the judge (default: the main model on openai, claude-opus-5-5 on anthropic)",
+    )
     judge.add_argument("--out", type=Path, help="write the result as JSON")
     judge.add_argument("--units", action="store_true", help="also write each judged unit's row")
     judge.set_defaults(func=_cmd_judge)

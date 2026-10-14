@@ -127,6 +127,47 @@ def _add_spend_args(parser: argparse.ArgumentParser) -> None:
     )
 
 
+def _add_judge_args(parser: argparse.ArgumentParser) -> None:
+    parser.add_argument(
+        "--judge-provider",
+        choices=["openai", "anthropic"],
+        help="provider of the figure judge (default: the run's provider); the report records "
+        "it as `judge_client`",
+    )
+    parser.add_argument(
+        "--judge-model",
+        metavar="ID",
+        help="model of the figure judge (default: the run's main model on openai, "
+        "claude-opus-5-5 on anthropic, whatever the run's main model is)",
+    )
+
+
+def _make_judge(
+    args: argparse.Namespace, settings: Any, client: Any, budget: Any, *, label: str
+) -> Any:
+    """The figure judge of this run (`eval.judge.make_judge`), or an error message. It
+    charges the run's budget, so one `--max-usd` covers the run and the judge."""
+    from pydantic import ValidationError
+
+    from a11y_stem.config import ConfigError
+    from a11y_stem.eval import judge as judge_mod
+
+    try:
+        return judge_mod.make_judge(
+            settings,
+            budget,
+            run_client=client,
+            provider=getattr(args, "judge_provider", None),
+            model=getattr(args, "judge_model", None),
+            fake=label == "fake",
+        )
+    except ValidationError as exc:
+        reasons = "; ".join(str(e["msg"]).removeprefix("Value error, ") for e in exc.errors())
+        return f"invalid judge settings: {reasons}"
+    except ConfigError as exc:
+        return str(exc)
+
+
 def _make_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any, str] | str:
     """(client, budget, label), or an error message. Every request reserves spend first."""
     from a11y_stem.config import ConfigError
@@ -317,6 +358,15 @@ def _run_pipeline(
     if isinstance(made, str):
         return _error(made)
     client, budget, label = made
+    judge = None
+    if args.task == "figures":  # the only task with a judge
+        judge = _make_judge(args, settings, client, budget, label=label)
+        if isinstance(judge, str):
+            return _error(judge)
+    elif args.judge_provider or args.judge_model:
+        return _error(
+            f"--judge-provider and --judge-model apply to the figures task, not {args.task}"
+        )
     fetcher = HttpFetcher(cache_dir=openstax_cache or _default(OPENSTAX_CACHE))
     with pe.CachedMedia(
         gold_dir, cache_dir or args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
@@ -333,6 +383,7 @@ def _run_pipeline(
             gold_label=gold_label,
             concurrency=args.concurrency,
             budget=budget,
+            judge=judge,
             scorer_gaps=pe.scorer_gap_ids(pe.load_gold(gold_dir), _default(SCORER_CHECK))
             if args.task in {"equations", "document"}
             else frozenset(),
@@ -500,6 +551,8 @@ def _cmd_calibrate(args: argparse.Namespace) -> int:
 
     if args.probes:
         return _calibrate_probes(args)
+    if args.judge_provider or args.judge_model:
+        return _error("--judge-provider and --judge-model go with --probes (the calls it makes)")
     if args.write_template and not args.judge:
         return _error("--write-template needs --judge judged.jsonl (from eval pipeline)")
     if not args.write_template and not (args.judge and args.labels):
@@ -538,7 +591,10 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
     made = _make_client(args, settings)
     if isinstance(made, str):
         return _error(made)
-    client, _budget, _label = made
+    client, budget, label = made
+    judge = _make_judge(args, settings, client, budget, label=label)
+    if isinstance(judge, str):
+        return _error(judge)
     paraphrases = cal.load_paraphrases(args.paraphrases) if args.paraphrases else None
     figures = cal.probe_figures(load_gold(gold_dir), args.limit)
     images = None
@@ -553,8 +609,13 @@ def _calibrate_probes(args: argparse.Namespace) -> int:
         except render.RenderError as exc:
             return _error(f"could not get a figure image (no model calls made): {exc}")
     report, items = cal.run_probes(
-        figures, client=client, settings=settings, paraphrases=paraphrases, images=images
+        figures,
+        client=judge.client,
+        settings=judge.settings,
+        paraphrases=paraphrases,
+        images=images,
     )
+    report["judge"] = judge.describe()
     if args.out:
         _write_json(report, args.out)
     if args.items:
@@ -847,6 +908,7 @@ def register(
     )
     pipeline.add_argument("--task", required=True, choices=PIPELINE_TASKS)
     _add_spend_args(pipeline)
+    _add_judge_args(pipeline)
     heldout_cli.add_set_arguments(pipeline)
     pipeline.add_argument(
         "--limit",
@@ -933,6 +995,7 @@ def register(
     )
     sample.add_argument("--task", required=True, choices=TASKS)
     _add_spend_args(sample)
+    _add_judge_args(sample)
     sample.add_argument("--fraction", type=float, default=0.05, help="share of units (0.05)")
     sample.add_argument("--week", help="ISO week used as the seed, e.g. 2026-W41 (default: now)")
     sample.add_argument("--gold", type=Path, help="gold dir (default: data/gold)")
@@ -958,6 +1021,7 @@ def register(
         "--probes", action="store_true", help="run the judge bias probes on gold figures"
     )
     _add_spend_args(calibrate)
+    _add_judge_args(calibrate)
     calibrate.add_argument("--gold", type=Path, help="gold dir for --probes")
     calibrate.add_argument(
         "--text-only",

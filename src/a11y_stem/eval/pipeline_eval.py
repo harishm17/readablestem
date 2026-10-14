@@ -411,6 +411,13 @@ class EvalConfig:
     # Gold equation ids the scorer marks wrong even for known-correct LaTeX (normalisation
     # gaps, `scorer_gap_ids`): review-load metrics are also given without them.
     scorer_gaps: frozenset[str] = frozenset()
+    # Who judges the figures (`judge_mod.make_judge`); None: the run's own client and main
+    # model, as before the judge could be chosen.
+    judge: judge_mod.JudgeSetup | None = None
+
+    @property
+    def judge_setup(self) -> judge_mod.JudgeSetup:
+        return self.judge or judge_mod.JudgeSetup(self.client, self.settings)
 
 
 @dataclass
@@ -1127,8 +1134,8 @@ def _eval_figures(
                     fix.figure.alt,
                     reference,
                     caption,
-                    client=cfg.client,
-                    settings=cfg.settings,
+                    client=cfg.judge_setup.client,
+                    settings=cfg.judge_setup.settings,
                     image=png,
                 )
             long_judgement = None
@@ -1139,8 +1146,8 @@ def _eval_figures(
                     proposal.data_table,
                     reference,
                     caption,
-                    client=cfg.client,
-                    settings=cfg.settings,
+                    client=cfg.judge_setup.client,
+                    settings=cfg.judge_setup.settings,
                     image=png,
                 )
         except BudgetExceeded as exc:
@@ -1736,9 +1743,9 @@ def build_report(
     latencies = [float(i.get("latency_ms", 0)) for i in items]
     models = {"main": cfg.settings.main_model, "cheap": cfg.settings.cheap_model}
     if task == "figures":
-        models["judge"] = cfg.settings.main_model
+        models["judge"] = cfg.judge_setup.model
     used = sorted({m for i in items for m in i.get("models", [])})
-    return {
+    report = {
         "schema_version": SCHEMA_VERSION,
         "task": task,
         "date": cfg.date,
@@ -1763,6 +1770,10 @@ def build_report(
         "latency_ms": latency_summary(latencies)
         | {"basis": LATENCY_BASIS.get(task, DEFAULT_LATENCY_BASIS)},
     }
+    if task == "figures" and cfg.judge is not None:
+        # Which provider judged is recorded when the run chose it (the CLI always does).
+        report["judge_client"] = cfg.judge.describe()
+    return report
 
 
 def run_pipeline_eval(cfg: EvalConfig) -> EvalRun:

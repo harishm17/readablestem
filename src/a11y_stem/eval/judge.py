@@ -18,6 +18,13 @@ Design choices:
 - Main model (`settings.main_model`, gpt-6.1-sol) with no fallback: a judge that silently
   switched models would change the measuring instrument mid-run. A failed call is
   recorded and the item is left unjudged.
+- Which provider and model judge is a choice of the run (`make_judge`, the
+  `--judge-provider` / `--judge-model` options): by default the run's own provider, and
+  then the run's main model on OpenAI, but always `claude-opus-5-5` on Anthropic, so the
+  instrument stays the same while the run's main model changes. The judge has its own
+  client (same budget) and, on Anthropic, the server-side refusal fallback is off for it.
+  The prompt is the same for both providers; the report records the judge's provider and
+  model.
 - All three texts are untrusted data and travel in `VisionRequest.context_text` (fenced
   by the client); the instructions are the fixed prompt `models/prompts/judge_figure.md`.
 
@@ -33,13 +40,17 @@ not calibrated against human labels yet.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from a11y_stem.config import Settings
+from a11y_stem.config import ANTHROPIC_MAIN_MODEL, Provider, Settings, with_provider
 from a11y_stem.core.types import ModelCall, TableGrid
 from a11y_stem.models.base import VisionClient, VisionRequest
 from a11y_stem.models.prompts import load_prompt
+
+if TYPE_CHECKING:
+    from a11y_stem.core.budget import JobBudget
 
 JUDGE_PROMPT = "judge_figure"
 # Per-field caps keep the whole data block under `fence_untrusted`'s default 2000-character
@@ -257,3 +268,70 @@ def judge_long(
 
 def long_judge_prompt_version() -> str:
     return load_prompt(LONG_JUDGE_PROMPT).version
+
+
+# ===================================================================== who judges
+
+
+@dataclass(frozen=True)
+class JudgeSetup:
+    """The instrument of a run: the client that sends judge calls and the settings whose
+    `main_model` they name. `provider` and `model` are what reports record."""
+
+    client: VisionClient
+    settings: Settings
+
+    @property
+    def provider(self) -> str:
+        return self.settings.model_provider
+
+    @property
+    def model(self) -> str:
+        return self.settings.main_model
+
+    def describe(self) -> dict[str, str]:
+        return {"provider": self.provider, "model": self.model}
+
+
+def judge_settings(
+    settings: Settings, provider: Provider | None = None, model: str | None = None
+) -> Settings:
+    """The settings the judge runs with. `provider` None: the run's. Model None: the run's
+    main model on OpenAI (unchanged), `claude-opus-5-5` on Anthropic (not the run's main
+    model, which may be a Sonnet being compared). On Anthropic the refusal fallback is
+    off, so the judge never changes model inside a call. Raises pydantic's
+    `ValidationError` for a Claude model without a price."""
+    chosen = provider or settings.model_provider
+    if chosen == "anthropic":
+        base = with_provider(settings, "anthropic", main_model=model or ANTHROPIC_MAIN_MODEL)
+        return base.model_copy(update={"anthropic_refusal_fallback": False})
+    if chosen == settings.model_provider and model is None:
+        return settings
+    return with_provider(settings, chosen, main_model=model)
+
+
+def make_judge(
+    settings: Settings,
+    budget: JobBudget,
+    *,
+    run_client: VisionClient | None,
+    provider: Provider | None = None,
+    model: str | None = None,
+    fake: bool = False,
+) -> JudgeSetup:
+    """The judge for a run. Reuses the run's client when the judge settings are the run's
+    (OpenAI, nothing chosen); otherwise builds the judge's own client on the same
+    `budget`, so one cap covers the run and its judge. `run_client` None: there is no run
+    (the invented-content judge), so the judge always gets its own. `fake` gives an
+    offline `FakeVisionClient`. Raises `ConfigError` when the judge provider's key is
+    missing, now and not on the first call."""
+    chosen = judge_settings(settings, provider, model)
+    if fake:
+        from a11y_stem.models.fake import FakeVisionClient
+
+        return JudgeSetup(run_client or FakeVisionClient(budget=budget), chosen)
+    if run_client is not None and chosen == settings:
+        return JudgeSetup(run_client, chosen)
+    from a11y_stem.models import make_live_client
+
+    return JudgeSetup(make_live_client(chosen, budget, second_check=False), chosen)

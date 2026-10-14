@@ -244,6 +244,7 @@ class FigureJudgement:
     judged: list[Judged] = field(default_factory=list)
     prompt_version: str = ""
     model: str = ""
+    provider: str = ""
 
     @property
     def answered(self) -> list[Judged]:
@@ -267,6 +268,7 @@ class FigureJudgement:
             "judge_cost_usd": round(sum(j.cost_usd for j in self.judged), 6),
             "judge_prompt": self.prompt_version,
             "judge_model": self.model,
+            "judge_provider": self.provider,
             "by_source": {
                 source: {
                     "answered": sum(1 for j in answered if j.source == source),
@@ -303,6 +305,7 @@ def judge_sample(
         seed=seed,
         prompt_version=judge_mod.judge_prompt_version(),
         model=settings.main_model,
+        provider=settings.model_provider,
     )
     for item in sample:
         judgement = judge_mod.judge_alt(
