@@ -213,3 +213,16 @@ def test_an_equation_that_holds_its_own_bar_is_not_half_a_fraction():
     )
     layout._flag_half_fractions([whole], [bar], [above])
     assert whole.reasons == ["fraction bar"]
+
+
+def test_a_lowered_bracket_on_a_baseline_of_its_own_stays_in_the_equation():
+    # TeX sets the tall "(" of d/dx (7x^3 - 15x^2) lowered, on a baseline of its own.
+    def fill(page):
+        page.insert_text((72, 140), "Evaluate the derivative", fontsize=BODY)
+        end = fraction(page, 212, 140, "d", "dx")
+        page.insert_text((end, 133), "(", fontsize=BODY)  # lowered 7 pt: its own row
+        page.insert_text((end + 4, 140), "7x + 5)", fontsize=BODY, fontname="tiit")
+        page.insert_text((end + 40, 140), "at the point.", fontsize=BODY)
+
+    found = equations(prose_page(fill))
+    assert len(found) == 1 and spaceless(found[0].text).startswith("ddx(")

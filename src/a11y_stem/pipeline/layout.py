@@ -1516,8 +1516,16 @@ def _attach_scripts(rows: list[_Row]) -> list[_Row]:
     return [merged.get(i, row) for i, row in enumerate(rows) if i not in dropped]
 
 
+def _tall_bracket(row: _Row) -> bool:
+    """Is the row a single bracket glyph? A bracket that is a row of its own is one the
+    line's baseline did not take in: TeX sets a tall bracket (a CMEX glyph) lowered, on a
+    baseline of its own, round a fraction or a stack, as in d/dx (7x^3 - 15x^2)."""
+    return len(row.ink) == 1 and row.ink[0].c in _BRACKETS
+
+
 def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
-    """Fold a short fragment led by a big operator into the line it sits in.
+    """Fold a short fragment led by a big operator, or a tall bracket, into the line it
+    sits in.
 
     TeX sets the integral sign of an inline $\\int_0^1 x^2\\,dx$ (and a text-style sum or
     root) on a baseline of its own, so it arrives as a separate row of an integral sign
@@ -1525,12 +1533,15 @@ def _attach_big_operators(rows: list[_Row]) -> list[_Row]:
     equation of its own and the inline equation's crop misses the sign. A fragment of at
     most four glyphs with a big operator in it joins the row whose vertical extent holds
     its centre and whose horizontal extent it lies within, before the first glyph to its
-    right.
+    right. So does a lone bracket (`_tall_bracket`): the opening bracket of
+    "d/dx (7x^3 - 15x^2)" stood in a row of its own, and the inline equation lost it and
+    kept the closing one, which was then cut off as unmatched.
     """
     pieces = [
         i
         for i, r in enumerate(rows)
-        if not r.vertical and len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)
+        if not r.vertical
+        and ((len(r.ink) <= 4 and any(c.c in _BIG_OPERATORS for c in r.ink)) or _tall_bracket(r))
     ]
     if not pieces:
         return rows
