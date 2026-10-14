@@ -157,7 +157,7 @@ def test_every_heading_is_accepted_and_uncertain_ones_carry_notes():
             assert fix.confidence is not None and fix.confidence >= ACCEPT_AT
 
 
-def test_repeated_uncertain_labels_make_one_group_decision():
+def test_repeated_uncertain_labels_are_an_optional_note_not_a_decision():
     elements = [
         large(0, "Motion", 18.0),
         large(1, "Teacher Support", 14.0),
@@ -173,23 +173,66 @@ def test_repeated_uncertain_labels_make_one_group_decision():
         heading(11, "Teacher Support", 11.0, REASON_BOLD_BODY),
     ]
     fixes = by_id(elements)
-    members = ["p1-e3", "p1-e7", "p1-e11"]
-    for element_id in members:
+    for element_id in ("p1-e3", "p1-e7", "p1-e11"):
         fix = fixes[element_id]
         assert (fix.status, fix.review, fix.group_key, fix.group_size) == (
-            Status.NEEDS_REVIEW,
-            "required",
-            "hg-p1-e3",
-            3,
+            Status.ACCEPTED,
+            "optional",
+            None,
+            None,
         ), element_id
+        assert failed_codes(fix) == ["heading.weak_evidence", "heading.repeated_label"]
         assert fix.heading is not None and fix.heading.level == 3
     # Certain copies of the same words are not part of it, nor is a label used once.
-    assert fixes["p1-e1"].status is Status.ACCEPTED and fixes["p1-e1"].group_key is None
+    assert failed_codes(fixes["p1-e1"]) == []
     for element_id in ("p1-e2", "p1-e9"):
         assert fixes[element_id].status is Status.ACCEPTED
         assert fixes[element_id].review == "optional"
-        assert fixes[element_id].group_key is None
-    assert re.fullmatch(r"hg-p\d+-e\d+", fixes["p1-e3"].group_key or "")
+        assert failed_codes(fixes[element_id]) == ["heading.weak_evidence"]
+    assert not [f for f in fixes.values() if f.review == "required"]
+
+
+@pytest.mark.parametrize(
+    ("text", "required"),
+    [
+        ("Given a binomial, write it in expanded form.", True),
+        ("Can factorials always be found using a calculator?", True),
+        ("Remember the order of operations:", True),
+        ("Solve a system by substitution.)", True),  # a closing bracket after the mark
+        ("Solve each equation, and give a reason for every step", False),  # no end mark
+        ("Answer:", False),  # a label, not a sentence
+        ("Definition.", False),
+        ("Worked example", False),
+    ],
+)
+def test_a_bold_line_that_reads_as_a_sentence_is_a_required_decision(text, required):
+    (fix,) = heading_fixes([heading(0, text, 11.0, REASON_BOLD_BODY)])
+    assert (fix.review == "required") is required
+    assert (fix.status is Status.NEEDS_REVIEW) is required
+    assert ("heading.sentence_like" in failed_codes(fix)) is required
+    assert fix.heading is not None and fix.heading.text == text  # written as a heading either way
+
+
+def test_a_sentence_in_a_large_font_or_with_a_section_number_is_a_heading():
+    elements = [
+        large(0, "Why does the sign change?", 16.0),
+        heading(1, "2.3 What is speed?", 11.0, REASON_BOLD_BODY, REASON_NUMBERED),
+    ]
+    assert [(f.status, f.review) for f in heading_fixes(elements)] == [
+        (Status.ACCEPTED, "none"),
+        (Status.ACCEPTED, "none"),
+    ]
+
+
+def test_repeated_sentence_like_lines_are_each_a_decision():
+    elements = [
+        heading(0, "Take a break when stuck:", 11.0, REASON_BOLD_BODY),
+        large(1, "Review", 14.0),
+        heading(2, "Take a break when stuck:", 11.0, REASON_BOLD_BODY),
+    ]
+    fixes = heading_fixes(elements)
+    assert [f.review for f in fixes] == ["required", "none", "required"]
+    assert all(f.group_key is None for f in fixes)
 
 
 def test_a_heading_with_the_same_text_and_level_as_the_one_above_becomes_bold_text():
@@ -342,8 +385,10 @@ def _bold_lines(lines: list[tuple[str, str, float]]) -> list[Element]:
     doc = pymupdf.open()
     page = doc.new_page(width=612, height=792)
     y = 100.0
-    for i in range(6):
-        page.insert_text((72, y), "The cart keeps a constant speed along the whole ramp.", fontsize=11)
+    for _ in range(6):
+        page.insert_text(
+            (72, y), "The cart keeps a constant speed along the whole ramp.", fontsize=11
+        )
         y += 15
     y += 12
     for text, font, size in lines:
@@ -353,15 +398,21 @@ def _bold_lines(lines: list[tuple[str, str, float]]) -> list[Element]:
 
 
 def test_two_bold_lines_in_other_typefaces_are_two_headings():
-    found = _bold_lines([("Practice Makes Perfect", "hebo", 11.0), ("Solve a System", "tibo", 11.0)])
+    found = _bold_lines(
+        [("Practice Makes Perfect", "hebo", 11.0), ("Solve a System", "tibo", 11.0)]
+    )
     assert [e.text for e in found] == ["Practice Makes Perfect", "Solve a System"]
 
 
 def test_two_bold_lines_of_other_sizes_are_two_headings():
-    found = _bold_lines([("Practice Makes Perfect", "hebo", 11.0), ("Solve a System", "hebo", 11.9)])
+    found = _bold_lines(
+        [("Practice Makes Perfect", "hebo", 11.0), ("Solve a System", "hebo", 11.9)]
+    )
     assert [e.text for e in found] == ["Practice Makes Perfect", "Solve a System"]
 
 
 def test_a_long_bold_heading_wrapped_over_two_lines_is_still_one_heading():
-    found = _bold_lines([("Solve a System of Equations", "hebo", 12.0), ("by Substitution", "hebo", 12.0)])
+    found = _bold_lines(
+        [("Solve a System of Equations", "hebo", 12.0), ("by Substitution", "hebo", 12.0)]
+    )
     assert [e.text for e in found] == ["Solve a System of Equations by Substitution"]

@@ -25,24 +25,30 @@ strong evidence and none of the first three penalties (confidence >= 0.85, the d
 `Settings.auto_accept_confidence`). Check codes are content-free categories
 ("heading.level_repaired", "heading.weak_evidence").
 
-Review tiers ("meaning-level only" policy, 2026-10-08). Every heading is written as a
-heading either way; the tier only says whether a person must decide:
+Review tiers ("meaning-level only" policy, 2026-10-08; sentence rule and optional groups
+2026-10-14, T2-7). Every heading is written as a heading either way; the tier only says
+whether a person must decide:
 
 - certain: ACCEPTED, review "none" ("optional" when the outline repair moved it);
 - uncertain and on its own: ACCEPTED, review "optional" (its checks are the notes): a
   single heading with weak evidence, or a level, is cheap to fix later;
+- a sentence: weak evidence (bold at body size) and the line reads as a sentence or a
+  lead-in (ends in a full stop, a question mark or a colon, three words or more):
+  NEEDS_REVIEW, review "required", check "heading.sentence_like". Whether "Given a
+  binomial, write it in expanded form." is a heading or a bold instruction is a meaning
+  question, and every wrong guess the dev-v2 headings run made sat in the optional bucket
+  (backlog A5);
 - uncertain and repeated: when the same label (normalised text) with the same style
   (font size, weight, evidence, level) is uncertain two or more times ("Teacher Support"
-  as a small bold line in every box), the copies make one group: NEEDS_REVIEW, review
-  "required", sharing `group_key` ("hg-" + the first one's element id) and `group_size`.
-  The review screen asks once: keep them all as headings at that level, choose another
-  level, or make them all plain bold text. One wrong guess repeated eleven times is worth
-  a decision; a label used once is not.
+  as a small bold line in every box), each copy carries the optional note
+  "heading.repeated_label" (no decision). Asking once per label, "Answer:" or "Definition."
+  under every example, cost a decision for each label and caught few of the wrong ones;
+  the labels are short run-in words that mostly are real box headings in the gold.
 
 Bold run-in labels ("Solution", "Discussion", "Procedure" in an OpenStax worked example)
 are not headings in OpenStax's gold outline, but no structural rule separated them from
 real box headings reliably (docs/layout.md, "Run-in labels"), so they are not guessed
-at: on their own they are optional notes, repeated they form a group like any label.
+at: optional notes, with the repeated-label note when they repeat.
 """
 
 from __future__ import annotations
@@ -70,8 +76,10 @@ from a11y_stem.pipeline.layout import (
 
 ACCEPT_AT = 0.85  # matches the default Settings.auto_accept_confidence
 MIN_LETTERS = 4  # fewer letters than this ("Ex.", "A") is too little to trust
-MIN_GROUP = 2  # uncertain copies of one label that make a group decision
-GROUP_PREFIX = "hg-"
+MIN_GROUP = 2  # uncertain copies of one label that make a repeated-label group
+MIN_SENTENCE_WORDS = 3  # a shorter line ("Answer:", "Definition.") is a label, not a sentence
+SENTENCE_ENDS = ".?:"
+_CLOSERS = "\"'\u2019\u201d)]"  # closing quotes and brackets after the final mark
 
 
 def heading_fixes(elements: list[Element]) -> list[Fix]:
@@ -163,26 +171,32 @@ def style_key(element: Element, level: int) -> tuple[float | None, bool, bool, i
 
 
 def group_repeated(headings: Sequence[Element], fixes: Sequence[Fix]) -> None:
-    """Turn repeated uncertain labels into one required decision per label (in place).
+    """Note repeated uncertain labels (in place): each copy gets the optional check
+    "heading.repeated_label", and no decision is asked for (T2-7).
 
     Uncertain = the optional single headings `_fix` made with a failed evidence or
-    shape check (not the certain ones whose only note is the outline repair).
+    shape check (not the certain ones whose only note is the outline repair, and not the
+    sentence-like ones, which are required decisions on their own).
     """
     groups: dict[tuple, list[Fix]] = {}
     for element, fix in zip(headings, fixes, strict=True):
-        if fix.heading is None or not _uncertain(fix):
+        if fix.heading is None or fix.review != "optional" or not _uncertain(fix):
             continue
         key = (label_key(fix.heading.text), style_key(element, fix.heading.level))
         groups.setdefault(key, []).append(fix)
     for members in groups.values():
         if len(members) < MIN_GROUP:
             continue
-        group_key = GROUP_PREFIX + members[0].element_id
         for fix in members:
-            fix.status = Status.NEEDS_REVIEW
-            fix.review = "required"
-            fix.group_key = group_key
-            fix.group_size = len(members)
+            fix.checks.append(_check("heading.repeated", False, "heading.repeated_label"))
+
+
+def sentence_like(text: str) -> bool:
+    """Does a line read as a sentence or a lead-in rather than a title: it ends in a full
+    stop, a question mark or a colon (closing quotes and brackets aside) and has at least
+    `MIN_SENTENCE_WORDS` words?"""
+    stripped = text.rstrip().rstrip(_CLOSERS).rstrip()
+    return stripped[-1:] in SENTENCE_ENDS and len(text.split()) >= MIN_SENTENCE_WORDS
 
 
 UNCERTAIN_CODES = frozenset(
@@ -263,14 +277,20 @@ def _fix(element: Element, raw_level: int, level: int) -> Fix:
         _check("heading.length", not evidence.very_short, "heading.very_short"),
         _check("heading.list_like", not evidence.maybe_list_item, "heading.list_like"),
     ]
-    # Accepted either way (a group of repeated labels becomes NEEDS_REVIEW later, in
-    # `group_repeated`); any failed check is an optional note.
+    sentence = not evidence.strong and sentence_like(text)
+    checks.append(_check("heading.sentence", not sentence, "heading.sentence_like"))
+    # Accepted either way, except a sentence-like line with weak evidence (a decision);
+    # any other failed check is an optional note.
     return Fix(
         element_id=element.id,
         kind=Kind.HEADING,
-        status=Status.ACCEPTED,
+        status=Status.NEEDS_REVIEW if sentence else Status.ACCEPTED,
         confidence=evidence.confidence(repaired),
         heading=HeadingFix(level=level, text=text),
         checks=checks,
-        review="optional" if any(not c.passed for c in checks) else "none",
+        review="required"
+        if sentence
+        else "optional"
+        if any(not c.passed for c in checks)
+        else "none",
     )

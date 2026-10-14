@@ -190,6 +190,12 @@ CHECK_MESSAGES: dict[tuple[str, str], str] = {
     "label or running header rather than a section heading.",
     ("heading.length", "heading.very_short"): "The text is very short, which is often a label "
     '(like "Ex.") rather than a section heading.',
+    ("heading.sentence", "heading.sentence_like"): "It reads like a sentence or a lead-in "
+    "(it ends in a full stop, a question mark or a colon), not a title: decide whether it is "
+    "a heading or just bold text.",
+    ("heading.repeated", "heading.repeated_label"): "The same words are used for several "
+    "headings that look alike, which is often a label repeated in each box rather than a "
+    "section heading.",
     ("heading.list_like", "heading.list_like"): 'It starts like a numbered list item ("1.", '
     '"A)"), so it may be part of a list rather than a heading.',
     # Whole-document checks of the output HTML (pipeline.html_checks)
