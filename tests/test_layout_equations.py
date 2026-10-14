@@ -289,3 +289,48 @@ def test_centred_whole_equations_set_an_em_apart_stay_separate():
 
     elements = analyze(one_page(fill)).elements
     assert [e.kind for e in elements].count(Kind.EQUATION) == 2
+
+
+# ---------------------------------------------------------------- a braced system
+
+
+def braced_system(page: pymupdf.Page, number: str | None, brace_row: int) -> None:
+    """OpenStax: the brace is in the text font, on the first row, after the prose; or
+    it is a glyph of its own at the left, level with the middle of the two rows."""
+    prose(page, 100, "Work through the next exercise carefully.")
+    if number:
+        page.insert_text((72, 128), number, fontsize=BODY, fontname="helv")
+    if brace_row == 0:
+        page.insert_text((number and 100 or 72, 140), "Solve the system.", fontsize=BODY)
+        page.insert_text((214, 140), "{", fontsize=BODY)
+    else:
+        page.insert_text((212, 147), "{", fontsize=BODY)
+    page.insert_text((224, 140), "2 x + y = 7", fontsize=BODY, fontname="tiit")
+    page.insert_text((224, 154), "x - 2 y = 6", fontsize=BODY, fontname="tiit")
+    prose(page, 230, "Then check the answer in both original equations as well.")
+
+
+def test_a_brace_after_prose_keeps_both_rows_of_the_system_in_one_equation():
+    elements = analyze(one_page(lambda page: braced_system(page, None, 0))).elements
+    blocks = equations(elements)
+    assert [nospace(e.text) for e in blocks] == ["{2x+y=7x-2y=6"]
+    assert blocks[0].display == "block"
+    assert any(e.kind == Kind.PARAGRAPH and "Solve the system." in (e.text or "") for e in elements)
+
+
+def test_a_brace_beside_the_middle_of_the_rows_is_part_of_the_system():
+    elements = analyze(one_page(lambda page: braced_system(page, "87.", 1))).elements
+    blocks = equations(elements)
+    assert len(blocks) == 1
+    assert sorted(nospace(blocks[0].text)) == sorted("{2x+y=7x-2y=6")
+    assert "87." in [e.text for e in elements if e.kind != Kind.EQUATION]
+
+
+def test_a_set_in_braces_is_not_cut_from_its_sentence():
+    def fill(page):
+        prose(page, 100, "The solution set is { 1, 2, 3 } and nothing else.")
+        page.insert_text((230, 140), "x = 7", fontsize=BODY, fontname="tiit")
+        prose(page, 230, "That is the end of the example for this page of text.")
+
+    elements = analyze(one_page(fill)).elements
+    assert "{ 1, 2, 3 }" in (elements[0].text or "")

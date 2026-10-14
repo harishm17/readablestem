@@ -3144,6 +3144,8 @@ def _number_beside(row: _Row, box: BBox, size: float) -> bool:
 
 # Signs that continue the line above when a maths line starts with them ("= 250 m/s" under
 # "v = ...", "+ c" under a long sum).
+# A system's opening brace: the glyph, or the pieces TeX builds a tall one from (CMEX).
+_OPENING_BRACES = frozenset("{\uf8f1\uf8f2\uf8f3\uf8f4")
 _CONTINUATION_SIGNS = _ROW_RELATIONS | frozenset("+-\u2212\u00b1\u2213\u00d7\u22c5")
 MAX_LINE_GAP = 0.8  # x font size: widest vertical gap between lines of one display equation
 TABLE_ROW_GAP = 0.7  # x font size: widest gap between whole equations that are rows of a table
@@ -3189,6 +3191,57 @@ def _split_labels(rows: list[_Row]) -> list[_Row]:
         else:
             out.append(row)
     return out
+
+
+def _split_braced_systems(rows: list[_Row]) -> list[_Row]:
+    """Cut the text off the front of the first row of a braced system.
+
+    OpenStax prints "Solve the system by substitution. { 2x + y = 7" with the opening
+    brace in the text font, on the first row of the system, so the prose before it and
+    the first equation read as one row of text, and the equations below it as a display
+    equation of their own: the system comes out cut in two. The row is cut at its brace
+    when the brace is followed by maths with no closing brace (not a set "{1, 2}") and a
+    maths row sits right under that maths, overlapping it: the rows are a system.
+    The text before the brace (a sentence, an exercise number) stays a row of its own;
+    the brace goes with the equations, so the crop shows it.
+    """
+    index = _RowIndex([r for r in rows if not r.vertical])
+    out: list[_Row] = []
+    for row in rows:
+        cut = _brace_cut(row, index)
+        if cut is None:
+            out.append(row)
+            continue
+        out.append(_Row(row.chars[:cut], column=row.column, marker=row.marker))
+        out.append(_Row(row.chars[cut:], column=row.column))
+    return out
+
+
+def _brace_cut(row: _Row, index: _RowIndex) -> int | None:
+    """Index of the brace to cut `row` at (see `_split_braced_systems`), or None."""
+    chars = row.chars
+    if row.vertical or len(chars) < 4 or not any(c.c == "{" for c in chars):
+        return None
+    start = next(i for i, c in enumerate(chars) if c.c == "{")
+    if not any(not c.blank for c in chars[:start]) or any(c.c == "}" for c in chars[start:]):
+        return None
+    after = _Row(chars[start + 1 :], column=row.column)
+    if not after.ink or after.ink[0].blank:
+        return None
+    _classify_row(after)
+    if after.kind != "math" or after.x0 - chars[start].x1 > 1.5 * row.size:
+        return None
+    size = max(row.size, after.size)
+    for below in index.near(after.y1 - 0.3 * size, after.y1 + 1.0 * size):
+        if below is row or below.y0 < after.y1 - 0.3 * size or below.column != row.column:
+            continue
+        shared = min(below.x1, after.x1) - max(below.x0, after.x0)
+        if shared >= 0.5 * min(below.x1 - below.x0, after.x1 - after.x0):
+            probe = _Row(below.chars, column=below.column)  # not classified yet
+            _classify_row(probe)
+            if probe.kind == "math":
+                return start
+    return None
 
 
 _EXERCISE_NUMBER = re.compile(r"^\d{1,3}[.)]$")
@@ -3297,6 +3350,22 @@ class _Line:
             for c in r.ink
             if c.c in _ROW_RELATIONS and not r.is_script(c) and c.size >= 0.75 * self.size
         ]
+
+    @cached_property
+    def opens_system(self) -> bool:
+        """Only the brace of a system, standing left of its rows, level with their middle."""
+        return all(c.c in _OPENING_BRACES for c in self.ink)
+
+    @cached_property
+    def ink_x1(self) -> float:
+        """Right edge of the line's glyphs (not of the rules drawn with it)."""
+        return max(c.x1 for c in self.ink)
+
+    @cached_property
+    def body_x0(self) -> float:
+        """Left edge of the line without the brace that opens a system."""
+        ink = self.ink
+        return next((c.x0 for c in ink if c.c not in _OPENING_BRACES), ink[0].x0)
 
     @cached_property
     def complete(self) -> bool:
@@ -3430,7 +3499,7 @@ def _joins_line(above: _Line, box: BBox, line: _Line) -> bool:
     reach = MAX_LINE_GAP * size * (1.5 if line.continues else 1.0)
     if line.box[1] - box[3] > reach or line.rows[0].column != above.rows[0].column:
         return False
-    if line.box[0] > box[2] + size or line.box[2] < box[0] - size:
+    if line.box[0] > box[2] + size or (line.box[2] < box[0] - size and not line.opens_system):
         return False
     if above.labels and line.labels:
         return False  # two numbered equations
@@ -3456,11 +3525,8 @@ def _table_rows(above: _Line, line: _Line, box: BBox, size: float) -> bool:
     if line.box[1] - box[3] > TABLE_ROW_GAP * size:
         return False
     tolerance = 0.3 * size
-    return (
-        abs(above.box[0] - line.box[0]) <= tolerance
-        or abs(above.box[2] - line.box[2]) <= tolerance
-        or abs((above.box[0] + above.box[2]) - (line.box[0] + line.box[2])) <= 2 * tolerance
-    )
+    left, right = (above.body_x0 - line.body_x0), (above.ink_x1 - line.ink_x1)
+    return abs(left) <= tolerance or abs(right) <= tolerance or abs(left + right) <= 2 * tolerance
 
 
 def _stack_lines(lines: list[_Line]) -> list[_Region]:
@@ -5182,7 +5248,7 @@ def _page_blocks(
     covers: Sequence[tuple[float, float]] = (),
 ) -> _PageBlocks:
     page_rect = page.rect
-    rows = _split_exercise_numbers(_split_labels(rows))
+    rows = _split_exercise_numbers(_split_braced_systems(_split_labels(rows)))
     for row in rows:
         _classify_row(row)
     rules = [p for p in paths if p.kind in ("hrule", "radical")]
