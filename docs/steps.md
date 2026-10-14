@@ -607,6 +607,8 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Powers | "x squared", "x cubed", "x to the power n", "10 to the power minus 3", "e to the power minus k t end power" |
 | Primes, degrees | "y double prime", "30 degrees" |
 | Subscripts | "x sub 0", "v sub avg", "x sub i plus 1 end sub" |
+| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
+| Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
 | Roots | "the square root of x", "... end root" when compound, "the cube root of", "the root of index n of" |
 | Large operators | "the sum from i equals 1 to n of", "the integral from 0 to 1 of", "the product over k of" |
 | Limits | "the limit as x approaches 0 of" (an arrow under `lim` reads "approaches") |
@@ -619,8 +621,6 @@ only. Input is parsed with defusedxml (depth-capped) and normalised with the sco
 | Unknown symbols | their Unicode name, lower-cased |
 
 Sentence punctuation at the very end of the equation is not read. Unreadable input
-| Charges | "SO sub 4 to the power 2 minus", "Fe to the power 3 plus" (a digit and a sign need no "end power") |
-| Scripts before a symbol (a nuclide) | "superscript 14 subscript 6 C", "superscript 235 U" |
 raises `SpeechError` with a content-free message. In the equation step a speech failure
 is a warning (`speech.generated`, code `speech_failed`), not an error, and only an optional
 note: the output keeps MathML only, so a missing reading aid changes nothing a student gets.
