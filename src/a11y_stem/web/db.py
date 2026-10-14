@@ -152,6 +152,11 @@ class Job(Base):
     # owner only). Both document-derived: deleted with the job.
     revises_job_id: Mapped[str | None] = mapped_column(String(32))
     carried_json: Mapped[dict | None] = mapped_column(JSON)
+    # "Try again" (T3-1, `web.retry`): how many times the person asked for a stopped or
+    # partly converted job to be converted again, and the value of `attempts` when the last
+    # one began (a job interrupted `MAX_ATTEMPTS` times since then is failed, as before).
+    retries: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    attempts_at_retry: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
 
     user: Mapped[User] = relationship(back_populates="jobs")
     blobs: Mapped[list[Blob]] = relationship(
@@ -186,6 +191,23 @@ class Blob(Base):
     job: Mapped[Job] = relationship(back_populates="blobs")
 
     __table_args__ = (UniqueConstraint("job_id", "kind", "element_id", name="uq_blob_slot"),)
+
+
+class StepRecord(Base):
+    """A finished model step of a job, kept so "Try again" does not pay for it twice (T3-1,
+    `web.step_cache`). `input_key` is `pipeline.run.step_key`: what the answer depends on.
+    The answer is a `Fix` as JSON. Document-derived: deleted with the job."""
+
+    __tablename__ = "step_records"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    job_id: Mapped[str] = mapped_column(ForeignKey("jobs.id", ondelete="CASCADE"), index=True)
+    element_id: Mapped[str] = mapped_column(String(64))
+    input_key: Mapped[str] = mapped_column(String(64))
+    fix_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+    __table_args__ = (UniqueConstraint("job_id", "element_id", name="uq_step_record_slot"),)
 
 
 class ReviewEdit(Base):

@@ -32,6 +32,7 @@ from a11y_stem.pipeline import language as languages
 from a11y_stem.web import documents, events, notation, retention
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
+from a11y_stem.web import retry as retry_rules
 from a11y_stem.web.database import as_utc, utc_today
 from a11y_stem.web.db import Blob, Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import (
@@ -689,7 +690,21 @@ def status_context(job: JobView, outcome: JobOutcome | None) -> dict[str, Any]:
     version = f"{job.version}-{outcome.code}" if outcome is not None else job.version
     counts = job.summary.counts if job.summary is not None else None
     headline = page_rules.headline(job.status, job.status_detail, outcome, counts)
-    return {"job": job, "outcome": outcome, "status_version": version, "headline": headline}
+    # The AI service is not answering right now (T3-1, `web.provider_health`): said on a
+    # document that is waiting or converting, and beside "Try again". The status version
+    # changes with it, so a page left open hears when it starts and stops.
+    from a11y_stem.web.provider_health import HEALTH
+
+    down = HEALTH.is_down()
+    if down:
+        version += "-down"
+    return {
+        "job": job,
+        "outcome": outcome,
+        "status_version": version,
+        "headline": headline,
+        "provider_down": down,
+    }
 
 
 @router.get("/jobs/{job_id}")
@@ -815,6 +830,76 @@ def set_language(
     )
     # No fragment: the confirmation (the flash at the top) takes focus on load, as after
     # any other change; a fragment would scroll past it and keep focus on the page.
+    return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+# --------------------------------------------------------------------------- try again
+
+RETRY_REFUSED = {
+    "not_stopped": (
+        409,
+        "Nothing to try again",
+        "This document is not stopped: it is still waiting or being converted, or it has "
+        "finished completely. Nothing was changed.",
+    ),
+    "too_many_active": (
+        429,
+        "Too many documents in progress",
+        f"You already have {MAX_ACTIVE_JOBS_PER_USER} documents waiting or being converted. "
+        "Wait for one to finish, then try again. Nothing was changed.",
+    ),
+}
+
+
+@router.post("/jobs/{job_id}/retry", dependencies=[limited("retry"), Depends(require_csrf)])
+def retry_job(request: Request, job_id: str, user: UserDep) -> Response:
+    """ "Try again" on a stopped or partly converted document (T3-1, `web.retry`): the same
+    job goes back in the queue. Nothing is counted against the daily pages (this is not an
+    upload), the finished steps and the decisions made are kept, and every limit holds: the
+    daily budget (a queued job waits for it), the job's own spend caps, the documents
+    waiting or converting at once, the tries per job and the rate limit."""
+    ctx = get_ctx(request)
+    enforce(request, "retry_user", user.id)
+    refused = ""
+    with session_scope(ctx.factory) as session:
+        job = owned_job(session, job_id, user, lock=True)
+        others = int(
+            session.scalar(
+                select(func.count())
+                .select_from(Job)
+                .where(
+                    Job.user_id == user.id,
+                    Job.id != job.id,
+                    Job.status.in_([JobStatus.QUEUED, JobStatus.RUNNING]),
+                )
+            )
+            or 0
+        )
+        try:
+            retry_rules.start(job, active_others=others, max_active=MAX_ACTIVE_JOBS_PER_USER)
+        except retry_rules.RetryRefused as exc:
+            refused, tries = exc.code, job.retries or 0
+        else:
+            retention.restart_clock(job, ctx.settings)
+            tries = job.retries or 0
+    if refused == "no_tries_left":
+        raise PageError(
+            409,
+            "No more tries",
+            f"You have already tried this document {tries} times. Upload the file again as a "
+            "new document. Nothing was changed.",
+            context={"job_id": job_id},
+        )
+    if refused:
+        status, title, message = RETRY_REFUSED[refused]
+        raise PageError(status, title, message, context={"job_id": job_id})
+    log_event(logger, "job_retried", job_id=job_id, tries=tries)
+    flash(
+        request,
+        "Your document is queued again. What was already converted is kept, and nothing "
+        "was counted against your daily pages.",
+        undo=False,
+    )
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
 
 

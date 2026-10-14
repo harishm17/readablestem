@@ -14,6 +14,7 @@ from a11y_stem.web.db import Job, JobStatus, session_scope, utcnow
 from a11y_stem.web.deps import get_ctx, render
 from a11y_stem.web.events import EVENT_RETENTION_DAYS
 from a11y_stem.web.health import readiness
+from a11y_stem.web.provider_health import HEALTH
 from a11y_stem.web.quota import next_day_start
 from a11y_stem.web.security import VIEW_CSP
 
@@ -97,6 +98,8 @@ def status(request: Request) -> Response:
         "waiting": None,
         "converting": None,
         "next_reset": next_day_start(utcnow()),
+        # The AI service, as this server's own recent requests saw it (web.provider_health).
+        "provider_down_since": HEALTH.down_since(),
     }
     if database_ok:
         with session_scope(ctx.factory) as session:

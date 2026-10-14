@@ -299,6 +299,7 @@ def test_every_state_changing_route_rejects_a_missing_csrf_token(web):
         "/jobs/{job_id}/feedback",
         "/jobs/{job_id}/keep",  # keep 7 more days (T1-8)
         "/jobs/{job_id}/language",
+        "/jobs/{job_id}/retry",  # try a stopped document again (T3-1)
         "/jobs/{job_id}/review/{element_id}",
         "/jobs/{job_id}/review/{element_id}/check",  # changes nothing, but sends LaTeX
         "/jobs/{job_id}/title",  # the title students hear (T1-7)

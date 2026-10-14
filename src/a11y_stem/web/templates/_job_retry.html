@@ -1,0 +1,17 @@
+{# "Try again" (T3-1, web/retry.py): for a conversion that stopped, or finished with parts
+   not converted because the AI service did not answer or the day's budget ran out.
+   `job.retry` is the offer; None when trying again cannot help. #}
+{% if job.retry %}
+<form method="post" action="/jobs/{{ job.id }}/retry" class="inline-form" id="retry-form">
+  <input type="hidden" name="{{ csrf_field }}" value="{{ csrf_token }}">
+  <p id="retry-explain">{{ job.retry.explain }}</p>
+  <button type="submit" class="button" aria-describedby="retry-explain">{{ job.retry.label }}</button>
+</form>
+{% if provider_down|default(false) %}
+<p class="hint" id="provider-down">The AI service is not answering right now, so a new try may stop
+  at the same place. It is safe to try again later: nothing is lost.</p>
+{% endif %}
+{% elif job.retries %}
+<p id="retry-none">You have already tried this document {{ job.retries }} {{ "time" if job.retries == 1 else "times" }}.
+  Upload it again as a new document.</p>
+{% endif %}

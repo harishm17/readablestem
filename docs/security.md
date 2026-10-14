@@ -70,6 +70,8 @@ cannot skip these checks unnoticed.
 | Admin | `/admin`, `POST /admin/allowlist`, `POST /admin/allowlist/remove` |
 | Cron token | `POST /internal/cron/aggregate-and-purge` (header `X-Cron-Token`, constant-time compare) |
 
+`POST /jobs/{id}/retry` ("Try again") is owner-only and CSRF-checked like every other write on a job, and rate limited; it refuses with 409 when the document is not stopped or has had its 3 tries, and with 429 when the person already has 10 documents waiting or converting.
+
 The job page's three settings, `POST /jobs/{id}/title`, `/contact` and `/keep`, are owner-only
 and CSRF-checked like every other write on a job. They are not rate limited: each costs one
 re-render of the person's own document (the same as a review decision or a language change,
@@ -120,6 +122,8 @@ script injected into an app page is refused by the policy.
 | Waiting or running documents per person | 10 | `routes/jobs.py` |
 | Kept documents per person | 40 | `routes/jobs.py`; "Keep 7 more days" (`routes/job_settings.py`) refuses with a 429 page when it would exceed it |
 | Daily and per-job model spend | `DAILY_SPEND_CAP_USD`, per-job caps | `web/spend.py` |
+| Tries again of one document | 3 | `web/retry.py`; "Try again" never touches the page quota, the job's spend caps cover all tries |
+| "Try again" requests, per address / per person | 20 / 10 per 10 minutes | `web/abuse.py` |
 | Sign-in starts, per address | 10 per 5 minutes | `web/abuse.py` |
 | Sign-in callbacks, per address | 20 per 5 minutes | `web/abuse.py` |
 | Uploads, per address / per person | 30 / 15 per 10 minutes | `web/abuse.py` |

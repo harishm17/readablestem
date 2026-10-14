@@ -96,6 +96,7 @@ All live in `a11y_stem.config.Settings` (environment or `.env`).
 | GET `/jobs/{id}/progress?v=` | owner | The list of steps with their counts, polled on its own outside the live region (204 while unchanged) |
 | GET `/jobs/{id}/draft` | owner | Asked before a download while decisions are open: what students would get, "Review N decisions first" or "Download the draft anyway"; with none open, 303 to the finish line |
 | POST `/jobs/{id}/language` | owner | Confirm or change the document language (`lang`, one the control offers); lang_source becomes "user" and the HTML is made again |
+| POST `/jobs/{id}/retry` | owner | "Try again" / "Convert the missing parts" on a stopped or partly converted document (below): the same job goes back in the queue; 409 when it is not stopped or has had its 3 tries, 429 with 10 documents already waiting or converting; rate limited per address and per person |
 | GET `/jobs/{id}/download` | owner | The HTML as an attachment |
 | GET `/jobs/{id}/download/canvas` | owner | The Canvas export as a zip (`pipeline/export_canvas.py`, docs/output.md "The Canvas export"): `index.html` with no style block, `images/`, `README.txt`, and with `?course=<digits>` (the Canvas course number) `canvas-page.html` to paste into a Canvas Page. A bad course number is a 400 page; a job that is not done is 409, another user's or an expired one 404. Recorded as a download. The job page's "For Canvas (zip with images)" is a plain GET form (no script, no token: like the HTML download) |
 | GET `/jobs/{id}/view` | owner | The HTML inline, sandboxed (see below) |
@@ -599,8 +600,53 @@ A thread started and stopped with the app's lifespan when `RUN_WORKER=true`.
   A finished job with no code whose equations, figures and tables mostly failed with
   `model_api_error` or `model_timeout` is shown as "Stopped: the AI service did not
   answer" (`outcome.MODEL_OUTAGE`, read from the stored result on the job page; nothing
-  is stored on the job, and it goes away once enough of them are filled in). Retrying
-  without a new upload is not built yet.
+  is stored on the job, and it goes away once enough of them are filled in). "Convert
+  the missing parts" on that page tries it again ("Trying a document again", below).
+
+### Trying a document again (`web/retry.py`, `web/step_cache.py`)
+
+A conversion can stop for reasons that are nobody's fault. The job page offers a button, not
+a dead end:
+
+| The document | The button | Why |
+|---|---|---|
+| Failed with `timeout`, `lease_expired`, `store_failed`, `internal_error`, `budget_daily` or `model_not_configured` | "Try again" | Stopped by something that is not about the file. The other failure codes (a handwritten or scanned file, `no_content`, a removed account) are not offered a retry: it would stop the same way |
+| Finished with `budget_daily`, or converted while the AI service was down | "Convert the missing parts" | Only the parts that were not converted are sent again |
+
+`POST /jobs/{id}/retry` (owner only, CSRF, rate limits `retry` per address and `retry_user`
+per person) puts the **same job** back in the queue: `queued`, `jobs.retries` plus one,
+`jobs.attempts_at_retry` set to `attempts` (the limit of 3 interrupted attempts counts from
+there). What it does not do:
+
+- **Charge pages again.** Pages are counted when a file is uploaded (`quota_days`); this is
+  not an upload, and nothing in the route touches the quota. The route restarts the
+  deletion clock, as any activity does.
+- **Pay for finished steps again.** While a job converts, each model step whose answer is
+  worth keeping (`pipeline.run.reusable`: not `model_*`, `budget_*`, `internal_error` or
+  `crop_error` failures, which a new try could change) is stored in `step_records` under a
+  key made from the element, its picture, its nearby text, the conversion options and the
+  models in use (`pipeline.run.step_key`). A later conversion of the same job takes those
+  answers instead of calling the model, so a retry spends only on what was missing; the
+  cost and calls of the steps given back are taken off the new result's totals
+  (`DbStepCache.reused_usd`), so `jobs.cost_usd` counts every step once. A changed key (a
+  new course notation, exam mode, another model) asks again. When a job finishes with
+  nothing a retry could improve, its records are deleted at once; the rest go with the job.
+- **Lose decisions.** A partly converted result keeps what the person decided: the new
+  result inherits the job's own earlier decisions item by item (`web/carry.py`, the same
+  rules as for a revised upload), no `ReviewEdit` is added (they already are the job's) and
+  the HTML is made again.
+- **Skip a limit.** A retried job waits for the daily budget like any queued job; the job's
+  own spend caps cover all tries together (`jobs.cost_usd` is kept); a person with 10
+  documents waiting or converting is refused (429); a job has at most 3 tries (409, "No more
+  tries": upload the file again as a new document); a job that is not stopped is a 409.
+
+**Is the AI service answering?** The converter reports how every model request ended
+(`convert_pdf(call_observer=)`); `web/provider_health.py` keeps the last few minutes in
+memory. When the most recent 5 requests, all within 10 minutes, ended in `api_error` or
+`timeout`, the public `/status` page says "Not answering since ...", and a document that is
+waiting or converting says so on its page and in its status box; one answered request ends
+it. It is a hint from this server's own traffic (per process, forgotten on restart), never a
+gate: nothing is refused because of it.
 
 **Limits of the worker.** The conversion (`layout.analyze`, crops) runs MuPDF inside the
 web process, not in a child process like the upload probe. A conversion stuck in native
@@ -1574,6 +1620,11 @@ a user id is added without it.
   `dev`), `jobs.title_override` and `jobs.contact_line`; the downgrade drops them.
 - `3b8e5f1a9d27` (after `7c1d9a4e2b60`) adds `jobs.exam_mode` (server default false); the
   downgrade drops it.
+- The jobs work (docs/web.md sections above) adds, in this order: `e2b6d1f84a30` (`jobs.revises_job_id`,
+  `jobs.carried_json`), `f7a3c9d20b15` (`step_records`, `jobs.retries`, `jobs.attempts_at_retry`),
+  `a8c4e0b61d97` (`pending_uploads`, `jobs.part_group`, `jobs.part_label`) and `b1d5f7a29c46`
+  (`jobs.is_sample`; its downgrade deletes the sample documents first). `tests/test_web_jobs_migrations.py`
+  runs each one up and down on SQLite and `tests/test_web_postgres.py` on Postgres.
 - New migration: change `web/db.py`, then
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic upgrade head` followed by
   `DATABASE_URL=sqlite:////tmp/empty.db uv run alembic revision --autogenerate -m "..."`,
@@ -1598,6 +1649,8 @@ a user id is added without it.
 | `uv run pytest tests/test_page_types_pipeline.py` | Hidden text and kept pages through layout, the pipeline and the app (synthetic fixtures, offline model client): handwritten and scanned PDFs refused before any quota, the job page's outcome, one card per group on both review screens, one click keeping every page, a refused action |
 | `uv run pytest -m browser tests/test_page_types_browser.py` | Chromium: a course PDF with typed, handwritten and scanned pages (axe at 1440 and 390 px before and after the pages are kept, 320 px reflow with text spacing, the group decision without JavaScript) |
 | `uv run pytest -m browser tests/test_web_review_ux_browser.py` | Chromium: the UX review fixes (axe at 1280 and 320 px in each new state, reflow, keyboard flow, the live check, stale tab, Undo and "Use my edit anyway" without JavaScript, drafts kept across a session ending) |
+| `uv run pytest tests/test_web_carry.py tests/test_web_retry.py tests/test_web_parts.py tests/test_web_ranges.py tests/test_web_multiupload.py tests/test_web_sample.py` | The jobs work: decisions carried to a revised upload, trying a document again (the real pipeline with a model that stops answering), large files in parts, several files, the course page and the zip, the sample document |
+| `uv run pytest -m browser tests/test_web_jobs_browser.py` | Chromium: the new pages in each state (axe at 1280 and 375 px, no sideways scrolling at 320 px, keyboard flows) |
 
 Postgres tests use `TEST_POSTGRES_URL` if set (CI service container), else start an
 embedded server from the `pgserver` dev dependency (Python 3.12), else skip. Browser tests

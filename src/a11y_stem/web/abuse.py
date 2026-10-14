@@ -43,6 +43,8 @@ RULES: dict[str, Rule] = {
     "callback": Rule(20, 300),  # coming back from Google or Microsoft
     "upload": Rule(30, 600),  # uploads, per address; accepted or not
     "upload_user": Rule(15, 600),  # uploads, per signed-in person
+    "retry": Rule(20, 600),  # "Try again" on a stopped document, per address
+    "retry_user": Rule(10, 600),  # ... per signed-in person
     "cron": Rule(10, 300),  # the scheduler's endpoint, per address
 }
 MAX_KEYS = 20_000  # entries kept; a spoofed header must not grow memory without bound

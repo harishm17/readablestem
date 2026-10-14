@@ -58,6 +58,7 @@ from a11y_stem.web.db import (
     Job,
     QuotaDay,
     ReviewEdit,
+    StepRecord,
     User,
     session_scope,
 )
@@ -177,6 +178,7 @@ def delete_jobs(
     _count_review_actions(session, day_of)
     blobs = _deleted(session.execute(delete(Blob).where(Blob.job_id.in_(ids))))
     session.execute(delete(ReviewEdit).where(ReviewEdit.job_id.in_(ids)))
+    session.execute(delete(StepRecord).where(StepRecord.job_id.in_(ids)))
     jobs = _deleted(session.execute(delete(Job).where(Job.id.in_(ids))))
     # The student-file images made from the figures are kept in memory for a while
     # (`pipeline.figure_images`); a deleted document's go with it.

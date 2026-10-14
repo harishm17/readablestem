@@ -12,6 +12,11 @@
   {% if counts and counts.decisions and headline.state != "decisions" %}
   <p>{{ counts.decisions }} {{ "decision needs" if counts.decisions == 1 else "decisions need" }} you before you share it.</p>
   {% endif %}
+  {% if provider_down|default(false) and job.status in ("queued", "running") %}
+  <p id="provider-down-note">The AI service is not answering right now, so this document
+    may stop early with parts not converted. If it does, “Try again” converts them once the
+    service is back; nothing is lost.</p>
+  {% endif %}
   {% if results_link|default(false) %}
   {# Only in the polled fragment: the full page shows the results itself. From here the
      first decision is one click away (MF17). #}

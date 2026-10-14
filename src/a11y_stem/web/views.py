@@ -22,6 +22,7 @@ from a11y_stem.core import triage
 from a11y_stem.core.types import DocumentResult, Fix, Kind, Status
 from a11y_stem.web import carry as carry_rules
 from a11y_stem.web import job_page, titles
+from a11y_stem.web import retry as retry_rules
 from a11y_stem.web.database import as_utc
 from a11y_stem.web.db import Job, JobStatus, ReviewEdit, User
 from a11y_stem.web.messages import Explained, explain_check, severity_label
@@ -63,7 +64,7 @@ KIND_LABELS = {
 
 JOB_ERROR_MESSAGES = {
     "budget_daily": "Today's conversion budget ran out while this document was being "
-    "converted. Please upload it again tomorrow.",
+    "converted. After 00:00 UTC, use “Try again”: what was already converted is kept.",
     "budget_job_usd": "This document needed more model work than one conversion is allowed. "
     "Try splitting it into smaller parts.",
     "budget_job_calls": "This document needed more model calls than one conversion is "
@@ -72,14 +73,15 @@ JOB_ERROR_MESSAGES = {
     "unreadable": "The PDF could not be read.",
     "too_many_pages": "The PDF has too many pages.",
     "no_pages": "The PDF has no pages.",
-    "lease_expired": "The conversion was interrupted several times and has been stopped.",
+    "lease_expired": "The conversion was interrupted several times and has been stopped. "
+    "Use “Try again”: what was already converted is kept.",
     "timeout": "The conversion took longer than a document of this size is allowed and was "
     "stopped. Try splitting it into smaller parts.",
     "store_failed": "The conversion finished but its results could not be saved. Please "
     "upload the document again.",
     "upload_missing": "The uploaded file was no longer available.",
     "internal_error": "Something went wrong on our side. The error was recorded without any "
-    "of your document's content.",
+    "of your document's content. You can use “Try again”: what was already converted is kept.",
     # Codes with a longer explanation of what to do next (scanned PDFs, no model key,
     # removed access, ...) share their wording with the status box.
     **FAILED_MESSAGES,
@@ -153,6 +155,10 @@ class JobView:
     # While queued: how many of the jobs ahead are this user's, and the estimated wait.
     ahead_yours: int = 0
     wait_s: float | None = None
+    # "Try again" (T3-1, `web.retry`): the offer for a stopped or partly converted job, how
+    # many tries it has had, and whether the AI service is not answering right now.
+    retry: retry_rules.Offer | None = None
+    retries: int = 0
     # While converting: the stored live progress (`jobs.progress_json`).
     progress: dict[str, Any] | None = None
     # The job page's data from the result (`job_page.PageData`), when asked for.
@@ -421,6 +427,15 @@ def job_view(
         cost_usd=job.cost_usd,
         model_calls=job.model_calls,
         queue_ahead=ahead,
+        retry=retry_rules.offer(
+            status=str(job.status),
+            error_code=job.error_code,
+            result_json=job.result_json,
+            retries=job.retries or 0,
+        )
+        if with_page
+        else None,
+        retries=job.retries or 0,
         summary=summarise(job.result_json) if with_summary or with_page else None,
         result_version=job.result_version or 0,
         ahead_yours=yours,

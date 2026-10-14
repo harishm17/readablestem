@@ -86,10 +86,14 @@ from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendG
 from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from a11y_stem.ops import limits
 from a11y_stem.web import events
+from a11y_stem.web import retry as retry_rules
 from a11y_stem.web.database import as_utc, rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
 from a11y_stem.web.logsafe import log_event, log_exception
+from a11y_stem.web.provider_health import HEALTH
 from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
+from a11y_stem.web.step_cache import DbStepCache
+from a11y_stem.web.step_cache import forget as forget_steps
 
 if TYPE_CHECKING:
     from a11y_stem.core.types import ConversionOptions
@@ -140,7 +144,8 @@ PROGRESS_WRITE_S = 2.0
 class Converter(Protocol):
     """`pipeline.run.convert_pdf`, or a fake with the same keyword arguments.
 
-    The optional arguments (`tracer`, `options`, `stage_progress`, `concurrency`) are passed
+    The optional arguments (`tracer`, `options`, `stage_progress`, `concurrency`, `step_cache`,
+    `call_observer`) are passed
     only when set (`Worker._converter_kwargs`), so a fake without them works in every other case.
     """
 
@@ -338,6 +343,19 @@ class _Attempt:
     max_calls: int
     budget: JobBudget = field(init=False)
     cancelled: threading.Event = field(default_factory=threading.Event)
+    # The finished steps kept for this job (T3-1); None for a converter that takes none.
+    step_cache: DbStepCache | None = None
+
+
+@dataclass
+class _Earlier:
+    """The result a new one inherits decisions from (`Worker._earlier_version`): it, its
+    crops, its file name, and whether it is the job's own earlier result (a try-again)."""
+
+    result: DocumentResult
+    crops: dict[str, bytes]
+    name: str
+    own: bool
 
 
 @dataclass
@@ -407,7 +425,7 @@ class Worker:
             failed = rowcount(
                 session.execute(
                     update(Job)
-                    .where(*expired, Job.attempts >= MAX_ATTEMPTS)
+                    .where(*expired, Job.attempts - Job.attempts_at_retry >= MAX_ATTEMPTS)
                     .values(
                         status=JobStatus.FAILED,
                         error_code="lease_expired",
@@ -420,7 +438,7 @@ class Worker:
             requeued = rowcount(
                 session.execute(
                     update(Job)
-                    .where(*expired, Job.attempts < MAX_ATTEMPTS)
+                    .where(*expired, Job.attempts - Job.attempts_at_retry < MAX_ATTEMPTS)
                     .values(
                         status=JobStatus.QUEUED, lease_until=None, pages_done=0, progress_json=None
                     )
@@ -656,6 +674,17 @@ class Worker:
         # (only to a converter that takes it: older fakes and scripts do not).
         if _accepts(self.converter, "stage_progress"):
             kwargs["stage_progress"] = self._stage_progress(attempt)
+
+        # step_cache: the job's finished model steps (T3-1). A try-again asks the model only
+        # for what the earlier tries did not finish.
+        if _accepts(self.converter, "step_cache"):
+            attempt.step_cache = DbStepCache(self.factory, attempt.claim.job_id)
+            kwargs["step_cache"] = attempt.step_cache
+
+        # call_observer: how each model request ended, for the status line about the AI
+        # service (`web.provider_health`).
+        if _accepts(self.converter, "call_observer"):
+            kwargs["call_observer"] = lambda call: HEALTH.record(call.outcome)
 
         # concurrency: `MODEL_CONCURRENCY` steps at once, fewer when what is left of the
         # job's cap or of today's cap could not hold that many reservations.
@@ -927,45 +956,67 @@ class Worker:
             job.html_stale = False  # the file is made from this result
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
+            # The steps given back by the cache cost this much when they were first run: it
+            # is already on the row, and in the result's totals again.
+            cache = attempt.step_cache
+            reused_usd = cache.reused_usd if cache is not None else 0.0
+            reused_calls = cache.reused_calls if cache is not None else 0
             job.cost_usd = max(
-                float(job.cost_usd or 0.0), round(attempt.prior_usd + result.stats.cost_usd, 8)
+                float(job.cost_usd or 0.0),
+                round(attempt.prior_usd + result.stats.cost_usd - reused_usd, 8),
             )
             job.model_calls = max(
-                int(job.model_calls or 0), attempt.prior_calls + result.stats.model_calls
+                int(job.model_calls or 0),
+                attempt.prior_calls + result.stats.model_calls - reused_calls,
             )
             job.pages_done = job.page_count
             job.status = JobStatus.DONE
             job.error_code = code
             job.finished_at = self.clock()
             job.lease_until = None
+            # Finished steps are only kept for a result that "Try again" can still improve.
+            if not retry_rules.offer(
+                status=JobStatus.DONE,
+                error_code=code,
+                result_json=job.result_json,
+                retries=0,
+            ):
+                forget_steps(session, job.id)
+        if attempt.step_cache is not None:
+            attempt.step_cache.log_reuse()
         return True
 
     # ------------------------------------------------------------------ earlier decisions
 
-    def _earlier_version(
-        self, session: Session, job: Job
-    ) -> tuple[DocumentResult, dict[str, bytes], str] | None:
-        """The result whose decisions this one inherits (T3-2, `web.carry`): the earlier
-        version the upload said it revises, if it is still the owner's, finished and not
-        past its deletion time. (result, its crops, its file name), or None."""
-        if not job.revises_job_id:
+    def _earlier_version(self, session: Session, job: Job) -> _Earlier | None:
+        """The result whose decisions this one inherits, with its crops, or None.
+
+        A job being tried again inherits from its own earlier result (T3-1: the decisions
+        made on a partly converted document survive "Convert the missing parts"). Else the
+        earlier version the upload said it revises (T3-2, `web.carry`), if it is still the
+        owner's, finished and not past its deletion time."""
+        if job.retries and job.result_json:
+            source, own = job, True
+        elif job.revises_job_id:
+            source, own = session.get(Job, job.revises_job_id), False
+        else:
             return None
-        before = session.get(Job, job.revises_job_id)
         if (
-            before is None
-            or before.user_id != job.user_id
-            or before.status != JobStatus.DONE
-            or not before.result_json
-            or (retain := as_utc(before.retain_until)) is None
+            source is None
+            or source.user_id != job.user_id
+            or not source.result_json
+            or (not own and source.status != JobStatus.DONE)
+            or (retain := as_utc(source.retain_until)) is None
             or retain <= self.clock()
         ):
             return None
         try:
-            earlier = DocumentResult.model_validate(before.result_json)
+            earlier = DocumentResult.model_validate(source.result_json)
         except ValueError:
             return None
-        blobs = session.scalars(select(Blob).where(Blob.job_id == before.id, Blob.kind == "crop"))
-        return earlier, {b.element_id: b.content for b in blobs if b.element_id}, before.filename
+        blobs = session.scalars(select(Blob).where(Blob.job_id == source.id, Blob.kind == "crop"))
+        crops = {b.element_id: b.content for b in blobs if b.element_id}
+        return _Earlier(earlier, crops, source.filename, own)
 
     def _carry_decisions(
         self,
@@ -973,18 +1024,19 @@ class Worker:
         job: Job,
         result: DocumentResult,
         crops: dict[str, bytes],
-        earlier: tuple[DocumentResult, dict[str, bytes], str],
+        earlier: _Earlier,
     ) -> None:
-        """Put the earlier version's decisions on the new result (`carry.carry_decisions`),
-        make the HTML file again from it, record a `ReviewEdit` per carried decision and
-        keep the report on the job. Never fails the conversion: a problem here leaves the
-        result as the pipeline made it, with every decision to be made again."""
+        """Put the earlier result's decisions on the new result (`carry.carry_decisions`)
+        and make the HTML file again from it. For a revised upload, also record a
+        `ReviewEdit` per carried decision and keep the report on the job; for a job tried
+        again the decisions already are its own review edits, so nothing is recorded.
+        Never fails the conversion: a problem here leaves the result as the pipeline made
+        it, with every decision to be made again."""
         from a11y_stem.web import carry
         from a11y_stem.web.review import rerender_job_html
 
-        before, before_crops, name = earlier
         try:
-            report, changes = carry.carry_decisions(before, before_crops, result, crops)
+            report, changes = carry.carry_decisions(earlier.result, earlier.crops, result, crops)
             if changes:
                 from a11y_stem.web import notation
 
@@ -995,22 +1047,24 @@ class Worker:
         except Exception as exc:  # the result is as the pipeline made it, or half-carried
             log_exception(logger, "carry_failed", exc, job_id=job.id)
             return
-        for change in changes:
-            session.add(
-                ReviewEdit(
-                    job_id=job.id,
-                    user_id=job.user_id,
-                    element_id=change.element_id,
-                    action=carry.CARRIED_ACTION,
-                    before=change.before,
-                    after=change.after,
+        if not earlier.own:
+            for change in changes:
+                session.add(
+                    ReviewEdit(
+                        job_id=job.id,
+                        user_id=job.user_id,
+                        element_id=change.element_id,
+                        action=carry.CARRIED_ACTION,
+                        before=change.before,
+                        after=change.after,
+                    )
                 )
-            )
-        job.carried_json = report.to_json() | {"from_name": name}
+            job.carried_json = report.to_json() | {"from_name": earlier.name}
         log_event(
             logger,
             "decisions_carried",
             job_id=job.id,
+            source="retry" if earlier.own else "revision",
             carried=len(report.carried),
             changed=len(report.changed) + len(report.suggestion_changed),
             new=len(report.new),

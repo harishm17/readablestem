@@ -62,6 +62,12 @@ Design notes:
   "tables" with how many of each are done, first with their totals and then after every
   element (the receiver decides how often to store them); "assemble" and "checks" as the
   HTML is written and checked. All on the calling thread, content-free.
+- Finished steps can be kept and reused (`StepCache`, T3-1): with a cache, every model
+  step's answer that is worth keeping (`reusable`: not a failure that a new try could
+  change) is stored under a key made from the element, its crop, its nearby text, the
+  options and the models (`step_key`), and a later run of the same document finds it
+  there instead of calling the model again. The web app keeps them per job so that
+  "Try again" on a stopped conversion pays only for what was not finished.
 - After the steps, `pipeline.notices` derives the notices that follow from the fixes
   (a table kept as an image, a scanned page, a colour-only figure, a chart without a
   long description) and `pipeline.source_facts` measures the PDF for the before/after
@@ -72,6 +78,7 @@ from __future__ import annotations
 
 import contextlib
 import contextvars
+import hashlib
 import logging
 import threading
 import time
@@ -82,7 +89,7 @@ from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from functools import partial
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import Field
 
@@ -193,9 +200,15 @@ class _RecordingClient:
     is closed with the call's tokens, cost and outcome.
     """
 
-    def __init__(self, inner: VisionClient, tracer: Tracer) -> None:
+    def __init__(
+        self,
+        inner: VisionClient,
+        tracer: Tracer,
+        observer: Callable[[ModelCall], None] | None = None,
+    ) -> None:
         self._inner = inner
         self._tracer = tracer
+        self._observer = observer
         self.calls: list[ModelCall] = []
 
     def run(
@@ -211,6 +224,8 @@ class _RecordingClient:
         ) as span:
             parsed, call = self._inner.run(request, schema, is_fallback=is_fallback)
             self.calls.append(call)
+            if self._observer is not None:
+                self._observer(call)
             _annotate(
                 span,
                 model=call.model,
@@ -264,6 +279,67 @@ def _failed(element: Element, reason: str, calls: Iterable[ModelCall] = ()) -> F
         reason=reason,
         calls=list(calls),
     )
+
+
+class StepCache(Protocol):
+    """Where finished steps are kept between runs of one document (module docstring).
+
+    `lookup` returns the stored fix for this element when `key` is what it was stored
+    under, else None; `store` keeps one. Both are called on the calling thread, and a
+    cache must not raise: a failure to read or write is a miss, never a failed run."""
+
+    def lookup(self, element: Element, key: str) -> Fix | None: ...
+
+    def store(self, element: Element, key: str, fix: Fix) -> None: ...
+
+
+# `Fix.reason` codes of a failure that trying again could change: the model did not answer
+# or answered something unusable, or the step itself broke. Everything else a step ends
+# with is its answer (a proposal, a refusal to propose, a check that failed).
+_TRANSIENT_REASONS = frozenset({"internal_error", "crop_error"})
+_TRANSIENT_PREFIXES = ("model_", "budget_")
+
+
+def reusable(fix: Fix) -> bool:
+    """Whether a later run may use this fix as it is instead of asking again."""
+    if fix.status is not Status.FAILED:
+        return True
+    reason = fix.reason or ""
+    return reason not in _TRANSIENT_REASONS and not reason.startswith(_TRANSIENT_PREFIXES)
+
+
+def step_key(
+    element: Element,
+    png: bytes,
+    context_text: str | None,
+    options: ConversionOptions,
+    settings: Settings,
+) -> str:
+    """What a step's answer depends on, as a digest: the pipeline version, the element
+    (its text layer is checked against the answer), the picture, the nearby text sent with
+    it, the conversion options (notation, exam mode, feature flags) and the models and
+    checks in use. Equal keys mean the same question asked the same way."""
+    parts = [
+        PIPELINE_VERSION,
+        element.model_dump_json(exclude={"id", "order"}),
+        hashlib.sha256(png).hexdigest(),
+        context_text or "",
+        options.model_dump_json(),
+        "|".join(
+            str(getattr(settings, name, ""))
+            for name in (
+                "model_provider",
+                "main_model",
+                "cheap_model",
+                "decisions_model",
+                "decisions_figure_verify",
+                "decisions_equation_shadow",
+                "claude_check_model",
+                "claude_check_scope",
+            )
+        ),
+    ]
+    return hashlib.sha256("\x1f".join(parts).encode()).hexdigest()
 
 
 def _budget_scope(fix: Fix) -> str | None:
@@ -456,7 +532,13 @@ def _validated(fix: object, element: Element, calls: list[ModelCall]) -> Fix:
 
 
 def _run_step(
-    task: _Task, *, client: VisionClient, settings: Settings, stop: _Stop, tracer: Tracer
+    task: _Task,
+    *,
+    client: VisionClient,
+    settings: Settings,
+    stop: _Stop,
+    tracer: Tracer,
+    observer: Callable[[ModelCall], None] | None = None,
 ) -> _Done:
     """Worker body: one element through its step.
 
@@ -469,7 +551,7 @@ def _run_step(
     if stop.scope is not None:  # budget gone while this task was queued
         return _Done(element, _failed(element, stop.reason()), 0)
     step_name, step = _step_for(element.kind)
-    recorder = _RecordingClient(client, tracer)
+    recorder = _RecordingClient(client, tracer, observer)
     started = time.perf_counter()
     with _span(
         tracer,
@@ -616,6 +698,11 @@ class _Run:
     # Per model kind: how many elements it has, and the ids that have their fix.
     stage_totals: dict[Kind, int] = field(default_factory=dict)
     stage_done: dict[Kind, set[str]] = field(default_factory=dict)
+    # Finished steps kept between runs (T3-1), and the key each element's step was asked under.
+    cache: StepCache | None = None
+    keys: dict[str, str] = field(default_factory=dict)
+    # Told how each model request ended (`ModelCall`), for the status line about the AI service.
+    observer: Callable[[ModelCall], None] | None = None
 
     def start_stages(self, elements: list[Element]) -> None:
         """Each model stage's total, counting what was decided before any model work (a
@@ -660,6 +747,13 @@ class _Run:
             self.fixes[element.id] = _failed(element, self.stop.reason())
             self.step_done(element)
             return
+        if self.cache is not None:
+            key = step_key(element, png, self.contexts.get(element.id), self.options, self.settings)
+            if (kept := self.cache.lookup(element, key)) is not None:
+                self.fixes[element.id] = kept  # finished in an earlier run: no model call
+                self.step_done(element)
+                return
+            self.keys[element.id] = key
         work = partial(
             _run_step,
             _Task(element, png, self.contexts.get(element.id)),
@@ -667,6 +761,7 @@ class _Run:
             settings=self.settings,
             stop=self.stop,
             tracer=self.tracer,
+            observer=self.observer,
         )
         # Each task runs in a copy of this context, so a contextvars-based tracer nests the
         # step span under this page's span even though it runs on a pool thread.
@@ -702,6 +797,8 @@ class _Run:
             done = future.result()  # re-raises a FATAL_ERRORS from the worker
             self.fixes[element.id] = done.fix
             self.page_ms[element.page] += done.elapsed_ms
+            if self.cache is not None and (key := self.keys.get(element.id)) and reusable(done.fix):
+                self.cache.store(element, key, done.fix)
         self.pages.finished(element.page)
         self.step_done(element)
 
@@ -955,6 +1052,8 @@ def convert_pdf(
     source_note: str | None = None,
     options: ConversionOptions | None = None,
     stage_progress: StageProgressFn | None = None,
+    step_cache: StepCache | None = None,
+    call_observer: Callable[[ModelCall], None] | None = None,
 ) -> ConversionOutput:
     """Convert one PDF (0-based `pages`, all by default) into a `PipelineOutput`.
 
@@ -976,6 +1075,10 @@ def convert_pdf(
     `ConversionOptions.from_settings(settings)`. `stage_progress` receives
     `ProgressEvent`s on the calling thread as each stage starts and moves on (see the
     module docstring); like `progress`, an exception from it aborts the run.
+
+    `step_cache` keeps the answers of finished model steps and gives them back to a later
+    run of the same document (module docstring); without one every step is asked.
+    `call_observer` is told each model request's `ModelCall` when it ends (any thread).
     """
     if options is None:
         options = ConversionOptions.from_settings(settings)
@@ -992,6 +1095,8 @@ def convert_pdf(
             source_note=source_note,
             options=options,
             stage_progress=stage_progress,
+            step_cache=step_cache,
+            call_observer=call_observer,
         )
 
 
@@ -1008,6 +1113,8 @@ def _convert(
     source_note: str | None,
     options: ConversionOptions,
     stage_progress: StageProgressFn | None,
+    step_cache: StepCache | None = None,
+    call_observer: Callable[[ModelCall], None] | None = None,
 ) -> ConversionOutput:
     """`convert_pdf`'s body, with its options already in force."""
     tracer = tracer or NoopTracer()
@@ -1045,6 +1152,8 @@ def _convert(
                 crops={},
                 page_ms=Counter(),
                 futures={},
+                cache=step_cache,
+                observer=call_observer,
             )
             # The text pass adds links, colour runs and passage languages to the elements
             # without touching their text or anything a step reads, and the heading
