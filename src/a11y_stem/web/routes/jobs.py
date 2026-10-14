@@ -175,8 +175,8 @@ def _quota_message(name: str, pages: int | None, left: int | None, quota: int | 
 # Per person, on top of the daily page count: documents waiting or being converted, and
 # documents kept (finished or not, until their deletion time). A person with a full queue
 # would hold everyone else back; a person with hundreds of kept files would fill the database.
-MAX_ACTIVE_JOBS_PER_USER = 3
-MAX_LIVE_JOBS_PER_USER = 25
+MAX_ACTIVE_JOBS_PER_USER = 10
+MAX_LIVE_JOBS_PER_USER = 40
 
 
 class TooManyJobs(Exception):
