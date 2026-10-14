@@ -141,11 +141,11 @@ def _judge_client(args: argparse.Namespace, settings: Any) -> tuple[Any, Any] | 
     budget = JobBudget(InMemorySpendGuard(cap_usd=cap), max_usd=cap, max_calls=args.max_calls)
     if args.fake:
         return FakeVisionClient(budget=budget), budget
-    from a11y_stem.models import make_live_client
+    from a11y_stem.models.openai_client import OpenAIVisionClient
 
     try:
-        # The provider is MODEL_PROVIDER; no second check: the judge alone.
-        return make_live_client(settings, budget, second_check=False), budget
+        settings.require_openai_key()
+        return OpenAIVisionClient(settings, budget), budget  # no second check: the judge alone
     except ConfigError as exc:
         return str(exc)
 
