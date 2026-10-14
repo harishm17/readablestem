@@ -216,9 +216,15 @@ def test_the_real_gate_lets_the_repeated_heading_card_load_all_its_images():
     gate = page_images.RenderGate(  # the real per-person number, room for them on the instance
         total=8, per_user=page_images.MAX_RENDERS_PER_USER, wait_s=0.01
     )
-    with gate.slot("card"), gate.slot("card"), gate.slot("card"), gate.slot("card"):
-        with pytest.raises(page_images.RenderLimited), gate.slot("card"):
-            pass
+    with (
+        gate.slot("card"),
+        gate.slot("card"),
+        gate.slot("card"),
+        gate.slot("card"),
+        pytest.raises(page_images.RenderLimited),
+        gate.slot("card"),
+    ):
+        pass
     with gate.slot("card"):  # all four were freed
         pass
 
