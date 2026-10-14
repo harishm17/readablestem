@@ -192,14 +192,14 @@ def test_repeated_uncertain_labels_make_one_group_decision():
     assert re.fullmatch(r"hg-p\d+-e\d+", fixes["p1-e3"].group_key or "")
 
 
-def test_a_heading_with_the_same_text_as_the_one_above_becomes_bold_text():
+def test_a_heading_with_the_same_text_and_level_as_the_one_above_becomes_bold_text():
     elements = [
         large(0, "Motion", 18.0),
         large(1, "Teacher Support", 14.0),
-        heading(2, "Teacher Support", 11.0, REASON_BOLD_BODY),  # the box title again
+        large(2, "Teacher Support", 14.0),  # the same box title again, at the same level
         large(3, "Teacher Demonstration", 14.0),
-        heading(4, "teacher  demonstration:", 11.0, REASON_BOLD_BODY),  # same label, normalised
-        heading(5, "Teacher Demonstration", 11.0, REASON_BOLD_BODY),  # a third copy repeats it
+        large(4, "teacher  demonstration:", 14.0),  # same label, normalised
+        large(5, "Teacher Demonstration", 14.0),  # a third copy repeats the second
         large(6, "Summary", 14.0),
     ]
     fixes = by_id(elements)
@@ -215,6 +215,20 @@ def test_a_heading_with_the_same_text_as_the_one_above_becomes_bold_text():
         assert fix.group_key is None and not fix.pending
     # The first copy stays a heading, and the repeats take no part in the outline.
     assert [fixes[f"p1-e{i}"].heading.level for i in (0, 1, 3, 6)] == [1, 2, 2, 2]
+
+
+def test_the_same_text_one_level_down_is_a_real_sub_heading():
+    """OpenStax sets "Teacher Support" as a box title and again, smaller, as its first
+    line: the book's own outline has both (h3 then h4), so both stay headings."""
+    elements = [
+        large(0, "Motion", 18.0),
+        large(1, "Teacher Support", 14.0),
+        large(2, "Teacher Support", 12.0),
+        heading(3, "Teacher Support", 11.0, REASON_BOLD_BODY),  # lower still
+    ]
+    fixes = by_id(elements)
+    assert all(f.reason is None and f.heading is not None for f in fixes.values())
+    assert [f.heading.level for f in fixes.values()] == [1, 2, 3, 4]
 
 
 def test_a_heading_with_other_text_between_two_copies_is_not_a_repeat():
@@ -235,14 +249,14 @@ def test_the_repeated_heading_is_written_as_bold_text_in_the_html():
     elements = [
         large(0, "Motion", 18.0),
         large(1, "Teacher Support", 14.0),
-        heading(2, "Teacher Support", 11.0, REASON_BOLD_BODY),
+        large(2, "Teacher Support", 14.0),
         large(3, "Summary", 14.0),
     ]
     html = render_html(
         title="T", lang="en", elements=elements, fixes=heading_fixes(elements), crops={}
     )
     main = html[html.index("<main>") : html.index("</main>")]
-    assert main.count("<h2") == 2 and "<h3" not in main
+    assert main.count("<h2") == 2 and "<h3" not in main  # Teacher Support once, Summary
     assert '<p id="p1-e2"><strong>Teacher Support</strong></p>' in main
 
 
