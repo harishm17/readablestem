@@ -1,6 +1,6 @@
 # ReadableSTEM
 
-[![CI](https://github.com/harishm17/a11y-stem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/harishm17/a11y-stem/actions/workflows/ci.yml)
+[![CI](https://github.com/harishm17/readablestem/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/harishm17/readablestem/actions/workflows/ci.yml)
 [![Licence: MIT](https://img.shields.io/badge/code-MIT-blue.svg)](LICENSE)
 
 ReadableSTEM assists instructors who need to turn a STEM course PDF into an accessible web
@@ -246,8 +246,8 @@ the main choices are in [docs/decisions/](docs/decisions/).
 Requires [uv](https://docs.astral.sh/uv/) and Python 3.12 or newer.
 
 ```
-git clone https://github.com/harishm17/a11y-stem.git
-cd a11y-stem
+git clone https://github.com/harishm17/readablestem.git
+cd readablestem
 uv sync
 uv run readablestem convert tests/fixtures/layout/latex/problem_set.pdf --out out.html --fake
 ```

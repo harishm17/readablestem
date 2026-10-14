@@ -30,7 +30,7 @@ def test_the_demo_is_written_with_the_note_one_h1_and_the_dark_scheme(tmp_path):
     assert 'aria-label="About this demo"' in html and "Precomputed demo." in html
     assert "@media screen and (prefers-color-scheme: dark)" in html
     assert 'id="about-conversion-title" class="about-title"' in html
-    assert "https://github.com/harishm17/a11y-stem" in html  # the AGPL source link
+    assert "https://github.com/harishm17/readablestem" in html  # the AGPL source link
 
 
 def test_it_is_repeatable_and_leaves_the_stored_result_as_written(tmp_path):

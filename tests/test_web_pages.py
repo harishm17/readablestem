@@ -111,7 +111,7 @@ def test_every_page_has_the_shared_accessible_layout(pages):
         assert page.count("header") == 1 and page.count("footer") == 1, name
         for link in ('href="/privacy"', 'href="/terms"', 'href="/limits"', 'href="/status"'):
             assert link in html, (name, link)
-        assert 'href="https://github.com/harishm17/a11y-stem">Source code</a>' in html, name
+        assert 'href="https://github.com/harishm17/readablestem">Source code</a>' in html, name
         assert "GNU Affero General Public License" in html, name
 
 

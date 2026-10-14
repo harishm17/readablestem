@@ -40,7 +40,7 @@ SITE_DIR = Path(__file__).resolve().parent
 REPO_ROOT = SITE_DIR.parent
 DEFAULT_OUT = SITE_DIR / "_build"
 
-REPO_URL = "https://github.com/harishm17/a11y-stem"
+REPO_URL = "https://github.com/harishm17/readablestem"
 STEMCHECK_URL = "https://github.com/harishm17/stemcheck"
 AUTHOR = "Harish Manoharan"
 CC_BY = "https://creativecommons.org/licenses/by/4.0/"

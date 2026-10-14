@@ -78,7 +78,7 @@ production if a required one is missing, and logs the reason):
 
 | Variable | Why | Suggested |
 |---|---|---|
-| `SOURCE_URL` | The footer's link to the source (AGPL, launch.md B12). The default points at the old `harishm17/a11y-stem` repository. | The public repository's URL. |
+| `SOURCE_URL` | The footer's link to the source (AGPL, launch.md B12). The default is the public repository, `https://github.com/harishm17/readablestem`, which has to exist before the first sign-in. | Leave unset, or set it to the deployed commit's URL (launch.md B12). |
 | `MAX_USD_PER_JOB`, `MAX_USD_PER_PAGE` | Per-conversion dollar caps. | Leave unset: the defaults for Claude are $3.00 and $1.00, and the start-up check refuses numbers that cannot work. |
 | `FEEDBACK_URL` | The footer's Feedback link. | Leave unset: it becomes an email to `CONTACT_EMAIL`. A form service is a new data processor to name on the privacy page. |
 | `ALERT_EMAIL` | Read only by `deploy/deploy.sh` (Google Cloud alert policies). The app ignores it, so setting it on Railway does nothing. | Skip. Use Railway's project notifications and the weekly GitHub uptime check (below). |

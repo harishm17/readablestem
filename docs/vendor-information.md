@@ -2,7 +2,7 @@
 
 One page. It says what the tool does, what happens to a document, and where it falls short.
 It is written from how the beta behaves today, not from a contract or an audit by anyone
-outside the project. The command is `readablestem` (the old `a11y-stem` still works); the GitHub repository keeps the name `a11y-stem` for now.
+outside the project. The command is `readablestem` (the old `a11y-stem` still works); the GitHub repository is `harishm17/readablestem`.
 
 ## What it does
 

@@ -1,5 +1,17 @@
 # Changelog
 
+## Beta wording and repository link (2026-10-14)
+
+- The draft wording of the privacy, terms, known-limits, landing and Canvas help pages is the beta
+  wording: draft banners and `TODO(Harish)` markers are gone and `readablestem ops launch-check`
+  reports no unfinished copy. Railway is named as host, daily backups are kept about 6 days (a
+  deleted document can remain in a backup for up to about a week), governing law is Texas, and
+  Word and PowerPoint are described only when the server can convert them. Details in
+  [docs/launch.md](docs/launch.md).
+- The source link (`SOURCE_URL` default), the README and the site point at
+  https://github.com/harishm17/readablestem. The repository has to be public before the first
+  sign-in (AGPL, launch.md B12).
+
 ## Railway deploy and layout limits (2026-10-14)
 
 - Deploy on Railway: `railway.json` (Dockerfile build, `readablestem db upgrade` before each deploy,
@@ -38,8 +50,7 @@ proof bundle and gold file is untouched.
   provisioned under the old names, set `SERVICE`, `AR_REPO` and `SQL_INSTANCE` to them.
 - URLs: `BASE_URL` is `https://readablestem.com`; the Google redirect URI is
   `https://readablestem.com/auth/callback`.
-- Left alone on purpose: the GitHub repository URL (a11y-stem until the repository is
-  renamed), the registered proof files and `PROOF.md` ("a11y-stem" is the name the run
+- Left alone on purpose: the registered proof files and `PROOF.md` ("a11y-stem" is the name the run
   was made under), the page prints the evaluation set is made from (their footer names
   a11y-stem; the page images are part of the recorded answers' request keys), and sampling
   seeds, fingerprint keys and `generated_by` lines of gold data.

@@ -255,7 +255,7 @@ class Settings(BaseSettings):
     rate_limits_enabled: bool = True
 
     # --- public pages
-    source_url: str = "https://github.com/harishm17/a11y-stem"
+    source_url: str = "https://github.com/harishm17/readablestem"
     contact_email: str | None = None
     # Where the footer's "Feedback" link goes (http or https). Unset: an email to
     # CONTACT_EMAIL. A form service here is a new data processor: name it in the privacy
