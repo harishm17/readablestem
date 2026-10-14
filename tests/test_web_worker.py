@@ -105,6 +105,7 @@ def test_worker_converts_a_job_and_stores_everything(env):
     assert job.result_json is not None and "html" not in job.result_json
     assert job.result_json["fixes"][2]["status"] == "needs_review"
     assert job.html is not None and "SECRET-DOC-TEXT" in job.html
+    assert job.html_stale is False
     assert set(blobs(env, job_id, "crop")) == {"p1-e3", "p1-e4", "p1-e5"}
     assert env.converter.calls[0]["pdf"] == pdf
 

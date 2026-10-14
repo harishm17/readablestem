@@ -921,6 +921,7 @@ class Worker:
                 )
             job.result_json = db_safe(result.model_dump(mode="json", exclude={"html"}))
             job.html = db_safe(result.html)
+            job.html_stale = False  # the file is made from this result
             # The row already counts every reservation (`_hold_on_job`). A converter that
             # reports more than went through the budget (a test fake) is counted as well.
             job.cost_usd = max(
