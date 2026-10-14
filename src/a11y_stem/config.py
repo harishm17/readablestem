@@ -170,6 +170,14 @@ class Settings(BaseSettings):
     max_model_calls_per_page: int = Field(default=80, gt=0)
     max_pages_per_job: int = Field(default=30, gt=0)
     max_upload_mb: int = Field(default=20, gt=0)
+    # Word and PowerPoint uploads (T3-30): converted to a tagged PDF by LibreOffice in a
+    # sandboxed child process (`web.office_convert`). Taken only when LibreOffice is
+    # installed (the production image has it only when built with INSTALL_LIBREOFFICE=true,
+    # docs/deploy.md); SOFFICE_PATH names the program when it is not `soffice` on PATH.
+    office_input_enabled: bool = True
+    soffice_path: str | None = None
+    # How long LibreOffice may take for one file, in seconds (it is killed after that).
+    office_timeout_s: float = Field(default=90.0, gt=0, le=300)
     # Uploads taken in at once per instance (one per user); see web/uploads.py.
     max_concurrent_uploads: int = Field(default=3, gt=0)
 

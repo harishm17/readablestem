@@ -29,7 +29,7 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.pipeline import export_canvas, text_pass
 from a11y_stem.pipeline import language as languages
-from a11y_stem.web import documents, events, notation, retention
+from a11y_stem.web import documents, events, notation, office_convert, retention
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web.database import as_utc, utc_today
@@ -57,7 +57,9 @@ from a11y_stem.web.quota import next_day_start, pages_left, try_consume_pages
 from a11y_stem.web.security import VIEW_CSP
 from a11y_stem.web.uploads import (
     UploadRejected,
+    convert_office_isolated,
     inspect_pdf_isolated,
+    is_office_upload,
     max_upload_bytes,
     read_upload_form,
 )
@@ -91,30 +93,62 @@ def upload_error_message(
     filename: str = "",
     pages: int | None = None,
     left: int | None = None,
+    *,
+    office: bool = False,
 ) -> str:
     """What went wrong with an upload, naming the file (and its pages) when known. The
     file name is shown to its owner only, never logged. `left`: pages left today, for
-    "page_quota"."""
+    "page_quota". `office`: the file was a Word or PowerPoint file, made into a PDF first
+    (T3-30), so the advice about pages is about the document and not about a PDF."""
     s = ctx.settings
     name = filename or "This file"
     limit = s.max_pages_per_job
     too_many = f"{name} has {pages} pages" if pages else f"{name} has more than {limit} pages"
     if code == "page_quota":
         return _quota_message(name, pages, left, s.per_user_daily_page_quota)
+    accepted = office_convert.input_kinds(s)  # Word and PowerPoint files taken (T3-30)
+    word = bool(accepted)
+    kinds, endings = office_convert.accepted_phrases(accepted)
     return {
-        "missing_file": "Choose a PDF file to upload.",
+        "missing_file": f"Choose {kinds} to upload." if word else "Choose a PDF file to upload.",
         "bad_form": "The upload did not arrive complete. Please try again.",
-        "empty": f"{name} is empty. Choose a PDF that has content.",
-        "not_pdf": f"{name} is not a PDF. Choose a PDF file.",
+        "empty": f"{name} is empty. Choose a file that has content."
+        if word
+        else f"{name} is empty. Choose a PDF that has content.",
+        "not_pdf": f"{name} is not {kinds}. Choose {endings}."
+        if word
+        else f"{name} is not a PDF. Choose a PDF file.",
         "too_large": f"{name} is larger than {s.max_upload_mb} MB. Split it into smaller "
+        "files and upload each one."
+        if word
+        else f"{name} is larger than {s.max_upload_mb} MB. Split it into smaller "
         "PDFs and upload each one.",
+        "office_unavailable": f"{name} is a Word or PowerPoint file, and this server cannot "
+        "read those yet. In Word or PowerPoint, save a copy as a PDF (File, Save As, PDF; "
+        f"keep the option for accessibility tags ticked) and upload that. {NOTHING_TAKEN}",
+        "office_unsupported": f"{name} is not {kinds}. Choose {endings}.",
+        "office_old_or_locked": f"{name} is in an older Word or PowerPoint format (.doc or "
+        ".ppt), or it is protected with a password. Save a copy as .docx or .pptx "
+        "without a password, or save it as a PDF, and upload that.",
+        "office_unsafe": f"{name} has something this tool will not open: macros, content "
+        "linked from another file or web address, or far more data inside it than a "
+        "document needs. Save a copy without them (put pictures in the file instead of "
+        "linking them), or save it as a PDF, and upload that.",
+        "office_failed": f"{name} could not be turned into a PDF. It may be damaged or too "
+        "complicated. Open it in Word or PowerPoint, save it as a PDF, and upload that.",
+        "office_busy": "Another Word or PowerPoint file is being converted at the moment. "
+        f"Wait a minute, then upload {name} again. Nothing was uploaded.",
         "encrypted": f"{name} is password-protected. Save a copy without a password (for "
         "example with Print to PDF) and upload that.",
         "unreadable": f"{name} could not be opened. It may be damaged. {FRESH_COPY}",
         "damaged": f"{name} looks damaged or incomplete: it may not have finished "
         f"downloading. {FRESH_COPY}",
         "no_pages": f"{name} has no pages. Check that you chose the right file.",
-        "too_many_pages": f"{too_many}; the limit is {limit} per upload. Split it into parts "
+        "too_many_pages": f"{too_many} once it is made into a PDF (the count can differ from "
+        f"Word's or PowerPoint's); the limit is {limit} per upload. Split it into parts of "
+        f"up to {limit} pages and upload each part."
+        if office
+        else f"{too_many}; the limit is {limit} per upload. Split it into parts "
         f"of up to {limit} pages (in Acrobat: Organize Pages, then Split) and upload each "
         "part.",
         "page_too_large": f"{name} has a page larger than 1.7 metres on a side, which is too "
@@ -302,6 +336,8 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         courses = (
             notation.list_courses(session, user.id) if notation.enabled(ctx.settings) else None
         )
+    kinds = office_convert.input_kinds(ctx.settings)
+    phrases = office_convert.accepted_phrases(kinds)
     return {
         "documents": listing,
         "pages_left": left,
@@ -311,6 +347,10 @@ def app_context(ctx: AppContext, user: CurrentUser) -> dict[str, Any]:
         "next_reset": next_day_start(now),
         "active": "app",
         "courses": courses,
+        # Word (.docx) and PowerPoint (.pptx) files are taken (T3-30): the kinds installed.
+        "office_kinds": kinds,
+        "office_what": phrases[0],
+        "office_choose": phrases[1],
     }
 
 
@@ -348,10 +388,11 @@ def _upload_error_page(
     left: int | None = None,
     headers: dict[str, str] | None = None,
     course: str = "",
+    office: bool = False,
 ) -> Response:
     ctx = get_ctx(request)
-    log_event(logger, "upload_rejected", code=code)
-    message = upload_error_message(code, ctx, filename, pages, left)
+    log_event(logger, "upload_rejected", code=code, office=office)
+    message = upload_error_message(code, ctx, filename, pages, left, office=office)
     context = app_context(ctx, user)
     # The course chosen stays chosen (the form marks it only among the user's courses),
     # so the file chosen again is read with the course's notation.
@@ -428,9 +469,16 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         )
     if course_id is not None and not await run_in_threadpool(_users_course, ctx, user, course_id):
         return await run_in_threadpool(_course_error_page, request, user)
+    # Word and PowerPoint (T3-30): made into a tagged PDF in a sandboxed child first; from
+    # here on the PDF is what is probed, stored and converted, as for any upload.
+    original = form.data
+    source, office = original, False
     try:
+        if is_office_upload(original):
+            office = True
+            source = await run_in_threadpool(_office_to_pdf, ctx, original)
         pages = await run_in_threadpool(
-            lambda: inspect_pdf_isolated(form.data or b"", max_pages=ctx.settings.max_pages_per_job)
+            lambda: inspect_pdf_isolated(source, max_pages=ctx.settings.max_pages_per_job)
         )
     except UploadRejected as exc:
         return await run_in_threadpool(
@@ -443,6 +491,8 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
                 form.filename,
                 exc.pages,
                 course=chosen,
+                office=office,
+                headers={"Retry-After": "10"} if exc.code == "office_busy" else None,
             )
         )
     mode = retention.mode_for_upload(
@@ -452,7 +502,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     exam = form.fields.get("exam") == "on"
     try:
         job_id = await run_in_threadpool(
-            _store_upload, ctx, user, form.filename, form.data, pages, mode, course_id, exam
+            _store_upload, ctx, user, form.filename, source, pages, mode, course_id, exam
         )
     except TooManyJobs as exc:
         return await run_in_threadpool(
@@ -486,13 +536,23 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
         logger, "job_created", job_id=job_id, pages=pages, opt_in=mode == "dev", retention=mode
     )
     # Usage events (web/events.py): `uploaded`, and `reuploaded` for the same file again.
-    data = form.data or b""
+    data = original  # what the person sent: a converted PDF differs in its dates every time
     await run_in_threadpool(
         lambda: events.record_upload(
             ctx.factory, ctx.settings, user_id=user.id, job_id=job_id, data=data, pages=pages
         )
     )
     return RedirectResponse(f"/jobs/{job_id}", status_code=303)
+
+
+def _office_to_pdf(ctx: AppContext, data: bytes) -> bytes:
+    """A Word or PowerPoint upload as PDF bytes (`web.office_convert`); `UploadRejected`
+    when this server cannot take it."""
+    s = ctx.settings
+    soffice = office_convert.soffice_command(s.soffice_path)
+    if not office_convert.input_kinds(s):
+        raise UploadRejected("office_unavailable")
+    return convert_office_isolated(data, soffice=soffice, timeout_s=s.office_timeout_s)
 
 
 def _job_course(request: Request, job_id: str, user: CurrentUser) -> dict[str, str] | None:

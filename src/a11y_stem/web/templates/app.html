@@ -45,6 +45,9 @@
         {% if pages_left is not none %}You can convert {{ pages_left }} more
         {{ "page" if pages_left == 1 else "pages" }} today; the count starts again at
         {{ next_reset|utc }}.{% endif %}
+        {% if office_kinds %}Word (.docx){% if "pptx" in office_kinds %} and PowerPoint (.pptx){% endif %}
+        files also work; they are turned into a PDF on the server first, so the page count
+        is the PDF's.{% endif %}
         Only upload materials you wrote or may adapt, with no student records.</p>
       {% if pdf_error %}
       <p class="error-message" id="pdf-error"><span class="visually-hidden">Error: </span>{{ pdf_error.message }}</p>
@@ -52,8 +55,9 @@
       {# app.js checks the size and type as soon as a file is chosen and puts what is
          wrong here, before anything is sent (UX review MF21). #}
       <div id="pdf-check" aria-live="polite"></div>
-      <input type="file" id="pdf" name="pdf" accept="application/pdf,.pdf"
-             data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
+      <input type="file" id="pdf" name="pdf"
+             accept="application/pdf,.pdf{% if "docx" in office_kinds %},.docx,application/vnd.openxmlformats-officedocument.wordprocessingml.document{% endif %}{% if "pptx" in office_kinds %},.pptx,application/vnd.openxmlformats-officedocument.presentationml.presentation{% endif %}"
+             {% if office_kinds %}data-office="{{ office_kinds|join(' ') }}" data-office-what="{{ office_what }}" data-office-choose="{{ office_choose }}" {% endif %}data-max-bytes="{{ max_upload_mb * 1024 * 1024 }}" data-max-mb="{{ max_upload_mb }}"
              aria-describedby="pdf-hint{% if pdf_error %} pdf-error{% endif %}"{% if pdf_error %} aria-invalid="true"{% endif %}>
     </div>
     {% include "_course_choice.html" %}

@@ -98,6 +98,9 @@ def make_settings(tmp_path: Path, **overrides: Any) -> Settings:
         "google_client_id": None,
         "google_client_secret": None,
         "session_secret": None,
+        # Word and PowerPoint uploads depend on LibreOffice being installed; the tests that
+        # are about them (tests/test_web_office.py) turn this on.
+        "office_input_enabled": False,
     }
     values.update(overrides)
     if values["env"] != "prod":

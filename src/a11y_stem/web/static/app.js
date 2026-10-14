@@ -124,15 +124,29 @@
   var serverError = input.getAttribute("aria-invalid") === "true";
   if (!box || !status || !button || !field) return;
 
+  // "docx pptx": the Word and PowerPoint kinds this server converts (data-office, T3-30).
+  var office = (input.getAttribute("data-office") || "").split(" ").filter(Boolean);
+
   function problem(file) {
     if (!file) return "";
     var pdf = /\.pdf$/i.test(file.name) || file.type === "application/pdf";
-    if (!pdf) return file.name + " is not a PDF. Choose a PDF file.";
-    if (file.size === 0) return file.name + " is empty. Choose a PDF that has content.";
+    var word = office.some(function (kind) {
+      return new RegExp("\\." + kind + "$", "i").test(file.name);
+    });
+    if (!pdf && !word) {
+      return office.length
+        ? file.name + " is not " + input.getAttribute("data-office-what") + ". Choose " +
+            input.getAttribute("data-office-choose") + "."
+        : file.name + " is not a PDF. Choose a PDF file.";
+    }
+    if (file.size === 0) {
+      return file.name + (office.length ? " is empty. Choose a file that has content."
+        : " is empty. Choose a PDF that has content.");
+    }
     if (file.size > maxBytes) {
       return (
-        file.name + " is larger than " + maxMb + " MB. Split it into smaller PDFs and " +
-        "upload each one."
+        file.name + " is larger than " + maxMb + " MB. Split it into smaller " +
+        (office.length ? "files" : "PDFs") + " and upload each one."
       );
     }
     return "";
