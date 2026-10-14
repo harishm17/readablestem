@@ -190,6 +190,17 @@ RULE_MIN_SHARE = 0.5
 # never answered "unreadable".
 INK_BUDGET_S = 10.0
 INK_MAX_ITEMS = 200_000
+# The page cap (docs/layout.md "Time budget"). Every analysis step after the drawings are
+# extracted costs time and memory for each path (a page of 86,000 strokes took 5 to 9 s
+# and 50 MB of Python objects in layout alone, 30 such pages 4 minutes and 1.8 GB), so a
+# page with more than PAGE_MAX_PATHS drawings, or more than PAGE_MAX_ITEMS path items, is
+# not read for drawings at all: its ink is not analysed (`ink_not_analysed`), it says
+# `drawings_over_cap`, and `kept_reason` keeps it as its page image with a decision,
+# reading its visible typed text. The largest real page found (a dense handwritten note,
+# a map) has under 30,000 paths.
+PAGE_MAX_PATHS = 50_000
+PAGE_MAX_ITEMS = 500_000
+OVER_CAP_REASON = "drawings_over_cap"
 
 # Handwriting regions on a typed page (mixed_ink): strokes closer than this join one
 # region; a region is padded by REGION_PAD. More than MAX_REGIONS regions on a page
@@ -268,6 +279,7 @@ class TextStats:
 @dataclass
 class InkStats:
     analysed: bool = True  # False: over the time budget or the item cap
+    over_cap: bool = False  # too many drawings to read at all (`too_complex`)
     paths: int = 0  # visible drawings
     marks: int = 0  # ... that are not only straight lines (a paper template's rules)
     items: int = 0  # their path items
@@ -1027,14 +1039,32 @@ def _rows_at(shapes: list[tuple[BBox, int]], theta: float) -> int:
     )
 
 
+def too_complex(drawings: Sequence[dict[str, Any]]) -> bool:
+    """The page has more drawings (or path items) than it is worth reading (PAGE_MAX_PATHS,
+    PAGE_MAX_ITEMS)."""
+    if len(drawings) > PAGE_MAX_PATHS:
+        return True
+    return sum(len(d.get("items") or ()) for d in drawings) > PAGE_MAX_ITEMS
+
+
 def ink_stats(
-    page: pymupdf.Page, drawings: Sequence[dict[str, Any]], budget: InkBudget | None = None
+    page: pymupdf.Page,
+    drawings: Sequence[dict[str, Any]],
+    budget: InkBudget | None = None,
+    seen: Sequence[tuple[bool, bool]] | None = None,
 ) -> InkStats:
     """Handwriting evidence from the drawings layout extracted. Counts the visible paths
-    always; the stroke analysis only within the budget and the item cap."""
+    always; the stroke analysis only within the budget and the item cap. `seen` is
+    `paint_visibility` of these drawings when the caller has it already."""
     stats = InkStats()
     frame = page.cropbox  # the visible page: text, images and drawings are read in its frame
-    seen = paint_visibility(drawings, image_boxes(page)[0])
+    if too_complex(drawings):  # nothing below is worth its time on such a page
+        stats.analysed, stats.over_cap = False, True
+        stats.paths = stats.marks = len(drawings)  # unknown: not blank, not refused
+        stats.items = sum(len(d.get("items") or ()) for d in drawings)
+        return stats
+    if seen is None:
+        seen = paint_visibility(drawings, image_boxes(page)[0])
     for d, (filled, stroked) in zip(drawings, seen, strict=True):
         if not (filled or stroked):
             continue
@@ -1264,6 +1294,8 @@ def decide(
         reasons.append("ocr_font")
     if not ink.analysed:
         reasons.append("ink_not_analysed")
+        if ink.over_cap:
+            reasons.append(OVER_CAP_REASON)
     elif writing:
         reasons.append("ink_writing")
     elif some_ink:
@@ -1350,11 +1382,15 @@ def classify(
     *,
     budget: InkBudget | None = None,
     producer: str = "other",
+    images: tuple[list[BBox], float] | None = None,
+    seen: Sequence[tuple[bool, bool]] | None = None,
 ) -> PageTypeResult:
-    """The page's type, from the rawdict blocks and drawings layout already extracted."""
-    images, coverage = image_boxes(page)
-    text = text_stats(page, raw_blocks, images, drawings)
-    ink = ink_stats(page, drawings, budget)
+    """The page's type, from the rawdict blocks and drawings layout already extracted.
+    `images` (`image_boxes`) and `seen` (`paint_visibility` of these drawings and those
+    images) are passed by a caller that has them already."""
+    boxes, coverage = images if images is not None else image_boxes(page)
+    text = text_stats(page, raw_blocks, boxes, drawings)
+    ink = ink_stats(page, drawings, budget, seen)
     return decide(text, ink, coverage, producer)
 
 
@@ -1381,6 +1417,8 @@ def kept_reason(page: PageTypeResult | PageType) -> str | None:
         return UNREAD_PAGE
     if page.kind in SCAN_KINDS:
         return SCANNED_PAGE
+    if OVER_CAP_REASON in page.reasons:
+        return UNREAD_PAGE  # its drawings are not read; any visible typed text is
     if (
         page.kind == "vector_no_text"
         and "ink_not_analysed" in page.reasons

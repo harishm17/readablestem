@@ -112,7 +112,7 @@ read from the `before` snapshot of its earliest review. Categories:
 | `job` | `status:done`, `status:failed` | finished jobs |
 | `job` | `error:<code>` | `Job.error_code`, e.g. `error:encrypted`, `error:handwritten`; on done jobs the outcome code (`error:budget_daily`, `error:pages_not_converted`; `error:scanned_pages` before page types) |
 | `page` | `page_type:<kind>` | analysed pages of a job by page type (`born_digital`, `handwritten_ocr`, `scan_ocr`, ...; `pipeline.page_type`, docs/layout.md "Hidden text and page types"): the signal for whether handwriting and scans are common enough to matter |
-| `page` | `page_type_reason:<code>` | their content-free reason codes (`invisible_text`, `text_covered`, `ocr_font`, `ink_writing`, `hidden_ratio`, `ink_not_analysed`, ...) |
+| `page` | `page_type_reason:<code>` | their content-free reason codes (`invisible_text`, `text_covered`, `ocr_font`, `ink_writing`, `hidden_ratio`, `ink_not_analysed`, `drawings_over_cap`, ...) |
 | `job` | `pages` | pages of done jobs (a sum, not a count of jobs) |
 | `job` | `cost_microusd` | model spend of done jobs in millionths of a dollar (a sum): `sum(cost_microusd) / sum(pages) / 1e6` is the production cost per page |
 | `job` | `latency:lt60s` ... `latency:ge600s` | done jobs by conversion wall time (buckets 60, 120, 300, 600 s) |

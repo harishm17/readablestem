@@ -55,6 +55,7 @@ from __future__ import annotations
 
 import bisect
 import hashlib
+import math
 import re
 import statistics
 import subprocess
@@ -114,6 +115,8 @@ FULL_PAGE_FRACTION = 0.85  # images covering this share of the page: background 
 MIN_DRAWING_PT = 24.0  # a vector figure is at least this big on both sides
 FIGURE_PART_REACH = 12.0  # a smaller drawing this close to a vector figure is part of it
 DRAWING_CLUSTER_GAP = 6.0  # drawings closer than this belong to the same figure
+CLUSTER_BAND_PT = 16.0  # `_cluster` looks up earlier boxes in horizontal bands this tall
+CLUSTER_MAX_BANDS = 32  # a box spanning more bands than this is checked against every box
 PAGE_SIZED_FRACTION = 0.85  # a drawing this wide and tall fills the page (or its frame)
 FRAME_EDGE_BAND = 0.15  # a page-long rule within this share of an edge is a frame's side
 FRAME_LINE_BAND = 0.05  # every point of a frame lies this share of its smaller side (at
@@ -174,7 +177,11 @@ LOWERED_CELL_REASON = "lowered text in cells"  # a table with a subscript, writt
 WATERMARK_RATIO = 2.0  # diagonal text this many times the body size is a watermark
 DOCUMENT_CACHE_SIZE = 4
 DOCUMENT_CACHE_TTL_S = 120.0  # a cached document unused for this long is closed
-PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render the pages
+PROBE_TIMEOUT_S = 60.0  # longest a child process may take to open and render the pages ...
+# ... plus this for each page after the first: a page of 86,000 strokes takes about a second
+# (30 of them 30 s on a fast core), a page of text a few hundredths. Over the limit the
+# error is "too_complex", not "unreadable": the file is fine, it asks for too much.
+PROBE_PER_PAGE_S = 2.0
 PROBE_ZOOM = 1.0  # trial render at 72 dpi: the crash is in building the page display list
 # ... but never more than this many pixels on the long side (crop's own cap), so a huge
 # page box (MuPDF accepts 18000 pt) does not need a gigabyte of pixels: the display list,
@@ -355,6 +362,7 @@ class LayoutError(ValueError):
     def __init__(self, code: str, message: str) -> None:
         super().__init__(message)
         # "unreadable" | "encrypted" | "too_many_pages" | "no_pages" | "page_out_of_range"
+        # | "too_complex" (a page needs more time or memory to read than a conversion has)
         self.code = code
 
 
@@ -703,6 +711,7 @@ pymupdf.TOOLS.mupdf_display_errors(False)
 pymupdf.TOOLS.mupdf_display_warnings(False)
 doc = pymupdf.open(stream=sys.stdin.buffer.read(), filetype="pdf")
 zoom, max_side = float(sys.argv[2]), float(sys.argv[4])
+starved = False  # a page that ran out of the memory cap above: reported, not swallowed
 for number in map(int, sys.argv[1].split(",")):
     try:
         page = doc[number]
@@ -712,9 +721,11 @@ for number in map(int, sys.argv[1].split(",")):
         side = max(page.rect.width, page.rect.height, 1.0)
         scale = min(zoom, max_side / side)
         page.get_pixmap(matrix=pymupdf.Matrix(scale, scale), alpha=False)
-    except Exception:
-        pass
-sys.stdout.write("ok")
+    except Exception as exc:
+        text = str(exc).lower()
+        if isinstance(exc, MemoryError | SystemError) or "alloc" in text or "out of memory" in text:
+            starved = True
+sys.stdout.write("memory" if starved else "ok")
 """
 
 
@@ -758,12 +769,14 @@ def _probe_pages(pdf_bytes: bytes, pages: list[int]) -> None:
             command,
             input=pdf_bytes,
             capture_output=True,
-            timeout=PROBE_TIMEOUT_S,
+            timeout=PROBE_TIMEOUT_S + PROBE_PER_PAGE_S * max(0, len(pages) - 1),
             check=False,
             env=child_env(),  # no keys or secrets for the process that reads the PDF
         )
     except subprocess.TimeoutExpired:
-        raise LayoutError("unreadable", "the PDF took too long to render") from None
+        raise LayoutError("too_complex", "the PDF took too long to render") from None
+    if result.returncode == 0 and result.stdout == b"memory":
+        raise LayoutError("too_complex", "the PDF needs more memory than a page may use")
     if result.returncode != 0 or result.stdout != b"ok":
         raise LayoutError("unreadable", "the PDF could not be rendered")
 
@@ -3568,7 +3581,7 @@ def _list_levels(blocks: Iterable[_Block], tolerance: float) -> dict[int, int]:
 # ============================================================================ drawings
 
 
-@dataclass(eq=False)
+@dataclass(eq=False, slots=True)
 class _Path:
     bbox: BBox
     kind: str  # "hrule" | "vrule" | "radical" | "shape"
@@ -3597,7 +3610,11 @@ class _Path:
     fill_share: float = 0.0
 
 
-def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[_Path]:
+def _page_paths(
+    page: pymupdf.Page,
+    drawings: list[dict] | None = None,
+    seen: Sequence[tuple[bool, bool]] | None = None,
+) -> list[_Path]:
     """Visible vector paths, classified. `get_cdrawings` (plain tuples) is several times
     faster than `get_drawings` on plots with thousands of markers; the same list is
     shared with the page type's ink analysis. Near-white paint counts only on something
@@ -3609,7 +3626,10 @@ def _page_paths(page: pymupdf.Page, drawings: list[dict] | None = None) -> list[
     paths: list[_Path] = []
     lines: list[list[_Straight]] = []  # each path's horizontal and vertical lines
     drawings = drawings if drawings is not None else page.get_cdrawings()
-    seen = page_type.paint_visibility(drawings, page_type.image_boxes(page)[0])
+    if page_type.too_complex(drawings):
+        return []  # not read: the page keeps its image (`page_type.PAGE_MAX_PATHS`)
+    if seen is None:
+        seen = page_type.paint_visibility(drawings, page_type.image_boxes(page)[0])
     for source, drawing in enumerate(drawings):
         filled, stroked = seen[source]
         if not (stroked or filled):
@@ -4886,8 +4906,9 @@ def _edges(pix: pymupdf.Pixmap) -> int:
     return edges
 
 
-def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
-    """Groups of box indices whose boxes come within `gap` of each other."""
+def _cluster_scan(boxes: list[BBox], gap: float) -> list[list[int]]:
+    """`_cluster` by comparing each box with every later one in reach on the x axis (the
+    reference the banded sweep must match; used for boxes with a non-finite edge)."""
     parent = list(range(len(boxes)))
 
     def find(i: int) -> int:
@@ -4905,6 +4926,64 @@ def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
                 break
             if by0 <= ay1 + gap and ay0 <= by1 + gap:
                 parent[find(a)] = find(b)
+    groups: dict[int, list[int]] = {}
+    for i in range(len(boxes)):
+        groups.setdefault(find(i), []).append(i)
+    return list(groups.values())
+
+
+def _cluster(boxes: list[BBox], gap: float) -> list[list[int]]:
+    """Groups of box indices whose boxes come within `gap` of each other.
+
+    The groups are the connected parts of the graph that joins two boxes when they are
+    within `gap` of each other in both directions, each in ascending order of index and
+    the groups in order of their first index. A sweep from left to right looks, for each
+    box, only at the earlier boxes still in reach on the x axis and in the horizontal
+    bands its extent (grown by `gap`) touches, so a page of tens of thousands of small
+    pen strokes costs a few comparisons per box, not a pass over every box in its column.
+    """
+    if not all(math.isfinite(v) for box in boxes for v in box):
+        return _cluster_scan(boxes, gap)  # no bands for a box with no place
+    parent = list(range(len(boxes)))
+
+    def find(i: int) -> int:
+        while parent[i] != i:
+            parent[i] = parent[parent[i]]
+            i = parent[i]
+        return i
+
+    band = max(gap, CLUSTER_BAND_PT)
+    order = sorted(range(len(boxes)), key=lambda i: boxes[i][0])
+    bands: dict[int, list[int]] = {}  # band number -> earlier boxes touching it
+    tall: list[int] = []  # earlier boxes spanning more than CLUSTER_MAX_BANDS bands
+    for b in order:
+        bx0, by0, _, by1 = boxes[b]
+        low, high = min(by0, by1), max(by0, by1)
+        first, last = math.floor((low - gap) / band), math.floor((high + gap) / band)
+        if last - first + 1 > CLUSTER_MAX_BANDS:
+            lists = [*bands.values(), tall]
+        else:
+            lists = [tall]
+            lists += [bands[n] for n in range(first, last + 1) if n in bands]
+        for held in lists:
+            kept = 0
+            for a in held:
+                _, ay0, ax1, ay1 = boxes[a]
+                if ax1 + gap < bx0:
+                    continue  # out of reach now, and of every later box (they start further right)
+                held[kept] = a
+                kept += 1
+                if by0 <= ay1 + gap and ay0 <= by1 + gap:
+                    root = find(a)
+                    if root != b:  # `b` is a root here: no box has joined it yet
+                        parent[root] = b
+            del held[kept:]
+        own_first, own_last = math.floor(low / band), math.floor(high / band)
+        if own_last - own_first + 1 > CLUSTER_MAX_BANDS:
+            tall.append(b)
+        else:
+            for n in range(own_first, own_last + 1):
+                bands.setdefault(n, []).append(b)
     groups: dict[int, list[int]] = {}
     for i in range(len(boxes)):
         groups.setdefault(find(i), []).append(i)
@@ -6571,6 +6650,7 @@ def _claim_tables(
     frags: dict[int, list[_Row]],
     paths: dict[int, list[_Path]],
     previous: list[tables.PageTable] | None,
+    budget: tables.DetectorBudget | None = None,
 ) -> list[tables.PageTable]:
     """Find the page's data tables (`pipeline.tables`) and take their lines (cells and
     "Table N" caption) and rules out of the page, before columns, rows, headings and
@@ -6582,7 +6662,7 @@ def _claim_tables(
     that row (`tables.join_split_row`)."""
     if TABLE_PREFILTER and not tables.may_hold_table(page, frags[number], paths[number]):
         return []  # nothing the detector could find would be kept (`may_hold_table`)
-    found = tables.find(page, frags[number], paths[number], clean=_clean)
+    found = tables.find(page, frags[number], paths[number], clean=_clean, budget=budget)
     if not found:
         return found
     lines = set().union(*(t.lines for t in found))
@@ -7443,9 +7523,18 @@ def _read_page(
     drawings list (`pipeline.page_type` reads the same two)."""
     raw = _raw_blocks(page)
     drawings = page.get_cdrawings()
-    kind = page_type.classify(page, raw, drawings, budget=budget, producer=producer)
+    images = page_type.image_boxes(page)
+    if page_type.too_complex(drawings):  # PAGE_MAX_PATHS: no path is read (`kept_reason`)
+        kind = page_type.classify(
+            page, raw, drawings, budget=budget, producer=producer, images=images
+        )
+        return _page_rows(page, raw, kind.text.covered), [], kind
+    seen = page_type.paint_visibility(drawings, images[0])  # once: the page type reads it too
+    kind = page_type.classify(
+        page, raw, drawings, budget=budget, producer=producer, images=images, seen=seen
+    )
     rows = _page_rows(page, raw, kind.text.covered)
-    return rows, _page_paths(page, drawings), kind
+    return rows, _page_paths(page, drawings, seen), kind
 
 
 def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
@@ -7456,6 +7545,12 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     producer = page_type.producer_hint(doc)
     for number in selected:
         frags[number], paths[number], types[number] = _read_page(doc[number], budget, producer)
+        if _kept_whole(types[number]):
+            # Nothing but the header and footer bands of its paths is read again (by the
+            # margin filter, before this page is dropped): a page of tens of thousands of
+            # strokes must not stay in memory as objects.
+            height = doc[number].rect.height
+            paths[number] = [p for p in paths[number] if _box_zone(p.bbox, height) is not None]
     margins = _margin_filter(doc, selected, frags, paths)
     # Handwritten and scanned pages are kept as their page image: nothing on them is read
     # (there is no handwriting or scan conversion). On a typed page with handwriting on
@@ -7471,6 +7566,7 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
     }
     prepared = {}
     found: dict[int, list[tables.PageTable]] = {}
+    detector = tables.DetectorBudget()  # the slow detections of this document (tables.py)
     for number in selected:
         if number in kept and number not in text_kept:
             frags[number], paths[number], found[number] = [], [], []
@@ -7480,7 +7576,13 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         if types[number].kind == "mixed_ink":
             ink = types[number].ink.ink_drawings
             paths[number] = [p for p in paths[number] if p.source not in ink]
-        found[number] = _claim_tables(doc[number], number, frags, paths, found.get(number - 1))
+        # A page kept as its image beside its text reads no drawings (no rules to judge a
+        # grid by), and the detector is the slowest step on the pen-stroke pages these are.
+        found[number] = (
+            []
+            if number in text_kept
+            else _claim_tables(doc[number], number, frags, paths, found.get(number - 1), detector)
+        )
         prepared[number] = _prepare_rows(doc[number], frags[number], margins, paths[number])
         # Axes with tick labels, an axis title or a curve from their corner are a plot's:
         # the rows the header and footer rules dropped count (tick labels in the bands).
@@ -7557,6 +7659,13 @@ def _analyze_document(doc: pymupdf.Document, selected: list[int]) -> Layout:
         page_types=types,
         kept_pages=dict(sorted(kept.items())),
     )
+
+
+def _kept_whole(kind: page_type.PageTypeResult) -> bool:
+    """The page is kept as its page image and nothing on it is read (a kept page that has
+    visible typed text keeps that text, `text_kept` in `_analyze_document`)."""
+    reason = page_type.kept_reason(kind)
+    return reason is not None and not (reason == page_type.UNREAD_PAGE and kind.text.visible_chars)
 
 
 def _kept_page(page: pymupdf.Page, number: int) -> _PageBlocks:

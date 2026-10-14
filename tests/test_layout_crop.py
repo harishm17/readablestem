@@ -220,13 +220,35 @@ def test_a_pdf_that_kills_the_renderer_is_unreadable_not_fatal(monkeypatch, unpr
     assert exc.value.code == "unreadable"
 
 
-def test_a_pdf_that_hangs_the_renderer_is_unreadable(monkeypatch, unprobed):
+def test_a_pdf_that_hangs_the_renderer_is_too_complex_not_a_hang(monkeypatch, unprobed):
     monkeypatch.setattr(layout, "_PROBE_SCRIPT", "import time; time.sleep(60)")
     monkeypatch.setattr(layout, "PROBE_TIMEOUT_S", 0.5)
     started = time.monotonic()
     with pytest.raises(LayoutError) as exc:
         analyze(block_pdf())
-    assert exc.value.code == "unreadable" and time.monotonic() - started < 10
+    assert exc.value.code == "too_complex" and time.monotonic() - started < 10
+
+
+def test_a_page_that_runs_out_of_the_childs_memory_is_too_complex(monkeypatch, unprobed):
+    monkeypatch.setattr(
+        layout, "_PROBE_SCRIPT", "import sys; sys.stdout.write('memory')"
+    )  # what the real script writes after a page raised MemoryError
+    with pytest.raises(LayoutError) as exc:
+        analyze(block_pdf())
+    assert exc.value.code == "too_complex"
+
+
+def test_the_probe_time_limit_grows_with_the_pages(monkeypatch, unprobed):
+    seen = []
+    real = layout.subprocess.run
+
+    def spy(*args, **kwargs):
+        seen.append(kwargs["timeout"])
+        return real(*args, **kwargs)
+
+    monkeypatch.setattr(layout.subprocess, "run", spy)
+    layout._probe_pages(block_pdf(), [0])
+    assert seen == [layout.PROBE_TIMEOUT_S]
 
 
 def test_a_damaged_pdf_that_aborts_mupdf_does_not_kill_this_process(unprobed):
@@ -286,7 +308,10 @@ page.insert_text((20, 40), "Big page")
 page.set_mediabox(pymupdf.Rect(0, 0, side, side))
 layout.PROBE_MAX_SIDE_PX = max_side
 layout.PROBE_MEMORY_BYTES = memory
-layout._probe_pages(doc.tobytes(), [0])  # LayoutError if the child died
+try:
+    layout._probe_pages(doc.tobytes(), [0])  # LayoutError if the child died
+except layout.LayoutError as exc:
+    print(exc.code, file=sys.stderr)  # "too_complex" when the child ran out of memory
 print(resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss)
 """
 MIB = 1024 * 1024
@@ -296,6 +321,8 @@ def probe_peak_mib(
     side: float,
     max_side: float = layout.PROBE_MAX_SIDE_PX,
     memory: int = layout.PROBE_MEMORY_BYTES,
+    *,
+    errors: list[str] | None = None,
 ) -> float:
     """Peak resident memory of the probe child for one page `side` points square."""
     done = subprocess.run(
@@ -305,6 +332,8 @@ def probe_peak_mib(
         timeout=120,
         check=True,
     )
+    if errors is not None:
+        errors.extend(done.stderr.split())
     return int(done.stdout.strip()) / 1024  # ru_maxrss is in KiB on Linux
 
 
@@ -330,5 +359,7 @@ def test_the_probe_render_is_capped_in_pixels():
 def test_the_probe_child_caps_its_own_address_space():
     """Without the pixel cap an 18000 pt page needs ~1 GB of pixels; under a 400 MB
     limit the allocation fails inside the child (a Python error there is ignored) and
-    the child never grows past it."""
-    assert probe_peak_mib(18000, max_side=10**6, memory=400 * MIB) < 450
+    the child never grows past it. The parent is told, as "too_complex"."""
+    errors: list[str] = []
+    assert probe_peak_mib(18000, max_side=10**6, memory=400 * MIB, errors=errors) < 450
+    assert errors == ["too_complex"]

@@ -45,6 +45,31 @@ the layout time on lecture notes and problem sets (`scripts/bench_runtime.py con
 the test). `layout.TABLE_PREFILTER`
 turns it off (for that comparison).
 
+Three more rules keep a page of pen strokes from costing minutes. They change what the
+detector would have found only on such pages (in the fixtures, the development set, the
+table sets and the 332 research PDFs of handwriting, no output changed; the largest page
+with a table in all of them has 375 paths and 375 items, and a page with 26,500 items is
+the largest that got through the detector at all):
+
+- a page kept as its image beside its text (`text_kept`, [layout.md](layout.md)
+  "Page cap") is not given to it;
+- a page with more than `tables.MAX_DETECTOR_ITEMS` (30,000) path items has no table
+  proposed, and its lines are read as text;
+- a document has a time budget for slow detections (`tables.DetectorBudget`): a detection
+  longer than `DETECTOR_FREE_S` (3 s; a page with a table takes under 1 s) draws the time
+  beyond that from `DETECTOR_EXCESS_S` (60 s) for the whole document, and when it is used
+  up the document's remaining pages get no proposals (one content-free warning). A
+  document within the budget reads exactly as it would without one; one over it depends
+  on the machine's speed from there on, as the ink analysis does (`INK_BUDGET_S`).
+
+The detector's time depends on what is drawn on the page, not on its tables, and is
+nearly all inside PyMuPDF: a lecture slide with 202 pen-stroke paths (11,000 curve items)
+took 14 s in the layout model's text extraction (`TEXT_COLLECT_VECTORS`, `TEXT_TABLE_HUNT`)
+and 1 s in the rest; one with 35,000 items 47 s (four `get_drawings` calls inside
+`find_tables` cost 4 s each); a page of 800 stroked line paths 9 s; a typed page with
+5,000 items of pen strokes 0.4 s. That lecture PDF (12 pages) took 260 s, 94 s with the
+rules above.
+
 ### How a page's tables are found
 
 1. **Propose.** PyMuPDF Layout (`pymupdf-layout`, ONNX layout models in the wheel) with
