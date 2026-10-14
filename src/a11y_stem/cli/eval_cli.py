@@ -222,6 +222,8 @@ def _settings_for(args: argparse.Namespace) -> Any:
 
 
 def _cmd_pipeline(args: argparse.Namespace) -> int:
+    if args.gold_set == "dev-v2":
+        return _run_devset(args)
     if args.gold_set:
         return _run_heldout(args)
     if args.task == TABLES_TASK:
@@ -277,6 +279,46 @@ def _run_heldout(args: argparse.Namespace) -> int:
         },
         cache_dir=cache_dir,
         openstax_cache=loc.openstax,
+    )
+
+
+def _run_devset(args: argparse.Namespace) -> int:
+    """`eval pipeline --set dev-v2`: the extended development set (data/dev-v2). `--part
+    dev` is the part to build against; `--part check` is the small sealed part, run for a
+    pre-merge sanity check: its files and caches stay outside the repository, the report
+    holds totals only (no `--items`) and goes outside the repository too. `--fake` is
+    allowed on both. The tables task reads this set's tables (OpenStax and authored)."""
+    from a11y_stem.cli import devset as devset_cli
+    from a11y_stem.eval.devset_media import DevSetMedia
+
+    if args.notation:
+        return _error("--notation is not part of --set dev-v2")
+    if args.part == "check" and args.items:
+        return _error("--items would list the sealed check part item by item; not allowed")
+    resolved = devset_cli.resolve_eval(
+        args.part,
+        args.devset_dir,
+        args.gold,
+        args.cache,
+        writes=(("--out", args.out),),
+    )
+    if isinstance(resolved, str):
+        return _error(resolved)
+    gold_dir, cache_dir, openstax_cache, extra = resolved
+    out = devset_cli.report_path(args.part, args.task, args.out)
+    if args.task == TABLES_TASK:
+        # The authored documents' tables sit beside the OpenStax pages' (authored/index.json).
+        authored = gold_dir / "authored"
+        return _run_tables(args, devset=(gold_dir, authored, cache_dir, openstax_cache, out, extra))
+    return _run_pipeline(
+        args,
+        gold_dir,
+        out,
+        gold_label=f"dev-v2 ({args.part})",
+        extra=extra,
+        cache_dir=cache_dir,
+        openstax_cache=openstax_cache,
+        media_cls=DevSetMedia,
     )
 
 
@@ -346,6 +388,7 @@ def _run_pipeline(
     extra: dict | None = None,
     cache_dir: Path | None = None,
     openstax_cache: Path | None = None,
+    media_cls: type | None = None,
 ) -> int:
     from a11y_stem.eval import pipeline_eval as pe
     from a11y_stem.eval.render import RenderError
@@ -368,7 +411,7 @@ def _run_pipeline(
             f"--judge-provider and --judge-model apply to the figures task, not {args.task}"
         )
     fetcher = HttpFetcher(cache_dir=openstax_cache or _default(OPENSTAX_CACHE))
-    with pe.CachedMedia(
+    with (media_cls or pe.CachedMedia)(
         gold_dir, cache_dir or args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
     ) as media:
         config = pe.EvalConfig(
@@ -403,14 +446,20 @@ def _run_pipeline(
     return 0
 
 
-def _run_tables(args: argparse.Namespace) -> int:
+def _run_tables(
+    args: argparse.Namespace,
+    *,
+    devset: tuple[Path, Path, Path | None, Path | None, Path, dict] | None = None,
+) -> int:
     """`eval pipeline --task tables`: local mode needs no model and no spend cap; model
-    mode needs `--max-usd` (or `--fake`) like every task that calls a model."""
+    mode needs `--max-usd` (or `--fake`) like every task that calls a model. `devset` is
+    (gold dir, authored dir, render cache, archive cache, report, report extras) of
+    `--set dev-v2`."""
     from a11y_stem.eval import tables
     from a11y_stem.eval.render import RenderError
     from a11y_stem.gold.openstax import HttpFetcher
 
-    gold_dir = args.gold or _default(TABLE_GOLD_DIR)
+    gold_dir = devset[0] if devset else args.gold or _default(TABLE_GOLD_DIR)
     if not gold_dir.is_dir():
         return _error(f"gold dir not found: {gold_dir} (run: a11y-stem gold fetch --set tables)")
     styles = tuple(s.strip() for s in args.styles.split(",") if s.strip())
@@ -432,10 +481,18 @@ def _run_tables(args: argparse.Namespace) -> int:
     if args.real_dir is not None and not (args.real_dir / tables.LABELS_FILE).is_file():
         return _error(f"no {tables.LABELS_FILE} in {args.real_dir}")
     out = args.out or _default(EVAL_DIR / f"latest-tables-{args.mode}.json")
-    fetcher = HttpFetcher(cache_dir=_default(OPENSTAX_CACHE))
-    with tables.CachedTableMedia(
-        gold_dir, args.cache or _default(EVAL_CACHE), fetcher, paper=args.paper
-    ) as media:
+    cache_dir = args.cache or _default(EVAL_CACHE)
+    openstax_cache = _default(OPENSTAX_CACHE)
+    extra: dict = {}
+    if devset:
+        gold_dir, authored, render_cache, archive_cache, out, extra = devset
+        cache_dir = render_cache or cache_dir
+        openstax_cache = archive_cache or openstax_cache
+        real_dir = Path(
+            "/nonexistent-private-inputs"
+        )  # the private documents are not part of this set
+    fetcher = HttpFetcher(cache_dir=openstax_cache)
+    with tables.CachedTableMedia(gold_dir, cache_dir, fetcher, paper=args.paper) as media:
         config = tables.TablesConfig(
             settings=settings,
             media=media,
@@ -447,7 +504,7 @@ def _run_tables(args: argparse.Namespace) -> int:
             styles=styles,
             limit=args.limit,
             client_label=label,
-            gold_label=_shown(gold_dir),
+            gold_label=f"dev-v2 ({args.part})" if devset else _shown(gold_dir),
             concurrency=args.concurrency,
             budget=budget,
             real_dir=real_dir if (real_dir / tables.LABELS_FILE).is_file() else None,
@@ -458,6 +515,7 @@ def _run_tables(args: argparse.Namespace) -> int:
             return _error(f"could not build the eval input (no model calls made): {exc}")
     from a11y_stem.eval import pipeline_eval as pe
 
+    run.report.update(extra)
     pe.write_report(run.report, out)
     if args.items:
         pe.write_items(run.items, args.items)
@@ -657,7 +715,16 @@ def _cmd_render(args: argparse.Namespace) -> int:
     gold_dir = args.gold or _default(GOLD_DIR)
     cache = args.cache or _default(EVAL_CACHE)
     openstax_cache = _default(OPENSTAX_CACHE)
-    if args.gold_set:
+    if args.gold_set == "dev-v2":
+        from a11y_stem.cli import devset as devset_cli
+
+        if args.part != "dev" or args.all or args.out_dir:
+            return _error("eval render --set dev-v2 prints pages of the dev part only")
+        found = devset_cli.resolve_eval("dev", args.devset_dir, args.gold, args.cache)
+        if isinstance(found, str):
+            return _error(found)
+        gold_dir = found[0]
+    elif args.gold_set:
         from a11y_stem.gold.heldout import REGISTERED
 
         resolved = heldout_cli.resolve(

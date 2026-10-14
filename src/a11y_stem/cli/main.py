@@ -18,6 +18,7 @@ from typing import Any
 
 from a11y_stem import __version__
 from a11y_stem.cli import convert, eval_cli, ops, serve
+from a11y_stem.cli import devset as devset_cli_reg
 from a11y_stem.cli import heldout as heldout_cli
 from a11y_stem.cli import proof as proof_cli
 
@@ -247,7 +248,16 @@ def _cmd_eval_equations(args: argparse.Namespace) -> int:
     )
 
     gold_path = args.gold or _default(GOLD_DIR)
-    if args.gold_set:
+    if args.gold_set == "dev-v2":
+        from a11y_stem.cli import devset as devset_cli
+
+        if args.part != "dev":
+            return _error("--part check is only for eval pipeline (totals, no item output)")
+        found = devset_cli.resolve_eval("dev", args.devset_dir, args.gold, None)
+        if isinstance(found, str):
+            return _error(found)
+        gold_path = found[0]
+    elif args.gold_set:
         resolved = heldout_cli.resolve(
             args.heldout_dir, args.gold, writes=(("--report", args.report),)
         )
@@ -375,6 +385,8 @@ def build_parser() -> argparse.ArgumentParser:
         help=f"the held-out folder (default: {heldout_cli.default_root()})",
     )
     verify.set_defaults(func=_cmd_gold_verify)
+
+    devset_cli_reg.register(gold)
 
     manifest = gold.add_parser("manifest", help="rebuild manifest.json and ATTRIBUTION.md")
     manifest.add_argument("--out", type=Path, help="gold dir (default: <project>/data/gold)")

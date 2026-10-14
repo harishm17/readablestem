@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "documents": [
+    {
+      "id": "html-code-glossary",
+      "pdf": "html-code-glossary/html-code-glossary.pdf",
+      "gold": "html-code-glossary/gold.jsonl",
+      "toolchain": "chromium"
+    },
+    {
+      "id": "latex-structure",
+      "pdf": "latex-structure/latex-structure.pdf",
+      "gold": "latex-structure/gold.jsonl",
+      "toolchain": "tectonic"
+    },
+    {
+      "id": "word-eq-images",
+      "pdf": "word-eq-images/word-eq-images.pdf",
+      "gold": "word-eq-images/gold.jsonl",
+      "toolchain": "libreoffice"
+    },
+    {
+      "id": "word-lecture",
+      "pdf": "word-lecture/word-lecture.pdf",
+      "gold": "word-lecture/gold.jsonl",
+      "toolchain": "libreoffice"
+    }
+  ]
+}

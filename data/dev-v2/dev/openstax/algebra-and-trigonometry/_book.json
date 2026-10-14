@@ -1,0 +1,18 @@
+{
+  "archive_path": "/apps/archive/20260604.144757",
+  "archive_version": "20260604.144757",
+  "authors": [
+    "Jay Abramson"
+  ],
+  "cms_license_name": "Creative Commons Attribution License",
+  "cms_license_url": "https://creativecommons.org/licenses/by/4.0/",
+  "details_url": "https://openstax.org/details/books/algebra-and-trigonometry",
+  "license_name": "Creative Commons Attribution License",
+  "license_url": "http://creativecommons.org/licenses/by/4.0/",
+  "retrieved_at": "2026-10-14",
+  "slug": "algebra-and-trigonometry",
+  "state": "retired",
+  "title": "Algebra and Trigonometry",
+  "uuid": "13ac107a-f15f-49d2-97e8-60ab2e3b519c",
+  "version": "ebc5beb"
+}

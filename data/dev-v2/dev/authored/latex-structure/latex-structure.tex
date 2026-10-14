@@ -1,0 +1,689 @@
+% Authored for a11y-stem's development set (dev-v2). Original text, no third-party material.
+% Licence: MIT. Author: a11y-stem contributors.
+\documentclass[11pt]{article}
+% Computer Modern text fonts, as pdfLaTeX writes them; XeTeX defaults to Latin Modern.
+\usepackage[OT1]{fontenc}
+\renewcommand{\rmdefault}{cmr}
+\renewcommand{\ttdefault}{cmtt}
+\usepackage{amsmath,amssymb}
+\usepackage[margin=1.15in]{geometry}
+\usepackage{float,booktabs,listings}
+\setcounter{secnumdepth}{-1}
+\lstset{basicstyle=\ttfamily\small,columns=fixed,keepspaces=true,showstringspaces=false}
+\setlength{\parindent}{0pt}\setlength{\parskip}{7pt}
+
+\begin{document}
+
+\begin{center}{\Large\bfseries Study Skills for Science: Notes, Examples and Key Terms}\end{center}
+
+\section{Estimating Rates of Change from Tables of Measured Values Collected During Class Experiments}
+
+A table of values is often the first form in which a rate of change is met. The difference quotient between neighbouring rows is the best guide to the behaviour of the underlying quantity.
+
+\paragraph{Check the units before you start.} Convert every quantity to a single system of units before substituting any numbers.
+
+\paragraph{Why does the sign change?} Dividing both sides of an inequality by a negative number reverses its direction.
+
+\paragraph{Notation} Vectors are written in bold type and scalars in italics.
+
+A short Python function for this step is shown below.
+
+{\small\begin{verbatim}
+def bisect(f, lo, hi, tol=1e-9):
+    # f(lo) and f(hi) must have opposite signs
+    while hi - lo > tol:
+        mid = (lo + hi) / 2
+        if f(lo) * f(mid) <= 0:
+            hi = mid
+        else:
+            lo = mid
+    return (lo + hi) / 2
+\end{verbatim}}
+
+A short Python function for this step is shown below.
+
+\begin{lstlisting}[language=Python]
+def trapezoid(f, a, b, n=100):
+    h = (b - a) / n
+    total = (f(a) + f(b)) / 2
+    for k in range(1, n):
+        total += f(a + k * h)
+    return total * h
+\end{lstlisting}
+
+\section{Reading Graphs of Velocity Against Time and Recovering the Distance Travelled by an Object}
+
+The area between a velocity graph and the time axis equals the displacement. Signs matter: regions below the axis count as motion in the opposite direction.
+
+\textbf{Remember the order of operations:} Brackets first, then powers, then multiplication and division, and last addition and subtraction.
+
+\paragraph{Do not round early!} Carry at least two more digits than you need until the last line of the calculation.
+
+\paragraph{Caution} Calculators may be set to degrees or to radians; check before using trigonometric functions.
+
+\noindent\begin{tabular}{@{}p{0.46\textwidth}@{\hspace{0.06\textwidth}}p{0.46\textwidth}@{}}
+Reading list. Chapter 3 of the course notes, the practice sheet on rates of change, and the short article on measurement error. & Schedule. Lecture on Monday, laboratory on Wednesday, and a quiz at the start of class on Friday morning. \\
+\end{tabular}
+
+\subsubsection*{Example}
+
+A cart rolls 12 m down a ramp in 4.0 s, starting from rest. Find its acceleration.
+
+\subsubsection*{Solution}
+
+Use d = (1/2) a t\textsuperscript{2}, so a = 2d / t\textsuperscript{2} = 2(12) / (4.0)\textsuperscript{2} = 1.5 m/s\textsuperscript{2}.
+
+A short Python function for this step is shown below.
+
+{\small\begin{verbatim}
+def newton(f, df, x, steps=8):
+    for _ in range(steps):
+        x = x - f(x) / df(x)
+    return x
+
+print(newton(lambda t: t * t - 2, lambda t: 2 * t, 1.0))
+\end{verbatim}}
+
+A short Python function for this step is shown below.
+
+\begin{lstlisting}[language=Python]
+def gcd(a, b):
+    while b:
+        a, b = b, a % b
+    return a
+
+print(gcd(84, 36))
+\end{lstlisting}
+
+\section{How Rounding Errors Accumulate When a Long Calculation Is Carried Out on a Pocket Calculator}
+
+Every rounded intermediate result introduces a small error, and these errors can grow. Keeping extra digits until the final step is a simple habit that avoids most of the damage.
+
+\paragraph{Write down what you know.} A short list of given quantities and unknowns often shows which formula is needed.
+
+\textbf{Is the answer reasonable?} Compare the size of the result with a rough estimate made in your head.
+
+\paragraph{Reminder} Bring the data sheet and a ruler to the next lab session.
+
+\begin{table}[H]
+\centering
+\caption{Measurements of a falling steel ball}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Trial} & \textbf{Height (m)} & \textbf{Time (s)} & \textbf{Speed (m/s)} \\
+\midrule
+1 & 0.50 & 0.32 & 3.1 \\
+2 & 1.00 & 0.45 & 4.4 \\
+3 & 1.50 & 0.55 & 5.4 \\
+4 & 2.00 & 0.64 & 6.3 \\
+5 & 2.50 & 0.71 & 7.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+A short Python function for this step is shown below.
+
+{\small\begin{verbatim}
+def sieve(n):
+    flags = [True] * (n + 1)
+    flags[0:2] = [False, False]
+    for p in range(2, int(n ** 0.5) + 1):
+        if flags[p]:
+            for m in range(p * p, n + 1, p):
+                flags[m] = False
+    return [i for i, ok in enumerate(flags) if ok]
+\end{verbatim}}
+
+A short Python function for this step is shown below.
+
+\begin{lstlisting}[language=Python]
+def mean_and_variance(xs):
+    n = len(xs)
+    mean = sum(xs) / n
+    var = sum((x - mean) ** 2 for x in xs) / (n - 1)
+    return mean, var
+\end{lstlisting}
+
+\subsection*{Key Takeaways}
+\begin{itemize}
+\item A rate of change is a ratio of two differences.
+\item Neighbouring table rows give the best estimate of a local rate.
+\item State the unit of every rate you report.
+\end{itemize}
+
+\section{Choosing Between a Linear Model and an Exponential Model for a Small Set of Experimental Data}
+
+A straight line and a curve that bends upward can both pass close to a handful of points. The choice should rest on the process that produced the data, not only on how well the curve fits.
+
+\paragraph{Draw a picture first.} Even a crude sketch of the situation prevents many sign and direction errors.
+
+\paragraph{State the assumptions clearly.} Ignoring air resistance or treating a gas as ideal is acceptable only if it is said aloud.
+
+\paragraph{Convention} Angles are measured anticlockwise from the positive horizontal axis.
+
+\subsubsection*{Example}
+
+A solution is made by dissolving 18 g of salt in water to make 250 cm\textsuperscript{3}. Find the concentration in g per cm\textsuperscript{3}.
+
+\subsubsection*{Solution}
+
+The concentration is 18 / 250 = 0.072 g/cm\textsuperscript{3}.
+
+A short Python function for this step is shown below.
+
+{\small\begin{verbatim}
+def fit_line(xs, ys):
+    n = len(xs)
+    sx, sy = sum(xs), sum(ys)
+    sxy = sum(x * y for x, y in zip(xs, ys))
+    sxx = sum(x * x for x in xs)
+    slope = (n * sxy - sx * sy) / (n * sxx - sx ** 2)
+    return slope, (sy - slope * sx) / n
+\end{verbatim}}
+
+A short Python function for this step is shown below.
+
+\begin{lstlisting}[language=Python]
+def transpose(m):
+    return [list(row) for row in zip(*m)]
+
+a = [[1, 2, 3], [4, 5, 6]]
+print(transpose(a))
+\end{lstlisting}
+
+\subsection*{Check Your Understanding}
+\begin{enumerate}
+\item Explain in one sentence why the slope of a position graph is a velocity.
+\item A graph is flat between t = 2 s and t = 5 s. What does that say about the motion?
+\end{enumerate}
+
+\section{A Careful Look at Units, Dimensions and the Common Mistakes Made When Converting Between Them}
+
+A numerical answer without a unit is incomplete, and a unit with the wrong dimensions is a sign of an error earlier in the work. Checking both takes only a few seconds.
+
+\textbf{Start from the definition.} When a formula is forgotten, the definition of the quantity usually rebuilds it.
+
+\paragraph{Label every axis and every curve.} A graph without labels and units cannot be read by anyone else.
+
+\noindent\begin{tabular}{@{}ll@{}}
+Name: & \rule{7cm}{0.4pt} \\[10pt]
+Student number: & \rule{7cm}{0.4pt} \\[10pt]
+Date of laboratory: & \rule{7cm}{0.4pt} \\
+\end{tabular}
+
+A short Python function for this step is shown below.
+
+{\small\begin{verbatim}
+def binary_search(items, target):
+    lo, hi = 0, len(items) - 1
+    while lo <= hi:
+        mid = (lo + hi) // 2
+        if items[mid] == target:
+            return mid
+        if items[mid] < target:
+            lo = mid + 1
+        else:
+            hi = mid - 1
+    return -1
+\end{verbatim}}
+
+A short Python function for this step is shown below.
+
+\begin{lstlisting}[language=Python]
+counts = {}
+for word in text.split():
+    counts[word] = counts.get(word, 0) + 1
+top = sorted(counts, key=counts.get, reverse=True)[:5]
+\end{lstlisting}
+
+\subsection*{Key Takeaways}
+\begin{itemize}
+\item Area under a velocity graph is displacement.
+\item Regions below the axis count as negative.
+\item Check the answer against a rough area estimate.
+\end{itemize}
+
+\section{From Words to Equations: Translating Short Problem Statements into Algebra Without Losing Information}
+
+Most algebra mistakes are made before any algebra is done, when a sentence is turned into an equation. Writing down what every symbol stands for removes much of the risk.
+
+\paragraph{One change at a time.} Vary a single quantity in each trial so that the effect can be traced to its cause.
+
+\textbf{Keep a record of failed attempts?} They explain later why a particular approach was abandoned.
+
+\begin{table}[H]
+\centering
+\caption{Selected properties of four metals}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Metal} & \textbf{Symbol} & \textbf{Density (g/cm\textsuperscript{3})} & \textbf{Melting point (K)} \\
+\midrule
+\textbf{Aluminium} & Al & 2.70 & 933 \\
+\textbf{Copper} & Cu & 8.96 & 1358 \\
+\textbf{Iron} & Fe & 7.87 & 1811 \\
+\textbf{Zinc} & Zn & 7.14 & 693 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Example}
+
+The sum of two numbers is 25 and their difference is 7. Find both numbers.
+
+\subsubsection*{Solution}
+
+Adding the two equations gives twice the larger number, 32, so the larger number is 16 and the smaller is 9.
+
+A short Python function for this step is shown below.
+
+{\small\begin{verbatim}
+class Vector:
+    def __init__(self, x, y):
+        self.x, self.y = x, y
+
+    def dot(self, other):
+        return self.x * other.x + self.y * other.y
+\end{verbatim}}
+
+A short Python function for this step is shown below.
+
+\begin{lstlisting}[language=Python]
+def celsius_to_kelvin(c):
+    if c < -273.15:
+        raise ValueError("below absolute zero")
+    return c + 273.15
+\end{lstlisting}
+
+\subsection*{Check Your Understanding}
+\begin{enumerate}
+\item Why is it risky to round 1/3 to 0.33 in the first line of a long calculation?
+\item How many significant figures does 0.00450 have?
+\end{enumerate}
+
+\section{Why Some Chemical Reactions Reach Equilibrium and What the Equilibrium Constant Tells Us About Them}
+
+A reversible reaction does not stop; the forward and reverse rates become equal. The equilibrium constant compares the amounts of products and reactants once that balance has been reached.
+
+\paragraph{Use consistent notation throughout the whole solution.} Switching between two symbols for the same quantity is a frequent source of confusion.
+
+\paragraph{Look for a pattern in the first few cases.} A conjecture formed from small examples can then be tested on a larger one.
+
+The same idea written in C looks like this.
+
+{\small\begin{verbatim}
+int sum_array(const int *a, int n) {
+    int total = 0;
+    for (int i = 0; i < n; i++) {
+        total += a[i];
+    }
+    return total;
+}
+\end{verbatim}}
+
+The same idea written in C looks like this.
+
+\begin{lstlisting}[language=C]
+void swap(int *p, int *q) {
+    int tmp = *p;
+    *p = *q;
+    *q = tmp;
+}
+\end{lstlisting}
+
+\subsection*{Key Takeaways}
+\begin{itemize}
+\item Round only at the end of a calculation.
+\item Keep two spare digits in every intermediate step.
+\item Report the answer with the precision of the data.
+\end{itemize}
+
+\section{Sketching Polynomial Functions by Finding Intercepts, Turning Points and the Long-Run Behaviour}
+
+The shape of a polynomial can be predicted from a few facts: its degree, its roots, and the sign of the leading coefficient. A rough sketch based on these facts is often enough.
+
+\textbf{Read the question twice.} The second reading usually reveals a condition that the first one skipped.
+
+\paragraph{Substitute back to check.} Putting the solution into the original equation catches arithmetic slips and extraneous roots.
+
+\noindent\begin{tabular}{@{}p{0.46\textwidth}@{\hspace{0.06\textwidth}}p{0.46\textwidth}@{}}
+\rule{6cm}{0.4pt} & \rule{6cm}{0.4pt} \\[2pt]
+Student signature & Instructor signature \\
+\end{tabular}
+
+\subsubsection*{Example}
+
+A data set has the values 4.2, 5.1 and 6.0. Find the mean.
+
+\subsubsection*{Solution}
+
+The mean is (4.2 + 5.1 + 6.0) / 3 = 5.1.
+
+The same idea written in C looks like this.
+
+{\small\begin{verbatim}
+struct point {
+    double x;
+    double y;
+};
+
+double norm2(struct point p) {
+    return p.x * p.x + p.y * p.y;
+}
+\end{verbatim}}
+
+The same idea written in C looks like this.
+
+\begin{lstlisting}[language=C]
+unsigned long factorial(unsigned n) {
+    unsigned long r = 1;
+    while (n > 1) {
+        r *= n--;
+    }
+    return r;
+}
+\end{lstlisting}
+
+\subsection*{Check Your Understanding}
+\begin{enumerate}
+\item Name one situation in which a straight line is the wrong model for data.
+\item What does a negative residual tell you about a data point?
+\end{enumerate}
+
+\section{Interpreting the Slope and the Intercept of a Line of Best Fit in the Context of an Experiment}
+
+The slope of a fitted line is a rate with units, and the intercept is a starting value. Reading both in the language of the experiment turns a formula into a statement about the world.
+
+\paragraph{Estimate the uncertainty.} Half of the smallest scale division is a sensible starting point for a single reading.
+
+\textbf{Take a break when stuck:} A short walk often clears the way to an idea that hours at the desk did not.
+
+\begin{table}[H]
+\centering
+\caption{Summary of quiz scores by group}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Group} & \textbf{Students} & \textbf{Mean score} & \textbf{Standard deviation} \\
+\midrule
+\textbf{Morning} & 28 & 71.4 & 9.2 \\
+\textbf{Afternoon} & 31 & 68.9 & 10.5 \\
+\textbf{Evening} & 19 & 74.2 & 8.1 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The same idea written in C looks like this.
+
+{\small\begin{verbatim}
+#include <stdio.h>
+
+int main(void) {
+    for (int k = 1; k <= 5; k++)
+        printf("%d squared is %d\n", k, k * k);
+    return 0;
+}
+\end{verbatim}}
+
+The same idea written in C looks like this.
+
+\begin{lstlisting}[language=C]
+int count_bits(unsigned v) {
+    int n = 0;
+    for (; v; v >>= 1)
+        n += v & 1u;
+    return n;
+}
+\end{lstlisting}
+
+\subsection*{Key Takeaways}
+\begin{itemize}
+\item Choose the model from the process, not from the plot alone.
+\item Compare residuals, not only the correlation.
+\item A good fit inside the data says little outside it.
+\end{itemize}
+
+\section{Sampling, Uncertainty and the Difference Between a Mistake in the Method and a Random Fluctuation}
+
+No measurement is exact, and repeated readings scatter around a typical value. A systematic offset, by contrast, moves every reading in the same direction.
+
+\paragraph{Explain the result in words.} A final sentence in plain language shows that the numbers have been understood.
+
+\paragraph{Mind the difference between mass and weight.} Mass is measured in kilograms and weight, a force, in newtons.
+
+\subsubsection*{Example}
+
+A sample of 80 g of a radioactive isotope has a half-life of 6 hours. How much remains after 18 hours?
+
+\subsubsection*{Solution}
+
+Eighteen hours is 3 half-lives, so the mass is 80 / 2\textsuperscript{3} = 10 g.
+
+The same idea written in C looks like this.
+
+{\small\begin{verbatim}
+double mean(const double *x, size_t n) {
+    double s = 0.0;
+    for (size_t i = 0; i < n; i++)
+        s += x[i];
+    return s / n;
+}
+\end{verbatim}}
+
+From the command line the steps are as follows.
+
+\begin{lstlisting}[language=bash]
+for f in data/*.csv; do
+    echo "$f has $(wc -l < "$f") lines"
+done
+\end{lstlisting}
+
+\subsection*{Check Your Understanding}
+\begin{enumerate}
+\item A student writes 5 m + 3 s. What is wrong with this expression?
+\item Convert 72 km/h to metres per second.
+\end{enumerate}
+
+\section{Counting Techniques for Arrangements and Selections, with Worked Examples from Games of Chance}
+
+Counting problems become easier once it is clear whether order matters and whether repetition is allowed. The two questions fix which formula applies.
+
+\textbf{Collect like terms before factoring.} Neater expressions have fewer chances for sign errors.
+
+\paragraph{Compare with a limiting case.} Setting a parameter to zero or letting it grow often gives a result that is known already.
+
+\noindent\begin{tabular}{@{}p{0.46\textwidth}@{\hspace{0.06\textwidth}}p{0.46\textwidth}@{}}
+Given. The mass is 2.0 kg, the height is 5.0 m and the starting speed is zero. & Find. The speed of the mass just before it reaches the ground. \\
+\end{tabular}
+
+From the command line the steps are as follows.
+
+{\small\begin{verbatim}
+mkdir -p results/plots
+python analyse.py --input raw.csv --out results/
+ls -l results
+\end{verbatim}}
+
+From the command line the steps are as follows.
+
+\begin{lstlisting}[language=bash]
+cut -d, -f2 grades.csv | sort -n | uniq -c | sort -rn | head
+\end{lstlisting}
+
+\subsection*{Key Takeaways}
+\begin{itemize}
+\item Every equation must balance in its units.
+\item Convert before you substitute.
+\item Write the unit on every line of the work.
+\end{itemize}
+
+\section{Solving Systems of Linear Equations by Elimination and Recognising When No Solution Exists at All}
+
+Elimination replaces a pair of equations by an equivalent pair in which one unknown has disappeared. A row that reduces to zero equals a nonzero number reveals that the system has no solution.
+
+\paragraph{Report the final answer with its unit.} A number alone is not an answer in any science course.
+
+\textbf{Share the work with a partner?} Explaining a step aloud is the quickest way to find a gap in it.
+
+\begin{table}[H]
+\centering
+\caption{Half-lives of some radioactive isotopes}
+\begin{tabular}{lccc}
+\toprule
+\textbf{Isotope} & \textbf{Protons} & \textbf{Neutrons} & \textbf{Half-life} \\
+\midrule
+\textbf{\textsuperscript{14}C} & 6 & 8 & 5730 years \\
+\textbf{\textsuperscript{60}Co} & 27 & 33 & 5.27 years \\
+\textbf{\textsuperscript{131}I} & 53 & 78 & 8.0 days \\
+\textbf{\textsuperscript{238}U} & 92 & 146 & 4.5 billion years \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsubsection*{Example}
+
+A rectangle has a perimeter of 30 cm and one side of 4 cm. Find its area.
+
+\subsubsection*{Solution}
+
+The other side is 30/2 - 4 = 11 cm, so the area is 44 cm\textsuperscript{2}.
+
+From the command line the steps are as follows.
+
+{\small\begin{verbatim}
+find . -name "*.log" -mtime +30 -print
+grep -c "ERROR" run.log
+\end{verbatim}}
+
+From the command line the steps are as follows.
+
+\begin{lstlisting}[language=bash]
+tar -czf backup.tar.gz notes/ figures/
+tar -tzf backup.tar.gz | head -n 5
+\end{lstlisting}
+
+\subsection*{Check Your Understanding}
+\begin{enumerate}
+\item State two assumptions behind the ideal gas law.
+\item What quantity stays constant at equilibrium: the amounts or the rates?
+\end{enumerate}
+
+\section{Writing a Clear Laboratory Report That Another Student Could Follow Without Asking Any Questions}
+
+A good report states the question, the method, the data and the conclusion, in that order. Each part should be short enough to read in a minute.
+
+From the command line the steps are as follows.
+
+{\small\begin{verbatim}
+name="lab3"
+echo "Preparing $name"
+cp template.tex "$name.tex"
+head -n 3 "$name.tex" 
+\end{verbatim}}
+
+A database query for the same summary is given next.
+
+\begin{lstlisting}[language=SQL]
+SELECT student, AVG(score) AS mean_score
+FROM quiz
+GROUP BY student
+HAVING COUNT(*) >= 3
+ORDER BY mean_score DESC;
+\end{lstlisting}
+
+\section{Checking an Answer for Reasonableness Before Submitting It: Estimates, Limiting Cases and Symmetry}
+
+Before an answer is handed in, a quick estimate, a limiting case or a symmetry argument can reveal a slip. Such checks are cheap and surprisingly effective.
+
+A database query for the same summary is given next.
+
+{\small\begin{verbatim}
+SELECT s.name, c.title
+FROM enrolment AS e
+JOIN student AS s ON s.id = e.student_id
+JOIN course AS c ON c.id = e.course_id;
+\end{verbatim}}
+
+In JavaScript the idea is expressed like this.
+
+{\small\begin{verbatim}
+function clamp(x, lo, hi) {
+  return Math.min(hi, Math.max(lo, x));
+}
+
+console.log(clamp(12, 0, 10));
+\end{verbatim}}
+
+\section{Key Terms}
+
+\begin{description}
+
+\item[Derivative] The limit of the ratio of the change in a function to the change in its input; it gives the slope of the tangent line.
+
+\item[Integral] A limit of sums that measures accumulated change, such as the area under a curve.
+
+\item[Limit] The value that a function approaches as its input gets arbitrarily close to a chosen point.
+
+\item[Matrix] A rectangular array of numbers arranged in rows and columns.
+
+\item[Determinant] A single number computed from a square matrix that tells whether the matrix can be inverted.
+
+\item[Eigenvalue] A scalar by which a matrix stretches a special direction called an eigenvector.
+
+\item[Vector] A quantity with both a size and a direction, often written as a column of numbers.
+
+\item[Scalar] A quantity described by a single number and, in physics, a unit.
+
+\item[Domain] The set of all inputs for which a function is defined.
+
+\item[Range] The set of all outputs that a function actually produces.
+
+\item[Asymptote] A line that a curve approaches without ever reaching it.
+
+\item[Polynomial] A sum of terms, each a constant times a whole-number power of a variable.
+
+\item[Logarithm] The exponent to which a base must be raised to give a stated number.
+
+\item[Sequence] An ordered list of numbers, usually given by a rule.
+
+\item[Series] The sum of the terms of a sequence.
+
+\item[Probability] A number between zero and one that measures how likely an event is.
+
+\item[Mean] The sum of a set of values divided by how many values there are.
+
+\item[Variance] The average squared distance of the values in a data set from their mean.
+
+\item[Hypothesis] A statement about the world that an experiment is designed to test.
+
+\item[Isotope] One of several forms of an element that have the same number of protons but different numbers of neutrons.
+
+\item[Ion] An atom or molecule that carries a net electric charge.
+
+\item[Mole] The amount of substance that contains as many particles as there are atoms in twelve grams of carbon-12.
+
+\item[Molarity] The number of moles of solute in one litre of solution.
+
+\item[Catalyst] A substance that speeds up a reaction without being used up.
+
+\item[Equilibrium] A state in which the forward and reverse rates of a process are equal and the amounts stop changing.
+
+\item[Half-life] The time needed for half of the nuclei in a radioactive sample to decay.
+
+\item[Velocity] The rate of change of position, with a direction.
+
+\item[Acceleration] The rate of change of velocity.
+
+\item[Momentum] The product of an object's mass and its velocity.
+
+\item[Frequency] The number of complete cycles of a wave that pass a point each second.
+
+\item[Wavelength] The distance between two matching points on neighbouring cycles of a wave.
+
+\item[Amplitude] The largest displacement of a wave from its rest position.
+
+\item[Algorithm] A finite list of precise steps that solves a class of problems.
+
+\item[Variable] A name that stands for a value which may change.
+
+\end{description}
+
+\end{document}

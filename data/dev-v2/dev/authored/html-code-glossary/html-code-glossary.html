@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Programming and Mathematics Study Guide</title><style>
+@page { size: 210mm 297mm; margin: 16mm 18mm; }
+body { font-family: 'Liberation Serif', 'DejaVu Serif', serif; font-size: 11pt; line-height: 1.4; color: #111; }
+h1 { font-family: 'Liberation Sans', sans-serif; font-size: 22pt; margin: 0 0 4pt 0; }
+h2 { font-family: 'Liberation Sans', sans-serif; font-size: 14pt; margin: 16pt 0 4pt 0; border-bottom: 1px solid #999; }
+pre { background: #f3f4f6; border: 1px solid #d0d4da; padding: 6pt 8pt; font-size: 9pt; line-height: 1.3; margin: 4pt 0 8pt 0;
+  break-inside: avoid; }
+code { font-family: 'Liberation Mono', 'DejaVu Sans Mono', monospace; }
+dl { margin: 0; } dt { font-weight: 700; margin-top: 5pt; } dd { margin: 0 0 0 18pt; }
+table { border-collapse: collapse; margin: 6pt 0; } caption { font-weight: 700; text-align: left; padding-bottom: 3pt; }
+table.data th, table.data td { border: 1px solid #555; padding: 3pt 8pt; text-align: left; }
+table.data th { background: #e8ecf4; }
+table.layout td { vertical-align: top; padding: 0 14pt 0 0; width: 50%; }
+</style></head><body>
+<h1>Programming and Mathematics Study Guide</h1>
+<p>A one-page guide with short programs, a list of key terms and two small tables.</p>
+<h2>Short Programs</h2>
+<p>Find a root by repeated halving.</p>
+<pre><code class="language-python">def bisect(f, lo, hi, tol=1e-9):
+    # f(lo) and f(hi) must have opposite signs
+    while hi - lo &gt; tol:
+        mid = (lo + hi) / 2
+        if f(lo) * f(mid) &lt;= 0:
+            hi = mid
+        else:
+            lo = mid
+    return (lo + hi) / 2</code></pre>
+<p>Estimate an area with trapezoids.</p>
+<pre><code class="language-python">def trapezoid(f, a, b, n=100):
+    h = (b - a) / n
+    total = (f(a) + f(b)) / 2
+    for k in range(1, n):
+        total += f(a + k * h)
+    return total * h</code></pre>
+<p>Find a square root with Newton&#x27;s method.</p>
+<pre><code class="language-python">def newton(f, df, x, steps=8):
+    for _ in range(steps):
+        x = x - f(x) / df(x)
+    return x
+
+print(newton(lambda t: t * t - 2, lambda t: 2 * t, 1.0))</code></pre>
+<p>Sum the entries of an array in C.</p>
+<pre><code class="language-c">int sum_array(const int *a, int n) {
+    int total = 0;
+    for (int i = 0; i &lt; n; i++) {
+        total += a[i];
+    }
+    return total;
+}</code></pre>
+<p>Swap two integers through pointers.</p>
+<pre><code class="language-c">void swap(int *p, int *q) {
+    int tmp = *p;
+    *p = *q;
+    *q = tmp;
+}</code></pre>
+<p>Summarise a column of numbers from the shell.</p>
+<pre><code class="language-bash">cut -d, -f2 grades.csv | sort -n | uniq -c | sort -rn | head</code></pre>
+<p>Count the lines of every data file.</p>
+<pre><code class="language-bash">for f in data/*.csv; do
+    echo &quot;$f has $(wc -l &lt; &quot;$f&quot;) lines&quot;
+done</code></pre>
+<p>Group quiz scores in a database query.</p>
+<pre><code class="language-sql">SELECT student, AVG(score) AS mean_score
+FROM quiz
+GROUP BY student
+HAVING COUNT(*) &gt;= 3
+ORDER BY mean_score DESC;</code></pre>
+<p>Clamp a value to an interval in JavaScript.</p>
+<pre><code class="language-javascript">function clamp(x, lo, hi) {
+  return Math.min(hi, Math.max(lo, x));
+}
+
+console.log(clamp(12, 0, 10));</code></pre>
+<p>Check whether a word reads the same backwards.</p>
+<pre><code class="language-python">def is_palindrome(s):
+    cleaned = [ch.lower() for ch in s if ch.isalnum()]
+    return cleaned == cleaned[::-1]</code></pre>
+<p>Sort a short list by hand.</p>
+<pre><code class="language-python">def bubble_sort(items):
+    items = list(items)
+    for i in range(len(items)):
+        for j in range(len(items) - 1 - i):
+            if items[j] &gt; items[j + 1]:
+                items[j], items[j + 1] = items[j + 1], items[j]
+    return items</code></pre>
+<p>Test a number for primality.</p>
+<pre><code class="language-c">int is_prime(int n) {
+    if (n &lt; 2) return 0;
+    for (int d = 2; d * d &lt;= n; d++)
+        if (n % d == 0) return 0;
+    return 1;
+}</code></pre>
+<h2>Key Terms</h2>
+<dl>
+<dt>Loop</dt><dd>A piece of code that repeats until a condition is met.</dd>
+<dt>Recursion</dt><dd>A method in which a function is defined in terms of a smaller instance of itself.</dd>
+<dt>Compiler</dt><dd>A program that translates source code into machine instructions.</dd>
+<dt>Bit</dt><dd>The smallest unit of information, holding either zero or one.</dd>
+<dt>Entropy</dt><dd>A measure of how many microscopic arrangements are consistent with a macroscopic state.</dd>
+<dt>Torque</dt><dd>The turning effect of a force about an axis, equal to force times lever arm.</dd>
+<dt>Resistance</dt><dd>The opposition of a material to the flow of electric current.</dd>
+<dt>Refraction</dt><dd>The bending of a wave as it passes from one medium into another.</dd>
+<dt>Enzyme</dt><dd>A protein that acts as a catalyst for a reaction in a living cell.</dd>
+<dt>Tangent</dt><dd>A line that touches a curve at one point and has the same direction as the curve there.</dd>
+<dt>Corollary</dt><dd>A result that follows almost immediately from a theorem that has just been proved.</dd>
+<dt>Residual</dt><dd>The difference between an observed value and the value predicted by a model.</dd>
+<dt>Outlier</dt><dd>A data point that lies unusually far from the rest of the values.</dd>
+<dt>Dimensionless</dt><dd>Describing a quantity that has no unit, such as a ratio of two lengths.</dd>
+<dt>Significant figures</dt><dd>The digits of a measured number that carry information about its precision.</dd>
+</dl>
+<h2>Run Times of the Examples</h2>
+<table class="data"><caption>Measured run times of four of the programs</caption><thead><tr><th scope="col">Program</th><th scope="col">Input size</th><th scope="col">Steps</th><th scope="col">Time (ms)</th></tr></thead><tbody><tr><th scope="row">Bisection</th><td>1</td><td>30</td><td>0.02</td></tr><tr><th scope="row">Trapezoid rule</th><td>100</td><td>100</td><td>0.05</td></tr><tr><th scope="row">Sieve</th><td>10000</td><td>24000</td><td>1.4</td></tr><tr><th scope="row">Binary search</th><td>1000000</td><td>20</td><td>0.01</td></tr></tbody></table>
+<h2>Reading and Schedule</h2>
+<table class="layout" role="presentation"><tr><td>Reading list. The chapter on loops and the short article on numerical error.</td><td>Schedule. Lecture on Tuesday, laboratory on Thursday and a quiz on Friday.</td></tr></table>
+</body></html>

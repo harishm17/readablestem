@@ -91,6 +91,8 @@ allowed-confusables = ["\u2212", "\u2032", "\u0394"]
 # Look-alike dashes, minus signs and relations are what the sign check is about.
 "src/a11y_stem/pipeline/signs.py" = ["RUF001", "RUF002", "RUF003"]
 "tests/test_sign_check.py" = ["RUF001", "RUF002", "RUF003"]
+# Fences, arrows, minus and dash signs are what the extended development set classifies by.
+"src/a11y_stem/gold/devset_classify.py" = ["RUF001"]
 # Styled maths letters (the reals, a script L) are what these tests check.
 "tests/test_letter_style_fonts.py" = ["RUF001", "RUF002", "RUF003"]
 

@@ -1,0 +1,444 @@
+{
+  "schema_version": 1,
+  "set": "dev-v2",
+  "title": "Extended development set (T2-0)",
+  "config": {
+    "salt": "a11y-stem dev-v2 check split 2026-10-14",
+    "archive_version": "20260604.144757",
+    "books": {
+      "algebra-and-trigonometry": "ebc5beb",
+      "college-algebra": "ebc5beb",
+      "elementary-algebra": "eb2e29d",
+      "prealgebra": "eb2e29d",
+      "chemistry-atoms-first": "741a7af",
+      "physics": "dfdfd7a"
+    },
+    "dev_targets": {
+      "inline_fraction": 80,
+      "system_braced": 40,
+      "multirow_equations": 40,
+      "determinant": 40,
+      "matrix": 40,
+      "piecewise_words": 30,
+      "numbered_exercise_eq": 80,
+      "chem_formula": 80,
+      "chem_charge": 60,
+      "chem_equation": 60,
+      "nuclide": 40,
+      "prose_unit_power": 40,
+      "prose_chem_script": 80,
+      "prose_nuclide": 20,
+      "prose_script_other": 60,
+      "heading_sentence": 60,
+      "heading_repeated_label": 60,
+      "heading_multiline": 30,
+      "table_data": 12,
+      "table_layout": 6,
+      "glossary_entry": 40
+    },
+    "check_targets": {
+      "inline_fraction": 13,
+      "system_braced": 6,
+      "multirow_equations": 6,
+      "determinant": 6,
+      "matrix": 6,
+      "piecewise_words": 5,
+      "numbered_exercise_eq": 13,
+      "chem_formula": 13,
+      "chem_charge": 10,
+      "chem_equation": 10,
+      "nuclide": 6,
+      "prose_unit_power": 6,
+      "prose_chem_script": 13,
+      "prose_nuclide": 4,
+      "prose_script_other": 10,
+      "heading_sentence": 10,
+      "heading_repeated_label": 10,
+      "heading_multiline": 5,
+      "table_data": 4,
+      "table_layout": 4,
+      "glossary_entry": 10
+    },
+    "max_sections": 22,
+    "max_pages": 300
+  },
+  "check_rule": {
+    "share": 0.15,
+    "note": "A candidate section is in the check pool when the first 8 bytes of SHA-256(salt + ':' + book + '/' + slug), read as a fraction of 2^64, are below the share. The check sections are chosen by the same greedy rule among those candidates. Their names are not recorded here; they are in the sealed archive."
+  },
+  "dev": [
+    {
+      "book": "elementary-algebra",
+      "slug": "8-5-simplify-complex-rational-expressions",
+      "title": "8.5 Simplify Complex Rational Expressions",
+      "words": 1231,
+      "equations": 98,
+      "figures": 0,
+      "tables": 6,
+      "overlap_with_heldout": 0.0275,
+      "pdf_pages": 20,
+      "items": {
+        "heading_multiline": 4,
+        "heading_repeated_label": 11,
+        "heading_sentence": 6,
+        "inline_fraction": 81,
+        "numbered_exercise_eq": 44,
+        "table_layout": 6
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "16-3-standard-reduction-potentials",
+      "title": "16.3 Standard Reduction Potentials",
+      "words": 918,
+      "equations": 57,
+      "figures": 3,
+      "tables": 1,
+      "overlap_with_heldout": 0.007,
+      "pdf_pages": 7,
+      "items": {
+        "chem_charge": 41,
+        "chem_equation": 46,
+        "chem_formula": 51,
+        "heading_sentence": 1,
+        "prose_chem_script": 3,
+        "prose_script_other": 2,
+        "table_data": 1
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "20-2-nuclear-equations",
+      "title": "20.2 Nuclear Equations",
+      "words": 983,
+      "equations": 28,
+      "figures": 1,
+      "tables": 0,
+      "overlap_with_heldout": 0.0072,
+      "pdf_pages": 4,
+      "items": {
+        "chem_equation": 6,
+        "chem_formula": 11,
+        "heading_sentence": 1,
+        "nuclide": 26,
+        "prose_nuclide": 4,
+        "prose_script_other": 1
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "17-3-rate-laws",
+      "title": "17.3 Rate Laws",
+      "words": 2107,
+      "equations": 66,
+      "figures": 1,
+      "tables": 5,
+      "overlap_with_heldout": 0.0029,
+      "pdf_pages": 10,
+      "items": {
+        "chem_charge": 3,
+        "chem_equation": 5,
+        "chem_formula": 14,
+        "heading_repeated_label": 11,
+        "heading_sentence": 4,
+        "inline_fraction": 6,
+        "multirow_equations": 3,
+        "prose_chem_script": 40,
+        "prose_script_other": 25,
+        "prose_unit_power": 14,
+        "table_data": 5
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "12-3-the-second-and-third-laws-of-thermodynamics",
+      "title": "12.3 The Second and Third Laws of Thermodynamics",
+      "words": 1392,
+      "equations": 22,
+      "figures": 0,
+      "tables": 2,
+      "overlap_with_heldout": 0.0044,
+      "pdf_pages": 6,
+      "items": {
+        "chem_equation": 5,
+        "chem_formula": 7,
+        "heading_repeated_label": 11,
+        "heading_sentence": 5,
+        "multirow_equations": 2,
+        "piecewise_words": 1,
+        "prose_chem_script": 14,
+        "prose_script_other": 18,
+        "prose_unit_power": 4,
+        "table_data": 2
+      }
+    },
+    {
+      "book": "algebra-and-trigonometry",
+      "slug": "11-8-solving-systems-with-cramers-rule",
+      "title": "11.8 Solving Systems with Cramer's Rule",
+      "words": 3180,
+      "equations": 144,
+      "figures": 2,
+      "tables": 1,
+      "overlap_with_heldout": 0.0108,
+      "pdf_pages": 27,
+      "items": {
+        "determinant": 39,
+        "heading_multiline": 3,
+        "heading_repeated_label": 8,
+        "heading_sentence": 11,
+        "inline_fraction": 3,
+        "matrix": 6,
+        "multirow_equations": 36,
+        "numbered_exercise_eq": 44,
+        "table_data": 1
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "14-1-bronsted-lowry-acids-and-bases",
+      "title": "14.1 Brønsted-Lowry Acids and Bases",
+      "words": 1553,
+      "equations": 36,
+      "figures": 0,
+      "tables": 0,
+      "overlap_with_heldout": 0.0039,
+      "pdf_pages": 5,
+      "items": {
+        "chem_charge": 13,
+        "chem_equation": 10,
+        "chem_formula": 17,
+        "heading_multiline": 1,
+        "heading_repeated_label": 9,
+        "heading_sentence": 4,
+        "nuclide": 1,
+        "prose_chem_script": 33,
+        "prose_script_other": 12
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "2-3-atomic-structure-and-symbolism",
+      "title": "2.3 Atomic Structure and Symbolism",
+      "words": 3105,
+      "equations": 38,
+      "figures": 5,
+      "tables": 3,
+      "overlap_with_heldout": 0.0023,
+      "pdf_pages": 11,
+      "items": {
+        "chem_formula": 9,
+        "heading_repeated_label": 13,
+        "heading_sentence": 3,
+        "inline_fraction": 1,
+        "multirow_equations": 4,
+        "nuclide": 23,
+        "prose_nuclide": 20,
+        "prose_script_other": 11,
+        "table_data": 3
+      }
+    },
+    {
+      "book": "elementary-algebra",
+      "slug": "5-2-solve-systems-of-equations-by-substitution",
+      "title": "5.2 Solve Systems of Equations by Substitution",
+      "words": 3371,
+      "equations": 101,
+      "figures": 0,
+      "tables": 11,
+      "overlap_with_heldout": 0.031,
+      "pdf_pages": 29,
+      "items": {
+        "heading_multiline": 1,
+        "heading_repeated_label": 14,
+        "heading_sentence": 4,
+        "inline_fraction": 31,
+        "multirow_equations": 5,
+        "numbered_exercise_eq": 36,
+        "prose_script_other": 2,
+        "system_braced": 65,
+        "table_layout": 11
+      }
+    },
+    {
+      "book": "college-algebra",
+      "slug": "9-6-binomial-theorem",
+      "title": "9.6 Binomial Theorem",
+      "words": 1462,
+      "equations": 161,
+      "figures": 2,
+      "tables": 0,
+      "overlap_with_heldout": 0.0085,
+      "pdf_pages": 11,
+      "items": {
+        "heading_repeated_label": 7,
+        "heading_sentence": 2,
+        "inline_fraction": 6,
+        "matrix": 35,
+        "multirow_equations": 2,
+        "numbered_exercise_eq": 25,
+        "prose_script_other": 1
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "1-4-measurements",
+      "title": "1.4 Measurements",
+      "words": 2521,
+      "equations": 20,
+      "figures": 3,
+      "tables": 3,
+      "overlap_with_heldout": 0.0024,
+      "pdf_pages": 9,
+      "items": {
+        "heading_repeated_label": 8,
+        "heading_sentence": 2,
+        "prose_script_other": 33,
+        "prose_unit_power": 22,
+        "table_data": 3
+      }
+    },
+    {
+      "book": "algebra-and-trigonometry",
+      "slug": "11-4-partial-fractions",
+      "title": "11.4 Partial Fractions",
+      "words": 2190,
+      "equations": 215,
+      "figures": 0,
+      "tables": 0,
+      "overlap_with_heldout": 0.0117,
+      "pdf_pages": 25,
+      "items": {
+        "heading_multiline": 11,
+        "heading_repeated_label": 8,
+        "heading_sentence": 11,
+        "inline_fraction": 72,
+        "multirow_equations": 25,
+        "numbered_exercise_eq": 54
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "16-4-the-nernst-equation",
+      "title": "16.4 The Nernst Equation",
+      "words": 1126,
+      "equations": 41,
+      "figures": 1,
+      "tables": 0,
+      "overlap_with_heldout": 0.0054,
+      "pdf_pages": 7,
+      "items": {
+        "chem_charge": 10,
+        "chem_equation": 6,
+        "chem_formula": 9,
+        "heading_multiline": 1,
+        "heading_repeated_label": 9,
+        "heading_sentence": 4,
+        "inline_fraction": 1,
+        "prose_chem_script": 2,
+        "prose_script_other": 8
+      }
+    },
+    {
+      "book": "algebra-and-trigonometry",
+      "slug": "13-1-sequences-and-their-notations",
+      "title": "13.1 Sequences and Their Notations",
+      "words": 3606,
+      "equations": 236,
+      "figures": 7,
+      "tables": 3,
+      "overlap_with_heldout": 0.0021,
+      "pdf_pages": 21,
+      "items": {
+        "heading_multiline": 7,
+        "heading_repeated_label": 26,
+        "heading_sentence": 9,
+        "inline_fraction": 44,
+        "multirow_equations": 16,
+        "numbered_exercise_eq": 46,
+        "piecewise_words": 8,
+        "prose_script_other": 2,
+        "table_layout": 3
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "18-12-occurrence-preparation-and-properties-of-the-noble-gases",
+      "title": "18.12 Occurrence, Preparation, and Properties of the Noble Gases",
+      "words": 797,
+      "equations": 3,
+      "figures": 0,
+      "tables": 0,
+      "overlap_with_heldout": 0.0076,
+      "pdf_pages": 2,
+      "items": {
+        "chem_equation": 1,
+        "chem_formula": 2,
+        "heading_multiline": 1,
+        "heading_sentence": 1,
+        "inline_fraction": 1,
+        "prose_chem_script": 10
+      }
+    },
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "18-2-occurrence-and-preparation-of-the-representative-metals",
+      "title": "18.2 Occurrence and Preparation of the Representative Metals",
+      "words": 1373,
+      "equations": 12,
+      "figures": 2,
+      "tables": 0,
+      "overlap_with_heldout": 0.0044,
+      "pdf_pages": 4,
+      "items": {
+        "chem_charge": 2,
+        "chem_equation": 12,
+        "chem_formula": 12,
+        "heading_multiline": 1,
+        "heading_repeated_label": 2,
+        "heading_sentence": 1,
+        "prose_chem_script": 11
+      }
+    },
+    {
+      "book": "algebra-and-trigonometry",
+      "slug": "11-6-solving-systems-with-gaussian-elimination",
+      "title": "11.6 Solving Systems with Gaussian Elimination",
+      "words": 3073,
+      "equations": 165,
+      "figures": 1,
+      "tables": 0,
+      "overlap_with_heldout": 0.0096,
+      "pdf_pages": 30,
+      "items": {
+        "determinant": 42,
+        "heading_multiline": 3,
+        "heading_repeated_label": 16,
+        "heading_sentence": 11,
+        "inline_fraction": 18,
+        "matrix": 9,
+        "multirow_equations": 56,
+        "numbered_exercise_eq": 46
+      }
+    }
+  ],
+  "dev_key_terms": [
+    {
+      "book": "chemistry-atoms-first",
+      "slug": "20-key-terms",
+      "title": "Key Terms",
+      "words": 1233,
+      "equations": 12,
+      "figures": 0,
+      "tables": 0,
+      "overlap_with_heldout": 0.0,
+      "pdf_pages": 5,
+      "items": {
+        "chem_formula": 1,
+        "glossary_entry": 67,
+        "nuclide": 9,
+        "prose_script_other": 4
+      }
+    }
+  ]
+}
