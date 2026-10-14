@@ -2,8 +2,8 @@
   "schema_version": 1,
   "task": "tables",
   "mode": "local",
-  "date": "2026-10-12",
-  "pipeline_version": "0.4.0",
+  "date": "2026-10-14",
+  "pipeline_version": "0.5.0",
   "prompt_versions": {
     "table": "table-b3769ce7"
   },
@@ -231,8 +231,8 @@
     "seconds_per_table_p95": 0.0
   },
   "latency_ms": {
-    "p50": 3486.0,
-    "p95": 10077.799999999983,
+    "p50": 4397.0,
+    "p95": 15984.59999999997,
     "n": 45,
     "basis": "wall-clock per document: layout, crops and the table step (no printing)"
   }

@@ -1,15 +1,15 @@
 {
   "schema_version": 1,
   "task": "headings",
-  "date": "2026-10-09",
-  "pipeline_version": "0.4.0",
+  "date": "2026-10-14",
+  "pipeline_version": "0.5.0",
   "prompt_versions": {},
   "models": {
-    "main": "gpt-6.1-sol",
-    "cheap": "gpt-6-luna"
+    "main": "claude-opus-5-5",
+    "cheap": "claude-haiku-5-5"
   },
   "models_used": [],
-  "client": "openai",
+  "client": "anthropic",
   "dataset": {
     "gold_dir": "data/gold",
     "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",

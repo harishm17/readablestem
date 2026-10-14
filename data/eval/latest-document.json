@@ -1,22 +1,22 @@
 {
   "schema_version": 1,
   "task": "document",
-  "date": "2026-10-12",
-  "pipeline_version": "0.4.0",
+  "date": "2026-10-14",
+  "pipeline_version": "0.5.0",
   "prompt_versions": {
     "equation": "equation-df0e12f1",
     "figure": "figure-ac51f42d",
     "table": "table-b3769ce7"
   },
   "models": {
-    "main": "gpt-6.1-sol",
-    "cheap": "gpt-6-luna"
+    "main": "claude-opus-5-5",
+    "cheap": "claude-haiku-5-5"
   },
   "models_used": [
-    "gpt-6-luna",
-    "gpt-6.1-sol"
+    "claude-haiku-5-5",
+    "claude-opus-5-5"
   ],
-  "client": "openai",
+  "client": "anthropic",
   "dataset": {
     "gold_dir": "data/gold",
     "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
@@ -30,9 +30,9 @@
   "stopped_reason": null,
   "metrics": {
     "gold_equations": 30,
-    "predicted_equations": 55,
+    "predicted_equations": 40,
     "matched": 30,
-    "detection_precision": 0.5454545454545454,
+    "detection_precision": 0.75,
     "detection_recall": 1.0,
     "detection_recall_by_display": {
       "block": {
@@ -44,17 +44,34 @@
         "recall": 1.0
       }
     },
-    "matched_exact_lenient": 0.7333333333333333,
-    "matched_mean_teds": 0.8563455484352451,
-    "end_to_end_exact_lenient": 0.7333333333333333,
-    "unmatched_predicted": 25,
+    "matched_exact_lenient": 0.7666666666666667,
+    "matched_mean_teds": 0.8671047046106055,
+    "end_to_end_exact_lenient": 0.7666666666666667,
+    "unmatched_predicted": 10,
     "unmatched_by_reason": {
-      "prose_math": 24,
+      "prose_math": 9,
       "fragment": 0,
       "other": 1
     },
     "detection_precision_excluding_prose_math": 0.967741935483871,
+    "unmatched_text_layer_supported": 10,
+    "unmatched_text_layer_supported_by_reason": {
+      "prose_math": 9,
+      "fragment": 0,
+      "other": 1
+    },
+    "unmatched_not_supported": 0,
+    "detection_precision_excluding_text_layer_supported": 1.0,
     "split_gold_equations": 0,
+    "secondary_stream_v2": {
+      "label": "stream v2 (secondary; the primary scorer is exact_lenient)",
+      "matched_exact": 0.9666666666666667,
+      "matched_mean_similarity": 0.9994535519125682,
+      "end_to_end_exact": 0.9666666666666667,
+      "end_to_end_exact_with_credit": 0.9666666666666667,
+      "credited_split": 0,
+      "credited_merged": 0
+    },
     "static_violations": 0,
     "static_violation_codes": {},
     "axe_violations": 0,
@@ -64,49 +81,49 @@
     "axe_error_pages": 0,
     "page_errors": {},
     "review_load": {
-      "required_decisions": 10,
-      "required_fixes": 42,
-      "optional": 23,
-      "none": 144,
+      "required_decisions": 9,
+      "required_fixes": 41,
+      "optional": 24,
+      "none": 129,
       "required_by_kind": {
-        "equation": 1,
         "heading": 9
       },
       "optional_by_kind": {
-        "equation": 3,
+        "equation": 2,
+        "figure": 2,
         "heading": 20
       },
       "required_by_reason": {
         "heading.repeated_label": 41,
-        "heading.weak_evidence": 41,
-        "style_mismatch": 1
+        "heading.weak_evidence": 41
       },
       "optional_by_reason": {
         "heading.weak_evidence": 20,
-        "style_cosmetic": 3
+        "single_reading": 2,
+        "too_long": 2
       },
       "sections": 3,
       "pdf_pages": 43,
-      "required_per_section": 3.3333,
-      "required_per_pdf_page": 0.2326,
-      "optional_per_pdf_page": 0.5349,
+      "required_per_section": 3.0,
+      "required_per_pdf_page": 0.2093,
+      "optional_per_pdf_page": 0.5581,
       "equation_flags": {
         "units": 30,
-        "required_units": 1,
-        "required_units_wrong": 1,
-        "wrong": 8,
-        "wrong_required": 1,
-        "flag_precision": 1.0,
-        "flag_recall": 0.125
+        "required_units": 0,
+        "required_units_wrong": 0,
+        "wrong": 7,
+        "wrong_required": 0,
+        "flag_precision": null,
+        "flag_recall": 0.0
       },
       "equation_flags_excluding_scorer_gaps": {
         "units": 25,
-        "required_units": 1,
-        "required_units_wrong": 1,
-        "wrong": 3,
-        "wrong_required": 1,
-        "flag_precision": 1.0,
-        "flag_recall": 0.3333333333333333
+        "required_units": 0,
+        "required_units_wrong": 0,
+        "wrong": 2,
+        "wrong_required": 0,
+        "flag_precision": null,
+        "flag_recall": 0.0
       },
       "heading_flags": {
         "units": 106,
@@ -119,21 +136,21 @@
       },
       "flags": {
         "units": 136,
-        "required_units": 10,
-        "required_units_wrong": 6,
-        "wrong": 26,
-        "wrong_required": 15,
-        "flag_precision": 0.6,
-        "flag_recall": 0.5769230769230769
+        "required_units": 9,
+        "required_units_wrong": 5,
+        "wrong": 25,
+        "wrong_required": 14,
+        "flag_precision": 0.5555555555555556,
+        "flag_recall": 0.56
       },
       "flags_excluding_scorer_gaps": {
         "units": 131,
-        "required_units": 10,
-        "required_units_wrong": 6,
-        "wrong": 21,
-        "wrong_required": 15,
-        "flag_precision": 0.6,
-        "flag_recall": 0.7142857142857143
+        "required_units": 9,
+        "required_units_wrong": 5,
+        "wrong": 20,
+        "wrong_required": 14,
+        "flag_precision": 0.5555555555555556,
+        "flag_recall": 0.7
       },
       "wrong_not_required": [
         {
@@ -143,7 +160,7 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": true,
-          "pred_latex": "\\text{time} = \\frac{\\text{distance}}{v_{\\text{avg}}}."
+          "pred_latex": "\\text{time} = \\frac{\\text{distance}}{v_\\text{avg}}."
         },
         {
           "page": "physics/2-2-speed-and-velocity",
@@ -152,18 +169,16 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": true,
-          "pred_latex": "\\text{distance} = v_{\\text{avg}} \\times \\text{time}"
+          "pred_latex": "\\text{distance} = v_\\text{avg} \\times \\text{time}"
         },
         {
           "page": "physics/2-2-speed-and-velocity",
           "kind": "equation",
           "gold_id": "openstax/physics/2-2-speed-and-velocity/eq-007",
-          "review": "optional",
-          "reasons": [
-            "style_cosmetic"
-          ],
+          "review": "none",
+          "reasons": [],
           "scorer_gap": false,
-          "pred_latex": "\\mathbf{v}_{\\text{avg}} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta \\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_{f} - \\mathbf{d}_{0}}{t_{f} - t_{0}}"
+          "pred_latex": "\\mathbf{v}_{\\mathbf{avg}} = \\frac{\\text{displacement}}{\\text{time}} = \\frac{\\Delta\\mathbf{d}}{\\Delta t} = \\frac{\\mathbf{d}_\\text{f} - \\mathbf{d}_0}{t_\\text{f} - t_0}"
         },
         {
           "page": "physics/2-2-speed-and-velocity",
@@ -172,7 +187,7 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": true,
-          "pred_latex": "\\begin{array}{rcl} \\mathbf{v}_{\\text{avg}} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ \\Delta \\mathbf{d} & = & \\mathbf{v}_{\\text{avg}}\\Delta t \\\\ & = & (2.4\\ \\text{m/s})(46\\ \\text{s}) \\\\ & = & 1.1 \\times 10^{2}\\ \\text{m east} \\end{array}"
+          "pred_latex": "\\begin{array}{rcl} \\mathbf{v}_\\text{avg} & = & \\frac{\\Delta \\mathbf{d}}{\\Delta t} \\\\ \\Delta \\mathbf{d} & = & \\mathbf{v}_{avg} \\Delta t \\\\ & = & (2.4\\ \\text{m/s})(46\\ \\text{s}) \\\\ & = & 1.1 \\times 10^{2}\\ \\text{m east} \\end{array}"
         },
         {
           "page": "physics/2-3-position-vs-time-graphs",
@@ -199,7 +214,7 @@
           "review": "none",
           "reasons": [],
           "scorer_gap": true,
-          "pred_latex": "\\begin{array}{rcl}\\text{slope} & = & v_Q = \\frac{\\Delta d_Q}{\\Delta t_Q} \\\\ & = & \\frac{(3120 - 1300)\\ \\text{m}}{(32 - 19)\\ \\text{s}} \\\\ & = & \\frac{1820\\ \\text{m}}{13\\ \\text{s}} \\\\ & = & 140\\ \\text{m/s}\\end{array}"
+          "pred_latex": "\\begin{array}{rcl} \\text{slope} & = & v_{Q} = \\frac{\\Delta d_{Q}}{\\Delta t_{Q}} \\\\ & = & \\frac{(3120 - 1300)\\ \\text{m}}{(32 - 19)\\ \\text{s}} \\\\ & = & \\frac{1820\\ \\text{m}}{13\\ \\text{s}} \\\\ & = & 140\\ \\text{m/s} \\end{array}"
         },
         {
           "page": "physics/2-1-relative-motion-distance-and-displacement",
@@ -258,45 +273,81 @@
     "second_check": {
       "equations_matched": {
         "answered": 30,
-        "wrong": 8,
-        "auroc_vs_wrong": 0.625,
-        "auroc_vs_wrong_excluding_scorer_gaps": 0.7803,
-        "would_flag": 9,
-        "would_flag_precision": 0.3333,
-        "would_flag_recall": 0.375,
-        "would_flag_wrong_excluding_scorer_gaps": 2
+        "wrong": 7,
+        "auroc_vs_wrong": 0.5,
+        "auroc_vs_wrong_excluding_scorer_gaps": 0.5,
+        "would_flag": 0,
+        "would_flag_precision": null,
+        "would_flag_recall": 0.0,
+        "would_flag_wrong_excluding_scorer_gaps": 0
       },
       "figure_checked": 16,
-      "figure_flagged": 0,
-      "equation_checked": 55,
-      "equation_would_flag": 14,
+      "figure_flagged": 1,
+      "equation_checked": 40,
+      "equation_would_flag": 0,
       "outcomes": {
-        "ok": 71
+        "ok": 56
       },
-      "cost_usd": 0.0043189,
-      "per_pdf_page_usd": 0.00010044
+      "cost_usd": 0.0742066,
+      "per_pdf_page_usd": 0.00172573
     }
   },
   "cost": {
-    "total_usd": 0.14463606,
-    "pipeline_usd": 0.14463606,
-    "per_item_usd": 0.04821202,
+    "total_usd": 0.23505413,
+    "pipeline_usd": 0.23505413,
+    "per_item_usd": 0.07835137666666667,
     "per_item_unit": "section",
-    "model_calls": 89,
-    "verifier_usd": 0.0043189000000000005,
-    "verifier_per_item_usd": 0.0014396333333333334,
-    "verifier_requests": 87,
+    "model_calls": 60,
+    "verifier_usd": 0.07420660000000001,
+    "verifier_per_item_usd": 0.024735533333333337,
+    "verifier_requests": 59,
     "pdf_pages": 43,
-    "per_pdf_page_usd": 0.0033636293023255816,
-    "verifier_per_pdf_page_usd": 0.00010043953488372094,
-    "budget_spent_usd": 0.14463605999999993,
-    "budget_calls": 89,
+    "per_pdf_page_usd": 0.00546637511627907,
+    "verifier_per_pdf_page_usd": 0.0017257348837209305,
+    "budget_spent_usd": 0.23505412999999994,
+    "budget_calls": 60,
     "dropped_usd": 0.0
   },
   "latency_ms": {
-    "p50": 33243.0,
-    "p95": 55271.399999999994,
+    "p50": 25988.0,
+    "p95": 31092.8,
     "n": 3,
     "basis": "wall-clock conversion of each section's PDF (layout, crops, model calls and assembly; DocumentStats.latency_ms)"
+  },
+  "answers_file": {
+    "by_step": {
+      "figure/claude-opus-5-5": {
+        "calls": 16.0,
+        "input": 40957.0,
+        "cached": 23616.0,
+        "written": 0.0,
+        "output": 1353.0,
+        "usd": 0.101147,
+        "steady_usd": 0.101147
+      },
+      "equation/claude-haiku-5-5": {
+        "calls": 23.0,
+        "input": 47674.0,
+        "cached": 45103.0,
+        "written": 0.0,
+        "output": 920.0,
+        "usd": 0.001168,
+        "steady_usd": 0.001168
+      },
+      "equation/claude-opus-5-5": {
+        "calls": 21.0,
+        "input": 43920.0,
+        "cached": 41181.0,
+        "written": 0.0,
+        "output": 1967.0,
+        "usd": 0.058532,
+        "steady_usd": 0.058532
+      }
+    },
+    "steady_cost_usd": 0.160848,
+    "answers_file_hits": 0,
+    "answers_file_misses": 60,
+    "live_cost_usd": 0.160848,
+    "replayed_cost_usd": 0.0
   }
 }

@@ -1,0 +1,142 @@
+{
+  "schema_version": 1,
+  "task": "figures",
+  "date": "2026-10-14",
+  "pipeline_version": "0.5.0",
+  "prompt_versions": {
+    "figure": "figure-ac51f42d",
+    "judge": "judge_figure-137e2607"
+  },
+  "models": {
+    "main": "claude-opus-5-5",
+    "cheap": "claude-haiku-5-5",
+    "judge": "claude-opus-5-5"
+  },
+  "models_used": [
+    "claude-opus-5-5"
+  ],
+  "client": "anthropic",
+  "dataset": {
+    "gold_dir": "data/gold",
+    "manifest_sha256": "63b5de054889b73fe1b15b6c092aca6d16ae09f886fac62adfc9d39ac7fc1cc6",
+    "limit": null,
+    "unit": "figure",
+    "selection_sha256": "ff55fd8f6e2e932fd674df868a755e7871e91ca5d1143afb81cb92af979977d9"
+  },
+  "n_planned": 13,
+  "n": 13,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "proposal_rate": 1.0,
+    "check_pass_rate": 1.0,
+    "failed_check_codes": {},
+    "by_status": {
+      "accepted": 13
+    },
+    "figure_types": {
+      "chart": 4,
+      "diagram": 4,
+      "illustration": 3,
+      "photo": 2
+    },
+    "with_reference": 13,
+    "judge_measured": 13,
+    "judge_errors": 0,
+    "judge_pass_rate": 1.0,
+    "judge_pass_rate_ci95": [
+      0.7719046248681998,
+      1.0
+    ],
+    "judge_pass_rate_answered": 1.0,
+    "judge_mean_score": 4.769230769230769,
+    "judge_factual_error_rate": 0.0,
+    "decorative_rate": 0.0,
+    "second_check": {
+      "mode": "note",
+      "versions": [
+        "check_figure-782beb04"
+      ],
+      "ran": 13,
+      "answered": 13,
+      "outcomes": {
+        "ok": 13
+      },
+      "flagged": 0,
+      "flag_rate": 0.0,
+      "flagged_ids": [],
+      "scores": {
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-000": 1.0,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-001": 1.0,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-002": 1.0,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-003": 1.0,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-004": 1.0,
+        "openstax/physics/2-1-relative-motion-distance-and-displacement/fig-005": 1.0,
+        "openstax/physics/2-2-speed-and-velocity/fig-000": 1.0,
+        "openstax/physics/2-2-speed-and-velocity/fig-001": 1.0,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-000": 1.0,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-001": 1.0,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-002": 1.0,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-003": 1.0,
+        "openstax/physics/2-3-position-vs-time-graphs/fig-004": 1.0
+      },
+      "agreement_with_judge": {
+        "n": 13,
+        "raw_agreement": 1.0,
+        "kappa": null,
+        "confusion": {
+          "flag_and_judge_fail": 0,
+          "flag_and_judge_pass": 0,
+          "no_flag_and_judge_fail": 0,
+          "no_flag_and_judge_pass": 13
+        },
+        "auroc_score_vs_judge_fail": null
+      },
+      "cost_usd": 0.0216838,
+      "per_figure_usd": 0.00166798,
+      "requests": 13
+    }
+  },
+  "cost": {
+    "total_usd": 0.12321199999999999,
+    "pipeline_usd": 0.0716222,
+    "per_item_usd": 0.005509399999999999,
+    "per_item_unit": "figure",
+    "model_calls": 26,
+    "verifier_usd": 0.021683800000000003,
+    "verifier_per_item_usd": 0.0016679846153846156,
+    "verifier_requests": 13,
+    "judge_usd": 0.0515898,
+    "budget_spent_usd": 0.12321199999999997,
+    "budget_calls": 26,
+    "dropped_usd": 0.0
+  },
+  "latency_ms": {
+    "p50": 2000.0,
+    "p95": 2591.2,
+    "n": 13,
+    "basis": "sum of model-call latencies per item (excludes rendering)"
+  },
+  "judge_client": {
+    "provider": "anthropic",
+    "model": "claude-opus-5-5"
+  },
+  "answers_file": {
+    "by_step": {
+      "figure/claude-opus-5-5": {
+        "calls": 13.0,
+        "input": 23607.0,
+        "cached": 17712.0,
+        "written": 1476.0,
+        "output": 1067.0,
+        "usd": 0.049938,
+        "steady_usd": 0.042854
+      }
+    },
+    "steady_cost_usd": 0.042854,
+    "answers_file_hits": 0,
+    "answers_file_misses": 13,
+    "live_cost_usd": 0.049938,
+    "replayed_cost_usd": 0.0
+  }
+}

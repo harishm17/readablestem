@@ -574,12 +574,33 @@ uv run a11y-stem eval gate --require-current --current data/eval/latest-equation
 After a prompt or model change, re-run the task, promote the new report `--as latest`
 and commit it with the change; CI's gate fails (exit 2) until you do.
 
-TODO(Harish): no baseline is committed yet, so CI's eval-gate job skips. The committed
-`data/eval/latest-<task>.json` are all pipeline 0.4.0 runs (equations, figures, document
-and tables re-run on 2026-10-12, headings on 2026-10-09; see "Results" below); review
-them and promote each as the baseline. Earlier runs were kept in a git-ignored
-`.local/eval/` and are not in the repository. figures-run1 was graded by the older text-only judge and cannot be a
-baseline for runs graded with the image.
+Baselines (2026-10-14, pipeline 0.5.0). `data/eval/baseline-<task>.json` and
+`latest-<task>.json` are the same run, one per task, made once on Claude
+(`MODEL_PROVIDER=anthropic`, `claude-opus-5-5` main, `claude-haiku-5-5` cheap, Opus as the
+figure judge) on the original development set (`data/gold`), and promoted with
+`eval promote ... --out-dir data/eval`. CI's eval-gate job therefore runs; it compares each
+`latest` with its `baseline`, so today it passes trivially, and from now on it catches a
+change to prompts, models or code that lowers a tracked metric. The gate reads only the
+original set; dev-v2 reports go to `.local/eval/dev-v2/` and are not gated. Each run was made
+once, live, with every model answer kept in `.local/answers-baseline.jsonl` (git-ignored), so a
+replay with `--answers-offline` is free (the second check's answers excepted, see below).
+
+| Task | Run | Cost of the run |
+|---|---|---|
+| equations (30) | exact_lenient 0.767, mean TEDS 0.867, proposals 30 of 30 | $0.098 ($0.0033 per equation, of which the Claude check $0.0010) |
+| figures (13) | judge pass 1.000, mean judge score 4.77 | $0.123 (figure step $0.050, Claude check $0.022, judge $0.052) |
+| document (43 PDF pages, 10 sections) | detection recall 1.000, precision 0.750, matched exact_lenient 0.767, axe violations 0 | $0.235 ($0.0055 per PDF page, check $0.0017) |
+| headings | precision 0.877, recall 1.000, F1 0.934, level accuracy 0.992 | no model |
+| tables (local) | 184 tables, flag recall 1.000, flag precision 0.223 | no model |
+
+Spend: $0.456 of the $6 cap. The pipeline's own model calls cost $0.069 (equations), $0.050
+(figures) and $0.161 (document); the rest is the Claude check ($0.029, $0.022, $0.074) and the
+figure judge ($0.052). The runs they replace were made with
+`gpt-6.1-sol` and `gpt-6-luna` on pipeline 0.4.0 (2026-10-12; equations 0.767 / TEDS 0.864,
+document precision 0.545 and matched 0.733, headings and figures the same as now); they are in
+git history before the commit that added the baselines, and the sections "Results" below
+describe them, not the committed files. The OpenAI path has no committed baseline; run
+`eval pipeline` with `--provider openai` and `promote --out-dir` elsewhere to compare.
 
 Recorded answers, replays and batches (`--answers`, `--batch`; development sets only). A live
 run is paid for once. `--answers FILE` keeps every model answer in a JSON-lines file keyed by

@@ -1,0 +1,239 @@
+{
+  "schema_version": 1,
+  "task": "tables",
+  "mode": "local",
+  "date": "2026-10-14",
+  "pipeline_version": "0.5.0",
+  "prompt_versions": {
+    "table": "table-b3769ce7"
+  },
+  "models": {
+    "main": "gpt-6.1-sol",
+    "cheap": "gpt-6-luna"
+  },
+  "models_used": [],
+  "client": "none",
+  "dataset": {
+    "gold_dir": "data/gold/tables",
+    "manifest_sha256": "c994c016627d6f288520c1990cad1d8320dd1f6f29a1d595f7cbfe1a331e1b15",
+    "authored_sha256": "6478c10e9dd09c06ee926ef02ba46908ef4b6a979da75e2bf78f5ee3b7db8989",
+    "styles": [
+      "grid",
+      "booktabs",
+      "norules"
+    ],
+    "limit": null,
+    "unit": "document",
+    "selection_sha256": "1881dea6e4c178310987ca1dd14cb7e55d15b82a7e3cf954941f7bfbd7935f99"
+  },
+  "n_planned": 45,
+  "n": 45,
+  "complete": true,
+  "stopped_reason": null,
+  "metrics": {
+    "gold_data_tables": 197,
+    "clusters": 86,
+    "detected": 179,
+    "false_tables": 3,
+    "detection_recall": 0.9086294416243654,
+    "detection_recall_ci95": [
+      0.8571428571428571,
+      0.9579439252336449
+    ],
+    "detection_precision": 0.9835164835164835,
+    "detection_precision_ci95": [
+      0.9526652424593839,
+      0.9943785499186014
+    ],
+    "teds": 0.8664816919771364,
+    "teds_ci95": [
+      0.8176583283905966,
+      0.9136736708461367
+    ],
+    "teds_structure": 0.8820276294372288,
+    "teds_structure_ci95": [
+      0.8326483735825365,
+      0.9289578135753959
+    ],
+    "teds_found": 0.9536139291591949,
+    "teds_structure_found": 0.9707231452465591,
+    "teds_with_headers": 0.8546529816767726,
+    "teds_with_headers_found": 0.9405957396107497,
+    "shape_ok": 0.7817258883248731,
+    "headers": {
+      "column": {
+        "precision": 0.958092485549133,
+        "recall": 0.9431009957325747,
+        "f1": 0.9505376344086022,
+        "tables": 197,
+        "tables_exact": 166,
+        "exact": 0.8426395939086294,
+        "exact_ci95": [
+          0.7828282828282829,
+          0.898936170212766
+        ]
+      },
+      "row": {
+        "precision": null,
+        "recall": 0.0,
+        "f1": null,
+        "tables": 7,
+        "tables_exact": 0,
+        "exact": 0.0,
+        "exact_ci95": [
+          0.0,
+          0.0
+        ]
+      },
+      "header_exact": 0.8121827411167513,
+      "header_exact_ci95": [
+        0.7464114832535885,
+        0.8724489795918368
+      ],
+      "gold_tables_without_headers": 0,
+      "found_tables_without_headers": 3,
+      "share_found_without_headers": 0.01675977653631285,
+      "row_headers_where_gold_has_none": 0
+    },
+    "column_header_exact": 0.8426395939086294,
+    "column_header_exact_ci95": [
+      0.7828282828282829,
+      0.898936170212766
+    ],
+    "header_exact": 0.8121827411167513,
+    "maths": {
+      "cells": 706,
+      "letter_digit_f1": 0.8237521986256846,
+      "cells_ok": 0.7917847025495751,
+      "mathml_cells": 482,
+      "mathml_match": 0.0
+    },
+    "text_fidelity": {
+      "gold_cells": 5616,
+      "faithful": 5521,
+      "faithful_rate": 0.9830840455840456,
+      "wrong_cells": 188,
+      "wrong_cells_not_flagged": 0,
+      "tables_with_wrong_cells": 22
+    },
+    "data_vs_layout": {
+      "layout_negatives": 33,
+      "layout_kept_out": 31,
+      "accuracy_on_negatives": 0.9393939393939394,
+      "accuracy_on_negatives_ci95": [
+        0.8039375504673153,
+        0.9832191170641916
+      ],
+      "data_called_layout": 0
+    },
+    "by_style": {
+      "grid": {
+        "n": 54,
+        "recall": 1.0,
+        "precision": 1.0,
+        "teds": 0.981961101533698,
+        "teds_found": 0.981961101533698,
+        "column_header_exact": 1.0
+      },
+      "booktabs": {
+        "n": 54,
+        "recall": 0.8888888888888888,
+        "precision": 0.96,
+        "teds": 0.8544037178854121,
+        "teds_found": 0.9612041826210888,
+        "column_header_exact": 0.8333333333333334
+      },
+      "norules": {
+        "n": 54,
+        "recall": 0.8148148148148148,
+        "precision": 0.9777777777777777,
+        "teds": 0.725931852636882,
+        "teds_found": 0.8909163645998096,
+        "column_header_exact": 0.6851851851851852
+      },
+      "authored": {
+        "n": 35,
+        "recall": 0.9428571428571428,
+        "precision": 1.0,
+        "teds": 0.9237963722420657,
+        "teds_found": 0.9797840311658272,
+        "column_header_exact": 0.8571428571428571
+      }
+    },
+    "by_feature": {
+      "spans": {
+        "n": 40,
+        "recall": 0.875,
+        "teds": 0.8314413020319886,
+        "teds_found": 0.9502186308937013,
+        "column_header_exact": 0.725
+      },
+      "maths": {
+        "n": 86,
+        "recall": 0.8488372093023255,
+        "teds": 0.7930988136730239,
+        "teds_found": 0.9343355887106857,
+        "column_header_exact": 0.8023255813953488
+      },
+      "row_headers": {
+        "n": 7,
+        "recall": 1.0,
+        "teds": 0.995361387339316,
+        "teds_found": 0.995361387339316,
+        "column_header_exact": 0.8571428571428571
+      }
+    },
+    "page_errors": {},
+    "pages_differ_from_reference": 0,
+    "review_load": {
+      "required_decisions": 184,
+      "required_fixes": 184,
+      "optional": 0,
+      "none": 0,
+      "required_by_kind": {
+        "table": 184
+      },
+      "optional_by_kind": {},
+      "required_by_reason": {
+        "table_not_rebuilt": 184
+      },
+      "optional_by_reason": {},
+      "tables": 184,
+      "pdf_pages": 675,
+      "required_per_table": 1.0,
+      "required_per_pdf_page": 0.2725925925925926,
+      "optional_per_pdf_page": 0.0,
+      "needs_review_share": 0.0,
+      "kept_as_image": 0,
+      "flags": {
+        "units": 179,
+        "required_units": 179,
+        "required_units_wrong": 40,
+        "wrong": 40,
+        "wrong_required": 40,
+        "flag_precision": 0.22346368715083798,
+        "flag_recall": 1.0
+      },
+      "wrong_not_required": []
+    },
+    "real_documents": null
+  },
+  "cost": {
+    "total_usd": 0,
+    "pipeline_usd": 0,
+    "per_item_usd": 0.0,
+    "per_item_unit": "document",
+    "per_table_usd": 0.0,
+    "pdf_pages": 675,
+    "per_pdf_page_usd": 0.0,
+    "model_calls": 0,
+    "seconds_per_table_p50": 0.0,
+    "seconds_per_table_p95": 0.0
+  },
+  "latency_ms": {
+    "p50": 4397.0,
+    "p95": 15984.59999999997,
+    "n": 45,
+    "basis": "wall-clock per document: layout, crops and the table step (no printing)"
+  }
+}
