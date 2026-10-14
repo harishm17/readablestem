@@ -20,6 +20,11 @@ when, and only when, the item is the same item:
   nothing about the new one. An edit (the instructor's own text) or a rejection (keep the
   original) belongs to the picture and is carried either way.
 - A heading level is carried only if the output would still write that level there.
+- An image the instructor described in words (T3-16) is a rejection that holds the
+  description: it is carried with the decision, onto the same picture only.
+- The edits no fix covers (the words of a paragraph, a heading made by hand, a picture or
+  equation added by hand, a page left out) are carried by `web.carry_edits`, under the same
+  rule: only onto an item that is unchanged.
 
 Nothing here reads a model, and the report holds element ids and counts, never text. The
 changes are returned as `web.review.ReviewChange`-like records so the caller can store a
@@ -72,6 +77,11 @@ class CarryReport:
     new: list[str] = field(default_factory=list)
     # Earlier decisions whose item is no longer in the document.
     removed: int = 0
+    # Edits to words, headings, added pictures and equations and pages left out (T3-5,
+    # T3-16, `web.carry_edits`): the ids they were put on in the new document, and how many
+    # earlier ones were not carried because the item they were made on changed.
+    edits: list[str] = field(default_factory=list)
+    edits_dropped: int = 0
 
     def to_json(self) -> dict[str, Any]:
         return {
@@ -80,6 +90,8 @@ class CarryReport:
             "changed": self.changed,
             "new": self.new,
             "removed": self.removed,
+            "edits": self.edits,
+            "edits_dropped": self.edits_dropped,
         }
 
     @classmethod
@@ -92,12 +104,15 @@ class CarryReport:
             return [v for v in value if isinstance(v, str)] if isinstance(value, list) else []
 
         removed = data.get("removed")
+        dropped = data.get("edits_dropped")
         return cls(
             carried=ids("carried"),
             suggestion_changed=ids("suggestion_changed"),
             changed=ids("changed"),
             new=ids("new"),
             removed=removed if isinstance(removed, int) and removed > 0 else 0,
+            edits=ids("edits"),
+            edits_dropped=dropped if isinstance(dropped, int) and dropped > 0 else 0,
         )
 
 
@@ -333,6 +348,7 @@ def _put_decision(target: Fix, source: Fix) -> None:
         value = getattr(source, name)
         setattr(target, name, value.model_copy(deep=True) if value is not None else None)
     target.checks = [c.model_copy(deep=True) for c in source.checks]
+    target.described = source.described  # the reviewer's words for an image kept as a picture
     target.status = source.status
     target.reviewed = True
 
@@ -341,6 +357,7 @@ def _put_back(fix: Fix, before: dict[str, Any]) -> None:
     restored = Fix.model_validate(fix.model_dump(mode="json") | before)
     for name in ("equation", "figure", "heading", "table", "checks", "status", "reviewed"):
         setattr(fix, name, getattr(restored, name))
+    fix.described = restored.described
 
 
 # --------------------------------------------------------------------------- the page
@@ -360,10 +377,19 @@ class CarrySummary:
     changed_ids: list[str]
     new_ids: list[str]
     waiting: int  # of the changed and new ones, how many are still waiting now
+    edits: int = 0  # edits to words, headings, added items and pages left out, carried
+    edits_dropped: int = 0  # earlier edits whose item changed: to be made again
 
     @property
     def any(self) -> bool:
-        return bool(self.carried or self.changed or self.new or self.removed)
+        return bool(
+            self.carried
+            or self.changed
+            or self.new
+            or self.removed
+            or self.edits
+            or self.edits_dropped
+        )
 
 
 def summary(report: CarryReport, result: DocumentResult) -> CarrySummary:
@@ -384,4 +410,6 @@ def summary(report: CarryReport, result: DocumentResult) -> CarrySummary:
         changed_ids=changed_ids,
         new_ids=list(report.new),
         waiting=len(waiting),
+        edits=len(report.edits),
+        edits_dropped=report.edits_dropped,
     )

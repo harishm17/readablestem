@@ -17,6 +17,8 @@
     <li>{{ s.carried }} {{ "decision was" if s.carried == 1 else "decisions were" }} carried over; you do not need to make {{ "it" if s.carried == 1 else "them" }} again.</li>
     {% if s.changed %}<li>{{ s.changed }} {{ "item changed" if s.changed == 1 else "items changed" }} since the earlier version, so {{ "it asks" if s.changed == 1 else "they ask" }} for a decision again.</li>{% endif %}
     {% if s.new %}<li>{{ s.new }} {{ "item is" if s.new == 1 else "items are" }} new and {{ "asks" if s.new == 1 else "ask" }} for a decision.</li>{% endif %}
+    {% if s.edits %}<li>{{ s.edits }} {{ "change you made by hand was" if s.edits == 1 else "changes you made by hand were" }} carried over (words, headings, pictures or equations you added, pages you left out).</li>{% endif %}
+    {% if s.edits_dropped %}<li>{{ s.edits_dropped }} {{ "change you made by hand was" if s.edits_dropped == 1 else "changes you made by hand were" }} not carried over, because the part of the page it was made on is not the same any more. Make {{ "it" if s.edits_dropped == 1 else "them" }} again if you still need {{ "it" if s.edits_dropped == 1 else "them" }}.</li>{% endif %}
     {% if s.removed %}<li>{{ s.removed }} earlier {{ "decision has" if s.removed == 1 else "decisions have" }} no matching item in this file, so {{ "it was" if s.removed == 1 else "they were" }} not used.</li>{% endif %}
   </ul>
   {% if c.first_waiting and job.page and job.page.counts.decisions %}

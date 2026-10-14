@@ -85,7 +85,7 @@ from a11y_stem.config import ConfigError, Settings
 from a11y_stem.core.budget import BudgetExceeded, JobBudget, Reservation, SpendGuard
 from a11y_stem.core.types import ConversionOutput, DocumentResult, ProgressEvent
 from a11y_stem.ops import limits
-from a11y_stem.web import events
+from a11y_stem.web import carry_edits, events
 from a11y_stem.web import retry as retry_rules
 from a11y_stem.web.database import as_utc, rowcount
 from a11y_stem.web.db import Blob, Job, JobStatus, ReviewEdit, User, session_scope, utcnow
@@ -94,6 +94,15 @@ from a11y_stem.web.provider_health import HEALTH
 from a11y_stem.web.spend import DbSpendGuard, largest_reservation_usd
 from a11y_stem.web.step_cache import DbStepCache
 from a11y_stem.web.step_cache import forget as forget_steps
+
+# `ReviewEdit.action` of the edits that change the structure and not a fix (web.page_edits):
+# their rows are read when a new conversion inherits from an earlier one.
+STRUCTURE_ACTIONS = frozenset(
+    {"edit_text", "make_heading", "add_figure", "add_equation", "omit_page", "restore_page"}
+)
+# A region or a page compared between two files is drawn at this size (pixels per point).
+COMPARE_ZOOM = 1.5
+COMPARE_MAX_SIDE_PX = 2400
 
 if TYPE_CHECKING:
     from a11y_stem.core.types import ConversionOptions
@@ -356,6 +365,9 @@ class _Earlier:
     crops: dict[str, bytes]
     name: str
     own: bool
+    # The job it came from, and its structural edits (`web.carry_edits`), oldest first.
+    source_id: str = ""
+    edits: list[carry_edits.EditRow] = field(default_factory=list)
 
 
 @dataclass
@@ -1016,7 +1028,47 @@ class Worker:
             return None
         blobs = session.scalars(select(Blob).where(Blob.job_id == source.id, Blob.kind == "crop"))
         crops = {b.element_id: b.content for b in blobs if b.element_id}
-        return _Earlier(earlier, crops, source.filename, own)
+        rows = session.scalars(
+            select(ReviewEdit)
+            .where(ReviewEdit.job_id == source.id, ReviewEdit.action.in_(STRUCTURE_ACTIONS))
+            .order_by(ReviewEdit.created_at, ReviewEdit.id)
+        )
+        edits = [carry_edits.EditRow(r.element_id, r.action, r.before, r.after) for r in rows]
+        return _Earlier(earlier, crops, source.filename, own, source.id, edits)
+
+    def _upload_of(self, session: Session, job_id: str) -> bytes | None:
+        found = session.scalar(
+            select(Blob.content).where(Blob.job_id == job_id, Blob.kind == "upload")
+        )
+        return bytes(found) if found is not None else None
+
+    def _unchanged(self, session: Session, job: Job, earlier: _Earlier) -> carry_edits.Unchanged:
+        """Does a page, or a region of it, look the same in the earlier file and in the new
+        one? A try-again is the same file, so yes. Else both are drawn the same way and the
+        pictures compared; a file that cannot be read, or a drawing that fails, is "no"."""
+        if earlier.own:
+            return lambda page, box: True
+        new_pdf = self._upload_of(session, job.id)
+        old_pdf = self._upload_of(session, earlier.source_id)
+        if new_pdf is None or old_pdf is None:
+            return lambda page, box: False
+        if new_pdf == old_pdf:
+            return lambda page, box: True
+        from a11y_stem.web import page_images
+
+        def same(page: int, box: tuple[float, float, float, float] | None) -> bool:
+            try:
+                drawn = [
+                    page_images.render_region(
+                        pdf, page, zoom=COMPARE_ZOOM, max_side=COMPARE_MAX_SIDE_PX, clip=box
+                    )
+                    for pdf in (old_pdf, new_pdf)
+                ]
+            except page_images.RenderFailed:
+                return False
+            return drawn[0] == drawn[1]
+
+        return same
 
     def _carry_decisions(
         self,
@@ -1026,27 +1078,63 @@ class Worker:
         crops: dict[str, bytes],
         earlier: _Earlier,
     ) -> None:
-        """Put the earlier result's decisions on the new result (`carry.carry_decisions`)
-        and make the HTML file again from it. For a revised upload, also record a
-        `ReviewEdit` per carried decision and keep the report on the job; for a job tried
-        again the decisions already are its own review edits, so nothing is recorded.
-        Never fails the conversion: a problem here leaves the result as the pipeline made
-        it, with every decision to be made again."""
+        """Put the earlier result's decisions and edits on the new result
+        (`carry.carry_decisions`, `carry_edits`) and make the HTML file again from it. For a
+        revised upload, also record a `ReviewEdit` per carried decision and edit and keep
+        the report on the job; for a job tried again the decisions already are its own review
+        edits, so nothing is recorded. Never fails the conversion: a problem here leaves the
+        result as the pipeline made it, with every decision to be made again."""
         from a11y_stem.web import carry
         from a11y_stem.web.review import rerender_job_html
 
+        backup = result.model_copy(deep=True)
+        crops_before = dict(crops)
+        edits = carry_edits.EditsCarried()
         try:
-            report, changes = carry.carry_decisions(earlier.result, earlier.crops, result, crops)
-            if changes:
+            # The earlier file with its omitted pages back, so what was decided or edited
+            # on a page before it was left out is found like anything else.
+            old = carry_edits.with_omitted_back(earlier.result)
+            unchanged = self._unchanged(session, job, earlier)
+            edits = carry_edits.carry_structure(
+                old,
+                earlier.crops,
+                result,
+                crops,
+                earlier.edits,
+                unchanged,
+                job_pages=job.page_count or 0,
+            )
+            crops.update(edits.crops)
+            report, changes = carry.carry_decisions(old, earlier.crops, result, crops)
+            edits.extend(
+                carry_edits.carry_omitted(old, result, unchanged, job_pages=job.page_count or 0)
+            )
+            report.edits = edits.ids
+            report.edits_dropped = edits.dropped
+            if changes or edits.items:
                 from a11y_stem.web import notation
 
                 with notation.in_force(self.factory, self.settings, job.id):
                     result.html = rerender_job_html(
                         job, result, crops, math_alttext=self.settings.mathml_alttext
                     )
-        except Exception as exc:  # the result is as the pipeline made it, or half-carried
+        except Exception as exc:  # the result is as the pipeline made it, with every decision new
             log_exception(logger, "carry_failed", exc, job_id=job.id)
+            for name in type(result).model_fields:
+                setattr(result, name, getattr(backup, name))
+            crops.clear()
+            crops.update(crops_before)
             return
+        for element_id, png in edits.crops.items():
+            session.add(
+                Blob(
+                    job_id=job.id,
+                    kind="crop",
+                    element_id=element_id,
+                    media_type="image/png",
+                    content=png,
+                )
+            )
         if not earlier.own:
             for change in changes:
                 session.add(
@@ -1059,6 +1147,17 @@ class Worker:
                         after=change.after,
                     )
                 )
+            for kind, element_id in edits.items:
+                session.add(
+                    ReviewEdit(
+                        job_id=job.id,
+                        user_id=job.user_id,
+                        element_id=element_id,
+                        action=carry.CARRIED_ACTION,
+                        before=None,
+                        after={carry_edits.CARRIED_KEY: kind},
+                    )
+                )
             job.carried_json = report.to_json() | {"from_name": earlier.name}
         log_event(
             logger,
@@ -1069,6 +1168,8 @@ class Worker:
             changed=len(report.changed) + len(report.suggestion_changed),
             new=len(report.new),
             removed=report.removed,
+            edits=len(edits.items),
+            edits_dropped=edits.dropped,
         )
 
     # ------------------------------------------------------------------ loop
