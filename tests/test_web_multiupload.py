@@ -64,6 +64,15 @@ def send(client, files: list[tuple[str, bytes]], **fields):
     )
 
 
+def answer(client, response):
+    """The page the redirect after an upload of several files leads to."""
+    assert response.status_code == 303, response.status_code
+    assert response.headers["location"].startswith("/app/upload/")
+    page = client.get(response.headers["location"])
+    assert page.status_code == 200
+    return page
+
+
 def jobs_of(env) -> list[Job]:
     with session_scope(env.ctx.factory) as session:
         rows = list(session.scalars(select(Job).order_by(Job.created_at, Job.id)))
@@ -84,13 +93,13 @@ def test_several_files_make_one_job_each(web):
         web.alice,
         [("week1.pdf", make_pdf(1)), ("week2.pdf", make_pdf(2)), ("week3.pdf", make_pdf(3))],
     )
-    assert response.status_code == 200  # the results page, not a redirect
+    results = answer(web.alice, response)  # a redirect to the results page
     assert [j.filename for j in jobs_of(web)] == ["week1.pdf", "week2.pdf", "week3.pdf"]
     assert pages_used(web) == 6
-    page = text_of(response.text)
+    page = text_of(results.text)
     assert "3 of 3 files uploaded" in page
     for job in jobs_of(web):
-        assert f'href="/jobs/{job.id}"' in response.text
+        assert f'href="/jobs/{job.id}"' in results.text
     assert "Not uploaded" not in page
 
 
@@ -104,19 +113,19 @@ def test_a_file_that_cannot_be_used_does_not_stop_the_others(web):
         web.alice,
         [("good1.pdf", make_pdf(1)), ("notes.docx", b"PK not a pdf"), ("good2.pdf", make_pdf(1))],
     )
-    assert response.status_code == 200
     assert [j.filename for j in jobs_of(web)] == ["good1.pdf", "good2.pdf"]
-    page = text_of(response.text)
+    page = text_of(answer(web.alice, response).text)
     assert "2 of 3 files uploaded" in page
     assert "notes.docx is not a PDF" in page and "Not uploaded" in page
     assert pages_used(web) == 2  # the refused file used none
 
 
-def test_when_every_file_is_refused_nothing_is_queued_and_the_status_says_why(web):
+def test_when_every_file_is_refused_nothing_is_queued_and_the_page_says_why(web):
     response = send(web.alice, [("a.docx", b"junk"), ("b.docx", b"more junk")])
-    assert response.status_code == 415
+    results = answer(web.alice, response)
     assert jobs_of(web) == [] and pages_used(web) == 0
-    assert "0 of 2 files uploaded" in text_of(response.text)
+    page = text_of(results.text)
+    assert "0 of 2 files uploaded" in page and "a.docx is not a PDF" in page
 
 
 def test_more_files_than_allowed_is_refused_whole(web):
@@ -157,9 +166,8 @@ def test_a_revised_version_replaces_one_document_not_several(web):
 def test_each_file_is_held_to_the_daily_page_quota(web):
     # 40 pages a day: the second file would be the 31st page onward.
     response = send(web.alice, [("big.pdf", make_pdf(30)), ("more.pdf", make_pdf(20))])
-    assert response.status_code == 200
     assert [j.filename for j in jobs_of(web)] == ["big.pdf"]
-    page = text_of(response.text)
+    page = text_of(answer(web.alice, response).text)
     assert "1 of 2 files uploaded" in page
     assert "more.pdf has 20 pages, but you have 10 of today's 40 pages left" in page
 
@@ -168,9 +176,8 @@ def test_the_cap_on_documents_waiting_holds_for_each_file(web):
     send(web.alice, [(f"w{n}.pdf", make_pdf(1)) for n in range(MAX_FILES_PER_UPLOAD)])
     assert len(jobs_of(web)) == MAX_ACTIVE_JOBS_PER_USER == MAX_FILES_PER_UPLOAD
     response = send(web.alice, [("late1.pdf", make_pdf(1)), ("late2.pdf", make_pdf(1))])
-    assert response.status_code == 429
     assert len(jobs_of(web)) == MAX_ACTIVE_JOBS_PER_USER
-    assert "You already have 10 documents waiting" in text_of(response.text)
+    assert "You already have 10 documents waiting" in text_of(answer(web.alice, response).text)
 
 
 def test_every_file_after_the_first_counts_for_the_rate_limit(tmp_path):
@@ -185,8 +192,60 @@ def test_every_file_after_the_first_counts_for_the_rate_limit(tmp_path):
             statuses.append(send(client, files).status_code)
         # 10 files cost 10 of the 15 allowed uploads: the second request would need 10 more.
         assert limit == 15
-        assert statuses[0] == 200 and statuses[1] == 429
+        assert statuses[0] == 303 and statuses[1] == 429
         assert len(jobs_of(env)) == MAX_FILES_PER_UPLOAD
+
+
+def test_refreshing_the_results_page_does_not_upload_again(web):
+    """The answer is a GET page: opening it again (a refresh, the back button, a bookmark)
+    changes nothing. Before, it was the POST's own response and a refresh sent every file
+    again."""
+    response = send(web.alice, [("a.pdf", make_pdf(1)), ("b.pdf", make_pdf(2))])
+    assert response.status_code == 303
+    url = response.headers["location"]
+    first = web.alice.get(url)
+    jobs, used = [j.id for j in jobs_of(web)], pages_used(web)
+    for _ in range(3):
+        again = web.alice.get(url)
+        assert again.status_code == 200 and text_of(again.text) == text_of(first.text)
+    assert [j.id for j in jobs_of(web)] == jobs and pages_used(web) == used == 3
+    # Following the redirect as a browser does leaves the address bar on the GET page.
+    followed = web.alice.post(
+        "/jobs",
+        data={"csrf_token": token(web.alice)},
+        files=[
+            ("pdf", ("c.pdf", make_pdf(1), "application/pdf")),
+            ("pdf", ("d.pdf", make_pdf(1), "application/pdf")),
+        ],
+        follow_redirects=True,
+    )
+    assert str(followed.url).split("/")[-2:-1] == ["upload"] and followed.request.method == "GET"
+
+
+def test_the_results_page_is_for_its_owner_and_for_an_hour(web):
+    response = send(web.alice, [("secret-name.pdf", make_pdf(1)), ("b.docx", b"junk")])
+    url = response.headers["location"]
+    assert "secret-name.pdf" in web.alice.get(url).text
+    stranger = web.bob.get(url)
+    missing = web.bob.get("/app/upload/" + "0" * 32)
+    assert stranger.status_code == missing.status_code == 404
+    assert "secret-name.pdf" not in stranger.text
+    assert web.client().get(url).status_code in {303, 401, 403}  # signed out
+    # Past its hour the page is gone (404) and the purge deletes the row, names and all.
+    from datetime import timedelta
+
+    from a11y_stem.ops.retention import purge_upload_results
+    from a11y_stem.web.db import UploadResult, utcnow
+
+    later = utcnow() + timedelta(hours=2)
+    with session_scope(web.ctx.factory) as session:
+        row = session.scalar(select(UploadResult))
+        assert row is not None and row.user_id == jobs_of(web)[0].user_id
+        row.retain_until = utcnow() - timedelta(minutes=1)
+    assert web.alice.get(url).status_code == 404
+    with session_scope(web.ctx.factory) as session:
+        assert purge_upload_results(session, later) == 1
+        assert session.scalar(select(func.count()).select_from(UploadResult)) == 0
 
 
 def test_the_upload_form_takes_several_files_and_says_so(web):

@@ -122,6 +122,8 @@ ROUTES: dict[tuple[str, str], str] = {
     ("GET", "/uploads/{upload_id}"): USER,
     ("POST", "/uploads/{upload_id}"): USER,  # CSRF, rate limited, quota and caps as an upload
     ("POST", "/uploads/{upload_id}/delete"): USER,  # asks first (confirm=yes)
+    # T3-4: the answer to an upload of several files, a page of its own for an hour
+    ("GET", "/app/upload/{result_id}"): USER,
 }
 
 
@@ -174,8 +176,19 @@ def site(tmp_path):
             entry_id = session.scalar(select(CourseNotation.id))
         kept = upload(alice, pdf(12))  # over the page limit: kept for its owner to choose pages
         upload_id = kept.headers["location"].rsplit("/", 1)[-1]
+        several = alice.post(
+            "/jobs",
+            data={"csrf_token": csrf_from(alice.get("/app").text)},
+            files=[
+                ("pdf", ("a.pdf", pdf(1), "application/pdf")),
+                ("pdf", ("b.pdf", b"not a pdf", "application/pdf")),
+            ],
+        )
+        assert several.status_code == 303 and "/app/upload/" in several.headers["location"]
+        result_id = several.headers["location"].rsplit("/", 1)[-1]
         env.ids = {
             "upload_id": upload_id,
+            "result_id": result_id,
             "job_id": job_id,
             "course_id": course_id,
             "entry_id": entry_id,

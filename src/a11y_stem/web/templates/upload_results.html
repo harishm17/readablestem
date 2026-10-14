@@ -1,7 +1,8 @@
 {% extends "base.html" %}
 {# T3-4: the answer to an upload of several files: what was queued, and what was not, and
-   why. Shown instead of a redirect because the reasons name the files (document-derived
-   text never goes in the session cookie). #}
+   why. The POST redirects here (`GET /app/upload/{id}`, kept for an hour), so a refresh opens
+   this page again and does not upload the files again; the reasons name the files, which
+   is why they are stored server-side and not in the session cookie. #}
 {% block title %}{{ received }} of {{ total }} {{ "file" if total == 1 else "files" }} uploaded{% endblock %}
 {% block content %}
 <h1>{{ received }} of {{ total }} {{ "file" if total == 1 else "files" }} uploaded</h1>

@@ -16,7 +16,7 @@ import logging
 import re
 import time
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
 from functools import partial
 from typing import Annotated, Any
@@ -31,7 +31,16 @@ from sqlalchemy.orm import Session
 from a11y_stem.core.types import DocumentResult
 from a11y_stem.pipeline import export_canvas, export_cartridge, text_pass
 from a11y_stem.pipeline import language as languages
-from a11y_stem.web import documents, events, notation, office_convert, pending, retention, sample
+from a11y_stem.web import (
+    documents,
+    events,
+    notation,
+    office_convert,
+    pending,
+    retention,
+    sample,
+    upload_result,
+)
 from a11y_stem.web import feedback as feedback_questions
 from a11y_stem.web import job_page as page_rules
 from a11y_stem.web import retry as retry_rules
@@ -593,7 +602,7 @@ async def _take_upload(request: Request, ctx: AppContext, user: CurrentUser) -> 
     )
     if len(placed) == 1:
         return await _answer_one(request, user, placed[0], chosen, revises or "")
-    return await run_in_threadpool(_results_page, request, ctx, user, placed)
+    return await run_in_threadpool(_results_redirect, ctx, user, placed)
 
 
 def _place_files(
@@ -777,15 +786,28 @@ async def _answer_one(
     )
 
 
-def _results_page(
-    request: Request, ctx: AppContext, user: CurrentUser, placed: list[Placed]
-) -> Response:
-    """The answer to an upload of several files: what was queued, what waits for the
-    person to choose its pages, and what was refused and why. A page, not a redirect: the
-    reasons name the files, and file names never go in the session cookie."""
+def _results_redirect(ctx: AppContext, user: CurrentUser, placed: list[Placed]) -> Response:
+    """The answer to an upload of several files: the outcome of each is stored for a short
+    time (`web.upload_result`) and the person is sent to the page that shows it. A redirect
+    and not the page itself, so refreshing the page cannot upload the files again."""
     for item in placed:
         if item.code:
             log_event(logger, "upload_rejected", code=item.code)
+    with session_scope(ctx.factory) as session:
+        result_id = upload_result.store(session, user.id, [asdict(item) for item in placed])
+    return RedirectResponse(f"/app/upload/{result_id}", status_code=303)
+
+
+@router.get("/app/upload/{result_id}")
+def upload_results_page(request: Request, result_id: str, user: UserDep) -> Response:
+    """What became of the files of an upload of several: what was queued, what waits for the
+    person to choose its pages, and what was refused and why. Owner only, for an hour."""
+    ctx = get_ctx(request)
+    with session_scope(ctx.factory) as session:
+        items = upload_result.load(session, user.id, result_id)
+    if items is None:
+        raise PageError(404, *UPLOAD_RESULT_GONE)
+    placed = [Placed(**item) for item in items]
     queued = [i for i in placed if i.job_id]
     choose = [i for i in placed if i.pending_id]
     refused = [
@@ -797,13 +819,6 @@ def _results_page(
         for i in placed
         if i.code
     ]
-    status = 200
-    headers: dict[str, str] | None = None
-    if not queued and not choose:  # nothing came of it: the first reason's status
-        first = next(i for i in placed if i.code)
-        status = first.status
-        if first.retry_after:
-            headers = {"Retry-After": first.retry_after}
     context = {
         "queued": [{"id": i.job_id, "filename": i.filename, "pages": i.pages} for i in queued],
         "choose": [{"id": i.pending_id, "filename": i.filename, "pages": i.pages} for i in choose],
@@ -812,7 +827,13 @@ def _results_page(
         "total": len(placed),
         "active": "app",
     }
-    return render(request, "upload_results.html", context, status_code=status, headers=headers)
+    return render(request, "upload_results.html", context)
+
+
+UPLOAD_RESULT_GONE = (
+    "This answer is no longer kept",
+    "The answer to an upload is kept for an hour. Your documents are on My documents.",
+)
 
 
 def _office_to_pdf(ctx: AppContext, data: bytes, *, timeout_s: float | None = None) -> bytes:

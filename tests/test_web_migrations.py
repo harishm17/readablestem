@@ -234,6 +234,7 @@ FACTS_COLUMNS = {"open_decisions", "result_title"}
 STALE_REVISION = "c4a7e9b05d18"
 SAMPLE_REVISION = "b1d5f7a29c46"  # the last of the jobs migrations
 SIGN_IN_REVISION = "5e2b8d70a3c1"
+RESULTS_REVISION = "d3f8a1c5b920"  # the head: the answer to an upload of several files
 SIGN_IN_TABLES = {"linked_emails", "login_links"}
 
 
@@ -252,7 +253,9 @@ def test_the_job_page_migration_follows_the_content_one_and_is_the_head():
     assert STALE_REVISION in {r.revision for r in script.walk_revisions()}
     fallback = script.get_revision(SIGN_IN_REVISION)
     assert fallback is not None and fallback.down_revision == SAMPLE_REVISION
-    assert migration_heads() == {SIGN_IN_REVISION}  # one head, the newest
+    results = script.get_revision(RESULTS_REVISION)
+    assert results is not None and results.down_revision == SIGN_IN_REVISION
+    assert migration_heads() == {RESULTS_REVISION}  # one head, the newest
 
 
 def test_the_job_page_migration_keeps_jobs_and_maps_the_old_opt_in(tmp_path):
@@ -475,7 +478,7 @@ def test_the_stale_html_migration_downgrades_without_handing_out_an_old_file(tmp
 def test_the_sign_in_fallback_migration_downgrades_and_upgrades_again(tmp_path):
     url = f"sqlite:///{tmp_path}/fallback.db"
     upgrade(url)
-    migrate(url, SAMPLE_REVISION, down=True)
+    migrate(url, SAMPLE_REVISION, down=True)  # past the upload results table, too
     engine = create_engine(url)
     try:
         assert not set(inspect(engine).get_table_names()) & SIGN_IN_TABLES
@@ -485,6 +488,26 @@ def test_the_sign_in_fallback_migration_downgrades_and_upgrades_again(tmp_path):
     engine = create_engine(url)
     try:
         assert set(inspect(engine).get_table_names()) >= SIGN_IN_TABLES
+        with engine.connect() as conn:
+            assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
+    finally:
+        engine.dispose()
+
+
+def test_the_upload_results_migration_downgrades_and_upgrades_again(tmp_path):
+    url = f"sqlite:///{tmp_path}/results.db"
+    upgrade(url)
+    migrate(url, SIGN_IN_REVISION, down=True)
+    engine = create_engine(url)
+    try:
+        assert "upload_results" not in inspect(engine).get_table_names()
+        assert set(inspect(engine).get_table_names()) >= SIGN_IN_TABLES  # only the one step
+    finally:
+        engine.dispose()
+    upgrade(url)
+    engine = create_engine(url)
+    try:
+        assert "upload_results" in inspect(engine).get_table_names()
         with engine.connect() as conn:
             assert compare_metadata(MigrationContext.configure(conn), db.Base.metadata) == []
     finally:

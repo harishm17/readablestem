@@ -284,6 +284,22 @@ class PendingUpload(Base):
     retain_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
 
 
+class UploadResult(Base):
+    """What became of each file of an upload of several files (T3-4), kept for a short time
+    so the answer is a page that can be opened again (a redirect to
+    `GET /app/upload/{id}`) instead of a POST response a refresh would send again. Holds
+    file names, so it is document-derived: deleted at `retain_until`, with the person
+    (`ops.retention`). `items` is a list of objects (`web.upload_result`)."""
+
+    __tablename__ = "upload_results"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    items: Mapped[list] = mapped_column(JSON, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    retain_until: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)
+
+
 class ErrorAggregate(Base):
     """Daily counts by step and category. Written before deletion; never holds text."""
 

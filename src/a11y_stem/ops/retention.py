@@ -62,6 +62,7 @@ from a11y_stem.web.db import (
     QuotaDay,
     ReviewEdit,
     StepRecord,
+    UploadResult,
     User,
     session_scope,
 )
@@ -103,6 +104,7 @@ def purge_expired(
     with session_scope(factory) as session:
         stats.events_deleted = purge_old_events(session, now)
         stats.pending_deleted = purge_pending(session, now)
+        purge_upload_results(session, now)
     get_logger(__name__).info(
         "purge_done",
         source=source,
@@ -119,6 +121,12 @@ def purge_pending(session: Session, now: datetime) -> int:
     """Delete the large files kept for choosing their pages that are past their deletion
     time (`web.pending`), in the caller's transaction. Returns how many."""
     return _deleted(session.execute(delete(PendingUpload).where(PendingUpload.retain_until < now)))
+
+
+def purge_upload_results(session: Session, now: datetime) -> int:
+    """Delete the stored answers to uploads of several files (`web.upload_result`) that are
+    past their hour, in the caller's transaction. Returns how many."""
+    return _deleted(session.execute(delete(UploadResult).where(UploadResult.retain_until < now)))
 
 
 def purge_old_events(session: Session, now: datetime) -> int:
@@ -218,6 +226,7 @@ def erase_user(session: Session, user_id: str, now: datetime | None = None) -> P
     courses = select(Course.id).where(Course.user_id == user_id).scalar_subquery()
     session.execute(delete(ReviewEdit).where(ReviewEdit.user_id == user_id))
     session.execute(delete(PendingUpload).where(PendingUpload.user_id == user_id))
+    session.execute(delete(UploadResult).where(UploadResult.user_id == user_id))
     session.execute(delete(CourseNotation).where(CourseNotation.course_id.in_(courses)))
     session.execute(delete(Course).where(Course.user_id == user_id))
     session.execute(delete(Event).where(Event.user_id == user_id))
