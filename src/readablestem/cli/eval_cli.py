@@ -1040,12 +1040,13 @@ def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: b
     nothing is paid. The pictures are cut from the PDF again as a conversion cuts them
     (`pipeline.run.recrop`), the file is written by today's assembler from the stored result
     (`web.review.rerender_html`), the demo note goes in again (`note`), and the report keeps
-    its result with the checks of the new file. What the models answered stays the stored
-    answers; so does the pipeline version the result says it was converted by."""
+    its result with the checks of the new file. The headings are decided again with today's
+    heading step (no model: `pipeline.run.refresh_heading_fixes`). What the models answered
+    stays the stored answers; so does the pipeline version the result says it was converted by."""
     from readablestem.config import Settings
     from readablestem.core.types import DocumentResult
     from readablestem.eval import render
-    from readablestem.pipeline.run import recrop
+    from readablestem.pipeline.run import recrop, refresh_heading_fixes
     from readablestem.web.review import rerender_html
 
     raw = report_path.read_text(encoding="utf-8")
@@ -1053,6 +1054,7 @@ def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: b
     meta = report["demo"]
     result = DocumentResult.model_validate({**report["result"], "html": ""})
     pdf = pdf_path.read_bytes()
+    refreshed = refresh_heading_fixes(result)  # the heading step needs no model
     html = rerender_html(result, recrop(pdf, result.elements))
     if note:
         page = render.PageSource(
@@ -1076,7 +1078,15 @@ def rerender_demo(report_path: Path, pdf_path: Path, html_path: Path, *, note: b
     # The report keeps the stored result as it was written, down to its formatting; only the
     # checks of the file (`html_checks`) are those of the file just written.
     checks = [c.model_dump(mode="json") for c in result.html_checks]
-    if report["result"].get("html_checks") != checks:
+    if refreshed:
+        # Only the heading fixes and the review counts follow; every other entry is as stored.
+        stored = result.model_dump(mode="json", exclude={"html"})
+        report["result"]["fixes"] = [
+            new if old["kind"] == "heading" else old
+            for old, new in zip(report["result"]["fixes"], stored["fixes"], strict=True)
+        ]
+        report["result"]["stats"] = stored["stats"]
+    if refreshed or report["result"].get("html_checks") != checks:
         report["result"]["html_checks"] = checks
         indented = raw.startswith("{\n")
         text = json.dumps(

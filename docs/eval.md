@@ -590,7 +590,7 @@ replay with `--answers-offline` is free (the second check's answers excepted, se
 | equations (30) | exact_lenient 0.767, mean TEDS 0.867, proposals 30 of 30 | $0.098 ($0.0033 per equation, of which the Claude check $0.0010) |
 | figures (13) | judge pass 1.000, mean judge score 4.77 | $0.123 (figure step $0.050, Claude check $0.022, judge $0.052) |
 | document (43 PDF pages, 10 sections) | detection recall 1.000, precision 0.750, matched exact_lenient 0.767, axe violations 0 | $0.235 ($0.0055 per PDF page, check $0.0017) |
-| headings | precision 0.877, recall 1.000, F1 0.934, level accuracy 0.992 | no model |
+| headings | precision 0.877, recall 1.000, F1 0.934, level accuracy 0.992 (replaced 2026-10-14: F1 0.821, see "Doubled box headings") | no model |
 | tables (local) | 184 tables, flag recall 1.000, flag precision 0.223 | no model |
 
 Spend: $0.456 of the $6 cap. The pipeline's own model calls cost $0.069 (equations), $0.050
@@ -2087,6 +2087,50 @@ Sample sizes: 30 equations is 3.3 points per equation, and the 13 and 14 figures
 judge's ceiling (1.00), so figure quality moves only when the judge fails one, which makes the
 figure comparison weak on both sets. The dev-v2 equation set was chosen to hold failures (its
 exact rate is 0.53), so its rates are not course PDFs' rates.
+
+## Doubled box headings (2026-10-14): heading F1 0.934 to 0.821 on purpose
+
+OpenStax prints a box's label and its title as two lines ("Teacher Support" at 14 pt, then
+"Teacher Support" again at 12 pt). Both are headings in the PDF and in OpenStax's own markup,
+which is the gold: 50 of the 121 gold headings on the original set are these pairs. A
+screen-reader user who navigates by headings hears the same name twice in a row, seven times
+on the public demo (OpenStax Physics 2.3). The heading step (`heading_step.repeated_above`)
+now writes a heading whose text equals the heading directly above it, with nothing between
+them, as bold text, whatever its level. The same text with any element between the two copies,
+repeated-label groups, the same-level rule and the sentence rule are as before. T1-13 had
+narrowed the rule to the same level only, because the gold counts both lines and the broader
+rule lowered the score; the product decision (2026-10-14) is that the outline a student hears
+matters more than agreement with that quirk of the gold. No model is called by the headings
+task, so these are exact re-runs (`eval pipeline --task headings --fake`; the fake client is
+not used by this task).
+
+| Headings, original set (3 pages) | before | after |
+|---|---|---|
+| precision | 0.877 | 0.850 |
+| recall | 1.000 | 0.793 |
+| F1 | 0.934 | 0.821 |
+| level accuracy | 0.992 | 0.740 |
+| predicted / matched (gold 121) | 138 / 121 | 113 / 96 |
+| required decisions | 9 | 6 |
+| flag precision / recall | 0.556 / 0.778 | 0.833 / 0.333 |
+
+| Headings, dev-v2 dev part (28 pages) | before | after |
+|---|---|---|
+| precision / recall / F1 | 0.921 / 0.919 / 0.920 | the same |
+| level accuracy | 0.898 | 0.898 |
+| required decisions | 59 | 59 |
+
+Where the drop is: `recall_by_context` for the Teacher Support boxes (`os-teacher`) goes from
+1.00 to 0.50, every other context stays at 1.00. The 25 missed gold headings are the second
+copies of the pairs. The level accuracy drop is the 24 surviving "Teacher Support" lines that
+the scorer pairs with the gold's second copy (gold h4, relative level 2 below the page's top
+heading, against our h2). The dev-v2 dev part does not move: the rule changes none of its headings.
+The eleven-fold "Teacher Support" group decision on the demo's h3 lines also goes: the demo's
+required decisions fall from 3 to 2 (its stored result is decided again by
+`readablestem demo rerender`, no model). `data/eval/baseline-headings.json` and
+`latest-headings.json` were replaced with the new run on purpose (the gate compares them with
+each other, `heading_recall` and `heading_precision`); their model fields are those of the
+earlier run because the task calls no model. Nothing under `proof/` or `PROOF.md` changed.
 
 ## What the numbers do not show
 

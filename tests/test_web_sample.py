@@ -81,7 +81,8 @@ def test_the_sample_is_the_recorded_conversion_in_the_persons_list(web):
     assert job.cost_usd == 0 and job.model_calls == 0 and job.aggregated
     result = DocumentResult.model_validate(job.result_json)
     assert result.title == "2.3 Position vs. Time Graphs" and result.stats.pages == 13
-    assert job.open_decisions == 3  # the repeated headings: one decision per kind of repeat
+    # The repeated headings ("Solution", "Discussion"): one decision per kind of repeat.
+    assert job.open_decisions == 2
     assert job.html and "<html" in job.html and "Position vs. Time Graphs" in job.html
     with session_scope(web.ctx.factory) as session:
         kinds = dict(
@@ -206,11 +207,11 @@ def test_the_job_page_says_what_it_is_where_it_comes_from_and_offers_the_review(
     assert "Creative Commons Attribution License" in text and "OpenStax" in text
     assert "Paul Peter Urone, Roger Hinrichs" in text
     assert "https://openstax.org/books/physics/pages/2-3-position-vs-time-graphs" in page.text
-    assert "Review 3 decisions" in text
+    assert "Review 2 decisions" in text
     assert "Upload a revised version" not in text  # a sample is not revised
     # The review screen opens on the first decision, with the page image beside it.
     review = web.alice.get(f"/jobs/{job_id}/review")
-    assert review.status_code == 200 and "Decision 1 of 3" in text_of(review.text)
+    assert review.status_code == 200 and "Decision 1 of 2" in text_of(review.text)
     image = web.alice.get(f"/jobs/{job_id}/pages/1.png")
     assert image.status_code == 200 and image.content.startswith(b"\x89PNG")
 
@@ -218,7 +219,7 @@ def test_the_job_page_says_what_it_is_where_it_comes_from_and_offers_the_review(
 def test_it_can_be_decided_downloaded_and_deleted_like_any_document(web):
     job_id = open_sample(web.alice)
     listing = text_of(web.alice.get("/app").text)
-    assert "Sample" in listing and "3 decisions to make" in listing
+    assert "Sample" in listing and "2 decisions to make" in listing
     deleted = web.alice.post(
         f"/jobs/{job_id}/delete",
         data={"csrf_token": token(web.alice, "/app"), "confirm": "yes"},

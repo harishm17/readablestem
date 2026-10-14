@@ -5261,59 +5261,19 @@
       {
         "element_id": "p1-e6",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -5435,59 +5395,19 @@
       {
         "element_id": "p1-e15",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -8165,59 +8085,19 @@
       {
         "element_id": "p5-e1",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -8513,59 +8393,19 @@
       {
         "element_id": "p7-e1",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -9648,59 +9488,19 @@
       {
         "element_id": "p8-e15",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -10708,59 +10508,19 @@
       {
         "element_id": "p11-e1",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       },
       {
@@ -11588,59 +11348,19 @@
       {
         "element_id": "p13-e4",
         "kind": "heading",
-        "status": "needs_review",
-        "confidence": 0.6,
+        "status": "accepted",
+        "confidence": null,
         "equation": null,
         "figure": null,
-        "heading": {
-          "level": 3,
-          "text": "Teacher Support"
-        },
+        "heading": null,
         "table": null,
-        "checks": [
-          {
-            "name": "heading.outline",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.evidence",
-            "passed": false,
-            "severity": "warning",
-            "code": "heading.weak_evidence"
-          },
-          {
-            "name": "heading.all_caps",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.length",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.list_like",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          },
-          {
-            "name": "heading.sentence",
-            "passed": true,
-            "severity": "warning",
-            "code": null
-          }
-        ],
+        "checks": [],
         "calls": [],
-        "reason": null,
+        "reason": "repeats_heading_above",
         "reviewed": false,
-        "review": "required",
-        "group_key": "hg-p1-e6",
-        "group_size": 7,
+        "review": "none",
+        "group_key": null,
+        "group_size": null,
         "verifications": []
       }
     ],
@@ -11655,15 +11375,15 @@
         "figure": 7
       },
       "by_status": {
-        "accepted": 49,
-        "needs_review": 11
+        "accepted": 56,
+        "needs_review": 4
       },
       "by_review": {
-        "none": 42,
-        "required": 11,
-        "optional": 7
+        "none": 49,
+        "optional": 7,
+        "required": 4
       },
-      "required_decisions": 3,
+      "required_decisions": 2,
       "per_page": [
         {
           "page": 0,

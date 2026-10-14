@@ -1,5 +1,16 @@
 # Changelog
 
+## One heading for a doubled box title (2026-10-14)
+
+- OpenStax prints a box's label and its title as two lines ("Teacher Support" twice), and a
+  screen-reader user navigating by headings heard each twice. A heading with the same text as the
+  heading directly above it, at any level, is now written as bold text (it was only the same
+  level). The same text with content between the two copies stays a heading. The public demo and
+  the site examples were written again from their stored results with `readablestem demo rerender`
+  (no model call; it now decides the headings again too). Heading F1 on the development set goes
+  from 0.934 to 0.821 because the gold counts both lines; the CI baseline was replaced on purpose
+  (docs/eval.md, "Doubled box headings").
+
 ## Beta wording and repository link (2026-10-14)
 
 - The draft wording of the privacy, terms, known-limits, landing and Canvas help pages is the beta

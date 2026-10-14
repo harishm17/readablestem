@@ -92,12 +92,13 @@ _CLOSERS = "\"'\u2019\u201d)]"  # closing quotes and brackets after the final ma
 def heading_fixes(elements: list[Element]) -> list[Fix]:
     """One fix per heading element, in reading order, with a repaired outline.
 
-    A heading whose text and level are the same as the heading directly above it (nothing
-    between them) is not a second heading: it gets a fix that writes it as bold text
-    (`repeated_above`), and takes no part in the outline, the levels or the groups. The
-    same text one level down is a real sub-heading and stays one."""
-    all_headings = [e for e in elements if e.kind == Kind.HEADING]
-    repeats = repeated_above(elements, heading_levels(all_headings))
+    A heading whose text is the same as the heading directly above it (nothing between
+    them), at any level, is not a second heading: it gets a fix that writes it as bold
+    text (`repeated_above`), and takes no part in the outline, the levels or the groups.
+    OpenStax prints a box's label and its title as two lines ("Teacher Support" twice);
+    a screen-reader user who navigates by headings should hear it once. The same text
+    with content between the two copies is a real second heading and stays one."""
+    repeats = repeated_above(elements)
     headings = sorted(
         (e for e in elements if e.kind == Kind.HEADING and e.id not in repeats),
         key=lambda e: e.order,
@@ -111,26 +112,23 @@ def heading_fixes(elements: list[Element]) -> list[Fix]:
     return sorted([*fixes, *bold], key=lambda fix: order[fix.element_id])
 
 
-def repeated_above(elements: Sequence[Element], levels: dict[str, int]) -> set[str]:
+def repeated_above(elements: Sequence[Element]) -> set[str]:
     """Ids of the headings that repeat the heading directly above them.
 
     "Directly above" is the previous element in reading order (any page). The text is the
-    same after `label_key` (case, spacing and punctuation aside) and so is the level
-    (`levels`: layout's raw level of every heading, from font size and weight), so
-    "Teacher Support" at h2 over "Teacher Support" at h3 are two headings. A third copy
-    repeats the second, so a run of copies keeps only the first as a heading. A label
-    with no letters or digits ("-") never counts."""
+    same after `label_key` (case, spacing and punctuation aside); the level does not
+    matter, so "Teacher Support" at h2 over "Teacher Support" at h3 is one heading (T1-13
+    first required the same level too, because the development set's gold counts both
+    lines as headings; the student-facing outline won, see docs/eval.md 2026-10-14). A
+    third copy repeats the second, so a run of copies keeps only the first as a heading.
+    A label with no letters or digits ("-") never counts."""
     found: set[str] = set()
     ordered = sorted(elements, key=lambda e: e.order)
     for above, element in pairwise(ordered):
         if above.kind != Kind.HEADING or element.kind != Kind.HEADING:
             continue
         label = label_key(element.text or "")
-        if (
-            label
-            and label == label_key(above.text or "")
-            and levels[above.id] == levels[element.id]
-        ):
+        if label and label == label_key(above.text or ""):
             found.add(element.id)
     return found
 

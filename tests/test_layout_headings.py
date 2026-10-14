@@ -260,18 +260,63 @@ def test_a_heading_with_the_same_text_and_level_as_the_one_above_becomes_bold_te
     assert [fixes[f"p1-e{i}"].heading.level for i in (0, 1, 3, 6)] == [1, 2, 2, 2]
 
 
-def test_the_same_text_one_level_down_is_a_real_sub_heading():
-    """OpenStax sets "Teacher Support" as a box title and again, smaller, as its first
-    line: the book's own outline has both (h3 then h4), so both stay headings."""
+def test_the_same_text_one_level_down_directly_below_is_bold_text():
+    """OpenStax prints a box's label and its title as two lines ("Teacher Support" at
+    14 pt over 12 pt). The gold counts both as headings; the outline a student hears keeps
+    one (2026-10-14)."""
     elements = [
         large(0, "Motion", 18.0),
         large(1, "Teacher Support", 14.0),
         large(2, "Teacher Support", 12.0),
         heading(3, "Teacher Support", 11.0, REASON_BOLD_BODY),  # lower still
+        large(4, "Summary", 14.0),
     ]
     fixes = by_id(elements)
-    assert all(f.reason is None and f.heading is not None for f in fixes.values())
-    assert [f.heading.level for f in fixes.values()] == [1, 2, 3, 4]
+    assert [fixes[f"p1-e{i}"].heading is not None for i in range(5)] == [
+        True,
+        True,
+        False,
+        False,
+        True,
+    ]
+    for element_id in ("p1-e2", "p1-e3"):
+        assert fixes[element_id].reason == "repeats_heading_above", element_id
+        assert fixes[element_id].status is Status.ACCEPTED
+    assert [fixes[f"p1-e{i}"].heading.level for i in (0, 1, 4)] == [1, 2, 2]
+
+
+def test_adjacent_h2_then_h3_with_the_same_text_makes_the_second_bold_text():
+    elements = [
+        large(0, "Motion", 20.0),
+        large(1, "Teacher Support", 16.0),
+        large(2, "Teacher Support", 13.0),
+    ]
+    fixes = by_id(elements)
+    assert fixes["p1-e1"].heading is not None and fixes["p1-e1"].reason is None
+    assert fixes["p1-e2"].heading is None and fixes["p1-e2"].reason == "repeats_heading_above"
+
+
+def test_the_same_text_with_a_paragraph_between_keeps_both_headings():
+    elements = [
+        large(0, "Motion", 20.0),
+        large(1, "Teacher Support", 16.0),
+        heading(2, "Some text.", 11.0, kind=Kind.PARAGRAPH),
+        large(3, "Teacher Support", 13.0),
+    ]
+    fixes = heading_fixes(elements)
+    assert all(f.reason is None for f in fixes)
+    assert [f.heading.level for f in fixes if f.heading] == [1, 2, 3]
+
+
+def test_different_text_at_adjacent_levels_is_unchanged():
+    elements = [
+        large(0, "Motion", 20.0),
+        large(1, "Teacher Support", 16.0),
+        large(2, "Teacher Demonstration", 13.0),
+    ]
+    fixes = heading_fixes(elements)
+    assert all(f.reason is None and f.heading is not None for f in fixes)
+    assert [f.heading.level for f in fixes] == [1, 2, 3]
 
 
 def test_a_heading_with_other_text_between_two_copies_is_not_a_repeat():
