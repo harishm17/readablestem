@@ -301,3 +301,13 @@ def test_a_bar_with_words_on_its_line_but_none_near_it_is_left_alone():
 
     elements = prose_page(fill)
     assert any(e.text and "Words at the start" in e.text for e in elements)
+
+
+def test_a_row_with_a_glyph_of_size_zero_does_not_crash():
+    # Fuzzed PDFs carry glyphs whose size rounds to 0; a script-size comparison divided by it.
+    def fill(page):
+        page.insert_text((72, 140), "Normal words here", fontsize=BODY)
+        page.insert_text((200, 140), "x", fontsize=0.1)
+
+    elements = prose_page(fill)
+    assert any(e.text and "Normal words here" in e.text for e in elements)

@@ -1055,7 +1055,7 @@ class _Row:
         scripts of anything."""
         counts = Counter(round(c.size * 2) / 2 for c in self.plain)
         size = max(counts.items(), key=lambda kv: (kv[1], kv[0]))[0]
-        larger = [s for s in counts if SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
+        larger = [s for s in counts if s > 0 and SCRIPT_MIN_RATIO <= size / s <= SCRIPT_RATIO]
         if not larger:
             return size
         big = max(larger, key=lambda s: (counts[s], s))
